@@ -1,0 +1,9 @@
+runs/
+artifacts/
+logs/
+__pycache__/
+*.pyc
+.venv/
+wandb/
+*.npz
+*.pt

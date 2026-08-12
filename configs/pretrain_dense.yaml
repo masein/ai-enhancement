@@ -1,0 +1,33 @@
+# Dense baseline. Run:  python -m aienh train --config configs/pretrain_dense.yaml
+#
+# Every number here is a decision. The comments say why, because six weeks from now
+# "why is lr 3e-3?" will be a real question and "it was in the file" is not an answer.
+model:
+  n_layer: 4
+  n_head: 6
+  n_embd: 192        # must be divisible by n_head
+  block_size: 64     # context length; also caps eval item length
+  norm: rms          # what Llama/Qwen use; layer = GPT-2 style
+  pos: rope          # rotary; "learned" for GPT-2-style absolute positions
+  tie_weights: true
+
+train:
+  corpus:            # a mixture is a first-class hyperparameter, not plumbing
+    arithmetic: 0.7
+    stories: 0.2
+    code: 0.1
+  n_docs: 20000
+  tokenizer: char    # "bpe" for byte-level BPE (fewer, longer tokens)
+  block_size: 64
+  steps: 800
+  micro_batch_size: 48
+  grad_accum: 1      # effective batch = micro_batch_size * grad_accum
+  lr: 3.0e-3         # high because the model is tiny; scale down as width grows
+  warmup_frac: 0.05
+  min_lr_ratio: 0.1
+  weight_decay: 0.1  # applied to matrices only, never to norms/biases
+  beta2: 0.95        # 0.95 not 0.999: LLM gradients are noisier than vision's
+  grad_clip: 1.0
+  eval_every: 100
+  log_every: 50
+  seed: 1337

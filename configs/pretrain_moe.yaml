@@ -1,0 +1,33 @@
+# MoE, matched to configs/pretrain_dense.yaml in depth, width and step count so the
+# only difference is the feed-forward block. That is the honest comparison:
+# more total parameters, near-identical FLOPs per token.
+#
+# Run:  python -m aienh train --moe --config configs/pretrain_moe.yaml
+model:
+  n_layer: 4
+  n_head: 6
+  n_embd: 192
+  block_size: 64
+  moe: true
+  n_experts: 8
+  top_k: 2                  # experts per token; 2 is the common choice
+  n_shared_experts: 0       # DeepSeek-style always-on expert; ADDS FLOPs on top of
+                            # the routed budget, so 0 keeps this FLOP-matched to
+                            # configs/pretrain_dense.yaml. Try 1 and compare.
+  aux_loss_coef: 0.01       # load balancing. 0 => the router collapses
+  router_z_loss_coef: 0.001 # keeps router logits small / softmax numerically sane
+  moe_every: 1              # MoE in every block; 2 = alternate dense/MoE layers
+
+train:
+  corpus:
+    arithmetic: 0.7
+    stories: 0.2
+    code: 0.1
+  n_docs: 20000
+  block_size: 64
+  steps: 800
+  micro_batch_size: 48
+  lr: 3.0e-3
+  eval_every: 100
+  log_every: 50
+  seed: 1337
