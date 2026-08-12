@@ -139,6 +139,23 @@ also has three properties real benchmarks want and rarely all have:
   can see an eval problem. That is decontamination by construction rather than
   measured after the fact — which is what you would want at real scale and rarely get.
 
+## What one 15-minute run actually shows
+
+`python -m aienh pipeline --scale small`, measured on the held-out problem split:
+
+| run | points | `arith_exact` | `ppl_stories` | note |
+|---|---|---|---|---|
+| pretrain, dense | 36.67 | 0.005 | 1.25 | 1.79M params |
+| pretrain, MoE | 37.77 | 0.005 | 1.23 | 2.98× total params, **1.00× active/token** |
+| + SFT | 48.43 | **0.365** | **78.32** | target task 73× better, general LM 63× worse |
+| + GRPO | 44.13 | 0.270 | 47.48 | RL made it worse — see `docs/07` |
+| distilled student | 31.17 | 0.180 | — | 231K params, 13% of the teacher |
+
+Three things in that table are the point of the whole repo: the MoE row is a genuinely
+FLOP-matched comparison (same active parameters per token, 3× the total), the SFT row
+shows catastrophic forgetting that only an unrelated metric in the suite could catch,
+and the GRPO row is a real negative result that the harness diagnoses rather than hides.
+
 ## What this repo is honest about
 
 - The corpora are generated, not real text. The pipeline stages are real; the data is

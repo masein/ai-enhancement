@@ -252,7 +252,7 @@ def svg_lines(series: list[dict], width: int = 660, height: int = 260,
         y1 = y0 + 1
     pad = (y1 - y0) * 0.1
     y0, y1 = max(0, y0 - pad), y1 + pad
-    L, R, T, B = 52, 108, 12, 30
+    L, R, T, B = 52, 108, 24, 30
     pw, ph = width - L - R, height - T - B
 
     def px(x): return L + pw * (x - x0) / max(1e-9, x1 - x0)
@@ -274,7 +274,7 @@ def svg_lines(series: list[dict], width: int = 660, height: int = 260,
                    f'fill="var(--muted)" text-anchor="middle">{fmt(t, 0)}</text>')
     out.append(f'<line x1="{L}" y1="{T + ph}" x2="{L + pw}" y2="{T + ph}" '
                f'stroke="var(--axis)" stroke-width="1"/>')
-    out.append(f'<text x="{L - 8}" y="{T - 2}" font-size="10" fill="var(--muted)" '
+    out.append(f'<text x="{L - 8}" y="10" font-size="10" fill="var(--muted)" '
                f'text-anchor="end">{esc(y_label)}</text>')
     out.append(f'<text x="{L + pw}" y="{height - 10}" font-size="10" fill="var(--muted)" '
                f'text-anchor="end">{esc(x_label)}</text>')
@@ -354,12 +354,17 @@ def _suite_view(suite: str, rows: list[dict], runs_dir: Path) -> str:
         f'<p class="sub">{esc(best["name"])} &middot; {esc(best.get("kind"))}'
         f'{" &middot; from " + esc(best["parent"]) if best.get("parent") else ""}</p></div>'
         '</div></div>')
+    # A zero here means "not recorded", not "no tokens" — post-training stages count
+    # examples and iterations, not tokens. Printing 0 would be a lie of omission.
+    tok_note = ('' if total_tokens
+                else '<div class="small">not recorded for post-training stages</div>')
     parts.append(
         '<div class="tiles">'
         f'<div class="tile"><div class="label">Runs on this suite</div>'
         f'<div class="value">{len(rows)}</div></div>'
         f'<div class="tile"><div class="label">Tokens trained (total)</div>'
-        f'<div class="value">{human(total_tokens)}</div></div>'
+        f'<div class="value">{human(total_tokens) if total_tokens else "&mdash;"}</div>'
+        f'{tok_note}</div>'
         f'<div class="tile"><div class="label">Compute (wall clock)</div>'
         f'<div class="value">{total_wall / 60:.1f}<span style="font-size:14px"> min</span></div></div>'
         f'<div class="tile"><div class="label">Largest model</div>'

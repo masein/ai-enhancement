@@ -144,20 +144,42 @@ Doc 08 covers soft vs hard labels and the offline/online/on-policy distinction.
 
 ---
 
-## Two results from this repo, both worth internalising
+## Three results from this repo, all worth internalising
 
-Both measured on the arithmetic task with a 1.8M-parameter model, so treat the
+All measured on the arithmetic task with a 1.8M-parameter model, so treat the
 magnitudes as illustrative and the *directions* as the lesson.
 
 **1. SFT concentrates the training signal, and that is worth a lot.** The base model
 trained on packed `a + b = c` documents spends most of its loss on the operand
 tokens, which are random by construction and therefore unlearnable. SFT with a
-response-only mask puts every gradient on the tokens you care about. Measured:
-exact-match went from ~5% (base) to ~99% (SFT, 12 epochs) on problems the model had
-seen. Same architecture, same data distribution — only the loss mask and the epoch
-count changed.
+response-only mask puts every gradient on the tokens you care about. Measured on the
+held-out problem split, one 15-minute pipeline run: exact-match **0.005 → 0.365**, a
+73× improvement from 448 SFT steps. Same architecture, same data distribution — only
+the loss mask and the epoch count changed.
 
-**2. The GRPO stage in this repo does not improve held-out accuracy — in four
+**2. That improvement came with catastrophic forgetting, and the suite caught it.**
+The same run, same eval suite:
+
+| stage | `arith_exact` (the target) | `ppl_stories` (unrelated) | `ppl_arithmetic` |
+|---|---|---|---|
+| pretrained | 0.005 | **1.25** | 2.84 |
+| after SFT | **0.365** | **78.32** | 24.66 |
+| after GRPO | 0.270 | 47.48 | 36.19 |
+
+General language modelling got **63× worse** while the target task got 73× better.
+That is the alignment tax, in a form you can watch happen on a laptop, and it is why
+doc 05 tells you to keep an unrelated-capability metric in the suite. Note the
+mechanism: the SFT data is `Q: … A: <number>` only, so 448 steps at lr 8e-4 pull the
+whole model toward emitting numbers. Real post-training mitigates this by mixing
+general pretraining data into the SFT mixture, using a lower learning rate, and
+running fewer epochs — all three are dials you can turn in `configs/sft.yaml` and
+measure.
+
+**The general point for your job:** an eval suite containing only the thing you are
+optimising cannot tell you what you broke. `ppl_stories` costs almost nothing to run
+and is the reason this regression is a number rather than a surprise in production.
+
+**3. The GRPO stage in this repo does not improve held-out accuracy — in four
 different configurations.** Starting points from 8.5% to 98.5% exact-match, learning
 rates from 3e-5 to 2e-4, 100 to 400 iterations: flat or worse every time. The full
 table and the diagnosis are in [doc 07](07-grpo.md#what-actually-happened-when-i-ran-it--the-honest-result).
