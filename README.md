@@ -21,6 +21,9 @@ corpus is generated rather than downloaded, so the whole repo works offline.
 
 ---
 
+**New here? Follow [`START-HERE.md`](START-HERE.md)** — a verified, ordered list of
+commands with what to look for in each output.
+
 ## Setup
 
 ```bash
@@ -90,7 +93,8 @@ python -m aienh eval       runs/<run>/model.pt --tasks arith_exact,arith_mc4 --t
 python -m aienh pipeline   --scale small
 python -m aienh dashboard
 python -m aienh leaderboard
-python -m aienh sample     runs/<run>/model.pt --prompt "Q: 17 + 25 =" --greedy
+python -m aienh sample     runs/<sft-run>/model.pt --greedy \
+                           --prompt "$(printf 'Q: 17 + 25 =\nA:')"   # the SFT template, exactly
 ```
 
 Any config value can be overridden inline, flat or qualified — and an unknown key is
