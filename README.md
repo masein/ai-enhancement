@@ -118,6 +118,18 @@ python scripts/sweep_local.py              # a hyperparameter sweep, no account 
 python scripts/wandb_example.py            # the five W&B calls that matter
 ```
 
+## Benchmarking real models on a GPU server
+
+Separate from the toy pipeline: download real open models, run MMLU / HellaSwag
+through lm-evaluation-harness, and produce a shareable HTML report with standard
+errors and significance testing. See [`docs/14`](docs/14-benchmarking-real-models.md).
+
+```bash
+./scripts/run_benchmarks.sh smoke      # 20 items/task, validates the plumbing
+./scripts/run_benchmarks.sh full       # the real run, hours
+python scripts/report_lm_eval.py results -o artifacts/benchmark_report.html --csv artifacts/benchmark.csv
+```
+
 ## Experiment tracking
 
 W&B if you are logged in, local JSONL otherwise — same call sites either way:
