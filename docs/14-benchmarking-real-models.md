@@ -258,6 +258,40 @@ hf download <model-id> --quiet && echo OK
 
 ---
 
+## Working on a busy card: the script runs what fits
+
+Each model in `run_benchmarks.sh` carries an estimated VRAM cost. On every launch the
+script reads free memory, runs the models that fit, and **lists the ones it skipped
+and why**. It also skips models it has already finished.
+
+The consequence is that you run *the same command* whenever you like:
+
+```bash
+./scripts/run_benchmarks.sh full      # 3 GB free  -> does 270M and 0.6B
+# ... colleague's job finishes ...
+./scripts/run_benchmarks.sh full      # 30 GB free -> does 1B, 1.7B, 3B, 4B, 8B
+                                      #                and skips the three already done
+```
+
+No editing, no bookkeeping, and results accumulate in one directory so the report
+covers everything you have measured so far.
+
+Two defaults are set for sharing rather than speed, and you should flip them once you
+have the card to yourself:
+
+- **`BACKEND=hf`, not vLLM.** vLLM grabs a large KV-cache block up front, which is
+  antisocial mid-training and fragile in a 3 GB slice. It is much faster on big models
+  — switch with `BACKEND=vllm` when you have room.
+- **`BATCH=8`, a fixed number, not `auto`.** Auto-batching probes upward until
+  something fails, and on a shared card the thing that fails can be your colleague's
+  job. Raise it (`BATCH=32`) when the card is yours.
+
+It also re-checks free memory before *each* model, so if the neighbouring job grows
+mid-run, the next model is skipped instead of crashing. A model that fails for any
+other reason is logged and the batch continues — you keep the results you did get.
+
+---
+
 ## Step 4 — the smoke run (do this first, always)
 
 ```bash
