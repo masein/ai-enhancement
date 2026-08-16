@@ -46,6 +46,7 @@ activations and the KV cache):
 |---|---|---|
 | 16 GB | ~7B | 4B is comfortable; 8B is tight |
 | 24 GB | ~13B | Everything in this guide fits easily |
+| 32 GB (RTX 5090) | ~14B | Comfortable for everything here — **if the card is free** |
 | 40–48 GB | ~24B | vLLM really pays off here |
 | 80 GB | ~35B dense, or a 35B-A3B MoE | Room to run several models without reloading |
 | 2× 80 GB | ~70B | Set `TP=2` in the run script |
@@ -65,6 +66,59 @@ nproc                      # CPU count, affects dataset preprocessing speed
 tmux new -s bench          # later: tmux attach -t bench
 ```
 
+### If the GPU is shared — read the Processes table
+
+The bottom half of `nvidia-smi` is the part people skip, and on a shared box it is
+the part that decides whether you can work at all:
+
+```
+|    0   N/A  N/A   3537376      C   VLLM::EngineCore              13238MiB |
+|    0   N/A  N/A   3635598      C   ...conda3/envs/olmo/bin/python3  16132MiB |
+```
+
+Type `C` means *compute* — a real job. `G` means graphics (an X server, a few MiB,
+ignore it). Add the `C` rows up and subtract from total: that is what is genuinely
+taken. Then:
+
+```bash
+# who owns those processes, and how long have they been running?
+ps -o user:16,pid,etime,cmd -p 3537376,3635598
+
+# free memory in one line
+nvidia-smi --query-gpu=memory.free,memory.total,utilization.gpu --format=csv
+
+# watch until it frees up
+watch -n 30 'nvidia-smi --query-gpu=memory.free,utilization.gpu --format=csv,noheader'
+```
+
+**Two rules on a shared card.** First, `gpu_memory_utilization` in vLLM is a fraction
+of **total** GPU memory, not free memory — set it to 0.85 while a colleague holds
+29 GB and you either fail to start or start a fight over the same memory. Derive it
+from what is actually free: `gpu_memory_utilization ≈ (free_MiB × 0.88) / total_MiB`.
+`run_benchmarks.sh` does this automatically in its preflight.
+
+Second, **talk to whoever owns the other process before you launch.** An OOM in your
+eval costs you an hour. An OOM in their training run costs them a day, and it will be
+your fault. The script refuses to start below `MIN_FREE_MIB` (default 10 GiB) for
+exactly this reason, and `./scripts/run_benchmarks.sh full --wait` will block and
+poll until the card frees up so you can queue behind them politely.
+
+### Put the model cache on a big volume, before the first download
+
+`df -h` usually shows a small root filesystem and a large data volume. HuggingFace
+caches to `~/.cache/huggingface` by default, and a handful of models is tens of GB.
+Point it somewhere with room, **before** you download anything:
+
+```bash
+export HF_HOME=/big/volume/$USER/hf-cache     # put this in ~/.bashrc
+mkdir -p "$HF_HOME"
+df -h "$HF_HOME"
+```
+
+Pick the volume with the most free space that you can actually write to — test with
+`touch "$HF_HOME/.probe" && rm "$HF_HOME/.probe"`. Filling the root filesystem on a
+shared machine breaks everyone's jobs, not just yours.
+
 ---
 
 ## Step 1 — environment
@@ -73,28 +127,69 @@ tmux new -s bench          # later: tmux attach -t bench
 mkdir -p ~/benchmarks && cd ~/benchmarks
 python3 -m venv .venv && source .venv/bin/activate
 pip install --upgrade pip
+```
 
-# PyTorch first, matched to your CUDA version (cu124 for CUDA 12.4+)
-pip install torch --index-url https://download.pytorch.org/whl/cu124
+### Pick the PyTorch build by GPU ARCHITECTURE, not just driver version
 
-# the harness, with the vLLM backend
+This is where RTX 50-series (Blackwell) trips everyone up. Blackwell consumer cards
+report compute capability **sm_120**, and PyTorch wheels built for CUDA 12.6 or
+earlier contain **no kernels for sm_120**. They install cleanly, `torch.cuda` reports
+the GPU correctly, and then the first real operation dies with:
+
+```
+CUDA error: no kernel image is available for execution on the device
+```
+
+You need a **CUDA 12.8 or newer** build:
+
+```bash
+# RTX 50-series / Blackwell (sm_120) — REQUIRED
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+
+# Ampere / Ada (RTX 30xx, 40xx, A100, L40S) — cu126 or cu128 both fine
+# Hopper (H100) — cu126 or newer
+```
+
+Your *driver's* CUDA version (the number `nvidia-smi` prints top-right) only needs to
+be ≥ the wheel's. It is not the thing to match on. A driver reporting CUDA 13.2 will
+happily run a cu128 build; it will not rescue a cu124 build on a Blackwell card.
+
+Then the harness:
+
+```bash
 pip install "lm_eval[vllm]"
 ```
 
-If the `[vllm]` extra fails, install them separately — `pip install lm_eval vllm` —
-and if vLLM won't build against your driver, fall back to `BACKEND=hf` later. The HF
-backend is slower but has no extra requirements.
+If `[vllm]` fails, install separately (`pip install lm_eval vllm`). vLLM has had a
+long tail of Blackwell issues — if it errors on sm_120, use `BACKEND=hf`, which is
+slower but has no kernel requirements beyond PyTorch's.
 
-Verify:
+### Verify with a real operation, not `is_available()`
 
 ```bash
-python -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.device_count())"
+python - <<'EOF'
+import torch
+print("torch", torch.__version__, "built for CUDA", torch.version.cuda)
+print("device:", torch.cuda.get_device_name(0))
+print("compute capability:", torch.cuda.get_device_capability(0))   # (12, 0) on a 5090
+x = torch.randn(2048, 2048, device="cuda", dtype=torch.bfloat16)
+torch.cuda.synchronize()
+print("bf16 matmul OK:", float((x @ x).float().mean()))
+EOF
+```
+
+**`torch.cuda.is_available()` returns True even when no kernels match your
+architecture.** That is exactly why the wrong wheel is so confusing: every check
+passes until you do arithmetic. The matmul above is the check that actually fails.
+
+Finally confirm the task names:
+
+```bash
 lm_eval --tasks list | grep -iE '^\s*(mmlu|hellaswag|arc_|winogrande|piqa|gsm8k|truthfulqa)' | head -30
 ```
 
-That second command is not optional ceremony — **task names move between harness
-versions**, and it takes two seconds to confirm the ones you're about to depend on
-actually exist in your install.
+Not optional ceremony — **task names move between harness versions**, and it takes
+two seconds to confirm the ones you are about to depend on exist in your install.
 
 ---
 

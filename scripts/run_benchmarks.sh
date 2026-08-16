@@ -13,12 +13,69 @@
 
 set -euo pipefail
 
+# ---------------------------------------------------------------------------
+# preflight: this is a SHARED GPU
+# ---------------------------------------------------------------------------
+# Two other jobs can be holding most of the card. Starting a run that OOMs wastes
+# your time; starting one that succeeds by squeezing the card can OOM someone
+# else's training run, which is worse. So: check first, refuse if it is tight, and
+# size our own allocation from FREE memory rather than total.
+preflight_gpu() {
+  command -v nvidia-smi >/dev/null || { echo "no nvidia-smi — is this the right box?"; exit 1; }
+  local free total used util
+  free=$(nvidia-smi --query-gpu=memory.free  --format=csv,noheader,nounits | head -1)
+  total=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1)
+  used=$(( total - free ))
+  util=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | head -1)
+
+  echo "GPU: ${free} MiB free of ${total} MiB   (${used} MiB in use by others, ${util}% busy)"
+  if [[ -n "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader)" ]]; then
+    echo "Other compute processes on this GPU right now:"
+    nvidia-smi --query-compute-apps=pid,used_memory --format=csv,noheader | sed 's/^/    /'
+    ps -o user:16,pid,etime,comm --no-headers \
+       -p "$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | paste -sd, -)" \
+       2>/dev/null | sed 's/^/    /' || true
+  fi
+
+  if (( free < MIN_FREE_MIB )); then
+    echo
+    echo "REFUSING TO START: only ${free} MiB free, need at least ${MIN_FREE_MIB} MiB."
+    echo "  - wait for the other job, or"
+    echo "  - lower MIN_FREE_MIB and pick smaller models, or"
+    echo "  - run:  ./scripts/run_benchmarks.sh $MODE --wait   to block until the card frees up"
+    exit 1
+  fi
+
+  # vLLM's gpu_memory_utilization is a fraction of TOTAL memory, so on a shared card
+  # you must derive it from what is actually free or vLLM will try to take memory
+  # that belongs to someone else.
+  GPU_UTIL=$(python3 -c "print(min(0.90, round(($free * 0.88) / $total, 2)))")
+  echo "Sizing vLLM to gpu_memory_utilization=$GPU_UTIL (derived from free memory)"
+  echo
+}
+
+wait_for_gpu() {
+  echo "Waiting for ${MIN_FREE_MIB} MiB to free up (Ctrl-C to give up)..."
+  while true; do
+    local free
+    free=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | head -1)
+    (( free >= MIN_FREE_MIB )) && { echo "GPU free: ${free} MiB. Starting."; return; }
+    printf "\r  %s  free=%s MiB  (need %s)   " "$(date +%H:%M:%S)" "$free" "$MIN_FREE_MIB"
+    sleep 60
+  done
+}
+
 MODE="${1:-smoke}"
 OUT="results"
 LOGS="logs"
 SEED=1234
 
 mkdir -p "$OUT" "$LOGS"
+
+# Model weights go wherever HF_HOME points. On a shared box the root filesystem is
+# usually small — set this to a big volume BEFORE the first download or you will
+# fill / and annoy everyone.
+echo "HF cache: ${HF_HOME:-$HOME/.cache/huggingface}   ($(df -h "${HF_HOME:-$HOME/.cache/huggingface}" 2>/dev/null | awk 'NR==2{print $4}' || echo '?') free)"
 
 # ---------------------------------------------------------------------------
 # what to run
@@ -49,8 +106,17 @@ TASK_ORDER=(mmlu hellaswag arc_challenge winogrande piqa)
 # vLLM is 5-10x faster than the HF backend for this. Set BACKEND=hf if vLLM is not
 # installed or misbehaves on your driver version.
 BACKEND="${BACKEND:-vllm}"
-GPU_UTIL="${GPU_UTIL:-0.85}"
 TP="${TP:-1}"                     # tensor_parallel_size — set to your GPU count
+
+# Minimum free VRAM before we are willing to start, in MiB. 10 GiB comfortably fits
+# a 4B model in bf16 (8 GB weights) plus a small KV cache. Raise it for bigger models:
+# roughly 2 GB per billion parameters, plus 2-4 GB of headroom.
+MIN_FREE_MIB="${MIN_FREE_MIB:-10000}"
+GPU_UTIL=""                       # computed by preflight_gpu from FREE memory
+
+[[ "${2:-}" == "--wait" ]] && WAIT_FOR_GPU=1 || WAIT_FOR_GPU=0
+[[ "$WAIT_FOR_GPU" == "1" ]] && wait_for_gpu
+preflight_gpu
 
 if [[ "$MODE" == "smoke" ]]; then
   LIMIT_ARG="--limit 20"
