@@ -18,6 +18,7 @@ vocabulary, and the three things to internalise before your first team meeting.
 | 10 | [experiment-tracking-wandb](10-experiment-tracking-wandb.md) | W&B, sweeps, artifacts, team conventions | `tracking.py` |
 | 11 | [the-pipeline-you-will-build](11-the-pipeline-you-will-build.md) | The design of your actual deliverable, and week-one questions | `pipeline.py` |
 | 12 | [reading-list](12-reading-list.md) | The papers, ordered, with what to take from each | — |
+| 13 | [review-of-team-doc](13-review-of-team-doc.md) | Notes on your colleague's `training_LLM.md`: what to trust, what to fix, what it doesn't cover | — |
 
 ## If you have one evening
 
