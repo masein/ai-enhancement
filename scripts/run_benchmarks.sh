@@ -67,10 +67,26 @@ MODELS=(
   # "Qwen/Qwen3-4B-Instruct-2507|instruct|10"
 )
 
-# Few-shot counts pinned per task — the Open LLM Leaderboard v1 conventions, which
-# is what makes your numbers comparable to published ones. Change them here, once,
-# and re-run everything if you change them at all.
-declare -A NFEWSHOT=([mmlu]=5 [hellaswag]=10 [arc_challenge]=25 [winogrande]=5 [piqa]=0)
+# Few-shot counts, passed EXPLICITLY per task (lm-eval's --num_fewshot is global, so
+# each task gets its own invocation — cheap here because the models are tiny).
+#
+# These are lower than the Open LLM Leaderboard v1 conventions (MMLU 5, HellaSwag 10,
+# ARC-C 25) on purpose. Pythia's context window is 2048 tokens, and a 25-shot
+# ARC-Challenge prompt does not fit in it. A prompt that gets silently truncated is a
+# different question from the one everyone else asked, so the choice is:
+#
+#   (a) use the leaderboard counts and let short-context models truncate — numbers
+#       comparable to published ones for some models and quietly wrong for others, or
+#   (b) use counts that fit EVERY model in the comparison — internally consistent,
+#       not directly comparable to published leaderboards.
+#
+# For a scaling study (b) is the right call: the whole point is comparing models to
+# each other. Say which you used. Set LEADERBOARD_SHOTS=1 to switch to (a).
+if [[ "${LEADERBOARD_SHOTS:-0}" == "1" ]]; then
+  declare -A NFEWSHOT=([mmlu]=5 [hellaswag]=10 [arc_challenge]=25 [winogrande]=5 [piqa]=0)
+else
+  declare -A NFEWSHOT=([mmlu]=5 [hellaswag]=5 [arc_challenge]=5 [winogrande]=5 [piqa]=0)
+fi
 TASK_ORDER=(${TASKS_OVERRIDE:-mmlu hellaswag arc_challenge winogrande piqa})
 
 # ---------------------------------------------------------------------------
@@ -208,28 +224,47 @@ for entry in "${RUNNABLE[@]}"; do
   fi
 
   START=$(date +%s)
-  set +e
-  lm_eval \
-    --model "$BACKEND" \
-    --model_args "$MODEL_ARGS" \
-    --tasks "$TASKS" \
-    --batch_size "$BATCH" \
-    --seed "$SEED" \
-    --output_path "$OUT/$SAFE" \
-    --log_samples \
-    $CHAT_ARG $DEVICE_ARG $LIMIT_ARG \
-    2>&1 | tee "$LOGS/${SAFE}_${MODE}.log"
-  STATUS=${PIPESTATUS[0]}
-  set -e
+  MODEL_FAILED=0
+  for TASK in "${TASK_ORDER[@]}"; do
+    SHOTS="${NFEWSHOT[$TASK]:-0}"
+    TASK_OUT="$OUT/$SAFE/${TASK}_${SHOTS}shot"
+    if compgen -G "$TASK_OUT/**/results*.json" > /dev/null 2>&1; then
+      echo "  skip  $TASK (${SHOTS}-shot) — already done"
+      continue
+    fi
+    printf '  %-14s %d-shot ... ' "$TASK" "$SHOTS"
+    T0=$(date +%s)
+    set +e
+    lm_eval \
+      --model "$BACKEND" \
+      --model_args "$MODEL_ARGS" \
+      --tasks "$TASK" \
+      --num_fewshot "$SHOTS" \
+      --batch_size "$BATCH" \
+      --seed "$SEED" \
+      --output_path "$TASK_OUT" \
+      --log_samples \
+      $CHAT_ARG $DEVICE_ARG $LIMIT_ARG \
+      >> "$LOGS/${SAFE}_${MODE}.log" 2>&1
+    STATUS=$?
+    set -e
+    if (( STATUS != 0 )); then
+      echo "FAILED (exit $STATUS)"
+      grep -iE 'out of memory|no kernel image|CUDA error|401 Client|GatedRepo|does not appear to have' \
+        "$LOGS/${SAFE}_${MODE}.log" | tail -2 | sed 's/^/        /' || true
+      MODEL_FAILED=1
+      # A task that OOMs will OOM again for this model; move to the next model.
+      grep -qi 'out of memory' "$LOGS/${SAFE}_${MODE}.log" && break
+    else
+      echo "$(( $(date +%s) - T0 ))s"
+    fi
+  done
 
-  if (( STATUS != 0 )); then
-    # One model failing must not kill the batch — you want the other results.
-    echo "FAIL  $MODEL (exit $STATUS). See $LOGS/${SAFE}_${MODE}.log"
-    grep -iE 'out of memory|no kernel image|CUDA error' "$LOGS/${SAFE}_${MODE}.log" | tail -3 || true
-    echo
-    continue
+  if (( MODEL_FAILED )); then
+    echo "PARTIAL  $MODEL — see $LOGS/${SAFE}_${MODE}.log"
+  else
+    echo "DONE     $MODEL in $(( ($(date +%s) - START) / 60 )) min"
   fi
-  echo "DONE  $MODEL in $(( ($(date +%s) - START) / 60 )) min"
   echo
 done
 
