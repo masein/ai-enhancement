@@ -27,11 +27,18 @@ LOGS="${LOGS:-logs}"
 SEED="${SEED:-1234}"
 
 # ---------------------------------------------------------------------------
-# what to run —  "hf_id | base|instruct | approx GB of VRAM needed"
+# what to run —  "hf_id | base|instruct | approx GB of VRAM needed | batch"
 # ---------------------------------------------------------------------------
-# The GB figure is weights in bf16 (2 bytes/param) plus a rough allowance for
-# activations and the KV cache. It only has to be good enough to sort models into
-# "fits" and "doesn't"; the script prints what it skipped either way.
+# THE GB FIGURE IS NOT ABOUT THE WEIGHTS. For loglikelihood evals the logits
+# tensor dominates on modern vocabularies:
+#
+#     memory ≈ batch × seq_len × vocab × 4 bytes × ~2.5 (softmax copies)
+#
+# Measured on this very card: gemma-3-270m — a 0.27B model whose weights are
+# 0.6 GB — tried to allocate 11.64 GiB on 5-shot MMLU at batch 8, because its
+# vocab is 262K and 8 × ~1400 tokens × 262144 × 4B is exactly that. Qwen3's
+# 152K vocab tried 6.43 GiB. Pythia (50K vocab) sailed through at batch 8.
+# So big-vocab models carry their own batch size; the 4th field (default $BATCH).
 MODELS=(
   # ---- the Pythia scaling ladder: 14M -> 410M ---------------------------------
   # All trained on THE SAME DATA IN THE SAME ORDER, differing only in size. That
@@ -53,8 +60,11 @@ MODELS=(
   # The gate is on your HF ACCOUNT, not on the machine — click "Acknowledge license"
   # in a browser anywhere (your laptop is fine), and the token you already have works
   # from this SSH-only box. Google's card says requests are processed immediately.
-  "google/gemma-3-270m|base|1.3"
-  "google/gemma-3-270m-it|instruct|1.3"
+  #
+  # batch=1 and need=8GB because of the 262K vocab (see the logits arithmetic above),
+  # NOT because of the 0.6 GB of weights.
+  "google/gemma-3-270m|base|8|1"
+  "google/gemma-3-270m-it|instruct|8|1"
 
   # If approval is slow, these are UNGATED plain re-uploads of the same weights
   # (verified: Gemma3ForCausalLM, 268,098,176 params, bf16 — not quantized).
@@ -64,17 +74,18 @@ MODELS=(
   # "unsloth/gemma-3-270m-it|instruct|1.3"
 
   # ---- 600M: still sub-billion despite the "0.6B" name ------------------------
-  "Qwen/Qwen3-0.6B|instruct|2.2"
+  # 152K vocab -> batch 1, ~6 GB headroom needed.
+  "Qwen/Qwen3-0.6B|instruct|6|1"
 
   # ---- billions: commented out until the card frees up. Uncomment then; the
   #      script skips everything already finished, so nothing is repeated.
-  # "EleutherAI/pythia-1b|base|3.5"
-  # "EleutherAI/pythia-1.4b|base|4.5"
-  # "HuggingFaceTB/SmolLM2-1.7B-Instruct|instruct|5"
-  # "google/gemma-3-1b-it|instruct|4"
-  # "Qwen/Qwen3-1.7B|instruct|5"
-  # "google/gemma-3-4b-it|instruct|10"
-  # "Qwen/Qwen3-4B-Instruct-2507|instruct|10"
+  # "EleutherAI/pythia-1b|base|4"
+  # "EleutherAI/pythia-1.4b|base|5"
+  # "HuggingFaceTB/SmolLM2-1.7B-Instruct|instruct|6"
+  # "google/gemma-3-1b-it|instruct|10|1"
+  # "Qwen/Qwen3-1.7B|instruct|8|1"
+  # "google/gemma-3-4b-it|instruct|16|1"
+  # "Qwen/Qwen3-4B-Instruct-2507|instruct|14|1"
 )
 
 # Few-shot counts, passed EXPLICITLY per task (lm-eval's --num_fewshot is global, so
@@ -194,7 +205,7 @@ TASKS=$(IFS=,; echo "${TASK_ORDER[*]}")
 RUNNABLE=(); TOO_BIG=(); ALREADY=()
 
 for entry in "${MODELS[@]}"; do
-  IFS='|' read -r MODEL KIND NEED_GB <<< "$entry"
+  IFS='|' read -r MODEL KIND NEED_GB MBATCH <<< "$entry"
   SAFE="${MODEL//\//__}"
   NEED_MIB=$(python3 -c "print(int($NEED_GB * 1024))")
 
@@ -225,7 +236,8 @@ echo
 # run
 # ---------------------------------------------------------------------------
 for entry in "${RUNNABLE[@]}"; do
-  IFS='|' read -r MODEL KIND NEED_GB <<< "$entry"
+  IFS='|' read -r MODEL KIND NEED_GB MBATCH <<< "$entry"
+  MBATCH="${MBATCH:-$BATCH}"
   SAFE="${MODEL//\//__}"
 
   # Re-check free memory before each model: the neighbouring job can grow.
@@ -248,7 +260,7 @@ for entry in "${RUNNABLE[@]}"; do
   else
     MODEL_ARGS="pretrained=$MODEL,dtype=bfloat16"
     DEVICE_ARG="--device cuda:0"
-    echo "RUN   $MODEL  ($KIND, hf, batch=$BATCH, ${NOW_FREE} MiB free)"
+    echo "RUN   $MODEL  ($KIND, hf, batch=$MBATCH, ${NOW_FREE} MiB free)"
   fi
 
   START=$(date +%s)
@@ -268,7 +280,7 @@ for entry in "${RUNNABLE[@]}"; do
       --model_args "$MODEL_ARGS" \
       --tasks "$TASK" \
       --num_fewshot "$SHOTS" \
-      --batch_size "$BATCH" \
+      --batch_size "$MBATCH" \
       --seed "$SEED" \
       --output_path "$TASK_OUT" \
       --log_samples \
@@ -278,11 +290,22 @@ for entry in "${RUNNABLE[@]}"; do
     set -e
     if (( STATUS != 0 )); then
       echo "FAILED (exit $STATUS)"
-      grep -iE 'out of memory|no kernel image|CUDA error|401 Client|GatedRepo|does not appear to have' \
-        "$LOGS/${SAFE}_${MODE}.log" | tail -2 | sed 's/^/        /' || true
+      # Show the known failure signatures if present; otherwise the raw tail of the
+      # log. Grepping only for known patterns hid a ModuleNotFoundError once — an
+      # error report that can say nothing is worse than a verbose one.
+      ERR=$(grep -iE 'out of memory|no kernel image|CUDA error|401 Client|GatedRepo|ModuleNotFoundError|ImportError' \
+        "$LOGS/${SAFE}_${MODE}.log" | tail -2 || true)
+      [[ -z "$ERR" ]] && ERR=$(tail -3 "$LOGS/${SAFE}_${MODE}.log")
+      echo "$ERR" | sed 's/^/        /'
       MODEL_FAILED=1
-      # A task that OOMs will OOM again for this model; move to the next model.
+      # A task that OOMs will OOM again for this model, and a missing package will
+      # fail for every model — stop wasting invocations in both cases.
       grep -qi 'out of memory' "$LOGS/${SAFE}_${MODE}.log" && break
+      if grep -qE 'ModuleNotFoundError|ImportError' "$LOGS/${SAFE}_${MODE}.log"; then
+        echo "  ^ a missing python package fails identically for every model —"
+        echo "    fix the environment (pip install transformers accelerate) and re-run."
+        exit 1
+      fi
     else
       echo "$(( $(date +%s) - T0 ))s"
     fi

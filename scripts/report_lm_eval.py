@@ -391,10 +391,25 @@ def build_report(runs: list[dict], out_path: Path, title: str) -> Path:
         out_path.write_text("<h1>No lm-eval results found.</h1>", encoding="utf-8")
         return out_path
 
-    # one row per model; if a model was run more than once, the later file wins
+    # MERGE files per model. run_benchmarks.sh makes one lm_eval invocation per
+    # (model, task) — so one model's results arrive as five separate JSONs, and
+    # "last file wins" would silently show one task per model. Union the tasks;
+    # a re-run of the same task later still wins by date order.
     by_model: dict[str, dict] = {}
     for r in sorted(runs, key=lambda r: str(r.get("date") or "")):
-        by_model[r["model"]] = r
+        m = by_model.get(r["model"])
+        if m is None:
+            by_model[r["model"]] = r
+            continue
+        m["tasks"].update(r["tasks"])
+        m["n_shot"].update(r["n_shot"])
+        m["n_samples"].update(r["n_samples"])
+        m["subtasks"] |= r["subtasks"]
+        m["higher_is_better"].update(r["higher_is_better"])
+        m["eval_seconds"] = (m["eval_seconds"] or 0) + (r["eval_seconds"] or 0)
+        m["date"] = r["date"]
+        m["chat_template"] = m["chat_template"] or r["chat_template"]
+        m["limit"] = m["limit"] or r["limit"]
     models = list(by_model)
 
     # collect the headline metric per (task, model)

@@ -26,10 +26,20 @@ kernels for it:
 
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cu128
-pip install lm_eval
+pip install lm_eval transformers accelerate sentencepiece
 ```
 
-**You should see:** `Successfully installed torch-... lm_eval-...`
+**Why transformers is spelled out:** `pip install lm_eval` alone does NOT install it —
+the HF backend's dependencies are behind an extra, and without them every single
+invocation dies instantly with `ModuleNotFoundError: No module named 'transformers'`
+(exit 1 on every task, no download ever starts). `accelerate` is needed for device
+placement; `sentencepiece` prevents a tokenizer failure on some model families.
+
+**You should see:** `Successfully installed ...`, then verify the import chain:
+
+```bash
+python -c "import lm_eval, transformers, accelerate; print('harness deps OK')"
+```
 
 ### Verify the GPU actually works
 
@@ -307,12 +317,23 @@ python aienh/scripts/report_lm_eval.py results/full \
     --title "Sub-1B model benchmark — teraformer-5090-3, August 2026"
 ```
 
-Copy it to your Mac to look at it:
+Copy it to your Mac to look at it (over Tailscale the hostname just works):
 
 ```bash
 # from your Mac:
-scp masein@teraformer-5090-3:~/benchmarks/artifacts/benchmark_report.html .
-open benchmark_report.html
+scp masein@teraformer-5090-3:~/benchmarks/artifacts/benchmark_report.html ~/Desktop/
+open ~/Desktop/benchmark_report.html
+```
+
+Or, if you'll be regenerating it repeatedly, serve it over your tailnet — bind to the
+Tailscale IP specifically, so it is reachable from your devices but not the server's LAN:
+
+```bash
+# on the server:
+cd ~/benchmarks/artifacts
+python3 -m http.server 8899 --bind "$(tailscale ip -4)"
+# then on your Mac:  http://teraformer-5090-3:8899/benchmark_report.html
+# Ctrl-C stops it. If `tailscale ip` needs sudo, get the IP from the Tailscale admin page.
 ```
 
 One self-contained HTML file — no server, no assets. It contains scores with error
@@ -431,9 +452,20 @@ Nothing is lost; no token was stored.
 Accept the licence on the model page in a browser while logged in. Affects only the
 two Gemma models here.
 
-**`CUDA out of memory`**
-The neighbouring job grew. Lower `BATCH=4`, or wait. The script re-checks free memory
-before each model, so it usually skips rather than crashes.
+**`CUDA out of memory` on a *tiny* model (gemma-270m, Qwen3-0.6B)**
+Not the weights — the logits tensor. For loglikelihood evals, memory ≈
+`batch × seq_len × vocab × 4 bytes × ~2.5`. gemma-3's vocab is 262K, so batch 8 on
+5-shot MMLU tries to allocate ~12 GiB from a model whose weights are 0.6 GB; Qwen3's
+152K vocab tries ~6.5 GiB. Pythia and SmolLM2 (49–50K vocabs) are unaffected at
+batch 8. The model list carries per-model batch sizes for exactly this; the blunt
+override is `BATCH=1 ./aienh/scripts/run_benchmarks.sh smoke` — resume means only
+the missing models re-run.
+
+**`CUDA out of memory` on a model that fit before**
+The neighbouring job grew between the check and the load (it's a race; one smoke run
+here lost pythia-14m to exactly this). Just re-run — resume picks up only what's
+missing. The script re-checks free memory before each model, so it usually skips
+rather than crashes.
 
 **A model shows `PARTIAL`**
 One task failed, the rest succeeded. Check `logs/<model>_full.log`. Re-running picks up
