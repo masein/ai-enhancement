@@ -160,6 +160,66 @@ it's called (`lm_eval --tasks list | grep -i mmlu`) and set
 
 ---
 
+## 4b · Optional but recommended: add corpus perplexity
+
+The datasets people list when they talk about LLM data — FineWeb, C4, Dolma,
+RedPajama, Common Crawl — are **pretraining corpora**: raw text, no labels, trillions
+of tokens. You cannot score accuracy on them, because there is no right answer. They
+are not benchmarks.
+
+But they give you the one measurement MMLU and HellaSwag cannot, and it matters
+especially for **this** run:
+
+- **MMLU can't distinguish your models.** It sits at chance until the low billions, so
+  all eleven will look identical. Bits-per-byte is continuous and will separate
+  pythia-14m from pythia-410m cleanly.
+- **It works on base models.** No chat template, no format to follow, nothing to parse.
+- **Domain slices are the real product question.** Perplexity on code vs. legal vs.
+  medical text tells you what a model is *for*. No public benchmark tells you that
+  about your team's data.
+
+`scripts/make_ppl_task.py` turns any corpus into a pinned lm-eval task:
+
+```bash
+cd ~/benchmarks
+
+# a slice of a real pretraining corpus (streamed — no full download)
+python aienh/scripts/make_ppl_task.py --hf HuggingFaceFW/fineweb-edu \
+    --config sample-10BT --split train --field text --n 2000 --name ppl_fineweb_edu
+
+# a code slice, for a domain contrast
+python aienh/scripts/make_ppl_task.py --hf bigcode/the-stack-smol \
+    --split train --field content --n 2000 --name ppl_code
+
+# and your team's own data — this is the one they'll actually care about
+python aienh/scripts/make_ppl_task.py --local /path/to/corpus.jsonl \
+    --field text --n 2000 --name ppl_internal
+```
+
+Each writes two files into `eval_tasks/`: the sampled documents as JSONL (**the pinned
+item set** — keep it; a perplexity number from a fresh random sample isn't comparable
+to last week's) and the task YAML. It prints a sha256 of the item set; record it.
+
+`run_benchmarks.sh` auto-discovers anything in `eval_tasks/` and runs it 0-shot, so
+there's nothing to wire up. Verify one cheaply first:
+
+```bash
+lm_eval --model hf --model_args pretrained=EleutherAI/pythia-160m \
+    --include_path eval_tasks --tasks ppl_fineweb_edu --limit 5 --device cuda:0
+```
+
+**You should see** three metrics: `word_perplexity`, `byte_perplexity`,
+`bits_per_byte`.
+
+**Quote `bits_per_byte`.** It's per byte, so it's tokenizer-independent — the only one
+of the three you can compare across model families. Per-token perplexity is on a
+different scale for every tokenizer, which makes cross-family comparison meaningless.
+The report puts these in their own chart, labelled lower-is-better, and excludes them
+from the significance test (they aren't proportions, and the harness reports no
+standard error for them).
+
+---
+
 ## 5 · Smoke run first — always
 
 ```bash
