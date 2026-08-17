@@ -100,6 +100,23 @@ fi
 TASK_ORDER=(${TASKS_OVERRIDE:-mmlu hellaswag arc_challenge winogrande piqa})
 
 # ---------------------------------------------------------------------------
+# custom tasks from eval_tasks/  (see scripts/make_ppl_task.py)
+# ---------------------------------------------------------------------------
+# Perplexity / bits-per-byte over corpora you pin yourself. These are the eval that
+# multiple-choice benchmarks cannot give you: continuous, works on base models, and
+# measurable on YOUR domain. Auto-discovered and run 0-shot.
+EVAL_TASKS_DIR="${EVAL_TASKS_DIR:-eval_tasks}"
+INCLUDE_ARG=""
+if [[ -d "$EVAL_TASKS_DIR" ]] && compgen -G "$EVAL_TASKS_DIR/*.yaml" > /dev/null 2>&1; then
+  INCLUDE_ARG="--include_path $EVAL_TASKS_DIR"
+  if [[ -z "${TASKS_OVERRIDE:-}" ]]; then
+    for y in "$EVAL_TASKS_DIR"/*.yaml; do
+      TASK_ORDER+=("$(basename "$y" .yaml)")
+    done
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # backend
 # ---------------------------------------------------------------------------
 # hf   — predictable memory, no engine startup cost. Right choice for small models
@@ -152,6 +169,7 @@ if [[ -n "$PIDS" ]]; then
 fi
 echo "HF cache: ${HF_HOME:-$HOME/.cache/huggingface} ($(df -h "${HF_HOME:-$HOME/.cache/huggingface}" 2>/dev/null | awk 'NR==2{print $4}' || echo '?') free)"
 echo "Backend : $BACKEND   batch=$BATCH   seed=$SEED"
+[[ -n "$INCLUDE_ARG" ]] && echo "Custom  : $INCLUDE_ARG ($(ls "$EVAL_TASKS_DIR"/*.yaml 2>/dev/null | wc -l) task(s))"
 
 if (( FREE < MIN_FREE_MIB )); then
   echo
@@ -254,7 +272,7 @@ for entry in "${RUNNABLE[@]}"; do
       --seed "$SEED" \
       --output_path "$TASK_OUT" \
       --log_samples \
-      $CHAT_ARG $DEVICE_ARG $LIMIT_ARG \
+      $INCLUDE_ARG $CHAT_ARG $DEVICE_ARG $LIMIT_ARG \
       >> "$LOGS/${SAFE}_${MODE}.log" 2>&1
     STATUS=$?
     set -e

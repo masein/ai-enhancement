@@ -90,7 +90,16 @@ def parse_run(blob: dict, source: Path) -> dict:
         for k in kids or []:
             if k != parent:
                 subtasks.add(k)
+    # The harness tells us the direction of every metric. Use it rather than guessing
+    # from the name: perplexity and bits-per-byte are LOWER-is-better and are not
+    # proportions, so they must not go in the same chart as accuracies, and the
+    # two-proportion z-test does not apply to them at all.
+    hib: dict[str, dict[str, bool]] = {}
+    for task, metrics in (blob.get("higher_is_better") or {}).items():
+        if isinstance(metrics, dict):
+            hib[task] = {k: bool(v) for k, v in metrics.items() if v is not None}
     return {
+        "higher_is_better": hib,
         "subtasks": subtasks,
         "source": str(source),
         "model": model,
@@ -133,7 +142,8 @@ def primary_metric(entry: dict) -> tuple[str, float, float] | None:
     code. The choice is recorded in the output so nobody has to guess which number
     they are looking at — and both are always in the full table.
     """
-    for name in ("acc_norm", "acc", "exact_match", "pass@1", "f1", "em"):
+    for name in ("acc_norm", "acc", "exact_match", "pass@1", "f1", "em",
+                 "bits_per_byte", "byte_perplexity", "word_perplexity"):
         d = entry.get(name)
         if isinstance(d, dict) and "value" in d:
             return name, d["value"], d.get("stderr", 0.0)
@@ -267,6 +277,13 @@ def pct(v, digits=1) -> str:
     return f"{100 * v:.{digits}f}%" if v is not None else "—"
 
 
+def fmt(v, digits=3) -> str:
+    """Plain number, for metrics that are not proportions (perplexity, bits/byte)."""
+    if v is None:
+        return "—"
+    return f"{v:,.{digits}f}".rstrip("0").rstrip(".") if digits else f"{v:,.0f}"
+
+
 def short(model: str) -> str:
     return model.split("/")[-1]
 
@@ -284,7 +301,8 @@ def nice_ticks(hi: float, n: int = 5) -> list[float]:
 
 def svg_grouped_bars(tasks: list[str], models: list[str], data: dict,
                      width: int = 660, row_h: int = 22, gap: int = 5,
-                     group_gap: int = 18, label_w: int = 150) -> str:
+                     group_gap: int = 18, label_w: int = 150,
+                     as_pct: bool = True) -> str:
     """
     Grouped horizontal bars: one group per task, one bar per model.
 
@@ -295,7 +313,9 @@ def svg_grouped_bars(tasks: list[str], models: list[str], data: dict,
     if not rows:
         return "<p class='small'>no data</p>"
     hi = max(v for (t, m), (v, _s) in data.items() if t in rows)
-    hi = min(1.0, max(0.25, hi * 1.18))
+    hi = min(1.0, max(0.25, hi * 1.18)) if as_pct else hi * 1.18
+    show = (lambda v: pct(v)) if as_pct else (lambda v: fmt(v, 3))
+    tick = (lambda t: f"{100 * t:.0f}%") if as_pct else (lambda t: fmt(t, 2))
     plot_w = width - label_w - 60
     height = sum(len([m for m in models if (t, m) in data]) * (row_h + gap) + group_gap
                  for t in rows) + 26
@@ -307,7 +327,7 @@ def svg_grouped_bars(tasks: list[str], models: list[str], data: dict,
         out.append(f'<line x1="{x:.1f}" y1="6" x2="{x:.1f}" y2="{height - 20}" '
                    f'stroke="var(--grid)" stroke-width="1"/>')
         out.append(f'<text x="{x:.1f}" y="{height - 6}" font-size="10" fill="var(--muted)" '
-                   f'text-anchor="middle">{100 * t:.0f}%</text>')
+                   f'text-anchor="middle">{tick(t)}</text>')
 
     y = 6
     for t in rows:
@@ -321,8 +341,8 @@ def svg_grouped_bars(tasks: list[str], models: list[str], data: dict,
             col = f"var({SERIES[models.index(m) % 8]})"
             w = max(2.0, plot_w * v / hi)
             r = min(4, w)
-            tip = (f"<b>{esc(short(m))}</b><br>{esc(t)}<br>{pct(v, 2)} "
-                   f"&plusmn; {pct(s, 2)}")
+            tip = (f"<b>{esc(short(m))}</b><br>{esc(t)}<br>{show(v)}"
+                   + (f" &plusmn; {show(s)}" if s else ""))
             out.append(
                 f'<path d="M{label_w},{y} H{label_w + w - r:.1f} q{r},0 {r},{r} '
                 f'V{y + row_h - r} q0,{r} -{r},{r} H{label_w} Z" fill="{col}" '
@@ -342,7 +362,7 @@ def svg_grouped_bars(tasks: list[str], models: list[str], data: dict,
                        f'height="{row_h + 4}" data-tip="{tip}"/>')
             out.append(f'<text x="{label_w + max(w, plot_w * (v + s) / hi) + 8:.1f}" '
                        f'y="{y + row_h * 0.72:.1f}" font-size="11.5" '
-                       f'fill="var(--text-primary)">{pct(v)}</text>')
+                       f'fill="var(--text-primary)">{show(v)}</text>')
             y += row_h + gap
         y += group_gap
     out.append(f'<line x1="{label_w}" y1="6" x2="{label_w}" y2="{height - 20}" '
@@ -400,7 +420,18 @@ def build_report(runs: list[dict], out_path: Path, title: str) -> Path:
     common = [t for t in all_tasks
               if t not in child_tasks
               and sum((t, m) in data for m in models) == len(models)]
-    headline = sorted(common, key=lambda t: (len(t), t))[:8] or sorted(all_tasks)[:8]
+    headline = sorted(common, key=lambda t: (len(t), t))[:12] or sorted(all_tasks)[:12]
+
+    # Split by metric direction. Accuracies are 0-1 proportions where higher is
+    # better; perplexity and bits-per-byte are unbounded and lower is better. Putting
+    # them on one axis would be nonsense, and the z-test only applies to the first kind.
+    PROPORTION = {"acc", "acc_norm", "exact_match", "pass@1", "f1", "em", "rubric_pass"}
+    acc_tasks, ppl_tasks = [], []
+    for t in headline:
+        met = metric_used.get(t, "")
+        lower_better = any(r["higher_is_better"].get(t, {}).get(met) is False
+                           for r in by_model.values())
+        (acc_tasks if (met in PROPORTION and not lower_better) else ppl_tasks).append(t)
 
     parts: list[str] = []
 
@@ -434,7 +465,7 @@ def build_report(runs: list[dict], out_path: Path, title: str) -> Path:
         parts.append(f'<div class="warn">{w}</div>')
 
     # ---- hero + tiles ----
-    best_task = headline[0] if headline else None
+    best_task = (acc_tasks or ppl_tasks or [None])[0]
     if best_task:
         ranked = sorted(((data[(best_task, m)][0], m) for m in models if (best_task, m) in data),
                         reverse=True)
@@ -465,27 +496,46 @@ def build_report(runs: list[dict], out_path: Path, title: str) -> Path:
     legend = "".join(
         f'<span><i class="key" style="background:var({SERIES[i % 8]})"></i>'
         f'{esc(short(m))}</span>' for i, m in enumerate(models[:8]))
-    tv_rows = [[esc(t), esc(metric_used.get(t, "")), esc(short(m)),
-                pct(data[(t, m)][0], 2), pct(data[(t, m)][1], 2),
-                by_model[m]["n_shot"].get(t, "—"),
-                by_model[m]["n_samples"].get(t, "—")]
-               for t in headline for m in models if (t, m) in data]
-    parts.append(
-        '<div class="card"><h2>Scores by task</h2>'
-        '<p class="sub">Whiskers are &plusmn;1 standard error. Two bars whose whiskers '
-        'overlap are not distinguishable at this sample size — see the significance '
-        'table below before claiming one model is better.</p>'
-        f'<div class="legend">{legend}</div>'
-        + svg_grouped_bars(headline, models, data)
-        + table_view("tv-scores",
-                     ["task", "metric", "model", "score", "stderr", "n-shot", "n samples"],
-                     tv_rows, {3, 4, 5, 6})
-        + '</div>')
+    def tv_for(tasks, as_pct):
+        f = (lambda v: pct(v, 2)) if as_pct else (lambda v: fmt(v, 4))
+        return [[esc(t), esc(metric_used.get(t, "")), esc(short(m)),
+                 f(data[(t, m)][0]), (f(data[(t, m)][1]) if data[(t, m)][1] else "—"),
+                 by_model[m]["n_shot"].get(t, "—"),
+                 by_model[m]["n_samples"].get(t, "—")]
+                for t in tasks for m in models if (t, m) in data]
+
+    COLS = ["task", "metric", "model", "score", "stderr", "n-shot", "n samples"]
+    if acc_tasks:
+        parts.append(
+            '<div class="card"><h2>Accuracy by task &mdash; higher is better</h2>'
+            '<p class="sub">Whiskers are &plusmn;1 standard error. Two bars whose whiskers '
+            'overlap are not distinguishable at this sample size &mdash; check the '
+            'significance table below before claiming one model is better. Chance level '
+            'depends on the number of options: 25% on a 4-way task, <b>50% on a 2-way '
+            'task like Winogrande or PIQA</b>.</p>'
+            f'<div class="legend">{legend}</div>'
+            + svg_grouped_bars(acc_tasks, models, data)
+            + table_view("tv-scores", COLS, tv_for(acc_tasks, True), {3, 4, 5, 6})
+            + '</div>')
+
+    if ppl_tasks:
+        parts.append(
+            '<div class="card"><h2>Perplexity / bits-per-byte &mdash; LOWER is better</h2>'
+            '<p class="sub">Separate chart on purpose: these are unbounded and '
+            'lower-is-better, so they share no axis with the accuracies above. '
+            '<b>Quote bits_per_byte</b> when comparing models with different tokenizers '
+            '&mdash; per-token perplexity is on a different scale for each tokenizer and '
+            'is not comparable across model families. The harness reports no standard '
+            'error for these, so the significance test below excludes them.</p>'
+            f'<div class="legend">{legend}</div>'
+            + svg_grouped_bars(ppl_tasks, models, data, as_pct=False)
+            + table_view("tv-ppl", COLS, tv_for(ppl_tasks, False), {3, 4, 5, 6})
+            + '</div>')
 
     # ---- pairwise significance ----
-    if len(models) > 1 and headline:
+    if len(models) > 1 and acc_tasks:
         sig_rows = []
-        for t in headline:
+        for t in acc_tasks:
             present = [m for m in models if (t, m) in data]
             for i, a in enumerate(present):
                 for b in present[i + 1:]:
@@ -515,7 +565,8 @@ def build_report(runs: list[dict], out_path: Path, title: str) -> Path:
             '<span class="mono">z = (p&#8321;&minus;p&#8322;) / &radic;(se&#8321;&sup2;+se&#8322;&sup2;)</span>, '
             'significant at |z| &gt; 1.96. Conservative &mdash; both models saw the same '
             'items, so a paired test would be more sensitive. It will not call a '
-            'non-difference significant, which is the direction that matters.</p>'
+            'non-difference significant, which is the direction that matters. '
+            'Proportion metrics only &mdash; perplexity is not a proportion.</p>'
             + table_view("tv-sig", ["task", "model A", "model B", "difference", "z", "verdict"],
                          sig_rows, {3, 4})
             + '</div>')
