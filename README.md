@@ -24,6 +24,9 @@ corpus is generated rather than downloaded, so the whole repo works offline.
 **New here? Follow [`START-HERE.md`](START-HERE.md)** — a verified, ordered list of
 commands with what to look for in each output.
 
+**Benchmarking real models on the GPU server? Follow
+[`BENCHMARK-RUN.md`](BENCHMARK-RUN.md)** — step by step, with the checks after each one.
+
 ## Setup
 
 ```bash
