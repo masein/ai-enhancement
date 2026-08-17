@@ -33,15 +33,38 @@ SEED="${SEED:-1234}"
 # activations and the KV cache. It only has to be good enough to sort models into
 # "fits" and "doesn't"; the script prints what it skipped either way.
 MODELS=(
-  "google/gemma-3-270m|base|1.5"
-  "google/gemma-3-270m-it|instruct|1.5"
-  "Qwen/Qwen3-0.6B|instruct|2.5"
-  "google/gemma-3-1b-it|instruct|4"
-  "Qwen/Qwen3-1.7B|instruct|5"
-  "HuggingFaceTB/SmolLM3-3B|instruct|8"
-  "google/gemma-3-4b-it|instruct|10"
-  "Qwen/Qwen3-4B-Instruct-2507|instruct|10"
-  "Qwen/Qwen3-8B|instruct|20"
+  # ---- the Pythia scaling ladder: 14M -> 410M ---------------------------------
+  # All trained on THE SAME DATA IN THE SAME ORDER, differing only in size. That
+  # makes this a controlled experiment rather than a collection of models: the only
+  # variable is parameter count, so the curve you get is a real scaling curve.
+  # Apache 2.0, ungated, and the whole ladder fits in ~1.5 GB.
+  "EleutherAI/pythia-14m|base|1.0"
+  "EleutherAI/pythia-70m|base|1.0"
+  "EleutherAI/pythia-160m|base|1.1"
+  "EleutherAI/pythia-410m|base|1.5"
+
+  # ---- modern small models, ungated -------------------------------------------
+  "HuggingFaceTB/SmolLM2-135M|base|1.1"
+  "HuggingFaceTB/SmolLM2-135M-Instruct|instruct|1.1"
+  "HuggingFaceTB/SmolLM2-360M|base|1.4"
+  "HuggingFaceTB/SmolLM2-360M-Instruct|instruct|1.4"
+
+  # ---- gated: accept the licence at huggingface.co/google/gemma-3-270m first ---
+  "google/gemma-3-270m|base|1.3"
+  "google/gemma-3-270m-it|instruct|1.3"
+
+  # ---- 600M: still sub-billion despite the "0.6B" name ------------------------
+  "Qwen/Qwen3-0.6B|instruct|2.2"
+
+  # ---- billions: commented out until the card frees up. Uncomment then; the
+  #      script skips everything already finished, so nothing is repeated.
+  # "EleutherAI/pythia-1b|base|3.5"
+  # "EleutherAI/pythia-1.4b|base|4.5"
+  # "HuggingFaceTB/SmolLM2-1.7B-Instruct|instruct|5"
+  # "google/gemma-3-1b-it|instruct|4"
+  # "Qwen/Qwen3-1.7B|instruct|5"
+  # "google/gemma-3-4b-it|instruct|10"
+  # "Qwen/Qwen3-4B-Instruct-2507|instruct|10"
 )
 
 # Few-shot counts pinned per task — the Open LLM Leaderboard v1 conventions, which
@@ -70,7 +93,7 @@ BATCH="${BATCH:-8}"
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 
 # Smallest model in the list decides whether it is worth starting at all.
-MIN_FREE_MIB="${MIN_FREE_MIB:-1600}"
+MIN_FREE_MIB="${MIN_FREE_MIB:-1100}"
 
 # ---------------------------------------------------------------------------
 # preflight
