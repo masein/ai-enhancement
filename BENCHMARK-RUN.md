@@ -97,20 +97,45 @@ hf auth login
 
 Paste a token from <https://huggingface.co/settings/tokens> — read scope is enough.
 
-**Nine of the eleven models are ungated** and will download immediately. The two Gemma
-ones are gated: open <https://huggingface.co/google/gemma-3-270m> in a browser while
-logged in and accept the licence. It's usually instant.
-
-Test:
+**Nine of the eleven models are ungated** and download immediately:
 
 ```bash
 hf download EleutherAI/pythia-160m --quiet && echo "ungated OK"
+```
+
+### The two Gemma models are gated — and SSH-only is not a blocker
+
+`Error: Access denied. This repository requires approval.`
+
+**The gate is on your Hugging Face ACCOUNT, not on the machine.** You do not need a
+browser on the server. Open this on your laptop, logged into the same account you made
+the token with, and click **Acknowledge license**:
+
+<https://huggingface.co/google/gemma-3-270m>
+
+Google's model card says *"Requests are processed immediately."* Then, back on the
+server, the token you already have works:
+
+```bash
 hf download google/gemma-3-270m --quiet && echo "gated OK too"
 ```
 
-**If the second one fails** with a 401 or `GatedRepo` — the licence isn't accepted yet.
-Don't wait on it; the script will run the other nine and report the two Gemma models as
-failures you can pick up later.
+Do the same for <https://huggingface.co/google/gemma-3-270m-it> if you want the
+instruction-tuned one (it is a separate repo and a separate click).
+
+**If approval doesn't come through**, there are ungated re-uploads of the same weights.
+I verified `unsloth/gemma-3-270m-it`: `gated: false`, architecture `Gemma3ForCausalLM`,
+**268,098,176 parameters in bf16** — a plain mirror, not a quantization. Uncomment the
+`unsloth/...` lines in `run_benchmarks.sh` and comment out the `google/...` ones.
+
+One caveat: I can confirm the metadata matches, not that the weights are byte-identical
+to Google's upload. For internal comparison it makes no practical difference; if you
+publish numbers, say which repo they came from. The report's provenance table records
+the exact `pretrained=` id, so this is handled for you.
+
+**Or just skip Gemma entirely for now.** Nine models is a perfectly good first run, and
+the four Pythia models — the controlled scaling ladder, which is the most valuable part
+— are all ungated.
 
 ---
 

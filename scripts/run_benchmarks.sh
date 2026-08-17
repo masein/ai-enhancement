@@ -49,9 +49,19 @@ MODELS=(
   "HuggingFaceTB/SmolLM2-360M|base|1.4"
   "HuggingFaceTB/SmolLM2-360M-Instruct|instruct|1.4"
 
-  # ---- gated: accept the licence at huggingface.co/google/gemma-3-270m first ---
+  # ---- gated: accept the licence at huggingface.co/google/gemma-3-270m first ----
+  # The gate is on your HF ACCOUNT, not on the machine — click "Acknowledge license"
+  # in a browser anywhere (your laptop is fine), and the token you already have works
+  # from this SSH-only box. Google's card says requests are processed immediately.
   "google/gemma-3-270m|base|1.3"
   "google/gemma-3-270m-it|instruct|1.3"
+
+  # If approval is slow, these are UNGATED plain re-uploads of the same weights
+  # (verified: Gemma3ForCausalLM, 268,098,176 params, bf16 — not quantized).
+  # Swap them in for the two lines above. They are third-party mirrors, so record
+  # which repo you used — the report's provenance table does this automatically.
+  # "unsloth/gemma-3-270m|base|1.3"
+  # "unsloth/gemma-3-270m-it|instruct|1.3"
 
   # ---- 600M: still sub-billion despite the "0.6B" name ------------------------
   "Qwen/Qwen3-0.6B|instruct|2.2"
