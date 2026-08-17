@@ -64,18 +64,27 @@ on a shared machine breaks everyone's jobs. Your home is on `/home` with 488 GB 
 which is far more than these models need (all eleven together are under 5 GB):
 
 ```bash
+# remove any earlier HF_HOME line first, so you don't end up with two
+sed -i '/HF_HOME/d' ~/.bashrc
 echo 'export HF_HOME=$HOME/hf-cache' >> ~/.bashrc
 source ~/.bashrc
 mkdir -p "$HF_HOME"
+
+# PROVE it is writable before anything tries to use it
+touch "$HF_HOME/.probe" && rm "$HF_HOME/.probe" && echo "WRITABLE: $HF_HOME"
 df -h "$HF_HOME"
 ```
 
-**You should see:** a line for `/home` with plenty available.
+**You should see:** `WRITABLE: /home/masein/hf-cache`, then a `/home` line with plenty
+available.
 
-*(If you later benchmark 4B+ models, move this to `/data-03` — your 15 TB RAID array
-with 14.6 TB free — but test write access first: `touch /data-03/.probe && rm
-/data-03/.probe`. It's a shared volume and I can't tell from `df` whether you have
-permission.)*
+That two-second probe is worth doing every time you point `HF_HOME` somewhere new. Skip
+it and the failure surfaces later, from inside a library, as a stack trace ending in
+`PermissionError: [Errno 13]` — see Troubleshooting.
+
+*(If you later benchmark 4B+ models you may want `/data-03`, your 15 TB RAID array. Run
+the probe against it first: `mkdir -p /data-03/$USER && touch /data-03/$USER/.probe`.
+It's a shared volume, so you may well not have write access — check `ls -ld /data-03`.)*
 
 ---
 
@@ -325,6 +334,13 @@ It polls once a minute and starts the moment 12 GB is free.
 
 **`no kernel image is available for execution on the device`**
 Wrong PyTorch wheel for Blackwell. Reinstall with `--index-url .../whl/cu128`.
+
+**`PermissionError: [Errno 13] Permission denied: '/data-03/.../stored_tokens'`**
+`HF_HOME` points at a directory you cannot write to. `/data-03` is a shared volume and
+you may not own a directory under it. Check with `ls -ld /data-03 /data-03/$USER`, then
+repoint `HF_HOME` at `$HOME/hf-cache` (Step 2) — remembering to **delete the old line**
+from `~/.bashrc` rather than appending a second one — and run `hf auth login` again.
+Nothing is lost; no token was stored.
 
 **`401 Client Error` / `GatedRepoError`**
 Accept the licence on the model page in a browser while logged in. Affects only the
