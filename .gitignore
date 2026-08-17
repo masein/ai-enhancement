@@ -7,3 +7,8 @@ __pycache__/
 wandb/
 *.npz
 *.pt
+.DS_Store
+_to_delete/
+*.bundle
+results/
+eval_tasks/*.lock
