@@ -136,7 +136,7 @@ def parse_run(blob: dict, source: Path) -> dict:
         "n_samples": {k: (v.get("effective") if isinstance(v, dict) else v)
                       for k, v in n_samples.items()},
         "git_hash": blob.get("git_hash"),
-        "date": blob.get("date"),
+        "date": _norm_date(blob.get("date")),
         "transformers_version": blob.get("transformers_version"),
         "eval_seconds": _to_float(blob.get("total_evaluation_time_seconds")),
         "tasks": tasks,
@@ -146,6 +146,17 @@ def parse_run(blob: dict, source: Path) -> dict:
 def _extract(args: str, key: str):
     m = re.search(rf"{key}=([^,\s]+)", str(args))
     return m.group(1) if m else None
+
+
+def _norm_date(v):
+    """lm-eval writes `date` as a unix float; normalize every form to an ISO string
+    so sorting, slicing and display never meet a bare number."""
+    if not v:
+        return None
+    try:
+        return _dt.datetime.fromtimestamp(float(v)).strftime("%Y-%m-%d %H:%M:%S")
+    except (TypeError, ValueError, OSError, OverflowError):
+        return str(v)
 
 
 def _to_float(v):
@@ -1090,7 +1101,7 @@ function vRuns(ms) {
         el('td', { class: 'num', text: m.minutes + ' min' }),
         el('td', {}, el('span', { class: 'mono', text: m.hash || '—' })),
         el('td', {}, el('span', { class: 'mono',
-          text: (m.date || '—').slice(0, 16).replace('T', ' ') })))))))));
+          text: String(m.date || '—').slice(0, 16).replace('T', ' ') })))))))));
   const names = new Set(ms.map(m => m.name));
   const rows = DATA.extra.filter(r => names.has(r[0]));
   const tv = el('div', { class: 'tv' }, el('table', {},
