@@ -61,6 +61,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import random
 import sys
 import unicodedata
@@ -214,4 +215,20 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # os._exit, not SystemExit: the HF download stack leaves native background
+    # threads that can crash CPython during normal interpreter teardown
+    # ("Fatal Python error: PyGILState_Release ... no thread-state", core dump) —
+    # AFTER every file is written and every message printed. All output paths in
+    # this script write-and-close before returning, so skipping finalization
+    # loses nothing and turns a scary abort into a clean exit 0.
+    try:
+        rc = main()
+    except SystemExit as e:
+        if isinstance(e.code, str):
+            print(e.code, file=sys.stderr)
+            rc = 1
+        else:
+            rc = e.code or 0
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(rc if isinstance(rc, int) else 0)
