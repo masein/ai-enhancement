@@ -161,12 +161,12 @@ ls aienh/scripts/run_benchmarks.sh aienh/scripts/report_lm_eval.py
 Confirm the task names exist in your harness version — they move between releases:
 
 ```bash
-lm_eval --tasks list | grep -iE '^\s*(mmlu|hellaswag|arc_challenge|winogrande|piqa)\s*$'
+lm_eval --tasks list | grep -iE '^\s*(mmlu|hellaswag|arc_challenge|arc_easy|winogrande|piqa|truthfulqa_mc2|gsm8k)\s*$'
 ```
 
-**You should see** all five. If `mmlu` isn't listed under that exact name, check what
-it's called (`lm_eval --tasks list | grep -i mmlu`) and set
-`TASKS_OVERRIDE="..."` when you run.
+**You should see** all eight (verified present under exactly these names in
+lm_eval 0.4.12). If one isn't listed under that exact name, check what it's called
+(`lm_eval --tasks list | grep -i <name>`) and set `TASKS_OVERRIDE="..."` when you run.
 
 ---
 
@@ -195,16 +195,25 @@ cd ~/benchmarks
 
 # a slice of a real pretraining corpus (streamed — no full download)
 python aienh/scripts/make_ppl_task.py --hf HuggingFaceFW/fineweb-edu \
-    --config sample-10BT --split train --field text --n 2000 --name ppl_fineweb_edu
+    --config sample-10BT --split train --field text \
+    --n 300 --max-chars 8000 --name ppl_fineweb_edu
 
-# a code slice, for a domain contrast
-python aienh/scripts/make_ppl_task.py --hf bigcode/the-stack-smol \
-    --split train --field content --n 2000 --name ppl_code
+# a code slice, for a domain contrast (ungated, streams, field is "content")
+python aienh/scripts/make_ppl_task.py --hf codeparrot/codeparrot-clean-valid \
+    --split train --field content --n 200 --max-chars 8000 --name ppl_code
 
 # and your team's own data — this is the one they'll actually care about
 python aienh/scripts/make_ppl_task.py --local /path/to/corpus.jsonl \
-    --field text --n 2000 --name ppl_internal
+    --field text --n 300 --name ppl_internal
 ```
+
+Why `--n 300` and not thousands: rolling perplexity feeds **every byte of every
+document** through the model, for **all eleven models**. 300 pinned documents is
+minutes per model and plenty to rank them cleanly; the harness reports no standard
+error for perplexity anyway, so extra documents buy less than they cost. The number
+that matters for comparability is the **sha256 it prints**, not the sample size. (If
+the code dataset errors on the field name, the script prints the fields it does
+have — use that.)
 
 Each writes two files into `eval_tasks/`: the sampled documents as JSONL (**the pinned
 item set** — keep it; a perplexity number from a fresh random sample isn't comparable
@@ -233,11 +242,14 @@ standard error for them).
 ## 5 · Smoke run first — always
 
 ```bash
-tmux new -s bench            # so an SSH drop doesn't kill anything
 cd ~/benchmarks
 source .venv/bin/activate
-./aienh/scripts/run_benchmarks.sh smoke
+bash aienh/scripts/run_benchmarks.sh smoke
 ```
+
+(`bash script.sh`, not `./script.sh` — the Mac→server sync does not preserve the
+execute bit, and `bash` works either way. No tmux on this box; for anything long,
+`nohup ... > run.log 2>&1 &` in step 6 survives an SSH drop the same way.)
 
 20 items per task. The scores are meaningless at that sample size and the script says
 so — what you're testing is the plumbing.
@@ -249,8 +261,17 @@ GPU     : 3182 MiB free of 32607 MiB   (29425 MiB in use, 87% busy)
 Sharing with:
           <user>  3537376  02:14:07  pt_main_thread
 Backend : hf   batch=8   seed=1234
+Lock    : results/.run.lock (pid 12345 — a second run will refuse to start ...)
+Tasks   : mmlu,hellaswag,arc_challenge,arc_easy,winogrande,piqa,truthfulqa_mc2,gsm8k
 WILL RUN  (11): EleutherAI/pythia-14m EleutherAI/pythia-70m ...
 ```
+
+That `Lock` line is new and it is load-bearing: **only one run at a time**. A second
+invocation while one is alive prints `REFUSING TO START` with the owner's PID —
+that's the script working, not breaking. (Two concurrent runs is exactly how the
+first full run here produced duplicate DONE lines and OOM-killed its own tasks.) If
+a run died hard (`kill -9`, reboot) the next invocation says `Stale lock ... taking
+over` and proceeds by itself.
 
 then per model:
 
@@ -285,17 +306,26 @@ python aienh/scripts/report_lm_eval.py results/smoke -o /tmp/smoke_report.html
 ## 6 · The real run
 
 ```bash
-./aienh/scripts/run_benchmarks.sh full
+nohup bash aienh/scripts/run_benchmarks.sh full --wait > run.log 2>&1 &
+tail -f run.log            # Ctrl-C stops the tail, NOT the run
 ```
 
-**Estimate your own timing rather than trusting mine:** watch the first model's
-`DONE ... in N min` line and multiply by 11. The models differ in size but they're all
-tiny, so the total is dominated by dataset iteration (~26,500 items across the five
-tasks), not by model forward passes. Expect a few hours, longer because you're sharing
-the card at 87% utilisation.
+`nohup ... &` keeps it alive when SSH drops; `--wait` makes it queue politely until
+enough VRAM is free. To stop the actual run: `kill <pid>` (the pid is in the `Lock`
+line and in `pgrep -af run_benchmarks`) — the lock cleans itself up and the in-flight
+lm_eval is killed with it.
 
-If you need to stop it: Ctrl-C. It resumes **per model *and* per task**, so restarting
-loses at most the one task in flight.
+**Estimate your own timing rather than trusting mine:** watch the first model's
+`DONE ... in N min` line and multiply by 11. Two cost notes: MMLU dominates the
+multiple-choice tasks (14,042 items of the ~33,000 total), and **gsm8k is the one
+generative task** — the model writes out a solution per item instead of scoring four
+options, so on the batch-1 big-vocab models (gemma, Qwen) it can take longer than
+every other task combined. It runs last per model, so the cheap results land first.
+
+However it stops — `kill`, Ctrl-C on a foreground run, reboot — it resumes **per
+model *and* per task**, so restarting loses at most the one task in flight. A model
+counts as DONE only when **every** task has results; anything less shows up as
+RESUMING with a `k/8 tasks done` count in the next run's header.
 
 ### While it runs, the four things worth watching
 
@@ -336,9 +366,13 @@ python3 -m http.server 8899 --bind "$(tailscale ip -4)"
 # Ctrl-C stops it. If `tailscale ip` needs sudo, get the IP from the Tailscale admin page.
 ```
 
-One self-contained HTML file — no server, no assets. It contains scores with error
-bars, a pairwise significance test, every metric including MMLU's 57 subjects, and a
-provenance table. Send it to anyone.
+One self-contained HTML file — no server, no assets, works from a `file://` open, an
+email attachment, or `python -m http.server`. It's a full interactive dashboard:
+tabs for **Overview / Leaderboard / Tasks / Scaling / Perplexity / Significance /
+Runs**, a sortable leaderboard, model search and base/instruct filters, a
+score-vs-parameters scaling chart with chance lines, a pairwise z-test matrix,
+light/dark theme, and CSV/JSON export buttons. The data is embedded in the file, so
+regenerating after more models finish is the same one command.
 
 ---
 
@@ -352,14 +386,17 @@ These are arithmetic, not estimates:
 | MMLU | 4 | **25%** |
 | HellaSwag | 4 | **25%** |
 | ARC-Challenge | 4 | **25%** |
+| ARC-Easy | 4 | **25%** |
 | Winogrande | 2 | **50%** |
 | PIQA | 2 | **50%** |
+| TruthfulQA (mc2) | weighted, multi-true | no clean chance level |
+| GSM8K | generative | **0%** |
 
 That Winogrande row is the one that catches people: **50% on Winogrande is a total
 failure**, not a pass. Someone will misread it in a meeting. Have the number ready.
 
-**What to expect from this particular set.** Two things, and both are findings rather
-than problems:
+**What to expect from this particular set.** All of these are findings rather than
+problems:
 
 1. **MMLU will be flat at ~25% across all eleven models.** MMLU requires broad
    knowledge that doesn't appear until models are in the low billions of parameters.
@@ -368,6 +405,19 @@ than problems:
 2. **HellaSwag will rise with size.** Commonsense sentence completion emerges much
    earlier than knowledge does. So you should get a rising HellaSwag curve next to a
    flat MMLU one — different capabilities emerging at different scales, in one chart.
+3. **ARC-Easy is the early mover.** Same format as ARC-Challenge, easier questions —
+   it climbs well above chance even for these sizes, which is exactly why it's here:
+   it separates the small models where ARC-Challenge still can't.
+4. **TruthfulQA may go DOWN as models get better.** mc2 rewards not-endorsing common
+   misconceptions; bigger models imitate popular text more fluently, misconceptions
+   included. A flat or falling TruthfulQA next to rising everything-else is the
+   famous inverse-scaling result, live on your own hardware. (It's also 0-shot **by
+   design** — the task ships its own primer — so the report's few-shot warning
+   ignores it.)
+5. **GSM8K will be ~0–5% everywhere.** It's the one generative task: the model must
+   write a worked solution and the harness extracts the final number
+   (`exact_match`, flexible extraction). Written arithmetic essentially does not
+   exist below a billion parameters. Zero is the informative, correct answer.
 
 **The Pythia models are the valuable part.** `pythia-14m` → `70m` → `160m` → `410m`
 were trained by EleutherAI on **identical data in identical order**, differing only in
@@ -388,8 +438,9 @@ asserted.
 
 ## 9 · One decision I made for you, and how to reverse it
 
-I set few-shot counts to **5 for everything** (0 for PIQA), rather than the Open LLM
-Leaderboard v1 conventions (MMLU 5, HellaSwag 10, ARC-Challenge 25).
+I set few-shot counts to **5 for everything** (0 for PIQA and TruthfulQA — the
+latter is 0-shot by construction), rather than the Open LLM Leaderboard v1
+conventions (MMLU 5, HellaSwag 10, ARC 25, TruthfulQA 0, GSM8K 5).
 
 Why: **Pythia's context window is 2048 tokens, and a 25-shot ARC-Challenge prompt
 doesn't fit in it.** A prompt that gets silently truncated is a different question from
@@ -404,7 +455,7 @@ For a scaling study the second is right, because the whole point is comparing th
 models *to each other*. To switch:
 
 ```bash
-LEADERBOARD_SHOTS=1 ./aienh/scripts/run_benchmarks.sh full
+LEADERBOARD_SHOTS=1 bash aienh/scripts/run_benchmarks.sh full
 ```
 
 Either way, **state which you used** when you report. One line — "5-shot uniform,
@@ -419,7 +470,7 @@ Open `aienh/scripts/run_benchmarks.sh`, uncomment the billion-parameter models a
 bottom of the `MODELS` list, and run the **same command**:
 
 ```bash
-BACKEND=vllm BATCH=32 ./aienh/scripts/run_benchmarks.sh full
+BACKEND=vllm BATCH=32 bash aienh/scripts/run_benchmarks.sh full
 ```
 
 Everything already measured is skipped; only the new models run. `BACKEND=vllm` is much
@@ -429,7 +480,7 @@ front, which is antisocial while someone else is mid-training.
 To queue politely behind the running job instead of checking manually:
 
 ```bash
-MIN_FREE_MIB=12000 ./aienh/scripts/run_benchmarks.sh full --wait
+MIN_FREE_MIB=12000 bash aienh/scripts/run_benchmarks.sh full --wait
 ```
 
 It polls once a minute and starts the moment 12 GB is free.
@@ -458,7 +509,7 @@ Not the weights — the logits tensor. For loglikelihood evals, memory ≈
 5-shot MMLU tries to allocate ~12 GiB from a model whose weights are 0.6 GB; Qwen3's
 152K vocab tries ~6.5 GiB. Pythia and SmolLM2 (49–50K vocabs) are unaffected at
 batch 8. The model list carries per-model batch sizes for exactly this; the blunt
-override is `BATCH=1 ./aienh/scripts/run_benchmarks.sh smoke` — resume means only
+override is `BATCH=1 bash aienh/scripts/run_benchmarks.sh smoke` — resume means only
 the missing models re-run.
 
 **`CUDA out of memory` on a model that fit before**
@@ -467,9 +518,33 @@ here lost pythia-14m to exactly this). Just re-run — resume picks up only what
 missing. The script re-checks free memory before each model, so it usually skips
 rather than crashes.
 
+**`REFUSING TO START: another run of this script (PID ...) holds results/.run.lock`**
+Working as intended — one run at a time. `ps -o pid,etime,cmd -p <PID>` to see what it
+is; if it's a run you forgot about, either let it finish (`tail -f run.log`) or
+`kill <PID>` (which also kills its in-flight lm_eval and releases the lock). Only if
+the PID is genuinely dead and the message persists: `rm -rf results/.run.lock`.
+
+**Duplicate `DONE` lines / `DONE ... in 0 min` / DONE then SKIP for the same model**
+The signature of two runs racing each other (each one resuming past work the other
+just finished) — possible only before the lockfile existed. Kill the strays and see
+what actually exists on disk; results are per-(model, task) directories, so nothing
+raced is corrupt, at worst incomplete:
+
+```bash
+pgrep -af "run_benchmarks|lm_eval"        # any stray runs still alive?
+cd ~/benchmarks
+for d in results/full/*/; do
+  printf '%-45s %s tasks done\n' "$(basename "$d")" \
+    "$(find "$d" -name 'results*.json' | wc -l)"
+done
+```
+
+Then one fresh `run_benchmarks.sh full` fills every gap — the header's RESUMING line
+shows exactly what it thinks is missing.
+
 **A model shows `PARTIAL`**
-One task failed, the rest succeeded. Check `logs/<model>_full.log`. Re-running picks up
-only the missing task.
+One task failed, the rest succeeded. Check `logs/<model>_full.log` (the run prints the
+failing lines inline too). Re-running picks up only the missing task.
 
 **Scores don't match published numbers**
 Expected. Different harness version, few-shot count, prompt format, or metric (`acc` vs
@@ -494,8 +569,10 @@ you'll want when a number looks wrong — but watch `df -h "$HF_HOME"`.
    distinguishable at this sample size. Those are the ones people would otherwise argue
    about.
 3. **State the settings in one line.** 5-shot uniform, `acc_norm`, greedy, harness hash.
-4. **Say what these benchmarks don't measure.** All five are multiple-choice: the model
-   picks between given options and never produces anything. They say nothing about
-   instruction-following, tool use, long context or generation quality. If anyone is
-   about to choose a model on the strength of an MMLU score, that caveat is the most
-   useful thing you'll say all week.
+4. **Say what these benchmarks don't measure.** Seven of the eight are
+   multiple-choice: the model picks between given options and never produces
+   anything. GSM8K is the lone generative task and the perplexity slices measure raw
+   language modelling — between them you still have nothing on
+   instruction-following, tool use, long context or open-ended generation quality.
+   If anyone is about to choose a model on the strength of an MMLU score, that
+   caveat is the most useful thing you'll say all week.

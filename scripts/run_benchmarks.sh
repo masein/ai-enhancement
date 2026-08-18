@@ -6,11 +6,15 @@
 #   ./scripts/run_benchmarks.sh full      # the real run
 #   ./scripts/run_benchmarks.sh full --wait   # block until the card frees up, then go
 #
-# TWO PROPERTIES THAT MATTER ON A SHARED BOX:
+# THREE PROPERTIES THAT MATTER ON A SHARED BOX:
 #
 #   1. It runs whatever FITS RIGHT NOW. Each model carries an estimated VRAM cost;
 #      anything that doesn't fit in currently-free memory is skipped with a reason.
-#   2. It is RESUMABLE. A model whose results already exist is skipped.
+#   2. It is RESUMABLE, per task. A (model, task) pair with results is skipped; a
+#      model only counts as DONE when EVERY task has results — so partial models
+#      get finished, and adding a new task to the list re-runs just that task.
+#   3. ONE RUN AT A TIME. A lockfile refuses a second concurrent invocation —
+#      two runs racing on one card duplicate work and OOM each other.
 #
 # Together those mean you run the same command today with 3 GB free and get the
 # small models, then run it again tomorrow with 30 GB free and it picks up exactly
@@ -25,6 +29,38 @@ WAIT_FOR_GPU=0
 OUT_ROOT="${OUT_ROOT:-results}"
 LOGS="${LOGS:-logs}"
 SEED="${SEED:-1234}"
+
+# ---------------------------------------------------------------------------
+# one run at a time
+# ---------------------------------------------------------------------------
+# Two of these racing on one card is how you get duplicate DONE lines, phantom
+# "DONE in 0 min" (each run resuming past the other's work), and OOM-kills caused
+# by your own second job. `mkdir` is atomic, which makes it the standard shell
+# mutex. The lock lives under OUT_ROOT, so smoke and full share it — they share
+# the GPU, so they should.
+mkdir -p "$OUT_ROOT" "$LOGS"
+LOCK="$OUT_ROOT/.run.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  OWNER="$(cat "$LOCK/pid" 2>/dev/null || echo '?')"
+  if [[ -d "/proc/$OWNER" ]]; then
+    echo "REFUSING TO START: another run of this script (PID $OWNER) holds $LOCK"
+    echo "  see what it is:  ps -o pid,etime,cmd -p $OWNER"
+    echo "  watch it:        tail -f run.log   (or wherever you nohup'd it)"
+    echo "  if it is wedged: kill $OWNER        # the lock cleans itself up"
+    exit 1
+  fi
+  echo "Stale lock from PID $OWNER (no longer running) — taking over."
+  rm -rf "$LOCK"; mkdir "$LOCK"
+fi
+echo "$$" > "$LOCK/pid"
+# Cleanup must also kill the in-flight lm_eval: bash delivers signals only between
+# commands, so lm_eval runs backgrounded with a `wait` (interruptible) and the trap
+# kills it explicitly. Otherwise `kill <this script>` leaves lm_eval on the GPU.
+LM_PID=""
+cleanup() { [[ -n "${LM_PID:-}" ]] && kill "$LM_PID" 2>/dev/null; rm -rf "$LOCK"; }
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # ---------------------------------------------------------------------------
 # what to run —  "hf_id | base|instruct | approx GB of VRAM needed | batch"
@@ -103,12 +139,25 @@ MODELS=(
 #
 # For a scaling study (b) is the right call: the whole point is comparing models to
 # each other. Say which you used. Set LEADERBOARD_SHOTS=1 to switch to (a).
+# Task notes, so nobody re-litigates the choices later:
+#   arc_easy        same format as arc_challenge but actually moves at this scale —
+#                   tiny models are far above chance here while ARC-C sits near it.
+#   truthfulqa_mc2  0-shot BY DESIGN (the task ships its own QA primer). Famous for
+#                   NOT improving with scale — bigger models imitate popular
+#                   misconceptions more fluently. A flat or falling curve is signal.
+#   gsm8k           the one GENERATIVE task here: the model writes a solution and the
+#                   harness extracts the final number. Expect ~0 below 1B — that is
+#                   the finding, not a bug. Runs LAST because generation is slow.
+# From the same doc: GPQA is skipped (gated dataset, graduate-level — pure chance
+# for models this size) and MATH is skipped (same reason, plus a slow judge).
 if [[ "${LEADERBOARD_SHOTS:-0}" == "1" ]]; then
-  declare -A NFEWSHOT=([mmlu]=5 [hellaswag]=10 [arc_challenge]=25 [winogrande]=5 [piqa]=0)
+  declare -A NFEWSHOT=([mmlu]=5 [hellaswag]=10 [arc_challenge]=25 [arc_easy]=25
+                       [winogrande]=5 [piqa]=0 [truthfulqa_mc2]=0 [gsm8k]=5)
 else
-  declare -A NFEWSHOT=([mmlu]=5 [hellaswag]=5 [arc_challenge]=5 [winogrande]=5 [piqa]=0)
+  declare -A NFEWSHOT=([mmlu]=5 [hellaswag]=5 [arc_challenge]=5 [arc_easy]=5
+                       [winogrande]=5 [piqa]=0 [truthfulqa_mc2]=0 [gsm8k]=5)
 fi
-TASK_ORDER=(${TASKS_OVERRIDE:-mmlu hellaswag arc_challenge winogrande piqa})
+TASK_ORDER=(${TASKS_OVERRIDE:-mmlu hellaswag arc_challenge arc_easy winogrande piqa truthfulqa_mc2 gsm8k})
 
 # ---------------------------------------------------------------------------
 # custom tasks from eval_tasks/  (see scripts/make_ppl_task.py)
@@ -180,6 +229,7 @@ if [[ -n "$PIDS" ]]; then
 fi
 echo "HF cache: ${HF_HOME:-$HOME/.cache/huggingface} ($(df -h "${HF_HOME:-$HOME/.cache/huggingface}" 2>/dev/null | awk 'NR==2{print $4}' || echo '?') free)"
 echo "Backend : $BACKEND   batch=$BATCH   seed=$SEED"
+echo "Lock    : $LOCK (pid $$ — a second run will refuse to start until this one exits)"
 [[ -n "$INCLUDE_ARG" ]] && echo "Custom  : $INCLUDE_ARG ($(ls "$EVAL_TASKS_DIR"/*.yaml 2>/dev/null | wc -l) task(s))"
 
 if (( FREE < MIN_FREE_MIB )); then
@@ -202,25 +252,35 @@ mkdir -p "$OUT" "$LOGS"
 # decide what fits
 # ---------------------------------------------------------------------------
 TASKS=$(IFS=,; echo "${TASK_ORDER[*]}")
-RUNNABLE=(); TOO_BIG=(); ALREADY=()
+RUNNABLE=(); TOO_BIG=(); ALREADY=(); RESUMING=()
 
 for entry in "${MODELS[@]}"; do
   IFS='|' read -r MODEL KIND NEED_GB MBATCH <<< "$entry"
   SAFE="${MODEL//\//__}"
   NEED_MIB=$(python3 -c "print(int($NEED_GB * 1024))")
 
-  if compgen -G "$OUT/$SAFE/**/results*.json" > /dev/null 2>&1; then
+  # "Done" means EVERY task has a results file — not "any results exist". The
+  # any-results version marked partially-failed models as finished forever, and
+  # meant a task added to TASK_ORDER never ran for models that were already done.
+  MISSING=0
+  for T in "${TASK_ORDER[@]}"; do
+    TS="${NFEWSHOT[$T]:-0}"
+    compgen -G "$OUT/$SAFE/${T}_${TS}shot/**/results*.json" > /dev/null 2>&1 || MISSING=$(( MISSING + 1 ))
+  done
+  if (( MISSING == 0 )); then
     ALREADY+=("$MODEL"); continue
   fi
   if (( NEED_MIB > FREE )); then
     TOO_BIG+=("$MODEL (needs ~${NEED_GB} GB)"); continue
   fi
+  (( MISSING < ${#TASK_ORDER[@]} )) && RESUMING+=("$MODEL ($(( ${#TASK_ORDER[@]} - MISSING ))/${#TASK_ORDER[@]} tasks done)")
   RUNNABLE+=("$entry")
 done
 
 echo "Tasks   : $TASKS"
 echo "--------------------------------------------------------------------------"
 printf 'WILL RUN  (%d): %s\n' "${#RUNNABLE[@]}" "$(printf '%s ' "${RUNNABLE[@]%%|*}")"
+(( ${#RESUMING[@]} )) && printf 'RESUMING  (%d): %s\n' "${#RESUMING[@]}" "$(printf '%s; ' "${RESUMING[@]}")"
 (( ${#ALREADY[@]} )) && printf 'DONE      (%d): %s\n' "${#ALREADY[@]}" "${ALREADY[*]}"
 if (( ${#TOO_BIG[@]} )); then
   printf 'TOO BIG   (%d): %s\n' "${#TOO_BIG[@]}" "$(printf '%s; ' "${TOO_BIG[@]}")"
@@ -285,8 +345,11 @@ for entry in "${RUNNABLE[@]}"; do
       --output_path "$TASK_OUT" \
       --log_samples \
       $INCLUDE_ARG $CHAT_ARG $DEVICE_ARG $LIMIT_ARG \
-      >> "$LOGS/${SAFE}_${MODE}.log" 2>&1
+      >> "$LOGS/${SAFE}_${MODE}.log" 2>&1 &
+    LM_PID=$!
+    wait "$LM_PID"
     STATUS=$?
+    LM_PID=""
     set -e
     if (( STATUS != 0 )); then
       echo "FAILED (exit $STATUS)"
@@ -321,5 +384,7 @@ done
 
 echo "=========================================================================="
 echo "Build the report:"
-echo "  python scripts/report_lm_eval.py $OUT -o artifacts/benchmark_report.html --csv artifacts/benchmark.csv"
+# $(dirname $0) makes this copy-pasteable from wherever the script was invoked,
+# instead of assuming the caller's cwd is the repo root.
+echo "  python $(dirname "$0")/report_lm_eval.py $OUT -o artifacts/benchmark_report.html --csv artifacts/benchmark.csv"
 echo "=========================================================================="

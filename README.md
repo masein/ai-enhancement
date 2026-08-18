@@ -123,14 +123,17 @@ python scripts/wandb_example.py            # the five W&B calls that matter
 
 ## Benchmarking real models on a GPU server
 
-Separate from the toy pipeline: download real open models, run MMLU / HellaSwag
-through lm-evaluation-harness, and produce a shareable HTML report with standard
-errors and significance testing. See [`docs/14`](docs/14-benchmarking-real-models.md).
+Separate from the toy pipeline: download real open models, run eight benchmarks
+(MMLU, HellaSwag, ARC-E/C, Winogrande, PIQA, TruthfulQA, GSM8K) plus pinned corpus
+perplexity through lm-evaluation-harness, and produce a self-contained interactive
+HTML dashboard — sortable leaderboard, scaling curves, significance matrix, CSV
+export. See [`docs/14`](docs/14-benchmarking-real-models.md) and
+[`BENCHMARK-RUN.md`](BENCHMARK-RUN.md).
 
 ```bash
-./scripts/run_benchmarks.sh smoke      # 20 items/task, validates the plumbing
-./scripts/run_benchmarks.sh full       # the real run, hours
-python scripts/report_lm_eval.py results -o artifacts/benchmark_report.html --csv artifacts/benchmark.csv
+bash scripts/run_benchmarks.sh smoke   # 20 items/task, validates the plumbing
+bash scripts/run_benchmarks.sh full    # the real run, hours; lockfile + per-task resume
+python scripts/report_lm_eval.py results/full -o artifacts/benchmark_report.html --csv artifacts/benchmark.csv
 ```
 
 ## Experiment tracking
