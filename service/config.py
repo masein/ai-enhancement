@@ -32,6 +32,13 @@ TASK_TIMEOUT_S = int(os.environ.get("TASK_TIMEOUT_S", str(3 * 3600)))
 MAX_PARAMS_B = float(os.environ.get("MAX_PARAMS_B", "4"))  # reject >4B params (bf16 ≈ 8 GB weights)
 SUBMIT_TOKEN = os.environ.get("SUBMIT_TOKEN", "")          # empty = no token required
 
+# Artifact storage: checkpoints uploaded directly to this box instead of the HF
+# Hub. They are ordinary model directories under ARTIFACTS_DIR and get evaluated
+# as `local/<name>`. Quotas exist because friends iterate and disks do not.
+ARTIFACTS_DIR = Path(os.environ.get("ARTIFACTS_DIR", BENCH_ROOT / "artifacts"))
+ARTIFACT_MAX_GB = float(os.environ.get("ARTIFACT_MAX_GB", "8"))     # per upload
+ARTIFACT_QUOTA_GB = float(os.environ.get("ARTIFACT_QUOTA_GB", "150"))  # total dir
+
 # The benchmark suite — one place, mirrored from run_benchmarks.sh. quick is for
 # iteration (minutes); full is the comparable number. Both write into the same
 # tree, so a quick run later "upgrades" to full by running only the missing tasks.

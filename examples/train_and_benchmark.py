@@ -104,41 +104,75 @@ def packed_batches(dataset_id, field, tokenizer, seq_len, batch_size):
 # ---------------------------------------------------------------------------
 
 def train(args, bench):
+    import tempfile
+
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"device: {device} · base: {args.base_model} · {args.steps} steps "
-          f"of {args.batch_size}×{args.seq_len} tokens")
+    run_name = args.run_name or f"demo-{int(time.time()) % 100000}"
+    print(f"device: {device} · base: {args.base_model} · run: {run_name} · "
+          f"{args.steps} steps of {args.batch_size}×{args.seq_len} tokens")
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model)
     model = AutoModelForCausalLM.from_pretrained(args.base_model).to(device)
     model.train()
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
 
-    submitted = []          # (step, repo_id, submission_id | None)
+    # run tracking: curves appear live on the dashboard's Training tab. If no
+    # service is reachable, run=None and everything still works locally.
+    run = None
+    if bench:
+        try:
+            run = bench.init(run_name, project=args.project, submitter=args.submitter,
+                             config={"base_model": args.base_model, "dataset": args.dataset,
+                                     "lr": args.lr, "batch_size": args.batch_size,
+                                     "seq_len": args.seq_len, "steps": args.steps,
+                                     "device": device},
+                             hf_prefix=args.push_to or f"local/{run_name}")
+            print(f"  tracking as training run #{run.id} — watch the Training tab")
+        except BenchError as e:
+            print(f"  run tracking unavailable (non-fatal): {e}")
+
+    submitted = []          # (step, model_id, submission_id | None)
 
     def checkpoint(step, running_loss):
+        # 1) materialize the checkpoint
         if args.local_only:
             out = Path(f"checkpoint-step{step}")
             model.save_pretrained(out)
             tokenizer.save_pretrained(out)
             print(f"  [ckpt] step {step}: saved locally to {out}/ (local-only mode)")
             return
-        repo = f"{args.push_to}-step{step}"
-        print(f"  [ckpt] step {step}: pushing {repo} ...")
-        model.push_to_hub(repo)
-        tokenizer.push_to_hub(repo)      # without this, evaluation cannot load it
-        try:
-            sid = bench.submit(repo, suite=args.suite, kind="base",
-                               submitter=args.submitter,
-                               note=f"step {step}, loss {running_loss:.3f}")
-            print(f"  [ckpt] step {step}: submitted as #{sid} (not waiting — training continues)")
-            submitted.append((step, repo, sid))
-        except BenchError as e:
-            # the pattern API.md preaches: benchmarking must never kill training
-            print(f"  [ckpt] step {step}: submit failed (non-fatal): {e}")
-            submitted.append((step, repo, None))
+        if args.push_to:                       # Hub mode — needs a write token
+            model_id = f"{args.push_to}-step{step}"
+            print(f"  [ckpt] step {step}: pushing {model_id} to the Hub ...")
+            model.push_to_hub(model_id)
+            tokenizer.push_to_hub(model_id)    # without this, evaluation cannot load it
+        else:                                  # artifact mode — no HF account at all
+            with tempfile.TemporaryDirectory() as td:
+                model.save_pretrained(td)
+                tokenizer.save_pretrained(td)
+                try:
+                    model_id = bench.upload_artifact(f"{run_name}-step{step}", td)
+                except BenchError as e:
+                    print(f"  [ckpt] step {step}: upload failed (non-fatal): {e}")
+                    return
+            print(f"  [ckpt] step {step}: uploaded as {model_id}")
+        # 2) mark it on the run + queue the benchmark, without waiting
+        if run:
+            sid = run.log_checkpoint(step, model_id, suite=args.suite,
+                                     note=f"{run_name} step {step}, loss {running_loss:.3f}")
+        else:
+            try:
+                sid = bench.submit(model_id, suite=args.suite, submitter=args.submitter,
+                                   note=f"step {step}, loss {running_loss:.3f}")
+            except BenchError as e:
+                print(f"  [ckpt] step {step}: submit failed (non-fatal): {e}")
+                sid = None
+        if sid:
+            print(f"  [ckpt] step {step}: benchmark queued as #{sid}")
+        submitted.append((step, model_id, sid))
 
     batches = packed_batches(args.dataset, args.field, tokenizer,
                              args.seq_len, args.batch_size)
@@ -148,17 +182,25 @@ def train(args, bench):
         loss = model(input_ids=ids, labels=ids).loss
         opt.zero_grad(set_to_none=True)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        gnorm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step()
         running = loss.item() if running is None else 0.95 * running + 0.05 * loss.item()
+        tok_s = step * args.batch_size * args.seq_len / (time.time() - t0)
+        if run:
+            m = {"loss": loss.item(), "lr": args.lr, "grad_norm": float(gnorm),
+                 "tokens_per_s": tok_s}
+            if device == "cuda":
+                m["gpu_mem_gb"] = torch.cuda.memory_allocated() / 1e9
+            run.log(m, step=step)
         if step % 10 == 0 or step == 1:
-            tok_s = step * args.batch_size * args.seq_len / (time.time() - t0)
             print(f"  step {step:>5}  loss {loss.item():.3f}  (avg {running:.3f}, "
                   f"CE nats/token — compare the nats/byte column on the dashboard)  "
                   f"{tok_s:,.0f} tok/s")
         if step % args.checkpoint_every == 0 or step == args.steps:
             checkpoint(step, running)
 
+    if run:
+        run.finish()
     return submitted
 
 
@@ -199,7 +241,11 @@ def main() -> int:
                     help="skip training; submit a known public model to prove the service works")
     ap.add_argument("--local-only", action="store_true",
                     help="train + save locally; never touch the Hub or the service")
-    ap.add_argument("--push-to", help="Hub repo prefix, e.g. youruser/bench-demo")
+    ap.add_argument("--push-to", help="OPTIONAL Hub repo prefix (needs a write token). "
+                    "Without it, checkpoints upload to the service's artifact storage — "
+                    "no HF account needed.")
+    ap.add_argument("--run-name", help="training-run name on the dashboard (default: demo-<time>)")
+    ap.add_argument("--project", default="default")
     ap.add_argument("--base-model", default="EleutherAI/pythia-14m")
     ap.add_argument("--dataset", default="roneneldan/TinyStories")
     ap.add_argument("--field", default="text")
@@ -232,11 +278,12 @@ def main() -> int:
         print("service OK — the whole pipeline works.")
         return 0
 
-    if not args.local_only:
-        if not args.bench or not args.push_to:
-            ap.error("full mode needs --bench and --push-to (or use --local-only / --dry-run)")
-        if "/" not in (args.push_to or ""):
-            ap.error("--push-to must look like username/repo-prefix")
+    if not args.local_only and not args.bench:
+        ap.error("full mode needs --bench (or use --local-only / --dry-run). "
+                 "Checkpoints go to the service's artifact storage by default; "
+                 "add --push-to user/prefix to use the HF Hub instead.")
+    if args.push_to and "/" not in args.push_to:
+        ap.error("--push-to must look like username/repo-prefix")
 
     submitted = train(args, bench)
     if args.local_only or args.no_wait or not submitted:

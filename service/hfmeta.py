@@ -48,7 +48,55 @@ def estimate(vocab: int, params: int | None) -> tuple[int, float]:
     return 1, round(weights_gb + SEQ_LEN * vocab * LOGITS_FACTOR / 1e9 + OVERHEAD_GB, 2)
 
 
+LOCAL_PREFIX = "local/"
+
+
+def _preflight_local(name: str) -> dict:
+    """An uploaded artifact: same decisions as the Hub path, answered from disk."""
+    d = config.ARTIFACTS_DIR / name
+    if not d.is_dir():
+        raise PreflightError(f"no uploaded artifact named {name!r} — upload it first "
+                             f"(POST /api/artifacts/{name}) or check the name.")
+    try:
+        cfg = json.loads((d / "config.json").read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        raise PreflightError(f"artifact {name!r} has no readable config.json — not a "
+                             f"loadable checkpoint.") from e
+    if cfg.get("auto_map"):
+        raise PreflightError(f"artifact {name!r} requires trust_remote_code — this "
+                             f"service does not execute uploaded code.")
+    # pickled weights execute arbitrary code on load; only safetensors are evaluated
+    if list(d.glob("*.bin")):
+        raise PreflightError(
+            f"artifact {name!r} contains pickle-format weights (*.bin), which execute "
+            f"code when loaded. Re-save with save_pretrained(..., safe_serialization=True) "
+            f"— the default in modern transformers — and re-upload.")
+    st = list(d.glob("*.safetensors"))
+    if not st:
+        raise PreflightError(f"artifact {name!r} has no *.safetensors weights.")
+    vocab = cfg.get("vocab_size") or (cfg.get("text_config") or {}).get("vocab_size")
+    if not vocab:
+        raise PreflightError(f"could not read vocab_size from {name!r}'s config.json.")
+    params = int(sum(f.stat().st_size for f in st) / 2)   # bf16/fp16 ≈ 2 bytes/param
+    if params / 1e9 > config.MAX_PARAMS_B:
+        raise PreflightError(f"artifact {name!r} is ~{params / 1e9:.1f}B params by file "
+                             f"size; the cap is {config.MAX_PARAMS_B:g}B.")
+    tok_cfg = {}
+    if (d / "tokenizer_config.json").exists():
+        try:
+            tok_cfg = json.loads((d / "tokenizer_config.json").read_text())
+        except (OSError, json.JSONDecodeError):
+            pass
+    has_template = bool(tok_cfg.get("chat_template")) or (d / "chat_template.jinja").exists()
+    batch, need = estimate(int(vocab), params)
+    return {"params": params, "vocab": int(vocab), "batch": batch, "need_gb": need,
+            "kind_detected": "instruct" if has_template else "base",
+            "architectures": cfg.get("architectures") or []}
+
+
 def preflight(hf_id: str) -> dict:
+    if hf_id.startswith(LOCAL_PREFIX):            # uploaded artifact — never touches the Hub
+        return _preflight_local(hf_id[len(LOCAL_PREFIX):])
     if os.environ.get("STUB_PREFLIGHT") == "1":   # offline tests
         batch, need = estimate(50304, 14_000_000)
         return {"params": 14_000_000, "vocab": 50304, "batch": batch,

@@ -89,6 +89,8 @@ re-queued automatically and per-task resume repeats only the interrupted task.
 | `MAX_JOB_GB` | 10 | VRAM budget a job may plan for (drives batch choice) |
 | `SUBMIT_TOKEN` | *(unset)* | if set, submits need it — friends use `http://…/?token=<value>` |
 | `TASK_TIMEOUT_S` | 10800 | kill a single task after this |
+| `ARTIFACT_MAX_GB` | 8 | per-upload cap for checkpoint artifacts |
+| `ARTIFACT_QUOTA_GB` | 150 | total artifact storage before uploads are refused |
 | `BENCH_ROOT` | cwd | the directory holding results/, eval_tasks/, logs/ |
 
 ## How a submission behaves
@@ -140,5 +142,6 @@ up after `GPU_WAIT_MAX_S` with a resubmit-later message.
 
 ## Backup
 
-Two things hold all state: the `results/` tree and `service.sqlite3`. Copy those,
+Three things hold all state: the `results/` tree, `service.sqlite3` (queue +
+training runs + metrics), and `artifacts/` (uploaded checkpoints). Copy those,
 and a fresh checkout of this repo reproduces the rest.

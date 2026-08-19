@@ -108,6 +108,7 @@ class Bench:
         """The full dashboard payload — see API.md § payload schema."""
         return self._call("/api/results")
 
+    # -- run tracking (the wandb-shaped half) -------------------------------------
     def scores(self, hf_id: str) -> dict:
         """Headline metric per task for one model:
         {task: {value, stderr, metric, shots, lower_is_better}}"""
@@ -122,6 +123,129 @@ class Bench:
                              "lower_is_better": bool(info.get("lower"))}
         return out
 
+
+    def init(self, name: str, project: str = "default", config: dict | None = None,
+             submitter: str = "", hf_prefix: str = "") -> "Run":
+        """Start a tracked training run. Use as a context manager:
+
+            with bench.init("run7", config={"lr": 3e-4}) as run:
+                run.log({"loss": loss, "lr": lr}, step=step)
+                run.log_checkpoint(step, "local/run7-step200")   # marks + submits
+
+        finish() is called on exit (status "failed" if an exception escaped)."""
+        r = self._call("/api/truns", {"name": name, "project": project,
+                                      "config": config or {}, "submitter": submitter,
+                                      "hf_prefix": hf_prefix})
+        return Run(self, int(r["id"]), name)
+
+    def upload_artifact(self, name: str, checkpoint_dir) -> str:
+        """Zip a save_pretrained() directory and upload it as artifact `name`.
+        Returns the model id to submit: "local/<name>". No HF account involved."""
+        import os
+        import tempfile
+        import zipfile
+        from pathlib import Path as _P
+        d = _P(checkpoint_dir)
+        if not (d / "config.json").exists():
+            raise BenchError(f"{d} does not look like a checkpoint (no config.json)")
+        # zip to a temp file and stream it — checkpoints are hundreds of MB and
+        # do not belong in RAM twice
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tf:
+            tmp = tf.name
+        try:
+            with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as z:
+                for f in sorted(d.rglob("*")):
+                    if f.is_file():
+                        z.write(f, f.relative_to(d))
+            size = os.path.getsize(tmp)
+            with open(tmp, "rb") as fh:
+                req = urllib.request.Request(
+                    f"{self.base}/api/artifacts/{name}", data=fh,
+                    headers={"Content-Type": "application/zip", "X-Token": self.token,
+                             "Content-Length": str(size)}, method="POST")
+                try:
+                    with urllib.request.urlopen(req, timeout=max(self.timeout, 1800)) as r:
+                        return json.loads(r.read().decode())["model_id"]
+                except urllib.error.HTTPError as e:
+                    try:
+                        detail = json.loads(e.read().decode()).get("detail", "")
+                    except Exception:
+                        detail = ""
+                    raise BenchError(f"{e.code} uploading {name}: "
+                                     f"{detail or e.reason}") from None
+        finally:
+            os.unlink(tmp)
+
+
+class Run:
+    """A live training run: buffered metric logging that NEVER raises into the
+    training loop, checkpoint markers that also queue the benchmark, finish()."""
+
+    FLUSH_EVERY = 64          # points
+    FLUSH_SECS = 10.0
+
+    def __init__(self, bench: Bench, rid: int, name: str):
+        self.bench, self.id, self.name = bench, rid, name
+        self._buf: list[dict] = []
+        self._last_flush = time.time()
+        self._warned = False
+
+    # context manager: finish cleanly, mark failed if an exception escaped
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, *_):
+        self.finish("failed" if exc_type else "finished")
+        return False
+
+    def log(self, metrics: dict, step: int) -> None:
+        for k, v in metrics.items():
+            try:
+                self._buf.append({"step": int(step), "name": str(k), "value": float(v)})
+            except (TypeError, ValueError):
+                continue
+        if len(self._buf) >= self.FLUSH_EVERY or \
+           time.time() - self._last_flush > self.FLUSH_SECS:
+            self.flush()
+
+    def flush(self) -> None:
+        if not self._buf:
+            return
+        batch, self._buf = self._buf, []
+        self._last_flush = time.time()
+        try:
+            self.bench._call(f"/api/truns/{self.id}/log", {"metrics": batch})
+            self._warned = False
+        except BenchError as e:
+            if not self._warned:      # complain once, then stay quiet — never kill training
+                print(f"[bench] metric logging failing (non-fatal): {e}", file=sys.stderr)
+                self._warned = True
+
+    def log_checkpoint(self, step: int, model_id: str, submit: bool = True,
+                       suite: str = "quick", note: str = "") -> int | None:
+        """Mark a checkpoint at `step` and (by default) queue it for evaluation.
+        `model_id` is a Hub repo or a local/<name> artifact id."""
+        self.flush()
+        try:
+            self.bench._call(f"/api/truns/{self.id}/event",
+                             {"step": int(step), "kind": "checkpoint", "detail": model_id})
+        except BenchError as e:
+            print(f"[bench] checkpoint marker failed (non-fatal): {e}", file=sys.stderr)
+        if not submit:
+            return None
+        try:
+            return self.bench.submit(model_id, suite=suite,
+                                     note=note or f"{self.name} @ step {step}")
+        except BenchError as e:
+            print(f"[bench] checkpoint submit failed (non-fatal): {e}", file=sys.stderr)
+            return None
+
+    def finish(self, status: str = "finished") -> None:
+        self.flush()
+        try:
+            self.bench._call(f"/api/truns/{self.id}/finish", {"status": status})
+        except BenchError:
+            pass
 
 # -- CLI ------------------------------------------------------------------------
 

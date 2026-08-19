@@ -1,8 +1,12 @@
 # ai-enhancement — model benchmarking on a shared GPU
 
-Submit a Hugging Face model id; get it evaluated on a fixed lm-eval suite and
-placed on a live, interactive leaderboard the whole team can read. Built for one
-shared GPU and a handful of trusted users on a tailnet.
+Submit a Hugging Face model id — or upload a checkpoint directly, no HF account
+needed — and get it evaluated on a fixed lm-eval suite and placed on a live,
+interactive leaderboard the whole team can read. Training code can also stream
+its metrics here (wandb-style `run.log()`), giving live loss curves, run
+comparison with config diffs, and benchmark scores joined to training steps on
+one Training tab. Built for one shared GPU and a handful of trusted users on a
+tailnet.
 
 ```
 browser / training script ──► FastAPI + SQLite queue ──► one worker at a time

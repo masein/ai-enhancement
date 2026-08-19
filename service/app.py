@@ -11,14 +11,16 @@ face the open internet.
 
 from __future__ import annotations
 
+import html
 import json
+import math
 import re
 import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
@@ -92,7 +94,8 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         raise HTTPException(401, "bad or missing X-Token header")
     hf_id = s.hf_id.strip()
     if not _HF_ID_RE.match(hf_id):
-        raise HTTPException(422, "model id must look like org/name (a Hugging Face repo id)")
+        raise HTTPException(422, "model id must look like org/name — a Hugging Face repo "
+                                 "id, or local/<name> for an uploaded artifact")
     if s.kind not in ("auto", "base", "instruct"):
         raise HTTPException(422, "kind must be auto, base or instruct")
     if s.suite not in ("quick", "full"):
@@ -116,6 +119,210 @@ def cancel(sid: int):
         raise HTTPException(409, "only queued submissions can be canceled — a running "
                                  "job finishes its current task")
     return {"id": sid, "status": "canceled"}
+
+
+# ---------------------------------------------------------------------------
+# training-run tracking — the wandb-shaped API (see API.md § run tracking)
+# ---------------------------------------------------------------------------
+
+class TrunIn(BaseModel):
+    name: str
+    project: str = "default"
+    submitter: str = ""
+    config: dict = {}
+    hf_prefix: str = ""
+
+
+class TrunLogIn(BaseModel):
+    metrics: list[dict]          # [{step:int, name:str, value:float}, ...]
+
+
+class TrunEventIn(BaseModel):
+    step: int
+    kind: str = "checkpoint"
+    detail: str = ""
+
+
+class TrunFinishIn(BaseModel):
+    status: str = "finished"
+
+
+def _check_token(x_token: str):
+    if config.SUBMIT_TOKEN and x_token != config.SUBMIT_TOKEN:
+        raise HTTPException(401, "bad or missing X-Token header")
+
+
+@app.post("/api/truns")
+def trun_create(t: TrunIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    name = t.name.strip()[:120]
+    if not name:
+        raise HTTPException(422, "run needs a name")
+    rid = db.trun_create(name, t.project.strip()[:80] or "default",
+                         t.submitter.strip()[:80],
+                         json.dumps(t.config)[:20000], t.hf_prefix.strip()[:200])
+    return {"id": rid}
+
+
+@app.post("/api/truns/{rid}/log")
+def trun_log(rid: int, body: TrunLogIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    if not db.trun_get(rid):
+        raise HTTPException(404, "no such run")
+    if len(body.metrics) > 5000:
+        raise HTTPException(422, "batch too large (max 5000 points per call)")
+    pts = []
+    for p in body.metrics:
+        try:
+            step, name, value = int(p["step"]), str(p["name"])[:80], float(p["value"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if math.isfinite(value):
+            pts.append((step, name, value))
+    return {"logged": db.trun_log(rid, pts) if pts else 0}
+
+
+@app.post("/api/truns/{rid}/event")
+def trun_event(rid: int, e: TrunEventIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    if not db.trun_get(rid):
+        raise HTTPException(404, "no such run")
+    db.trun_event(rid, e.step, e.kind[:40], e.detail[:300])
+    return {"ok": True}
+
+
+@app.post("/api/truns/{rid}/finish")
+def trun_finish(rid: int, f: TrunFinishIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    if f.status not in ("finished", "failed"):
+        raise HTTPException(422, "status must be finished or failed")
+    if not db.trun_get(rid):
+        raise HTTPException(404, "no such run")
+    db.trun_finish(rid, f.status)
+    return {"ok": True}
+
+
+@app.get("/api/truns")
+def trun_index(project: str | None = None, limit: int = 200):
+    return db.trun_list(project, min(limit, 500))
+
+
+@app.get("/api/truns/{rid}")
+def trun_detail(rid: int, max_points: int = 800):
+    run = db.trun_get(rid)
+    if not run:
+        raise HTTPException(404, "no such run")
+    return {"run": run, **db.trun_series(rid, max(50, min(max_points, 5000)))}
+
+
+# ---------------------------------------------------------------------------
+# artifact storage — upload a checkpoint directly, no Hub account needed.
+# Raw zip body (stdlib-friendly), streamed to disk, extracted with paranoia.
+# ---------------------------------------------------------------------------
+
+_ART_NAME_RE = re.compile(r"^[A-Za-z0-9._\-]{1,80}$")
+
+
+def _dir_bytes(d: Path) -> int:
+    return sum(f.stat().st_size for f in d.rglob("*") if f.is_file()) if d.is_dir() else 0
+
+
+@app.post("/api/artifacts/{name}")
+async def artifact_upload(name: str, request: Request, x_token: str = Header(default="")):
+    _check_token(x_token)
+    if not _ART_NAME_RE.match(name):
+        raise HTTPException(422, "artifact name: letters, digits, dot, dash, underscore only")
+    dest = config.ARTIFACTS_DIR / name
+    if dest.exists():
+        raise HTTPException(409, f"artifact {name!r} already exists — checkpoints are "
+                                 f"immutable; use a new name per checkpoint")
+    cap = int(config.ARTIFACT_MAX_GB * 1e9)
+    quota = int(config.ARTIFACT_QUOTA_GB * 1e9)
+    used = _dir_bytes(config.ARTIFACTS_DIR)
+    config.ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = config.ARTIFACTS_DIR / f".upload-{name}.zip"
+    got = 0
+    try:
+        with open(tmp, "wb") as fh:
+            async for chunk in request.stream():
+                got += len(chunk)
+                if got > cap:
+                    raise HTTPException(413, f"upload exceeds ARTIFACT_MAX_GB="
+                                             f"{config.ARTIFACT_MAX_GB:g}")
+                if used + got > quota:
+                    raise HTTPException(507, "artifact storage quota reached — delete "
+                                             "old artifacts (GET /api/artifacts to list)")
+                fh.write(chunk)
+        import zipfile
+        with zipfile.ZipFile(tmp) as z:
+            infos = [i for i in z.infolist() if not i.is_dir()]
+            if sum(i.file_size for i in infos) > cap * 3:
+                raise HTTPException(413, "zip expands past three times the upload cap")
+            # strip a single shared top-level directory if the zip has one
+            roots = {i.filename.split("/", 1)[0] for i in infos}
+            strip = (roots.pop() + "/") if len(roots) == 1 and all(
+                "/" in i.filename for i in infos) else ""
+            dest.mkdir(parents=True)
+            for i in infos:
+                rel = i.filename[len(strip):] if i.filename.startswith(strip) else i.filename
+                target = (dest / rel).resolve()
+                if not str(target).startswith(str(dest.resolve()) + "/"):
+                    raise HTTPException(422, f"zip member escapes the artifact dir: {i.filename}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with z.open(i) as src, open(target, "wb") as out:
+                    while True:
+                        buf = src.read(1 << 20)
+                        if not buf:
+                            break
+                        out.write(buf)
+        if not (dest / "config.json").exists():
+            raise HTTPException(422, "no config.json at the checkpoint root — zip the "
+                                     "directory save_pretrained() produced")
+        if list(dest.glob("*.bin")):
+            raise HTTPException(422, "pickle-format weights (*.bin) execute code on load "
+                                     "and are refused — re-save with safetensors")
+        return {"model_id": f"local/{name}", "bytes": _dir_bytes(dest)}
+    except HTTPException:
+        import shutil
+        shutil.rmtree(dest, ignore_errors=True)
+        raise
+    except Exception as e:                       # bad zip, disk error
+        import shutil
+        shutil.rmtree(dest, ignore_errors=True)
+        raise HTTPException(422, f"could not unpack upload: {e}") from e
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+@app.get("/api/artifacts")
+def artifact_index():
+    out = []
+    if config.ARTIFACTS_DIR.is_dir():
+        for d in sorted(config.ARTIFACTS_DIR.iterdir()):
+            if d.is_dir() and not d.name.startswith("."):
+                out.append({"name": d.name, "model_id": f"local/{d.name}",
+                            "bytes": _dir_bytes(d),
+                            "created": d.stat().st_mtime})
+    return {"artifacts": out,
+            "total_bytes": sum(a["bytes"] for a in out),
+            "quota_bytes": int(config.ARTIFACT_QUOTA_GB * 1e9)}
+
+
+@app.delete("/api/artifacts/{name}")
+def artifact_delete(name: str, x_token: str = Header(default="")):
+    _check_token(x_token)
+    if not _ART_NAME_RE.match(name):
+        raise HTTPException(422, "bad artifact name")
+    mid = f"local/{name}"
+    for row in db.recent(200):
+        if row["hf_id"] == mid and row["status"] in ACTIVE:
+            raise HTTPException(409, "that artifact is queued or being evaluated")
+    d = config.ARTIFACTS_DIR / name
+    if not d.is_dir():
+        raise HTTPException(404, "no such artifact")
+    import shutil
+    shutil.rmtree(d)
+    return {"deleted": name, "note": "its benchmark results stay on the leaderboard"}
 
 
 @app.get("/api/results")
@@ -154,3 +361,22 @@ _PAGE = (report.TEMPLATE
 @app.get("/", response_class=HTMLResponse)
 def index():
     return _PAGE
+
+
+# the friend-facing guide, served from the repo so onboarding is one link
+_GUIDE_MD = Path(__file__).resolve().parent.parent / "FRIENDS.md"
+
+
+@app.get("/guide", response_class=HTMLResponse)
+def guide():
+    text = (_GUIDE_MD.read_text(encoding="utf-8")
+            if _GUIDE_MD.exists() else "FRIENDS.md not found in this checkout.")
+    return (
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>Team benchmark — guide</title><style>"
+        "body{margin:0;background:#f9f9f7;color:#0b0b0b;font-family:system-ui,sans-serif}"
+        "@media(prefers-color-scheme:dark){body{background:#0d0d0d;color:#fff}}"
+        "pre{max-width:860px;margin:0 auto;padding:36px 22px;white-space:pre-wrap;"
+        "word-wrap:break-word;font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}"
+        "</style></head><body><pre>" + html.escape(text) + "</pre></body></html>")

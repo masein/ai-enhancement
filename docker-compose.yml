@@ -32,6 +32,8 @@ services:
       MAX_PARAMS_B: ${MAX_PARAMS_B:-4}
       MAX_JOB_GB: ${MAX_JOB_GB:-10}
       SUBMIT_TOKEN: ${SUBMIT_TOKEN:-}
+      ARTIFACT_MAX_GB: ${ARTIFACT_MAX_GB:-8}
+      ARTIFACT_QUOTA_GB: ${ARTIFACT_QUOTA_GB:-150}
     volumes:
       - ${BENCH_ROOT}:${BENCH_ROOT}
       - ${HF_HOME}:${HF_HOME}

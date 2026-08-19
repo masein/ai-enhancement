@@ -78,6 +78,11 @@ def parse_run(blob: dict, source: Path) -> dict:
     # the model id lives inside model_args as pretrained=<id>
     m = re.search(r"pretrained=([^,\s]+)", str(model_args))
     model = m.group(1) if m else (cfg.get("model_name") or source.parent.name)
+    # uploaded artifacts are evaluated by absolute path; normalize back to the
+    # local/<name> id they were submitted under so every view joins on one key
+    la = re.search(r"/artifacts/([^/,\s]+)/?$", model)
+    if la:
+        model = "local/" + la.group(1)
 
     tasks: dict[str, dict] = {}
     for task, metrics in (blob.get("results") or {}).items():
@@ -553,6 +558,20 @@ tr:last-child td { border-bottom:none; }
   padding:6px 10px; }
 .frm input:focus, .frm select:focus { outline:2px solid var(--accent-soft);
   border-color:var(--accent); }
+.tr-grid { display:grid; grid-template-columns:minmax(250px,320px) 1fr; gap:12px;
+  align-items:start; margin-top:12px; }
+@media (max-width:900px){ .tr-grid { grid-template-columns:1fr; } }
+.runrow { display:flex; gap:8px; padding:7px 9px; border-bottom:1px solid var(--grid);
+  cursor:pointer; align-items:center; font-size:13px; border-radius:6px; }
+.runrow:hover { background:var(--plane); }
+.runrow.sel { background:var(--accent-soft); }
+.rchip { width:10px; height:10px; border-radius:3px; border:1px solid var(--border);
+  flex:none; }
+.ctrl { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:2px 0 10px; }
+.ctrl input[type=range] { width:140px; accent-color:var(--accent); }
+.diffrow td { background:var(--accent-soft); }
+pre.mono { background:var(--plane); border:1px solid var(--border); border-radius:8px;
+  padding:10px 12px; margin:8px 0 0; }
 .mx { border-collapse:separate; border-spacing:2px; font-variant-numeric:tabular-nums;
   width:auto; }
 .mx th { border:0; font-size:10.5px; padding:3px 6px; text-transform:none; letter-spacing:0; }
@@ -592,9 +611,11 @@ const LIVE = DATA === null;
 const state = {
   q: '', kind: 'all', tab: 'overview',
   sort: { key: 'avg', dir: -1 },
-  runsQ: '',                           // the Runs tab query string
+  runsQ: '',                           // the Evals tab query string
   runsSort: { idx: 0, dir: 1 },        // column sort for the metric query table
   queue: [], qmsg: '',
+  trSel: [], trColors: {}, trSmooth: 0, trLog: false,   // Training tab
+  trRuns: [], trSeries: {}, trFetching: false,
 };
 
 // ---------- tiny DOM helper: everything dynamic goes through textContent ----------
@@ -1098,6 +1119,249 @@ function vRuns(ms) {
   return frag;
 }
 
+// ---------- live mode: training-run tracking (the wandb-shaped tab) ----------
+const trColor = slot => `var(--s${(slot % 8) + 1})`;
+const rel = ts => {
+  const s = Math.max(0, Date.now() / 1000 - ts);
+  return s < 90 ? `${Math.round(s)}s` : s < 5400 ? `${Math.round(s / 60)}m`
+       : s < 129600 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`;
+};
+const fmtv = v => !isFinite(v) ? '—' : Math.abs(v) >= 100 ? Math.round(v).toLocaleString()
+              : Math.abs(v) >= 1 ? v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
+              : v.toPrecision(3);
+const ema = (pts, a) => {
+  if (!a) return pts;
+  let s = null;
+  return pts.map(([x, y]) => [x, s = (s === null ? y : a * s + (1 - a) * y)]);
+};
+
+// One metric panel: lines = selected runs, crosshair readout, checkpoint markers.
+function lineChart(title, seriesList, o = {}) {
+  const W = 460, H = 235, L = 56, R = 14, T = 14, B = 28;
+  const smoothed = seriesList.map(s => ({ ...s, spts: ema(s.pts, o.smooth || 0) }));
+  const allPts = smoothed.flatMap(s => s.pts);
+  if (!allPts.length) return null;
+  let ys = allPts.map(p => p[1]);
+  const logY = o.logY && ys.every(y => y > 0);
+  if (logY) ys = ys.map(Math.log10);
+  const xmin = Math.min(...allPts.map(p => p[0])), xmax = Math.max(...allPts.map(p => p[0]));
+  let ymin = Math.min(...ys), ymax = Math.max(...ys);
+  if (ymin === ymax) { ymin -= 0.5; ymax += 0.5; }
+  const pad = (ymax - ymin) * 0.06;
+  ymin -= pad; ymax += pad;
+  const X = x => L + (W - L - R) * (x - xmin) / ((xmax - xmin) || 1);
+  const Y = v => { const t = logY ? Math.log10(Math.max(v, 1e-12)) : v;
+                   return T + (H - T - B) * (1 - (t - ymin) / (ymax - ymin)); };
+  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img',
+                              'aria-label': title });
+  // y gridlines: 4 loose ticks (log mode: powers of ten inside the range)
+  const yticks = [];
+  if (logY) {
+    for (let e = Math.ceil(ymin); e <= Math.floor(ymax); e++) yticks.push(e);
+    if (!yticks.length) yticks.push(ymin, ymax);
+  } else {
+    const step = (ymax - ymin) / 3.5, mag = Math.pow(10, Math.floor(Math.log10(step || 1)));
+    const st = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= step) || mag;
+    for (let v = Math.ceil(ymin / st) * st; v <= ymax; v += st) yticks.push(v);
+  }
+  for (const t of yticks) {
+    const yy = T + (H - T - B) * (1 - (t - ymin) / (ymax - ymin));
+    svg.append(el('svg:line', { x1: L, y1: yy, x2: W - R, y2: yy,
+      stroke: 'var(--grid)', 'stroke-width': 1 }));
+    svg.append(el('svg:text', { x: L - 7, y: yy + 3.5, 'font-size': 10,
+      fill: 'var(--muted)', 'text-anchor': 'end',
+      text: logY ? fmtv(Math.pow(10, t)) : fmtv(t) }));
+  }
+  for (const xv of [xmin, (xmin + xmax) / 2, xmax]) {
+    svg.append(el('svg:text', { x: X(xv), y: H - 8, 'font-size': 10,
+      fill: 'var(--muted)', 'text-anchor': 'middle', text: Math.round(xv).toLocaleString() }));
+  }
+  // checkpoint markers first (under the data)
+  for (const s of smoothed) for (const ev of (s.events || [])) {
+    if (ev.step < xmin || ev.step > xmax) continue;
+    svg.append(el('svg:line', { x1: X(ev.step), y1: T, x2: X(ev.step), y2: H - B,
+      stroke: s.color, 'stroke-width': 1, 'stroke-dasharray': '3 3', opacity: 0.5 }));
+  }
+  for (const s of smoothed) {
+    if (o.smooth > 0 && s.pts.length > 1)
+      svg.append(el('svg:polyline', { points: s.pts.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' '),
+        fill: 'none', stroke: s.color, 'stroke-width': 1.2, opacity: 0.25 }));
+    svg.append(el('svg:polyline', { points: s.spts.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' '),
+      fill: 'none', stroke: s.color, 'stroke-width': 2,
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+    const last = s.spts[s.spts.length - 1];
+    svg.append(el('svg:circle', { cx: X(last[0]), cy: Y(last[1]), r: 4,
+      fill: s.color, stroke: 'var(--surface-1)', 'stroke-width': 2 }));
+  }
+  // crosshair: nearest-step readout across every series, via the shared tooltip
+  const hair = el('svg:line', { x1: -9, y1: T, x2: -9, y2: H - B,
+    stroke: 'var(--axis)', 'stroke-width': 1 });
+  svg.append(hair);
+  const steps = [...new Set(allPts.map(p => p[0]))].sort((a, b) => a - b);
+  const overlay = el('svg:rect', { class: 'hit', x: L, y: 0, width: W - L - R, height: H,
+    onpointermove: e => {
+      const box = svg.getBoundingClientRect();
+      const fx = xmin + ((e.clientX - box.left) / box.width * W - L) / (W - L - R) * (xmax - xmin);
+      let lo = 0, hi = steps.length - 1;
+      while (lo < hi) { const mid = (lo + hi) >> 1; steps[mid] < fx ? lo = mid + 1 : hi = mid; }
+      const stp = (lo > 0 && fx - steps[lo - 1] < steps[lo] - fx) ? steps[lo - 1] : steps[lo];
+      hair.setAttribute('x1', X(stp)); hair.setAttribute('x2', X(stp));
+      const rows = [`step ${stp.toLocaleString()} — ${title}`];
+      for (const s of smoothed) {
+        let best = null;
+        for (const p of s.spts) if (best === null || Math.abs(p[0] - stp) < Math.abs(best[0] - stp)) best = p;
+        if (best && Math.abs(best[0] - stp) <= (xmax - xmin) * 0.05 + 1)
+          rows.push(`${s.label}: ${fmtv(best[1])}`);
+        const ev = (s.events || []).find(ev => ev.step === stp);
+        if (ev) rows.push(`⚑ checkpoint: ${ev.detail}`);
+      }
+      e.currentTarget.setAttribute('data-tip', JSON.stringify(rows));
+    },
+    onpointerleave: e => { hair.setAttribute('x1', -9); hair.setAttribute('x2', -9);
+                           e.currentTarget.removeAttribute('data-tip'); } });
+  svg.append(overlay);
+  return el('div', { class: 'panel' }, el('h3', { text: title }), svg);
+}
+
+async function loadTraining(force = false) {
+  if (!LIVE || state.trFetching) return;
+  state.trFetching = true;
+  try {
+    state.trRuns = await (await fetch('api/truns')).json();
+    await Promise.all(state.trSel.map(async id => {
+      const row = state.trRuns.find(r => r.id === id);
+      if (force || !state.trSeries[id] || (row && row.status === 'running'))
+        state.trSeries[id] = await (await fetch(`api/truns/${id}`)).json();
+    }));
+    if (state.tab === 'training') render();
+  } catch (e) { /* next poll retries */ }
+  finally { state.trFetching = false; }
+}
+
+function toggleRun(id) {
+  const i = state.trSel.indexOf(id);
+  if (i >= 0) {
+    state.trSel.splice(i, 1);
+    delete state.trColors[id];
+  } else {
+    if (state.trSel.length >= 8) { state.qmsg = ''; return; }   // palette cap
+    const used = new Set(Object.values(state.trColors));
+    let slot = 0; while (used.has(slot)) slot++;
+    state.trColors[id] = slot;                 // color follows the run while selected
+    state.trSel.push(id);
+  }
+  render();
+  loadTraining();
+}
+
+const METRIC_ORDER = ['loss', 'lr', 'grad_norm', 'tokens_per_s', 'gpu_mem_gb', 'gpu_util'];
+
+function vTraining() {
+  if (!state.trRuns.length && LIVE) loadTraining();
+  const frag = [];
+  // ---- left: the runs list --------------------------------------------------
+  const rows = state.trRuns.map(r => {
+    const sel = state.trSel.includes(r.id);
+    const stale = r.status === 'running' && (Date.now() / 1000 - r.updated_at) > 600;
+    return el('div', { class: 'runrow' + (sel ? ' sel' : ''), onclick: () => toggleRun(r.id),
+      role: 'button', tabindex: 0, title: `project: ${r.project} · started ${rel(r.created_at)} ago` },
+      el('span', { class: 'rchip', style: sel ? `background:${trColor(state.trColors[r.id])}` : '' }),
+      el('span', { style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis', text: r.name },
+        r.submitter ? el('span', { class: 'se', text: ` · ${r.submitter}` }) : ''),
+      el('span', { class: stale ? 'st st-muted' : r.status === 'running' ? 'st st-active'
+                        : r.status === 'failed' ? 'st st-failed' : 'st st-done',
+                   text: stale ? 'stale?' : r.status }),
+      el('span', { class: 'se', style: 'width:86px;text-align:right', text:
+        (r.last_step != null ? `step ${r.last_step.toLocaleString()}` : '—')
+        + (r.last_loss != null ? ` · ${fmtv(r.last_loss)}` : '') }));
+  });
+  const listCard = el('div', { class: 'card', style: 'margin:0' },
+    el('h2', { text: 'Training runs' }),
+    el('p', { class: 'sub', text: 'Click to overlay up to 8 runs. Streamed by your '
+      + 'training code via bench.init()/run.log() — see API.md.' }),
+    rows.length ? el('div', {}, rows)
+                : el('p', { class: 'small', text: 'No runs yet. From training code:' },
+                    el('pre', { class: 'mono', style: 'white-space:pre-wrap', text:
+'run = bench.init("run7", config={"lr": 3e-4})\n'
++ 'run.log({"loss": loss}, step=step)\n'
++ 'run.log_checkpoint(step, model_id)\n'
++ 'run.finish()' })));
+  // ---- right: controls + charts ----------------------------------------------
+  const selRuns = state.trSel.map(id => ({
+    row: state.trRuns.find(r => r.id === id),
+    det: state.trSeries[id], slot: state.trColors[id],
+  })).filter(x => x.row);
+  const right = [];
+  if (!selRuns.length) {
+    right.push(note('Select a run on the left — charts, config and its benchmark scores appear here.'));
+  } else {
+    const ctrl = el('div', { class: 'ctrl' },
+      el('span', { class: 'small', text: 'smoothing' }),
+      el('input', { type: 'range', min: 0, max: 0.95, step: 0.05, value: state.trSmooth,
+        oninput: e => { state.trSmooth = +e.target.value; render(); } }),
+      el('button', { 'aria-pressed': String(state.trLog),
+        onclick: () => { state.trLog = !state.trLog; render(); },
+        text: state.trLog ? 'log y: on' : 'log y: off' }),
+      el('span', { class: 'count-note', text:
+        selRuns.some(x => !x.det) ? 'loading series…' : '' }));
+    // one panel per metric name, union across selected runs
+    const names = [...new Set(selRuns.flatMap(x => Object.keys(x.det?.metrics || {})))];
+    names.sort((a, b) => {
+      const ia = METRIC_ORDER.indexOf(a), ib = METRIC_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    });
+    const panels = names.map(nm => lineChart(nm,
+      selRuns.filter(x => x.det?.metrics?.[nm]?.length).map(x => ({
+        label: x.row.name, color: trColor(x.slot),
+        pts: x.det.metrics[nm], events: x.det.events || [],
+      })), { smooth: state.trSmooth, logY: state.trLog })).filter(Boolean);
+    right.push(ctrl, el('div', { class: 'panels' }, panels));
+    // ---- benchmark join: single run selected → scores vs step -----------------
+    if (selRuns.length === 1 && selRuns[0].det) {
+      const evs = (selRuns[0].det.events || []).filter(e => e.kind === 'checkpoint');
+      const series = DATA.accTasks.map((t, i) => ({
+        label: t, color: trColor(i),
+        pts: evs.map(ev => cell(t, ev.detail) ? [ev.step, cell(t, ev.detail).v] : null)
+                .filter(Boolean),
+      })).filter(s => s.pts.length);
+      const pending = evs.filter(ev => !DATA.accTasks.some(t => cell(t, ev.detail))).length;
+      if (series.length || evs.length) {
+        const panel = series.length
+          ? lineChart('benchmark score vs step', series, {})
+          : note('Checkpoints are queued — scores appear here when evaluation finishes.');
+        right.push(el('div', { class: 'card' },
+          el('h2', { text: 'Benchmarks along this run' }),
+          el('p', { class: 'sub', text: 'Every checkpoint this run submitted, joined to its '
+            + 'scores on the leaderboard — capability versus training step, next to the loss.'
+            + (pending ? ` ${pending} checkpoint(s) still evaluating.` : '') }),
+          panel));
+      }
+    }
+    // ---- config: table for one run, diff for several ---------------------------
+    const cfgs = selRuns.map(x => { try { return JSON.parse(x.row.config || '{}'); }
+                                    catch { return {}; } });
+    const keys = [...new Set(cfgs.flatMap(c => Object.keys(c)))].sort();
+    if (keys.length) {
+      const diffRows = keys.map(k => {
+        const vals = cfgs.map(c => c[k] === undefined ? '—' : JSON.stringify(c[k]));
+        const differ = new Set(vals).size > 1;
+        return el('tr', { class: differ && selRuns.length > 1 ? 'diffrow' : '' },
+          el('td', {}, el('span', { class: 'mono', text: k })),
+          vals.map(v => el('td', { class: 'num', text: v })));
+      });
+      right.push(el('div', { class: 'card' },
+        el('h2', { text: selRuns.length > 1 ? 'Config diff' : 'Config' }),
+        selRuns.length > 1 ? el('p', { class: 'sub', text: 'Highlighted rows differ between the selected runs — usually the whole explanation of why their curves differ.' }) : '',
+        el('div', { class: 'lb-wrap' }, el('table', {},
+          el('thead', {}, el('tr', {}, el('th', { text: 'key' }),
+            selRuns.map(x => el('th', { class: 'num', text: x.row.name })))),
+          el('tbody', {}, diffRows)))));
+    }
+  }
+  frag.push(el('div', { class: 'tr-grid' }, listCard, el('div', {}, right)));
+  return frag;
+}
+
 // ---------- live mode: submit + queue (only reachable when served by the API) ----------
 const TOKEN = new URLSearchParams(location.search).get('token') || '';
 const ACTIVE_STATUS = new Set(['preflight', 'waiting_gpu', 'waiting_lock', 'running']);
@@ -1107,7 +1371,7 @@ const stClass = s => s === 'done' ? 'st st-done' : s === 'failed' ? 'st st-faile
 function vQueue() {
   const f = {
     hf_id: el('input', { type: 'text', style: 'flex:2;min-width:260px',
-      placeholder: 'org/model — e.g. HuggingFaceTB/SmolLM2-135M' }),
+      placeholder: 'org/model on the Hub, or local/<name> for an uploaded artifact' }),
     kind: el('select', {}, ['auto', 'base', 'instruct'].map(v =>
       el('option', { value: v, text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
     suite: el('select', {},
@@ -1182,11 +1446,12 @@ function exportJson() { download('benchmark.json', 'application/json', JSON.stri
 // ---------- shell ----------
 const TABS = [
   ['overview', 'Overview', vOverview],
-  ...(LIVE ? [['queue', 'Submit & Queue', vQueue]] : []),
+  ...(LIVE ? [['training', 'Training', vTraining],
+              ['queue', 'Submit & Queue', vQueue]] : []),
   ['leaderboard', 'Leaderboard', vLeaderboard],
   ['tasks', 'Tasks', vTasks],
   ['perplexity', 'Perplexity & Loss', vPpl],
-  ['runs', 'Runs', vRuns],
+  ['runs', 'Evals', vRuns],
 ];
 function render() {
   const ms = visible();
@@ -1204,11 +1469,16 @@ function render() {
 
 // static shell bits (rendered whenever a payload arrives)
 function renderStatic() {
+  if (LIVE) document.getElementById('pageSub').textContent =
+    'Live team benchmark: submit models, track training runs, compare results — '
+    + 'updates as work finishes.';
   document.getElementById('warnings').replaceChildren(
     ...DATA.warnings.map(w => el('div', { class: 'warn' }, el('b', { text: 'Check: ' }), w)));
   document.getElementById('metaChips').replaceChildren(
     el('span', { class: 'chip', text: `generated ${DATA.generated}` }),
     LIVE ? el('span', { class: 'chip', text: 'live — updates as runs finish' }) : '',
+    LIVE ? el('a', { class: 'chip', href: 'guide', target: '_blank', rel: 'noopener',
+                     style: 'text-decoration:none', text: '📖 guide for new users' }) : '',
     DATA.meta.hashes.length ? el('span', { class: 'chip' }, 'harness ',
       el('span', { class: 'mono', text: DATA.meta.hashes.join(', ') })) : '',
     DATA.meta.transformers ? el('span', { class: 'chip', text: `transformers ${DATA.meta.transformers}` }) : '',
@@ -1267,7 +1537,7 @@ if (LIVE) {
     if (DATA && !DATA.models.length) { state.tab = 'queue'; render(); }
   });
   loadQueue();
-  setInterval(loadQueue, 5000);
+  setInterval(() => { loadQueue(); if (state.tab === 'training') loadTraining(); }, 5000);
 } else {
   initData(DATA);
 }
@@ -1281,8 +1551,8 @@ TEMPLATE = """<!doctype html>
   <div class="topbar">
     <div>
       <h1>__TITLE__</h1>
-      <p class="sub">lm-evaluation-harness results, one self-contained file — data
-      embedded, charts drawn locally, nothing fetched.</p>
+      <p class="sub" id="pageSub">lm-evaluation-harness results, one self-contained
+      file — data embedded, charts drawn locally, nothing fetched.</p>
       <div class="meta-chips" id="metaChips"></div>
     </div>
     <button id="themeBtn" title="cycle auto / light / dark">Theme: auto</button>

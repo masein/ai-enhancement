@@ -172,9 +172,14 @@ def run_submission(sub: dict) -> None:
                 continue
             db.update(sid, status="running", progress=label)
 
+            # local/<name> artifacts resolve to their on-disk directory; the report
+            # normalizes the path back to local/<name> so ids stay consistent
+            pretrained = sub["hf_id"]
+            if pretrained.startswith("local/"):
+                pretrained = str((config.ARTIFACTS_DIR / pretrained[6:]).resolve())
             cmd = ["lm_eval",
                    "--model", "hf",
-                   "--model_args", f"pretrained={sub['hf_id']},dtype=bfloat16",
+                   "--model_args", f"pretrained={pretrained},dtype=bfloat16",
                    "--tasks", task,
                    "--num_fewshot", str(shots),
                    "--batch_size", str(meta["batch"]),

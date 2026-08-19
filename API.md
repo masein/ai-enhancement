@@ -139,20 +139,75 @@ tokenizer-independent one.
 
 ---
 
+## Run tracking — your training curves, live on the Training tab
+
+The wandb-shaped half of the service. Your training loop streams metrics here and
+the **Training** tab shows live curves, run overlay/compare, config diff between
+runs, and — the part no external tracker can do — your benchmark scores plotted
+on the same step axis as your loss, joined through checkpoints.
+
+```python
+from bench_client import Bench
+bench = Bench("http://teraformer-5090-3:8899")
+
+with bench.init("run7", project="llm", submitter="you",
+                config={"lr": 3e-4, "batch": 32}) as run:
+    for step, batch in enumerate(loader, 1):
+        loss = train_step(batch)
+        run.log({"loss": loss, "lr": sched.get_last_lr()[0],
+                 "gpu_mem_gb": torch.cuda.memory_allocated()/1e9}, step=step)
+        if step % 1000 == 0:
+            model_id = push_checkpoint(step)          # Hub repo or artifact upload
+            run.log_checkpoint(step, model_id)        # marks the step AND queues the benchmark
+# leaving the `with` calls run.finish() — status "failed" if an exception escaped
+```
+
+Semantics worth knowing: `log()` buffers (64 points or 10 s) and **never raises
+into your training loop** — if the service is down it warns once on stderr and
+keeps training; any metric name is fine (system stats like `gpu_mem_gb` are just
+metrics); values are step-indexed; a run that stops logging for 10+ minutes shows
+as "stale?" until `finish()` is called. Raw endpoints, if you'd rather not use
+the client: `POST /api/truns` → `{id}`, `POST /api/truns/{id}/log`
+`{"metrics":[{"step":n,"name":"loss","value":x},…]}` (≤5000/batch),
+`POST /api/truns/{id}/event` `{"step":n,"kind":"checkpoint","detail":"<model id>"}`,
+`POST /api/truns/{id}/finish` `{"status":"finished"}`,
+`GET /api/truns`, `GET /api/truns/{id}` (downsampled series + events).
+
+## Artifact storage — no Hugging Face account needed
+
+Upload a checkpoint directly to the service and benchmark it as `local/<name>`:
+
+```python
+model.save_pretrained(tmp); tokenizer.save_pretrained(tmp)
+model_id = bench.upload_artifact("run7-step4000", tmp)   # -> "local/run7-step4000"
+run.log_checkpoint(4000, model_id)                        # or bench.submit(model_id)
+```
+
+Raw endpoint: `POST /api/artifacts/{name}` with the checkpoint directory zipped
+as the raw request body; `GET /api/artifacts` lists names and sizes against the
+quota; `DELETE /api/artifacts/{name}` frees disk (its leaderboard scores remain).
+The rules: names are immutable (new checkpoint → new name); **safetensors only**
+— pickle `.bin` weights execute code on load and are refused; per-upload cap
+`ARTIFACT_MAX_GB` (default 8), total quota `ARTIFACT_QUOTA_GB` (default 150).
+Checkpoints saved by modern `save_pretrained()` pass all of this by default.
+
 ## A runnable, end-to-end sample
 
 [`examples/train_and_benchmark.py`](examples/train_and_benchmark.py) is this
-whole document as working code: it fine-tunes a tiny model for real, pushes each
-checkpoint to the Hub as `<your-prefix>-step<N>`, submits every checkpoint the
-moment it lands (non-blocking), and prints a task × step score table at the end.
+whole document as working code: it fine-tunes a tiny model for real, streams its loss/lr/throughput curves to the
+Training tab, uploads each checkpoint as an artifact (or pushes to the Hub with
+--push-to), submits every checkpoint the moment it lands (non-blocking), and
+prints a task × step score table at the end.
 
 ```bash
 # 1) prove the service works — no training, no HF account, ~a minute:
 python examples/train_and_benchmark.py --bench http://teraformer-5090-3:8899 --dry-run
 
-# 2) the full pipeline (needs `hf auth login` with a WRITE token):
+# 2) the full pipeline — checkpoints go to the service's artifact storage,
+#    so NO Hugging Face account is needed:
 python examples/train_and_benchmark.py --bench http://teraformer-5090-3:8899 \
-    --push-to <your-hf-username>/bench-demo --steps 200 --checkpoint-every 100
+    --steps 200 --checkpoint-every 100
+# (add --push-to <hf-user>/bench-demo to publish checkpoints to the Hub instead)
 ```
 
 It's also the template to copy from: the `checkpoint()` function is the
