@@ -539,6 +539,20 @@ tr:last-child td { border-bottom:none; }
   color:var(--text-secondary); font-size:13px; }
 .warn b, .note b { color:var(--text-primary); }
 .lb td.model { white-space:nowrap; }
+.st { display:inline-block; font-size:11px; border-radius:999px; padding:2px 9px;
+  border:1px solid var(--border); white-space:nowrap; }
+.st-done { color:var(--success-text); border-color:var(--success-text); }
+.st-failed { color:var(--critical); border-color:var(--critical); }
+.st-active { color:var(--accent); border-color:var(--accent); }
+.st-muted { color:var(--muted); }
+@keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:1} }
+.st-active::before { content:'●'; margin-right:5px; animation:pulse 1.4s infinite; }
+.frm { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+.frm input, .frm select { font:inherit; font-size:13px; color:var(--text-primary);
+  background:var(--plane); border:1px solid var(--border); border-radius:8px;
+  padding:6px 10px; }
+.frm input:focus, .frm select:focus { outline:2px solid var(--accent-soft);
+  border-color:var(--accent); }
 .mx { border-collapse:separate; border-spacing:2px; font-variant-numeric:tabular-nums;
   width:auto; }
 .mx th { border:0; font-size:10.5px; padding:3px 6px; text-transform:none; letter-spacing:0; }
@@ -570,13 +584,18 @@ footer { margin-top:28px; font-size:12px; color:var(--muted); }
 
 JS = r"""
 'use strict';
-const DATA = JSON.parse(document.getElementById('data').textContent);
+// Two lives, one page: embedded JSON = the frozen single-file report;
+// an empty (null) data slot = served by service/app.py, which makes this the
+// LIVE dashboard — same charts, data fetched, plus a Submit & Queue tab.
+let DATA = JSON.parse(document.getElementById('data').textContent || 'null');
+const LIVE = DATA === null;
 const SLOTS = 8;                       // fixed categorical palette; never cycled
 const state = {
   q: '', kind: 'all', tab: 'overview',
   sort: { key: 'avg', dir: -1 },
   scal: null,                          // Set of task names shown on the scaling chart
-  sigTask: (DATA.accTasks[0] || null),
+  sigTask: null,
+  queue: [], qmsg: '',
 };
 
 // ---------- tiny DOM helper: everything dynamic goes through textContent ----------
@@ -604,12 +623,13 @@ const slotColor = i => `var(--s${(i % SLOTS) + 1})`;
 // selected by default on the Scaling chart occupy slots 1-4, the palette's
 // validated opening chain. The mapping never changes with filtering or toggling —
 // color follows the task, not its current row number.
-const SLOT_ORDER = (() => {
+let SLOT_ORDER = [];
+const slotOf = t => SLOT_ORDER.indexOf(t);
+function computeSlots() {
   const pref = ['hellaswag', 'arc_easy', 'piqa', 'winogrande']
     .filter(t => DATA.accTasks.includes(t));
-  return [...pref, ...DATA.accTasks.filter(t => !pref.includes(t))];
-})();
-const slotOf = t => SLOT_ORDER.indexOf(t);
+  SLOT_ORDER = [...pref, ...DATA.accTasks.filter(t => !pref.includes(t))];
+}
 const cell = (t, m) => (DATA.cells[t] || {})[m];
 const taskLabel = t => {
   const info = DATA.tasks[t] || {};
@@ -1131,6 +1151,75 @@ function vRuns(ms) {
   return frag;
 }
 
+// ---------- live mode: submit + queue (only reachable when served by the API) ----------
+const TOKEN = new URLSearchParams(location.search).get('token') || '';
+const ACTIVE_STATUS = new Set(['preflight', 'waiting_gpu', 'waiting_lock', 'running']);
+const stClass = s => s === 'done' ? 'st st-done' : s === 'failed' ? 'st st-failed'
+                   : ACTIVE_STATUS.has(s) ? 'st st-active' : 'st st-muted';
+
+function vQueue() {
+  const f = {
+    hf_id: el('input', { type: 'text', style: 'flex:2;min-width:260px',
+      placeholder: 'org/model — e.g. HuggingFaceTB/SmolLM2-135M' }),
+    kind: el('select', {}, ['auto', 'base', 'instruct'].map(v =>
+      el('option', { value: v, text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
+    suite: el('select', {},
+      el('option', { value: 'full', text: 'full — all tasks, comparable' }),
+      el('option', { value: 'quick', text: 'quick — hellaswag + arc_easy + ppl, minutes' })),
+    submitter: el('input', { type: 'text', placeholder: 'your name', style: 'width:130px' }),
+    note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px' }),
+  };
+  const btn = el('button', { text: 'Submit model', onclick: async () => {
+    const body = { hf_id: f.hf_id.value.trim(), kind: f.kind.value, suite: f.suite.value,
+                   submitter: f.submitter.value, note: f.note.value };
+    if (!body.hf_id) { state.qmsg = 'enter a Hugging Face model id first'; render(); return; }
+    btn.disabled = true;
+    try {
+      const r = await fetch('api/submissions', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+        body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      state.qmsg = r.ok ? `#${j.id}: ${j.note || 'queued'}`
+                        : 'rejected: ' + (typeof j.detail === 'string' ? j.detail : r.status);
+    } catch (e) { state.qmsg = 'submit failed — server unreachable?'; }
+    await loadQueue(); render();
+  }});
+  const rows = state.queue.map(r => el('tr', {},
+    el('td', { class: 'num', text: '#' + r.id }),
+    el('td', { title: r.note || '' }, r.hf_id,
+      el('span', { class: 'badge' + (r.kind === 'instruct' ? ' instruct' : ''), text: r.kind })),
+    el('td', { text: r.suite }),
+    el('td', { text: r.submitter || '—' }),
+    el('td', {}, el('span', { class: stClass(r.status), text: r.status })),
+    el('td', { class: 'small', text: r.progress || '' },
+      r.error ? el('div', { class: 'down', text: r.error }) : ''),
+    el('td', { class: 'num', text: r.gpu_seconds ? Math.round(r.gpu_seconds / 60) + ' min' : '—' }),
+    el('td', {},
+      el('a', { href: `api/runs/${r.id}/log`, target: '_blank', rel: 'noopener', text: 'log' }),
+      r.status === 'queued' ? el('button', { style: 'margin-left:8px;padding:2px 8px;font-size:12px',
+        text: 'cancel', onclick: async () => {
+          await fetch(`api/submissions/${r.id}/cancel`, { method: 'POST' }).catch(() => {});
+          await loadQueue(); render();
+        }}) : '')));
+  return [
+    el('div', { class: 'card' },
+      el('h2', { text: 'Submit a model' }),
+      el('p', { class: 'sub', text:
+        'Any public (or server-accessible) Hugging Face model up to the size cap. Preflight '
+        + 'checks the repo before any GPU is spent; one run at a time, per-task resume — '
+        + 'resubmitting a finished model costs nothing, and a quick run upgrades to full by '
+        + 'running only the missing tasks. Results land on this leaderboard automatically.' }),
+      el('div', { class: 'frm' }, f.hf_id, f.kind, f.suite, f.submitter, f.note, btn),
+      state.qmsg ? el('p', { class: 'small', style: 'margin-top:8px', text: state.qmsg }) : ''),
+    el('div', { class: 'card' },
+      el('h2', { text: 'Queue' }),
+      state.queue.length ? el('div', { class: 'lb-wrap' }, el('table', {},
+        el('thead', {}, el('tr', {}, ['#', 'model', 'suite', 'by', 'status', 'progress',
+          'gpu', ''].map(h => el('th', { text: h })))),
+        el('tbody', {}, rows)))
+      : el('p', { class: 'small', text: 'Nothing submitted yet.' }))];
+}
+
 function download(name, mime, text) {
   const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: mime })), download: name });
   document.body.append(a); a.click(); a.remove();
@@ -1146,6 +1235,7 @@ function exportJson() { download('benchmark.json', 'application/json', JSON.stri
 // ---------- shell ----------
 const TABS = [
   ['overview', 'Overview', vOverview],
+  ...(LIVE ? [['queue', 'Submit & Queue', vQueue]] : []),
   ['leaderboard', 'Leaderboard', vLeaderboard],
   ['tasks', 'Tasks', vTasks],
   ['scaling', 'Scaling', vScaling],
@@ -1167,15 +1257,51 @@ function render() {
   view.replaceChildren(...fn(ms));
 }
 
-// static bits
-document.getElementById('warnings').replaceChildren(
-  ...DATA.warnings.map(w => el('div', { class: 'warn' }, el('b', { text: 'Check: ' }), w)));
-document.getElementById('metaChips').replaceChildren(
-  el('span', { class: 'chip', text: `generated ${DATA.generated}` }),
-  DATA.meta.hashes.length ? el('span', { class: 'chip' }, 'harness ',
-    el('span', { class: 'mono', text: DATA.meta.hashes.join(', ') })) : '',
-  DATA.meta.transformers ? el('span', { class: 'chip', text: `transformers ${DATA.meta.transformers}` }) : '',
-  DATA.meta.anyLimit ? el('span', { class: 'chip', text: '⚠ smoke data (--limit)' }) : '');
+// static shell bits (rendered whenever a payload arrives)
+function renderStatic() {
+  document.getElementById('warnings').replaceChildren(
+    ...DATA.warnings.map(w => el('div', { class: 'warn' }, el('b', { text: 'Check: ' }), w)));
+  document.getElementById('metaChips').replaceChildren(
+    el('span', { class: 'chip', text: `generated ${DATA.generated}` }),
+    LIVE ? el('span', { class: 'chip', text: 'live — updates as runs finish' }) : '',
+    DATA.meta.hashes.length ? el('span', { class: 'chip' }, 'harness ',
+      el('span', { class: 'mono', text: DATA.meta.hashes.join(', ') })) : '',
+    DATA.meta.transformers ? el('span', { class: 'chip', text: `transformers ${DATA.meta.transformers}` }) : '',
+    DATA.meta.anyLimit ? el('span', { class: 'chip', text: '⚠ smoke data (--limit)' }) : '');
+}
+
+function initData(d) {
+  DATA = d;
+  computeSlots();
+  if (!DATA.accTasks.includes(state.sigTask)) state.sigTask = DATA.accTasks[0] || null;
+  if (state.scal) {
+    for (const t of [...state.scal]) if (!DATA.accTasks.includes(t)) state.scal.delete(t);
+    if (!state.scal.size) state.scal = null;
+  }
+  renderStatic();
+  render();
+}
+
+async function refreshResults() {
+  try { initData(await (await fetch('api/results')).json()); } catch (e) { /* next poll retries */ }
+}
+
+async function loadQueue() {
+  try {
+    const rows = await (await fetch('api/submissions?limit=100')).json();
+    const prev = new Map(state.queue.map(r => [r.id, r.status]));
+    const justFinished = rows.some(r => r.status === 'done' && prev.get(r.id)
+                                        && prev.get(r.id) !== 'done');
+    const changed = rows.length !== state.queue.length || rows.some(r => {
+      const p = state.queue.find(o => o.id === r.id);
+      return !p || p.status !== r.status || p.progress !== r.progress;
+    });
+    state.queue = rows;
+    if (justFinished) await refreshResults();       // new scores -> re-render everything
+    else if (changed && state.tab === 'queue') render();
+  } catch (e) { /* server briefly away; keep polling */ }
+}
+
 document.getElementById('q').addEventListener('input', e => { state.q = e.target.value; render(); });
 document.getElementById('kindSeg').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -1193,7 +1319,19 @@ document.getElementById('themeBtn').addEventListener('click', e => {
   else document.documentElement.setAttribute('data-theme', t);
   e.target.textContent = 'Theme: ' + t;
 });
-render();
+
+// boot: embedded data renders immediately; live mode fetches then polls
+if (LIVE) {
+  document.getElementById('view').replaceChildren(
+    el('p', { class: 'small', style: 'margin:20px 4px', text: 'Loading results…' }));
+  refreshResults().then(() => {
+    if (DATA && !DATA.models.length) { state.tab = 'queue'; render(); }
+  });
+  loadQueue();
+  setInterval(loadQueue, 5000);
+} else {
+  initData(DATA);
+}
 """
 
 TEMPLATE = """<!doctype html>

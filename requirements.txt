@@ -1,8 +1,15 @@
-# Core. Everything in this repo runs with just these three.
-torch>=2.0
-numpy>=1.24
-pyyaml>=6.0        # only for reading configs/*.yaml; JSON configs work without it
+# Benchmark service + pipeline dependencies.
+#
+# torch is deliberately NOT listed: it must match your CUDA stack. An RTX 5090
+# (Blackwell, sm_120) needs the cu128 wheel index or newer:
+#     pip install torch --index-url https://download.pytorch.org/whl/cu128
+# The Docker image skips this entirely — its base image ships the matching torch.
 
-# Optional.
-# wandb>=0.16      # experiment tracking. Without it, tracking.py writes JSONL instead.
-# pytest>=7.0      # tests also run standalone: python tests/test_smoke.py
+lm_eval==0.4.12       # pinned on purpose: a benchmark whose code changed is a different benchmark
+transformers>=4.55    # recorded per-run in the report's provenance, so drift is visible
+accelerate
+sentencepiece
+datasets
+huggingface_hub
+fastapi
+uvicorn[standard]

@@ -1,0 +1,47 @@
+# The benchmark service on a shared GPU box. Copy .env.example to .env, fill in
+# the three values, then:  docker compose up -d --build
+#
+# Three deliberate choices worth knowing before you change them:
+#
+#   pid: "host"     The run lock (results/.run.lock) proves liveness by checking
+#                   /proc/<pid>. Container and host have separate PID namespaces,
+#                   so WITHOUT this a containerized service would misread a live
+#                   host CLI run as a stale lock and race it — the exact failure
+#                   the lock exists to prevent. Sharing the host PID namespace
+#                   makes the check truthful in both directions.
+#
+#   path-identical  BENCH_ROOT and HF_HOME are mounted at the SAME path inside
+#   volume mounts   the container as on the host. That keeps three things working
+#                   at once: the sqlite DB, HF auth (your accepted gemma license
+#                   rides in HF_HOME), and eval_tasks/*.yaml files, which pin
+#                   their corpus by ABSOLUTE path.
+#
+#   ports from      The service binds 0.0.0.0 inside the container; the publish
+#   ${BIND}         line pins exposure to the Tailscale IP on the host, so the
+#                   tailnet reaches it and the LAN does not.
+
+services:
+  bench:
+    build: .
+    image: aienh-bench
+    pid: "host"
+    environment:
+      BENCH_ROOT: ${BENCH_ROOT}
+      HF_HOME: ${HF_HOME}
+      TITLE: ${TITLE:-Team model benchmark}
+      MAX_PARAMS_B: ${MAX_PARAMS_B:-4}
+      MAX_JOB_GB: ${MAX_JOB_GB:-10}
+      SUBMIT_TOKEN: ${SUBMIT_TOKEN:-}
+    volumes:
+      - ${BENCH_ROOT}:${BENCH_ROOT}
+      - ${HF_HOME}:${HF_HOME}
+    ports:
+      - "${BIND}:8899:8899"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped

@@ -12,3 +12,7 @@ _to_delete/
 *.bundle
 results/
 eval_tasks/*.lock
+
+# service + docker local state
+.env
+service.sqlite3*

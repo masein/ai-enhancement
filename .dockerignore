@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.env.example
+*.md
+results/
+eval_tasks/
+logs/
+artifacts/
+service.sqlite3*
+__pycache__/
+*.pyc
+.venv/
+clients/
