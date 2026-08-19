@@ -7,8 +7,21 @@ ARG BASE_IMAGE=pytorch/pytorch:2.11.0-cuda12.8-cudnn9-runtime
 FROM ${BASE_IMAGE}
 
 # lm-eval + service deps; torch comes from the base image.
+#
+# `python -m pip`, not bare `pip`: it targets the exact interpreter that CMD runs,
+# which is the one the base image installed torch into. `--break-system-packages`:
+# these images use Ubuntu's system Python 3.12, which is PEP 668 "externally
+# managed" and rejects bare pip installs — inside a single-purpose container that
+# protection protects nothing, and it's how the base image got torch in there too.
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
+RUN python -m pip install --no-cache-dir --break-system-packages -r /tmp/requirements.txt \
+    && rm /tmp/requirements.txt
+
+# Fail the BUILD, not the first submission, if the env is incoherent (e.g. deps
+# landed in a different interpreter than torch).
+RUN python -c "import torch, lm_eval, transformers, accelerate, datasets, fastapi, uvicorn; \
+print('image env OK — torch', torch.__version__, '| built for CUDA', torch.version.cuda, \
+'| lm_eval', lm_eval.__version__)"
 
 WORKDIR /app
 COPY scripts/ scripts/
