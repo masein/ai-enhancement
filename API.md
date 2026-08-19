@@ -139,6 +139,26 @@ tokenizer-independent one.
 
 ---
 
+## A runnable, end-to-end sample
+
+[`examples/train_and_benchmark.py`](examples/train_and_benchmark.py) is this
+whole document as working code: it fine-tunes a tiny model for real, pushes each
+checkpoint to the Hub as `<your-prefix>-step<N>`, submits every checkpoint the
+moment it lands (non-blocking), and prints a task × step score table at the end.
+
+```bash
+# 1) prove the service works — no training, no HF account, ~a minute:
+python examples/train_and_benchmark.py --bench http://teraformer-5090-3:8899 --dry-run
+
+# 2) the full pipeline (needs `hf auth login` with a WRITE token):
+python examples/train_and_benchmark.py --bench http://teraformer-5090-3:8899 \
+    --push-to <your-hf-username>/bench-demo --steps 200 --checkpoint-every 100
+```
+
+It's also the template to copy from: the `checkpoint()` function is the
+integration in ~15 lines, including the rule that matters (a submit failure
+prints a warning and training continues).
+
 ## The training-loop pattern
 
 Submit at every checkpoint, don't wait, collect at the end (or from a separate

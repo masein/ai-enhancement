@@ -351,6 +351,14 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
                 extra.append([display[mid], task, name, round(d["value"], 6),
                               (round(d["stderr"], 6) if d.get("stderr") else None),
                               r["n_shot"].get(task), r["n_samples"].get(task)])
+            # derived: cross-entropy loss in nats/byte (= bits_per_byte * ln 2) —
+            # the same quantity as a training loss, per byte instead of per token,
+            # so it is comparable across tokenizers and against training curves
+            bpb = r["tasks"][task].get("bits_per_byte")
+            if isinstance(bpb, dict) and "value" in bpb:
+                extra.append([display[mid], task, "cross_entropy_nats_per_byte",
+                              round(bpb["value"] * math.log(2), 6), None,
+                              r["n_shot"].get(task), r["n_samples"].get(task)])
 
     # provenance warnings — they gate every claim below them
     warnings: list[str] = []
@@ -516,14 +524,6 @@ tr:last-child td { border-bottom:none; }
   color:var(--text-secondary); }
 .key { width:11px; height:11px; border-radius:3px; display:inline-block; }
 .key.line { width:14px; height:0; border-top:3px solid; border-radius:2px; }
-.tchip { display:inline-flex; align-items:center; gap:7px; font-size:12.5px;
-  border:1px solid var(--border); border-radius:999px; padding:4px 12px;
-  background:var(--surface-1); color:var(--text-secondary); cursor:pointer; }
-.tchip[aria-pressed="true"] { color:var(--text-primary); border-color:var(--axis);
-  background:var(--accent-soft); }
-.tchip i { width:12px; border-top:3px solid; border-radius:2px; display:inline-block; }
-.tchip.off i { border-color:var(--muted) !important; }
-.chips { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }
 .panels { display:grid; grid-template-columns:repeat(auto-fill,minmax(430px,1fr)); gap:12px; }
 @media (max-width:520px){ .panels { grid-template-columns:1fr; } }
 .panel { background:var(--surface-1); border:1px solid var(--border); border-radius:12px;
@@ -589,12 +589,11 @@ JS = r"""
 // LIVE dashboard — same charts, data fetched, plus a Submit & Queue tab.
 let DATA = JSON.parse(document.getElementById('data').textContent || 'null');
 const LIVE = DATA === null;
-const SLOTS = 8;                       // fixed categorical palette; never cycled
 const state = {
   q: '', kind: 'all', tab: 'overview',
   sort: { key: 'avg', dir: -1 },
-  scal: null,                          // Set of task names shown on the scaling chart
-  sigTask: null,
+  runsQ: '',                           // the Runs tab query string
+  runsSort: { idx: 0, dir: 1 },        // column sort for the metric query table
   queue: [], qmsg: '',
 };
 
@@ -618,18 +617,6 @@ const num  = (v, d = 3) => v == null ? '—'
   : (+v).toFixed(d).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
 const P    = v => v == null ? '—' : v >= 995e6 ? (v / 1e9).toFixed(v % 1e9 ? 1 : 0) + 'B'
                                   : Math.round(v / 1e6) + 'M';
-const slotColor = i => `var(--s${(i % SLOTS) + 1})`;
-// Fixed task -> color-slot assignment, informative-defaults first: the four tasks
-// selected by default on the Scaling chart occupy slots 1-4, the palette's
-// validated opening chain. The mapping never changes with filtering or toggling —
-// color follows the task, not its current row number.
-let SLOT_ORDER = [];
-const slotOf = t => SLOT_ORDER.indexOf(t);
-function computeSlots() {
-  const pref = ['hellaswag', 'arc_easy', 'piqa', 'winogrande']
-    .filter(t => DATA.accTasks.includes(t));
-  SLOT_ORDER = [...pref, ...DATA.accTasks.filter(t => !pref.includes(t))];
-}
 const cell = (t, m) => (DATA.cells[t] || {})[m];
 const taskLabel = t => {
   const info = DATA.tasks[t] || {};
@@ -764,12 +751,15 @@ function barPanel(task, models, opts) {
     svg.append(el('svg:text', { x: X(c.v + (lower ? 0 : c.se || 0)) + 6, y: y + BH * 0.75,
       'font-size': 11, fill: 'var(--text-primary)', class: 'blab', 'data-model': m.id,
       text: fmt(c.v) }));
+    const tipRows = [
+      fmt(c.v) + (c.se ? ` ± ${lower ? num(c.se, 3) : (100 * c.se).toFixed(1) + ' pts'}` : ''),
+      `${task} — ${c.shots != null ? c.shots + '-shot, ' : ''}${c.n != null ? c.n + ' items' : ''}`,
+      m.id + (m.params ? ` · ${P(m.params)} params` : '')];
+    if (lower && info.metric === 'bits_per_byte')
+      tipRows.splice(1, 0, `cross-entropy ${num(c.v * Math.LN2, 3)} nats/byte`);
     svg.append(el('svg:rect', { class: 'hit', x: 0, y: y - GAP / 2, width: W,
       height: BH + GAP, tabindex: 0, 'data-model': m.id,
-      'data-tip': JSON.stringify([
-        fmt(c.v) + (c.se ? ` ± ${lower ? num(c.se, 3) : (100 * c.se).toFixed(1) + ' pts'}` : ''),
-        `${task} — ${c.shots != null ? c.shots + '-shot, ' : ''}${c.n != null ? c.n + ' items' : ''}`,
-        m.id + (m.params ? ` · ${P(m.params)} params` : '')]) }));
+      'data-tip': JSON.stringify(tipRows) }));
     y += BH + GAP;
   }
   panel.append(svg);
@@ -818,14 +808,14 @@ function vOverview(ms) {
       el('h2', { text: 'Biggest statistically real gap' }),
       el('p', { class: 'sub', text:
         `${big.t}: ${win.name} beats ${lose.name} by ${(100 * Math.abs(big.diff)).toFixed(1)} points (z = ${Math.abs(big.z).toFixed(1)}). `
-        + `The Significance tab has the full matrix — ${pairs - real} of ${pairs} comparisons here are inside the noise.` })));
+        + `${pairs - real} of ${pairs} pairwise comparisons are inside the noise — treat overlapping whiskers as ties.` })));
   }
   frag.push(el('div', { class: 'card' },
     el('h2', { text: 'How to read these numbers' }),
     note('Chance is not zero. 4-option tasks (MMLU, ARC, HellaSwag) sit at 25% for a model that knows nothing; 2-option tasks (Winogrande, PIQA) sit at 50%. A "50%" that looks respectable may be a coin flip.'),
     note('GSM8K near zero is a finding, not a failure — sub-billion models mostly cannot do written arithmetic. TruthfulQA is famous for NOT improving with scale.'),
-    note('Perplexity (bits per byte) is the scale-sensitive metric here: it separates models that multiple-choice tasks cannot tell apart, and it works on base models with no prompt format at all. Lower is better.'),
-    note('Whiskers are ±1 standard error. If two whiskers overlap, do not call a winner — check the Significance tab; the z-test is the arbiter.')));
+    note('Perplexity (bits per byte) is the scale-sensitive metric here: it separates models that multiple-choice tasks cannot tell apart, and it works on base models with no prompt format at all. Multiply by ln 2 for cross-entropy loss in nats/byte — the Perplexity & Loss tab does it for you. Lower is better.'),
+    note('Whiskers are ±1 standard error. If two whiskers overlap, do not call a winner — every pairwise z-test verdict rides along in the JSON export (the "sig" field) when you need the arbiter.')));
   return frag;
 }
 const tile = (label, value, notetext) => el('div', { class: 'tile' },
@@ -927,12 +917,41 @@ function vTasks(ms) {
 
 function vPpl(ms) {
   if (!DATA.pplTasks.length) return [note('No perplexity tasks found. Create pinned corpus slices with scripts/make_ppl_task.py — they are the eval that separates models multiple-choice cannot.')];
+  const CE_NOTE = 'cross-entropy = bits_per_byte × ln 2, in nats per byte — the same quantity '
+    + 'as a training loss, just per byte instead of per token (token counts are not comparable '
+    + 'across tokenizers; bytes are).';
+  // the CE table: bits/byte and its loss form side by side, per task × model
+  const rows = [];
+  for (const t of DATA.pplTasks) {
+    const info = DATA.tasks[t] || {};
+    for (const m of ms) {
+      const c = cell(t, m.id);
+      if (!c) continue;
+      const isBpb = info.metric === 'bits_per_byte';
+      rows.push(el('tr', {},
+        el('td', { text: t }),
+        el('td', { 'data-model': m.id, text: m.name }),
+        el('td', { class: 'num', text: isBpb ? num(c.v, 4) : '—' }),
+        el('td', { class: 'num best', text: isBpb ? num(c.v * Math.LN2, 4) : '—' }),
+        el('td', { class: 'num', text: !isBpb ? `${num(c.v, 4)} (${info.metric})` : '—' }),
+        el('td', { class: 'num', text: c.n != null ? String(c.n) : '—' })));
+    }
+  }
   return [
     el('p', { class: 'sub', style: 'margin:10px 2px', text:
-      'Rolling-loglikelihood perplexity over pinned corpus samples. Quote bits_per_byte when comparing '
-      + 'across tokenizers — per-token perplexity is not comparable between model families. LOWER is better. '
-      + 'No standard error is reported for these, so they are excluded from the significance tests.' }),
+      'Rolling-loglikelihood language modelling over pinned corpus samples. LOWER is better '
+      + 'everywhere here. Quote bits_per_byte across model families; ' + CE_NOTE + ' '
+      + 'No standard error is reported for these, so treat close values as ties.' }),
     el('div', { class: 'panels' }, DATA.pplTasks.map(t => barPanel(t, ms, { lower: true }))),
+    el('div', { class: 'card' },
+      el('h2', { text: 'Cross-entropy loss' }),
+      el('p', { class: 'sub', text: CE_NOTE + ' Compare it directly against the loss curves '
+        + 'in your training logs to see where a checkpoint sits.' }),
+      el('table', {},
+        el('thead', {}, el('tr', {},
+          ['task', 'model', 'bits / byte', 'CE loss (nats / byte)', 'other metric', 'docs']
+            .map((h, i) => el('th', { class: i >= 2 ? 'num' : '', text: h })))),
+        el('tbody', {}, rows))),
     tableTwin('ppl-table', ms, DATA.pplTasks, true)];
 }
 
@@ -957,143 +976,6 @@ function tableTwin(id, ms, tasks, lower) {
     btn.textContent = tv.classList.contains('open') ? 'Hide data table' : 'Show data table';
   }, text: 'Show data table' });
   return el('div', {}, btn, tv);
-}
-
-function vScaling(ms) {
-  const withP = ms.filter(m => m.params != null);
-  const noP = ms.filter(m => m.params == null);
-  if (!state.scal) state.scal = new Set(SLOT_ORDER.slice(0, 4));
-  const chips = el('div', { class: 'chips' }, DATA.accTasks.map(t => {
-    const overflow = slotOf(t) >= SLOTS;
-    const on = state.scal.has(t) && !overflow;
-    return el('button', { class: 'tchip' + (on ? '' : ' off'),
-      'aria-pressed': String(on), disabled: overflow ? '' : null,
-      title: overflow ? 'more than 8 series cannot be told apart — see the Tasks panels' : '',
-      onclick: () => { state.scal.has(t) ? state.scal.delete(t) : state.scal.add(t); render(); } },
-      el('i', { style: `border-color:${slotColor(slotOf(t))}` }), t);
-  }));
-  const sel = DATA.accTasks.filter(t => state.scal.has(t) && slotOf(t) < SLOTS);
-  const frag = [el('div', { class: 'card' },
-    el('h2', { text: 'Score vs parameter count' }),
-    el('p', { class: 'sub', text:
-      'The scaling view: log-x parameter axis, one line per task. Lines connect base and instruct '
-      + 'models alike in size order — use the Base filter above for a clean pretraining ladder '
-      + '(the Pythia models are trained on identical data in identical order, so that curve is a '
-      + 'genuine controlled experiment). Dashed lines mark chance.' }),
-    chips)];
-  if (withP.length < 2 || !sel.length) {
-    frag[0].append(note(sel.length ? 'Need at least two models with known parameter counts.'
-                                   : 'Select at least one task above.'));
-    return frag;
-  }
-  const W = 780, H = 400, L = 52, R = 130, T = 16, B = 40;
-  const pw = W - L - R, ph = H - T - B;
-  const lo = Math.min(...withP.map(m => m.params)) * 0.8;
-  const hi = Math.max(...withP.map(m => m.params)) * 1.25;
-  const X = v => L + pw * (Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo));
-  const Y = v => T + ph * (1 - v);
-  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img',
-                              'aria-label': 'score versus parameter count' });
-  for (const yv of [0, 0.25, 0.5, 0.75, 1]) {
-    svg.append(el('svg:line', { x1: L, y1: Y(yv), x2: L + pw, y2: Y(yv),
-      stroke: 'var(--grid)', 'stroke-width': 1 }));
-    svg.append(el('svg:text', { x: L - 8, y: Y(yv) + 4, 'font-size': 10.5,
-      fill: 'var(--muted)', 'text-anchor': 'end', text: Math.round(yv * 100) + '%' }));
-  }
-  const xt = [];
-  for (const base of [1e6, 1e7, 1e8, 1e9, 1e10]) for (const m of [1, 3])
-    if (base * m >= lo && base * m <= hi) xt.push(base * m);
-  for (const xv of xt) {
-    svg.append(el('svg:line', { x1: X(xv), y1: T, x2: X(xv), y2: T + ph,
-      stroke: 'var(--grid)', 'stroke-width': 1 }));
-    svg.append(el('svg:text', { x: X(xv), y: H - B + 16, 'font-size': 10.5,
-      fill: 'var(--muted)', 'text-anchor': 'middle', text: P(xv) }));
-  }
-  svg.append(el('svg:text', { x: L + pw / 2, y: H - 4, 'font-size': 11,
-    fill: 'var(--text-secondary)', 'text-anchor': 'middle', text: 'parameters (log scale)' }));
-  // chance lines for the selected tasks (deduped by level)
-  const chances = [...new Set(sel.map(t => DATA.tasks[t].chance).filter(c => c != null && c > 0))];
-  for (const c of chances) {
-    svg.append(el('svg:line', { x1: L, y1: Y(c), x2: L + pw, y2: Y(c),
-      stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '4 4' }));
-    svg.append(el('svg:text', { x: L + pw + 6, y: Y(c) + 3.5, 'font-size': 10,
-      fill: 'var(--muted)', text: `chance ${Math.round(c * 100)}%` }));
-  }
-  for (const t of sel) {
-    const col = slotColor(slotOf(t));
-    const pts = withP.map(m => ({ m, c: cell(t, m.id) })).filter(p => p.c)
-                     .sort((a, b) => a.m.params - b.m.params);
-    if (!pts.length) continue;
-    svg.append(el('svg:path', { fill: 'none', stroke: col, 'stroke-width': 2,
-      'stroke-linejoin': 'round', 'stroke-linecap': 'round',
-      d: pts.map((p, j) => `${j ? 'L' : 'M'}${X(p.m.params).toFixed(1)},${Y(p.c.v).toFixed(1)}`).join(' ') }));
-    for (const p of pts) {
-      svg.append(el('svg:circle', { cx: X(p.m.params), cy: Y(p.c.v), r: 4.5, fill: col,
-        stroke: 'var(--surface-1)', 'stroke-width': 2, 'data-model': p.m.id, class: 'bar' }));
-      svg.append(el('svg:circle', { class: 'hit', cx: X(p.m.params), cy: Y(p.c.v), r: 12,
-        tabindex: 0, 'data-model': p.m.id, 'data-tipkey': col,
-        'data-tip': JSON.stringify([
-          pct(p.c.v) + (p.c.se ? ` ± ${(100 * p.c.se).toFixed(1)} pts` : ''),
-          t, `${p.m.id} · ${P(p.m.params)} params${p.m.kind === 'instruct' ? ' · instruct' : ''}`]) }));
-    }
-  }
-  frag[0].append(svg);
-  if (noP.length) frag[0].append(el('p', { class: 'small', text:
-    'Not plotted (unknown parameter count): ' + noP.map(m => m.name).join(', ') }));
-  return frag;
-}
-
-function vSig(ms) {
-  if (!DATA.accTasks.length || ms.length < 2)
-    return [note('Need at least two models and one accuracy task.')];
-  if (!DATA.accTasks.includes(state.sigTask)) state.sigTask = DATA.accTasks[0];
-  const chips = el('div', { class: 'chips' }, DATA.accTasks.map(t =>
-    el('button', { class: 'tchip', 'aria-pressed': String(t === state.sigTask),
-      onclick: () => { state.sigTask = t; render(); } }, t)));
-  const t = state.sigTask;
-  const present = ms.filter(m => cell(t, m.id)).sort((a, b) => cell(t, b.id).v - cell(t, a.id).v);
-  const pair = {};
-  for (const [a, b, diff, z, ok] of (DATA.sig[t] || [])) {
-    pair[a + '|' + b] = { diff, z, ok }; pair[b + '|' + a] = { diff: -diff, z: z == null ? null : -z, ok };
-  }
-  const mx = el('table', { class: 'mx' });
-  mx.append(el('tr', {}, el('th'), present.map(m =>
-    el('th', { class: 'colh' }, el('span', { text: m.name })))));
-  let nsig = 0, npair = 0;
-  for (const a of present) {
-    const tr = el('tr', {}, el('th', { class: 'rowh', title: a.id, text: a.name }));
-    for (const b of present) {
-      if (a.id === b.id) { tr.append(el('td', { class: 'self' })); continue; }
-      const p = pair[a.id + '|' + b.id];
-      if (!p) { tr.append(el('td', { text: '—' })); continue; }
-      npair++;
-      const glyph = p.ok ? (p.diff > 0 ? '▲' : '▼') : '·';
-      if (p.ok) nsig++;
-      tr.append(el('td', { class: p.ok ? (p.diff > 0 ? 'up' : 'down') : 'small',
-        tabindex: 0,
-        'data-tip': JSON.stringify([
-          `${p.diff > 0 ? '+' : ''}${(100 * p.diff).toFixed(1)} pts` +
-          (p.z != null ? ` (z = ${p.z > 0 ? '+' : ''}${p.z.toFixed(2)})` : ''),
-          `${a.name}: ${pct(cell(t, a.id).v)}  vs  ${b.name}: ${pct(cell(t, b.id).v)}`,
-          p.ok ? 'significant at 95% — the row model really is ' + (p.diff > 0 ? 'better' : 'worse')
-               : 'inside the noise — cannot call a winner from this run']),
-        text: glyph }));
-    }
-    mx.append(tr);
-  }
-  return [el('div', { class: 'card' },
-    el('h2', { text: 'Is the difference real?' }),
-    el('p', { class: 'sub', text: `Two-proportion z-test on ${t}: `
-      + `${nsig / 2} of ${npair / 2} pairs are significant at 95%. `
-      + '▲ row model significantly better than column · ▼ significantly worse · '
-      + '· inside the noise. Rows and columns are sorted by score.' }),
-    chips,
-    el('div', { style: 'overflow-x:auto' }, mx),
-    el('p', { class: 'sub', style: 'margin-top:10px', text:
-      'z = (p₁−p₂) / √(se₁²+se₂²), significant at |z| > 1.96. Conservative: both models saw the same '
-      + 'items, so a paired test would be more sensitive — this one will not call a non-difference '
-      + 'significant, which is the direction that matters. Proportion metrics only; perplexity is '
-      + 'not a proportion and never enters this table.' }))];
 }
 
 function vRuns(ms) {
@@ -1122,26 +1004,91 @@ function vRuns(ms) {
         el('td', {}, el('span', { class: 'mono', text: m.hash || '—' })),
         el('td', {}, el('span', { class: 'mono',
           text: String(m.date || '—').slice(0, 16).replace('T', ' ') })))))))));
+  // ---- query every metric — a search bar instead of a wall of rows -----------
+  // Client-side on purpose: the whole corpus is a few thousand rows, so a search
+  // service would be infrastructure guarding data a browser filters in under a
+  // millisecond. The query language is the useful part.
   const names = new Set(ms.map(m => m.name));
-  const rows = DATA.extra.filter(r => names.has(r[0]));
-  const tv = el('div', { class: 'tv' }, el('table', {},
-    el('thead', {}, el('tr', {}, ['model', 'task', 'metric', 'value', 'stderr', 'n-shot', 'items']
-      .map((h, i) => el('th', { class: i >= 3 ? 'num' : '', text: h })))),
-    el('tbody', {}, rows.map(r => el('tr', {},
+  const all = DATA.extra.filter(r => names.has(r[0]));
+  function buildPred(q) {
+    const preds = q.trim().toLowerCase().split(/\s+/).filter(Boolean).map(tok => {
+      let m;
+      if ((m = tok.match(/^(value|stderr|shots|items)(>=|<=|>|<|=)(-?\d*\.?\d+)$/))) {
+        const idx = { value: 3, stderr: 4, shots: 5, items: 6 }[m[1]];
+        const op = m[2], x = +m[3];
+        return r => { const v = r[idx];
+          return v != null && (op === '>' ? v > x : op === '<' ? v < x :
+                 op === '>=' ? v >= x : op === '<=' ? v <= x : Math.abs(v - x) < 1e-9); };
+      }
+      if ((m = tok.match(/^(model|task|metric):(.+)$/))) {
+        const idx = { model: 0, task: 1, metric: 2 }[m[1]];
+        return r => String(r[idx]).toLowerCase().includes(m[2]);
+      }
+      if (tok.length > 1 && tok.startsWith('-')) {
+        const s = tok.slice(1);
+        return r => !(r[0] + ' ' + r[1] + ' ' + r[2]).toLowerCase().includes(s);
+      }
+      return r => (r[0] + ' ' + r[1] + ' ' + r[2]).toLowerCase().includes(tok);
+    });
+    return r => preds.every(p => p(r));
+  }
+  const CAP = 500;
+  const countEl = el('p', { class: 'small', style: 'margin:8px 0 6px' });
+  const tbody = el('tbody');
+  let current = all;
+  function requery() {
+    let rows = all.filter(buildPred(state.runsQ));
+    const { idx, dir } = state.runsSort;
+    rows.sort((a, b) => {
+      const va = a[idx], vb = b[idx];
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      return typeof va === 'number' && typeof vb === 'number'
+        ? dir * (va - vb) : dir * String(va).localeCompare(String(vb));
+    });
+    current = rows;
+    countEl.textContent = `${rows.length} of ${all.length} rows`
+      + (rows.length > CAP ? ` — showing the first ${CAP}; refine the query` : '');
+    tbody.replaceChildren(...rows.slice(0, CAP).map(r => el('tr', {},
       el('td', { text: r[0] }), el('td', { text: r[1] }), el('td', { text: r[2] }),
       el('td', { class: 'num', text: num(r[3], 4) }),
       el('td', { class: 'num', text: r[4] == null ? '—' : num(r[4], 4) }),
       el('td', { class: 'num', text: r[5] == null ? '—' : String(r[5]) }),
-      el('td', { class: 'num', text: r[6] == null ? '—' : String(r[6]) }))))));
-  const btn = el('button', { onclick: () => {
-    tv.classList.toggle('open');
-    btn.textContent = tv.classList.contains('open')
-      ? 'Hide all metrics' : `Show every metric (${rows.length} rows, incl. MMLU subjects)`;
-  }, text: `Show every metric (${rows.length} rows, incl. MMLU subjects)` });
+      el('td', { class: 'num', text: r[6] == null ? '—' : String(r[6]) }))));
+  }
+  // requery() updates the table in place instead of re-rendering the tab, so the
+  // input keeps focus and caret across every keystroke.
+  const qIn = el('input', { type: 'search', value: state.runsQ,
+    style: 'width:100%;max-width:620px',
+    placeholder: 'e.g.  pythia task:mmlu_ metric:acc value>0.3   ·   gsm8k value>0   ·   metric:cross_entropy',
+    oninput: e => { state.runsQ = e.target.value; requery(); } });
+  const thead = el('thead', {}, el('tr', {},
+    ['model', 'task', 'metric', 'value', 'stderr', 'n-shot', 'items'].map((h, i) =>
+      el('th', { class: (i >= 3 ? 'num ' : '') + 'sortable',
+        onclick: () => { state.runsSort = { idx: i,
+          dir: state.runsSort.idx === i ? -state.runsSort.dir : (i >= 3 ? -1 : 1) };
+          requery(); },
+        text: h }))));
+  requery();
   frag.push(el('div', { class: 'card' },
-    el('h2', { text: 'Every metric, including sub-tasks' }),
-    el('p', { class: 'sub', text: 'Both acc and acc_norm appear wherever the harness reported both — if they disagree, the benchmark is partly measuring option length; say which one you quote.' }),
-    btn, tv));
+    el('h2', { text: 'Query every metric' }),
+    el('p', { class: 'sub', text:
+      'Every number from every run — MMLU’s 57 subjects, acc and acc_norm side by side, '
+      + 'derived cross-entropy, all of it. Bare words match model/task/metric (prefix with '
+      + '− to exclude); field filters model:, task:, metric:; numeric filters value>0.3, '
+      + 'stderr<0.01, shots=5, items>=1000. Terms AND together. Click a column to sort. '
+      + 'The CSV button exports exactly what the query matches.' }),
+    qIn, countEl,
+    el('div', { class: 'lb-wrap', style: 'max-height:480px;overflow-y:auto' },
+      el('table', { class: 'lb' }, thead, tbody)),
+    el('button', { style: 'margin-top:10px', text: 'Download filtered CSV', onclick: () => {
+      const esc = v => v == null ? '' : /[",\n]/.test(String(v))
+        ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
+      download('benchmark_query.csv', 'text/csv',
+        ['model,task,metric,value,stderr,n_shot,n_samples',
+         ...current.map(r => r.map(esc).join(','))].join('\n'));
+    }})));
   frag.push(el('div', { class: 'card' },
     el('h2', { text: 'Export' }),
     el('p', { class: 'sub', text: 'The CSV is the flat every-metric table; the JSON is everything this page renders.' }),
@@ -1238,9 +1185,7 @@ const TABS = [
   ...(LIVE ? [['queue', 'Submit & Queue', vQueue]] : []),
   ['leaderboard', 'Leaderboard', vLeaderboard],
   ['tasks', 'Tasks', vTasks],
-  ['scaling', 'Scaling', vScaling],
-  ['perplexity', 'Perplexity', vPpl],
-  ['significance', 'Significance', vSig],
+  ['perplexity', 'Perplexity & Loss', vPpl],
   ['runs', 'Runs', vRuns],
 ];
 function render() {
@@ -1272,12 +1217,6 @@ function renderStatic() {
 
 function initData(d) {
   DATA = d;
-  computeSlots();
-  if (!DATA.accTasks.includes(state.sigTask)) state.sigTask = DATA.accTasks[0] || null;
-  if (state.scal) {
-    for (const t of [...state.scal]) if (!DATA.accTasks.includes(t)) state.scal.delete(t);
-    if (!state.scal.size) state.scal = null;
-  }
   renderStatic();
   render();
 }

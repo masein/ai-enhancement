@@ -368,10 +368,11 @@ python3 -m http.server 8899 --bind "$(tailscale ip -4)"
 
 One self-contained HTML file — no server, no assets, works from a `file://` open, an
 email attachment, or `python -m http.server`. It's a full interactive dashboard:
-tabs for **Overview / Leaderboard / Tasks / Scaling / Perplexity / Significance /
-Runs**, a sortable leaderboard, model search and base/instruct filters, a
-score-vs-parameters scaling chart with chance lines, a pairwise z-test matrix,
-light/dark theme, and CSV/JSON export buttons. The data is embedded in the file, so
+tabs for **Overview / Leaderboard / Tasks / Perplexity & Loss / Runs**, a sortable
+leaderboard, model search and base/instruct filters, per-task panels with chance
+lines, cross-entropy loss derived from bits-per-byte, a query bar over every raw
+metric (field filters + numeric comparisons, with filtered CSV export),
+light/dark theme, and JSON export. The data is embedded in the file, so
 regenerating after more models finish is the same one command.
 
 ---
@@ -562,7 +563,7 @@ you'll want when a number looks wrong — but watch `df -h "$HF_HOME"`.
 
 ## What to say when you share it
 
-1. **Lead with the scaling curve**, not the leaderboard. "Across a controlled 14M→410M
+1. **Lead with the trend**, not the leaderboard. "Across a controlled 14M→410M
    ladder, HellaSwag rises from chance to X% while MMLU stays at chance throughout" is
    a finding. A table of eleven models is data.
 2. **Name what's inside the noise.** The report tells you which pairs aren't

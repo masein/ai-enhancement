@@ -22,8 +22,11 @@ ARC-Easy, Winogrande, PIQA, TruthfulQA (mc2), GSM8K — plus corpus perplexity
 (bits per byte) on pinned text slices you create with
 `scripts/make_ppl_task.py`. Same seed, dtype, and harness version (lm_eval
 0.4.12, pinned) for every run: scores are comparable to each other by
-construction. The dashboard shows standard errors everywhere and z-tests every
-pairwise gap before anyone calls it a win.
+construction. The dashboard shows standard errors everywhere, counts which
+pairwise gaps clear a z-test before anyone calls them wins, derives
+cross-entropy loss (nats/byte) from the perplexity slices so checkpoints can be
+read against training curves, and gives the Runs tab a query bar over every raw
+metric.
 
 ## Run it (Docker)
 
@@ -60,6 +63,8 @@ scripts/
   make_ppl_task.py    any corpus -> pinned perplexity task (records a sha256)
 clients/
   bench_client.py     stdlib-only API client + CLI
+examples/
+  train_and_benchmark.py   real mini training run -> push checkpoints -> benchmark each
 Dockerfile / docker-compose.yml / .env.example
 SERVICE.md            operate it     API.md  integrate it     BENCHMARK-RUN.md  run it by hand
 ```
