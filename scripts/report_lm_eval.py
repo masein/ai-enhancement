@@ -555,9 +555,29 @@ td { padding:6px 9px; border-bottom:1px solid var(--grid); font-size:13px; }
 td.num, th.num { text-align:right; }
 tr:last-child td { border-bottom:none; }
 .lb-wrap { overflow-x:auto; }
-.lb th.sortable { cursor:pointer; user-select:none; }
-.lb th.sortable:hover { color:var(--text-primary); }
-.lb th .dir { font-size:9px; }
+th.sortable { cursor:pointer; user-select:none; }
+th.sortable:hover { color:var(--text-primary); }
+th .dir { font-size:9px; }
+/* typeahead dropdown under the metric query bar */
+.ac { position:relative; max-width:620px; }
+.ac-list { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:30;
+  background:var(--surface-1); border:1px solid var(--border); border-radius:10px;
+  box-shadow:0 10px 28px rgba(0,0,0,.14); max-height:288px; overflow-y:auto; }
+.ac-item { display:flex; gap:10px; align-items:center; padding:7px 11px;
+  cursor:pointer; font-size:13px; }
+.ac-item[aria-selected=true], .ac-item:hover { background:var(--accent-soft); }
+.ac-item .ac-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:12.5px; }
+.ac-item mark { background:none; color:var(--accent); font-weight:650; padding:0; }
+.ac-tag { font-size:10px; color:var(--muted); border:1px solid var(--border);
+  border-radius:999px; padding:1px 7px; flex:none; }
+.toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0 4px; }
+.toolbar input, .toolbar select { font:inherit; font-size:12.5px; color:var(--text-primary);
+  background:var(--plane); border:1px solid var(--border); border-radius:8px;
+  padding:5px 9px; }
+.toolbar input:focus, .toolbar select:focus { outline:2px solid var(--accent-soft);
+  border-color:var(--accent); }
 .lb td.model, .lb th.model { position:sticky; left:0; background:var(--surface-1); z-index:1; }
 .lb tr:hover td { background:var(--plane); }
 .lb .se { color:var(--muted); font-size:11px; }
@@ -661,9 +681,17 @@ const state = {
   sort: { key: 'avg', dir: -1 },
   runsQ: '',                           // the Evals tab query string
   runsSort: { idx: 0, dir: 1 },        // column sort for the metric query table
+  provSort: { key: 'date', dir: -1 },  // run-provenance table: newest eval first
+  ceSort: { key: 'task', dir: 1 },     // cross-entropy table
   queue: [], qmsg: '',
-  trSel: [], trColors: {}, trSmooth: 0, trLog: false,   // Training tab
+  qQ: '', qStatus: 'all', qSort: { key: 'id', dir: -1 },   // queue filter/sort
+  trSel: [], trColors: {}, trSmooth: 0, trLog: false,      // Training tab
   trRuns: [], trSeries: {}, trFetching: false,
+  trQ: '', trStatus: 'all', trOrder: 'updated',            // runs-list filter/sort
+  // in-place refreshers registered by the mounted tab, so the 5s poll updates
+  // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
+  // focus from filter inputs and kill slider drags
+  trRedraw: null, queueRedraw: null,
 };
 
 // ---------- tiny DOM helper: everything dynamic goes through textContent ----------
@@ -687,6 +715,18 @@ const num  = (v, d = 3) => v == null ? '—'
 const P    = v => v == null ? '—' : v >= 995e6 ? (v / 1e9).toFixed(v % 1e9 ? 1 : 0) + 'B'
                                   : Math.round(v / 1e6) + 'M';
 const cell = (t, m) => (DATA.cells[t] || {})[m];
+// natural string order: checkpoint names sort by their numbers ("s300" < "s1000"),
+// which plain lexicographic gets wrong the moment step counts cross a digit boundary
+const natCmp = (a, b) =>
+  String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+// a <select> whose change handler gets the picked value — toolbar shorthand
+function mkSel(label, opts, cur, onpick) {
+  const s = el('select', { 'aria-label': label },
+    opts.map(([v, l]) => el('option', { value: v, text: l,
+                                        selected: cur === v ? '' : null })));
+  s.addEventListener('change', e => onpick(e.target.value));
+  return s;
+}
 const taskLabel = t => {
   const info = DATA.tasks[t] || {};
   return t + (info.metric ? ` (${info.metric})` : '');
@@ -920,7 +960,7 @@ function vLeaderboard(ms) {
     const va = val(a, c), vb = val(b, c);
     if (va == null && vb == null) return 0;
     if (va == null) return 1; if (vb == null) return -1;
-    return typeof va === 'string' ? state.sort.dir * va.localeCompare(vb)
+    return typeof va === 'string' ? state.sort.dir * natCmp(va, vb)
                                   : state.sort.dir * (va - vb);
   });
   // best per column (max for accuracy/avg, min for perplexity)
@@ -992,22 +1032,42 @@ function vPpl(ms) {
     + 'as a training loss, just per byte instead of per token (token counts are not comparable '
     + 'across tokenizers; bytes are).';
   // the CE table: bits/byte and its loss form side by side, per task × model
-  const rows = [];
+  const ceData = [];
   for (const t of DATA.pplTasks) {
     const info = DATA.tasks[t] || {};
     for (const m of ms) {
       const c = cell(t, m.id);
       if (!c) continue;
       const isBpb = info.metric === 'bits_per_byte';
-      rows.push(el('tr', {},
-        el('td', { text: t }),
-        el('td', { 'data-model': m.id, text: m.name }),
-        el('td', { class: 'num', text: isBpb ? num(c.v, 4) : '—' }),
-        el('td', { class: 'num best', text: isBpb ? num(c.v * Math.LN2, 4) : '—' }),
-        el('td', { class: 'num', text: !isBpb ? `${num(c.v, 4)} (${info.metric})` : '—' }),
-        el('td', { class: 'num', text: c.n != null ? String(c.n) : '—' })));
+      ceData.push({ task: t, model: m.name, mid: m.id,
+        bpb: isBpb ? c.v : null, ce: isBpb ? c.v * Math.LN2 : null,
+        other: !isBpb ? c.v : null, om: info.metric, docs: c.n });
     }
   }
+  const CE_COLS = [
+    { key: 'task',  label: 'task' },
+    { key: 'model', label: 'model' },
+    { key: 'bpb',   label: 'bits / byte', num: true },
+    { key: 'ce',    label: 'CE loss (nats / byte)', num: true },
+    { key: 'other', label: 'other metric', num: true },
+    { key: 'docs',  label: 'docs', num: true },
+  ];
+  const { key: ceKey, dir: ceDir } = state.ceSort;
+  const ceCol = CE_COLS.find(c => c.key === ceKey) || CE_COLS[0];
+  const ceRows = [...ceData].sort((A, B) => {
+    const va = A[ceCol.key], vb = B[ceCol.key];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1; if (vb == null) return -1;
+    const base = ceCol.num ? ceDir * (va - vb) : ceDir * natCmp(va, vb);
+    // sorting by task keeps each group internally best-first
+    return base || (ceCol.key === 'task' ? (A.bpb ?? 1e9) - (B.bpb ?? 1e9) : 0);
+  }).map(r => el('tr', {},
+    el('td', { text: r.task }),
+    el('td', { 'data-model': r.mid, text: r.model }),
+    el('td', { class: 'num', text: r.bpb != null ? num(r.bpb, 4) : '—' }),
+    el('td', { class: 'num best', text: r.ce != null ? num(r.ce, 4) : '—' }),
+    el('td', { class: 'num', text: r.other != null ? `${num(r.other, 4)} (${r.om})` : '—' }),
+    el('td', { class: 'num', text: r.docs != null ? String(r.docs) : '—' })));
   return [
     el('p', { class: 'sub', style: 'margin:10px 2px', text:
       'Rolling-loglikelihood language modelling over pinned corpus samples. LOWER is better '
@@ -1019,10 +1079,14 @@ function vPpl(ms) {
       el('p', { class: 'sub', text: CE_NOTE + ' Compare it directly against the loss curves '
         + 'in your training logs to see where a checkpoint sits.' }),
       el('table', {},
-        el('thead', {}, el('tr', {},
-          ['task', 'model', 'bits / byte', 'CE loss (nats / byte)', 'other metric', 'docs']
-            .map((h, i) => el('th', { class: i >= 2 ? 'num' : '', text: h })))),
-        el('tbody', {}, rows))),
+        el('thead', {}, el('tr', {}, CE_COLS.map(c => el('th', {
+          class: (c.num ? 'num ' : '') + 'sortable',
+          onclick: () => { state.ceSort = { key: c.key,
+            dir: state.ceSort.key === c.key ? -state.ceSort.dir : 1 }; render(); },
+          'aria-sort': ceKey === c.key ? (ceDir > 0 ? 'ascending' : 'descending') : 'none' },
+          c.label + ' ', ceKey === c.key
+            ? el('span', { class: 'dir', text: ceDir > 0 ? '▲' : '▼' }) : '')))),
+        el('tbody', {}, ceRows))),
     tableTwin('ppl-table', ms, DATA.pplTasks, true)];
 }
 
@@ -1054,15 +1118,51 @@ function vRuns(ms) {
   if (DATA.warnings.length)
     frag.push(el('div', { class: 'card' }, el('h2', { text: 'Warnings' }),
       DATA.warnings.map(w => el('div', { class: 'warn', text: w }))));
+  // provenance was rendered in results-directory scan order — effectively random,
+  // and worst exactly when it matters most (a burst of checkpoint evals). Sortable
+  // now, defaulting to last run first: the eval you just finished is row one.
+  const PROV_COLS = [
+    { key: 'name',   label: 'model' },
+    { key: 'id',     label: 'hf id' },
+    { key: 'arch',   label: 'architecture', get: m => (m.archinfo || {}).arch },
+    { key: 'shape',  label: 'shape', num: true, get: m =>
+        m.archinfo && m.archinfo.hidden != null
+          ? m.archinfo.hidden * 1e4 + (m.archinfo.layers || 0) : null },
+    { key: 'vocab',  label: 'vocab', num: true, get: m => (m.archinfo || {}).vocab },
+    { key: 'backend', label: 'backend' },
+    { key: 'dtype',  label: 'dtype' },
+    { key: 'batch',  label: 'batch', num: true },
+    { key: 'chat',   label: 'chat template', num: true, get: m => m.chat ? 1 : 0 },
+    { key: 'seed',   label: 'seed', num: true },
+    { key: 'limit',  label: 'limit', num: true,
+      get: m => m.limit == null ? Infinity : m.limit },   // 'full' sorts as largest
+    { key: 'paramsSrc', label: 'params from' },
+    { key: 'minutes', label: 'wall clock', num: true },
+    { key: 'hash',   label: 'harness' },
+    { key: 'date',   label: 'last run', defDir: -1 },
+  ];
+  const pv = (m, c) => c.get ? c.get(m) : m[c.key];
+  const provCol = PROV_COLS.find(c => c.key === state.provSort.key) || PROV_COLS[14];
+  const provRows = [...ms].sort((a, b) => {
+    const va = pv(a, provCol), vb = pv(b, provCol);
+    if (va === vb) return 0;
+    if (va == null) return 1; if (vb == null) return -1;
+    return state.provSort.dir * (provCol.num ? va - vb : natCmp(va, vb));
+  });
   frag.push(el('div', { class: 'card' },
     el('h2', { text: 'Run provenance' }),
-    el('p', { class: 'sub', text: 'Every field here can change a score. Publish this table with the numbers, or the numbers are hearsay.' }),
+    el('p', { class: 'sub', text: 'Every field here can change a score. Publish this table with the numbers, or the numbers are hearsay. Sorted newest-eval-first — click any column to re-sort.' }),
     el('div', { class: 'lb-wrap' }, el('table', {},
-      el('thead', {}, el('tr', {}, ['model', 'hf id', 'architecture', 'shape', 'vocab',
-        'backend', 'dtype', 'batch', 'chat template', 'seed', 'limit', 'params from',
-        'wall clock', 'harness', 'last run']
-        .map(h => el('th', { text: h })))),
-      el('tbody', {}, ms.map(m => el('tr', {},
+      el('thead', {}, el('tr', {}, PROV_COLS.map(c => el('th', {
+        class: (c.num ? 'num ' : '') + 'sortable',
+        onclick: () => { state.provSort = { key: c.key,
+          dir: state.provSort.key === c.key ? -state.provSort.dir
+             : (c.defDir || (c.num ? -1 : 1)) }; render(); },
+        'aria-sort': state.provSort.key === c.key
+          ? (state.provSort.dir > 0 ? 'ascending' : 'descending') : 'none' },
+        c.label + ' ', state.provSort.key === c.key
+          ? el('span', { class: 'dir', text: state.provSort.dir > 0 ? '▲' : '▼' }) : '')))),
+      el('tbody', {}, provRows.map(m => el('tr', {},
         el('td', { 'data-model': m.id, text: m.name }),
         el('td', {}, el('span', { class: 'mono', text: m.id })),
         el('td', { text: (m.archinfo && m.archinfo.arch) || '—' }),
@@ -1191,7 +1291,7 @@ function vRuns(ms) {
       if (va == null) return 1;
       if (vb == null) return -1;
       return typeof va === 'number' && typeof vb === 'number'
-        ? dir * (va - vb) : dir * String(va).localeCompare(String(vb));
+        ? dir * (va - vb) : dir * natCmp(va, vb);
     });
     current = rows.map(x => x.r);
     countEl.textContent = `${rows.length} of ${all.length} rows`
@@ -1206,9 +1306,122 @@ function vRuns(ms) {
   // requery() updates the table in place instead of re-rendering the tab, so the
   // input keeps focus and caret across every keystroke.
   const qIn = el('input', { type: 'search', value: state.runsQ,
-    style: 'width:100%;max-width:620px',
+    style: 'width:100%', role: 'combobox', 'aria-autocomplete': 'list',
+    'aria-expanded': 'false', autocomplete: 'off',
     placeholder: 'pythia|gemma task:mmlu_ value>0.3 · "acc_norm" stderr<0.01 · gptneox layers>=24',
-    oninput: e => { state.runsQ = e.target.value; requery(); } });
+    oninput: e => { state.runsQ = e.target.value; requery(); refreshAc(); } });
+  // ---- typeahead: complete the token under the caret --------------------------
+  // Suggestions come from the data itself (model / task / metric / architecture
+  // names) plus the query language (field prefixes, numeric fields), so nobody
+  // has to remember what a task is called or how a filter is spelled.
+  const AC_VOCAB = {
+    model:  [...new Set(all.map(x => x.r[0]))],
+    task:   [...new Set(all.map(x => x.r[1]))],
+    metric: [...new Set(all.map(x => x.r[2]))],
+    arch:   [...new Set(DATA.models.map(m => (m.archinfo || {}).arch).filter(Boolean))],
+  };
+  function suggestFor(rawTok) {
+    let neg = '', tok = rawTok;
+    if (tok.startsWith('-') && tok.length > 1) { neg = '-'; tok = tok.slice(1); }
+    if (!tok || tok.startsWith('"')) return [];
+    const low = tok.toLowerCase();
+    const out = [];
+    const fm = low.match(/^(model|task|metric|arch):(.*)$/);
+    if (fm) {                       // completing a field's value
+      const part = fm[2], starts = [], subs = [];
+      for (const v of AC_VOCAB[fm[1]] || []) {
+        const vl = v.toLowerCase();
+        if (part && vl.startsWith(part)) starts.push(v);
+        else if (!part || vl.includes(part)) subs.push(v);
+      }
+      for (const v of [...starts, ...subs])
+        out.push({ ins: neg + fm[1] + ':' + v, show: fm[1] + ':' + v, tag: fm[1] });
+      return out.slice(0, 8);
+    }
+    for (const f of ['model:', 'task:', 'metric:', 'arch:'])
+      if (f.startsWith(low) && f !== low)
+        out.push({ ins: neg + f, show: f, tag: 'field', keep: true });
+    if (low.length >= 2)
+      for (const f of NUMF.split('|'))
+        if (f.startsWith(low) && f !== low)
+          out.push({ ins: neg + f + '>', show: f + '> …', tag: 'number', keep: true });
+    const buckets = [[], [], []];   // prefix > substring > one-typo fuzzy
+    for (const [tag, pool] of Object.entries(AC_VOCAB))
+      for (const v of pool) {
+        const vl = v.toLowerCase();
+        if (vl === low) continue;
+        if (vl.startsWith(low)) buckets[0].push({ ins: neg + v, show: v, tag });
+        else if (vl.includes(low)) buckets[1].push({ ins: neg + v, show: v, tag });
+        else if (low.length >= 4 &&
+                 vl.split(/[^a-z0-9_]+/).some(w => within1(w, low)))
+          buckets[2].push({ ins: neg + v, show: v, tag });
+      }
+    out.push(...buckets[0], ...buckets[1], ...buckets[2]);
+    return out.slice(0, 8);
+  }
+  function tokenAt() {              // the whitespace-delimited token under the caret
+    const v = qIn.value, c = qIn.selectionStart == null ? v.length : qIn.selectionStart;
+    let s = c; while (s > 0 && !/\s/.test(v[s - 1])) s--;
+    let e = c; while (e < v.length && !/\s/.test(v[e])) e++;
+    return { s, e, tok: v.slice(s, e) };
+  }
+  let acItems = [], acIdx = -1;
+  const acList = el('div', { class: 'ac-list', role: 'listbox',
+                             style: 'display:none' });
+  function closeAc() {
+    acItems = []; acIdx = -1;
+    acList.style.display = 'none'; acList.replaceChildren();
+    qIn.setAttribute('aria-expanded', 'false');
+  }
+  function acLabel(show, rawTok) {  // bold the part the user actually typed
+    const wrap = el('span', { class: 'ac-name' });
+    const t = rawTok.replace(/^-/, '').toLowerCase();
+    const at = t ? show.toLowerCase().indexOf(t) : -1;
+    if (at < 0) { wrap.textContent = show; return wrap; }
+    wrap.append(show.slice(0, at), el('mark', { text: show.slice(at, at + t.length) }),
+                show.slice(at + t.length));
+    return wrap;
+  }
+  function refreshAc() {
+    const { tok } = tokenAt();
+    acItems = suggestFor(tok);
+    if (!acItems.length) { closeAc(); return; }
+    acIdx = 0;
+    acList.replaceChildren(...acItems.map((s, i) => el('div', {
+      class: 'ac-item', role: 'option', 'aria-selected': String(i === acIdx),
+      // mousedown (not click) + preventDefault: accept BEFORE the input can blur
+      onmousedown: ev => { ev.preventDefault(); accept(s); } },
+      acLabel(s.show, tok), el('span', { class: 'ac-tag', text: s.tag }))));
+    acList.style.display = '';
+    qIn.setAttribute('aria-expanded', 'true');
+  }
+  function accept(sug) {
+    const { s, e } = tokenAt();
+    const v = qIn.value, tail = sug.keep ? '' : ' ';
+    qIn.value = v.slice(0, s) + sug.ins + tail + v.slice(e);
+    const pos = s + sug.ins.length + tail.length;
+    qIn.setSelectionRange(pos, pos);
+    state.runsQ = qIn.value;
+    requery();
+    refreshAc();                    // field prefixes keep suggesting their values
+  }
+  qIn.addEventListener('keydown', ev => {
+    const open = acItems.length > 0;
+    if (!open) { if (ev.key === 'ArrowDown') refreshAc(); return; }
+    if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+      ev.preventDefault();
+      acIdx = (acIdx + (ev.key === 'ArrowDown' ? 1 : -1) + acItems.length) % acItems.length;
+      [...acList.children].forEach((n, i) =>
+        n.setAttribute('aria-selected', String(i === acIdx)));
+      const active = acList.children[acIdx];
+      if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' });
+    } else if (ev.key === 'Enter' || ev.key === 'Tab') {
+      ev.preventDefault(); accept(acItems[acIdx] || acItems[0]);
+    } else if (ev.key === 'Escape') { closeAc(); }
+  });
+  qIn.addEventListener('focus', refreshAc);
+  qIn.addEventListener('blur', () => setTimeout(closeAc, 120));
+  const acWrap = el('div', { class: 'ac' }, qIn, acList);
   const EXAMPLES = ['pythia task:mmlu_ metric:acc value>0.3', 'metric:cross_entropy',
     'gemma|qwen vocab>100000', 'layers>=24 task:hellaswag', '"acc_norm" stderr<0.01'];
   const exChips = el('div', { class: 'chips', style: 'margin:8px 0 0' }, EXAMPLES.map(q =>
@@ -1230,9 +1443,10 @@ function vRuns(ms) {
       + 'architecture is queryable. Terms AND; a|b is OR; "quotes" match exactly; -word '
       + 'excludes; typos within one edit still hit. Fields: model:, task:, metric:, arch:. '
       + 'Numerics: value, stderr, shots, items, vocab, hidden, layers, heads, ctx, params '
-      + 'with > < >= <= =. Click a column to sort; the CSV button exports exactly what '
-      + 'the query matches.' }),
-    qIn, exChips, countEl,
+      + 'with > < >= <= =. Suggestions appear as you type — ↑↓ to pick, Enter or Tab to '
+      + 'insert, Esc to dismiss. Click a column to sort; the CSV button exports exactly '
+      + 'what the query matches.' }),
+    acWrap, exChips, countEl,
     el('div', { class: 'lb-wrap', style: 'max-height:480px;overflow-y:auto' },
       el('table', { class: 'lb' }, thead, tbody)),
     el('button', { style: 'margin-top:10px', text: 'Download filtered CSV', onclick: () => {
@@ -1369,7 +1583,7 @@ async function loadTraining(force = false) {
       if (force || !state.trSeries[id] || (row && row.status === 'running'))
         state.trSeries[id] = await (await fetch(`api/truns/${id}`)).json();
     }));
-    if (state.tab === 'training') render();
+    if (state.tab === 'training') (state.trRedraw || render)();
   } catch (e) { /* next poll retries */ }
   finally { state.trFetching = false; }
 }
@@ -1396,13 +1610,13 @@ function vTraining() {
   if (!state.trRuns.length && LIVE) loadTraining();
   const frag = [];
   // ---- left: the runs list --------------------------------------------------
-  const rows = state.trRuns.map(r => {
+  const runRow = r => {
     const sel = state.trSel.includes(r.id);
     const stale = r.status === 'running' && (Date.now() / 1000 - r.updated_at) > 600;
     return el('div', { class: 'runrow' + (sel ? ' sel' : ''), onclick: () => toggleRun(r.id),
       role: 'button', tabindex: 0, title: `project: ${r.project} · started ${rel(r.created_at)} ago` },
       el('span', { class: 'rchip', style: sel ? `background:${trColor(state.trColors[r.id])}` : '' }),
-      el('span', { style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis', text: r.name },
+      el('span', { style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: r.name },
         r.submitter ? el('span', { class: 'se', text: ` · ${r.submitter}` }) : ''),
       el('span', { class: stale ? 'st st-muted' : r.status === 'running' ? 'st st-active'
                         : r.status === 'failed' ? 'st st-failed' : 'st st-done',
@@ -1411,29 +1625,83 @@ function vTraining() {
         (r.last_step != null ? `step ${r.last_step.toLocaleString()}` : '—')
         + (r.last_loss != null ? ` · ${fmtv(r.last_loss)}` : '')
         + (r.tokens != null ? ` · ${fmtCount(r.tokens)} tok` : '') }));
-  });
-  const listCard = el('div', { class: 'card', style: 'margin:0' },
-    el('h2', { text: 'Training runs' }),
-    el('p', { class: 'sub', text: 'Click to overlay up to 8 runs. Streamed by your '
-      + 'training code via bench.init()/run.log() — see API.md.' }),
-    rows.length ? el('div', {}, rows)
-                : el('p', { class: 'small', text: 'No runs yet. From training code:' },
-                    el('pre', { class: 'mono', style: 'white-space:pre-wrap', text:
+  };
+  // filter + order: with three runs this is furniture; with forty (three friends
+  // × a dozen sweeps each) it is the difference between a list and a haystack
+  const TR_ORDERS = [['updated', 'recently updated'], ['created', 'newest'],
+    ['name', 'name'], ['loss', 'best loss'], ['tokens', 'most tokens'],
+    ['steps', 'most steps']];
+  function trVisible() {
+    const q = state.trQ.trim().toLowerCase();
+    const nul = v => v == null ? 1 : 0;               // nulls always sink
+    const cmp = {
+      updated: (a, b) => (b.updated_at || 0) - (a.updated_at || 0),
+      created: (a, b) => (b.created_at || 0) - (a.created_at || 0),
+      name:    (a, b) => natCmp(a.name, b.name),
+      loss:    (a, b) => nul(a.last_loss) - nul(b.last_loss)
+                         || (a.last_loss || 0) - (b.last_loss || 0),
+      tokens:  (a, b) => nul(a.tokens) - nul(b.tokens)
+                         || (b.tokens || 0) - (a.tokens || 0),
+      steps:   (a, b) => nul(a.last_step) - nul(b.last_step)
+                         || (b.last_step || 0) - (a.last_step || 0),
+    }[state.trOrder] || (() => 0);
+    return state.trRuns.filter(r =>
+      (state.trStatus === 'all' || r.status === state.trStatus) &&
+      (!q || `${r.name} ${r.project || ''} ${r.submitter || ''}`
+               .toLowerCase().includes(q)))
+      .sort(cmp);
+  }
+  const listWrap = el('div');
+  const listCount = el('span', { class: 'count-note' });
+  const trToolbar = el('div', { class: 'toolbar' },
+    el('input', { type: 'search', value: state.trQ, style: 'flex:1;min-width:120px',
+      placeholder: 'name, project, person…', 'aria-label': 'filter runs',
+      oninput: e => { state.trQ = e.target.value; rebuildRows(); } }),
+    mkSel('status filter',
+      [['all', 'status: all'], ['running', 'running'], ['finished', 'finished'],
+       ['failed', 'failed']],
+      state.trStatus, v => { state.trStatus = v; rebuildRows(); }),
+    mkSel('sort runs', TR_ORDERS.map(([v, l]) => [v, '↕ ' + l]),
+      state.trOrder, v => { state.trOrder = v; rebuildRows(); }),
+    listCount);
+  function rebuildRows() {
+    trToolbar.style.display = state.trRuns.length ? '' : 'none';
+    if (!state.trRuns.length) {
+      listWrap.replaceChildren(
+        el('p', { class: 'small', text: 'No runs yet. From training code:' },
+          el('pre', { class: 'mono', style: 'white-space:pre-wrap', text:
 'run = bench.init("run7", config={"lr": 3e-4})\n'
 + 'run.log({"loss": loss}, step=step)\n'
 + 'run.log_checkpoint(step, model_id)\n'
 + 'run.finish()' })));
+      return;
+    }
+    const rs = trVisible();
+    listCount.textContent = `${rs.length} of ${state.trRuns.length}`;
+    listWrap.replaceChildren(...(rs.length ? rs.map(runRow)
+      : [el('p', { class: 'small', text: 'No run matches the filter.' })]));
+  }
+  rebuildRows();
+  const listCard = el('div', { class: 'card', style: 'margin:0' },
+    el('h2', { text: 'Training runs' }),
+    el('p', { class: 'sub', text: 'Click to overlay up to 8 runs. Streamed by your '
+      + 'training code via bench.init()/run.log() — see API.md.' }),
+    trToolbar, listWrap);
   // ---- right: controls + charts ----------------------------------------------
-  const selRuns = state.trSel.map(id => ({
+  // getSel() re-derives the selection fresh on every call: the poll swaps
+  // state.trSeries entries, and a captured array would pin the stale objects.
+  const getSel = () => state.trSel.map(id => ({
     row: state.trRuns.find(r => r.id === id),
     det: state.trSeries[id], slot: state.trColors[id],
   })).filter(x => x.row);
   const right = [];
-  if (!selRuns.length) {
+  let redraw = null, extraWrap = null, buildExtras = null;
+  if (!getSel().length) {
     right.push(note('Select a run on the left — charts, config and its benchmark scores appear here.'));
   } else {
     // one panel per metric name, union across selected runs
     function buildPanels() {
+      const selRuns = getSel();
       const names = [...new Set(selRuns.flatMap(x => Object.keys(x.det?.metrics || {})))];
       names.sort((a, b) => {
         const ia = METRIC_ORDER.indexOf(a), ib = METRIC_ORDER.indexOf(b);
@@ -1450,9 +1718,12 @@ function vTraining() {
     const panelsWrap = el('div', { class: 'panels' }, buildPanels());
     const smoothVal = el('span', { class: 'count-note',
       text: state.trSmooth ? state.trSmooth.toFixed(2) : 'off' });
-    const redraw = () => {
+    const loadNote = el('span', { class: 'count-note', text:
+      getSel().some(x => !x.det) ? 'loading series…' : '' });
+    redraw = () => {
       panelsWrap.replaceChildren(...buildPanels());
       smoothVal.textContent = state.trSmooth ? state.trSmooth.toFixed(2) : 'off';
+      loadNote.textContent = getSel().some(x => !x.det) ? 'loading series…' : '';
     };
     const logBtn = el('button', { 'aria-pressed': String(state.trLog),
       text: state.trLog ? 'log y: on' : 'log y: off',
@@ -1463,63 +1734,76 @@ function vTraining() {
       el('span', { class: 'small', text: 'smoothing' }),
       el('input', { type: 'range', min: 0, max: 0.95, step: 0.05, value: state.trSmooth,
         oninput: e => { state.trSmooth = +e.target.value; redraw(); } }),
-      smoothVal, logBtn,
-      el('span', { class: 'count-note', text:
-        selRuns.some(x => !x.det) ? 'loading series…' : '' }));
+      smoothVal, logBtn, loadNote);
     right.push(ctrl, panelsWrap);
-    // ---- benchmark join: single run selected → scores vs step -----------------
-    if (selRuns.length === 1 && selRuns[0].det) {
-      const evs = (selRuns[0].det.events || []).filter(e => e.kind === 'checkpoint');
-      const series = DATA.accTasks.map((t, i) => ({
-        label: t, color: trColor(i),
-        pts: evs.map(ev => cell(t, ev.detail) ? [ev.step, cell(t, ev.detail).v] : null)
-                .filter(Boolean),
-      })).filter(s => s.pts.length);
-      const pendingEvs = evs.filter(ev => !DATA.accTasks.some(t => cell(t, ev.detail)));
-      // honesty line: "finished" on a run means TRAINING finished — say where the
-      // benchmarks are, so a green chip with an empty chart is never confusing
-      const stById = new Map(state.queue.map(q => [q.hf_id, q.status]));
-      const inQueue = pendingEvs.filter(ev =>
-        ['queued', 'preflight', 'waiting_lock', 'waiting_gpu', 'running']
-          .includes(stById.get(ev.detail))).length;
-      const failedEvs = pendingEvs.filter(ev => stById.get(ev.detail) === 'failed').length;
-      let statusLine = `Training ${selRuns[0].row.status} · benchmarks: `
-        + `${evs.length - pendingEvs.length}/${evs.length} done`;
-      if (inQueue) statusLine += `, ${inQueue} in the eval queue`;
-      if (failedEvs) statusLine += `, ${failedEvs} failed (see Submit & Queue)`;
-      if (series.length || evs.length) {
-        const panel = series.length
-          ? lineChart('benchmark score vs step', series, {})
-          : note('Checkpoints are queued — scores appear here when evaluation finishes.');
-        right.push(el('div', { class: 'card' },
-          el('h2', { text: 'Benchmarks along this run' }),
-          el('p', { class: 'sub', text: statusLine + '. Every checkpoint this run submitted, '
-            + 'joined to its scores on the leaderboard — capability versus training step, '
-            + 'next to the loss.' }),
-          panel));
+    // benchmark-join + config cards, rebuilt in place as events and scores arrive
+    buildExtras = () => {
+      const selRuns = getSel();
+      const out = [];
+      // ---- benchmark join: single run selected → scores vs step ---------------
+      if (selRuns.length === 1 && selRuns[0].det) {
+        const evs = (selRuns[0].det.events || []).filter(e => e.kind === 'checkpoint');
+        const series = DATA.accTasks.map((t, i) => ({
+          label: t, color: trColor(i),
+          pts: evs.map(ev => cell(t, ev.detail) ? [ev.step, cell(t, ev.detail).v] : null)
+                  .filter(Boolean),
+        })).filter(s => s.pts.length);
+        const pendingEvs = evs.filter(ev => !DATA.accTasks.some(t => cell(t, ev.detail)));
+        // honesty line: "finished" on a run means TRAINING finished — say where the
+        // benchmarks are, so a green chip with an empty chart is never confusing
+        const stById = new Map(state.queue.map(q => [q.hf_id, q.status]));
+        const inQueue = pendingEvs.filter(ev =>
+          ['queued', 'preflight', 'waiting_lock', 'waiting_gpu', 'running']
+            .includes(stById.get(ev.detail))).length;
+        const failedEvs = pendingEvs.filter(ev => stById.get(ev.detail) === 'failed').length;
+        let statusLine = `Training ${selRuns[0].row.status} · benchmarks: `
+          + `${evs.length - pendingEvs.length}/${evs.length} done`;
+        if (inQueue) statusLine += `, ${inQueue} in the eval queue`;
+        if (failedEvs) statusLine += `, ${failedEvs} failed (see Submit & Queue)`;
+        if (series.length || evs.length) {
+          const panel = series.length
+            ? lineChart('benchmark score vs step', series, {})
+            : note('Checkpoints are queued — scores appear here when evaluation finishes.');
+          out.push(el('div', { class: 'card' },
+            el('h2', { text: 'Benchmarks along this run' }),
+            el('p', { class: 'sub', text: statusLine + '. Every checkpoint this run submitted, '
+              + 'joined to its scores on the leaderboard — capability versus training step, '
+              + 'next to the loss.' }),
+            panel));
+        }
       }
-    }
-    // ---- config: table for one run, diff for several ---------------------------
-    const cfgs = selRuns.map(x => { try { return JSON.parse(x.row.config || '{}'); }
-                                    catch { return {}; } });
-    const keys = [...new Set(cfgs.flatMap(c => Object.keys(c)))].sort();
-    if (keys.length) {
-      const diffRows = keys.map(k => {
-        const vals = cfgs.map(c => c[k] === undefined ? '—' : JSON.stringify(c[k]));
-        const differ = new Set(vals).size > 1;
-        return el('tr', { class: differ && selRuns.length > 1 ? 'diffrow' : '' },
-          el('td', {}, el('span', { class: 'mono', text: k })),
-          vals.map(v => el('td', { class: 'num', text: v })));
-      });
-      right.push(el('div', { class: 'card' },
-        el('h2', { text: selRuns.length > 1 ? 'Config diff' : 'Config' }),
-        selRuns.length > 1 ? el('p', { class: 'sub', text: 'Highlighted rows differ between the selected runs — usually the whole explanation of why their curves differ.' }) : '',
-        el('div', { class: 'lb-wrap' }, el('table', {},
-          el('thead', {}, el('tr', {}, el('th', { text: 'key' }),
-            selRuns.map(x => el('th', { class: 'num', text: x.row.name })))),
-          el('tbody', {}, diffRows)))));
-    }
+      // ---- config: table for one run, diff for several -------------------------
+      const cfgs = selRuns.map(x => { try { return JSON.parse(x.row.config || '{}'); }
+                                      catch { return {}; } });
+      const keys = [...new Set(cfgs.flatMap(c => Object.keys(c)))].sort();
+      if (keys.length) {
+        const diffRows = keys.map(k => {
+          const vals = cfgs.map(c => c[k] === undefined ? '—' : JSON.stringify(c[k]));
+          const differ = new Set(vals).size > 1;
+          return el('tr', { class: differ && selRuns.length > 1 ? 'diffrow' : '' },
+            el('td', {}, el('span', { class: 'mono', text: k })),
+            vals.map(v => el('td', { class: 'num', text: v })));
+        });
+        out.push(el('div', { class: 'card' },
+          el('h2', { text: selRuns.length > 1 ? 'Config diff' : 'Config' }),
+          selRuns.length > 1 ? el('p', { class: 'sub', text: 'Highlighted rows differ between the selected runs — usually the whole explanation of why their curves differ.' }) : '',
+          el('div', { class: 'lb-wrap' }, el('table', {},
+            el('thead', {}, el('tr', {}, el('th', { text: 'key' }),
+              selRuns.map(x => el('th', { class: 'num', text: x.row.name })))),
+            el('tbody', {}, diffRows)))));
+      }
+      return out;
+    };
+    extraWrap = el('div', {}, buildExtras());
+    right.push(extraWrap);
   }
+  // the 5s poll calls this instead of render(): fresh points, statuses and rows
+  // flow in without rebuilding the DOM under the user's cursor
+  state.trRedraw = () => {
+    rebuildRows();
+    if (redraw) redraw();
+    if (extraWrap && buildExtras) extraWrap.replaceChildren(...buildExtras());
+  };
   frag.push(el('div', { class: 'tr-grid' }, listCard, el('div', {}, right)));
   return frag;
 }
@@ -1557,7 +1841,7 @@ function vQueue() {
     } catch (e) { state.qmsg = 'submit failed — server unreachable?'; }
     await loadQueue(); render();
   }});
-  const rows = state.queue.map(r => el('tr', {},
+  const qrow = r => el('tr', {},
     el('td', { class: 'num', text: '#' + r.id }),
     el('td', { title: (r.note || '') + (r.arch && r.arch.length > 2 ? (() => {
         try { const a = JSON.parse(r.arch);
@@ -1576,7 +1860,71 @@ function vQueue() {
         text: 'cancel', onclick: async () => {
           await fetch(`api/submissions/${r.id}/cancel`, { method: 'POST' }).catch(() => {});
           await loadQueue(); render();
-        }}) : '')));
+        }}) : ''));
+  // ---- queue filter + sort: a long shared queue needs "my jobs, failures first" ----
+  const QCOLS = [
+    { key: 'id',          label: '#', num: true, defDir: -1 },
+    { key: 'hf_id',       label: 'model' },
+    { key: 'suite',       label: 'suite' },
+    { key: 'submitter',   label: 'by' },
+    { key: 'status',      label: 'status' },
+    { key: null,          label: 'progress' },
+    { key: 'gpu_seconds', label: 'gpu', num: true, defDir: -1 },
+    { key: null,          label: '' },
+  ];
+  function qVisible() {
+    const q = state.qQ.trim().toLowerCase();
+    const rows = state.queue.filter(r =>
+      (state.qStatus === 'all'
+        || (state.qStatus === 'active' ? ACTIVE_STATUS.has(r.status)
+                                       : r.status === state.qStatus)) &&
+      (!q || `#${r.id} ${r.hf_id} ${r.submitter || ''} ${r.note || ''} ${r.status} `
+               .toLowerCase().includes(q)));
+    const c = QCOLS.find(x => x.key === state.qSort.key) || QCOLS[0];
+    return rows.sort((a, b) => {
+      const va = a[c.key], vb = b[c.key];
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1; if (vb == null) return -1;
+      return state.qSort.dir * (c.num ? va - vb : natCmp(va, vb));
+    });
+  }
+  const qCount = el('span', { class: 'count-note' });
+  const qToolbar = el('div', { class: 'toolbar', style: 'margin-top:2px' },
+    el('input', { type: 'search', value: state.qQ, style: 'flex:1;min-width:160px',
+      placeholder: 'filter: model, person, note…', 'aria-label': 'filter queue',
+      oninput: e => { state.qQ = e.target.value; rebuildQueue(); } }),
+    mkSel('status filter',
+      [['all', 'status: all'], ['active', 'active'], ['queued', 'queued'],
+       ['done', 'done'], ['failed', 'failed'], ['canceled', 'canceled']],
+      state.qStatus, v => { state.qStatus = v; rebuildQueue(); }),
+    qCount);
+  const qThead = el('thead');
+  const qTbody = el('tbody');
+  const qTableWrap = el('div', { class: 'lb-wrap' }, el('table', {}, qThead, qTbody));
+  const qEmpty = el('p', { class: 'small', text: 'Nothing submitted yet.' });
+  // in place, same reason as everywhere: the 5s poll must never eat a keystroke
+  function rebuildQueue() {
+    const any = state.queue.length > 0;
+    qToolbar.style.display = any ? '' : 'none';
+    qTableWrap.style.display = any ? '' : 'none';
+    qEmpty.style.display = any ? 'none' : '';
+    if (!any) return;
+    qThead.replaceChildren(el('tr', {}, QCOLS.map(c => c.key
+      ? el('th', { class: (c.num ? 'num ' : '') + 'sortable',
+          onclick: () => { state.qSort = { key: c.key,
+            dir: state.qSort.key === c.key ? -state.qSort.dir
+               : (c.defDir || 1) }; rebuildQueue(); },
+          'aria-sort': state.qSort.key === c.key
+            ? (state.qSort.dir > 0 ? 'ascending' : 'descending') : 'none' },
+          c.label + ' ', state.qSort.key === c.key
+            ? el('span', { class: 'dir', text: state.qSort.dir > 0 ? '▲' : '▼' }) : '')
+      : el('th', { text: c.label }))));
+    const rs = qVisible();
+    qCount.textContent = `${rs.length} of ${state.queue.length}`;
+    qTbody.replaceChildren(...rs.map(qrow));
+  }
+  state.queueRedraw = rebuildQueue;
+  rebuildQueue();
   return [
     el('div', { class: 'card' },
       el('h2', { text: 'Submit a model' }),
@@ -1589,11 +1937,7 @@ function vQueue() {
       state.qmsg ? el('p', { class: 'small', style: 'margin-top:8px', text: state.qmsg }) : ''),
     el('div', { class: 'card' },
       el('h2', { text: 'Queue' }),
-      state.queue.length ? el('div', { class: 'lb-wrap' }, el('table', {},
-        el('thead', {}, el('tr', {}, ['#', 'model', 'suite', 'by', 'status', 'progress',
-          'gpu', ''].map(h => el('th', { text: h })))),
-        el('tbody', {}, rows)))
-      : el('p', { class: 'small', text: 'Nothing submitted yet.' }))];
+      qToolbar, qTableWrap, qEmpty)];
 }
 
 function download(name, mime, text) {
@@ -1619,6 +1963,9 @@ const TABS = [
   ['runs', 'Evals', vRuns],
 ];
 function render() {
+  // full rebuild: drop the in-place refreshers so a poll can never touch the
+  // DOM of a tab that just got torn down — the mounted tab re-registers its own
+  state.trRedraw = state.queueRedraw = null;
   const ms = visible();
   document.getElementById('countNote').textContent =
     `${ms.length} of ${DATA.models.length} models shown`;
@@ -1672,7 +2019,7 @@ async function loadQueue() {
     });
     state.queue = rows;
     if (justFinished) await refreshResults();       // new scores -> re-render everything
-    else if (changed && state.tab === 'queue') render();
+    else if (changed && state.tab === 'queue') (state.queueRedraw || render)();
   } catch (e) { /* server briefly away; keep polling */ }
 }
 

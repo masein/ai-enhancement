@@ -85,7 +85,11 @@ python examples/train_and_benchmark.py --bench http://teraformer-5090-3:8899 --s
 
 **Overview** — best model, how many differences are statistically real.
 **Training** — your live curves, run compare, config diff, benchmark-vs-step.
-**Submit & Queue** — submit models, watch progress, read failure logs.
+The runs list has a search box (name, project or person), a status filter and a
+sort menu — "best loss" and "recently updated" are the two you'll live in.
+**Submit & Queue** — submit models, watch progress, read failure logs. The
+queue is searchable and filterable the same way (find *your* jobs, failures
+first); click any column header to sort.
 **Leaderboard** — every model × every task, ± standard error, sortable.
 **Tasks** — one panel per benchmark; the dashed line is chance. Distance from
 chance is the real score: **50% on Winogrande/PIQA is a coin flip, not a pass**,
@@ -93,8 +97,11 @@ and MMLU sits at ~25% for every model under ~1B — that's expected, not a bug.
 **Perplexity & Loss** — bits/byte on pinned corpora, plus cross-entropy in
 nats/byte (same quantity as your training loss, per byte, so it's comparable
 across tokenizers — line it up with your loss curve).
-**Evals** — full provenance and a query bar over every raw number
-(`pythia task:mmlu_ value>0.3`, `metric:cross_entropy`), with CSV export.
+**Evals** — full provenance (sorted newest-eval-first; click a column to
+re-sort) and a query bar over every raw number (`pythia task:mmlu_ value>0.3`,
+`metric:cross_entropy`), with CSV export. The query bar suggests completions
+as you type — model, task and metric names straight from the data, so you
+never have to remember what a task is called: ↑↓ to pick, Enter to insert.
 
 Two honest-statistics habits the dashboard enforces: every score carries its
 standard error, and if two error bars overlap, treat the models as tied.
