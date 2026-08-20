@@ -57,14 +57,15 @@ CREATE TABLE IF NOT EXISTS submissions (
   created_at  REAL NOT NULL,
   started_at  REAL,
   finished_at REAL,
-  gpu_seconds REAL DEFAULT 0
+  gpu_seconds REAL DEFAULT 0,
+  arch        TEXT                               -- JSON: architecture/hidden/layers/heads/ctx/vocab
 );
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
 """
 
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
-         "finished_at", "gpu_seconds"]
+         "finished_at", "gpu_seconds", "arch"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -77,6 +78,12 @@ def _conn() -> sqlite3.Connection:
 def init() -> None:
     with closing(_conn()) as c:
         c.executescript(SCHEMA)
+        # migrations for databases created before a column existed — sqlite has no
+        # ADD COLUMN IF NOT EXISTS, so probe and tolerate the duplicate error
+        try:
+            c.execute("ALTER TABLE submissions ADD COLUMN arch TEXT")
+        except sqlite3.OperationalError:
+            pass
         # A worker that died mid-run leaves a phantom 'running' row; on startup no
         # run can be in flight (single process), so re-queue it. Per-task resume
         # means the re-run only repeats the task that was interrupted.
@@ -214,8 +221,12 @@ def trun_list(project: str | None = None, limit: int = 200) -> list[dict]:
                 "ORDER BY step DESC LIMIT 1", (r["id"],)).fetchone()
             mx = c.execute("SELECT MAX(step) FROM tmetrics WHERE run_id=?",
                            (r["id"],)).fetchone()
+            tok = c.execute(
+                "SELECT value FROM tmetrics WHERE run_id=? AND name='tokens' "
+                "ORDER BY step DESC LIMIT 1", (r["id"],)).fetchone()
             r["last_step"] = mx[0] if mx and mx[0] is not None else None
             r["last_loss"] = last[1] if last else None
+            r["tokens"] = tok[0] if tok else None
             r["n_events"] = c.execute("SELECT COUNT(*) FROM tevents WHERE run_id=?",
                                       (r["id"],)).fetchone()[0]
     return rows

@@ -14,6 +14,7 @@ on this exact GPU:
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -121,6 +122,7 @@ def run_submission(sub: dict) -> None:
     kind = sub["kind"] if sub["kind"] in ("base", "instruct") else meta["kind_detected"]
     db.update(sid, kind=kind, params=meta["params"], vocab=meta["vocab"],
               batch=meta["batch"], need_gb=meta["need_gb"],
+              arch=json.dumps(meta.get("archinfo") or {}),
               progress=f"preflight ok · batch={meta['batch']} · "
                        f"needs ~{meta['need_gb']:g} GB")
 
@@ -129,6 +131,15 @@ def run_submission(sub: dict) -> None:
     log_path = config.LOGS_DIR / f"service_{sid}_{safe}.log"
     config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
     config.OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # drop the model's shape next to its results, so the report (live OR the
+    # frozen single-file kind) can show architecture/hidden/layers/vocab without
+    # any access to the service database
+    meta_dir = config.OUT_DIR / safe
+    meta_dir.mkdir(parents=True, exist_ok=True)
+    (meta_dir / "model_meta.json").write_text(json.dumps(
+        {"model": sub["hf_id"], "kind": kind, "params": meta["params"],
+         **(meta.get("archinfo") or {})}), encoding="utf-8")
 
     # -- one run at a time: wait for the shared lock ------------------------------
     t0 = time.time()

@@ -47,6 +47,10 @@ run.log({"loss": loss.item(), "lr": lr}, step=step)     # every step or every N 
 run.finish()
 ```
 
+Two useful conventions: put `batch_size` / `micro_batch_size` / `grad_accum` in
+`config=` (they show and diff in the UI), and log a cumulative `tokens` metric —
+the run list then shows total trained tokens.
+
 Your curves appear **live** on the **Training** tab: overlay runs to compare,
 smoothing slider, log scale, and a config diff that highlights exactly what you
 changed between two runs. Logging is buffered and can never crash your training —

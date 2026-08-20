@@ -118,6 +118,9 @@ The payload your tooling wants. The useful parts:
 {
   "models": [ {"id": "myorg/my-model", "name": "my-model", "kind": "instruct",
                "params": 596049920, "avg": 0.393, "navg": 8,   // mean over accuracy tasks it ran, and how many
+               "archinfo": {"arch": "Qwen3ForCausalLM", "hidden": 1024,   // captured at preflight from
+                            "layers": 28, "heads": 16,                     // the model's config.json —
+                            "ctx": 40960, "vocab": 151936},                // null for CLI-run models
                "minutes": 61.2, "date": "2026-08-19 10:02:11", ...} ],
   "accTasks": ["mmlu", "hellaswag", ...],       // higher-is-better, proportions
   "pplTasks": ["ppl_code", "ppl_fineweb_edu"],  // lower-is-better, no stderr
@@ -161,6 +164,12 @@ with bench.init("run7", project="llm", submitter="you",
             run.log_checkpoint(step, model_id)        # marks the step AND queues the benchmark
 # leaving the `with` calls run.finish() — status "failed" if an exception escaped
 ```
+
+Two conventions the dashboard understands: put `batch_size`, `micro_batch_size`
+and `grad_accum` in `config=` (they render in the Config card and highlight in
+the diff between runs), and log a cumulative **`tokens`** metric
+(`step × batch × seq_len`, or your real count) — the run list shows total
+trained tokens and it charts like any metric.
 
 Semantics worth knowing: `log()` buffers (64 points or 10 s) and **never raises
 into your training loop** — if the service is down it warns once on stderr and

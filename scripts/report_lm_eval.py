@@ -54,6 +54,27 @@ from pathlib import Path
 _METRIC_RE = re.compile(r"^(?P<metric>[a-zA-Z0-9_@\-]+?)(?P<stderr>_stderr)?,(?P<filter>.+)$")
 
 
+_META_CACHE: dict = {}
+
+
+def _model_meta(source: Path) -> dict | None:
+    """model_meta.json sits at the model's directory level (the service writes
+    it at preflight); results files are one or two levels below it."""
+    for up in (1, 2):
+        if len(source.parents) <= up:
+            continue
+        cand = source.parents[up] / "model_meta.json"
+        key = str(cand)
+        if key not in _META_CACHE:
+            try:
+                _META_CACHE[key] = json.loads(cand.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                _META_CACHE[key] = None
+        if _META_CACHE[key] is not None:
+            return _META_CACHE[key]
+    return None
+
+
 def load_results(path: Path) -> list[dict]:
     """Find and parse every lm-eval results file under `path`."""
     files = sorted(path.rglob("results*.json")) if path.is_dir() else [path]
@@ -149,6 +170,7 @@ def parse_run(blob: dict, source: Path) -> dict:
         "date": _norm_date(blob.get("date")),
         "transformers_version": blob.get("transformers_version"),
         "eval_seconds": _to_float(blob.get("total_evaluation_time_seconds")),
+        "archinfo": _model_meta(source),
         "tasks": tasks,
     }
 
@@ -265,6 +287,7 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
         m["chat_template"] = m["chat_template"] or r["chat_template"]
         m["limit"] = m["limit"] or r["limit"]
         m["num_params"] = m["num_params"] or r["num_params"]
+        m["archinfo"] = m.get("archinfo") or r.get("archinfo")
     return by_model
 
 
@@ -334,6 +357,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
             "seed": r["seed"], "limit": r["limit"],
             "minutes": round((r["eval_seconds"] or 0) / 60, 1),
             "hash": r["git_hash"], "date": r["date"],
+            "archinfo": r.get("archinfo"),
             "avg": (sum(have) / len(have)) if have else None,
             "navg": len(have),
         })
@@ -905,7 +929,9 @@ function vLeaderboard(ms) {
       text: c.task ? (c.lower ? DATA.tasks[c.task].metric : shotOf(c.task)) : '' }))));
   const tbody = el('tbody', {}, rows.map(m => el('tr', {},
     cols.map(c => {
-      if (c.key === 'name') return el('td', { class: 'model', 'data-model': m.id, title: m.id },
+      if (c.key === 'name') return el('td', { class: 'model', 'data-model': m.id,
+        title: m.id + (m.archinfo && m.archinfo.hidden
+          ? `\n${m.archinfo.arch || ''} · hidden ${m.archinfo.hidden} · layers ${m.archinfo.layers} · vocab ${m.archinfo.vocab}` : '') },
         m.name, m.kind === 'instruct' ? el('span', { class: 'badge instruct', text: 'instruct' })
                                       : el('span', { class: 'badge', text: 'base' }));
       if (c.key === 'params') return el('td', { class: 'num',
@@ -1013,12 +1039,18 @@ function vRuns(ms) {
     el('h2', { text: 'Run provenance' }),
     el('p', { class: 'sub', text: 'Every field here can change a score. Publish this table with the numbers, or the numbers are hearsay.' }),
     el('div', { class: 'lb-wrap' }, el('table', {},
-      el('thead', {}, el('tr', {}, ['model', 'hf id', 'backend', 'dtype', 'batch',
-        'chat template', 'seed', 'limit', 'params from', 'wall clock', 'harness', 'last run']
+      el('thead', {}, el('tr', {}, ['model', 'hf id', 'architecture', 'shape', 'vocab',
+        'backend', 'dtype', 'batch', 'chat template', 'seed', 'limit', 'params from',
+        'wall clock', 'harness', 'last run']
         .map(h => el('th', { text: h })))),
       el('tbody', {}, ms.map(m => el('tr', {},
         el('td', { 'data-model': m.id, text: m.name }),
         el('td', {}, el('span', { class: 'mono', text: m.id })),
+        el('td', { text: (m.archinfo && m.archinfo.arch) || '—' }),
+        el('td', { class: 'num', title: m.archinfo ? `heads ${m.archinfo.heads ?? '—'} · ctx ${m.archinfo.ctx ?? '—'}` : '',
+          text: m.archinfo && m.archinfo.hidden ? `${m.archinfo.hidden}×${m.archinfo.layers ?? '?'}` : '—' }),
+        el('td', { class: 'num', text: (m.archinfo && m.archinfo.vocab)
+          ? m.archinfo.vocab.toLocaleString() : '—' }),
         el('td', { text: m.backend || '—' }),
         el('td', { text: m.dtype || '—' }),
         el('td', { text: m.batch == null ? '—' : String(m.batch) }),
@@ -1134,6 +1166,10 @@ const rel = ts => {
 const fmtv = v => !isFinite(v) ? '—' : Math.abs(v) >= 100 ? Math.round(v).toLocaleString()
               : Math.abs(v) >= 1 ? v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
               : v.toPrecision(3);
+const fmtCount = v => v == null ? '—' : v < 1e3 ? String(Math.round(v))
+              : v < 1e6 ? (v / 1e3).toFixed(v < 1e4 ? 1 : 0) + 'K'
+              : v < 1e9 ? (v / 1e6).toFixed(v < 1e7 ? 1 : 0) + 'M'
+              : (v / 1e9).toFixed(2) + 'B';
 const ema = (pts, a) => {
   if (!a) return pts;
   let s = null;
@@ -1276,9 +1312,10 @@ function vTraining() {
       el('span', { class: stale ? 'st st-muted' : r.status === 'running' ? 'st st-active'
                         : r.status === 'failed' ? 'st st-failed' : 'st st-done',
                    text: stale ? 'stale?' : r.status }),
-      el('span', { class: 'se', style: 'width:86px;text-align:right', text:
+      el('span', { class: 'se', style: 'width:110px;text-align:right', text:
         (r.last_step != null ? `step ${r.last_step.toLocaleString()}` : '—')
-        + (r.last_loss != null ? ` · ${fmtv(r.last_loss)}` : '') }));
+        + (r.last_loss != null ? ` · ${fmtv(r.last_loss)}` : '')
+        + (r.tokens != null ? ` · ${fmtCount(r.tokens)} tok` : '') }));
   });
   const listCard = el('div', { class: 'card', style: 'margin:0' },
     el('h2', { text: 'Training runs' }),
@@ -1427,7 +1464,10 @@ function vQueue() {
   }});
   const rows = state.queue.map(r => el('tr', {},
     el('td', { class: 'num', text: '#' + r.id }),
-    el('td', { title: r.note || '' }, r.hf_id,
+    el('td', { title: (r.note || '') + (r.arch && r.arch.length > 2 ? (() => {
+        try { const a = JSON.parse(r.arch);
+              return `\n${a.arch || ''} · hidden ${a.hidden ?? '—'} · layers ${a.layers ?? '—'} · vocab ${a.vocab ?? '—'}`; }
+        catch { return ''; } })() : '') }, r.hf_id,
       el('span', { class: 'badge' + (r.kind === 'instruct' ? ' instruct' : ''), text: r.kind })),
     el('td', { text: r.suite }),
     el('td', { text: r.submitter || '—' }),

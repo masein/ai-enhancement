@@ -129,9 +129,14 @@ def train(args, bench):
     run = None
     if bench:
         try:
+            # config convention: batch_size / micro_batch_size / grad_accum here
+            # show up in the Config card and diff between runs. This loop has no
+            # gradient accumulation, so micro == batch and accum == 1 — a real
+            # trainer sets its own values.
             run = bench.init(run_name, project=args.project, submitter=args.submitter,
                              config={"base_model": args.base_model, "dataset": args.dataset,
                                      "lr": args.lr, "batch_size": args.batch_size,
+                                     "micro_batch_size": args.batch_size, "grad_accum": 1,
                                      "seq_len": args.seq_len, "steps": args.steps,
                                      "device": device},
                              hf_prefix=args.push_to or f"local/{run_name}")
@@ -205,7 +210,10 @@ def train(args, bench):
         tok_s = step * args.batch_size * args.seq_len / (time.time() - t0)
         if run:
             m = {"loss": loss_val, "lr": lr_now, "grad_norm": float(gnorm),
-                 "tokens_per_s": tok_s}
+                 "tokens_per_s": tok_s,
+                 # cumulative 'tokens' is a CONVENTION the dashboard understands:
+                 # the run list shows it, and it charts like any metric
+                 "tokens": step * args.batch_size * args.seq_len}
             if device == "cuda":
                 m["gpu_mem_gb"] = torch.cuda.memory_allocated() / 1e9
             run.log(m, step=step)

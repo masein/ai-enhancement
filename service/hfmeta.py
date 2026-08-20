@@ -51,6 +51,24 @@ def estimate(vocab: int, params: int | None) -> tuple[int, float]:
 LOCAL_PREFIX = "local/"
 
 
+def _arch_from_config(cfg: dict) -> dict:
+    """The model's shape, from its config.json — architecture name, hidden size,
+    layer count, head count, context length, vocab. Handles the two naming eras
+    (hidden_size/num_hidden_layers vs GPT-2's n_embd/n_layer) and multimodal
+    wrappers that nest the text model under text_config."""
+    tc = cfg.get("text_config") or {}
+    pick = lambda *keys: next((v for src in (cfg, tc) for k in keys
+                               if (v := src.get(k)) is not None), None)
+    return {
+        "arch": (cfg.get("architectures") or tc.get("architectures") or [None])[0],
+        "hidden": pick("hidden_size", "n_embd", "d_model"),
+        "layers": pick("num_hidden_layers", "n_layer", "num_layers"),
+        "heads": pick("num_attention_heads", "n_head"),
+        "ctx": pick("max_position_embeddings", "n_positions", "n_ctx"),
+        "vocab": pick("vocab_size"),
+    }
+
+
 def _preflight_local(name: str) -> dict:
     """An uploaded artifact: same decisions as the Hub path, answered from disk."""
     d = config.ARTIFACTS_DIR / name
@@ -91,7 +109,8 @@ def _preflight_local(name: str) -> dict:
     batch, need = estimate(int(vocab), params)
     return {"params": params, "vocab": int(vocab), "batch": batch, "need_gb": need,
             "kind_detected": "instruct" if has_template else "base",
-            "architectures": cfg.get("architectures") or []}
+            "architectures": cfg.get("architectures") or [],
+            "archinfo": _arch_from_config(cfg)}
 
 
 def preflight(hf_id: str) -> dict:
@@ -100,7 +119,9 @@ def preflight(hf_id: str) -> dict:
     if os.environ.get("STUB_PREFLIGHT") == "1":   # offline tests
         batch, need = estimate(50304, 14_000_000)
         return {"params": 14_000_000, "vocab": 50304, "batch": batch,
-                "need_gb": need, "kind_detected": "base", "architectures": ["stub"]}
+                "need_gb": need, "kind_detected": "base", "architectures": ["stub"],
+                "archinfo": {"arch": "StubForCausalLM", "hidden": 128, "layers": 6,
+                             "heads": 4, "ctx": 2048, "vocab": 50304}}
 
     try:
         from huggingface_hub import HfApi, hf_hub_download
@@ -165,4 +186,5 @@ def preflight(hf_id: str) -> dict:
         "need_gb": need,
         "kind_detected": "instruct" if has_template else "base",
         "architectures": cfg.get("architectures") or [],
+        "archinfo": _arch_from_config(cfg),
     }
