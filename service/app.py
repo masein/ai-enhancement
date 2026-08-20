@@ -363,20 +363,107 @@ def index():
     return _PAGE
 
 
-# the friend-facing guide, served from the repo so onboarding is one link
+# ---------------------------------------------------------------------------
+# the friend-facing guide, rendered as a proper page. A focused markdown
+# renderer, not a library: it covers exactly what FRIENDS.md uses (headings,
+# paragraphs, lists, code fences, bold/italic/inline-code, links, hr) and
+# escapes first, so nothing in the file can inject markup.
+# ---------------------------------------------------------------------------
+
 _GUIDE_MD = Path(__file__).resolve().parent.parent / "FRIENDS.md"
+
+_INLINE = [
+    (re.compile(r"\*\*(.+?)\*\*"), r"<b>\1</b>"),
+    (re.compile(r"(?<!\*)\*([^*\n]+)\*(?!\*)"), r"<i>\1</i>"),
+    (re.compile(r"`([^`]+)`"), r"<code>\1</code>"),
+    (re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+|/[^)\s]*)\)"),
+     r'<a href="\2" rel="noopener">\1</a>'),
+]
+
+
+def _md_inline(escaped: str) -> str:
+    for rx, rep in _INLINE:
+        escaped = rx.sub(rep, escaped)
+    return escaped
+
+
+def _md_to_html(text: str) -> str:
+    out: list[str] = []
+    para: list[str] = []
+    items: list[str] = []
+    code: list[str] | None = None
+
+    def flush():
+        if para:
+            out.append("<p>" + _md_inline(html.escape(" ".join(para))) + "</p>")
+            para.clear()
+        if items:
+            out.append("<ul>" + "".join(f"<li>{i}</li>" for i in items) + "</ul>")
+            items.clear()
+
+    for line in text.splitlines():
+        if line.strip().startswith("```"):
+            flush()
+            if code is None:
+                code = []
+            else:
+                out.append("<pre><code>" + html.escape("\n".join(code)) + "</code></pre>")
+                code = None
+            continue
+        if code is not None:
+            code.append(line)
+            continue
+        s = line.strip()
+        if not s:
+            flush()
+        elif s.startswith("## "):
+            flush(); out.append("<h2>" + _md_inline(html.escape(s[3:])) + "</h2>")
+        elif s.startswith("# "):
+            flush(); out.append("<h1>" + _md_inline(html.escape(s[2:])) + "</h1>")
+        elif s == "---":
+            flush(); out.append("<hr>")
+        elif s.startswith("- "):
+            if para:
+                flush()
+            items.append(_md_inline(html.escape(s[2:])))
+        elif items:
+            items[-1] += " " + _md_inline(html.escape(s))   # wrapped list item
+        else:
+            para.append(s)
+    flush()
+    if code is not None:                                    # unclosed fence
+        out.append("<pre><code>" + html.escape("\n".join(code)) + "</code></pre>")
+    return "".join(out)
+
+
+_GUIDE_CSS = """
+:root{color-scheme:light dark}
+body{margin:0;background:#f9f9f7;color:#0b0b0b;
+  font:15px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+@media(prefers-color-scheme:dark){body{background:#0d0d0d;color:#eee}
+  main{background:#1a1a19!important;border-color:rgba(255,255,255,.1)!important}
+  pre,code{background:#0d0d0d!important;border-color:rgba(255,255,255,.12)!important}
+  a{color:#3987e5!important}hr{border-color:#383835!important}h1,h2{color:#fff}}
+main{max-width:780px;margin:28px auto;padding:34px 38px;background:#fcfcfb;
+  border:1px solid rgba(11,11,11,.1);border-radius:14px}
+h1{font-size:26px;letter-spacing:-.01em;margin:0 0 6px}
+h2{font-size:18px;margin:30px 0 8px;letter-spacing:-.01em}
+p{margin:10px 0}ul{margin:8px 0;padding-left:22px}li{margin:5px 0}
+code{background:#f0efec;border:1px solid rgba(11,11,11,.08);border-radius:5px;
+  padding:1px 5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:#f0efec;border:1px solid rgba(11,11,11,.08);border-radius:10px;
+  padding:14px 16px;overflow-x:auto}
+pre code{background:none;border:0;padding:0;font-size:13px;line-height:1.55}
+a{color:#2a78d6;text-decoration:none}a:hover{text-decoration:underline}
+hr{border:0;border-top:1px solid #e1e0d9;margin:26px 0}
+"""
 
 
 @app.get("/guide", response_class=HTMLResponse)
 def guide():
     text = (_GUIDE_MD.read_text(encoding="utf-8")
-            if _GUIDE_MD.exists() else "FRIENDS.md not found in this checkout.")
-    return (
-        "<!doctype html><html><head><meta charset='utf-8'>"
-        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>Team benchmark — guide</title><style>"
-        "body{margin:0;background:#f9f9f7;color:#0b0b0b;font-family:system-ui,sans-serif}"
-        "@media(prefers-color-scheme:dark){body{background:#0d0d0d;color:#fff}}"
-        "pre{max-width:860px;margin:0 auto;padding:36px 22px;white-space:pre-wrap;"
-        "word-wrap:break-word;font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace}"
-        "</style></head><body><pre>" + html.escape(text) + "</pre></body></html>")
+            if _GUIDE_MD.exists() else "# Guide missing\nFRIENDS.md not found in this build.")
+    return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<title>Team benchmark — guide</title><style>" + _GUIDE_CSS + "</style></head>"
+            "<body><main>" + _md_to_html(text) + "</main></body></html>")

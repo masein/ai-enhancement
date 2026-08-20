@@ -1300,27 +1300,41 @@ function vTraining() {
   if (!selRuns.length) {
     right.push(note('Select a run on the left — charts, config and its benchmark scores appear here.'));
   } else {
+    // one panel per metric name, union across selected runs
+    function buildPanels() {
+      const names = [...new Set(selRuns.flatMap(x => Object.keys(x.det?.metrics || {})))];
+      names.sort((a, b) => {
+        const ia = METRIC_ORDER.indexOf(a), ib = METRIC_ORDER.indexOf(b);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+      });
+      return names.map(nm => lineChart(nm,
+        selRuns.filter(x => x.det?.metrics?.[nm]?.length).map(x => ({
+          label: x.row.name, color: trColor(x.slot),
+          pts: x.det.metrics[nm], events: x.det.events || [],
+        })), { smooth: state.trSmooth, logY: state.trLog })).filter(Boolean);
+    }
+    // redraw() swaps ONLY the panels — a full render() would replace the slider
+    // element mid-drag and kill the gesture after one notch
+    const panelsWrap = el('div', { class: 'panels' }, buildPanels());
+    const smoothVal = el('span', { class: 'count-note',
+      text: state.trSmooth ? state.trSmooth.toFixed(2) : 'off' });
+    const redraw = () => {
+      panelsWrap.replaceChildren(...buildPanels());
+      smoothVal.textContent = state.trSmooth ? state.trSmooth.toFixed(2) : 'off';
+    };
+    const logBtn = el('button', { 'aria-pressed': String(state.trLog),
+      text: state.trLog ? 'log y: on' : 'log y: off',
+      onclick: e => { state.trLog = !state.trLog;
+        e.target.textContent = state.trLog ? 'log y: on' : 'log y: off';
+        e.target.setAttribute('aria-pressed', String(state.trLog)); redraw(); } });
     const ctrl = el('div', { class: 'ctrl' },
       el('span', { class: 'small', text: 'smoothing' }),
       el('input', { type: 'range', min: 0, max: 0.95, step: 0.05, value: state.trSmooth,
-        oninput: e => { state.trSmooth = +e.target.value; render(); } }),
-      el('button', { 'aria-pressed': String(state.trLog),
-        onclick: () => { state.trLog = !state.trLog; render(); },
-        text: state.trLog ? 'log y: on' : 'log y: off' }),
+        oninput: e => { state.trSmooth = +e.target.value; redraw(); } }),
+      smoothVal, logBtn,
       el('span', { class: 'count-note', text:
         selRuns.some(x => !x.det) ? 'loading series…' : '' }));
-    // one panel per metric name, union across selected runs
-    const names = [...new Set(selRuns.flatMap(x => Object.keys(x.det?.metrics || {})))];
-    names.sort((a, b) => {
-      const ia = METRIC_ORDER.indexOf(a), ib = METRIC_ORDER.indexOf(b);
-      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
-    });
-    const panels = names.map(nm => lineChart(nm,
-      selRuns.filter(x => x.det?.metrics?.[nm]?.length).map(x => ({
-        label: x.row.name, color: trColor(x.slot),
-        pts: x.det.metrics[nm], events: x.det.events || [],
-      })), { smooth: state.trSmooth, logY: state.trLog })).filter(Boolean);
-    right.push(ctrl, el('div', { class: 'panels' }, panels));
+    right.push(ctrl, panelsWrap);
     // ---- benchmark join: single run selected → scores vs step -----------------
     if (selRuns.length === 1 && selRuns[0].det) {
       const evs = (selRuns[0].det.events || []).filter(e => e.kind === 'checkpoint');
@@ -1329,16 +1343,27 @@ function vTraining() {
         pts: evs.map(ev => cell(t, ev.detail) ? [ev.step, cell(t, ev.detail).v] : null)
                 .filter(Boolean),
       })).filter(s => s.pts.length);
-      const pending = evs.filter(ev => !DATA.accTasks.some(t => cell(t, ev.detail))).length;
+      const pendingEvs = evs.filter(ev => !DATA.accTasks.some(t => cell(t, ev.detail)));
+      // honesty line: "finished" on a run means TRAINING finished — say where the
+      // benchmarks are, so a green chip with an empty chart is never confusing
+      const stById = new Map(state.queue.map(q => [q.hf_id, q.status]));
+      const inQueue = pendingEvs.filter(ev =>
+        ['queued', 'preflight', 'waiting_lock', 'waiting_gpu', 'running']
+          .includes(stById.get(ev.detail))).length;
+      const failedEvs = pendingEvs.filter(ev => stById.get(ev.detail) === 'failed').length;
+      let statusLine = `Training ${selRuns[0].row.status} · benchmarks: `
+        + `${evs.length - pendingEvs.length}/${evs.length} done`;
+      if (inQueue) statusLine += `, ${inQueue} in the eval queue`;
+      if (failedEvs) statusLine += `, ${failedEvs} failed (see Submit & Queue)`;
       if (series.length || evs.length) {
         const panel = series.length
           ? lineChart('benchmark score vs step', series, {})
           : note('Checkpoints are queued — scores appear here when evaluation finishes.');
         right.push(el('div', { class: 'card' },
           el('h2', { text: 'Benchmarks along this run' }),
-          el('p', { class: 'sub', text: 'Every checkpoint this run submitted, joined to its '
-            + 'scores on the leaderboard — capability versus training step, next to the loss.'
-            + (pending ? ` ${pending} checkpoint(s) still evaluating.` : '') }),
+          el('p', { class: 'sub', text: statusLine + '. Every checkpoint this run submitted, '
+            + 'joined to its scores on the leaderboard — capability versus training step, '
+            + 'next to the loss.' }),
           panel));
       }
     }

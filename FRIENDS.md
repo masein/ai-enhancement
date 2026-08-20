@@ -121,6 +121,11 @@ accept that model's license once — ask Omar, or submit an ungated mirror.
 **My run shows "stale?"** Your training stopped logging without calling
 `run.finish()` (crash, Ctrl-C). Cosmetic — logging again resumes it.
 
+**My run says "finished" but there are no benchmark scores yet.** "Finished"
+means the *training* finished; your checkpoints may still be in the eval queue
+(one runs at a time). The run's page shows "benchmarks: X/Y done" and the
+Submit & Queue tab shows live progress — scores appear as each one lands.
+
 **Something else broke.** Every failed submission has a `log` link with the raw
 error, and the error messages are written to be actionable. If they aren't: Omar.
 

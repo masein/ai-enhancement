@@ -136,7 +136,7 @@ class Bench:
         r = self._call("/api/truns", {"name": name, "project": project,
                                       "config": config or {}, "submitter": submitter,
                                       "hf_prefix": hf_prefix})
-        return Run(self, int(r["id"]), name)
+        return Run(self, int(r["id"]), name, submitter)
 
     def upload_artifact(self, name: str, checkpoint_dir) -> str:
         """Zip a save_pretrained() directory and upload it as artifact `name`.
@@ -184,8 +184,9 @@ class Run:
     FLUSH_EVERY = 64          # points
     FLUSH_SECS = 10.0
 
-    def __init__(self, bench: Bench, rid: int, name: str):
+    def __init__(self, bench: Bench, rid: int, name: str, submitter: str = ""):
         self.bench, self.id, self.name = bench, rid, name
+        self.submitter = submitter
         self._buf: list[dict] = []
         self._last_flush = time.time()
         self._warned = False
@@ -234,7 +235,7 @@ class Run:
         if not submit:
             return None
         try:
-            return self.bench.submit(model_id, suite=suite,
+            return self.bench.submit(model_id, suite=suite, submitter=self.submitter,
                                      note=note or f"{self.name} @ step {step}")
         except BenchError as e:
             print(f"[bench] checkpoint submit failed (non-fatal): {e}", file=sys.stderr)
