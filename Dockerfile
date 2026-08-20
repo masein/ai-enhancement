@@ -26,6 +26,8 @@ print('image env OK — torch', torch.__version__, '| built for CUDA', torch.ver
 WORKDIR /app
 COPY scripts/ scripts/
 COPY service/ service/
+# FRIENDS.md is served at /guide — .dockerignore carries an exception for it
+COPY FRIENDS.md ./
 
 ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1

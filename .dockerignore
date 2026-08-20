@@ -3,6 +3,7 @@
 .env
 .env.example
 *.md
+!FRIENDS.md
 results/
 eval_tasks/
 logs/

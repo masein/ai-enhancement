@@ -115,9 +115,14 @@ def train(args, bench):
           f"{args.steps} steps of {args.batch_size}×{args.seq_len} tokens")
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model)
-    model = AutoModelForCausalLM.from_pretrained(args.base_model).to(device)
+    # .float() is load-bearing: newer transformers loads checkpoints in their
+    # STORED dtype (pythia ships fp16), and full fine-tuning in fp16 without a
+    # loss scaler diverges to NaN within a few hundred steps. fp32 is cheap at
+    # this size and always stable.
+    model = AutoModelForCausalLM.from_pretrained(args.base_model).float().to(device)
     model.train()
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    warmup = min(50, max(10, args.steps // 10))   # LR warmup — cheap divergence insurance
 
     # run tracking: curves appear live on the dashboard's Training tab. If no
     # service is reachable, run=None and everything still works locally.
@@ -176,18 +181,30 @@ def train(args, bench):
 
     batches = packed_batches(args.dataset, args.field, tokenizer,
                              args.seq_len, args.batch_size)
-    t0, running = time.time(), None
+    t0, running, nan_warned = time.time(), None, False
     for step in range(1, args.steps + 1):
+        lr_now = args.lr * min(1.0, step / warmup)
+        for g in opt.param_groups:
+            g["lr"] = lr_now
         ids = next(batches).to(device)
         loss = model(input_ids=ids, labels=ids).loss
+        loss_val = loss.item()
+        if not math.isfinite(loss_val):
+            # a NaN step must not update weights — one bad step poisons the model
+            opt.zero_grad(set_to_none=True)
+            if not nan_warned:
+                print(f"  step {step}: loss is not finite — skipping the optimizer "
+                      f"step. If this persists, lower --lr (currently {args.lr:g}).")
+                nan_warned = True
+            continue
         opt.zero_grad(set_to_none=True)
         loss.backward()
         gnorm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step()
-        running = loss.item() if running is None else 0.95 * running + 0.05 * loss.item()
+        running = loss_val if running is None else 0.95 * running + 0.05 * loss_val
         tok_s = step * args.batch_size * args.seq_len / (time.time() - t0)
         if run:
-            m = {"loss": loss.item(), "lr": args.lr, "grad_norm": float(gnorm),
+            m = {"loss": loss_val, "lr": lr_now, "grad_norm": float(gnorm),
                  "tokens_per_s": tok_s}
             if device == "cuda":
                 m["gpu_mem_gb"] = torch.cuda.memory_allocated() / 1e9

@@ -93,6 +93,11 @@ def parse_run(blob: dict, source: Path) -> dict:
             mm = _METRIC_RE.match(key)
             if not mm or not isinstance(val, (int, float)):
                 continue
+            # A NaN/Infinity score is not a score (a diverged model's perplexity
+            # comes back as Infinity) — and it would poison JSON serialization
+            # downstream: the API layer rightly refuses non-finite floats.
+            if not math.isfinite(float(val)):
+                continue
             name = mm.group("metric")
             slot = "stderr" if mm.group("stderr") else "value"
             # keep the first filter seen per metric, but prefer flexible-extract for
