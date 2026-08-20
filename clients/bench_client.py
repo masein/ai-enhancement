@@ -148,6 +148,20 @@ class Bench:
         d = _P(checkpoint_dir)
         if not (d / "config.json").exists():
             raise BenchError(f"{d} does not look like a checkpoint (no config.json)")
+        # pre-check the name: artifact names are immutable, and a duplicate makes
+        # the server refuse before reading the body — which a mid-upload client
+        # experiences as a bare connection reset instead of the real reason
+        try:
+            existing = {a["name"] for a in self._call("/api/artifacts")["artifacts"]}
+            if name in existing:
+                raise BenchError(
+                    f"artifact {name!r} already exists (names are immutable — an "
+                    f"earlier run probably used the same run-name). Pick a fresh "
+                    f"name, or delete the old one: DELETE /api/artifacts/{name}")
+        except BenchError as e:
+            if "already exists" in str(e):
+                raise
+            # listing failed (old server?) — proceed; the upload itself will say
         # zip to a temp file and stream it — checkpoints are hundreds of MB and
         # do not belong in RAM twice
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tf:
@@ -173,6 +187,14 @@ class Bench:
                         detail = ""
                     raise BenchError(f"{e.code} uploading {name}: "
                                      f"{detail or e.reason}") from None
+                except (urllib.error.URLError, OSError) as e:
+                    # a mid-send reset usually means the server refused early
+                    # (duplicate name, size cap, quota) — surface it as ours, so
+                    # callers' BenchError handling keeps training alive
+                    raise BenchError(
+                        f"connection dropped while uploading {name}: {e}. If this "
+                        f"repeats, check GET /api/artifacts (name taken? quota?) "
+                        f"and the service logs.") from None
         finally:
             os.unlink(tmp)
 

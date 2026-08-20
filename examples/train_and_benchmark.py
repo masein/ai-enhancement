@@ -165,7 +165,7 @@ def train(args, bench):
                 tokenizer.save_pretrained(td)
                 try:
                     model_id = bench.upload_artifact(f"{run_name}-step{step}", td)
-                except BenchError as e:
+                except Exception as e:        # NOTHING here may kill training
                     print(f"  [ckpt] step {step}: upload failed (non-fatal): {e}")
                     return
             print(f"  [ckpt] step {step}: uploaded as {model_id}")
@@ -320,4 +320,11 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # os._exit, not SystemExit: HF/torch native threads can crash CPython's
+    # teardown ("PyGILState_Release ... must be current") AFTER all work is done
+    # — same cosmetic abort make_ppl_task.py sidesteps the same way.
+    import os as _os
+    _rc = main()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    _os._exit(_rc if isinstance(_rc, int) else 0)

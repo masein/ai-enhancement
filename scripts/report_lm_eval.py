@@ -41,8 +41,25 @@ import datetime as _dt
 import html
 import json
 import math
+import os
 import re
 from pathlib import Path
+
+# Timestamps render in TZ (e.g. TZ=Asia/Qatar) when set — otherwise whatever
+# this process's local time is. Inside a container that defaults to UTC, which
+# reads three hours wrong in Doha; docker-compose sets TZ for exactly that.
+def _tzinfo():
+    name = os.environ.get("TZ")
+    if not name:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(name)
+    except Exception:
+        return None
+
+
+_TZ = _tzinfo()
 
 # ---------------------------------------------------------------------------
 # parsing lm-eval output
@@ -186,7 +203,7 @@ def _norm_date(v):
     if not v:
         return None
     try:
-        return _dt.datetime.fromtimestamp(float(v)).strftime("%Y-%m-%d %H:%M:%S")
+        return _dt.datetime.fromtimestamp(float(v), _TZ).strftime("%Y-%m-%d %H:%M:%S")
     except (TypeError, ValueError, OSError, OverflowError):
         return str(v)
 
@@ -426,7 +443,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
     dates = sorted(str(r["date"]) for r in by_model.values() if r["date"])
     return {
         "title": title,
-        "generated": _dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "generated": _dt.datetime.now(_TZ).strftime("%Y-%m-%d %H:%M %Z").strip(),
         "source": source,
         "models": model_rows,
         "accTasks": acc_tasks,
@@ -599,6 +616,8 @@ tr:last-child td { border-bottom:none; }
 .ctrl { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:2px 0 10px; }
 .ctrl input[type=range] { width:140px; accent-color:var(--accent); }
 .diffrow td { background:var(--accent-soft); }
+mark { background:var(--accent-soft); color:var(--text-primary); border-radius:3px;
+  padding:0 1px; }
 pre.mono { background:var(--plane); border:1px solid var(--border); border-radius:8px;
   padding:10px 12px; margin:8px 0 0; }
 .mx { border-collapse:separate; border-spacing:2px; font-variant-numeric:tabular-nums;
@@ -1067,49 +1086,118 @@ function vRuns(ms) {
   // service would be infrastructure guarding data a browser filters in under a
   // millisecond. The query language is the useful part.
   const names = new Set(ms.map(m => m.name));
-  const all = DATA.extra.filter(r => names.has(r[0]));
+  // each row joins its model's shape, so queries can mix scores with architecture:
+  // "gptneox layers>=24 task:hellaswag" or "vocab>100000 metric:acc value>0.3"
+  const byName = new Map(DATA.models.map(m => [m.name, m]));
+  const all = DATA.extra.filter(r => names.has(r[0])).map(r => {
+    const m = byName.get(r[0]) || {};
+    const a = m.archinfo || {};
+    return { r,
+      hay: (r[0] + ' ' + r[1] + ' ' + r[2] + ' ' + (a.arch || '') + ' '
+            + (m.kind || '')).toLowerCase(),
+      words: null,   // built lazily for fuzzy matching
+      nums: { value: r[3], stderr: r[4], shots: r[5], items: r[6],
+              vocab: a.vocab, hidden: a.hidden, layers: a.layers,
+              heads: a.heads, ctx: a.ctx, params: m.params } };
+  });
+  for (const row of all) row.words = row.hay.split(/[^a-z0-9_]+/).filter(Boolean);
+  // one edit (insert/delete/substitute) of tolerance — the typo-forgiveness that
+  // makes search feel like a search engine instead of a grep
+  function within1(a, b) {
+    if (a === b) return true;
+    const la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > 1) return false;
+    let i = 0, j = 0, edits = 0;
+    while (i < la && j < lb) {
+      if (a[i] === b[j]) { i++; j++; continue; }
+      if (++edits > 1) return false;
+      // adjacent transposition ("shaeps" -> "shapes") counts as ONE edit —
+      // it is the most common human typo
+      if (la === lb && a[i] === b[j + 1] && a[i + 1] === b[j]) { i += 2; j += 2; continue; }
+      if (la > lb) i++; else if (lb > la) j++; else { i++; j++; }
+    }
+    return edits + (la - i) + (lb - j) <= 1;
+  }
+  const NUMF = 'value|stderr|shots|items|vocab|hidden|layers|heads|ctx|params';
   function buildPred(q) {
-    const preds = q.trim().toLowerCase().split(/\s+/).filter(Boolean).map(tok => {
+    const toks = [...q.trim().toLowerCase().matchAll(/"([^"]+)"|(\S+)/g)]
+      .map(m => m[1] != null ? { s: m[1], quoted: true } : { s: m[2], quoted: false });
+    const lits = [];          // positive literals, for highlighting
+    const preds = toks.map(({ s, quoted }) => {
       let m;
-      if ((m = tok.match(/^(value|stderr|shots|items)(>=|<=|>|<|=)(-?\d*\.?\d+)$/))) {
-        const idx = { value: 3, stderr: 4, shots: 5, items: 6 }[m[1]];
-        const op = m[2], x = +m[3];
-        return r => { const v = r[idx];
+      if (!quoted && (m = s.match(new RegExp('^(' + NUMF + ')(>=|<=|>|<|=)(-?\\d*\\.?\\d+)$')))) {
+        const f = m[1], op = m[2], x = +m[3];
+        return row => { const v = row.nums[f];
           return v != null && (op === '>' ? v > x : op === '<' ? v < x :
                  op === '>=' ? v >= x : op === '<=' ? v <= x : Math.abs(v - x) < 1e-9); };
       }
-      if ((m = tok.match(/^(model|task|metric):(.+)$/))) {
+      if (!quoted && (m = s.match(/^(model|task|metric|arch):(.+)$/))) {
         const idx = { model: 0, task: 1, metric: 2 }[m[1]];
-        return r => String(r[idx]).toLowerCase().includes(m[2]);
+        const alts = m[2].split('|').filter(Boolean);
+        alts.forEach(a => lits.push(a));
+        if (m[1] === 'arch')
+          return row => alts.some(a => row.hay.includes(a));
+        return row => alts.some(a => String(row.r[idx]).toLowerCase().includes(a));
       }
-      if (tok.length > 1 && tok.startsWith('-')) {
-        const s = tok.slice(1);
-        return r => !(r[0] + ' ' + r[1] + ' ' + r[2]).toLowerCase().includes(s);
+      if (!quoted && s.length > 1 && s.startsWith('-')) {
+        const neg = s.slice(1);
+        return row => !row.hay.includes(neg);
       }
-      return r => (r[0] + ' ' + r[1] + ' ' + r[2]).toLowerCase().includes(tok);
+      const alts = quoted ? [s] : s.split('|').filter(Boolean);
+      alts.forEach(a => lits.push(a));
+      return row => alts.some(a =>
+        row.hay.includes(a) ||
+        (!quoted && a.length >= 5 && row.words.some(w => within1(w, a))));
     });
-    return r => preds.every(p => p(r));
+    return { pred: row => preds.every(p => p(row)), lits };
+  }
+  // highlight positive literals inside a cell, DOM-built (never innerHTML)
+  function hcell(text, lits, cls) {
+    const td = el('td', cls ? { class: cls } : {});
+    const lower = String(text).toLowerCase();
+    let cuts = [];
+    for (const l of lits) {
+      let at = 0;
+      while (l && (at = lower.indexOf(l, at)) !== -1) { cuts.push([at, at + l.length]); at += l.length; }
+    }
+    if (!cuts.length) { td.textContent = String(text); return td; }
+    cuts.sort((a, b) => a[0] - b[0]);
+    const merged = [];
+    for (const c of cuts) {
+      const last = merged[merged.length - 1];
+      if (last && c[0] <= last[1]) last[1] = Math.max(last[1], c[1]);
+      else merged.push(c);
+    }
+    let pos = 0;
+    for (const [a, b] of merged) {
+      if (a > pos) td.append(String(text).slice(pos, a));
+      td.append(el('mark', { text: String(text).slice(a, b) }));
+      pos = b;
+    }
+    if (pos < String(text).length) td.append(String(text).slice(pos));
+    return td;
   }
   const CAP = 500;
   const countEl = el('p', { class: 'small', style: 'margin:8px 0 6px' });
   const tbody = el('tbody');
   let current = all;
   function requery() {
-    let rows = all.filter(buildPred(state.runsQ));
+    const { pred, lits } = buildPred(state.runsQ);
+    let rows = all.filter(pred);
     const { idx, dir } = state.runsSort;
-    rows.sort((a, b) => {
-      const va = a[idx], vb = b[idx];
+    rows.sort((A, B) => {
+      const va = A.r[idx], vb = B.r[idx];
       if (va == null && vb == null) return 0;
       if (va == null) return 1;
       if (vb == null) return -1;
       return typeof va === 'number' && typeof vb === 'number'
         ? dir * (va - vb) : dir * String(va).localeCompare(String(vb));
     });
-    current = rows;
+    current = rows.map(x => x.r);
     countEl.textContent = `${rows.length} of ${all.length} rows`
       + (rows.length > CAP ? ` — showing the first ${CAP}; refine the query` : '');
-    tbody.replaceChildren(...rows.slice(0, CAP).map(r => el('tr', {},
-      el('td', { text: r[0] }), el('td', { text: r[1] }), el('td', { text: r[2] }),
+    tbody.replaceChildren(...rows.slice(0, CAP).map(({ r }) => el('tr', {},
+      hcell(r[0], lits), hcell(r[1], lits), hcell(r[2], lits),
       el('td', { class: 'num', text: num(r[3], 4) }),
       el('td', { class: 'num', text: r[4] == null ? '—' : num(r[4], 4) }),
       el('td', { class: 'num', text: r[5] == null ? '—' : String(r[5]) }),
@@ -1119,8 +1207,13 @@ function vRuns(ms) {
   // input keeps focus and caret across every keystroke.
   const qIn = el('input', { type: 'search', value: state.runsQ,
     style: 'width:100%;max-width:620px',
-    placeholder: 'e.g.  pythia task:mmlu_ metric:acc value>0.3   ·   gsm8k value>0   ·   metric:cross_entropy',
+    placeholder: 'pythia|gemma task:mmlu_ value>0.3 · "acc_norm" stderr<0.01 · gptneox layers>=24',
     oninput: e => { state.runsQ = e.target.value; requery(); } });
+  const EXAMPLES = ['pythia task:mmlu_ metric:acc value>0.3', 'metric:cross_entropy',
+    'gemma|qwen vocab>100000', 'layers>=24 task:hellaswag', '"acc_norm" stderr<0.01'];
+  const exChips = el('div', { class: 'chips', style: 'margin:8px 0 0' }, EXAMPLES.map(q =>
+    el('button', { class: 'st st-muted', style: 'cursor:pointer', text: q,
+      onclick: () => { state.runsQ = q; qIn.value = q; requery(); } })));
   const thead = el('thead', {}, el('tr', {},
     ['model', 'task', 'metric', 'value', 'stderr', 'n-shot', 'items'].map((h, i) =>
       el('th', { class: (i >= 3 ? 'num ' : '') + 'sortable',
@@ -1133,11 +1226,13 @@ function vRuns(ms) {
     el('h2', { text: 'Query every metric' }),
     el('p', { class: 'sub', text:
       'Every number from every run — MMLU’s 57 subjects, acc and acc_norm side by side, '
-      + 'derived cross-entropy, all of it. Bare words match model/task/metric (prefix with '
-      + '− to exclude); field filters model:, task:, metric:; numeric filters value>0.3, '
-      + 'stderr<0.01, shots=5, items>=1000. Terms AND together. Click a column to sort. '
-      + 'The CSV button exports exactly what the query matches.' }),
-    qIn, countEl,
+      + 'derived cross-entropy, all of it — with each model\u2019s shape joined in, so '
+      + 'architecture is queryable. Terms AND; a|b is OR; "quotes" match exactly; -word '
+      + 'excludes; typos within one edit still hit. Fields: model:, task:, metric:, arch:. '
+      + 'Numerics: value, stderr, shots, items, vocab, hidden, layers, heads, ctx, params '
+      + 'with > < >= <= =. Click a column to sort; the CSV button exports exactly what '
+      + 'the query matches.' }),
+    qIn, exChips, countEl,
     el('div', { class: 'lb-wrap', style: 'max-height:480px;overflow-y:auto' },
       el('table', { class: 'lb' }, thead, tbody)),
     el('button', { style: 'margin-top:10px', text: 'Download filtered CSV', onclick: () => {

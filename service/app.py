@@ -233,12 +233,26 @@ async def artifact_upload(name: str, request: Request, x_token: str = Header(def
     if not _ART_NAME_RE.match(name):
         raise HTTPException(422, "artifact name: letters, digits, dot, dash, underscore only")
     dest = config.ARTIFACTS_DIR / name
-    if dest.exists():
-        raise HTTPException(409, f"artifact {name!r} already exists — checkpoints are "
-                                 f"immutable; use a new name per checkpoint")
     cap = int(config.ARTIFACT_MAX_GB * 1e9)
     quota = int(config.ARTIFACT_QUOTA_GB * 1e9)
     used = _dir_bytes(config.ARTIFACTS_DIR)
+    # Refusing BEFORE the body is read makes a mid-send client see a bare
+    # connection reset instead of the reason. The client declares Content-Length,
+    # so size/quota can be judged up front; for a duplicate name, drain the body
+    # (bounded by the declared length ≤ cap) and then answer honestly.
+    declared = int(request.headers.get("content-length") or 0)
+    if declared > cap:
+        raise HTTPException(413, f"upload of {declared / 1e9:.1f} GB exceeds "
+                                 f"ARTIFACT_MAX_GB={config.ARTIFACT_MAX_GB:g}")
+    if used + declared > quota:
+        raise HTTPException(507, "artifact storage quota reached — delete old "
+                                 "artifacts (GET /api/artifacts to list)")
+    if dest.exists():
+        async for _ in request.stream():
+            pass
+        raise HTTPException(409, f"artifact {name!r} already exists — checkpoints are "
+                                 f"immutable; use a new name per checkpoint (or "
+                                 f"DELETE /api/artifacts/{name} first)")
     config.ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     tmp = config.ARTIFACTS_DIR / f".upload-{name}.zip"
     got = 0

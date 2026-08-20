@@ -13,3 +13,4 @@ datasets
 huggingface_hub
 fastapi
 uvicorn[standard]
+tzdata                # zoneinfo data for TZ-aware timestamps in containers

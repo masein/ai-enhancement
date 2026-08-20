@@ -26,6 +26,7 @@ services:
     image: aienh-bench
     pid: "host"
     environment:
+      TZ: ${TZ:-Asia/Qatar}
       BENCH_ROOT: ${BENCH_ROOT}
       HF_HOME: ${HF_HOME}
       TITLE: ${TITLE:-Team model benchmark}
