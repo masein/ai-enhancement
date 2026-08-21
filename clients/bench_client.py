@@ -5,17 +5,17 @@ vendor this single file into any training repo without touching its environment.
 Library:
 
     from bench_client import Bench
-    bench = Bench("http://teraformer-5090-3:8899")          # token="..." if the server wants one
+    bench = Bench("http://100.74.89.105:8899")          # token="..." if the server wants one
 
     sid = bench.submit("myorg/run7-step4000", suite="quick",
-                       submitter="omar", note="step 4000")   # returns immediately
+                       submitter="masein", note="step 4000")   # returns immediately
     info = bench.wait(sid)                                    # blocks until done/failed
     print(bench.scores("myorg/run7-step4000"))
     # {'hellaswag': {'value': 0.412, 'stderr': 0.005, 'metric': 'acc_norm', 'shots': 5}, ...}
 
 CLI (the same four verbs):
 
-    python bench_client.py --base http://teraformer-5090-3:8899 submit myorg/model --suite quick --wait
+    python bench_client.py --base http://100.74.89.105:8899 submit myorg/model --suite quick --wait
     python bench_client.py --base ... queue
     python bench_client.py --base ... scores myorg/model
     python bench_client.py --base ... cancel 7
@@ -274,7 +274,7 @@ class Run:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--base", required=True, help="e.g. http://teraformer-5090-3:8899")
+    ap.add_argument("--base", required=True, help="e.g. http://100.74.89.105:8899")
     ap.add_argument("--token", default="", help="only if the server sets SUBMIT_TOKEN")
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("submit"); s.add_argument("hf_id")

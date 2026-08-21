@@ -14,12 +14,12 @@ Full mode:
 
 Connectivity check first (no training, no HF account, ~a minute of queue time):
 
-    python examples/train_and_benchmark.py --bench http://teraformer-5090-3:8899 --dry-run
+    python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --dry-run
 
 The real thing (needs `hf auth login` with a WRITE token):
 
     python examples/train_and_benchmark.py \
-        --bench http://teraformer-5090-3:8899 \
+        --bench http://100.74.89.105:8899 \
         --push-to <your-hf-username>/bench-demo \
         --steps 200 --checkpoint-every 100 --suite quick
 

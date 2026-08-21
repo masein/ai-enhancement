@@ -591,6 +591,7 @@ th .dir { font-size:9px; }
   vertical-align:1px; }
 .badge.instruct { color:var(--accent); border-color:var(--accent-soft);
   background:var(--accent-soft); }
+.badge.ckpt { border-style:dashed; color:var(--text-secondary); }
 .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px;
   color:var(--text-secondary); }
 .legend { display:flex; gap:14px; flex-wrap:wrap; margin:6px 0 10px; }
@@ -681,7 +682,7 @@ let DATA = JSON.parse(document.getElementById('data').textContent || 'null');
 const LIVE = DATA === null;
 const state = {
   q: '', kind: 'all', tab: 'overview',
-  src: 'hub',                          // comparison tabs: hide checkpoint evals by default
+  src: 'all',                          // All | Models | Checkpoints — a filter, nothing hidden by default
   panelOpen: {},                       // per-task "show all bars" toggles
   sort: { key: 'avg', dir: -1 },
   runsQ: '',                           // the Evals tab query string
@@ -737,42 +738,23 @@ const taskLabel = t => {
   return t + (info.metric ? ` (${info.metric})` : '');
 };
 
-// The four ranked-comparison tabs separate REFERENCE models from CHECKPOINTS:
-// a sweep's every-300-steps evals are trajectory points, not new models, and
-// twenty of them at chance level drown the ladder. Training and Evals always
-// see everything — one is the trajectory view, the other is the raw record.
-const CMP_TABS = new Set(['overview', 'leaderboard', 'tasks', 'perplexity']);
-function visWith(src) {
+// Source is a FILTER like Base/Instruct, never a default hide: everything a
+// friend uploads stays in every comparison. Checkpoints are marked instead —
+// hollow bars in the panels, a dashed ckpt badge in the tables — and ranking
+// does the tidying on its own, since a chance-level checkpoint sorts to the
+// tail and long panels open on their best 12.
+function visible() {
   const q = state.q.toLowerCase();
-  const hideCk = src === 'hub' && CMP_TABS.has(state.tab);
   return DATA.models.filter(m =>
-    // an explicit name search overrides the hide — typing "sweep" must FIND it
-    (!hideCk || m.source !== 'artifact' ||
-     (q && (m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)))) &&
+    (state.src === 'all' || m.source === state.src) &&
     (state.kind === 'all' || m.kind === state.kind) &&
     (!q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q) ||
      m.family.includes(q)));
 }
-const visible  = () => visWith(state.src);
-const ckHidden = () => visWith('all').length - visWith(state.src).length;
-function setSrc(v) {
-  state.src = v;
-  for (const b of document.querySelectorAll('#srcSeg button'))
-    b.setAttribute('aria-pressed', String(b.getAttribute('data-src') === v));
-  render();
-}
-// the affordance that keeps "hidden by default" honest: every comparison view
-// says how many checkpoint evals it is not showing, one click brings them in
-function hiddenCkNote() {
-  const n = ckHidden();
-  if (!n) return null;
-  return el('p', { class: 'small', style: 'margin:10px 2px 0' },
-    `${n} checkpoint eval${n > 1 ? 's' : ''} hidden from this comparison — `,
-    el('a', { href: '#', onclick: e => { e.preventDefault(); setSrc('all'); },
-              text: 'show them' }),
-    ' or find any one by name in the filter box. The Training tab plots them '
-    + 'against their steps; Evals has every raw number.');
-}
+const anyCk = () => DATA.models.some(m => m.source === 'artifact');
+const ckBadge = m => m.source === 'artifact'
+  ? el('span', { class: 'badge ckpt', title: 'uploaded checkpoint (local artifact)',
+                 text: 'ckpt' }) : null;
 
 // ---------- tooltip: one element, filled with textContent, follows pointer ----------
 const tip = document.getElementById('tip');
@@ -899,6 +881,7 @@ function barPanel(task, models, opts) {
   let y = TOP;
   for (const { m, c } of shown) {
     const dim = noisy(c);                  // within noise of chance: still there, but quiet
+    const isCk = m.source === 'artifact';  // hollow = uploaded checkpoint, same hue
     const w = Math.max(2, X(c.v) - LBL), r = Math.min(4, w);
     const name = m.name.length > 22 ? m.name.slice(0, 21) + '…' : m.name;
     svg.append(el('svg:text', { x: LBL - 8, y: y + BH * 0.75, 'font-size': 11.5,
@@ -907,6 +890,9 @@ function barPanel(task, models, opts) {
     svg.append(el('svg:path', { class: 'bar', 'data-model': m.id,
       d: `M${LBL},${y} H${LBL + w - r} q${r},0 ${r},${r} V${y + BH - r} q0,${r} -${r},${r} H${LBL} Z`,
       opacity: dim ? 0.45 : null,
+      'fill-opacity': isCk ? 0.28 : null,
+      stroke: isCk ? 'var(--s1)' : null,
+      'stroke-width': isCk ? 1.2 : null,
       fill: 'var(--s1)' }));
     if (c.se > 0 && !lower) {
       const lo = X(Math.max(0, c.v - c.se)), hx = X(c.v + c.se), cy = y + BH / 2;
@@ -925,6 +911,7 @@ function barPanel(task, models, opts) {
       `${task} — ${c.shots != null ? c.shots + '-shot, ' : ''}${c.n != null ? c.n + ' items' : ''}`,
       m.id + (m.params ? ` · ${P(m.params)} params` : '')];
     if (dim) tipRows.splice(1, 0, '≈ chance — not statistically above it');
+    if (isCk) tipRows.push('uploaded checkpoint (local artifact)');
     if (lower && info.metric === 'bits_per_byte')
       tipRows.splice(1, 0, `cross-entropy ${num(c.v * Math.LN2, 3)} nats/byte`);
     svg.append(el('svg:rect', { class: 'hit', x: 0, y: y - GAP / 2, width: W,
@@ -943,7 +930,6 @@ function barPanel(task, models, opts) {
 // ---------- views ----------
 function vOverview(ms) {
   const frag = [];
-  const hk = hiddenCkNote(); if (hk) frag.push(hk);
   const ranked = ms.filter(m => m.avg != null).sort((a, b) => b.avg - a.avg);
   let pairs = 0, real = 0, big = null;
   for (const t of DATA.accTasks) for (const [a, b, diff, z, ok] of (DATA.sig[t] || [])) {
@@ -1003,7 +989,8 @@ function lbMini(rows) {
   const tb = el('tbody', {}, rows.map((m, i) => el('tr', {},
     el('td', { text: String(i + 1) }),
     el('td', { 'data-model': m.id }, m.name,
-      m.kind === 'instruct' ? el('span', { class: 'badge instruct', text: 'instruct' }) : ''),
+      ckBadge(m) || (m.kind === 'instruct'
+        ? el('span', { class: 'badge instruct', text: 'instruct' }) : '')),
     el('td', { class: 'num', text: P(m.params) }),
     el('td', { class: 'num best', text: pct(m.avg) }))));
   return el('table', {},
@@ -1057,8 +1044,9 @@ function vLeaderboard(ms) {
       if (c.key === 'name') return el('td', { class: 'model', 'data-model': m.id,
         title: m.id + (m.archinfo && m.archinfo.hidden
           ? `\n${m.archinfo.arch || ''} · hidden ${m.archinfo.hidden} · layers ${m.archinfo.layers} · vocab ${m.archinfo.vocab}` : '') },
-        m.name, m.kind === 'instruct' ? el('span', { class: 'badge instruct', text: 'instruct' })
-                                      : el('span', { class: 'badge', text: 'base' }));
+        m.name, ckBadge(m) || (m.kind === 'instruct'
+          ? el('span', { class: 'badge instruct', text: 'instruct' })
+          : el('span', { class: 'badge', text: 'base' })));
       if (c.key === 'params') return el('td', { class: 'num',
         title: m.paramsSrc ? 'from ' + (m.paramsSrc === 'config' ? 'harness config' : 'model name') : '',
         text: P(m.params) });
@@ -1073,7 +1061,7 @@ function vLeaderboard(ms) {
         c.lower ? num(cc.v, 3) : pct(cc.v),
         cc.se && !c.lower ? el('span', { class: 'se', text: ` ±${(100 * cc.se).toFixed(1)}` }) : '');
     }))));
-  return [hiddenCkNote() || '', el('div', { class: 'card' },
+  return [el('div', { class: 'card' },
     el('h2', { text: 'Leaderboard' }),
     el('p', { class: 'sub', text: 'Click a column to sort. Accuracy cells are score ± stderr; '
       + 'perplexity columns are lower-is-better and excluded from Avg. '
@@ -1085,10 +1073,10 @@ function vLeaderboard(ms) {
 function vTasks(ms) {
   if (!DATA.accTasks.length) return [note('No accuracy tasks found.')];
   return [
-    hiddenCkNote() || '',
     el('p', { class: 'sub', style: 'margin:10px 2px', text:
       'One panel per benchmark, models ranked. Bars share one hue on purpose — the label is the identity; '
-      + 'pointing at any model highlights it in every panel. Dashed line = chance.' }),
+      + 'pointing at any model highlights it in every panel. Dashed line = chance.'
+      + (anyCk() ? ' Hollow bars are uploaded checkpoints.' : '') }),
     el('div', { class: 'panels' }, DATA.accTasks.map(t => barPanel(t, ms, { lower: false }))),
     tableTwin('tasks-table', ms, DATA.accTasks, false)];
 }
@@ -1136,11 +1124,11 @@ function vPpl(ms) {
     el('td', { class: 'num', text: r.other != null ? `${num(r.other, 4)} (${r.om})` : '—' }),
     el('td', { class: 'num', text: r.docs != null ? String(r.docs) : '—' })));
   return [
-    hiddenCkNote() || '',
     el('p', { class: 'sub', style: 'margin:10px 2px', text:
       'Rolling-loglikelihood language modelling over pinned corpus samples. LOWER is better '
       + 'everywhere here. Quote bits_per_byte across model families; ' + CE_NOTE + ' '
-      + 'No standard error is reported for these, so treat close values as ties.' }),
+      + 'No standard error is reported for these, so treat close values as ties.'
+      + (anyCk() ? ' Hollow bars are uploaded checkpoints.' : '') }),
     el('div', { class: 'panels' }, DATA.pplTasks.map(t => barPanel(t, ms, { lower: true }))),
     el('div', { class: 'card' },
       el('h2', { text: 'Cross-entropy loss' }),
@@ -1231,7 +1219,7 @@ function vRuns(ms) {
         c.label + ' ', state.provSort.key === c.key
           ? el('span', { class: 'dir', text: state.provSort.dir > 0 ? '▲' : '▼' }) : '')))),
       el('tbody', {}, provRows.map(m => el('tr', {},
-        el('td', { 'data-model': m.id, text: m.name }),
+        el('td', { 'data-model': m.id }, m.name, ckBadge(m) || ''),
         el('td', {}, el('span', { class: 'mono', text: m.id })),
         el('td', { text: (m.archinfo && m.archinfo.arch) || '—' }),
         el('td', { class: 'num', title: m.archinfo ? `heads ${m.archinfo.heads ?? '—'} · ctx ${m.archinfo.ctx ?? '—'}` : '',
@@ -2035,12 +2023,8 @@ function render() {
   // DOM of a tab that just got torn down — the mounted tab re-registers its own
   state.trRedraw = state.queueRedraw = null;
   const ms = visible();
-  const hid = ckHidden();
   document.getElementById('countNote').textContent =
-    `${ms.length} of ${DATA.models.length} models shown`
-    + (hid ? ` · ${hid} checkpoints hidden` : '');
-  document.getElementById('srcSeg').style.display =
-    DATA.models.some(m => m.source === 'artifact') && CMP_TABS.has(state.tab) ? '' : 'none';
+    `${ms.length} of ${DATA.models.length} models shown`;
   const tabs = document.getElementById('tabs');
   tabs.replaceChildren(...TABS.map(([id, label]) =>
     el('button', { role: 'tab', 'aria-selected': String(state.tab === id),
@@ -2059,8 +2043,10 @@ function renderStatic() {
   document.getElementById('warnings').replaceChildren(
     ...DATA.warnings.map(w => el('div', { class: 'warn' }, el('b', { text: 'Check: ' }), w)));
   const nCk = DATA.models.filter(m => m.source === 'artifact').length;
-  const ckBtn = document.querySelector('#srcSeg [data-src="all"]');
-  if (ckBtn) ckBtn.textContent = nCk ? `+ checkpoints (${nCk})` : '+ checkpoints';
+  const srcSeg = document.getElementById('srcSeg');
+  srcSeg.style.display = nCk ? '' : 'none';   // no artifacts -> no third filter
+  const ckBtn = srcSeg.querySelector('[data-src="artifact"]');
+  if (ckBtn) ckBtn.textContent = `Checkpoints (${nCk})`;
   document.getElementById('metaChips').replaceChildren(
     el('span', { class: 'chip', text: `generated ${DATA.generated}` }),
     LIVE ? el('span', { class: 'chip', text: 'live — updates as runs finish' }) : '',
@@ -2108,7 +2094,10 @@ document.getElementById('kindSeg').addEventListener('click', e => {
 });
 document.getElementById('srcSeg').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  setSrc(b.getAttribute('data-src'));
+  state.src = b.getAttribute('data-src');
+  for (const x of e.currentTarget.querySelectorAll('button'))
+    x.setAttribute('aria-pressed', String(x === b));
+  render();
 });
 const THEMES = ['auto', 'light', 'dark'];
 let themeIdx = 0;
@@ -2157,8 +2146,9 @@ TEMPLATE = """<!doctype html>
       <button data-kind="instruct" aria-pressed="false">Instruct</button>
     </div>
     <div class="seg" role="group" aria-label="model source" id="srcSeg" style="display:none">
-      <button data-src="hub" aria-pressed="true">Models</button>
-      <button data-src="all" aria-pressed="false">+ checkpoints</button>
+      <button data-src="all" aria-pressed="true">All</button>
+      <button data-src="hub" aria-pressed="false">Models</button>
+      <button data-src="artifact" aria-pressed="false">Checkpoints</button>
     </div>
     <span class="count-note" id="countNote"></span>
   </div>
