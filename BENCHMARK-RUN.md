@@ -362,7 +362,7 @@ Tailscale IP specifically, so it is reachable from your devices but not the serv
 # on the server:
 cd ~/benchmarks/artifacts
 python3 -m http.server 8899 --bind "$(tailscale ip -4)"
-# then on your Mac:  http://teraformer-5090-3:8899/benchmark_report.html
+# then on your Mac:  http://100.74.89.105:8899/benchmark_report.html
 # Ctrl-C stops it. If `tailscale ip` needs sudo, get the IP from the Tailscale admin page.
 ```
 

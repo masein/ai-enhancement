@@ -3,8 +3,8 @@
 One place for the whole loop: **benchmark any model, track your training runs,
 store your checkpoints** — on our shared GPU, on the tailnet.
 
-Dashboard: **http://teraformer-5090-3:8899/** (you need to be on the tailnet —
-ask Omar for an invite). This guide lives at `/guide` on the same host.
+Dashboard: **http://100.74.89.105:8899/** (you need to be on the tailnet —
+ask Masein for an invite). This guide lives at `/guide` on the same host.
 
 ---
 
@@ -37,7 +37,7 @@ Then in your training code:
 
 ```python
 from bench_client import Bench
-bench = Bench("http://teraformer-5090-3:8899")
+bench = Bench("http://100.74.89.105:8899")
 
 run = bench.init("my-run7", submitter="yourname",
                  config={"lr": 3e-4, "batch": 32})     # config shows + diffs in the UI
@@ -77,18 +77,20 @@ trains a tiny model and does all of the above:
 
 ```bash
 git clone https://github.com/masein/ai-enhancement && cd ai-enhancement
-python examples/train_and_benchmark.py --bench http://teraformer-5090-3:8899 --dry-run   # 1-minute check
-python examples/train_and_benchmark.py --bench http://teraformer-5090-3:8899 --steps 200 --checkpoint-every 100
+python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --dry-run   # 1-minute check
+python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --steps 200 --checkpoint-every 100
 ```
 
 ## 4 · Reading the dashboard
 
 **Overview** — best model, how many differences are statistically real.
-Checkpoint evals (anything you uploaded as an artifact) are kept out of the
-model comparisons by default so sweeps don't bury the ladder — the
-**"+ checkpoints"** switch next to the Base/Instruct filter brings them in,
-and searching a checkpoint by name always finds it. Their natural home is the
-Training tab (score vs step) and the Evals query bar.
+Uploaded checkpoints appear everywhere — nothing is hidden. They're just
+marked: hollow bars in the panels, a dashed `ckpt` badge in the tables. Since
+everything ranks by score and long panels open on their best 12 (a button
+shows the rest), a chance-level checkpoint tail stays out of the way on its
+own. The **All / Models / Checkpoints** switch next to Base/Instruct filters
+when you want only one kind, and the Training tab plots each run's
+checkpoints against its training steps.
 **Training** — your live curves, run compare, config diff, benchmark-vs-step.
 The runs list has a search box (name, project or person), a status filter and a
 sort menu — "best loss" and "recently updated" are the two you'll live in.
@@ -126,13 +128,13 @@ without archaeology.
 
 **My model scored below 25% on MMLU.** Below-chance on a 4-way task means the
 prompt format is fighting the model (usually a chat-template mismatch), not that
-it "knows negative things". Try `kind: base` vs `instruct`, or ask Omar.
+it "knows negative things". Try `kind: base` vs `instruct`, or ask Masein.
 
 **GSM8K is ~0%.** Correct and expected under ~1B params — written math barely
 exists at this scale. It's there so you can see it emerge.
 
 **A gated model (gemma, llama) fails preflight.** The server's HF account must
-accept that model's license once — ask Omar, or submit an ungated mirror.
+accept that model's license once — ask Masein, or submit an ungated mirror.
 
 **My run shows "stale?"** Your training stopped logging without calling
 `run.finish()` (crash, Ctrl-C). Cosmetic — logging again resumes it.
@@ -143,7 +145,7 @@ means the *training* finished; your checkpoints may still be in the eval queue
 Submit & Queue tab shows live progress — scores appear as each one lands.
 
 **Something else broke.** Every failed submission has a `log` link with the raw
-error, and the error messages are written to be actionable. If they aren't: Omar.
+error, and the error messages are written to be actionable. If they aren't: Masein.
 
 *Everything here is also an HTTP API — see
 [API.md](https://github.com/masein/ai-enhancement/blob/main/API.md) if you'd

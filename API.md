@@ -6,7 +6,7 @@ The intended pattern is **push a checkpoint to Hugging Face → submit its id he
 keep training → collect scores later**. Evaluation runs on the shared GPU, one
 job at a time, and results appear on the team leaderboard.
 
-Base URL (on the tailnet): `http://teraformer-5090-3:8899`
+Base URL (on the tailnet): `http://100.74.89.105:8899`
 
 Auth: none by default. If the operator sets `SUBMIT_TOKEN`, send it as an
 `X-Token` header on POSTs (the dashboard picks it up from `?token=…` in the URL).
@@ -20,7 +20,7 @@ wraps all of this in one stdlib-only file — vendor it into your repo.
 
 ```python
 from bench_client import Bench
-bench = Bench("http://teraformer-5090-3:8899")
+bench = Bench("http://100.74.89.105:8899")
 
 sid = bench.submit("myorg/my-model", suite="quick", submitter="you")  # returns immediately
 bench.wait(sid, echo=True)                                            # optional: block until done
@@ -31,7 +31,7 @@ print(bench.scores("myorg/my-model"))
 Or from a shell:
 
 ```bash
-python bench_client.py --base http://teraformer-5090-3:8899 submit myorg/my-model --suite quick --wait
+python bench_client.py --base http://100.74.89.105:8899 submit myorg/my-model --suite quick --wait
 ```
 
 ---
@@ -75,7 +75,7 @@ other*, not to public leaderboards (different n-shot conventions).
 {"hf_id": "myorg/my-model",     // required, org/name on the HF Hub
  "suite": "quick",              // "quick" (hellaswag+arc_easy+perplexity) | "full" (all tasks) — default full
  "kind": "auto",                // "auto" | "base" | "instruct" — default auto
- "submitter": "omar",           // shows on the queue and in provenance
+ "submitter": "masein",           // shows on the queue and in provenance
  "note": "run7 step 4000"}      // free text, shows as a tooltip
 ```
 
@@ -88,7 +88,7 @@ Each row:
 
 ```json
 {"id": 12, "hf_id": "myorg/my-model", "kind": "instruct", "suite": "quick",
- "submitter": "omar", "note": "run7 step 4000",
+ "submitter": "masein", "note": "run7 step 4000",
  "status": "running",              // queued | preflight | waiting_lock | waiting_gpu | running | done | failed | canceled
  "progress": "2/4 · arc_easy (5-shot)",
  "error": "",                      // human-readable reason when failed
@@ -151,7 +151,7 @@ on the same step axis as your loss, joined through checkpoints.
 
 ```python
 from bench_client import Bench
-bench = Bench("http://teraformer-5090-3:8899")
+bench = Bench("http://100.74.89.105:8899")
 
 with bench.init("run7", project="llm", submitter="you",
                 config={"lr": 3e-4, "batch": 32}) as run:
@@ -210,11 +210,11 @@ prints a task × step score table at the end.
 
 ```bash
 # 1) prove the service works — no training, no HF account, ~a minute:
-python examples/train_and_benchmark.py --bench http://teraformer-5090-3:8899 --dry-run
+python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --dry-run
 
 # 2) the full pipeline — checkpoints go to the service's artifact storage,
 #    so NO Hugging Face account is needed:
-python examples/train_and_benchmark.py --bench http://teraformer-5090-3:8899 \
+python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 \
     --steps 200 --checkpoint-every 100
 # (add --push-to <hf-user>/bench-demo to publish checkpoints to the Hub instead)
 ```
@@ -231,11 +231,11 @@ process). The service dedupes and resumes, so this is cheap and crash-safe:
 ```python
 # during training — after each checkpoint is pushed to the Hub
 from bench_client import Bench, BenchError
-bench = Bench("http://teraformer-5090-3:8899")
+bench = Bench("http://100.74.89.105:8899")
 
 def on_checkpoint(step: int, repo_id: str):
     try:
-        bench.submit(repo_id, suite="quick", submitter="omar", note=f"step {step}")
+        bench.submit(repo_id, suite="quick", submitter="masein", note=f"step {step}")
     except BenchError as e:
         print(f"benchmark submit failed (non-fatal): {e}")   # never kill training over this
 
@@ -251,7 +251,7 @@ the "is it actually getting better on capabilities, not just on loss" plot. If
 you prefer fire-and-forget without any client code, it's one curl:
 
 ```bash
-curl -s -X POST http://teraformer-5090-3:8899/api/submissions \
+curl -s -X POST http://100.74.89.105:8899/api/submissions \
      -H 'Content-Type: application/json' \
      -d "{\"hf_id\":\"myorg/run7-step$STEP\",\"suite\":\"quick\",\"submitter\":\"$USER\",\"note\":\"step $STEP\"}"
 ```

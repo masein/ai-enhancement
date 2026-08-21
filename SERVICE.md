@@ -74,7 +74,7 @@ tail -f service.log        # Ctrl-C stops the tail, not the service
 curl -s "http://$(tailscale ip -4):8899/healthz"
 ```
 
-Friends open `http://teraformer-5090-3:8899/` (tailnet hostname works from any
+Friends open `http://100.74.89.105:8899/` (tailnet hostname works from any
 device on the tailnet). To stop the service: `pkill -f "uvicorn service.app"` —
 a run in flight is killed with it; on restart the interrupted submission is
 re-queued automatically and per-task resume repeats only the interrupted task.
@@ -111,7 +111,7 @@ upgrades to `full` by running only the missing tasks.
 B="http://$(tailscale ip -4):8899"
 curl -s $B/api/results | jq '.models | length'
 curl -s -X POST $B/api/submissions -H 'Content-Type: application/json' \
-     -d '{"hf_id":"EleutherAI/pythia-31m","suite":"quick","submitter":"omar"}'
+     -d '{"hf_id":"EleutherAI/pythia-31m","suite":"quick","submitter":"masein"}'
 curl -s $B/api/submissions | jq '.[0]'
 curl -s $B/api/runs/1/log
 curl -s -X POST $B/api/submissions/2/cancel
