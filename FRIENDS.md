@@ -84,6 +84,11 @@ python examples/train_and_benchmark.py --bench http://teraformer-5090-3:8899 --s
 ## 4 · Reading the dashboard
 
 **Overview** — best model, how many differences are statistically real.
+Checkpoint evals (anything you uploaded as an artifact) are kept out of the
+model comparisons by default so sweeps don't bury the ladder — the
+**"+ checkpoints"** switch next to the Base/Instruct filter brings them in,
+and searching a checkpoint by name always finds it. Their natural home is the
+Training tab (score vs step) and the Evals query bar.
 **Training** — your live curves, run compare, config diff, benchmark-vs-step.
 The runs list has a search box (name, project or person), a status filter and a
 sort menu — "best loss" and "recently updated" are the two you'll live in.

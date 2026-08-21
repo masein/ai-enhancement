@@ -365,6 +365,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
         model_rows.append({
             "id": mid, "name": display[mid],
             "family": re.split(r"[^a-z0-9]", mid.split("/")[-1].lower())[0],
+            # uploaded checkpoints are experiment points, not reference models —
+            # the dashboard separates the two so sweeps don't drown the ladder
+            "source": "artifact" if mid.startswith("local/") else "hub",
             "kind": "instruct" if r["chat_template"] else "base",
             "params": params,
             "paramsSrc": ("config" if r["num_params"] else
@@ -678,6 +681,8 @@ let DATA = JSON.parse(document.getElementById('data').textContent || 'null');
 const LIVE = DATA === null;
 const state = {
   q: '', kind: 'all', tab: 'overview',
+  src: 'hub',                          // comparison tabs: hide checkpoint evals by default
+  panelOpen: {},                       // per-task "show all bars" toggles
   sort: { key: 'avg', dir: -1 },
   runsQ: '',                           // the Evals tab query string
   runsSort: { idx: 0, dir: 1 },        // column sort for the metric query table
@@ -732,12 +737,41 @@ const taskLabel = t => {
   return t + (info.metric ? ` (${info.metric})` : '');
 };
 
-function visible() {
+// The four ranked-comparison tabs separate REFERENCE models from CHECKPOINTS:
+// a sweep's every-300-steps evals are trajectory points, not new models, and
+// twenty of them at chance level drown the ladder. Training and Evals always
+// see everything — one is the trajectory view, the other is the raw record.
+const CMP_TABS = new Set(['overview', 'leaderboard', 'tasks', 'perplexity']);
+function visWith(src) {
   const q = state.q.toLowerCase();
+  const hideCk = src === 'hub' && CMP_TABS.has(state.tab);
   return DATA.models.filter(m =>
+    // an explicit name search overrides the hide — typing "sweep" must FIND it
+    (!hideCk || m.source !== 'artifact' ||
+     (q && (m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)))) &&
     (state.kind === 'all' || m.kind === state.kind) &&
     (!q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q) ||
      m.family.includes(q)));
+}
+const visible  = () => visWith(state.src);
+const ckHidden = () => visWith('all').length - visWith(state.src).length;
+function setSrc(v) {
+  state.src = v;
+  for (const b of document.querySelectorAll('#srcSeg button'))
+    b.setAttribute('aria-pressed', String(b.getAttribute('data-src') === v));
+  render();
+}
+// the affordance that keeps "hidden by default" honest: every comparison view
+// says how many checkpoint evals it is not showing, one click brings them in
+function hiddenCkNote() {
+  const n = ckHidden();
+  if (!n) return null;
+  return el('p', { class: 'small', style: 'margin:10px 2px 0' },
+    `${n} checkpoint eval${n > 1 ? 's' : ''} hidden from this comparison — `,
+    el('a', { href: '#', onclick: e => { e.preventDefault(); setSrc('all'); },
+              text: 'show them' }),
+    ' or find any one by name in the filter box. The Training tab plots them '
+    + 'against their steps; Evals has every raw number.');
 }
 
 // ---------- tooltip: one element, filled with textContent, follows pointer ----------
@@ -803,21 +837,44 @@ function barPanel(task, models, opts) {
                      .sort((a, b) => lower ? a.c.v - b.c.v : b.c.v - a.c.v);
   const shots = [...new Set(rows.map(r => r.c.shots).filter(s => s != null))];
   const ns    = [...new Set(rows.map(r => r.c.n).filter(n => n != null))];
+  const hasChance = info.chance != null && info.chance > 0 && !lower;
+  // "above chance" is a statistical claim, not a pixel one: the bar must clear
+  // the chance line by more than 1.96 standard errors to count
+  const noisy = c => hasChance && (c.v - 1.96 * (c.se || 0)) <= info.chance;
+  const above = hasChance ? rows.filter(r => !noisy(r.c)).length : 0;
+  // missing models: name them, and say WHY when the answer is "quick suite"
+  const missing = models.filter(m => !cell(task, m.id));
+  const missTip = missing.length
+    ? 'missing: ' + missing.slice(0, 12).map(m => m.name).join(', ')
+      + (missing.length > 12 ? ` +${missing.length - 12} more` : '')
+      + (missing.every(m => m.source === 'artifact')
+         ? ' — checkpoints ran the quick suite; resubmit with suite=full to fill this panel'
+         : '')
+    : null;
   const panel = el('div', { class: 'panel' },
     el('h3', { text: taskLabel(task) }),
-    el('div', { class: 'pmeta', text:
+    el('div', { class: 'pmeta', title: missTip, text:
       (lower ? 'lower is better' : 'higher is better')
       + (shots.length ? ` · ${shots.length > 1 ? 'MIXED n-shot!' : shots[0] + '-shot'}` : '')
       + (ns.length === 1 ? ` · ${ns[0]} items` : '')
-      + (rows.length < models.length ? ` · ${models.length - rows.length} model(s) missing` : '') }));
+      + (hasChance && rows.length > 1
+         ? ` · ${above ? above + ' of ' + rows.length + ' clearly above chance'
+                       : 'none clearly above chance'}` : '')
+      + (missing.length ? ` · ${missing.length} model(s) missing${
+           missing.every(m => m.source === 'artifact') ? ' (quick-suite)' : ''}` : '') }));
   if (!rows.length) { panel.append(el('p', { class: 'small', text: 'no data' })); return panel; }
 
+  // long lists collapse to the best 12 — a wall of forty chance-level bars is
+  // scrolling, not reading; the button below the axis brings the rest back
+  const CAPN = 12;
+  const capped = !state.panelOpen[task] && rows.length > CAPN + 2;
+  const shown = capped ? rows.slice(0, CAPN) : rows;
+
   const W = 460, LBL = 150, PAD = 56, BH = 15, GAP = 7;
-  const hasChance = info.chance != null && info.chance > 0 && !lower;
   const TOP = hasChance ? 20 : 8;          // reserve headroom for the chance label
   const plotW = W - LBL - PAD;
-  const H = rows.length * (BH + GAP) + TOP + 16;
-  const maxv = Math.max(...rows.map(r => r.c.v + (r.c.se || 0)), info.chance || 0);
+  const H = shown.length * (BH + GAP) + TOP + 16;
+  const maxv = Math.max(...shown.map(r => r.c.v + (r.c.se || 0)), info.chance || 0);
   // scale to the data, not to a fixed floor — gsm8k at 2% must not be squashed
   // into an axis drawn for 25%-chance tasks
   const hi = lower ? maxv * 1.15
@@ -840,14 +897,16 @@ function barPanel(task, models, opts) {
       fill: 'var(--muted)', text: 'chance ' + Math.round(100 * info.chance) + '%' }));
   }
   let y = TOP;
-  for (const { m, c } of rows) {
+  for (const { m, c } of shown) {
+    const dim = noisy(c);                  // within noise of chance: still there, but quiet
     const w = Math.max(2, X(c.v) - LBL), r = Math.min(4, w);
     const name = m.name.length > 22 ? m.name.slice(0, 21) + '…' : m.name;
     svg.append(el('svg:text', { x: LBL - 8, y: y + BH * 0.75, 'font-size': 11.5,
-      fill: 'var(--text-secondary)', 'text-anchor': 'end', class: 'blab',
+      fill: dim ? 'var(--muted)' : 'var(--text-secondary)', 'text-anchor': 'end', class: 'blab',
       'data-model': m.id, text: name }));
     svg.append(el('svg:path', { class: 'bar', 'data-model': m.id,
       d: `M${LBL},${y} H${LBL + w - r} q${r},0 ${r},${r} V${y + BH - r} q0,${r} -${r},${r} H${LBL} Z`,
+      opacity: dim ? 0.45 : null,
       fill: 'var(--s1)' }));
     if (c.se > 0 && !lower) {
       const lo = X(Math.max(0, c.v - c.se)), hx = X(c.v + c.se), cy = y + BH / 2;
@@ -858,12 +917,14 @@ function barPanel(task, models, opts) {
           stroke: 'var(--text-primary)', 'stroke-width': 1.4, opacity: 0.55 }));
     }
     svg.append(el('svg:text', { x: X(c.v + (lower ? 0 : c.se || 0)) + 6, y: y + BH * 0.75,
-      'font-size': 11, fill: 'var(--text-primary)', class: 'blab', 'data-model': m.id,
+      'font-size': 11, fill: dim ? 'var(--muted)' : 'var(--text-primary)',
+      class: 'blab', 'data-model': m.id,
       text: fmt(c.v) }));
     const tipRows = [
       fmt(c.v) + (c.se ? ` ± ${lower ? num(c.se, 3) : (100 * c.se).toFixed(1) + ' pts'}` : ''),
       `${task} — ${c.shots != null ? c.shots + '-shot, ' : ''}${c.n != null ? c.n + ' items' : ''}`,
       m.id + (m.params ? ` · ${P(m.params)} params` : '')];
+    if (dim) tipRows.splice(1, 0, '≈ chance — not statistically above it');
     if (lower && info.metric === 'bits_per_byte')
       tipRows.splice(1, 0, `cross-entropy ${num(c.v * Math.LN2, 3)} nats/byte`);
     svg.append(el('svg:rect', { class: 'hit', x: 0, y: y - GAP / 2, width: W,
@@ -872,12 +933,17 @@ function barPanel(task, models, opts) {
     y += BH + GAP;
   }
   panel.append(svg);
+  if (rows.length > CAPN + 2)
+    panel.append(el('button', { style: 'margin:2px 0 8px;padding:3px 10px;font-size:12px',
+      text: capped ? `show all ${rows.length}` : `show best ${CAPN}`,
+      onclick: () => { state.panelOpen[task] = !state.panelOpen[task]; render(); } }));
   return panel;
 }
 
 // ---------- views ----------
 function vOverview(ms) {
   const frag = [];
+  const hk = hiddenCkNote(); if (hk) frag.push(hk);
   const ranked = ms.filter(m => m.avg != null).sort((a, b) => b.avg - a.avg);
   let pairs = 0, real = 0, big = null;
   for (const t of DATA.accTasks) for (const [a, b, diff, z, ok] of (DATA.sig[t] || [])) {
@@ -1007,7 +1073,7 @@ function vLeaderboard(ms) {
         c.lower ? num(cc.v, 3) : pct(cc.v),
         cc.se && !c.lower ? el('span', { class: 'se', text: ` ±${(100 * cc.se).toFixed(1)}` }) : '');
     }))));
-  return [el('div', { class: 'card' },
+  return [hiddenCkNote() || '', el('div', { class: 'card' },
     el('h2', { text: 'Leaderboard' }),
     el('p', { class: 'sub', text: 'Click a column to sort. Accuracy cells are score ± stderr; '
       + 'perplexity columns are lower-is-better and excluded from Avg. '
@@ -1019,6 +1085,7 @@ function vLeaderboard(ms) {
 function vTasks(ms) {
   if (!DATA.accTasks.length) return [note('No accuracy tasks found.')];
   return [
+    hiddenCkNote() || '',
     el('p', { class: 'sub', style: 'margin:10px 2px', text:
       'One panel per benchmark, models ranked. Bars share one hue on purpose — the label is the identity; '
       + 'pointing at any model highlights it in every panel. Dashed line = chance.' }),
@@ -1069,6 +1136,7 @@ function vPpl(ms) {
     el('td', { class: 'num', text: r.other != null ? `${num(r.other, 4)} (${r.om})` : '—' }),
     el('td', { class: 'num', text: r.docs != null ? String(r.docs) : '—' })));
   return [
+    hiddenCkNote() || '',
     el('p', { class: 'sub', style: 'margin:10px 2px', text:
       'Rolling-loglikelihood language modelling over pinned corpus samples. LOWER is better '
       + 'everywhere here. Quote bits_per_byte across model families; ' + CE_NOTE + ' '
@@ -1967,8 +2035,12 @@ function render() {
   // DOM of a tab that just got torn down — the mounted tab re-registers its own
   state.trRedraw = state.queueRedraw = null;
   const ms = visible();
+  const hid = ckHidden();
   document.getElementById('countNote').textContent =
-    `${ms.length} of ${DATA.models.length} models shown`;
+    `${ms.length} of ${DATA.models.length} models shown`
+    + (hid ? ` · ${hid} checkpoints hidden` : '');
+  document.getElementById('srcSeg').style.display =
+    DATA.models.some(m => m.source === 'artifact') && CMP_TABS.has(state.tab) ? '' : 'none';
   const tabs = document.getElementById('tabs');
   tabs.replaceChildren(...TABS.map(([id, label]) =>
     el('button', { role: 'tab', 'aria-selected': String(state.tab === id),
@@ -1986,6 +2058,9 @@ function renderStatic() {
     + 'updates as work finishes.';
   document.getElementById('warnings').replaceChildren(
     ...DATA.warnings.map(w => el('div', { class: 'warn' }, el('b', { text: 'Check: ' }), w)));
+  const nCk = DATA.models.filter(m => m.source === 'artifact').length;
+  const ckBtn = document.querySelector('#srcSeg [data-src="all"]');
+  if (ckBtn) ckBtn.textContent = nCk ? `+ checkpoints (${nCk})` : '+ checkpoints';
   document.getElementById('metaChips').replaceChildren(
     el('span', { class: 'chip', text: `generated ${DATA.generated}` }),
     LIVE ? el('span', { class: 'chip', text: 'live — updates as runs finish' }) : '',
@@ -2030,6 +2105,10 @@ document.getElementById('kindSeg').addEventListener('click', e => {
   for (const x of e.currentTarget.querySelectorAll('button'))
     x.setAttribute('aria-pressed', String(x === b));
   render();
+});
+document.getElementById('srcSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  setSrc(b.getAttribute('data-src'));
 });
 const THEMES = ['auto', 'light', 'dark'];
 let themeIdx = 0;
@@ -2076,6 +2155,10 @@ TEMPLATE = """<!doctype html>
       <button data-kind="all" aria-pressed="true">All</button>
       <button data-kind="base" aria-pressed="false">Base</button>
       <button data-kind="instruct" aria-pressed="false">Instruct</button>
+    </div>
+    <div class="seg" role="group" aria-label="model source" id="srcSeg" style="display:none">
+      <button data-src="hub" aria-pressed="true">Models</button>
+      <button data-src="all" aria-pressed="false">+ checkpoints</button>
     </div>
     <span class="count-note" id="countNote"></span>
   </div>
