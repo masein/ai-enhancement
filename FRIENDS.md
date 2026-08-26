@@ -21,19 +21,54 @@ Open the dashboard → **Submit & Queue** → paste a model id → Submit.
   scores by tens of points).
 - Put **your name** in the submitter field. The queue shows live progress; when
   it's done your model is on the Leaderboard with everyone else's.
+- Already uploaded a checkpoint (§2)? Its `local/<name>` id goes in the same
+  box.
 
 Re-submitting an already-benchmarked model is free (results are cached per
 task), and submitting something already in the queue just joins that run.
 
-## 2 · Track your training run (2 lines in your loop)
+## 2 · Benchmark your own model — straight from your disk, no Hugging Face
 
-Grab the client (one stdlib-only file, no pip installs):
+This is the main path for most of us. The service has its **own checkpoint
+storage**: upload any `save_pretrained()` directory under a name you pick, and
+it becomes `local/<name>` — a first-class model on the leaderboard, no Hugging
+Face account anywhere.
+
+First grab the client (one stdlib-only file, no pip installs) straight from
+the service — no GitHub access needed:
 
 ```bash
-curl -O https://raw.githubusercontent.com/masein/ai-enhancement/main/clients/bench_client.py
+curl -o bench_client.py http://100.74.89.105:8899/client
 ```
 
-Then in your training code:
+(It's also `clients/bench_client.py` in the repo.)
+
+Then one shell line uploads **and** benchmarks:
+
+```bash
+python bench_client.py --base http://100.74.89.105:8899 \
+    upload my-model-v1 ./my_checkpoint_dir --submit --suite quick --submitter yourname
+```
+
+Or, from Python:
+
+```python
+from bench_client import Bench
+bench = Bench("http://100.74.89.105:8899")
+mid = bench.upload_artifact("my-model-v1", "./my_checkpoint_dir")   # -> "local/my-model-v1"
+bench.submit(mid, suite="quick", submitter="yourname")
+print(bench.scores(mid))     # once it's done — or just watch the dashboard
+```
+
+Three rules, all enforced with readable errors: **one name per checkpoint**
+(names are immutable — `my-model-v2` next time, no re-uploads); weights must be
+**safetensors** (anything modern `save_pretrained()` writes is); storage is a
+shared quota — `python bench_client.py --base … artifacts` shows who's using
+what, `… delete <name>` frees space and your scores stay.
+
+## 3 · Track your training run (2 lines in your loop)
+
+With the same `bench_client.py` from §2, in your training code:
 
 ```python
 from bench_client import Bench
@@ -57,9 +92,10 @@ changed between two runs. Logging is buffered and can never crash your training 
 if the service is unreachable it warns once and your loop keeps going. Anything
 is a metric: `grad_norm`, `tokens_per_s`, `gpu_mem_gb`, whatever you log.
 
-## 3 · Benchmark your checkpoints — no Hugging Face account needed
+## 4 · Checkpoints during training — scores on your loss curve's step axis
 
-When you save a checkpoint, upload it and let the service evaluate it:
+Combine §2 and §3: when you save a checkpoint, upload it (same storage as §2)
+and mark the step:
 
 ```python
 model.save_pretrained("ckpt"); tokenizer.save_pretrained("ckpt")
@@ -76,12 +112,12 @@ Want the whole thing as working code? The repo has a runnable sample that
 trains a tiny model and does all of the above:
 
 ```bash
-git clone https://github.com/masein/ai-enhancement && cd ai-enhancement
+git clone https://github.com/Teraformer-LIMITED/evalboard && cd evalboard
 python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --dry-run   # 1-minute check
 python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --steps 200 --checkpoint-every 100
 ```
 
-## 4 · Reading the dashboard
+## 5 · Reading the dashboard
 
 **Overview** — best model, how many differences are statistically real.
 Uploaded checkpoints appear everywhere — nothing is hidden. They're just
@@ -113,7 +149,7 @@ never have to remember what a task is called: ↑↓ to pick, Enter to insert.
 Two honest-statistics habits the dashboard enforces: every score carries its
 standard error, and if two error bars overlap, treat the models as tied.
 
-## 5 · House rules
+## 6 · House rules
 
 The GPU is shared with real training jobs, so: one evaluation runs at a time
 (your submission queues — that's normal); use **quick** while iterating and save
@@ -148,5 +184,5 @@ Submit & Queue tab shows live progress — scores appear as each one lands.
 error, and the error messages are written to be actionable. If they aren't: Masein.
 
 *Everything here is also an HTTP API — see
-[API.md](https://github.com/masein/ai-enhancement/blob/main/API.md) if you'd
+[API.md](https://github.com/Teraformer-LIMITED/evalboard/blob/main/API.md) if you'd
 rather curl.*

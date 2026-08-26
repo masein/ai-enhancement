@@ -2,22 +2,27 @@
 """Zero-dependency client for the benchmark service — stdlib only, so you can
 vendor this single file into any training repo without touching its environment.
 
-Library:
+Library — benchmark a model straight from your disk (no Hugging Face needed):
 
     from bench_client import Bench
     bench = Bench("http://100.74.89.105:8899")          # token="..." if the server wants one
 
-    sid = bench.submit("myorg/run7-step4000", suite="quick",
-                       submitter="masein", note="step 4000")   # returns immediately
-    info = bench.wait(sid)                                    # blocks until done/failed
-    print(bench.scores("myorg/run7-step4000"))
+    mid = bench.upload_artifact("run7-step4000", "ckpt_dir/")   # -> "local/run7-step4000"
+    sid = bench.submit(mid, suite="quick", submitter="masein")  # returns immediately
+    info = bench.wait(sid)                                      # blocks until done/failed
+    print(bench.scores(mid))
     # {'hellaswag': {'value': 0.412, 'stderr': 0.005, 'metric': 'acc_norm', 'shots': 5}, ...}
 
-CLI (the same four verbs):
+    (Hub models work the same — bench.submit("myorg/model", ...).)
 
-    python bench_client.py --base http://100.74.89.105:8899 submit myorg/model --suite quick --wait
+CLI (same verbs from a shell):
+
+    python bench_client.py --base http://100.74.89.105:8899 upload run7-step4000 ckpt_dir/ --submit --wait
+    python bench_client.py --base ... submit myorg/model --suite quick --wait
+    python bench_client.py --base ... artifacts        # what's in storage, vs quota
     python bench_client.py --base ... queue
-    python bench_client.py --base ... scores myorg/model
+    python bench_client.py --base ... scores local/run7-step4000
+    python bench_client.py --base ... delete run7-step4000
     python bench_client.py --base ... cancel 7
 
 The full API contract lives in API.md; the pattern for calling this from a
@@ -198,6 +203,16 @@ class Bench:
         finally:
             os.unlink(tmp)
 
+    def artifacts(self) -> dict:
+        """What the storage holds: {"artifacts": [{"name", "model_id", "bytes",
+        "created"}, ...], "total_bytes": ..., "quota_bytes": ...}."""
+        return self._call("/api/artifacts")
+
+    def delete_artifact(self, name: str) -> dict:
+        """Free an artifact's disk. Its scores stay on the leaderboard; refused
+        (409) while that artifact is queued or being evaluated."""
+        return self._call(f"/api/artifacts/{name}", method="DELETE")
+
 
 class Run:
     """A live training run: buffered metric logging that NEVER raises into the
@@ -277,11 +292,25 @@ def main() -> int:
     ap.add_argument("--base", required=True, help="e.g. http://100.74.89.105:8899")
     ap.add_argument("--token", default="", help="only if the server sets SUBMIT_TOKEN")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    s = sub.add_parser("submit"); s.add_argument("hf_id")
+    s = sub.add_parser("submit", help="queue a model — a Hub id or local/<name>")
+    s.add_argument("hf_id")
     s.add_argument("--suite", default="full", choices=["quick", "full"])
     s.add_argument("--kind", default="auto", choices=["auto", "base", "instruct"])
     s.add_argument("--submitter", default=""); s.add_argument("--note", default="")
     s.add_argument("--wait", action="store_true")
+    u = sub.add_parser("upload",
+                       help="upload a save_pretrained() dir to the service's storage "
+                            "(no Hugging Face), optionally submit it in one go")
+    u.add_argument("name", help="artifact name, e.g. run7-step4000 — immutable, one per checkpoint")
+    u.add_argument("checkpoint_dir", help="directory with config.json + *.safetensors")
+    u.add_argument("--submit", action="store_true", help="also queue the benchmark")
+    u.add_argument("--suite", default="quick", choices=["quick", "full"])
+    u.add_argument("--kind", default="auto", choices=["auto", "base", "instruct"])
+    u.add_argument("--submitter", default=""); u.add_argument("--note", default="")
+    u.add_argument("--wait", action="store_true", help="implies --submit; block until scored")
+    sub.add_parser("artifacts", help="list uploaded checkpoints and quota use")
+    dl = sub.add_parser("delete", help="free an artifact's disk (scores stay)")
+    dl.add_argument("name")
     sub.add_parser("queue")
     sc = sub.add_parser("scores"); sc.add_argument("hf_id")
     c = sub.add_parser("cancel"); c.add_argument("sid", type=int)
@@ -295,6 +324,27 @@ def main() -> int:
             if a.wait:
                 b.wait(sid, echo=True)
                 print(json.dumps(b.scores(a.hf_id), indent=1))
+        elif a.cmd == "upload":
+            mid = b.upload_artifact(a.name, a.checkpoint_dir)
+            print(f"uploaded -> {mid}")
+            if a.submit or a.wait:
+                sid = b.submit(mid, a.suite, a.kind, a.submitter, a.note)
+                print(f"#{sid} queued ({a.suite})")
+                if a.wait:
+                    b.wait(sid, echo=True)
+                    print(json.dumps(b.scores(mid), indent=1))
+            else:
+                print(f"benchmark it with: submit {mid} --suite quick "
+                      f"(or paste {mid} into the dashboard)")
+        elif a.cmd == "artifacts":
+            info = b.artifacts()
+            for art in info.get("artifacts", []):
+                print(f"{art['model_id']:<48} {art['bytes'] / 1e9:7.2f} GB")
+            print(f"{'total':<48} {info.get('total_bytes', 0) / 1e9:7.2f} GB "
+                  f"of {info.get('quota_bytes', 0) / 1e9:.0f} GB quota")
+        elif a.cmd == "delete":
+            r = b.delete_artifact(a.name)
+            print(f"deleted {r.get('deleted', a.name)} — {r.get('note', 'disk freed')}")
         elif a.cmd == "queue":
             for r in b.queue():
                 print(f"#{r['id']:<4} {r['status']:<12} {r['hf_id']:<44} "

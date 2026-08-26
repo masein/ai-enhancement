@@ -26,7 +26,9 @@ print('image env OK — torch', torch.__version__, '| built for CUDA', torch.ver
 WORKDIR /app
 COPY scripts/ scripts/
 COPY service/ service/
-# FRIENDS.md is served at /guide — .dockerignore carries an exception for it
+# served over HTTP by the app: FRIENDS.md at /guide, bench_client.py at /client
+# (.dockerignore carries the FRIENDS.md exception)
+COPY clients/ clients/
 COPY FRIENDS.md ./
 
 ENV PYTHONPATH=/app \
