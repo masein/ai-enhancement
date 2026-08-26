@@ -2,9 +2,17 @@
 
 For anyone who wants their checkpoints benchmarked automatically: everything the
 dashboard does goes through this JSON API, so your training code can do it too.
-The intended pattern is **push a checkpoint to Hugging Face → submit its id here →
-keep training → collect scores later**. Evaluation runs on the shared GPU, one
-job at a time, and results appear on the team leaderboard.
+There are two ways to get a model in, and **you do not need a Hugging Face
+account for the first one**:
+
+1. **Upload it to the service's own artifact storage** (`POST /api/artifacts/…`
+   or `bench.upload_artifact(...)`) and benchmark it as `local/<name>` — the
+   default path for your own checkpoints.
+2. Submit a **Hugging Face id** (`org/model`) for anything public on the Hub.
+
+Either way: evaluation runs on the shared GPU, one job at a time, and results
+land on the team leaderboard. The pattern is **upload → submit → keep training →
+collect scores later**.
 
 Base URL (on the tailnet): `http://100.74.89.105:8899`
 
@@ -12,27 +20,93 @@ Auth: none by default. If the operator sets `SUBMIT_TOKEN`, send it as an
 `X-Token` header on POSTs (the dashboard picks it up from `?token=…` in the URL).
 
 The zero-dependency Python client in [`clients/bench_client.py`](clients/bench_client.py)
-wraps all of this in one stdlib-only file — vendor it into your repo.
+wraps all of this in one stdlib-only file — vendor it into your repo. The
+service also serves it directly (`curl -o bench_client.py
+http://100.74.89.105:8899/client`), so you never need repo access to use it.
 
 ---
 
 ## The 30-second version
 
+Your model is a directory on your disk (anything `save_pretrained()` wrote):
+
 ```python
 from bench_client import Bench
 bench = Bench("http://100.74.89.105:8899")
 
-sid = bench.submit("myorg/my-model", suite="quick", submitter="you")  # returns immediately
-bench.wait(sid, echo=True)                                            # optional: block until done
-print(bench.scores("myorg/my-model"))
+mid = bench.upload_artifact("run7-step4000", "ckpt_dir/")    # -> "local/run7-step4000"
+sid = bench.submit(mid, suite="quick", submitter="you")      # returns immediately
+bench.wait(sid, echo=True)                                   # optional: block until done
+print(bench.scores(mid))
 # {'hellaswag': {'value': 0.412, 'stderr': 0.005, 'metric': 'acc_norm', 'shots': 5, ...}, ...}
 ```
 
-Or from a shell:
+Or from a shell, one line — upload, benchmark, wait, print the scores:
 
 ```bash
-python bench_client.py --base http://100.74.89.105:8899 submit myorg/my-model --suite quick --wait
+python bench_client.py --base http://100.74.89.105:8899 \
+    upload run7-step4000 ckpt_dir/ --submit --suite quick --submitter you --wait
 ```
+
+(For a public Hub model, skip the upload: `bench.submit("myorg/my-model", …)` /
+`… submit myorg/my-model --suite quick --wait`.)
+
+---
+
+## Artifact storage — benchmark models without Hugging Face
+
+The service stores your checkpoints itself. Upload a `save_pretrained()`
+directory under a name; from then on `local/<name>` works **everywhere a model
+id does** — `bench.submit()`, `log_checkpoint()`, `bench.scores()`, and the
+dashboard's Submit box.
+
+**SDK** (what most training loops use):
+
+```python
+model.save_pretrained("ckpt"); tokenizer.save_pretrained("ckpt")
+mid = bench.upload_artifact("run7-step4000", "ckpt")   # -> "local/run7-step4000"
+bench.submit(mid, suite="quick", submitter="you")      # or run.log_checkpoint(4000, mid)
+```
+
+**CLI**:
+
+```bash
+python bench_client.py --base … upload run7-step4000 ckpt/ --submit --suite quick
+python bench_client.py --base … artifacts        # names, sizes, quota use
+python bench_client.py --base … delete run7-step4000
+```
+
+**Raw HTTP** (no client at all) — zip the directory's *contents* and POST it:
+
+```bash
+cd ckpt && zip -r ../ckpt.zip . && cd ..
+curl -X POST --data-binary @ckpt.zip -H 'Content-Type: application/zip' \
+     http://100.74.89.105:8899/api/artifacts/run7-step4000
+# -> {"model_id": "local/run7-step4000", ...}
+```
+
+### The endpoints
+
+- `POST /api/artifacts/{name}` — body is the zip, streamed to disk. A single
+  top-level folder inside the zip is fine (it's stripped); `config.json` must
+  end up at the artifact root.
+- `GET /api/artifacts` — `{"artifacts": [{"name", "model_id", "bytes",
+  "created"}, …], "total_bytes": …, "quota_bytes": …}`.
+- `DELETE /api/artifacts/{name}` — frees the disk. Scores already on the
+  leaderboard stay; refused (409) while that artifact is queued or running.
+
+### The rules
+
+- **Names are immutable** — one name per checkpoint (`run7-step4000`, not
+  `run7`). Re-uploading a taken name is refused with 409; the client pre-checks
+  and tells you before wasting the upload.
+- **safetensors only** — pickle `.bin` weights execute code on load and are
+  refused. Anything modern `save_pretrained()` writes passes by default.
+- **Caps**: per-upload `ARTIFACT_MAX_GB` (default 8), shared total quota
+  `ARTIFACT_QUOTA_GB` (default 150) — `GET /api/artifacts` shows usage, delete
+  what you no longer need.
+- Preflight (params cap, architecture capture, `trust_remote_code` refusal)
+  applies to uploads exactly as it does to Hub models.
 
 ---
 
@@ -72,7 +146,7 @@ other*, not to public leaderboards (different n-shot conventions).
 ### POST /api/submissions — queue a model
 
 ```json
-{"hf_id": "myorg/my-model",     // required, org/name on the HF Hub
+{"hf_id": "myorg/my-model",     // required — org/name on the HF Hub, OR local/<name> for an uploaded artifact
  "suite": "quick",              // "quick" (hellaswag+arc_easy+perplexity) | "full" (all tasks) — default full
  "kind": "auto",                // "auto" | "base" | "instruct" — default auto
  "submitter": "masein",           // shows on the queue and in provenance
@@ -140,6 +214,11 @@ tokenizer-independent one.
 
 `{"ok": true, "queue": 1}` — for your scripts' sanity checks.
 
+### GET /client
+
+`bench_client.py` itself, as plain Python — `curl -o bench_client.py …/client`.
+(`GET /guide` is the human quick-start, rendered HTML.)
+
 ---
 
 ## Run tracking — your training curves, live on the Training tab
@@ -182,23 +261,11 @@ the client: `POST /api/truns` → `{id}`, `POST /api/truns/{id}/log`
 `POST /api/truns/{id}/finish` `{"status":"finished"}`,
 `GET /api/truns`, `GET /api/truns/{id}` (downsampled series + events).
 
-## Artifact storage — no Hugging Face account needed
-
-Upload a checkpoint directly to the service and benchmark it as `local/<name>`:
-
-```python
-model.save_pretrained(tmp); tokenizer.save_pretrained(tmp)
-model_id = bench.upload_artifact("run7-step4000", tmp)   # -> "local/run7-step4000"
-run.log_checkpoint(4000, model_id)                        # or bench.submit(model_id)
-```
-
-Raw endpoint: `POST /api/artifacts/{name}` with the checkpoint directory zipped
-as the raw request body; `GET /api/artifacts` lists names and sizes against the
-quota; `DELETE /api/artifacts/{name}` frees disk (its leaderboard scores remain).
-The rules: names are immutable (new checkpoint → new name); **safetensors only**
-— pickle `.bin` weights execute code on load and are refused; per-upload cap
-`ARTIFACT_MAX_GB` (default 8), total quota `ARTIFACT_QUOTA_GB` (default 150).
-Checkpoints saved by modern `save_pretrained()` pass all of this by default.
+The two halves compose at checkpoint time: `upload_artifact()` then
+`run.log_checkpoint(step, model_id)` — one call that marks the step on your
+curves **and** queues the benchmark. (Storage details in
+[Artifact storage](#artifact-storage--benchmark-models-without-hugging-face)
+above.)
 
 ## A runnable, end-to-end sample
 
@@ -229,11 +296,11 @@ Submit at every checkpoint, don't wait, collect at the end (or from a separate
 process). The service dedupes and resumes, so this is cheap and crash-safe:
 
 ```python
-# during training — after each checkpoint is pushed to the Hub
+# during training — after each checkpoint is saved (uploaded artifact or Hub repo)
 from bench_client import Bench, BenchError
 bench = Bench("http://100.74.89.105:8899")
 
-def on_checkpoint(step: int, repo_id: str):
+def on_checkpoint(step: int, repo_id: str):     # repo_id: "local/<name>" or "org/model"
     try:
         bench.submit(repo_id, suite="quick", submitter="masein", note=f"step {step}")
     except BenchError as e:
@@ -265,7 +332,8 @@ curl -s -X POST http://100.74.89.105:8899/api/submissions \
 | 401 | server requires `X-Token` | get the token from the operator; dashboard users append `?token=…` |
 | 404 | unknown submission id | check `GET /api/submissions` |
 | 409 | cancel on a non-queued job | it's already running or finished |
-| 422 | bad request shape | `hf_id` must be `org/name`; suite `quick|full`; kind `auto|base|instruct` |
+| 422 | bad request shape | `hf_id` must be `org/name` or `local/<name>`; suite `quick|full`; kind `auto|base|instruct` |
+| 409 / 507 | artifact upload refused | name already taken (immutable — pick a new one) / size cap or storage quota hit |
 | (failed status) | preflight or run failure | read `error` on the row; raw output at `/api/runs/{id}/log` |
 
 ## Etiquette

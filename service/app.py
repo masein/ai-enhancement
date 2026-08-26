@@ -385,6 +385,7 @@ def index():
 # ---------------------------------------------------------------------------
 
 _GUIDE_MD = Path(__file__).resolve().parent.parent / "FRIENDS.md"
+_CLIENT_PY = Path(__file__).resolve().parent.parent / "clients" / "bench_client.py"
 
 _INLINE = [
     (re.compile(r"\*\*(.+?)\*\*"), r"<b>\1</b>"),
@@ -481,3 +482,16 @@ def guide():
             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
             "<title>Team benchmark — guide</title><style>" + _GUIDE_CSS + "</style></head>"
             "<body><main>" + _md_to_html(text) + "</main></body></html>")
+
+
+@app.get("/client")
+def client_file():
+    """The one-file training client, served from the service itself — friends on
+    the tailnet grab it with `curl -O http://…:8899/client` and never need
+    access to the git repo (which may be private)."""
+    if not _CLIENT_PY.exists():
+        raise HTTPException(404, "bench_client.py not found in this build")
+    return PlainTextResponse(
+        _CLIENT_PY.read_text(encoding="utf-8"),
+        media_type="text/x-python",
+        headers={"Content-Disposition": 'attachment; filename="bench_client.py"'})
