@@ -131,9 +131,26 @@ server's account hasn't accepted, models over the parameter cap (default 4B), an
 models requiring `trust_remote_code` (the service never executes repo code) all
 fail in seconds with a human-readable `error`.
 
-**Kind matters.** `kind:"auto"` (default) applies the chat template iff the repo
-ships one — the right call almost always. Only override it if you know your
-checkpoint is mislabeled; a wrong template moves scores by tens of points.
+**Kind matters, and ambiguity is refused.** `kind:"auto"` applies the chat
+template only when the repo ships one **and** the model's name corroborates it
+(`instruct`, `-it`, `chat`, `sft`, `dpo`…). If a template is present but nothing
+says the model is instruction-tuned, preflight **fails** and asks you to send
+`kind:"base"` or `kind:"instruct"` — because a checkpoint saved from an instruct
+model's tokenizer inherits that template even when the weights are a base model,
+and applying it moves multiple-choice scores by tens of points. Each run records
+the template's hash, its source, and the reason for the decision; they appear in
+provenance and in CSV exports, and two runs with different template ids are not
+comparable.
+
+**Official vs preliminary.** An overall average exists only for models that
+completed every task in the required list (`mmlu, hellaswag, arc_challenge,
+arc_easy, winogrande, piqa, truthfulqa_mc2` by default; `REQUIRED_TASKS`
+overrides). Anything short of that is preliminary: `avg` and `avgRaw` are
+`null`, `official` is `false`, and `missing` lists what it still needs. Its
+per-task cells are unaffected. `avg` is scaled so chance = 0 (`avgRaw` is the
+unscaled mean) — raw accuracy is not comparable across tasks whose guess rates
+differ. gsm8k is reported but deliberately excluded from the average: it sits at
+~0% below ~1B params and only adds noise to a mean.
 
 **Comparability.** Every run uses the same few-shot counts, seed, dtype and
 harness version (lm_eval 0.4.12, pinned). Scores here are comparable to *each
@@ -191,7 +208,10 @@ The payload your tooling wants. The useful parts:
 ```jsonc
 {
   "models": [ {"id": "myorg/my-model", "name": "my-model", "kind": "instruct",
-               "params": 596049920, "avg": 0.393, "navg": 8,   // mean over accuracy tasks it ran, and how many
+               "params": 596049920,
+               "official": true, "nhave": 7, "nreq": 7, "missing": [],
+               "avg": 0.321, "avgRaw": 0.514,   // required-list mean: above-chance, and raw
+               "partialAvg": 0.455, "navg": 8,  // over whatever it ran — a diagnostic, never a rank
                "archinfo": {"arch": "Qwen3ForCausalLM", "hidden": 1024,   // captured at preflight from
                             "layers": 28, "heads": 16,                     // the model's config.json —
                             "ctx": 40960, "vocab": 151936},                // null for CLI-run models

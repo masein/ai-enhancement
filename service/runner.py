@@ -115,11 +115,13 @@ def run_submission(sub: dict) -> None:
 
     # -- preflight: metadata only, no GPU, seconds --------------------------------
     try:
-        meta = preflight(sub["hf_id"])
+        # the submitter's kind is passed in: 'auto' is resolved here, and refused
+        # when it is genuinely ambiguous rather than guessed
+        meta = preflight(sub["hf_id"], sub["kind"])
     except PreflightError as e:
         db.update(sid, status="failed", error=str(e), finished_at=time.time())
         return
-    kind = sub["kind"] if sub["kind"] in ("base", "instruct") else meta["kind_detected"]
+    kind = meta["kind"]
     db.update(sid, kind=kind, params=meta["params"], vocab=meta["vocab"],
               batch=meta["batch"], need_gb=meta["need_gb"],
               arch=json.dumps(meta.get("archinfo") or {}),
@@ -139,6 +141,7 @@ def run_submission(sub: dict) -> None:
     meta_dir.mkdir(parents=True, exist_ok=True)
     (meta_dir / "model_meta.json").write_text(json.dumps(
         {"model": sub["hf_id"], "kind": kind, "params": meta["params"],
+         "kind_reason": meta.get("kind_reason"),
          **(meta.get("archinfo") or {})}), encoding="utf-8")
 
     # -- one run at a time: wait for the shared lock ------------------------------

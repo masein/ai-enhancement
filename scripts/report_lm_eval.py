@@ -266,6 +266,45 @@ _CANON = ["mmlu", "hellaswag", "arc_challenge", "arc_easy",
 _CHANCE = {"mmlu": 0.25, "hellaswag": 0.25, "arc_challenge": 0.25, "arc_easy": 0.25,
            "winogrande": 0.5, "piqa": 0.5, "gsm8k": 0.0}
 
+# ---------------------------------------------------------------------------
+# The protocol: which tasks an OFFICIAL average requires.
+#
+# Averaging whatever tasks a model happened to finish is not a ranking — a
+# 2-task quick run scored 59% outranks an 8-task model at 45% while measuring
+# something else entirely. So the average is computed over one fixed list, a
+# model that is missing any of it is 'preliminary' (per-task results only, no
+# overall rank), and completion is shown next to every official number.
+#
+# gsm8k is deliberately NOT in the list: it is generative and sits at ~0% for
+# everything under ~1B, so it contributes noise rather than signal to a mean.
+# It is still run, still reported, still charted. REQUIRED_TASKS overrides.
+# ---------------------------------------------------------------------------
+_REQUIRED_DEFAULT = ["mmlu", "hellaswag", "arc_challenge", "arc_easy",
+                     "winogrande", "piqa", "truthfulqa_mc2"]
+
+
+def required_tasks(acc_tasks: list[str]) -> tuple[list[str], list[str]]:
+    """(required, absent) — the protocol list intersected with what this results
+    tree actually contains, plus the protocol tasks nobody has run. Intersecting
+    keeps a report built from a narrow tree honest instead of calling every
+    model preliminary against tasks that were never attempted; `absent` drives a
+    warning so a narrow list is never mistaken for the full protocol."""
+    env = os.environ.get("REQUIRED_TASKS", "").strip()
+    want = ([t.strip() for t in env.split(",") if t.strip()] if env
+            else list(_REQUIRED_DEFAULT))
+    return [t for t in want if t in acc_tasks], [t for t in want if t not in acc_tasks]
+
+
+def above_chance(task: str, v: float) -> float:
+    """Accuracy rescaled so 0 = chance and 1 = perfect. Raw accuracy is not
+    comparable across tasks with different guess rates: 50% on a 2-option task
+    (Winogrande, PIQA) is nothing, 50% on a 4-option one is real. Averaging raw
+    numbers silently rewards whoever ran the easier-to-guess tasks."""
+    c = _CHANCE.get(task)
+    if c is None or not (0 < c < 1):
+        return v
+    return max(0.0, (v - c) / (1 - c))
+
 # Proportion metrics: the only ones the two-proportion z-test is valid for.
 PROPORTION = {"acc", "acc_norm", "exact_match", "pass@1", "f1", "em", "rubric_pass"}
 
@@ -356,11 +395,15 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
                  if metric_used.get(t) in PROPORTION and not is_lower_better(t)]
     ppl_tasks = [t for t in headline if t not in acc_tasks]
 
-    # per-model average over the accuracy tasks it has (leaderboard sort key; the
-    # dashboard shows n/total so a partial model's average is visibly partial)
+    # official vs preliminary: the average is over the REQUIRED list or it does
+    # not exist. A model missing any required task gets no overall number.
+    required, req_absent = required_tasks(acc_tasks)
     model_rows = []
     for mid, r in by_model.items():
         have = [cells[t][mid]["v"] for t in acc_tasks if mid in cells.get(t, {})]
+        got_req = [t for t in required if mid in cells.get(t, {})]
+        missing = [t for t in required if t not in got_req]
+        official = bool(required) and not missing
         params = r["num_params"] or params_from_name(mid)
         model_rows.append({
             "id": mid, "name": display[mid],
@@ -378,7 +421,20 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
             "minutes": round((r["eval_seconds"] or 0) / 60, 1),
             "hash": r["git_hash"], "date": r["date"],
             "archinfo": r.get("archinfo"),
-            "avg": (sum(have) / len(have)) if have else None,
+            "kindReason": (r.get("archinfo") or {}).get("kind_reason"),
+            # official numbers only: normalized (the ranking key) and raw (the
+            # number you quote), both over the required list, both None when the
+            # model has not completed it
+            "avg": (sum(above_chance(t, cells[t][mid]["v"]) for t in required)
+                    / len(required)) if official else None,
+            "avgRaw": (sum(cells[t][mid]["v"] for t in required)
+                       / len(required)) if official else None,
+            # the same two over whatever it DID run — a diagnostic, never a rank
+            "partialAvg": (sum(have) / len(have)) if have else None,
+            "official": official,
+            "nreq": len(required),
+            "nhave": len(got_req),
+            "missing": missing,
             "navg": len(have),
         })
 
@@ -436,6 +492,29 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
         warnings.append(
             "At least one run used --limit, so it did not see the full task. Fine "
             "for a smoke test, not for a reported number.")
+    # a template that EXISTS but differs between models applied the same way is
+    # also a comparability break — the hash is what has to match, not the yes/no
+    shas = {(r.get("archinfo") or {}).get("tmpl_sha")
+            for m, r in by_model.items() if r["chat_template"]}
+    shas.discard(None)
+    if len(shas) > 1:
+        warnings.append(
+            f"The models evaluated WITH a chat template used {len(shas)} different "
+            f"templates ({', '.join(sorted(shas))}). Prompt format differs, so "
+            f"those scores answer slightly different questions.")
+    if req_absent:
+        warnings.append(
+            "This report's required-task list is narrower than the protocol: "
+            + ", ".join(req_absent) + " were not run by anyone here, so 'official' "
+            "means complete within this report, not complete under the full "
+            "protocol.")
+    n_prelim = sum(1 for m in model_rows if not m["official"])
+    if n_prelim and required:
+        warnings.append(
+            f"{n_prelim} of {len(model_rows)} models are preliminary (they have not "
+            f"finished all {len(required)} required tasks) and carry no overall "
+            f"average or rank. Their per-task numbers are shown everywhere and are "
+            f"valid on their own — resubmit with suite=full to make them official.")
     hashes = sorted({r["git_hash"] for r in by_model.values() if r["git_hash"]})
     if len(hashes) > 1:
         warnings.append(
@@ -451,6 +530,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
         "models": model_rows,
         "accTasks": acc_tasks,
         "pplTasks": ppl_tasks,
+        "required": required,          # the protocol list an official average needs
+        "reqAbsent": req_absent,
         "tasks": {t: {"metric": metric_used.get(t, ""),
                       "lower": is_lower_better(t),
                       "chance": _CHANCE.get(t)} for t in headline},
@@ -603,6 +684,9 @@ th .dir { font-size:9px; }
 .badge.instruct { color:var(--accent); border-color:var(--accent-soft);
   background:var(--accent-soft); }
 .badge.ckpt { border-style:dashed; color:var(--text-secondary); }
+.badge.prelim { color:var(--warning); border-color:var(--warning); }
+.tiebest { font-weight:650; }
+.tiebest::after { content:"\2009\2248"; color:var(--muted); font-size:9px; vertical-align:1px; }
 .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px;
   color:var(--text-secondary); }
 .legend { display:flex; gap:14px; flex-wrap:wrap; margin:6px 0 10px; }
@@ -740,6 +824,7 @@ const state = {
   trMetricQ: '', trSecClosed: {},                          // metric panels filter / sections
   cmpSel: [], cmpColors: {},                               // radar: compared models (≤3)
   radarNorm: 'chance', radarAxes: 'tasks',                 // radar scaling / axis mode
+  avgMode: 'chance',                   // official average: above-chance | raw
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
   // focus from filter inputs and kill slider drags
@@ -798,6 +883,16 @@ function visible() {
      m.family.includes(q)));
 }
 const anyCk = () => DATA.models.some(m => m.source === 'artifact');
+// the one number allowed to rank models, or null. Preliminary models have no
+// average at all — not a smaller one — so every ranking view drops them.
+const officialAvg = m => state.avgMode === 'raw' ? m.avgRaw : m.avg;
+const prelimBadge = m => m.official ? null
+  : el('span', { class: 'badge prelim',
+      title: `preliminary — ${m.nhave}/${m.nreq} required tasks`
+        + (m.missing && m.missing.length ? `\nmissing: ${m.missing.join(', ')}` : '')
+        + '\nPer-task scores are valid; there is no overall average until the '
+        + 'required suite completes.',
+      text: `prelim ${m.nhave}/${m.nreq}` });
 const ckBadge = m => m.source === 'artifact'
   ? el('span', { class: 'badge ckpt', title: 'uploaded checkpoint (local artifact)',
                  text: 'ckpt' }) : null;
@@ -976,7 +1071,10 @@ function barPanel(task, models, opts) {
 // ---------- views ----------
 function vOverview(ms) {
   const frag = [];
-  const ranked = ms.filter(m => m.avg != null).sort((a, b) => b.avg - a.avg);
+  // only official models can be ranked — a preliminary model has no average
+  const ranked = ms.filter(m => officialAvg(m) != null)
+                   .sort((a, b) => officialAvg(b) - officialAvg(a));
+  const prelim = ms.filter(m => !m.official);
   let pairs = 0, real = 0, big = null;
   for (const t of DATA.accTasks) for (const [a, b, diff, z, ok] of (DATA.sig[t] || [])) {
     if (!ms.find(m => m.id === a) || !ms.find(m => m.id === b)) continue;
@@ -987,16 +1085,29 @@ function vOverview(ms) {
     const top = ranked[0];
     frag.push(el('div', { class: 'hero-row' },
       el('div', { class: 'card' },
-        el('p', { class: 'sub', text: 'Best average across ' +
-          (top.navg === DATA.accTasks.length ? `all ${top.navg}` : `${top.navg} of ${DATA.accTasks.length}`)
-          + ' accuracy tasks' }),
-        el('div', { class: 'hero', text: pct(top.avg) }),
+        el('p', { class: 'sub', text: `Best official average — all ${top.nreq} required `
+          + `tasks, ${state.avgMode === 'raw' ? 'raw accuracy' : 'scaled above chance'}` }),
+        el('div', { class: 'hero', text: pct(officialAvg(top)) }),
         el('p', { class: 'sub', text: top.id
           + (top.params ? ` · ${P(top.params)} params` : '') })),
       el('div', { class: 'card' },
         el('h2', { text: 'Top models' }),
         lbMini(ranked.slice(0, 5)))));
+  } else {
+    frag.push(el('div', { class: 'card' },
+      el('h2', { text: 'No official result yet' }),
+      el('p', { class: 'sub', text: DATA.required.length
+        ? `Nothing here has completed all ${DATA.required.length} required tasks `
+          + `(${DATA.required.join(', ')}), so there is no overall ranking to show — `
+          + `only per-task numbers, which are on the Leaderboard and Tasks tabs. `
+          + `Submit with suite=full to produce an official result.`
+        : 'No accuracy tasks in this results tree.' })));
   }
+  if (prelim.length)
+    frag.push(el('p', { class: 'small', style: 'margin:10px 2px 0', text:
+      `${prelim.length} preliminary model${prelim.length > 1 ? 's' : ''} `
+      + `(${prelim.map(m => `${m.name} ${m.nhave}/${m.nreq}`).join(', ')}) `
+      + `— per-task results only, excluded from the ranking above.` }));
   frag.push(el('div', { class: 'tiles' },
     tile('Models compared', String(ms.length),
          ms.length !== DATA.models.length ? `of ${DATA.models.length} (filtered)` : null),
@@ -1038,7 +1149,7 @@ function lbMini(rows) {
       ckBadge(m) || (m.kind === 'instruct'
         ? el('span', { class: 'badge instruct', text: 'instruct' }) : '')),
     el('td', { class: 'num', text: P(m.params) }),
-    el('td', { class: 'num best', text: pct(m.avg) }))));
+    el('td', { class: 'num best', text: pct(officialAvg(m)) }))));
   return el('table', {},
     el('thead', {}, el('tr', {},
       el('th', { text: '#' }), el('th', { text: 'model' }),
@@ -1077,7 +1188,12 @@ function normScore(t, v) {
 // the compared set: explicit ticks, else the top three by average
 function cmpEffective(ms) {
   if (state.cmpSel.length) return state.cmpSel.filter(id => ms.some(m => m.id === id));
-  return ms.filter(m => m.avg != null).sort((a, b) => b.avg - a.avg).slice(0, 3).map(m => m.id);
+  // prefer official models; fall back to partial averages so a report with no
+  // official result still shows a profile rather than an empty card
+  return [...ms].filter(m => m.partialAvg != null)
+    .sort((a, b) => (officialAvg(b) ?? -1) - (officialAvg(a) ?? -1)
+                 || b.partialAvg - a.partialAvg)
+    .slice(0, 3).map(m => m.id);
 }
 function cmpToggle(id, ms) {
   if (!state.cmpSel.length) {        // first tick: materialize the default so it edits intuitively
@@ -1202,7 +1318,8 @@ function vLeaderboard(ms) {
     ...DATA.pplTasks.map(t => ({ key: t, label: t, num: true, task: t, lower: true })),
     { key: 'date', label: 'Last eval', num: false },   // when its newest task ran
   ];
-  const val = (m, c) => c.task ? (cell(c.task, m.id) || {}).v : m[c.key];
+  const val = (m, c) => c.key === 'avg' ? officialAvg(m)
+                      : c.task ? (cell(c.task, m.id) || {}).v : m[c.key];
   const rows = [...ms].sort((a, b) => {
     const c = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg');
     const va = val(a, c), vb = val(b, c);
@@ -1211,12 +1328,20 @@ function vLeaderboard(ms) {
     return typeof va === 'string' ? state.sort.dir * natCmp(va, vb)
                                   : state.sort.dir * (va - vb);
   });
-  // best per column (max for accuracy/avg, min for perplexity)
-  const best = {};
+  // best per column (max for accuracy/avg, min for perplexity). Perplexity has
+  // NO standard error from the harness, so a 0.001 lead is not a win: values
+  // within a tie band of the leader are all marked tied (≈) instead. The band
+  // is a stated placeholder until bootstrap CIs exist — see the tab text.
+  const pplBand = lead => Math.max(0.005, 0.01 * Math.abs(lead));
+  const best = {}, tiedCount = {};
   for (const c of cols) {
     if (!c.num || c.key === 'params') continue;
     const vs = ms.map(m => val(m, c)).filter(v => v != null);
-    if (vs.length > 1) best[c.key] = c.lower ? Math.min(...vs) : Math.max(...vs);
+    if (vs.length > 1) {
+      best[c.key] = c.lower ? Math.min(...vs) : Math.max(...vs);
+      tiedCount[c.key] = c.lower
+        ? vs.filter(v => v <= best[c.key] + pplBand(best[c.key])).length : 1;
+    }
   }
   const shotOf = t => {
     const s = [...new Set(ms.map(m => (cell(t, m.id) || {}).shots).filter(x => x != null))];
@@ -1246,29 +1371,56 @@ function vLeaderboard(ms) {
           ? `\n${m.archinfo.arch || ''} · hidden ${m.archinfo.hidden} · layers ${m.archinfo.layers} · vocab ${m.archinfo.vocab}` : '') },
         m.name, ckBadge(m) || (m.kind === 'instruct'
           ? el('span', { class: 'badge instruct', text: 'instruct' })
-          : el('span', { class: 'badge', text: 'base' })));
+          : el('span', { class: 'badge', text: 'base' })),
+        prelimBadge(m) || '');
       if (c.key === 'params') return el('td', { class: 'num',
         title: m.paramsSrc ? 'from ' + (m.paramsSrc === 'config' ? 'harness config' : 'model name') : '',
         text: P(m.params) });
       if (c.key === 'date') return el('td', { class: 'small', style: 'white-space:nowrap',
         text: String(m.date || '—').slice(0, 16).replace('T', ' ') });
-      if (c.key === 'avg') return el('td', {
-        class: 'num' + (m.avg != null && m.avg === best.avg ? ' best' : '') },
-        pct(m.avg), m.navg < DATA.accTasks.length
-          ? el('span', { class: 'se', text: ` ${m.navg}/${DATA.accTasks.length}` }) : '');
+      if (c.key === 'avg') {
+        const a = officialAvg(m);
+        if (a == null) return el('td', { class: 'num' },
+          el('span', { class: 'se',
+            title: (m.missing || []).length ? 'missing: ' + m.missing.join(', ') : '',
+            text: `— ${m.nhave}/${m.nreq}` }));
+        return el('td', { class: 'num' + (a === best.avg ? ' best' : ''),
+          title: `mean over the ${m.nreq} required tasks, `
+            + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0') },
+          pct(a), el('span', { class: 'se', text: ` ${m.nreq}/${m.nreq}` }));
+      }
       const cc = cell(c.task, m.id);
       if (!cc) return el('td', { class: 'num', text: '—' });
-      const isBest = best[c.key] != null && cc.v === best[c.key];
-      return el('td', { class: 'num' + (isBest ? ' best' : '') },
+      const lead = best[c.key];
+      const within = lead != null && (c.lower
+        ? cc.v <= lead + pplBand(lead) : cc.v === lead);
+      const mark = !within ? '' : (c.lower && tiedCount[c.key] > 1) ? ' tiebest' : ' best';
+      return el('td', { class: 'num' + mark,
+        title: mark === ' tiebest'
+          ? 'tied for best — perplexity carries no standard error here, so a lead '
+            + 'this small is not a difference' : '' },
         c.lower ? num(cc.v, 3) : pct(cc.v),
         cc.se && !c.lower ? el('span', { class: 'se', text: ` ±${(100 * cc.se).toFixed(1)}` }) : '');
     }))));
+  const nOff = ms.filter(m => m.official).length;
   return [radarCard(ms) || '', el('div', { class: 'card' },
     el('h2', { text: 'Leaderboard' }),
     el('p', { class: 'sub', text: 'Click a column to sort. Accuracy cells are score ± stderr; '
-      + 'perplexity columns are lower-is-better and excluded from Avg. '
-      + 'Avg is the mean over the accuracy tasks a model actually ran (count shown when partial). '
-      + '● marks the best value per column.' }),
+      + 'perplexity columns are lower-is-better, excluded from Avg, and carry no standard '
+      + 'error — so ● marks a best value and ≈ marks values too close to call. '
+      + `Avg exists only for models that completed all ${DATA.required.length} required `
+      + `tasks (${DATA.required.join(', ')}): ${nOff} of ${ms.length} here. `
+      + 'Anything short of that is preliminary — its per-task scores are valid and shown, '
+      + 'it just has no overall number.' }),
+    el('div', { class: 'ctrl', style: 'margin:8px 0 2px' },
+      el('span', { class: 'small', text: 'Avg scale' }),
+      el('div', { class: 'seg', role: 'group', 'aria-label': 'average scale' },
+        [['chance', 'above chance'], ['raw', 'raw accuracy']].map(([v, l]) =>
+          el('button', { 'aria-pressed': String(state.avgMode === v), text: l,
+            onclick: () => { state.avgMode = v; render(); } }))),
+      el('span', { class: 'count-note', text: state.avgMode === 'raw'
+        ? 'raw: the number you quote, but a 2-option task starts at 50%'
+        : 'chance = 0, perfect = 100% — comparable across tasks with different guess rates' })),
     el('div', { class: 'lb-wrap' }, el('table', { class: 'lb' }, thead, tbody)))];
 }
 
@@ -1318,18 +1470,33 @@ function vPpl(ms) {
     const base = ceCol.num ? ceDir * (va - vb) : ceDir * natCmp(va, vb);
     // sorting by task keeps each group internally best-first
     return base || (ceCol.key === 'task' ? (A.bpb ?? 1e9) - (B.bpb ?? 1e9) : 0);
-  }).map(r => el('tr', {},
-    el('td', { text: r.task }),
-    el('td', { 'data-model': r.mid, text: r.model }),
-    el('td', { class: 'num', text: r.bpb != null ? num(r.bpb, 4) : '—' }),
-    el('td', { class: 'num best', text: r.ce != null ? num(r.ce, 4) : '—' }),
-    el('td', { class: 'num', text: r.other != null ? `${num(r.other, 4)} (${r.om})` : '—' }),
-    el('td', { class: 'num', text: r.docs != null ? String(r.docs) : '—' })));
+  }).map(r => {
+    // the CE column used to carry class 'best' on EVERY row, so the ● that means
+    // "best in column" appeared beside every value. Mark the actual leader per
+    // task, and only when it is clear of the tie band.
+    const peers = ceData.filter(x => x.task === r.task && x.ce != null).map(x => x.ce);
+    const lead = peers.length > 1 ? Math.min(...peers) : null;
+    const band = lead == null ? 0 : Math.max(0.005, 0.01 * Math.abs(lead));
+    const within = lead != null && r.ce != null && r.ce <= lead + band;
+    const tied = lead == null ? 0 : peers.filter(v => v <= lead + band).length;
+    return el('tr', {},
+      el('td', { text: r.task }),
+      el('td', { 'data-model': r.mid, text: r.model }),
+      el('td', { class: 'num', text: r.bpb != null ? num(r.bpb, 4) : '—' }),
+      el('td', { class: 'num' + (within ? (tied > 1 ? ' tiebest' : ' best') : ''),
+        title: within && tied > 1 ? 'tied for lowest on this corpus — no standard error' : '',
+        text: r.ce != null ? num(r.ce, 4) : '—' }),
+      el('td', { class: 'num', text: r.other != null ? `${num(r.other, 4)} (${r.om})` : '—' }),
+      el('td', { class: 'num', text: r.docs != null ? String(r.docs) : '—' }));
+  });
   return [
     el('p', { class: 'sub', style: 'margin:10px 2px', text:
       'Rolling-loglikelihood language modelling over pinned corpus samples. LOWER is better '
       + 'everywhere here. Quote bits_per_byte across model families; ' + CE_NOTE + ' '
-      + 'No standard error is reported for these, so treat close values as ties.'
+      + 'The harness reports NO standard error for these, so the dashboard will not '
+      + 'call a small lead a win: ≈ marks values within 1% (floor 0.005) of the best, '
+      + 'which is a stated placeholder until per-shard bootstrap intervals exist. Two '
+      + 'models 0.001 apart are tied, not ranked.'
       + (anyCk() ? ' Hollow bars are uploaded checkpoints.' : '') }),
     el('div', { class: 'panels' }, DATA.pplTasks.map(t => barPanel(t, ms, { lower: true }))),
     el('div', { class: 'card' },
@@ -1390,7 +1557,8 @@ function vRuns(ms) {
     { key: 'backend', label: 'backend' },
     { key: 'dtype',  label: 'dtype' },
     { key: 'batch',  label: 'batch', num: true },
-    { key: 'chat',   label: 'chat template', num: true, get: m => m.chat ? 1 : 0 },
+    { key: 'chat',   label: 'template applied', num: true, get: m => m.chat ? 1 : 0 },
+    { key: 'tmpl',   label: 'template id', get: m => (m.archinfo || {}).tmpl_sha },
     { key: 'seed',   label: 'seed', num: true },
     { key: 'limit',  label: 'limit', num: true,
       get: m => m.limit == null ? Infinity : m.limit },   // 'full' sorts as largest
@@ -1431,7 +1599,11 @@ function vRuns(ms) {
         el('td', { text: m.backend || '—' }),
         el('td', { text: m.dtype || '—' }),
         el('td', { text: m.batch == null ? '—' : String(m.batch) }),
-        el('td', { text: m.chat ? 'yes' : 'no' }),
+        el('td', { title: m.kindReason || '', text: m.chat ? 'yes' : 'no' }),
+        el('td', {}, el('span', { class: 'mono',
+          title: ((m.archinfo || {}).tmpl_src ? 'from ' + m.archinfo.tmpl_src : 'no chat template in the repo')
+            + (m.kindReason ? `\npolicy: ${m.kindReason}` : ''),
+          text: (m.archinfo || {}).tmpl_sha || '—' })),
         el('td', { class: 'num', text: m.seed == null ? '—' : String(m.seed) }),
         el('td', { text: m.limit == null ? 'full' : String(m.limit) }),
         el('td', { text: m.paramsSrc || '—' }),
@@ -1711,8 +1883,9 @@ function vRuns(ms) {
       const esc = v => v == null ? '' : /[",\n]/.test(String(v))
         ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
       download('benchmark_query.csv', 'text/csv',
-        ['model,task,metric,value,stderr,n_shot,n_samples',
-         ...current.map(r => r.map(esc).join(','))].join('\n'));
+        [['model', 'task', 'metric', 'value', 'stderr', 'n_shot', 'n_samples',
+          ...PROV_COLS].join(','),
+         ...current.map(r => [...r, ...provOf(r[0])].map(esc).join(','))].join('\n'));
     }})));
   frag.push(el('div', { class: 'card' },
     el('h2', { text: 'Export' }),
@@ -2259,10 +2432,27 @@ function download(name, mime, text) {
   const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: mime })), download: name });
   document.body.append(a); a.click(); a.remove();
 }
+// The flat CSV joins each row's model-level provenance, so an exported number
+// carries the conditions that produced it: a value without its template policy,
+// dtype, seed and harness build is not reproducible and should not be quoted.
+const PROV_COLS = ['result_class', 'required_done', 'template_applied', 'template_id',
+                   'template_policy', 'dtype', 'backend', 'batch_size', 'seed',
+                   'limit', 'harness_git', 'transformers', 'eval_finished'];
+function provOf(name) {
+  const m = DATA.models.find(x => x.name === name) || {};
+  const a = m.archinfo || {};
+  return [m.official ? 'official' : 'preliminary',
+          m.nreq ? `${m.nhave}/${m.nreq}` : '', m.chat ? 'yes' : 'no',
+          a.tmpl_sha || '', m.kindReason || '', m.dtype || '', m.backend || '',
+          m.batch == null ? '' : m.batch, m.seed == null ? '' : m.seed,
+          m.limit == null ? 'full' : m.limit, m.hash || '',
+          DATA.meta.transformers || '', m.date || ''];
+}
 function exportCsv() {
   const esc = v => v == null ? '' : /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
-  const lines = ['model,task,metric,value,stderr,n_shot,n_samples'];
-  for (const r of DATA.extra) lines.push(r.map(esc).join(','));
+  const lines = [['model', 'task', 'metric', 'value', 'stderr', 'n_shot', 'n_samples',
+                  ...PROV_COLS].join(',')];
+  for (const r of DATA.extra) lines.push([...r, ...provOf(r[0])].map(esc).join(','));
   download('benchmark.csv', 'text/csv', lines.join('\n'));
 }
 function exportJson() { download('benchmark.json', 'application/json', JSON.stringify(DATA, null, 1)); }
@@ -2473,8 +2663,13 @@ def main() -> int:
     print(f"\nwrote {out}  ({out.stat().st_size / 1024:.1f} KB)")
 
     if args.csv:
-        lines = ["model,task,metric,value,stderr,n_shot,n_samples,chat_template,git_hash"]
+        # provenance rides along with every row: a value whose template policy,
+        # dtype, seed and harness build are unknown cannot be reproduced
+        lines = ["model,task,metric,value,stderr,n_shot,n_samples,template_applied,"
+                 "template_id,template_policy,dtype,backend,batch_size,seed,limit,"
+                 "harness_git,transformers,eval_finished"]
         for r in runs:
+            ai = r.get("archinfo") or {}
             for task, entry in r["tasks"].items():
                 for name, d in entry.items():
                     if not isinstance(d, dict) or "value" not in d:
@@ -2482,7 +2677,13 @@ def main() -> int:
                     lines.append(",".join(str(x) for x in [
                         r["model"], task, name, d["value"], d.get("stderr", ""),
                         r["n_shot"].get(task, ""), r["n_samples"].get(task, ""),
-                        r["chat_template"], r["git_hash"] or ""]))
+                        r["chat_template"], ai.get("tmpl_sha") or "",
+                        (ai.get("kind_reason") or "").replace(",", ";"),
+                        r["dtype"] or "", r["backend"] or "",
+                        r["batch_size"] or "", r["seed"] if r["seed"] is not None else "",
+                        "full" if r["limit"] is None else r["limit"],
+                        r["git_hash"] or "", r["transformers_version"] or "",
+                        r["date"] or ""]))
         args.csv.parent.mkdir(parents=True, exist_ok=True)
         args.csv.write_text("\n".join(lines), encoding="utf-8")
         print(f"wrote {args.csv}  ({len(lines) - 1} rows)")

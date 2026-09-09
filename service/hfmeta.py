@@ -14,15 +14,19 @@ What it decides, and why:
         memory ≈ batch × seq_len × vocab × 4 bytes × ~2.5
     measured on this card: gemma-3-270m (262K vocab) tried 11.6 GiB at batch 8.
     We pick the largest batch in {8,4,2,1} whose estimate fits the job budget.
-  * chat template — present means instruct: the submitter can say base/instruct
-    explicitly, but 'auto' resolves here, because applying a chat template to the
-    wrong kind moves scores by tens of points.
+  * chat template — presence is evidence, not proof: a checkpoint inherits its
+    parent's template through the tokenizer, so 'auto' resolves here only when
+    the name corroborates it, and refuses otherwise. The template's hash and the
+    reason for the decision are recorded on the run, because applying a template
+    to the wrong kind of model moves scores by tens of points.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 from pathlib import Path
 
 from . import config
@@ -69,6 +73,66 @@ def _arch_from_config(cfg: dict) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# chat-template policy
+#
+# Applying a chat template to a base model (or withholding it from an instruct
+# model) moves multiple-choice scores by tens of points, so the decision has to
+# be recorded, not just made. Detection alone is not enough: a checkpoint saved
+# from a tokenizer that was initialized from an instruct model INHERITS that
+# model's chat template, so "a template exists" does not mean "this is a chat
+# model". When the name gives no corroborating evidence we refuse rather than
+# guess — the submitter types one word and the result becomes comparable.
+# ---------------------------------------------------------------------------
+
+_INSTRUCT_WORDS = ("instruct", "instruction", "chat", "sft", "dpo", "orpo",
+                   "rlhf", "tulu", "zephyr", "assistant")
+
+
+def _looks_instruct(hf_id: str) -> bool:
+    """Does the model's NAME claim to be instruction-tuned? ('-it' is a whole
+    token, so 'gemma-3-270m-it' matches but 'bit-net' does not.)"""
+    name = hf_id.split("/")[-1].lower()
+    tokens = set(re.split(r"[^a-z0-9]+", name))
+    return "it" in tokens or any(w in name for w in _INSTRUCT_WORDS)
+
+
+def _template_id(text: str | None, src: str | None) -> dict:
+    """A stable short hash of the template text — the thing that has to match
+    for two runs to be comparable. The text itself is too long for a table."""
+    if not text:
+        return {"tmpl_sha": None, "tmpl_src": None}
+    sha = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+    return {"tmpl_sha": sha, "tmpl_src": src}
+
+
+def resolve_kind(hf_id: str, requested: str, has_template: bool) -> tuple[str, str]:
+    """(kind, reason). Raises PreflightError for the one genuinely ambiguous
+    case, which is also the dangerous one: a template is present, the submitter
+    said 'auto', and nothing about the model corroborates 'instruct'."""
+    claims = _looks_instruct(hf_id)
+    if requested in ("base", "instruct"):
+        conflict = (requested == "instruct" and not has_template)
+        return requested, ("submitter said %s%s" % (
+            requested, "; note: no chat template found in the repo, so none is "
+                       "applied" if conflict else ""))
+    if not has_template:
+        return "base", ("no chat template in the repo"
+                        + ("; name suggests instruct, but a template cannot be "
+                           "invented — evaluated as base" if claims else ""))
+    if claims:
+        return "instruct", "chat template present and the name says instruct"
+    raise PreflightError(
+        f"{hf_id} is ambiguous: it ships a chat template, but nothing in its "
+        f"name says it is instruction-tuned. A checkpoint saved from an "
+        f"instruct model's tokenizer inherits that template even when the "
+        f"weights are a base model, and applying it moves multiple-choice "
+        f"scores by tens of points. Resubmit with kind=\"base\" (raw "
+        f"completions — right for a pretrained checkpoint) or kind=\"instruct\" "
+        f"(apply the template) so the run is comparable and the choice is on "
+        f"the record.")
+
+
 def _preflight_local(name: str) -> dict:
     """An uploaded artifact: same decisions as the Hub path, answered from disk."""
     d = config.ARTIFACTS_DIR / name
@@ -105,23 +169,44 @@ def _preflight_local(name: str) -> dict:
             tok_cfg = json.loads((d / "tokenizer_config.json").read_text())
         except (OSError, json.JSONDecodeError):
             pass
-    has_template = bool(tok_cfg.get("chat_template")) or (d / "chat_template.jinja").exists()
+    tmpl, tmpl_src = tok_cfg.get("chat_template"), "tokenizer_config.json"
+    if not tmpl and (d / "chat_template.jinja").exists():
+        try:
+            tmpl, tmpl_src = (d / "chat_template.jinja").read_text(), "chat_template.jinja"
+        except OSError:
+            tmpl = None
+    if isinstance(tmpl, list):        # multi-template repos: hash the whole set
+        tmpl = json.dumps(tmpl, sort_keys=True)
     batch, need = estimate(int(vocab), params)
     return {"params": params, "vocab": int(vocab), "batch": batch, "need_gb": need,
-            "kind_detected": "instruct" if has_template else "base",
+            "kind_detected": "instruct" if tmpl else "base",
+            "has_template": bool(tmpl),
             "architectures": cfg.get("architectures") or [],
-            "archinfo": _arch_from_config(cfg)}
+            "archinfo": {**_arch_from_config(cfg),
+                         **_template_id(tmpl, tmpl_src if tmpl else None)}}
 
 
-def preflight(hf_id: str) -> dict:
+def preflight(hf_id: str, requested_kind: str = "auto") -> dict:
+    """Metadata + the resolved template policy. `requested_kind` is the
+    submitter's choice; 'auto' may be refused as ambiguous (see resolve_kind)."""
+    meta = _preflight(hf_id)
+    kind, reason = resolve_kind(hf_id, requested_kind, meta.get("has_template", False))
+    meta["kind"] = kind
+    meta["kind_reason"] = reason
+    return meta
+
+
+def _preflight(hf_id: str) -> dict:
     if hf_id.startswith(LOCAL_PREFIX):            # uploaded artifact — never touches the Hub
         return _preflight_local(hf_id[len(LOCAL_PREFIX):])
     if os.environ.get("STUB_PREFLIGHT") == "1":   # offline tests
         batch, need = estimate(50304, 14_000_000)
         return {"params": 14_000_000, "vocab": 50304, "batch": batch,
-                "need_gb": need, "kind_detected": "base", "architectures": ["stub"],
+                "need_gb": need, "kind_detected": "base", "has_template": False,
+                "architectures": ["stub"],
                 "archinfo": {"arch": "StubForCausalLM", "hidden": 128, "layers": 6,
-                             "heads": 4, "ctx": 2048, "vocab": 50304}}
+                             "heads": 4, "ctx": 2048, "vocab": 50304,
+                             "tmpl_sha": None, "tmpl_src": None}}
 
     try:
         from huggingface_hub import HfApi, hf_hub_download
@@ -176,7 +261,15 @@ def preflight(hf_id: str) -> dict:
 
     siblings = {s.rfilename for s in (info.siblings or [])}
     tok_cfg = fetch_json("tokenizer_config.json") if "tokenizer_config.json" in siblings else {}
-    has_template = bool(tok_cfg.get("chat_template")) or "chat_template.jinja" in siblings
+    tmpl, tmpl_src = tok_cfg.get("chat_template"), "tokenizer_config.json"
+    if not tmpl and "chat_template.jinja" in siblings:
+        try:
+            tmpl = Path(hf_hub_download(hf_id, "chat_template.jinja")).read_text()
+            tmpl_src = "chat_template.jinja"
+        except (EntryNotFoundError, OSError):
+            tmpl = None
+    if isinstance(tmpl, list):        # multi-template repos: hash the whole set
+        tmpl = json.dumps(tmpl, sort_keys=True)
 
     batch, need = estimate(int(vocab), params)
     return {
@@ -184,7 +277,9 @@ def preflight(hf_id: str) -> dict:
         "vocab": int(vocab),
         "batch": batch,
         "need_gb": need,
-        "kind_detected": "instruct" if has_template else "base",
+        "kind_detected": "instruct" if tmpl else "base",
+        "has_template": bool(tmpl),
         "architectures": cfg.get("architectures") or [],
-        "archinfo": _arch_from_config(cfg),
+        "archinfo": {**_arch_from_config(cfg),
+                     **_template_id(tmpl, tmpl_src if tmpl else None)},
     }

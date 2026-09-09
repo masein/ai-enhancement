@@ -134,7 +134,14 @@ sort menu — "best loss" and "recently updated" are the two you'll live in.
 queue is searchable and filterable the same way (find *your* jobs, failures
 first); click any column header to sort.
 **Leaderboard** — every model × every task, ± standard error, sortable, with a
-"last eval" date per model. Above it, the **Capability profile** radar: tick up
+"last eval" date per model. **Avg only exists for models that finished all
+seven required tasks** (mmlu, hellaswag, arc_challenge, arc_easy, winogrande,
+piqa, truthfulqa_mc2). A quick run shows `— 2/7` and a `prelim` badge instead
+of an average: its per-task numbers are real and shown everywhere, it just
+can't hold an overall rank, because a mean over two easy tasks isn't
+comparable to a mean over seven. Run `suite=full` to make a model official.
+Avg is scaled so chance = 0 by default (raw accuracy is one click away) —
+otherwise a 2-option task like PIQA hands every model a free 50%. Above it, the **Capability profile** radar: tick up
 to three models in the table to compare their shape across benchmarks. Its axes
 are scaled *above chance* by default (25% on a 4-way task = 0), so read the
 shape there and the numbers in the table.
@@ -151,7 +158,30 @@ as you type — model, task and metric names straight from the data, so you
 never have to remember what a task is called: ↑↓ to pick, Enter to insert.
 
 Two honest-statistics habits the dashboard enforces: every score carries its
-standard error, and if two error bars overlap, treat the models as tied.
+standard error, and if two error bars overlap, treat the models as tied. On
+perplexity the harness gives no standard error at all, so the dashboard marks
+values within ~1% of the best with `≈` rather than crowning one — a 0.001 lead
+on bits/byte is not a win.
+
+## The protocol (what makes two numbers comparable)
+
+Scores can only be compared when the task, metric, n-shot count, prompt format
+and **chat-template policy** all match. The service enforces the last one:
+
+- `kind: auto` applies a chat template only when the repo ships one **and** the
+  model's name says it is instruction-tuned (`instruct`, `-it`, `chat`, `sft`…).
+- If a template exists but the name gives no such evidence, **preflight refuses
+  the submission** and asks you to say `base` or `instruct` explicitly. This is
+  the case that bites: a checkpoint saved from an instruct model's tokenizer
+  inherits its chat template even though the weights are a base model, and
+  applying it moves multiple-choice scores by tens of points.
+- Every run records which template it used (a short hash), where it came from,
+  and why the decision was made — visible in Evals → Run provenance, and in
+  every CSV export.
+
+If you change the policy for a model, its old scores are not comparable to the
+new ones. Move the old results out of `results/full/<model>/` before re-running,
+or the finished tasks are served from cache.
 
 ## 6 · House rules
 
