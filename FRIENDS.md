@@ -133,7 +133,11 @@ sort menu — "best loss" and "recently updated" are the two you'll live in.
 **Submit & Queue** — submit models, watch progress, read failure logs. The
 queue is searchable and filterable the same way (find *your* jobs, failures
 first); click any column header to sort.
-**Leaderboard** — every model × every task, ± standard error, sortable.
+**Leaderboard** — every model × every task, ± standard error, sortable, with a
+"last eval" date per model. Above it, the **Capability profile** radar: tick up
+to three models in the table to compare their shape across benchmarks. Its axes
+are scaled *above chance* by default (25% on a 4-way task = 0), so read the
+shape there and the numbers in the table.
 **Tasks** — one panel per benchmark; the dashed line is chance. Distance from
 chance is the real score: **50% on Winogrande/PIQA is a coin flip, not a pass**,
 and MMLU sits at ~25% for every model under ~1B — that's expected, not a bug.

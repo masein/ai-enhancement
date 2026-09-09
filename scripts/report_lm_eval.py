@@ -506,10 +506,21 @@ CSS = r"""
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
 }
+/* dim: slate blue-grey, softer than the near-black dark theme (the GitHub /
+   wandb "dimmed" look). Same dark series palette — re-validated against both
+   dim surfaces: all six checks pass. */
+:root[data-theme="dim"] .viz-root {
+  color-scheme: dark;
+  --surface-1:#1c2333; --plane:#141a26; --text-primary:#e6edf3; --text-secondary:#b6c2d1;
+  --muted:#8b98a8; --grid:#2b3546; --axis:#3a465a; --border:rgba(230,237,243,0.11);
+  --success-text:#3fb950; --accent:#58a6ff; --accent-soft:rgba(88,166,255,0.16);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+}
 * { box-sizing:border-box; }
 body { margin:0; background:var(--plane); color:var(--text-primary);
   font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:14px; line-height:1.5; }
-.wrap { max-width:1180px; margin:0 auto; padding:26px 22px 70px; }
+.wrap { max-width:1320px; margin:0 auto; padding:26px 22px 70px; }
 h1 { font-size:21px; font-weight:650; margin:0; letter-spacing:-0.01em; }
 h2 { font-size:15px; font-weight:600; margin:0 0 3px; }
 .sub { color:var(--text-secondary); font-size:13px; margin:2px 0 0; }
@@ -599,7 +610,7 @@ th .dir { font-size:9px; }
   color:var(--text-secondary); }
 .key { width:11px; height:11px; border-radius:3px; display:inline-block; }
 .key.line { width:14px; height:0; border-top:3px solid; border-radius:2px; }
-.panels { display:grid; grid-template-columns:repeat(auto-fill,minmax(430px,1fr)); gap:12px; }
+.panels { display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:12px; }
 @media (max-width:520px){ .panels { grid-template-columns:1fr; } }
 .panel { background:var(--surface-1); border:1px solid var(--border); border-radius:12px;
   padding:14px 16px 8px; }
@@ -628,18 +639,50 @@ th .dir { font-size:9px; }
   padding:6px 10px; }
 .frm input:focus, .frm select:focus { outline:2px solid var(--accent-soft);
   border-color:var(--accent); }
-.tr-grid { display:grid; grid-template-columns:minmax(250px,320px) 1fr; gap:12px;
-  align-items:start; margin-top:12px; }
+/* minmax(0,1fr) + min-width:0: a grid track's default minimum is its content's
+   min-content width, so one unbreakable config value (a 900-char JSON string)
+   used to push the whole right column to 3500px and scroll the page sideways */
+.tr-grid { display:grid; grid-template-columns:minmax(250px,320px) minmax(0,1fr);
+  gap:12px; align-items:start; margin-top:12px; }
+.tr-grid > * { min-width:0; }
 @media (max-width:900px){ .tr-grid { grid-template-columns:1fr; } }
+.runlist { max-height:72vh; overflow-y:auto; }
 .runrow { display:flex; gap:8px; padding:7px 9px; border-bottom:1px solid var(--grid);
-  cursor:pointer; align-items:center; font-size:13px; border-radius:6px; }
+  cursor:pointer; align-items:flex-start; font-size:13px; border-radius:6px; }
 .runrow:hover { background:var(--plane); }
 .runrow.sel { background:var(--accent-soft); }
 .rchip { width:10px; height:10px; border-radius:3px; border:1px solid var(--border);
-  flex:none; }
+  flex:none; margin-top:5px; }
+.rbody { flex:1; min-width:0; }
+.rtop { display:flex; align-items:center; gap:8px; }
+.rname { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rmeta { font-size:11.5px; color:var(--muted); margin-top:1px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
 .ctrl { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:2px 0 10px; }
 .ctrl input[type=range] { width:140px; accent-color:var(--accent); }
+.ctrl input[type=search] { font:inherit; font-size:12.5px; color:var(--text-primary);
+  background:var(--plane); border:1px solid var(--border); border-radius:8px;
+  padding:5px 9px; width:190px; }
+.msec { margin-bottom:10px; }
+.msec-h { background:none; border:0; padding:4px 0 6px; font-size:12.5px; font-weight:600;
+  color:var(--text-secondary); cursor:pointer; display:flex; gap:6px; align-items:center;
+  box-shadow:none; }
+.msec-h:hover { background:none; color:var(--text-primary); }
+.msec-h::before { content:'▾'; font-size:11px; color:var(--muted); }
+.msec.closed .msec-h::before { content:'▸'; }
+.msec-h .count-note { font-weight:400; }
 .diffrow td { background:var(--accent-soft); }
+td.cfgv { white-space:pre-wrap; overflow-wrap:anywhere; max-width:440px; }
+.radar-grid { display:grid; grid-template-columns:minmax(300px,540px) minmax(0,1fr);
+  gap:16px; align-items:start; margin-top:6px; }
+@media (max-width:900px){ .radar-grid { grid-template-columns:1fr; } }
+.radar .hit { cursor:pointer; }
+.radar-tbl th, .radar-tbl td { font-size:12.5px; }
+.xbtn { border:0; background:none; padding:0 2px; font-size:15px; line-height:1;
+  color:var(--muted); cursor:pointer; }
+.xbtn:hover { color:var(--critical); background:none; }
+.lb td input[type=checkbox] { accent-color:var(--accent); margin:0; vertical-align:middle;
+  cursor:pointer; }
 mark { background:var(--accent-soft); color:var(--text-primary); border-radius:3px;
   padding:0 1px; }
 pre.mono { background:var(--plane); border:1px solid var(--border); border-radius:8px;
@@ -694,6 +737,9 @@ const state = {
   trSel: [], trColors: {}, trSmooth: 0, trLog: false,      // Training tab
   trRuns: [], trSeries: {}, trFetching: false,
   trQ: '', trStatus: 'all', trOrder: 'updated',            // runs-list filter/sort
+  trMetricQ: '', trSecClosed: {},                          // metric panels filter / sections
+  cmpSel: [], cmpColors: {},                               // radar: compared models (≤3)
+  radarNorm: 'chance', radarAxes: 'tasks',                 // radar scaling / axis mode
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
   // focus from filter inputs and kill slider drags
@@ -999,17 +1045,166 @@ function lbMini(rows) {
       el('th', { class: 'num', text: 'params' }), el('th', { class: 'num', text: 'avg' }))), tb);
 }
 
+// ---------- capability profile: the radar ----------
+// The Eval-Gauntlet-style view: one axis per benchmark (or per category), one
+// polygon per model. Two honesty rules baked in: axes are scaled *above
+// chance* by default — 25% on a 4-way task is 0, a perfect score is 100% —
+// because raw accuracy makes a 2-way task look twice as strong as a 4-way one;
+// and the overlapping-polygon form caps at three models (the all-pairs ladder),
+// with colors that follow each model rather than its position in the list.
+const CATS = [
+  ['knowledge',    ['mmlu']],
+  ['commonsense',  ['hellaswag', 'piqa', 'winogrande']],
+  ['reasoning',    ['arc_challenge', 'arc_easy']],
+  ['math',         ['gsm8k']],
+  ['truthfulness', ['truthfulqa_mc2']],
+];
+function radarAxes() {
+  if (state.radarAxes === 'tasks') return DATA.accTasks.map(t => ({ key: t, label: t, tasks: [t] }));
+  const used = new Set(), out = [];
+  for (const [name, ts] of CATS) {
+    const have = ts.filter(t => DATA.accTasks.includes(t));
+    if (have.length) { out.push({ key: name, label: name, tasks: have }); have.forEach(t => used.add(t)); }
+  }
+  for (const t of DATA.accTasks) if (!used.has(t)) out.push({ key: t, label: t, tasks: [t] });
+  return out;
+}
+function normScore(t, v) {
+  const c = (DATA.tasks[t] || {}).chance;
+  if (state.radarNorm === 'raw' || !(c > 0)) return v;
+  return Math.max(0, Math.min(1, (v - c) / (1 - c)));
+}
+// the compared set: explicit ticks, else the top three by average
+function cmpEffective(ms) {
+  if (state.cmpSel.length) return state.cmpSel.filter(id => ms.some(m => m.id === id));
+  return ms.filter(m => m.avg != null).sort((a, b) => b.avg - a.avg).slice(0, 3).map(m => m.id);
+}
+function cmpToggle(id, ms) {
+  if (!state.cmpSel.length) {        // first tick: materialize the default so it edits intuitively
+    state.cmpSel = cmpEffective(ms);
+    state.cmpColors = {};
+    state.cmpSel.forEach((x, i) => { state.cmpColors[x] = i; });
+  }
+  const i = state.cmpSel.indexOf(id);
+  if (i >= 0) { state.cmpSel.splice(i, 1); delete state.cmpColors[id]; }
+  else {
+    if (state.cmpSel.length >= 3) {  // FIFO: the newest tick always lands
+      const old = state.cmpSel.shift(); delete state.cmpColors[old];
+    }
+    const used = new Set(Object.values(state.cmpColors));
+    let slot = 0; while (used.has(slot)) slot++;
+    state.cmpColors[id] = slot;      // color follows the model while it is compared
+    state.cmpSel.push(id);
+  }
+  render();
+}
+function radarCard(ms) {
+  const axes = radarAxes();
+  if (axes.length < 3) return null;
+  const ids = cmpEffective(ms);
+  const series = ids.map((id, i) => {
+    const m = DATA.models.find(x => x.id === id);
+    const slot = state.cmpSel.length ? state.cmpColors[id] : i;
+    const vals = {};
+    for (const ax of axes) {
+      const parts = ax.tasks.map(t => ({ t, c: cell(t, id) })).filter(p => p.c);
+      vals[ax.key] = parts.length
+        ? { n: parts.reduce((s, p) => s + normScore(p.t, p.c.v), 0) / parts.length, parts }
+        : null;
+    }
+    return { id, m, color: trColor(slot), vals };
+  }).filter(s => s.m);
+  const W = 540, H = 400, cx = 270, cy = 205, R = 140, N = axes.length;   // side margins fit long task names
+  const ang = i => -Math.PI / 2 + 2 * Math.PI * i / N;
+  const pt = (i, r) => [cx + r * Math.cos(ang(i)), cy + r * Math.sin(ang(i))];
+  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', class: 'radar',
+    role: 'img', 'aria-label': 'capability profile' });
+  for (const f of [0.25, 0.5, 0.75, 1]) {
+    svg.append(el('svg:polygon', {
+      points: axes.map((_, i) => pt(i, f * R).map(v => v.toFixed(1)).join(',')).join(' '),
+      fill: 'none', stroke: f === 1 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1 }));
+    svg.append(el('svg:text', { x: cx + 4, y: cy - f * R + 3.5, 'font-size': 9.5,
+      fill: 'var(--muted)', text: Math.round(f * 100) + '%' }));
+  }
+  axes.forEach((ax, i) => {
+    const [x, y] = pt(i, R);
+    svg.append(el('svg:line', { x1: cx, y1: cy, x2: x, y2: y, stroke: 'var(--grid)', 'stroke-width': 1 }));
+    const [lx, ly] = pt(i, R + 16), c = Math.cos(ang(i));
+    svg.append(el('svg:text', { x: lx, y: ly + 4, 'font-size': 11, fill: 'var(--text-secondary)',
+      'text-anchor': c > 0.15 ? 'start' : c < -0.15 ? 'end' : 'middle', text: ax.label }));
+  });
+  const unit = state.radarNorm === 'chance' ? 'above chance' : 'accuracy';
+  // marks are pointer-transparent and every hit target is appended LAST: a later
+  // model's translucent fill must never swallow an earlier model's hover
+  const hits = [];
+  for (const s of series) {
+    const pts = axes.map((ax, i) => s.vals[ax.key] ? pt(i, s.vals[ax.key].n * R) : null);
+    const have = pts.filter(Boolean);
+    if (have.length >= 2)
+      svg.append(el('svg:path', { d: 'M' + have.map(p => p.map(v => v.toFixed(1)).join(',')).join('L') + 'Z',
+        fill: s.color, 'fill-opacity': 0.12, stroke: s.color, 'stroke-width': 2,
+        'stroke-linejoin': 'round', 'pointer-events': 'none' }));
+    axes.forEach((ax, i) => {
+      const v = s.vals[ax.key]; if (!v) return;
+      const [x, y] = pts[i];
+      svg.append(el('svg:circle', { cx: x, cy: y, r: 3.5, fill: s.color,
+        stroke: 'var(--surface-1)', 'stroke-width': 1.5, 'pointer-events': 'none' }));
+      const rows = [s.m.name, `${ax.label}: ${pct(v.n)} ${unit}`,
+        ...v.parts.map(p => `${p.t}: ${pct(p.c.v)} raw` + (p.c.se ? ` ± ${(100 * p.c.se).toFixed(1)}` : ''))];
+      hits.push(el('svg:circle', { class: 'hit', cx: x, cy: y, r: 8, tabindex: 0,
+        'data-tip': JSON.stringify(rows), 'data-tipkey': s.color }));
+    });
+  }
+  svg.append(...hits);
+  const seg = (label, opts, cur, pick) => el('div', { class: 'seg', role: 'group', 'aria-label': label },
+    opts.map(([v, l]) => el('button', { 'aria-pressed': String(cur === v), text: l,
+      onclick: () => pick(v) })));
+  const legend = el('div', { class: 'legend', style: 'margin:6px 0 0' }, series.map(s => {
+    const missing = axes.filter(ax => !s.vals[ax.key]).map(ax => ax.label);
+    return el('span', { title: missing.length ? 'not evaluated on: ' + missing.join(', ') : s.id },
+      el('span', { class: 'key', style: `background:${s.color}` }), s.m.name,
+      missing.length ? el('span', { class: 'se', text: ` (${missing.length} axis missing)` }) : '',
+      el('button', { class: 'xbtn', 'aria-label': 'remove ' + s.m.name, text: '×',
+        onclick: () => cmpToggle(s.id, ms) }));
+  }));
+  const table = el('table', { class: 'radar-tbl' },
+    el('thead', {}, el('tr', {}, el('th', { text: 'axis' }),
+      series.map(s => el('th', { class: 'num', text: s.m.name })))),
+    el('tbody', {}, axes.map(ax => el('tr', {}, el('td', { text: ax.label }),
+      series.map(s => el('td', { class: 'num', text: s.vals[ax.key] ? pct(s.vals[ax.key].n) : '—' }))))));
+  return el('div', { class: 'card' },
+    el('h2', { text: 'Capability profile' }),
+    el('p', { class: 'sub', text:
+      'One axis per benchmark, one shape per model — tick up to three in the table below '
+      + '(a fourth tick replaces the oldest). Axes are scaled ABOVE CHANCE by default: 25% on a '
+      + '4-way task is 0, perfect is 100%, so a 4-way and a 2-way task are comparable; switch to '
+      + 'raw accuracy to quote the number itself. Perplexity tasks are excluded (different scale). '
+      + 'Read the shape here and the numbers below — a radar’s area exaggerates differences and '
+      + 'its shape depends on axis order.' }),
+    el('div', { class: 'ctrl', style: 'margin-top:8px' },
+      seg('scale', [['chance', 'above chance'], ['raw', 'raw accuracy']], state.radarNorm,
+          v => { state.radarNorm = v; render(); }),
+      seg('axes', [['tasks', 'tasks'], ['categories', 'categories']], state.radarAxes,
+          v => { state.radarAxes = v; render(); })),
+    el('div', { class: 'radar-grid' },
+      el('div', {}, svg, legend),
+      el('div', { class: 'lb-wrap' }, table)));
+}
+
 function vLeaderboard(ms) {
+  const cmpSet = new Set(cmpEffective(ms));
   const cols = [
+    { key: 'cmp',    label: '', nosort: true },
     { key: 'name',   label: 'Model',  num: false },
     { key: 'params', label: 'Params', num: true },
     { key: 'avg',    label: 'Avg',    num: true },
     ...DATA.accTasks.map(t => ({ key: t, label: t, num: true, task: t })),
     ...DATA.pplTasks.map(t => ({ key: t, label: t, num: true, task: t, lower: true })),
+    { key: 'date', label: 'Last eval', num: false },   // when its newest task ran
   ];
   const val = (m, c) => c.task ? (cell(c.task, m.id) || {}).v : m[c.key];
   const rows = [...ms].sort((a, b) => {
-    const c = cols.find(c => c.key === state.sort.key) || cols[2];
+    const c = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg');
     const va = val(a, c), vb = val(b, c);
     if (va == null && vb == null) return 0;
     if (va == null) return 1; if (vb == null) return -1;
@@ -1028,7 +1223,9 @@ function vLeaderboard(ms) {
     return s.length > 1 ? 'mixed!' : s.length ? s[0] + '-shot' : '';
   };
   const thead = el('thead', {},
-    el('tr', {}, cols.map(c => el('th', {
+    el('tr', {}, cols.map(c => c.nosort
+      ? el('th', { title: 'tick to compare in the capability profile above', text: '' })
+      : el('th', {
       class: (c.num ? 'num ' : '') + 'sortable' + (c.key === 'name' ? ' model' : ''),
       onclick: () => { state.sort = { key: c.key,
         dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
@@ -1041,6 +1238,9 @@ function vLeaderboard(ms) {
       text: c.task ? (c.lower ? DATA.tasks[c.task].metric : shotOf(c.task)) : '' }))));
   const tbody = el('tbody', {}, rows.map(m => el('tr', {},
     cols.map(c => {
+      if (c.key === 'cmp') return el('td', {}, el('input', { type: 'checkbox',
+        'aria-label': 'compare ' + m.name, checked: cmpSet.has(m.id) ? '' : null,
+        onchange: () => cmpToggle(m.id, ms) }));
       if (c.key === 'name') return el('td', { class: 'model', 'data-model': m.id,
         title: m.id + (m.archinfo && m.archinfo.hidden
           ? `\n${m.archinfo.arch || ''} · hidden ${m.archinfo.hidden} · layers ${m.archinfo.layers} · vocab ${m.archinfo.vocab}` : '') },
@@ -1050,6 +1250,8 @@ function vLeaderboard(ms) {
       if (c.key === 'params') return el('td', { class: 'num',
         title: m.paramsSrc ? 'from ' + (m.paramsSrc === 'config' ? 'harness config' : 'model name') : '',
         text: P(m.params) });
+      if (c.key === 'date') return el('td', { class: 'small', style: 'white-space:nowrap',
+        text: String(m.date || '—').slice(0, 16).replace('T', ' ') });
       if (c.key === 'avg') return el('td', {
         class: 'num' + (m.avg != null && m.avg === best.avg ? ' best' : '') },
         pct(m.avg), m.navg < DATA.accTasks.length
@@ -1061,7 +1263,7 @@ function vLeaderboard(ms) {
         c.lower ? num(cc.v, 3) : pct(cc.v),
         cc.se && !c.lower ? el('span', { class: 'se', text: ` ±${(100 * cc.se).toFixed(1)}` }) : '');
     }))));
-  return [el('div', { class: 'card' },
+  return [radarCard(ms) || '', el('div', { class: 'card' },
     el('h2', { text: 'Leaderboard' }),
     el('p', { class: 'sub', text: 'Click a column to sort. Accuracy cells are score ± stderr; '
       + 'perplexity columns are lower-is-better and excluded from Avg. '
@@ -1528,6 +1730,7 @@ const rel = ts => {
   return s < 90 ? `${Math.round(s)}s` : s < 5400 ? `${Math.round(s / 60)}m`
        : s < 129600 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`;
 };
+const absT = ts => ts ? new Date(ts * 1000).toLocaleString() : '—';   // viewer's zone
 const fmtv = v => !isFinite(v) ? '—' : Math.abs(v) >= 100 ? Math.round(v).toLocaleString()
               : Math.abs(v) >= 1 ? v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
               : v.toPrecision(3);
@@ -1666,21 +1869,31 @@ function vTraining() {
   if (!state.trRuns.length && LIVE) loadTraining();
   const frag = [];
   // ---- left: the runs list --------------------------------------------------
+  // two lines per run: name + status on top, the numbers underneath. The old
+  // single line gave the name whatever width was left — in a 250px column
+  // that was zero, and rows showed a status chip and nothing to attach it to.
   const runRow = r => {
     const sel = state.trSel.includes(r.id);
     const stale = r.status === 'running' && (Date.now() / 1000 - r.updated_at) > 600;
+    const meta = [
+      r.last_step != null ? `step ${r.last_step.toLocaleString()}` : null,
+      r.last_loss != null ? `loss ${fmtv(r.last_loss)}` : null,
+      r.tokens != null ? `${fmtCount(r.tokens)} tok` : null,
+      r.submitter || null,
+      r.updated_at ? `${rel(r.updated_at)} ago` : null,
+    ].filter(Boolean).join(' · ');
     return el('div', { class: 'runrow' + (sel ? ' sel' : ''), onclick: () => toggleRun(r.id),
-      role: 'button', tabindex: 0, title: `project: ${r.project} · started ${rel(r.created_at)} ago` },
+      role: 'button', tabindex: 0,
+      title: `${r.name}\nproject: ${r.project} · started ${rel(r.created_at)} ago`
+        + (r.updated_at ? ` · last update ${new Date(r.updated_at * 1000).toLocaleString()}` : '') },
       el('span', { class: 'rchip', style: sel ? `background:${trColor(state.trColors[r.id])}` : '' }),
-      el('span', { style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: r.name },
-        r.submitter ? el('span', { class: 'se', text: ` · ${r.submitter}` }) : ''),
-      el('span', { class: stale ? 'st st-muted' : r.status === 'running' ? 'st st-active'
-                        : r.status === 'failed' ? 'st st-failed' : 'st st-done',
-                   text: stale ? 'stale?' : r.status }),
-      el('span', { class: 'se', style: 'width:110px;text-align:right', text:
-        (r.last_step != null ? `step ${r.last_step.toLocaleString()}` : '—')
-        + (r.last_loss != null ? ` · ${fmtv(r.last_loss)}` : '')
-        + (r.tokens != null ? ` · ${fmtCount(r.tokens)} tok` : '') }));
+      el('div', { class: 'rbody' },
+        el('div', { class: 'rtop' },
+          el('span', { class: 'rname', text: r.name }),
+          el('span', { class: stale ? 'st st-muted' : r.status === 'running' ? 'st st-active'
+                            : r.status === 'failed' ? 'st st-failed' : 'st st-done',
+                       text: stale ? 'stale?' : r.status })),
+        el('div', { class: 'rmeta', text: meta })));
   };
   // filter + order: with three runs this is furniture; with forty (three friends
   // × a dozen sweeps each) it is the difference between a list and a haystack
@@ -1707,7 +1920,7 @@ function vTraining() {
                .toLowerCase().includes(q)))
       .sort(cmp);
   }
-  const listWrap = el('div');
+  const listWrap = el('div', { class: 'runlist' });
   const listCount = el('span', { class: 'count-note' });
   const trToolbar = el('div', { class: 'toolbar' },
     el('input', { type: 'search', value: state.trQ, style: 'flex:1;min-width:120px',
@@ -1755,23 +1968,48 @@ function vTraining() {
   if (!getSel().length) {
     right.push(note('Select a run on the left — charts, config and its benchmark scores appear here.'));
   } else {
-    // one panel per metric name, union across selected runs
+    // one panel per metric name, union across selected runs. A run that logs
+    // per-block MoE stats has dozens of metrics, so panels group into
+    // collapsible sections by their "prefix/" (the wandb convention) and a
+    // filter box narrows them.
+    const metricCount = el('span', { class: 'count-note' });
     function buildPanels() {
       const selRuns = getSel();
-      const names = [...new Set(selRuns.flatMap(x => Object.keys(x.det?.metrics || {})))];
+      const all = [...new Set(selRuns.flatMap(x => Object.keys(x.det?.metrics || {})))];
+      const q = state.trMetricQ.trim().toLowerCase();
+      const names = all.filter(n => !q || n.toLowerCase().includes(q));
       names.sort((a, b) => {
         const ia = METRIC_ORDER.indexOf(a), ib = METRIC_ORDER.indexOf(b);
         return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
       });
-      return names.map(nm => lineChart(nm,
+      metricCount.textContent = !all.length ? ''
+        : q ? `${names.length} of ${all.length} metrics` : `${all.length} metrics`;
+      const panelOf = nm => lineChart(nm,
         selRuns.filter(x => x.det?.metrics?.[nm]?.length).map(x => ({
           label: x.row.name, color: trColor(x.slot),
           pts: x.det.metrics[nm], events: x.det.events || [],
-        })), { smooth: state.trSmooth, logY: state.trLog })).filter(Boolean);
+        })), { smooth: state.trSmooth, logY: state.trLog });
+      const groups = new Map();
+      for (const nm of names) {
+        const i = nm.indexOf('/');
+        const key = i > 0 ? nm.slice(0, i) : '';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(nm);
+      }
+      if (groups.size <= 1)
+        return [el('div', { class: 'panels' }, names.map(panelOf).filter(Boolean))];
+      return [...groups.entries()].map(([key, nms]) => {
+        const closed = !!state.trSecClosed[key];
+        return el('div', { class: 'msec' + (closed ? ' closed' : '') },
+          el('button', { class: 'msec-h', 'aria-expanded': String(!closed),
+            onclick: () => { state.trSecClosed[key] = !closed; redraw(); } },
+            key || 'metrics', el('span', { class: 'count-note', text: String(nms.length) })),
+          closed ? '' : el('div', { class: 'panels' }, nms.map(panelOf).filter(Boolean)));
+      });
     }
     // redraw() swaps ONLY the panels — a full render() would replace the slider
     // element mid-drag and kill the gesture after one notch
-    const panelsWrap = el('div', { class: 'panels' }, buildPanels());
+    const panelsWrap = el('div', {}, buildPanels());
     const smoothVal = el('span', { class: 'count-note',
       text: state.trSmooth ? state.trSmooth.toFixed(2) : 'off' });
     const loadNote = el('span', { class: 'count-note', text:
@@ -1786,11 +2024,14 @@ function vTraining() {
       onclick: e => { state.trLog = !state.trLog;
         e.target.textContent = state.trLog ? 'log y: on' : 'log y: off';
         e.target.setAttribute('aria-pressed', String(state.trLog)); redraw(); } });
+    const mfilter = el('input', { type: 'search', value: state.trMetricQ,
+      placeholder: 'filter metrics…', 'aria-label': 'filter metrics',
+      oninput: e => { state.trMetricQ = e.target.value; redraw(); } });
     const ctrl = el('div', { class: 'ctrl' },
       el('span', { class: 'small', text: 'smoothing' }),
       el('input', { type: 'range', min: 0, max: 0.95, step: 0.05, value: state.trSmooth,
         oninput: e => { state.trSmooth = +e.target.value; redraw(); } }),
-      smoothVal, logBtn, loadNote);
+      smoothVal, logBtn, mfilter, metricCount, loadNote);
     right.push(ctrl, panelsWrap);
     // benchmark-join + config cards, rebuilt in place as events and scores arrive
     buildExtras = () => {
@@ -1838,7 +2079,7 @@ function vTraining() {
           const differ = new Set(vals).size > 1;
           return el('tr', { class: differ && selRuns.length > 1 ? 'diffrow' : '' },
             el('td', {}, el('span', { class: 'mono', text: k })),
-            vals.map(v => el('td', { class: 'num', text: v })));
+            vals.map(v => el('td', { class: 'num cfgv', text: v })));
         });
         out.push(el('div', { class: 'card' },
           el('h2', { text: selRuns.length > 1 ? 'Config diff' : 'Config' }),
@@ -1899,6 +2140,11 @@ function vQueue() {
   }});
   const qrow = r => el('tr', {},
     el('td', { class: 'num', text: '#' + r.id }),
+    el('td', { class: 'small', style: 'white-space:nowrap',
+      title: `submitted ${absT(r.created_at)}`
+        + (r.started_at ? `\nstarted ${absT(r.started_at)}` : '')
+        + (r.finished_at ? `\nfinished ${absT(r.finished_at)}` : ''),
+      text: r.created_at ? rel(r.created_at) + ' ago' : '—' }),
     el('td', { title: (r.note || '') + (r.arch && r.arch.length > 2 ? (() => {
         try { const a = JSON.parse(r.arch);
               return `\n${a.arch || ''} · hidden ${a.hidden ?? '—'} · layers ${a.layers ?? '—'} · vocab ${a.vocab ?? '—'}`; }
@@ -1920,6 +2166,7 @@ function vQueue() {
   // ---- queue filter + sort: a long shared queue needs "my jobs, failures first" ----
   const QCOLS = [
     { key: 'id',          label: '#', num: true, defDir: -1 },
+    { key: 'created_at',  label: 'submitted', num: true, defDir: -1 },
     { key: 'hf_id',       label: 'model' },
     { key: 'suite',       label: 'suite' },
     { key: 'submitter',   label: 'by' },
@@ -2099,14 +2346,21 @@ document.getElementById('srcSeg').addEventListener('click', e => {
     x.setAttribute('aria-pressed', String(x === b));
   render();
 });
-const THEMES = ['auto', 'light', 'dark'];
-let themeIdx = 0;
-document.getElementById('themeBtn').addEventListener('click', e => {
-  themeIdx = (themeIdx + 1) % 3;
-  const t = THEMES[themeIdx];
+const THEMES = ['auto', 'light', 'dark', 'dim'];
+function applyTheme(t) {
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', t);
-  e.target.textContent = 'Theme: ' + t;
+  document.getElementById('themeBtn').textContent = 'Theme: ' + t;
+  try { localStorage.setItem('bench-theme', t); } catch (e) { /* private mode etc. */ }
+}
+let themeIdx = 0;
+try {   // remembered per browser — the dashboard is a page people leave open
+  const saved = localStorage.getItem('bench-theme');
+  if (THEMES.includes(saved)) { themeIdx = THEMES.indexOf(saved); applyTheme(saved); }
+} catch (e) { /* storage unavailable: stay on auto */ }
+document.getElementById('themeBtn').addEventListener('click', () => {
+  themeIdx = (themeIdx + 1) % THEMES.length;
+  applyTheme(THEMES[themeIdx]);
 });
 
 // boot: embedded data renders immediately; live mode fetches then polls
@@ -2135,7 +2389,7 @@ TEMPLATE = """<!doctype html>
       file — data embedded, charts drawn locally, nothing fetched.</p>
       <div class="meta-chips" id="metaChips"></div>
     </div>
-    <button id="themeBtn" title="cycle auto / light / dark">Theme: auto</button>
+    <button id="themeBtn" title="cycle auto / light / dark / dim — remembered in this browser">Theme: auto</button>
   </div>
   <div id="warnings"></div>
   <div class="filters">
