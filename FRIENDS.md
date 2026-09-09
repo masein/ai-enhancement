@@ -168,13 +168,20 @@ on bits/byte is not a win.
 Scores can only be compared when the task, metric, n-shot count, prompt format
 and **chat-template policy** all match. The service enforces the last one:
 
-- `kind: auto` applies a chat template only when the repo ships one **and** the
-  model's name says it is instruction-tuned (`instruct`, `-it`, `chat`, `sft`…).
-- If a template exists but the name gives no such evidence, **preflight refuses
-  the submission** and asks you to say `base` or `instruct` explicitly. This is
-  the case that bites: a checkpoint saved from an instruct model's tokenizer
-  inherits its chat template even though the weights are a base model, and
-  applying it moves multiple-choice scores by tens of points.
+- `kind: auto` applies a chat template when the repo ships one and the model's
+  name says it is instruction-tuned (`instruct`, `-it`, `chat`, `sft`…).
+- For an **uploaded checkpoint** (`local/<name>`) that ships a template with no
+  such evidence in its name, **preflight refuses the submission** and asks you
+  to say `base` or `instruct` explicitly. This is the case that bites: a
+  checkpoint saved from an instruct model's tokenizer inherits its chat template
+  even though the weights are a base model, and applying it moves
+  multiple-choice scores by tens of points — it cost one of our own models
+  three to seven points before anyone noticed.
+- For a **Hub repo**, shipping a template usually does mean the model is a chat
+  model (Qwen3-0.6B ships one and says nothing in its name), so it is applied
+  and the run is flagged as resting on detection alone — visible as a `?` in
+  provenance and named in the warnings. If those weights are a pretrained
+  checkpoint, resubmit with `kind: base`.
 - Every run records which template it used (a short hash), where it came from,
   and why the decision was made — visible in Evals → Run provenance, and in
   every CSV export.

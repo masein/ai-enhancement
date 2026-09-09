@@ -131,16 +131,26 @@ server's account hasn't accepted, models over the parameter cap (default 4B), an
 models requiring `trust_remote_code` (the service never executes repo code) all
 fail in seconds with a human-readable `error`.
 
-**Kind matters, and ambiguity is refused.** `kind:"auto"` applies the chat
-template only when the repo ships one **and** the model's name corroborates it
-(`instruct`, `-it`, `chat`, `sft`, `dpo`…). If a template is present but nothing
-says the model is instruction-tuned, preflight **fails** and asks you to send
-`kind:"base"` or `kind:"instruct"` — because a checkpoint saved from an instruct
-model's tokenizer inherits that template even when the weights are a base model,
-and applying it moves multiple-choice scores by tens of points. Each run records
-the template's hash, its source, and the reason for the decision; they appear in
-provenance and in CSV exports, and two runs with different template ids are not
-comparable.
+**Kind matters, and ambiguity is refused where it bites.** `kind:"auto"` applies
+the chat template when the repo ships one and the model's name corroborates it
+(`instruct`, `-it`, `chat`, `sft`, `dpo`…). For an **uploaded artifact**
+(`local/<name>`) that ships a template with nothing in its name to corroborate
+it, preflight **fails** and asks you to send `kind:"base"` or `kind:"instruct"`
+— because a checkpoint saved from an instruct model's tokenizer inherits that
+template even when the weights are a base model, and applying it moves
+multiple-choice scores by tens of points. For a **Hub repo** in the same
+position the template is applied (publishing one usually does mean a chat
+model) and the run carries `archinfo.kind_unconfirmed: true`, which the report
+turns into a warning. Each run records the template's hash, its source, and the
+reason for the decision; they appear in provenance and in CSV exports, and two
+runs with different template ids are not comparable.
+
+**Parameter counts for uploads are exact.** They come from the safetensors
+headers, not from file size, so an fp32 checkpoint is not counted twice (which
+would also inflate it against `MAX_PARAMS_B`). `archinfo.stored_dtype` reports
+the precision the weights are saved in — worth checking before a full
+fine-tune, since transformers loads a checkpoint in its stored dtype and an
+fp16 one trained without a loss scaler is a classic route to a NaN loss.
 
 **Official vs preliminary.** An overall average exists only for models that
 completed every task in the required list (`mmlu, hellaswag, arc_challenge,

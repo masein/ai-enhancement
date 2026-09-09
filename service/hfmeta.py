@@ -27,6 +27,7 @@ import hashlib
 import json
 import os
 import re
+import struct
 from pathlib import Path
 
 from . import config
@@ -81,8 +82,19 @@ def _arch_from_config(cfg: dict) -> dict:
 # be recorded, not just made. Detection alone is not enough: a checkpoint saved
 # from a tokenizer that was initialized from an instruct model INHERITS that
 # model's chat template, so "a template exists" does not mean "this is a chat
-# model". When the name gives no corroborating evidence we refuse rather than
-# guess — the submitter types one word and the result becomes comparable.
+# model".
+#
+# Where that inheritance actually happens decides how hard we push back:
+#
+#   local/<name>  An uploaded checkpoint. Inheriting a parent's template is the
+#                 NORMAL case here and the person submitting knows what they
+#                 trained, so 'auto' + template + no name evidence is REFUSED.
+#                 This is the case that produced a three-to-seven point error on
+#                 a colleague's model before anyone noticed.
+#   org/model     A Hub repo. Publishing a chat template usually does mean the
+#                 model is a chat model — Qwen3-0.6B ships one and says nothing
+#                 in its name. Refusing those was friction with no safety win,
+#                 so detection stands and the run is flagged as unconfirmed.
 # ---------------------------------------------------------------------------
 
 _INSTRUCT_WORDS = ("instruct", "instruction", "chat", "sft", "dpo", "orpo",
@@ -97,6 +109,43 @@ def _looks_instruct(hf_id: str) -> bool:
     return "it" in tokens or any(w in name for w in _INSTRUCT_WORDS)
 
 
+def _safetensors_params(files: list[Path]) -> tuple[int, str] | None:
+    """(exact parameter count, stored dtype) read from the safetensors headers.
+
+    A safetensors file starts with an 8-byte little-endian header length and
+    that many bytes of JSON naming every tensor's dtype and shape, so the true
+    count costs one small read instead of loading the weights. Worth doing
+    rather than dividing file size by 2: that assumes bf16, and an fp32
+    checkpoint would read as twice its real size — which also inflates it
+    against the parameter cap and could reject a model that fits. Tied weights
+    (a shared embedding/output head) are stored once, so summing is correct."""
+    total, dtypes = 0, {}
+    try:
+        for f in files:
+            with open(f, "rb") as fh:
+                raw = fh.read(8)
+                if len(raw) < 8:
+                    return None
+                n = struct.unpack("<Q", raw)[0]
+                if not 0 < n < 100_000_000:        # not a safetensors header
+                    return None
+                hdr = json.loads(fh.read(n))
+            for key, spec in hdr.items():
+                if key == "__metadata__" or not isinstance(spec, dict):
+                    continue
+                numel = 1
+                for d in spec.get("shape") or []:
+                    numel *= int(d)
+                total += numel
+                dt = str(spec.get("dtype", "?"))
+                dtypes[dt] = dtypes.get(dt, 0) + numel
+    except (OSError, ValueError, KeyError, TypeError, struct.error):
+        return None
+    if not total:
+        return None
+    return total, max(dtypes, key=dtypes.get)      # the dtype most weights use
+
+
 def _template_id(text: str | None, src: str | None) -> dict:
     """A stable short hash of the template text — the thing that has to match
     for two runs to be comparable. The text itself is too long for a table."""
@@ -106,31 +155,39 @@ def _template_id(text: str | None, src: str | None) -> dict:
     return {"tmpl_sha": sha, "tmpl_src": src}
 
 
-def resolve_kind(hf_id: str, requested: str, has_template: bool) -> tuple[str, str]:
-    """(kind, reason). Raises PreflightError for the one genuinely ambiguous
-    case, which is also the dangerous one: a template is present, the submitter
-    said 'auto', and nothing about the model corroborates 'instruct'."""
+def resolve_kind(hf_id: str, requested: str,
+                 has_template: bool) -> tuple[str, str, bool]:
+    """(kind, reason, unconfirmed). Refuses only the case where guessing has
+    actually cost us a wrong number: an UPLOADED checkpoint that ships a
+    template with nothing in its name to corroborate it."""
     claims = _looks_instruct(hf_id)
     if requested in ("base", "instruct"):
         conflict = (requested == "instruct" and not has_template)
         return requested, ("submitter said %s%s" % (
             requested, "; note: no chat template found in the repo, so none is "
-                       "applied" if conflict else ""))
+                       "applied" if conflict else "")), False
     if not has_template:
         return "base", ("no chat template in the repo"
                         + ("; name suggests instruct, but a template cannot be "
-                           "invented — evaluated as base" if claims else ""))
+                           "invented — evaluated as base" if claims else "")), False
     if claims:
-        return "instruct", "chat template present and the name says instruct"
-    raise PreflightError(
-        f"{hf_id} is ambiguous: it ships a chat template, but nothing in its "
-        f"name says it is instruction-tuned. A checkpoint saved from an "
-        f"instruct model's tokenizer inherits that template even when the "
-        f"weights are a base model, and applying it moves multiple-choice "
-        f"scores by tens of points. Resubmit with kind=\"base\" (raw "
-        f"completions — right for a pretrained checkpoint) or kind=\"instruct\" "
-        f"(apply the template) so the run is comparable and the choice is on "
-        f"the record.")
+        return "instruct", "chat template present and the name says instruct", False
+    if hf_id.startswith(LOCAL_PREFIX):
+        raise PreflightError(
+            f"{hf_id} is ambiguous: this uploaded checkpoint ships a chat "
+            f"template, but nothing in its name says it is instruction-tuned. A "
+            f"checkpoint saved from an instruct model's tokenizer inherits that "
+            f"template even when the weights are a base model, and applying it "
+            f"moves multiple-choice scores by tens of points. Resubmit with "
+            f"kind=\"base\" (raw completions — right for a pretrained "
+            f"checkpoint) or kind=\"instruct\" (apply the template) so the run "
+            f"is comparable and the choice is on the record.")
+    # Hub repo: take the repo's word for it, but mark the run so the report can
+    # say the template policy rests on detection alone
+    return "instruct", ("chat template present; the repo name does not say "
+                        "instruct, so this is the Hub's word for it — submit "
+                        "kind=base explicitly if these weights are a pretrained "
+                        "checkpoint"), True
 
 
 def _preflight_local(name: str) -> dict:
@@ -159,10 +216,15 @@ def _preflight_local(name: str) -> dict:
     vocab = cfg.get("vocab_size") or (cfg.get("text_config") or {}).get("vocab_size")
     if not vocab:
         raise PreflightError(f"could not read vocab_size from {name!r}'s config.json.")
-    params = int(sum(f.stat().st_size for f in st) / 2)   # bf16/fp16 ≈ 2 bytes/param
+    exact = _safetensors_params(st)
+    if exact:
+        params, stored_dtype, params_src = exact[0], exact[1], "safetensors header"
+    else:   # not readable as safetensors headers — fall back to the old estimate
+        params, stored_dtype, params_src = (
+            int(sum(f.stat().st_size for f in st) / 2), None, "file size (bf16 assumed)")
     if params / 1e9 > config.MAX_PARAMS_B:
-        raise PreflightError(f"artifact {name!r} is ~{params / 1e9:.1f}B params by file "
-                             f"size; the cap is {config.MAX_PARAMS_B:g}B.")
+        raise PreflightError(f"artifact {name!r} is {params / 1e9:.2f}B params "
+                             f"({params_src}); the cap is {config.MAX_PARAMS_B:g}B.")
     tok_cfg = {}
     if (d / "tokenizer_config.json").exists():
         try:
@@ -183,16 +245,24 @@ def _preflight_local(name: str) -> dict:
             "has_template": bool(tmpl),
             "architectures": cfg.get("architectures") or [],
             "archinfo": {**_arch_from_config(cfg),
-                         **_template_id(tmpl, tmpl_src if tmpl else None)}}
+                         **_template_id(tmpl, tmpl_src if tmpl else None),
+                         # the dtype the WEIGHTS are stored in, which is not the
+                         # dtype we evaluate in — transformers loads a checkpoint
+                         # in its stored precision, and an fp16 checkpoint
+                         # full-fine-tuned without a scaler is how a loss goes NaN
+                         "stored_dtype": stored_dtype, "params_src": params_src}}
 
 
 def preflight(hf_id: str, requested_kind: str = "auto") -> dict:
     """Metadata + the resolved template policy. `requested_kind` is the
     submitter's choice; 'auto' may be refused as ambiguous (see resolve_kind)."""
     meta = _preflight(hf_id)
-    kind, reason = resolve_kind(hf_id, requested_kind, meta.get("has_template", False))
+    kind, reason, unconfirmed = resolve_kind(
+        hf_id, requested_kind, meta.get("has_template", False))
     meta["kind"] = kind
     meta["kind_reason"] = reason
+    if unconfirmed:      # rides in archinfo so it reaches the report and exports
+        meta.setdefault("archinfo", {})["kind_unconfirmed"] = True
     return meta
 
 
