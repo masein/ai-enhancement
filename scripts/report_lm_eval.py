@@ -502,6 +502,14 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
             f"The models evaluated WITH a chat template used {len(shas)} different "
             f"templates ({', '.join(sorted(shas))}). Prompt format differs, so "
             f"those scores answer slightly different questions.")
+    unconf = [display[m] for m, r in by_model.items()
+              if (r.get("archinfo") or {}).get("kind_unconfirmed")]
+    if unconf:
+        warnings.append(
+            "Chat template applied on detection alone to: " + ", ".join(unconf)
+            + ". Those repos ship a template but their names do not say "
+            "instruct, so nothing corroborates the choice — if any of them is a "
+            "pretrained checkpoint, resubmit it with kind=base.")
     if req_absent:
         warnings.append(
             "This report's required-task list is narrower than the protocol: "
@@ -1563,6 +1571,7 @@ function vRuns(ms) {
     { key: 'limit',  label: 'limit', num: true,
       get: m => m.limit == null ? Infinity : m.limit },   // 'full' sorts as largest
     { key: 'paramsSrc', label: 'params from' },
+    { key: 'stored',  label: 'weights dtype', get: m => (m.archinfo || {}).stored_dtype },
     { key: 'minutes', label: 'wall clock', num: true },
     { key: 'hash',   label: 'harness' },
     { key: 'date',   label: 'last run', defDir: -1 },
@@ -1599,7 +1608,11 @@ function vRuns(ms) {
         el('td', { text: m.backend || '—' }),
         el('td', { text: m.dtype || '—' }),
         el('td', { text: m.batch == null ? '—' : String(m.batch) }),
-        el('td', { title: m.kindReason || '', text: m.chat ? 'yes' : 'no' }),
+        el('td', { title: m.kindReason || '' },
+          m.chat ? 'yes' : 'no',
+          (m.archinfo || {}).kind_unconfirmed
+            ? el('span', { class: 'badge prelim', title: 'detection only — the '
+                + 'repo name does not corroborate it', text: '?' }) : ''),
         el('td', {}, el('span', { class: 'mono',
           title: ((m.archinfo || {}).tmpl_src ? 'from ' + m.archinfo.tmpl_src : 'no chat template in the repo')
             + (m.kindReason ? `\npolicy: ${m.kindReason}` : ''),
@@ -1607,6 +1620,9 @@ function vRuns(ms) {
         el('td', { class: 'num', text: m.seed == null ? '—' : String(m.seed) }),
         el('td', { text: m.limit == null ? 'full' : String(m.limit) }),
         el('td', { text: m.paramsSrc || '—' }),
+        el('td', { title: (m.archinfo || {}).params_src
+            ? 'parameter count from ' + m.archinfo.params_src : '',
+          text: (m.archinfo || {}).stored_dtype || '—' }),
         el('td', { class: 'num', text: m.minutes + ' min' }),
         el('td', {}, el('span', { class: 'mono', text: m.hash || '—' })),
         el('td', {}, el('span', { class: 'mono',
