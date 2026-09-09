@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS truns (
   hf_prefix   TEXT DEFAULT '',                   -- checkpoint repo/artifact prefix (benchmark join)
   created_at  REAL NOT NULL,
   updated_at  REAL NOT NULL,
-  finished_at REAL
+  finished_at REAL,
+  n_updates   INTEGER NOT NULL DEFAULT 0          -- log/event batches received (cadence estimate)
 );
 CREATE TABLE IF NOT EXISTS tmetrics (
   run_id INTEGER NOT NULL,
@@ -80,10 +81,12 @@ def init() -> None:
         c.executescript(SCHEMA)
         # migrations for databases created before a column existed — sqlite has no
         # ADD COLUMN IF NOT EXISTS, so probe and tolerate the duplicate error
-        try:
-            c.execute("ALTER TABLE submissions ADD COLUMN arch TEXT")
-        except sqlite3.OperationalError:
-            pass
+        for stmt in ("ALTER TABLE submissions ADD COLUMN arch TEXT",
+                     "ALTER TABLE truns ADD COLUMN n_updates INTEGER NOT NULL DEFAULT 0"):
+            try:
+                c.execute(stmt)
+            except sqlite3.OperationalError:
+                pass
         # A worker that died mid-run leaves a phantom 'running' row; on startup no
         # run can be in flight (single process), so re-queue it. Per-task resume
         # means the re-run only repeats the task that was interrupted.
@@ -183,7 +186,7 @@ def trun_log(rid: int, points: list[tuple[int, str, float]]) -> int:
         c.executemany("INSERT INTO tmetrics (run_id, step, name, value, ts) "
                       "VALUES (?,?,?,?,?)",
                       [(rid, s, n, v, now) for s, n, v in points])
-        c.execute("UPDATE truns SET updated_at=? WHERE id=?", (now, rid))
+        c.execute("UPDATE truns SET updated_at=?, n_updates=n_updates+1 WHERE id=?", (now, rid))
         c.commit()
         return len(points)
 
@@ -193,7 +196,7 @@ def trun_event(rid: int, step: int, kind: str, detail: str) -> None:
     with closing(_conn()) as c:
         c.execute("INSERT INTO tevents (run_id, step, kind, detail, ts) VALUES (?,?,?,?,?)",
                   (rid, step, kind, detail, now))
-        c.execute("UPDATE truns SET updated_at=? WHERE id=?", (now, rid))
+        c.execute("UPDATE truns SET updated_at=?, n_updates=n_updates+1 WHERE id=?", (now, rid))
         c.commit()
 
 
@@ -229,6 +232,13 @@ def trun_list(project: str | None = None, limit: int = 200) -> list[dict]:
             r["tokens"] = tok[0] if tok else None
             r["n_events"] = c.execute("SELECT COUNT(*) FROM tevents WHERE run_id=?",
                                       (r["id"],)).fetchone()[0]
+            # how often this run normally reports, in seconds — the dashboard
+            # calls a run idle only after it has been silent for several times
+            # its own cadence, so a slow-stepping run is not flagged for logging
+            # every 20 minutes while a fast one is not left "running" for hours
+            n_up = c.execute("SELECT n_updates FROM truns WHERE id=?", (r["id"],)).fetchone()[0]
+            r["cadence_s"] = ((r["updated_at"] - r["created_at"]) / n_up
+                              if n_up and n_up >= 3 else None)
     return rows
 
 

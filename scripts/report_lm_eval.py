@@ -1872,9 +1872,17 @@ function vTraining() {
   // two lines per run: name + status on top, the numbers underneath. The old
   // single line gave the name whatever width was left — in a 250px column
   // that was zero, and rows showed a status chip and nothing to attach it to.
+  // "idle": still 'running' (finish() never came) but silent for longer than
+  // this run's own rhythm allows — 5× its usual gap between updates, never
+  // less than IDLE_MIN_S. A run logging every 20 min is not idle at 25; a run
+  // logging every 5 s that went quiet for an hour is. Display-only: the row
+  // says how long, the tooltip says why, and the next log() clears it.
+  const IDLE_MIN_S = 30 * 60;
+  const idleAfter = r => Math.max(IDLE_MIN_S, 5 * (r.cadence_s || 0));
   const runRow = r => {
     const sel = state.trSel.includes(r.id);
-    const stale = r.status === 'running' && (Date.now() / 1000 - r.updated_at) > 600;
+    const silence = Date.now() / 1000 - (r.updated_at || 0);
+    const idle = r.status === 'running' && silence > idleAfter(r);
     const meta = [
       r.last_step != null ? `step ${r.last_step.toLocaleString()}` : null,
       r.last_loss != null ? `loss ${fmtv(r.last_loss)}` : null,
@@ -1885,14 +1893,18 @@ function vTraining() {
     return el('div', { class: 'runrow' + (sel ? ' sel' : ''), onclick: () => toggleRun(r.id),
       role: 'button', tabindex: 0,
       title: `${r.name}\nproject: ${r.project} · started ${rel(r.created_at)} ago`
-        + (r.updated_at ? ` · last update ${new Date(r.updated_at * 1000).toLocaleString()}` : '') },
+        + (r.updated_at ? ` · last update ${new Date(r.updated_at * 1000).toLocaleString()}` : '')
+        + (idle ? `\nno update for ${rel(r.updated_at)}`
+             + (r.cadence_s ? ` — this run normally reports every ${rel(Date.now() / 1000 - r.cadence_s)}` : '')
+             + `. Still "running" because run.finish() was never called (crash or Ctrl-C?); `
+             + 'logging again clears this.' : '') },
       el('span', { class: 'rchip', style: sel ? `background:${trColor(state.trColors[r.id])}` : '' }),
       el('div', { class: 'rbody' },
         el('div', { class: 'rtop' },
           el('span', { class: 'rname', text: r.name }),
-          el('span', { class: stale ? 'st st-muted' : r.status === 'running' ? 'st st-active'
+          el('span', { class: idle ? 'st st-muted' : r.status === 'running' ? 'st st-active'
                             : r.status === 'failed' ? 'st st-failed' : 'st st-done',
-                       text: stale ? 'stale?' : r.status })),
+                       text: idle ? `idle ${rel(r.updated_at)}` : r.status })),
         el('div', { class: 'rmeta', text: meta })));
   };
   // filter + order: with three runs this is furniture; with forty (three friends

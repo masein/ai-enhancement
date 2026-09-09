@@ -176,8 +176,11 @@ exists at this scale. It's there so you can see it emerge.
 **A gated model (gemma, llama) fails preflight.** The server's HF account must
 accept that model's license once — ask Masein, or submit an ungated mirror.
 
-**My run shows "stale?"** Your training stopped logging without calling
-`run.finish()` (crash, Ctrl-C). Cosmetic — logging again resumes it.
+**My run shows "idle 42m".** It is still marked *running* (nothing called
+`run.finish()`) but has been silent for a long time — longer than 5× its own
+usual gap between updates, and at least 30 minutes. Usually a crash or Ctrl-C.
+Display-only: logging again clears it, and hovering the row shows this run's
+normal reporting rhythm.
 
 **My run says "finished" but there are no benchmark scores yet.** "Finished"
 means the *training* finished; your checkpoints may still be in the eval queue

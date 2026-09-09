@@ -253,8 +253,9 @@ trained tokens and it charts like any metric.
 Semantics worth knowing: `log()` buffers (64 points or 10 s) and **never raises
 into your training loop** — if the service is down it warns once on stderr and
 keeps training; any metric name is fine (system stats like `gpu_mem_gb` are just
-metrics); values are step-indexed; a run that stops logging for 10+ minutes shows
-as "stale?" until `finish()` is called. Raw endpoints, if you'd rather not use
+metrics); values are step-indexed; a run that never calls `finish()` and goes
+silent for 5× its usual update gap (at least 30 min) shows as "idle …" in the
+list — display-only, cleared by the next `log()`. Raw endpoints, if you'd rather not use
 the client: `POST /api/truns` → `{id}`, `POST /api/truns/{id}/log`
 `{"metrics":[{"step":n,"name":"loss","value":x},…]}` (≤5000/batch),
 `POST /api/truns/{id}/event` `{"step":n,"kind":"checkpoint","detail":"<model id>"}`,
