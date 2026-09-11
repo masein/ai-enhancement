@@ -829,7 +829,7 @@ const state = {
   trSel: [], trColors: {}, trSmooth: 0, trLog: false,      // Training tab
   trRuns: [], trSeries: {}, trFetching: false,
   trQ: '', trStatus: 'all', trOrder: 'updated',            // runs-list filter/sort
-  trMetricQ: '', trSecClosed: {},                          // metric panels filter / sections
+  trMetricQ: '', trSecClosed: {}, trSecSig: '',            // metric panels filter / sections
   cmpSel: [], cmpColors: {},                               // radar: compared models (≤3)
   radarNorm: 'chance', radarAxes: 'tasks',                 // radar scaling / axis mode
   avgMode: 'chance',                   // official average: above-chance | raw
@@ -2190,7 +2190,24 @@ function vTraining() {
     const metricCount = el('span', { class: 'count-note' });
     function buildPanels() {
       const selRuns = getSel();
+      // the series are still in flight: say so where the charts will be, not in
+      // a muted note beside the controls — a run with 100+ per-block metrics
+      // takes a moment and a blank pane reads as broken
+      if (selRuns.some(x => !x.det))
+        return [el('div', { class: 'card' }, el('p', { class: 'small', text:
+          `Loading metrics for ${selRuns.filter(x => !x.det).length} run(s)…` }))];
       const all = [...new Set(selRuns.flatMap(x => Object.keys(x.det?.metrics || {})))];
+      // a hundred SVGs built in one synchronous pass locks the tab; with that
+      // many metrics, open the first section and leave the rest one click away
+      const sig = state.trSel.join(',');
+      if (sig !== state.trSecSig) {
+        state.trSecSig = sig;
+        if (all.length > 24) {
+          const keys = [...new Set(all.map(n => n.includes('/') ? n.split('/')[0] : ''))];
+          state.trSecClosed = {};
+          keys.slice(1).forEach(k => { state.trSecClosed[k] = true; });
+        }
+      }
       const q = state.trMetricQ.trim().toLowerCase();
       const names = all.filter(n => !q || n.toLowerCase().includes(q));
       names.sort((a, b) => {
