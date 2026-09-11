@@ -224,12 +224,28 @@ def trun_index(project: str | None = None, limit: int = 200):
     return db.trun_list(project, min(limit, 500))
 
 
+# A finished run's series never changes, and a live one changes only when a log
+# batch lands — updated_at moves with it, so it is a free cache key. Without
+# this, every 5-second poll on a watched run re-read and re-serialized every
+# point of every metric.
+_SERIES_CACHE: dict[int, tuple] = {}
+
+
 @app.get("/api/truns/{rid}")
-def trun_detail(rid: int, max_points: int = 800):
+def trun_detail(rid: int, max_points: int = 400):
     run = db.trun_get(rid)
     if not run:
         raise HTTPException(404, "no such run")
-    return {"run": run, **db.trun_series(rid, max(50, min(max_points, 5000)))}
+    mp = max(50, min(max_points, 5000))
+    key = (run["updated_at"], mp)
+    hit = _SERIES_CACHE.get(rid)
+    if hit and hit[0] == key:
+        return {"run": run, **hit[1]}
+    series = db.trun_series(rid, mp)
+    if len(_SERIES_CACHE) > 16:                  # tiny, bounded, no eviction policy needed
+        _SERIES_CACHE.clear()
+    _SERIES_CACHE[rid] = (key, series)
+    return {"run": run, **series}
 
 
 # ---------------------------------------------------------------------------
