@@ -48,12 +48,20 @@ ARTIFACT_QUOTA_GB = float(os.environ.get("ARTIFACT_QUOTA_GB", "150"))  # total d
 # other people's week-long jobs, so it is off unless three things line up:
 #
 #   ALLOW_REMOTE_CODE=1   the operator turned it on for this server
-#   SUBMIT_TOKEN set      and the submitter proved they are on the team
 #   EVAL_USER set         and there is an unprivileged user to run it as
 #
-# The last one is not optional on purpose. Without it the uploaded code would
-# run as root beside everyone's results and the server's Hugging Face token;
+# EVAL_USER is not optional on purpose. Without it the uploaded code would run
+# as root beside everyone's results and the server's Hugging Face token;
 # refusing to start that way is the difference between a gate and a nod.
+#
+# Deliberately NOT gated on a submit token. The tailnet is already the auth
+# boundary — the service binds to the Tailscale IP, so anyone who can upload an
+# artifact was invited onto the network by hand. A shared secret on top would
+# distinguish 'on the tailnet' from 'on the tailnet and knows a string', which
+# is a distinction shared secrets do not keep for long (they end up in shell
+# history and chat), while charging every friend a --token on every call. The
+# protections that do work are below: uploads only, dropped privileges, the HF
+# token withheld, and every .py hashed into the run's provenance.
 # Uploaded artifacts only — a Hub repo with auto_map stays refused outright,
 # because "someone on the tailnet uploaded it" is the only trust signal we have.
 # REMOTE_CODE_SHAS, when set, is an allowlist: only those exact .py files run.
@@ -69,9 +77,6 @@ def remote_code_blocked() -> str:
     if not ALLOW_REMOTE_CODE:
         return ("this server has ALLOW_REMOTE_CODE off, so uploaded model code is "
                 "never executed")
-    if not SUBMIT_TOKEN:
-        return ("remote code needs SUBMIT_TOKEN configured, so that running "
-                "someone's code requires proving membership of the team")
     if not EVAL_USER:
         return ("remote code needs EVAL_USER set to an unprivileged account — "
                 "without it the uploaded code would run as root next to the "

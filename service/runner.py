@@ -121,7 +121,7 @@ _FRIENDLY = [
      "operator; this fails identically for every model."),
     (r"trust_remote_code",
      "the model needs its own modeling code executed. Upload it as an artifact "
-     "and submit with allow_remote_code=true (team token required); code from "
+     "and submit with allow_remote_code=true; code from "
      "the Hub is never executed here."),
     (r"no kernel image",
      "PyTorch/CUDA mismatch on the server (wrong wheel for this GPU) — operator "

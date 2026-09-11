@@ -147,10 +147,10 @@ runs with different template ids are not comparable.
 
 **Custom architectures.** A checkpoint whose `config.json` has an `auto_map`
 needs its own `modeling_*.py` executed to load. Upload it as an artifact (the
-`.py` files ride along in the zip) and submit with `allow_remote_code: true`
-plus the team `X-Token`. The server must be configured for it
-(`ALLOW_REMOTE_CODE=1`, `SUBMIT_TOKEN`, `EVAL_USER`) — see SERVICE.md § custom
-model code for what that buys and what it does not. Those runs execute as an
+`.py` files ride along in the zip) and submit with `allow_remote_code: true`.
+The server must be configured for it (`ALLOW_REMOTE_CODE=1`, `EVAL_USER`) — see
+SERVICE.md § custom model code for what that buys and what it does not. There
+is no separate token for this: the tailnet is the auth boundary. Those runs execute as an
 unprivileged user with the Hub offline and the HF token withheld, and every
 `.py` is hashed into provenance (`archinfo.code_sha`) and the CSV exports. Hub
 repos with `auto_map` are refused regardless. Custom `model_type` values are
@@ -198,7 +198,7 @@ other*, not to public leaderboards (different n-shot conventions).
  "kind": "auto",                // "auto" | "base" | "instruct" — default auto
  "submitter": "masein",           // shows on the queue and in provenance
  "note": "run7 step 4000",      // free text, shows as a tooltip
- "allow_remote_code": false}    // uploads with a custom architecture; needs X-Token
+ "allow_remote_code": false}    // uploads with a custom architecture (see below)
 ```
 
 Returns `{"id": 12, "status": "queued"}` — or, if the model is already active,
