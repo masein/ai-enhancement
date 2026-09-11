@@ -113,9 +113,6 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         if blocked:
             raise HTTPException(403, f"remote code is not available: {blocked}. "
                                      f"See SERVICE.md § custom model code.")
-        if not x_token:
-            raise HTTPException(401, "running an upload's own code requires the team's "
-                                     "X-Token on the request")
     for row in db.recent(200):
         if row["hf_id"] == hf_id and row["status"] in ACTIVE:
             return {"id": row["id"], "status": row["status"],
