@@ -92,6 +92,60 @@ re-queued automatically and per-task resume repeats only the interrupted task.
 | `ARTIFACT_MAX_GB` | 8 | per-upload cap for checkpoint artifacts |
 | `ARTIFACT_QUOTA_GB` | 150 | total artifact storage before uploads are refused |
 | `BENCH_ROOT` | cwd | the directory holding results/, eval_tasks/, logs/ |
+| `ALLOW_REMOTE_CODE` | 0 | permit uploads that carry their own modeling code — read the section below first |
+| `EVAL_USER` | benchjob | unprivileged account those jobs run as; required when the above is on |
+| `REMOTE_CODE_SHAS` | *(unset)* | if set, an allowlist: only these .py hashes may run |
+
+## Custom model code (`trust_remote_code`)
+
+A checkpoint with a custom architecture ships `modeling_*.py` and points at it
+through `auto_map` in `config.json`. Loading it **executes that Python** — there
+is no way to evaluate such a model without running the uploader's code.
+
+Off by default. Three things must line up before any of it runs, and the service
+refuses with a specific reason when one is missing:
+
+```bash
+ALLOW_REMOTE_CODE=1          # the operator turned it on
+SUBMIT_TOKEN=<something>     # and the submitter proves team membership
+EVAL_USER=benchjob           # and there is a non-root account to run it as
+```
+
+`EVAL_USER` is not optional and is not a formality: the service itself runs as
+root (it writes the shared results tree), so without the drop, uploaded code
+would execute as root beside everyone's results and the server's Hugging Face
+token. If the name doesn't resolve to a real account the job **fails** rather
+than running as root. The Docker image creates `benchjob` for this.
+
+What the gate actually buys, stated honestly:
+
+- the job runs as an unprivileged user, so a stray `rmtree` in someone's
+  modeling file cannot touch what that user does not own;
+- `HF_TOKEN` and friends are stripped from its environment and the hub is put
+  offline — a local artifact needs neither, so nothing is lost. Make the token
+  file root-owned and mode 600 (`chmod 600 $HF_HOME/token`) and the drop does
+  the rest;
+- every `.py` in the artifact is sha256'd into the run's provenance, so what
+  code produced a score is on the record and a changed file is visible;
+- `REMOTE_CODE_SHAS` turns that into an allowlist when you want review-then-run.
+
+What it is **not**: a sandbox. The code still runs on the host GPU, in the host
+PID namespace, can read the results tree, and can burn CPU, RAM and disk.
+Anyone who can upload an artifact and holds the token can still ruin your day if
+they set out to. The threat this design addresses is a teammate's code
+misbehaving, not an adversary. If you ever need the stronger property, the shape
+is a separate ephemeral container per remote-code job, without `pid: host` and
+without `HF_HOME` mounted.
+
+Submissions from the Hub are refused whatever the settings — "a teammate
+uploaded this to our box" is the only trust signal there is, and a Hub id
+carries none. Upload it as an artifact instead.
+
+```bash
+# submitting one, once the server is configured
+python bench_client.py --base http://…:8899 --token "$SUBMIT_TOKEN" \
+    submit local/my-moe-step4000 --suite full --kind base --allow-remote-code
+```
 
 ## How a submission behaves
 

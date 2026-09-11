@@ -145,6 +145,26 @@ turns into a warning. Each run records the template's hash, its source, and the
 reason for the decision; they appear in provenance and in CSV exports, and two
 runs with different template ids are not comparable.
 
+**Custom architectures.** A checkpoint whose `config.json` has an `auto_map`
+needs its own `modeling_*.py` executed to load. Upload it as an artifact (the
+`.py` files ride along in the zip) and submit with `allow_remote_code: true`
+plus the team `X-Token`. The server must be configured for it
+(`ALLOW_REMOTE_CODE=1`, `SUBMIT_TOKEN`, `EVAL_USER`) — see SERVICE.md § custom
+model code for what that buys and what it does not. Those runs execute as an
+unprivileged user with the Hub offline and the HF token withheld, and every
+`.py` is hashed into provenance (`archinfo.code_sha`) and the CSV exports. Hub
+repos with `auto_map` are refused regardless. Custom `model_type` values are
+accepted on this path; preflight reads shape from `text_config` when the top
+level is a wrapper.
+
+**MoE models report both parameter counts.** `params` is the total (it drives
+VRAM and the size cap, since every expert is loaded) and
+`archinfo.active_params` is per-token (it drives a fair comparison against a
+dense model), alongside `experts` and `experts_per_tok`. Taken from
+`num_active_params` in the config when present, otherwise estimated from the
+expert geometry and labelled `active_src: "estimated"`. The leaderboard shows
+total with active beside it.
+
 **Parameter counts for uploads are exact.** They come from the safetensors
 headers, not from file size, so an fp32 checkpoint is not counted twice (which
 would also inflate it against `MAX_PARAMS_B`). `archinfo.stored_dtype` reports
@@ -177,7 +197,8 @@ other*, not to public leaderboards (different n-shot conventions).
  "suite": "quick",              // "quick" (hellaswag+arc_easy+perplexity) | "full" (all tasks) — default full
  "kind": "auto",                // "auto" | "base" | "instruct" — default auto
  "submitter": "masein",           // shows on the queue and in provenance
- "note": "run7 step 4000"}      // free text, shows as a tooltip
+ "note": "run7 step 4000",      // free text, shows as a tooltip
+ "allow_remote_code": false}    // uploads with a custom architecture; needs X-Token
 ```
 
 Returns `{"id": 12, "status": "queued"}` — or, if the model is already active,

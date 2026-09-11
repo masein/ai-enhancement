@@ -60,6 +60,14 @@ bench.submit(mid, suite="quick", submitter="yourname")
 print(bench.scores(mid))     # once it's done — or just watch the dashboard
 ```
 
+**Custom architecture?** If your checkpoint ships its own `modeling_*.py`
+(an `auto_map` in `config.json`), add `--allow-remote-code` and the team token —
+loading it runs your Python, so it is opt-in per submission, uploads only, and
+the server has to be configured for it. Those runs execute as an unprivileged
+user with the Hub offline, and every `.py` is hashed into the run's provenance.
+MoE models get both parameter counts on the leaderboard: total, and active per
+token beside it.
+
 Three rules, all enforced with readable errors: **one name per checkpoint**
 (names are immutable — `my-model-v2` next time, no re-uploads); weights must be
 **safetensors** (anything modern `save_pretrained()` writes is); storage is a

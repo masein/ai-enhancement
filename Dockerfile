@@ -23,6 +23,12 @@ RUN python -c "import torch, lm_eval, transformers, accelerate, datasets, fastap
 print('image env OK — torch', torch.__version__, '| built for CUDA', torch.version.cuda, \
 '| lm_eval', lm_eval.__version__)"
 
+# An unprivileged account for evaluating uploads that carry their own model code
+# (EVAL_USER). The service itself still runs as root — it needs to write the
+# shared results tree the CLI also writes — but a job executing someone's
+# modeling_*.py drops to this user, which owns nothing.
+RUN useradd --system --no-create-home --shell /usr/sbin/nologin benchjob
+
 WORKDIR /app
 COPY scripts/ scripts/
 COPY service/ service/

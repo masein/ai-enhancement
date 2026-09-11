@@ -146,6 +146,55 @@ def _safetensors_params(files: list[Path]) -> tuple[int, str] | None:
     return total, max(dtypes, key=dtypes.get)      # the dtype most weights use
 
 
+def _code_shas(d: Path) -> list[str]:
+    """sha256 (12 hex) of every .py in the artifact, sorted by filename.
+
+    Two jobs: provenance — what code produced this score is as much a part of
+    the run as the n-shot count — and the allowlist, since a hash is the only
+    honest way to say 'this exact file was reviewed'."""
+    out = []
+    for f in sorted(d.rglob("*.py")):
+        try:
+            out.append(f"{f.relative_to(d)}:"
+                       + hashlib.sha256(f.read_bytes()).hexdigest()[:12])
+        except OSError:
+            out.append(f"{f.relative_to(d)}:unreadable")
+    return out
+
+
+def _moe_params(cfg: dict, total: int | None) -> dict:
+    """Total vs active-per-token parameters.
+
+    A sparse model loads every expert (so VRAM and the size cap follow the
+    total) but routes each token through a few (so capability comparisons
+    follow the active count). Reporting only one of the two numbers makes a
+    MoE look either unfairly large or unfairly small next to a dense model."""
+    tc = cfg.get("text_config") or {}
+    g = lambda *keys: next((v for src in (cfg, tc) for k in keys
+                            if (v := src.get(k)) is not None), None)
+    n_exp = g("num_experts", "num_local_experts", "n_routed_experts", "moe_num_experts")
+    per_tok = g("num_experts_per_tok", "num_experts_per_token", "moe_topk", "top_k")
+    declared = g("num_active_params", "active_params", "num_activated_params")
+    if declared:
+        return {"experts": n_exp, "experts_per_tok": per_tok,
+                "active_params": int(declared), "active_src": "config"}
+    if not (n_exp and per_tok and total and n_exp > 1):
+        return {"experts": n_exp, "experts_per_tok": per_tok,
+                "active_params": None, "active_src": None}
+    # estimate: the expert MLPs are the only part that is sparse, so scale the
+    # expert block by the routing fraction and leave everything else whole
+    hidden, layers = g("hidden_size", "n_embd", "d_model"), g("num_hidden_layers", "n_layer")
+    inter = g("moe_intermediate_size", "expert_intermediate_size", "intermediate_size")
+    if not (hidden and layers and inter):
+        return {"experts": n_exp, "experts_per_tok": per_tok,
+                "active_params": None, "active_src": None}
+    per_expert = 3 * hidden * inter                  # gate/up/down
+    expert_total = per_expert * n_exp * layers
+    active = total - expert_total + per_expert * per_tok * layers
+    return {"experts": n_exp, "experts_per_tok": per_tok,
+            "active_params": int(max(active, 0)) or None, "active_src": "estimated"}
+
+
 def _template_id(text: str | None, src: str | None) -> dict:
     """A stable short hash of the template text — the thing that has to match
     for two runs to be comparable. The text itself is too long for a table."""
@@ -190,7 +239,7 @@ def resolve_kind(hf_id: str, requested: str,
                         "checkpoint"), True
 
 
-def _preflight_local(name: str) -> dict:
+def _preflight_local(name: str, allow_remote_code: bool = False) -> dict:
     """An uploaded artifact: same decisions as the Hub path, answered from disk."""
     d = config.ARTIFACTS_DIR / name
     if not d.is_dir():
@@ -201,9 +250,35 @@ def _preflight_local(name: str) -> dict:
     except (OSError, json.JSONDecodeError) as e:
         raise PreflightError(f"artifact {name!r} has no readable config.json — not a "
                              f"loadable checkpoint.") from e
+    code_shas, remote_code = [], False
     if cfg.get("auto_map"):
-        raise PreflightError(f"artifact {name!r} requires trust_remote_code — this "
-                             f"service does not execute uploaded code.")
+        if not allow_remote_code:
+            raise PreflightError(
+                f"artifact {name!r} carries an auto_map, so loading it executes the "
+                f"Python shipped in the upload. That is off by default. Resubmit "
+                f"with allow_remote_code=true (the request needs the team's "
+                f"X-Token), and the server must be running with "
+                f"ALLOW_REMOTE_CODE=1, SUBMIT_TOKEN and EVAL_USER set — see "
+                f"SERVICE.md § custom model code.")
+        blocked = config.remote_code_blocked()
+        if blocked:
+            raise PreflightError(f"artifact {name!r} needs custom model code, but "
+                                 f"{blocked}.")
+        code_shas = _code_shas(d)
+        if not code_shas:
+            raise PreflightError(
+                f"artifact {name!r} declares an auto_map but ships no .py files — "
+                f"the modeling/configuration modules it points at are missing.")
+        if config.REMOTE_CODE_SHAS:
+            unknown = [c for c in code_shas
+                       if c.split(":")[-1] not in config.REMOTE_CODE_SHAS]
+            if unknown:
+                raise PreflightError(
+                    f"artifact {name!r} ships code that is not on this server's "
+                    f"allowlist: {', '.join(unknown)}. Register the hash in "
+                    f"REMOTE_CODE_SHAS after reviewing the file, or clear the "
+                    f"allowlist to accept any team upload.")
+        remote_code = True
     # pickled weights execute arbitrary code on load; only safetensors are evaluated
     if list(d.glob("*.bin")):
         raise PreflightError(
@@ -243,20 +318,26 @@ def _preflight_local(name: str) -> dict:
     return {"params": params, "vocab": int(vocab), "batch": batch, "need_gb": need,
             "kind_detected": "instruct" if tmpl else "base",
             "has_template": bool(tmpl),
+            "remote_code": remote_code,
             "architectures": cfg.get("architectures") or [],
             "archinfo": {**_arch_from_config(cfg),
                          **_template_id(tmpl, tmpl_src if tmpl else None),
+                         **_moe_params(cfg, params),
                          # the dtype the WEIGHTS are stored in, which is not the
                          # dtype we evaluate in — transformers loads a checkpoint
                          # in its stored precision, and an fp16 checkpoint
                          # full-fine-tuned without a scaler is how a loss goes NaN
-                         "stored_dtype": stored_dtype, "params_src": params_src}}
+                         "stored_dtype": stored_dtype, "params_src": params_src,
+                         "model_type": cfg.get("model_type"),
+                         "remote_code": remote_code,
+                         "code_sha": code_shas or None}}
 
 
-def preflight(hf_id: str, requested_kind: str = "auto") -> dict:
+def preflight(hf_id: str, requested_kind: str = "auto",
+              allow_remote_code: bool = False) -> dict:
     """Metadata + the resolved template policy. `requested_kind` is the
     submitter's choice; 'auto' may be refused as ambiguous (see resolve_kind)."""
-    meta = _preflight(hf_id)
+    meta = _preflight(hf_id, allow_remote_code)
     kind, reason, unconfirmed = resolve_kind(
         hf_id, requested_kind, meta.get("has_template", False))
     meta["kind"] = kind
@@ -266,9 +347,9 @@ def preflight(hf_id: str, requested_kind: str = "auto") -> dict:
     return meta
 
 
-def _preflight(hf_id: str) -> dict:
+def _preflight(hf_id: str, allow_remote_code: bool = False) -> dict:
     if hf_id.startswith(LOCAL_PREFIX):            # uploaded artifact — never touches the Hub
-        return _preflight_local(hf_id[len(LOCAL_PREFIX):])
+        return _preflight_local(hf_id[len(LOCAL_PREFIX):], allow_remote_code)
     if os.environ.get("STUB_PREFLIGHT") == "1":   # offline tests
         batch, need = estimate(50304, 14_000_000)
         return {"params": 14_000_000, "vocab": 50304, "batch": batch,
@@ -311,11 +392,15 @@ def _preflight(hf_id: str) -> dict:
         raise PreflightError(f"{hf_id} has no readable config.json — not a loadable "
                              f"transformers checkpoint.")
     if cfg.get("auto_map"):
+        # Hub repos stay refused even when remote code is enabled: the gate is
+        # "a teammate uploaded this to our box", and a Hub id carries no such
+        # signal — anyone could point us at any repo. Upload it as an artifact.
         raise PreflightError(
             f"{hf_id} requires trust_remote_code=True (custom modeling code in the "
-            f"repo). This service does not execute submitted code on the shared "
-            f"server — ask for the model to be converted to a native transformers "
-            f"architecture.")
+            f"repo). Code from the Hub is never executed here, whatever the "
+            f"server settings. If this is your model, upload it as an artifact "
+            f"(POST /api/artifacts/<name>) and submit it with "
+            f"allow_remote_code=true.")
 
     # vocab_size sometimes lives under text_config for multimodal wrappers
     vocab = cfg.get("vocab_size") or (cfg.get("text_config") or {}).get("vocab_size")

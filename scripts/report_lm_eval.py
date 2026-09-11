@@ -1381,9 +1381,17 @@ function vLeaderboard(ms) {
           ? el('span', { class: 'badge instruct', text: 'instruct' })
           : el('span', { class: 'badge', text: 'base' })),
         prelimBadge(m) || '');
-      if (c.key === 'params') return el('td', { class: 'num',
-        title: m.paramsSrc ? 'from ' + (m.paramsSrc === 'config' ? 'harness config' : 'model name') : '',
-        text: P(m.params) });
+      if (c.key === 'params') {
+        const a = m.archinfo || {};
+        // a sparse model loads every expert but routes each token through a few:
+        // total drives VRAM, active drives the fair comparison, so show both
+        return el('td', { class: 'num',
+          title: (m.paramsSrc ? 'from ' + (m.paramsSrc === 'config' ? 'harness config' : 'model name') : '')
+            + (a.active_params ? `\n${a.experts} experts, ${a.experts_per_tok} per token`
+                 + `\nactive ${P(a.active_params)} of ${P(m.params)} (${a.active_src})` : '') },
+          P(m.params),
+          a.active_params ? el('span', { class: 'se', text: ` ${P(a.active_params)} act` }) : '');
+      }
       if (c.key === 'date') return el('td', { class: 'small', style: 'white-space:nowrap',
         text: String(m.date || '—').slice(0, 16).replace('T', ' ') });
       if (c.key === 'avg') {
@@ -1567,6 +1575,7 @@ function vRuns(ms) {
     { key: 'batch',  label: 'batch', num: true },
     { key: 'chat',   label: 'template applied', num: true, get: m => m.chat ? 1 : 0 },
     { key: 'tmpl',   label: 'template id', get: m => (m.archinfo || {}).tmpl_sha },
+    { key: 'code',   label: 'model code', get: m => ((m.archinfo || {}).code_sha || []).join(' ') },
     { key: 'seed',   label: 'seed', num: true },
     { key: 'limit',  label: 'limit', num: true,
       get: m => m.limit == null ? Infinity : m.limit },   // 'full' sorts as largest
@@ -1617,6 +1626,11 @@ function vRuns(ms) {
           title: ((m.archinfo || {}).tmpl_src ? 'from ' + m.archinfo.tmpl_src : 'no chat template in the repo')
             + (m.kindReason ? `\npolicy: ${m.kindReason}` : ''),
           text: (m.archinfo || {}).tmpl_sha || '—' })),
+        // which Python produced this score, when the checkpoint brought its own
+        el('td', {}, ((m.archinfo || {}).code_sha || []).length
+          ? el('span', { class: 'mono', title: m.archinfo.code_sha.join('\n'),
+              text: `custom ×${m.archinfo.code_sha.length}` })
+          : el('span', { class: 'se', text: 'library' })),
         el('td', { class: 'num', text: m.seed == null ? '—' : String(m.seed) }),
         el('td', { text: m.limit == null ? 'full' : String(m.limit) }),
         el('td', { text: m.paramsSrc || '—' }),
@@ -2452,14 +2466,16 @@ function download(name, mime, text) {
 // carries the conditions that produced it: a value without its template policy,
 // dtype, seed and harness build is not reproducible and should not be quoted.
 const PROV_COLS = ['result_class', 'required_done', 'template_applied', 'template_id',
-                   'template_policy', 'dtype', 'backend', 'batch_size', 'seed',
-                   'limit', 'harness_git', 'transformers', 'eval_finished'];
+                   'template_policy', 'model_code', 'active_params', 'dtype',
+                   'backend', 'batch_size', 'seed', 'limit', 'harness_git',
+                   'transformers', 'eval_finished'];
 function provOf(name) {
   const m = DATA.models.find(x => x.name === name) || {};
   const a = m.archinfo || {};
   return [m.official ? 'official' : 'preliminary',
           m.nreq ? `${m.nhave}/${m.nreq}` : '', m.chat ? 'yes' : 'no',
-          a.tmpl_sha || '', m.kindReason || '', m.dtype || '', m.backend || '',
+          a.tmpl_sha || '', m.kindReason || '', (a.code_sha || []).join(' ') || 'library',
+          a.active_params || '', m.dtype || '', m.backend || '',
           m.batch == null ? '' : m.batch, m.seed == null ? '' : m.seed,
           m.limit == null ? 'full' : m.limit, m.hash || '',
           DATA.meta.transformers || '', m.date || ''];
