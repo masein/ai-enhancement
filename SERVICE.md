@@ -102,14 +102,22 @@ A checkpoint with a custom architecture ships `modeling_*.py` and points at it
 through `auto_map` in `config.json`. Loading it **executes that Python** — there
 is no way to evaluate such a model without running the uploader's code.
 
-Off by default. Three things must line up before any of it runs, and the service
+Off by default. Two things must line up before any of it runs, and the service
 refuses with a specific reason when one is missing:
 
 ```bash
 ALLOW_REMOTE_CODE=1          # the operator turned it on
-SUBMIT_TOKEN=<something>     # and the submitter proves team membership
 EVAL_USER=benchjob           # and there is a non-root account to run it as
 ```
+
+There is deliberately **no token gate** on top. The tailnet already is the
+authentication boundary — the service binds to the Tailscale IP, so anyone who
+can upload an artifact was invited onto that network by hand. A shared secret
+would separate "on the tailnet" from "on the tailnet and knows a string", which
+is not a separation shared secrets keep (they end up in shell history and chat),
+while charging every friend a `--token` on every call. If you ever put a device
+on the tailnet you don't control, set `SUBMIT_TOKEN` — it gates every submission,
+remote code included.
 
 `EVAL_USER` is not optional and is not a formality: the service itself runs as
 root (it writes the shared results tree), so without the drop, uploaded code
@@ -143,7 +151,7 @@ carries none. Upload it as an artifact instead.
 
 ```bash
 # submitting one, once the server is configured
-python bench_client.py --base http://…:8899 --token "$SUBMIT_TOKEN" \
+python bench_client.py --base http://…:8899 \
     submit local/my-moe-step4000 --suite full --kind base --allow-remote-code
 ```
 

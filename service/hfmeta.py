@@ -256,10 +256,9 @@ def _preflight_local(name: str, allow_remote_code: bool = False) -> dict:
             raise PreflightError(
                 f"artifact {name!r} carries an auto_map, so loading it executes the "
                 f"Python shipped in the upload. That is off by default. Resubmit "
-                f"with allow_remote_code=true (the request needs the team's "
-                f"X-Token), and the server must be running with "
-                f"ALLOW_REMOTE_CODE=1, SUBMIT_TOKEN and EVAL_USER set — see "
-                f"SERVICE.md § custom model code.")
+                f"with allow_remote_code=true, on a server running with "
+                f"ALLOW_REMOTE_CODE=1 and EVAL_USER set — see SERVICE.md "
+                f"§ custom model code.")
         blocked = config.remote_code_blocked()
         if blocked:
             raise PreflightError(f"artifact {name!r} needs custom model code, but "

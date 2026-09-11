@@ -79,8 +79,8 @@ class Bench:
         allow_remote_code: for an uploaded artifact whose config.json has an
         auto_map, i.e. a custom architecture whose modeling code ships with the
         checkpoint. Loading it executes that code, so it is opt-in per
-        submission, needs the team token, and the server has to be configured
-        for it — see API.md § custom model code."""
+        submission and the server has to be configured for it — see API.md
+        § custom model code."""
         r = self._call("/api/submissions", {"hf_id": hf_id, "suite": suite, "kind": kind,
                                             "submitter": submitter, "note": note,
                                             "allow_remote_code": allow_remote_code})
@@ -308,8 +308,8 @@ def main() -> int:
     s.add_argument("--wait", action="store_true")
     s.add_argument("--allow-remote-code", action="store_true",
                    help="uploaded artifact with a custom architecture: execute the "
-                        "modeling code that ships with it (needs --token and a server "
-                        "configured for it)")
+                        "modeling code that ships with it (server must be configured "
+                        "for it)")
     u = sub.add_parser("upload",
                        help="upload a save_pretrained() dir to the service's storage "
                             "(no Hugging Face), optionally submit it in one go")
