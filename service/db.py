@@ -59,14 +59,15 @@ CREATE TABLE IF NOT EXISTS submissions (
   started_at  REAL,
   finished_at REAL,
   gpu_seconds REAL DEFAULT 0,
-  arch        TEXT                               -- JSON: architecture/hidden/layers/heads/ctx/vocab
+  arch        TEXT,                              -- JSON: architecture/hidden/layers/heads/ctx/vocab
+  allow_remote_code INTEGER NOT NULL DEFAULT 0   -- submitter opted in to executing the upload's code
 );
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
 """
 
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
-         "finished_at", "gpu_seconds", "arch"]
+         "finished_at", "gpu_seconds", "arch", "allow_remote_code"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -82,7 +83,9 @@ def init() -> None:
         # migrations for databases created before a column existed — sqlite has no
         # ADD COLUMN IF NOT EXISTS, so probe and tolerate the duplicate error
         for stmt in ("ALTER TABLE submissions ADD COLUMN arch TEXT",
-                     "ALTER TABLE truns ADD COLUMN n_updates INTEGER NOT NULL DEFAULT 0"):
+                     "ALTER TABLE truns ADD COLUMN n_updates INTEGER NOT NULL DEFAULT 0",
+                     "ALTER TABLE submissions ADD COLUMN allow_remote_code "
+                     "INTEGER NOT NULL DEFAULT 0"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:
@@ -95,11 +98,13 @@ def init() -> None:
         c.commit()
 
 
-def add(hf_id: str, kind: str, suite: str, submitter: str, note: str) -> int:
+def add(hf_id: str, kind: str, suite: str, submitter: str, note: str,
+        allow_remote_code: bool = False) -> int:
     with closing(_conn()) as c:
         cur = c.execute(
-            "INSERT INTO submissions (hf_id, kind, suite, submitter, note, created_at) "
-            "VALUES (?,?,?,?,?,?)", (hf_id, kind, suite, submitter, note, time.time()))
+            "INSERT INTO submissions (hf_id, kind, suite, submitter, note, created_at, "
+            "allow_remote_code) VALUES (?,?,?,?,?,?,?)",
+            (hf_id, kind, suite, submitter, note, time.time(), int(allow_remote_code)))
         c.commit()
         return int(cur.lastrowid)
 

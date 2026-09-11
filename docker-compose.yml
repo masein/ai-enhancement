@@ -35,6 +35,11 @@ services:
       SUBMIT_TOKEN: ${SUBMIT_TOKEN:-}
       ARTIFACT_MAX_GB: ${ARTIFACT_MAX_GB:-8}
       ARTIFACT_QUOTA_GB: ${ARTIFACT_QUOTA_GB:-150}
+      # custom model code (trust_remote_code) — off unless all three line up;
+      # see SERVICE.md § custom model code before turning this on
+      ALLOW_REMOTE_CODE: ${ALLOW_REMOTE_CODE:-0}
+      EVAL_USER: ${EVAL_USER:-benchjob}
+      REMOTE_CODE_SHAS: ${REMOTE_CODE_SHAS:-}
     volumes:
       - ${BENCH_ROOT}:${BENCH_ROOT}
       - ${HF_HOME}:${HF_HOME}

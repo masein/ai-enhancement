@@ -28,6 +28,46 @@ LOCK = config.RESULTS_ROOT / ".run.lock"
 
 
 # ---------------------------------------------------------------------------
+# running someone else's model code with less of the machine attached
+#
+# When a submission opts into trust_remote_code, the eval subprocess executes
+# Python that arrived in an upload. It still runs on the host GPU and can still
+# read the results tree — this is a smaller blast radius, not a sandbox — but
+# two specific things are worth taking away from it:
+#
+#   root         it drops to EVAL_USER, so a stray rmtree or chmod in someone's
+#                modeling file cannot reach anything that user does not own
+#   the HF token lives in HF_HOME and is what an exfiltration would actually be
+#                worth. The token env vars are unset and the hub is put offline;
+#                a local artifact needs neither, so nothing is lost. Make the
+#                token file root-owned 0600 and the drop does the rest.
+# ---------------------------------------------------------------------------
+
+def _eval_ids() -> tuple[int, int] | None:
+    """(uid, gid) for EVAL_USER, or None when it is unset/unknown."""
+    if not config.EVAL_USER:
+        return None
+    try:
+        import pwd
+        rec = pwd.getpwnam(config.EVAL_USER)
+        return rec.pw_uid, rec.pw_gid
+    except (ImportError, KeyError):
+        return None
+
+
+def _child_env(remote_code: bool) -> dict:
+    env = os.environ.copy()
+    if not remote_code:
+        return env
+    for var in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN",
+                "HF_API_TOKEN", "AWS_SECRET_ACCESS_KEY", "OPENAI_API_KEY"):
+        env.pop(var, None)
+    env["HF_HUB_OFFLINE"] = "1"        # the artifact is on disk; nothing to fetch
+    env["HF_HUB_DISABLE_TELEMETRY"] = "1"
+    return env
+
+
+# ---------------------------------------------------------------------------
 # the shared-GPU primitives
 # ---------------------------------------------------------------------------
 
@@ -80,8 +120,9 @@ _FRIENDLY = [
      "the server's python environment is broken (missing package) — tell the "
      "operator; this fails identically for every model."),
     (r"trust_remote_code",
-     "the model requires executing custom repo code, which this service refuses "
-     "on the shared server."),
+     "the model needs its own modeling code executed. Upload it as an artifact "
+     "and submit with allow_remote_code=true (team token required); code from "
+     "the Hub is never executed here."),
     (r"no kernel image",
      "PyTorch/CUDA mismatch on the server (wrong wheel for this GPU) — operator "
      "issue, not your model."),
@@ -117,11 +158,13 @@ def run_submission(sub: dict) -> None:
     try:
         # the submitter's kind is passed in: 'auto' is resolved here, and refused
         # when it is genuinely ambiguous rather than guessed
-        meta = preflight(sub["hf_id"], sub["kind"])
+        meta = preflight(sub["hf_id"], sub["kind"],
+                         allow_remote_code=bool(sub.get("allow_remote_code")))
     except PreflightError as e:
         db.update(sid, status="failed", error=str(e), finished_at=time.time())
         return
     kind = meta["kind"]
+    remote_code = bool(meta.get("remote_code"))
     db.update(sid, kind=kind, params=meta["params"], vocab=meta["vocab"],
               batch=meta["batch"], need_gb=meta["need_gb"],
               arch=json.dumps(meta.get("archinfo") or {}),
@@ -143,6 +186,8 @@ def run_submission(sub: dict) -> None:
         {"model": sub["hf_id"], "kind": kind, "params": meta["params"],
          "kind_reason": meta.get("kind_reason"),
          **(meta.get("archinfo") or {})}), encoding="utf-8")
+    if remote_code:      # the code that produced the scores is part of the record
+        db.update(sid, progress=f"preflight ok · custom model code · batch={meta['batch']}")
 
     # -- one run at a time: wait for the shared lock ------------------------------
     t0 = time.time()
@@ -191,9 +236,12 @@ def run_submission(sub: dict) -> None:
             pretrained = sub["hf_id"]
             if pretrained.startswith("local/"):
                 pretrained = str((config.ARTIFACTS_DIR / pretrained[6:]).resolve())
+            margs = f"pretrained={pretrained},dtype=bfloat16"
+            if remote_code:
+                margs += ",trust_remote_code=True"
             cmd = ["lm_eval",
                    "--model", "hf",
-                   "--model_args", f"pretrained={pretrained},dtype=bfloat16",
+                   "--model_args", margs,
                    "--tasks", task,
                    "--num_fewshot", str(shots),
                    "--batch_size", str(meta["batch"]),
@@ -206,12 +254,38 @@ def run_submission(sub: dict) -> None:
                 cmd.append("--apply_chat_template")
 
             t_task = time.time()
+            # the dropped-privilege child cannot create its own output dir under
+            # a root-owned tree, so make it here and hand over ownership
+            run_as = _eval_ids() if remote_code else None
+            if remote_code and not run_as and os.getuid() == 0:
+                # fail closed: the whole point of the gate is that uploaded code
+                # does NOT run as root, so an unresolvable EVAL_USER stops the job
+                # rather than quietly becoming the thing we were guarding against
+                db.update(sid, status="failed", finished_at=time.time(),
+                          error=f"refusing to run custom model code as root: "
+                                f"EVAL_USER={config.EVAL_USER!r} does not resolve to "
+                                f"an account on this machine.")
+                release_lock()
+                return
+            task_out.mkdir(parents=True, exist_ok=True)
+            if run_as:
+                try:
+                    os.chown(task_out, *run_as)
+                except OSError:
+                    pass
             with open(log_path, "a") as lf:
                 lf.write(f"\n===== [{sid}] {task} ({shots}-shot) =====\n")
+                if remote_code:
+                    lf.write(f"[trust_remote_code] running as "
+                             f"{config.EVAL_USER or 'root (EVAL_USER unset!)'}, "
+                             f"hub offline, token withheld\n")
                 lf.flush()
                 try:
                     proc = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT,
                                           cwd=config.BENCH_ROOT,
+                                          env=_child_env(remote_code),
+                                          **({"user": run_as[0], "group": run_as[1]}
+                                             if run_as else {}),
                                           timeout=config.TASK_TIMEOUT_S)
                     status = proc.returncode
                 except subprocess.TimeoutExpired:

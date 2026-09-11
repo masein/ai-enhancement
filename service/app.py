@@ -83,6 +83,7 @@ class SubmissionIn(BaseModel):
     suite: str = "full"
     submitter: str = ""
     note: str = ""
+    allow_remote_code: bool = False    # execute the upload's own modeling code
 
 
 ACTIVE = ("queued", "preflight", "waiting_gpu", "waiting_lock", "running")
@@ -100,11 +101,27 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         raise HTTPException(422, "kind must be auto, base or instruct")
     if s.suite not in ("quick", "full"):
         raise HTTPException(422, "suite must be quick or full")
+    if s.allow_remote_code:
+        # the flag is only meaningful for uploads, and only when the operator has
+        # configured the server to run other people's code at all. Checked here
+        # so the answer is immediate instead of a queued job that fails later.
+        if not hf_id.startswith("local/"):
+            raise HTTPException(422, "allow_remote_code applies to uploaded artifacts "
+                                     "(local/<name>) only — code from the Hub is never "
+                                     "executed on this server")
+        blocked = config.remote_code_blocked()
+        if blocked:
+            raise HTTPException(403, f"remote code is not available: {blocked}. "
+                                     f"See SERVICE.md § custom model code.")
+        if not x_token:
+            raise HTTPException(401, "running an upload's own code requires the team's "
+                                     "X-Token on the request")
     for row in db.recent(200):
         if row["hf_id"] == hf_id and row["status"] in ACTIVE:
             return {"id": row["id"], "status": row["status"],
                     "note": "already in the queue — joining the existing run"}
-    sid = db.add(hf_id, s.kind, s.suite, s.submitter.strip()[:80], s.note.strip()[:200])
+    sid = db.add(hf_id, s.kind, s.suite, s.submitter.strip()[:80], s.note.strip()[:200],
+                 allow_remote_code=s.allow_remote_code)
     return {"id": sid, "status": "queued"}
 
 
