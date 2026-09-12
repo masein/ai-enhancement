@@ -17,7 +17,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -55,7 +57,31 @@ def _eval_ids() -> tuple[int, int] | None:
         return None
 
 
-def _child_env(remote_code: bool) -> dict:
+def _job_scratch(sid: int, run_as: tuple[int, int] | None) -> Path:
+    """A writable scratch tree for a dropped-privilege job, on the mounted
+    volume rather than the container's own filesystem.
+
+    Dropping to EVAL_USER without this is broken in two ways, both found by a
+    friend's bug report rather than by me. HOME still points at root's home, so
+    every library that caches under ~/.cache writes somewhere it cannot. And
+    torch creates its inductor cache under tempfile.gettempdir() at IMPORT
+    time — before any model is touched — so a /tmp the job user cannot write is
+    an instant failure with a traceback that names none of our code. Putting
+    HOME, TMPDIR and the torch/triton caches here fixes both, and keeps the
+    writes on BENCH_ROOT, where there is room and the operator can see them."""
+    d = config.BENCH_ROOT / ".jobscratch" / str(sid)
+    for sub in ("tmp", "home/.cache", "inductor", "triton"):
+        (d / sub).mkdir(parents=True, exist_ok=True)
+    if run_as:
+        for p in (d, *(q for q in d.rglob("*") if q.is_dir())):
+            try:
+                os.chown(p, *run_as)
+            except OSError:
+                pass
+    return d
+
+
+def _child_env(remote_code: bool, scratch: Path | None = None) -> dict:
     env = os.environ.copy()
     if not remote_code:
         return env
@@ -64,7 +90,46 @@ def _child_env(remote_code: bool) -> dict:
         env.pop(var, None)
     env["HF_HUB_OFFLINE"] = "1"        # the artifact is on disk; nothing to fetch
     env["HF_HUB_DISABLE_TELEMETRY"] = "1"
+    if scratch:
+        env["HOME"] = str(scratch / "home")
+        env["TMPDIR"] = str(scratch / "tmp")
+        env["XDG_CACHE_HOME"] = str(scratch / "home" / ".cache")
+        env["TORCHINDUCTOR_CACHE_DIR"] = str(scratch / "inductor")
+        env["TRITON_CACHE_DIR"] = str(scratch / "triton")
     return env
+
+
+# the import chain that failed for the first real remote-code submission: it
+# runs before any model is loaded, so when the job environment is broken the
+# submitter gets "task failed" for a fault that has nothing to do with their
+# model. Probe it once, up front, and say so in those words.
+_CANARY = (
+    # the import chain that failed (torch builds its inductor cache at import)
+    "import os, transformers.generation.utils, torch._dynamo; "
+    # and the next wall: datasets writes lock files into the HF cache, which is
+    # root-owned because the service created it
+    "h = os.environ.get('HF_HOME') or os.path.expanduser('~/.cache/huggingface'); "
+    "os.makedirs(h, exist_ok=True); "
+    "f = os.path.join(h, '.bench-write-probe'); "
+    "open(f, 'w').write('x'); os.remove(f)")
+
+
+def _env_canary(env: dict, run_as: tuple[int, int] | None) -> str:
+    """'' if the job environment can import the stack AND write the caches it
+    needs, else the last line of what went wrong. Two failures this catches that
+    otherwise surface as four identical tracebacks blamed on the model: a
+    /tmp the job user cannot write (torch makes its inductor cache at import
+    time) and an HF cache it cannot write (datasets takes a lock)."""
+    try:
+        p = subprocess.run([sys.executable, "-c", _CANARY], env=env,
+                           capture_output=True, text=True, timeout=600,
+                           **({"user": run_as[0], "group": run_as[1]} if run_as else {}))
+    except (OSError, subprocess.SubprocessError) as e:
+        return f"could not start a job process: {e}"
+    if p.returncode == 0:
+        return ""
+    tail = (p.stderr or p.stdout or "").strip().splitlines()
+    return tail[-1] if tail else f"exit {p.returncode}"
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +188,11 @@ _FRIENDLY = [
      "the model needs its own modeling code executed. Upload it as an artifact "
      "and submit with allow_remote_code=true; code from "
      "the Hub is never executed here."),
+    (r"No space left on device|Errno 28",
+     "the server ran out of disk. Nothing to do with your model — tell the "
+     "operator. (Jobs that drop privileges hit this first: ext4 keeps 5% of "
+     "blocks in reserve for root, so root-run jobs keep working while these "
+     "fail.)"),
     (r"no kernel image",
      "PyTorch/CUDA mismatch on the server (wrong wheel for this GPU) — operator "
      "issue, not your model."),
@@ -220,6 +290,34 @@ def run_submission(sub: dict) -> None:
         if config.EVAL_TASKS_DIR.is_dir() and any(config.EVAL_TASKS_DIR.glob("*.yaml")):
             include_args = ["--include_path", str(config.EVAL_TASKS_DIR)]
 
+        # resolve the job identity ONCE, before any task: a broken sandbox should
+        # fail the submission with a service error, not four identical tracebacks
+        # blamed on the submitter's model
+        run_as = _eval_ids() if remote_code else None
+        if remote_code and not run_as and os.getuid() == 0:
+            # fail closed: the whole point of the gate is that uploaded code does
+            # NOT run as root, so an unresolvable EVAL_USER stops the job rather
+            # than quietly becoming the thing we were guarding against
+            db.update(sid, status="failed", finished_at=time.time(),
+                      error=f"refusing to run custom model code as root: "
+                            f"EVAL_USER={config.EVAL_USER!r} does not resolve to an "
+                            f"account on this machine.")
+            release_lock()
+            return
+        scratch = _job_scratch(sid, run_as) if remote_code else None
+        job_env = _child_env(remote_code, scratch)
+        if remote_code:
+            broken = _env_canary(job_env, run_as)
+            if broken:
+                db.update(sid, status="failed", finished_at=time.time(),
+                          error=f"the job environment is broken, not your model: "
+                                f"{broken}. Nothing of yours was loaded — this fails "
+                                f"identically for every custom-code submission. Tell "
+                                f"the operator (SERVICE.md § custom model code).")
+                release_lock()
+                shutil.rmtree(scratch, ignore_errors=True)
+                return
+
         gpu_seconds = 0.0
         failed_tasks: list[str] = []
         for i, task in enumerate(tasks, 1):
@@ -256,17 +354,6 @@ def run_submission(sub: dict) -> None:
             t_task = time.time()
             # the dropped-privilege child cannot create its own output dir under
             # a root-owned tree, so make it here and hand over ownership
-            run_as = _eval_ids() if remote_code else None
-            if remote_code and not run_as and os.getuid() == 0:
-                # fail closed: the whole point of the gate is that uploaded code
-                # does NOT run as root, so an unresolvable EVAL_USER stops the job
-                # rather than quietly becoming the thing we were guarding against
-                db.update(sid, status="failed", finished_at=time.time(),
-                          error=f"refusing to run custom model code as root: "
-                                f"EVAL_USER={config.EVAL_USER!r} does not resolve to "
-                                f"an account on this machine.")
-                release_lock()
-                return
             task_out.mkdir(parents=True, exist_ok=True)
             if run_as:
                 try:
@@ -283,7 +370,7 @@ def run_submission(sub: dict) -> None:
                 try:
                     proc = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT,
                                           cwd=config.BENCH_ROOT,
-                                          env=_child_env(remote_code),
+                                          env=job_env,
                                           **({"user": run_as[0], "group": run_as[1]}
                                              if run_as else {}),
                                           timeout=config.TASK_TIMEOUT_S)
@@ -303,6 +390,8 @@ def run_submission(sub: dict) -> None:
                     break            # will OOM again for this model — stop here
                 if re.search(r"ModuleNotFoundError|ImportError", tail, re.I):
                     break            # environment — fails for every task
+                if re.search(r"No space left on device|Errno 28", tail, re.I):
+                    break            # operator fault — every task fails the same
 
         if failed_tasks:
             db.update(sid, status="failed", finished_at=time.time(),
@@ -312,3 +401,6 @@ def run_submission(sub: dict) -> None:
                       progress=f"all {len(tasks)} tasks done", error="")
     finally:
         release_lock()
+        if remote_code:
+            shutil.rmtree(config.BENCH_ROOT / ".jobscratch" / str(sid),
+                          ignore_errors=True)

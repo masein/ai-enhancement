@@ -125,6 +125,40 @@ would execute as root beside everyone's results and the server's Hugging Face
 token. If the name doesn't resolve to a real account the job **fails** rather
 than running as root. The Docker image creates `benchjob` for this.
 
+### Two setup steps the drop requires
+
+Dropping privileges means the job user needs somewhere to write. The service
+handles the first automatically and the second needs one command from you.
+
+**Per-job scratch (automatic).** Torch builds its inductor cache under
+`tempfile.gettempdir()` at *import* time, before any model is loaded, so a
+`/tmp` the job user cannot write fails instantly with a traceback that names
+none of your code. Each remote-code job therefore gets `HOME`, `TMPDIR`,
+`XDG_CACHE_HOME`, `TORCHINDUCTOR_CACHE_DIR` and `TRITON_CACHE_DIR` pointed at
+`$BENCH_ROOT/.jobscratch/<id>/`, created and chowned to `EVAL_USER` and removed
+when the job ends. That also keeps those writes on the mounted volume rather
+than the container's own filesystem.
+
+**The Hugging Face cache (one command).** `datasets` takes lock files inside
+the cache while loading a task, and that cache is root-owned because the
+service created it. Give the job user write access, while keeping the token
+unreadable:
+
+```bash
+sudo chmod -R a+rwX "$HF_HOME"          # the cache is shared, not secret
+sudo chmod 600 "$HF_HOME/token"         # the token is
+```
+
+A remote-code job runs a canary first — it imports the stack and write-tests
+the cache — and reports an environment fault as a *service* error rather than
+letting the submitter see four identical tracebacks blamed on their model.
+
+**Watch the disk.** These jobs are also the first thing to break when the box
+fills up: ext4 keeps 5% of blocks in reserve for root, so at ~100% usage the
+root-run stock jobs keep working while every dropped-privilege job fails with
+`ENOSPC`. If custom-code submissions start failing and stock ones don't, run
+`df -h` before anything else.
+
 What the gate actually buys, stated honestly:
 
 - the job runs as an unprivileged user, so a stray `rmtree` in someone's
