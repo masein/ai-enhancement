@@ -60,14 +60,15 @@ CREATE TABLE IF NOT EXISTS submissions (
   finished_at REAL,
   gpu_seconds REAL DEFAULT 0,
   arch        TEXT,                              -- JSON: architecture/hidden/layers/heads/ctx/vocab
-  allow_remote_code INTEGER NOT NULL DEFAULT 0   -- submitter opted in to executing the upload's code
+  allow_remote_code INTEGER NOT NULL DEFAULT 0,  -- submitter opted in to executing the upload's code
+  load_missing TEXT DEFAULT ''                   -- JSON: checkpoint keys transformers had to invent
 );
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
 """
 
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
-         "finished_at", "gpu_seconds", "arch", "allow_remote_code"]
+         "finished_at", "gpu_seconds", "arch", "allow_remote_code", "load_missing"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -85,7 +86,8 @@ def init() -> None:
         for stmt in ("ALTER TABLE submissions ADD COLUMN arch TEXT",
                      "ALTER TABLE truns ADD COLUMN n_updates INTEGER NOT NULL DEFAULT 0",
                      "ALTER TABLE submissions ADD COLUMN allow_remote_code "
-                     "INTEGER NOT NULL DEFAULT 0"):
+                     "INTEGER NOT NULL DEFAULT 0",
+                     "ALTER TABLE submissions ADD COLUMN load_missing TEXT DEFAULT ''"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:

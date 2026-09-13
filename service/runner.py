@@ -214,6 +214,76 @@ def _tail(path: Path, n: int = 40) -> str:
 
 
 # ---------------------------------------------------------------------------
+# weights that never arrived
+#
+# transformers does not fail when a checkpoint lacks a parameter the model class
+# declares. It randomly initializes the gap, prints a report, and hands back a
+# model that runs — so lm_eval scores it, exits 0, and the number reaches the
+# leaderboard looking like every other number.
+#
+# The first custom-code submission this server ever completed did exactly that.
+# A GPTNeoX checkpoint stores its output projection as embed_out.weight; the
+# uploaded class called the module lm_head. 74 of 75 tensors loaded, the head
+# was noise, both accuracy tasks landed within a point of chance and both
+# perplexities were several times worse than the same weights under the stock
+# class. Status said 'done'. Nothing anywhere said otherwise, and it was caught
+# only because that upload happened to be a known model with a reference row.
+#
+# A crash is a safe failure: somebody fixes it. A plausible wrong number on a
+# shared board is not — it gets believed, and it gets compared against. So the
+# report is parsed after every task, for every submission and not just the ones
+# running custom code: a renamed head or a half-saved checkpoint does this
+# without any remote code involved.
+#
+# Only MISSING is fatal. UNEXPECTED means the checkpoint carries tensors this
+# class has no slot for, which is normal when loading across task heads. Tied
+# embeddings are the one plausible false positive — a model with
+# tie_word_embeddings does not store lm_head.weight separately — but
+# transformers resolves tying before it writes this report, and runs 31-34 here
+# (one of them tied) produce no MISSING rows, so the distinction holds in
+# practice on 5.15.1. If that ever changes the symptom is a clean model being
+# refused, which is loud, checkable and the safe direction to be wrong in.
+# ---------------------------------------------------------------------------
+
+_MISSING_ROW = re.compile(r"^\s*([A-Za-z_][\w.]*)\s*\|\s*MISSING\b", re.M)
+_MISSING_PROSE = re.compile(r"newly initialized:\s*\[([^\]]*)\]")
+
+_MISSING_MSG = (
+    "the checkpoint does not contain weights this architecture needs: {keys}{more}. "
+    "transformers filled them in with random values, so the model ran and scored "
+    "but the numbers were noise — they were discarded instead of published. This "
+    "is almost always a naming disagreement between the checkpoint and the model "
+    "class: a GPTNeoX checkpoint stores the output projection as embed_out.weight, "
+    "for instance, while a custom class that calls it lm_head silently gets a "
+    "random head. Rename the module or the tensor so the two agree, confirm the "
+    "load report is clean, and resubmit.")
+
+
+def _missing_weights(text: str) -> list[str]:
+    """Checkpoint keys transformers had to invent, or [] when the load was clean.
+
+    Two formats are matched because the wording belongs to transformers, not to
+    us, and a guard that quietly stops guarding when a library reformats its log
+    is worse than no guard: the table emitted by 5.x, and the older one-line
+    'newly initialized: [...]' prose."""
+    keys = set(_MISSING_ROW.findall(text))
+    for blob in _MISSING_PROSE.findall(text):
+        keys.update(k.strip().strip("'\"") for k in blob.split(",") if k.strip())
+    return sorted(keys)
+
+
+def _read_from(path: Path, offset: int) -> str:
+    """The log written since `offset` — one task's own output, so a report left
+    by an earlier task in the same submission cannot be re-attributed here."""
+    try:
+        with open(path, "r", errors="replace") as f:
+            f.seek(offset)
+            return f.read()
+    except OSError:
+        return ""
+
+
+# ---------------------------------------------------------------------------
 # the run
 # ---------------------------------------------------------------------------
 
@@ -367,6 +437,7 @@ def run_submission(sub: dict) -> None:
                              f"{config.EVAL_USER or 'root (EVAL_USER unset!)'}, "
                              f"hub offline, token withheld\n")
                 lf.flush()
+                mark = log_path.stat().st_size      # this task's output starts here
                 try:
                     proc = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT,
                                           cwd=config.BENCH_ROOT,
@@ -380,6 +451,27 @@ def run_submission(sub: dict) -> None:
                     lf.write(f"\n[service] killed after {config.TASK_TIMEOUT_S}s timeout\n")
             gpu_seconds += time.time() - t_task
             db.update(sid, gpu_seconds=gpu_seconds)
+
+            # checked before the exit code, because this failure has a zero exit
+            # code: lm_eval did its job perfectly on a model that was partly
+            # random. The scores are already on disk by now — lm_eval writes them
+            # before we get to look — so removing them is the whole point. Left
+            # there they would show on the leaderboard AND be counted as finished
+            # work by _task_done() when the submitter resubmits the fix.
+            missing = _missing_weights(_read_from(log_path, mark))
+            if missing:
+                shutil.rmtree(task_out, ignore_errors=True)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] discarded results for {task}: the "
+                             f"checkpoint is missing {', '.join(missing)} and "
+                             f"transformers initialized them randomly\n")
+                failed_tasks.append(task)
+                db.update(sid, load_missing=json.dumps(missing),
+                          error=_MISSING_MSG.format(
+                              keys=", ".join(missing[:6]),
+                              more=f" (+{len(missing) - 6} more)"
+                                   if len(missing) > 6 else ""))
+                break          # every remaining task would load the same model
 
             if status != 0:
                 tail = _tail(log_path)
