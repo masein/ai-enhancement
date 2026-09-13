@@ -274,11 +274,14 @@ def _missing_weights(text: str) -> list[str]:
 
 def _read_from(path: Path, offset: int) -> str:
     """The log written since `offset` — one task's own output, so a report left
-    by an earlier task in the same submission cannot be re-attributed here."""
+    by an earlier task in the same submission cannot be re-attributed here.
+
+    Read as bytes and decoded here: `offset` is a byte count from stat(), and
+    seeking a text handle to anything but a tell() cookie is undefined."""
     try:
-        with open(path, "r", errors="replace") as f:
+        with open(path, "rb") as f:
             f.seek(offset)
-            return f.read()
+            return f.read().decode("utf-8", "replace")
     except OSError:
         return ""
 
