@@ -267,6 +267,100 @@ _CHANCE = {"mmlu": 0.25, "hellaswag": 0.25, "arc_challenge": 0.25, "arc_easy": 0
            "winogrande": 0.5, "piqa": 0.5, "gsm8k": 0.0}
 
 # ---------------------------------------------------------------------------
+# What each task is, AS WE RUN IT.
+#
+# Public descriptions describe a benchmark as the field uses it. That is not the
+# thing on this page: our shot count, our metric choice and our template policy
+# are part of what the number means, and they are what a friend reading this
+# board needs in order to not misread it. So these are written for our protocol,
+# not copied from anywhere.
+#
+# `domain` is the SAME vocabulary the radar's CATS folding uses — one taxonomy
+# driving the chips and the axes, so the two cannot drift apart.
+# ---------------------------------------------------------------------------
+_TASK_META = {
+    "mmlu": ("knowledge",
+             "Four-choice exam questions across 57 academic and professional "
+             "subjects. 5-shot, acc. Breadth of recall rather than depth of "
+             "reasoning — and the task where a sub-1B model most often sits at "
+             "chance, so read it against the chance line, not against 0%."),
+    "hellaswag": ("commonsense",
+                  "Four-choice sentence completion about everyday situations. "
+                  "5-shot, acc_norm — length-normalized on purpose, because raw "
+                  "accuracy here rewards picking the longest ending."),
+    "arc_challenge": ("reasoning",
+                      "Four-choice grade-school science questions, the split that "
+                      "defeated retrieval baselines. 5-shot, acc_norm."),
+    "arc_easy": ("reasoning",
+                 "Four-choice grade-school science questions, the easier split. "
+                 "5-shot, acc_norm. Usually the first task a small model clears "
+                 "chance on, which makes it a useful early signal in a run."),
+    "winogrande": ("commonsense",
+                   "Two-choice pronoun resolution needing commonsense to bind the "
+                   "referent. 5-shot, acc. Chance is 50%, so a score near 50 means "
+                   "nothing at all — the most misread number on this board."),
+    "piqa": ("commonsense",
+             "Two-choice questions about physical commonsense — which of two "
+             "procedures actually works. 0-shot, acc_norm. Chance is 50%."),
+    "truthfulqa_mc2": ("truthfulness",
+                       "Multiple choice on questions where a common human "
+                       "misconception is the tempting answer. 0-shot, mc2 — "
+                       "several options can be true, so there is no clean chance "
+                       "level and none is drawn."),
+    "gsm8k": ("math",
+              "Grade-school word problems needing several arithmetic steps, "
+              "scored by exact match on the final answer. 5-shot, generative. "
+              "Reported here but deliberately excluded from the overall average: "
+              "it sits near 0% below ~1B and only adds noise to a mean."),
+}
+
+# ---------------------------------------------------------------------------
+# Frontier reference — where the ceiling is, for orientation only.
+#
+# Our scores are NOT comparable to published leaderboards: different n-shot
+# conventions, different harness, sometimes a different metric. At our model
+# scale that does not matter for orientation — a few points of protocol against
+# a forty-point gap does not change what anyone concludes — but it would matter
+# if one of our models ever came close, so every one of these carries its source
+# and the date we read it, and the UI renders it as a reference line rather than
+# a sortable column.
+#
+# Source data is CC-BY (Epoch AI), which we may use with attribution and do.
+# Fill the rest in from https://epoch.ai/benchmarks — do NOT write a number here
+# from memory: these move, and a remembered one goes stale silently.
+# ---------------------------------------------------------------------------
+_FRONTIER_SRC = "Epoch AI (CC-BY)"
+_FRONTIER = {
+    "mmlu": {"v": 0.88, "asof": "2026-09-15", "src": _FRONTIER_SRC},
+}
+
+
+def _task_facts(task: str, cells: dict, sig: dict) -> dict:
+    """The per-task metadata the UI hangs its chips and reference lines off."""
+    chance = _CHANCE.get(task)
+    domain, desc = _TASK_META.get(task, (None, None))
+    if desc is None and task.startswith("ppl_"):
+        domain, desc = "language modelling", (
+            "Perplexity on a pinned corpus slice — the same tokens for every "
+            "model, so it measures modelling quality directly. Lower is better, "
+            "there is no chance level, and unlike the multiple-choice tasks it "
+            "keeps separating models that all sit at chance elsewhere.")
+    rows = sig.get(task, [])
+    return {
+        "desc": desc,
+        "domain": domain,
+        # a task has a chance level precisely BECAUSE it is multiple-choice, so
+        # the option count is derivable rather than a hand-kept flag
+        "options": (round(1 / chance) if chance and 0 < chance < 1 else None),
+        "nmodels": len(cells.get(task, {})),
+        # does this task separate ANY pair of the models we actually have? A task
+        # where every pair is within noise is telling us nothing, and right now it
+        # looks exactly like one that works.
+        "discriminates": (any(r[4] for r in rows) if rows else None),
+        "frontier": _FRONTIER.get(task),
+    }
+
+# ---------------------------------------------------------------------------
 # The protocol: which tasks an OFFICIAL average requires.
 #
 # Averaging whatever tasks a model happened to finish is not a ranking — a
@@ -542,7 +636,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
         "reqAbsent": req_absent,
         "tasks": {t: {"metric": metric_used.get(t, ""),
                       "lower": is_lower_better(t),
-                      "chance": _CHANCE.get(t)} for t in headline},
+                      "chance": _CHANCE.get(t),
+                      **_task_facts(t, cells, sig)} for t in headline},
         "cells": cells,
         "sig": sig,
         "extra": extra,
@@ -708,6 +803,23 @@ th .dir { font-size:9px; }
   padding:14px 16px 8px; }
 .panel h3 { font-size:13.5px; font-weight:600; margin:0; }
 .panel .pmeta { font-size:11.5px; color:var(--muted); margin:1px 0 8px; }
+/* chip row under a task heading: what it measures, how many options, coverage,
+   whether it separates anything, where the ceiling is. Every chip carries the
+   long version in its title, so the row stays short. */
+.tchips { display:flex; flex-wrap:wrap; gap:5px; margin:5px 0 2px; }
+.tchip { font-size:10.5px; line-height:1.5; border:1px solid var(--border);
+  border-radius:5px; padding:0 6px; color:var(--text-secondary); cursor:help;
+  white-space:nowrap; }
+.tchip.dom { background:var(--accent-soft); border-color:var(--accent-soft);
+  color:var(--accent); }
+.tchip.flat { color:var(--warning); border-color:var(--warning); }
+.tchip.front { border-style:dashed; }
+/* a two-state toggle in a .ctrl row — pressed state is not colour alone */
+.tgl { font:inherit; font-size:12px; cursor:pointer; border-radius:8px;
+  padding:4px 10px; border:1px solid var(--border); background:var(--plane);
+  color:var(--text-secondary); }
+.tgl.on { background:var(--accent-soft); border-color:var(--accent);
+  color:var(--accent); font-weight:600; }
 .tv { display:none; margin-top:12px; } .tv.open { display:block; }
 .small { font-size:12px; color:var(--text-secondary); }
 .up { color:var(--success-text); } .down { color:var(--critical); }
@@ -717,6 +829,8 @@ th .dir { font-size:9px; }
   color:var(--text-secondary); font-size:13px; }
 .warn b, .note b { color:var(--text-primary); }
 .lb td.model { white-space:nowrap; }
+.lb td.model .mname { display:inline-block; max-width:22ch; overflow:hidden;
+  text-overflow:ellipsis; vertical-align:bottom; }
 .st { display:inline-block; font-size:11px; border-radius:999px; padding:2px 9px;
   border:1px solid var(--border); white-space:nowrap; }
 .st-done { color:var(--success-text); border-color:var(--success-text); }
@@ -830,7 +944,9 @@ const state = {
   trRuns: [], trSeries: {}, trFetching: false,
   trQ: '', trStatus: 'all', trOrder: 'updated',            // runs-list filter/sort
   trMetricQ: '', trSecClosed: {}, trSecSig: '',            // metric panels filter / sections
-  cmpSel: [], cmpColors: {},                               // radar: compared models (≤3)
+  cmpSel: [], cmpColors: {},                               // radar: compared models (≤CMP_MAX)
+  accScale: 'raw',                     // task panels: 'raw' | 'chance' (diverging)
+  cmpEvicted: '',                      // last model the compare FIFO dropped
   radarNorm: 'chance', radarAxes: 'tasks',                 // radar scaling / axis mode
   avgMode: 'chance',                   // official average: above-chance | raw
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
@@ -872,10 +988,44 @@ function mkSel(label, opts, cur, onpick) {
   s.addEventListener('change', e => onpick(e.target.value));
   return s;
 }
+// The option count rides on the name as a superscript — mmlu⁴, piqa². It is
+// derived from the chance level rather than hand-kept (a task HAS a chance level
+// because it is multiple-choice), and it is the fact that stops someone reading
+// 52% on a two-option task as a result.
+const SUP = { 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
 const taskLabel = t => {
   const info = DATA.tasks[t] || {};
-  return t + (info.metric ? ` (${info.metric})` : '');
+  return t + (info.options ? (SUP[info.options] || `^${info.options}`) : '')
+           + (info.metric ? ` (${info.metric})` : '');
 };
+
+// The chip row under a task heading: what it measures, how many options, how
+// many of our models have run it, whether it separates them, and where the
+// ceiling is. Each chip carries the long version in its title.
+function taskChips(t) {
+  const i = DATA.tasks[t] || {};
+  const out = [];
+  if (i.domain) out.push(el('span', { class: 'tchip dom', text: i.domain,
+    title: i.desc || '' }));
+  if (i.options) out.push(el('span', { class: 'tchip', text: i.options + '-choice',
+    title: `multiple choice with ${i.options} options — chance is `
+         + `${Math.round(100 / i.options)}%` }));
+  if (i.nmodels) out.push(el('span', { class: 'tchip', text: i.nmodels + ' models',
+    title: 'models on this board with a score for this task' }));
+  // a task where no pair of models differs by more than their combined error is
+  // measuring nothing here, and today it looks identical to one that works
+  if (i.discriminates === false) out.push(el('span', { class: 'tchip flat',
+    text: 'no separation',
+    title: 'no pair of models on this board differs by more than their combined '
+         + 'standard error — this task is not distinguishing our models, whatever '
+         + 'the ranking suggests' }));
+  if (i.frontier) out.push(el('span', { class: 'tchip front',
+    text: 'frontier ' + pct(i.frontier.v),
+    title: `best published score ${pct(i.frontier.v)} — ${i.frontier.src}, as of `
+         + `${i.frontier.asof}. A different protocol from ours (n-shot, harness), `
+         + `so read it as where the ceiling is, not as a like-for-like gap.` }));
+  return out.length ? el('div', { class: 'tchips' }, ...out) : '';
+}
 
 // Source is a FILTER like Base/Instruct, never a default hide: everything a
 // friend uploads stays in every comparison. Checkpoints are marked instead —
@@ -984,6 +1134,7 @@ function barPanel(task, models, opts) {
     : null;
   const panel = el('div', { class: 'panel' },
     el('h3', { text: taskLabel(task) }),
+    taskChips(task),
     el('div', { class: 'pmeta', title: missTip, text:
       (lower ? 'lower is better' : 'higher is better')
       + (shots.length ? ` · ${shots.length > 1 ? 'MIXED n-shot!' : shots[0] + '-shot'}` : '')
@@ -1001,59 +1152,130 @@ function barPanel(task, models, opts) {
   const capped = !state.panelOpen[task] && rows.length > CAPN + 2;
   const shown = capped ? rows.slice(0, CAPN) : rows;
 
+  // "vs chance" is a DIVERGING bar centred on the chance line instead of on
+  // zero — the form for "above/below a baseline". It is the honest fix for
+  // models bunched at the floor: at 26%, 28% and 31% on a 0–100% axis they are
+  // three bars of the same length, while against chance they are 1%, 4% and 8%
+  // of the available headroom and the difference is finally visible. (A logit
+  // axis would separate them too, but bar length has to stay proportional to
+  // its baseline — a non-linear axis on a bar chart encodes a lie.)
+  const div = hasChance && state.accScale === 'chance';
+  const dv  = c => (c.v - info.chance) / (1 - info.chance);
+  const dse = c => (c.se || 0) / (1 - info.chance);
+  const front = info.frontier;
+
   const W = 460, LBL = 150, PAD = 56, BH = 15, GAP = 7;
-  const TOP = hasChance ? 20 : 8;          // reserve headroom for the chance label
+  const TOP = (hasChance || (front && div)) ? 20 : 8;   // headroom for a rule label
   const plotW = W - LBL - PAD;
   const H = shown.length * (BH + GAP) + TOP + 16;
-  const maxv = Math.max(...shown.map(r => r.c.v + (r.c.se || 0)), info.chance || 0);
-  // scale to the data, not to a fixed floor — gsm8k at 2% must not be squashed
-  // into an axis drawn for 25%-chance tasks
-  const hi = lower ? maxv * 1.15
-                   : Math.min(1, Math.max(maxv * 1.15, (info.chance || 0) * 1.25, 0.05));
-  const X = v => LBL + plotW * Math.max(0, Math.min(v, hi)) / hi;
+  let X, base, ticks, tickFmt;
+  if (div) {
+    // the axis runs from the worst model to perfect, so the frontier reference
+    // always fits on it — which is why the frontier line is drawn in this mode
+    // and only chipped in the raw one
+    const fd = front ? dv({ v: front.v, se: 0 }) : 0;
+    const dlo = Math.min(0, ...shown.map(r => dv(r.c) - dse(r.c))) * 1.08;
+    const dhi = Math.max(0.05, fd, ...shown.map(r => dv(r.c) + dse(r.c))) * 1.05;
+    X = v => LBL + plotW * (Math.max(dlo, Math.min(v, dhi)) - dlo) / (dhi - dlo);
+    base = X(0);
+    ticks = [];
+    for (let v = Math.ceil(dlo / 0.25) * 0.25; v <= dhi + 1e-9; v += 0.25)
+      ticks.push(+v.toFixed(4));
+    tickFmt = v => (v > 0 ? '+' : '') + Math.round(100 * v) + '%';
+  } else {
+    const maxv = Math.max(...shown.map(r => r.c.v + (r.c.se || 0)), info.chance || 0);
+    // scale to the data, not to a fixed floor — gsm8k at 2% must not be squashed
+    // into an axis drawn for 25%-chance tasks
+    const hi = lower ? maxv * 1.15
+                     : Math.min(1, Math.max(maxv * 1.15, (info.chance || 0) * 1.25, 0.05));
+    X = v => LBL + plotW * Math.max(0, Math.min(v, hi)) / hi;
+    base = LBL;
+    ticks = niceTicks(hi, 4);
+    tickFmt = v => lower ? num(v, 2) : Math.round(100 * v) + '%';
+  }
   const fmt = lower ? (v => num(v, 3)) : (v => pct(v));
   const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%',
                               role: 'img', 'aria-label': task });
-  for (const t of niceTicks(hi, 4)) {
+  for (const t of ticks) {
     svg.append(el('svg:line', { x1: X(t), y1: TOP - 4, x2: X(t), y2: H - 18,
       stroke: 'var(--grid)', 'stroke-width': 1 }));
     svg.append(el('svg:text', { x: X(t), y: H - 5, 'font-size': 10,
-      fill: 'var(--muted)', 'text-anchor': 'middle',
-      text: lower ? num(t, 2) : Math.round(100 * t) + '%' }));
+      fill: 'var(--muted)', 'text-anchor': 'middle', text: tickFmt(t) }));
   }
+  // the chance rule: in raw mode it sits where chance falls on the axis, in
+  // diverging mode it IS the axis origin
   if (hasChance) {
-    svg.append(el('svg:line', { x1: X(info.chance), y1: 14, x2: X(info.chance), y2: H - 18,
+    const cx = div ? base : X(info.chance);
+    svg.append(el('svg:line', { x1: cx, y1: 14, x2: cx, y2: H - 18,
       stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '3 3' }));
-    svg.append(el('svg:text', { x: X(info.chance) + 4, y: 10, 'font-size': 9.5,
-      fill: 'var(--muted)', text: 'chance ' + Math.round(100 * info.chance) + '%' }));
+    svg.append(el('svg:text', { x: cx + 4, y: 10, 'font-size': 9.5,
+      fill: 'var(--muted)',
+      text: 'chance ' + Math.round(100 * info.chance) + '%' }));
   }
+  if (front && div) {
+    const fx = X(dv({ v: front.v, se: 0 }));
+    svg.append(el('svg:line', { x1: fx, y1: 14, x2: fx, y2: H - 18,
+      stroke: 'var(--axis)', 'stroke-width': 1, 'stroke-dasharray': '1 3' }));
+    svg.append(el('svg:text', { x: fx - 4, y: 10, 'font-size': 9.5,
+      fill: 'var(--muted)', 'text-anchor': 'end',
+      text: 'frontier ' + Math.round(100 * front.v) + '%' }));
+  }
+  // rounded at the data end, square at the baseline — and mirrored when a bar
+  // points left, which only happens below chance
+  const barPath = (x0, x1, yy, h) => {
+    const dir = x1 >= x0 ? 1 : -1;
+    const w = Math.max(2, Math.abs(x1 - x0)), r = Math.min(4, w), tip = x0 + dir * w;
+    return dir > 0
+      ? `M${x0},${yy} H${tip - r} q${r},0 ${r},${r} V${yy + h - r} q0,${r} -${r},${r} H${x0} Z`
+      : `M${x0},${yy} H${tip + r} q${-r},0 ${-r},${r} V${yy + h - r} q0,${r} ${r},${r} H${x0} Z`;
+  };
   let y = TOP;
   for (const { m, c } of shown) {
     const dim = noisy(c);                  // within noise of chance: still there, but quiet
     const isCk = m.source === 'artifact';  // hollow = uploaded checkpoint, same hue
-    const w = Math.max(2, X(c.v) - LBL), r = Math.min(4, w);
-    const name = m.name.length > 22 ? m.name.slice(0, 21) + '…' : m.name;
+    const vx = div ? X(dv(c)) : X(c.v);
+    // below chance is the red arm of the diverging pair, and it is not a
+    // curiosity: an instruct template applied to a base model puts real models
+    // under the line, so the chart has to be able to say so
+    const below = div && dv(c) < 0;
+    const hue = below ? 'var(--s8)' : 'var(--s1)';
+    // 18, not 22: at 11.5px a 22-character id runs past the panel's left edge and
+    // the first letters are simply cut off. The full id is on hover and in the
+    // row tooltip, so the gutter is the constraint, not the information.
+    const name = m.name.length > 18 ? m.name.slice(0, 17) + '…' : m.name;
     svg.append(el('svg:text', { x: LBL - 8, y: y + BH * 0.75, 'font-size': 11.5,
       fill: dim ? 'var(--muted)' : 'var(--text-secondary)', 'text-anchor': 'end', class: 'blab',
-      'data-model': m.id, text: name }));
+      'data-model': m.id, text: name },
+      el('svg:title', { text: m.id })));
     svg.append(el('svg:path', { class: 'bar', 'data-model': m.id,
-      d: `M${LBL},${y} H${LBL + w - r} q${r},0 ${r},${r} V${y + BH - r} q0,${r} -${r},${r} H${LBL} Z`,
+      d: barPath(base, vx, y, BH),
       opacity: dim ? 0.45 : null,
       'fill-opacity': isCk ? 0.28 : null,
-      stroke: isCk ? 'var(--s1)' : null,
+      stroke: isCk ? hue : null,
       'stroke-width': isCk ? 1.2 : null,
-      fill: 'var(--s1)' }));
+      fill: hue }));
     if (c.se > 0 && !lower) {
-      const lo = X(Math.max(0, c.v - c.se)), hx = X(c.v + c.se), cy = y + BH / 2;
+      const lo = div ? X(dv(c) - dse(c)) : X(Math.max(0, c.v - c.se));
+      const hx = div ? X(dv(c) + dse(c)) : X(c.v + c.se);
+      const cy = y + BH / 2;
       svg.append(el('svg:line', { x1: lo, y1: cy, x2: hx, y2: cy,
         stroke: 'var(--text-primary)', 'stroke-width': 1.4, opacity: 0.55 }));
       for (const xx of [lo, hx])
         svg.append(el('svg:line', { x1: xx, y1: cy - 3.5, x2: xx, y2: cy + 3.5,
           stroke: 'var(--text-primary)', 'stroke-width': 1.4, opacity: 0.55 }));
     }
-    svg.append(el('svg:text', { x: X(c.v + (lower ? 0 : c.se || 0)) + 6, y: y + BH * 0.75,
+    // the label follows the bar's OWN transform (it floated off the end of every
+    // diverging bar otherwise) and flips to the outside when the bar points left
+    // a left-pointing bar leaves its row empty to the RIGHT of the origin, so the
+    // number goes there. Putting it outside the bar tip instead walks it straight
+    // into the model-name gutter, which is where it collided.
+    const labX = div
+      ? (below ? Math.max(base, X(dv(c) + dse(c))) + 6 : X(dv(c) + dse(c)) + 6)
+      : X(c.v + (lower ? 0 : c.se || 0)) + 6;
+    svg.append(el('svg:text', { x: labX, y: y + BH * 0.75,
       'font-size': 11, fill: dim ? 'var(--muted)' : 'var(--text-primary)',
       class: 'blab', 'data-model': m.id,
+      // always the real score — the axis may be relative, the number never is
       text: fmt(c.v) }));
     const tipRows = [
       fmt(c.v) + (c.se ? ` ± ${lower ? num(c.se, 3) : (100 * c.se).toFixed(1) + ' pts'}` : ''),
@@ -1193,7 +1415,14 @@ function normScore(t, v) {
   if (state.radarNorm === 'raw' || !(c > 0)) return v;
   return Math.max(0, Math.min(1, (v - c) / (1 - c)));
 }
-// the compared set: explicit ticks, else the top three by average
+// How many models the capability profile will hold at once. The cap exists for
+// the chart, not the code: past about five overlapping polygons a radar stops
+// being readable. Five is the ceiling the eight-slot palette and the eye agree
+// on. The eviction below used to be silent, which read as a bug — it is now
+// labelled on the card and the evicted row is named.
+const CMP_MAX = 5;
+
+// the compared set: explicit ticks, else the top few by average
 function cmpEffective(ms) {
   if (state.cmpSel.length) return state.cmpSel.filter(id => ms.some(m => m.id === id));
   // prefer official models; fall back to partial averages so a report with no
@@ -1201,7 +1430,7 @@ function cmpEffective(ms) {
   return [...ms].filter(m => m.partialAvg != null)
     .sort((a, b) => (officialAvg(b) ?? -1) - (officialAvg(a) ?? -1)
                  || b.partialAvg - a.partialAvg)
-    .slice(0, 3).map(m => m.id);
+    .slice(0, CMP_MAX).map(m => m.id);
 }
 function cmpToggle(id, ms) {
   if (!state.cmpSel.length) {        // first tick: materialize the default so it edits intuitively
@@ -1212,9 +1441,11 @@ function cmpToggle(id, ms) {
   const i = state.cmpSel.indexOf(id);
   if (i >= 0) { state.cmpSel.splice(i, 1); delete state.cmpColors[id]; }
   else {
-    if (state.cmpSel.length >= 3) {  // FIFO: the newest tick always lands
+    if (state.cmpSel.length >= CMP_MAX) {  // FIFO: the newest tick always lands
       const old = state.cmpSel.shift(); delete state.cmpColors[old];
-    }
+      const gone = DATA.models.find(x => x.id === old);
+      state.cmpEvicted = gone ? gone.name : old;   // said out loud on the card
+    } else state.cmpEvicted = '';
     const used = new Set(Object.values(state.cmpColors));
     let slot = 0; while (used.has(slot)) slot++;
     state.cmpColors[id] = slot;      // color follows the model while it is compared
@@ -1292,15 +1523,19 @@ function radarCard(ms) {
         onclick: () => cmpToggle(s.id, ms) }));
   }));
   const table = el('table', { class: 'radar-tbl' },
+    // truncated with the full id on hover: an untruncated checkpoint name here
+    // sets the column's min-content width and shoves every other model out of
+    // the card. The legend above already carries the names in full.
     el('thead', {}, el('tr', {}, el('th', { text: 'axis' }),
-      series.map(s => el('th', { class: 'num', text: s.m.name })))),
+      series.map(s => el('th', { class: 'num', title: s.id,
+        text: s.m.name.length > 16 ? s.m.name.slice(0, 15) + '…' : s.m.name })))),
     el('tbody', {}, axes.map(ax => el('tr', {}, el('td', { text: ax.label }),
       series.map(s => el('td', { class: 'num', text: s.vals[ax.key] ? pct(s.vals[ax.key].n) : '—' }))))));
   return el('div', { class: 'card' },
     el('h2', { text: 'Capability profile' }),
     el('p', { class: 'sub', text:
-      'One axis per benchmark, one shape per model — tick up to three in the table below '
-      + '(a fourth tick replaces the oldest). Axes are scaled ABOVE CHANCE by default: 25% on a '
+      `One axis per benchmark, one shape per model — tick up to ${CMP_MAX} in the table below. `
+      + 'Axes are scaled ABOVE CHANCE by default: 25% on a '
       + '4-way task is 0, perfect is 100%, so a 4-way and a 2-way task are comparable; switch to '
       + 'raw accuracy to quote the number itself. Perplexity tasks are excluded (different scale). '
       + 'Read the shape here and the numbers below — a radar’s area exaggerates differences and '
@@ -1309,7 +1544,13 @@ function radarCard(ms) {
       seg('scale', [['chance', 'above chance'], ['raw', 'raw accuracy']], state.radarNorm,
           v => { state.radarNorm = v; render(); }),
       seg('axes', [['tasks', 'tasks'], ['categories', 'categories']], state.radarAxes,
-          v => { state.radarAxes = v; render(); })),
+          v => { state.radarAxes = v; render(); }),
+      // the slot count, said out loud. A full set silently dropping a model on
+      // the next tick is the single most confusing thing this card used to do.
+      el('span', { class: 'small', style: 'margin-left:auto',
+        text: `comparing ${ids.length} of ${CMP_MAX} slots`
+            + (ids.length >= CMP_MAX ? ' — full, the next tick replaces the oldest' : '')
+            + (state.cmpEvicted ? ` · dropped ${state.cmpEvicted}` : '') })),
     el('div', { class: 'radar-grid' },
       el('div', {}, svg, legend),
       el('div', { class: 'lb-wrap' }, table)));
@@ -1377,7 +1618,10 @@ function vLeaderboard(ms) {
       if (c.key === 'name') return el('td', { class: 'model', 'data-model': m.id,
         title: m.id + (m.archinfo && m.archinfo.hidden
           ? `\n${m.archinfo.arch || ''} · hidden ${m.archinfo.hidden} · layers ${m.archinfo.layers} · vocab ${m.archinfo.vocab}` : '') },
-        m.name, ckBadge(m) || (m.kind === 'instruct'
+        // the name truncates, the badges never do: a long checkpoint id used to
+        // set the column's min-content width and push every task off-screen
+        el('span', { class: 'mname', text: m.name }),
+        ckBadge(m) || (m.kind === 'instruct'
           ? el('span', { class: 'badge instruct', text: 'instruct' })
           : el('span', { class: 'badge', text: 'base' })),
         prelimBadge(m) || '');
@@ -1442,11 +1686,28 @@ function vLeaderboard(ms) {
 
 function vTasks(ms) {
   if (!DATA.accTasks.length) return [note('No accuracy tasks found.')];
+  const scaleBtn = (v, label, tip) => el('button', {
+    class: 'tgl' + (state.accScale === v ? ' on' : ''), title: tip, text: label,
+    'aria-pressed': String(state.accScale === v),
+    onclick: () => { state.accScale = v; render(); } });
   return [
     el('p', { class: 'sub', style: 'margin:10px 2px', text:
       'One panel per benchmark, models ranked. Bars share one hue on purpose — the label is the identity; '
       + 'pointing at any model highlights it in every panel. Dashed line = chance.'
       + (anyCk() ? ' Hollow bars are uploaded checkpoints.' : '') }),
+    el('div', { class: 'ctrl', style: 'margin:0 2px 10px' },
+      el('span', { class: 'small', text: 'scale' }),
+      scaleBtn('raw', 'raw score',
+               'accuracy as the harness reports it, 0% to the best score on the board'),
+      scaleBtn('chance', 'vs chance',
+               'share of the headroom above chance: 0% = guessing, 100% = perfect. '
+             + 'Bars diverge from the chance line, so a model BELOW chance points '
+             + 'left in red. This is the scale on which models bunched at the floor '
+             + 'become distinguishable, and the one the frontier reference fits on.'),
+      el('span', { class: 'small', style: 'margin-left:auto',
+        text: state.accScale === 'chance'
+          ? '0% = chance · 100% = perfect'
+          : 'tasks with no chance level are unchanged by this toggle' })),
     el('div', { class: 'panels' }, DATA.accTasks.map(t => barPanel(t, ms, { lower: false }))),
     tableTwin('tasks-table', ms, DATA.accTasks, false)];
 }
