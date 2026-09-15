@@ -806,6 +806,9 @@ th .dir { font-size:9px; }
 /* chip row under a task heading: what it measures, how many options, coverage,
    whether it separates anything, where the ceiling is. Every chip carries the
    long version in its title, so the row stays short. */
+.domhead { font-size:12px; font-weight:650; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); margin:18px 2px 8px; }
+.domhead .se { text-transform:none; letter-spacing:0; font-weight:400; }
 .tchips { display:flex; flex-wrap:wrap; gap:5px; margin:5px 0 2px; }
 .tchip { font-size:10.5px; line-height:1.5; border:1px solid var(--border);
   border-radius:5px; padding:0 6px; color:var(--text-secondary); cursor:help;
@@ -1044,6 +1047,67 @@ const anyCk = () => DATA.models.some(m => m.source === 'artifact');
 // the one number allowed to rank models, or null. Preliminary models have no
 // average at all — not a smaller one — so every ranking view drops them.
 const officialAvg = m => state.avgMode === 'raw' ? m.avgRaw : m.avg;
+
+const ord = n => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+                   return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+
+// Rank over the WHOLE board, never the filtered view: "#1 of 7" that changes
+// because someone typed in the search box is not a rank. Preliminary models are
+// absent rather than last — they have no number, not a worse one. Memoized per
+// render because the avg mode is the only thing that can reorder it.
+let _rankMap = null, _rankKey = '';
+function rankOf(m) {
+  const key = state.avgMode + ':' + DATA.models.length;
+  if (_rankKey !== key) {
+    const ranked = DATA.models.filter(x => officialAvg(x) != null)
+                              .sort((a, b) => officialAvg(b) - officialAvg(a));
+    _rankMap = new Map(ranked.map((x, i) => [x.id, { n: i + 1, of: ranked.length }]));
+    _rankKey = key;
+  }
+  return _rankMap.get(m.id) || null;
+}
+
+// One sentence about a model, entirely derived — nothing here is typed by hand,
+// so it cannot go stale or disagree with the table above it. The last clause is
+// the one that matters at our model scale: a board full of numbers hides the
+// fact that several of them are indistinguishable from guessing.
+function modelSentence(m) {
+  const out = [];
+  out.push(`${m.name} is ${m.source === 'artifact' ? 'an uploaded checkpoint'
+                                                   : 'a Hub model'}`
+    + `, evaluated as ${m.kind === 'instruct' ? 'instruct-tuned (chat template applied)'
+                                              : 'base (no chat template)'}`
+    + (m.params ? `, ${P(m.params)} parameters` : '') + '.');
+  const r = rankOf(m), a = officialAvg(m);
+  if (r && a != null)
+    out.push(`It averages ${pct(a)} `
+      + `${state.avgMode === 'raw' ? 'raw' : 'above chance'} over the ${m.nreq} `
+      + `required tasks, ranking ${ord(r.n)} of ${r.of} ranked models here.`);
+  else
+    out.push(`It has ${m.nhave} of ${m.nreq} required tasks, so it is preliminary `
+      + `and carries no overall rank`
+      + ((m.missing || []).length ? ` — still missing ${m.missing.join(', ')}.` : '.'));
+  const bestAt = DATA.accTasks.filter(t => {
+    const mv = (cell(t, m.id) || {}).v;
+    if (mv == null) return false;
+    const vs = DATA.models.map(x => (cell(t, x.id) || {}).v).filter(v => v != null);
+    return vs.length > 1 && mv === Math.max(...vs);
+  });
+  // capped: a sentence naming eight tasks is a list wearing punctuation
+  const few = (xs, n = 3) => xs.slice(0, n).join(', ')
+    + (xs.length > n ? ` and ${xs.length - n} more` : '');
+  if (bestAt.length) out.push(`Best on the board at ${few(bestAt)}.`);
+  // not "scored low" — not distinguishable from guessing, which is a different
+  // and much more useful claim
+  const atChance = DATA.accTasks.filter(t => {
+    const i = DATA.tasks[t] || {}, c = cell(t, m.id);
+    return c && i.chance > 0 && (c.v - 1.96 * (c.se || 0)) <= i.chance;
+  });
+  if (atChance.length)
+    out.push(`Not statistically above chance on ${few(atChance)}.`);
+  if (m.date) out.push(`Last evaluated ${String(m.date).slice(0, 10)}.`);
+  return out.join(' ');
+}
 const prelimBadge = m => m.official ? null
   : el('span', { class: 'badge prelim',
       title: `preliminary — ${m.nhave}/${m.nreq} required tasks`
@@ -1319,7 +1383,11 @@ function vOverview(ms) {
           + `tasks, ${state.avgMode === 'raw' ? 'raw accuracy' : 'scaled above chance'}` }),
         el('div', { class: 'hero', text: pct(officialAvg(top)) }),
         el('p', { class: 'sub', text: top.id
-          + (top.params ? ` · ${P(top.params)} params` : '') })),
+          + (top.params ? ` · ${P(top.params)} params` : '') }),
+        // every clause derived from the payload, so it cannot drift from the
+        // table below it — including the one nobody writes down by choice
+        el('p', { class: 'small', style: 'margin-top:8px',
+                  text: modelSentence(top) })),
       el('div', { class: 'card' },
         el('h2', { text: 'Top models' }),
         lbMini(ranked.slice(0, 5)))));
@@ -1616,7 +1684,7 @@ function vLeaderboard(ms) {
         'aria-label': 'compare ' + m.name, checked: cmpSet.has(m.id) ? '' : null,
         onchange: () => cmpToggle(m.id, ms) }));
       if (c.key === 'name') return el('td', { class: 'model', 'data-model': m.id,
-        title: m.id + (m.archinfo && m.archinfo.hidden
+        title: modelSentence(m) + '\n\n' + m.id + (m.archinfo && m.archinfo.hidden
           ? `\n${m.archinfo.arch || ''} · hidden ${m.archinfo.hidden} · layers ${m.archinfo.layers} · vocab ${m.archinfo.vocab}` : '') },
         // the name truncates, the badges never do: a long checkpoint id used to
         // set the column's min-content width and push every task off-screen
@@ -1644,10 +1712,16 @@ function vLeaderboard(ms) {
           el('span', { class: 'se',
             title: (m.missing || []).length ? 'missing: ' + m.missing.join(', ') : '',
             text: `— ${m.nhave}/${m.nreq}` }));
+        const r = rankOf(m);
         return el('td', { class: 'num' + (a === best.avg ? ' best' : ''),
           title: `mean over the ${m.nreq} required tasks, `
-            + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0') },
-          pct(a), el('span', { class: 'se', text: ` ${m.nreq}/${m.nreq}` }));
+            + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0')
+            + (r ? `\nrank ${r.n} of ${r.of} ranked models on this board (not of the `
+                 + `filtered view)` : '') },
+          pct(a),
+          // the rank is over the whole board, so it does not move when you filter
+          r ? el('span', { class: 'se', text: ` #${r.n}/${r.of}` })
+            : el('span', { class: 'se', text: ` ${m.nreq}/${m.nreq}` }));
       }
       const cc = cell(c.task, m.id);
       if (!cc) return el('td', { class: 'num', text: '—' });
@@ -1684,6 +1758,18 @@ function vLeaderboard(ms) {
     el('div', { class: 'lb-wrap' }, el('table', { class: 'lb' }, thead, tbody)))];
 }
 
+// tasks under their domain, payload order preserved, undomained ones last
+function domainGroups(tasks) {
+  const by = new Map();
+  for (const t of tasks) {
+    const d = (DATA.tasks[t] || {}).domain || 'other';
+    if (!by.has(d)) by.set(d, []);
+    by.get(d).push(t);
+  }
+  return [...by.entries()].sort((a, b) =>
+    (a[0] === 'other') - (b[0] === 'other'));
+}
+
 function vTasks(ms) {
   if (!DATA.accTasks.length) return [note('No accuracy tasks found.')];
   const scaleBtn = (v, label, tip) => el('button', {
@@ -1708,7 +1794,12 @@ function vTasks(ms) {
         text: state.accScale === 'chance'
           ? '0% = chance · 100% = perfect'
           : 'tasks with no chance level are unchanged by this toggle' })),
-    el('div', { class: 'panels' }, DATA.accTasks.map(t => barPanel(t, ms, { lower: false }))),
+    // grouped under their domain — the same vocabulary the radar folds on, so a
+    // reader learns one taxonomy rather than two
+    ...domainGroups(DATA.accTasks).map(([dom, ts]) => el('div', {},
+      el('h3', { class: 'domhead' }, dom,
+        el('span', { class: 'se', text: ` · ${ts.length} task${ts.length > 1 ? 's' : ''}` })),
+      el('div', { class: 'panels' }, ts.map(t => barPanel(t, ms, { lower: false }))))),
     tableTwin('tasks-table', ms, DATA.accTasks, false)];
 }
 
@@ -2804,8 +2895,22 @@ function renderStatic() {
   const nCk = DATA.models.filter(m => m.source === 'artifact').length;
   const srcSeg = document.getElementById('srcSeg');
   srcSeg.style.display = nCk ? '' : 'none';   // no artifacts -> no third filter
-  const ckBtn = srcSeg.querySelector('[data-src="artifact"]');
-  if (ckBtn) ckBtn.textContent = `Checkpoints (${nCk})`;
+  // every filter says how many it holds, not just the one that happened to have
+  // a count. A filter that might return nothing should say so before it is clicked.
+  const setCount = (seg, attr, val, label, n) => {
+    const b = seg.querySelector(`[${attr}="${val}"]`);
+    if (b) b.textContent = `${label} (${n})`;
+  };
+  const kindSeg = document.getElementById('kindSeg');
+  setCount(kindSeg, 'data-kind', 'all', 'All', DATA.models.length);
+  setCount(kindSeg, 'data-kind', 'base', 'Base',
+           DATA.models.filter(m => m.kind === 'base').length);
+  setCount(kindSeg, 'data-kind', 'instruct', 'Instruct',
+           DATA.models.filter(m => m.kind === 'instruct').length);
+  setCount(srcSeg, 'data-src', 'all', 'All', DATA.models.length);
+  setCount(srcSeg, 'data-src', 'hub', 'Models',
+           DATA.models.filter(m => m.source === 'hub').length);
+  setCount(srcSeg, 'data-src', 'artifact', 'Checkpoints', nCk);
   document.getElementById('metaChips').replaceChildren(
     el('span', { class: 'chip', text: `generated ${DATA.generated}` }),
     LIVE ? el('span', { class: 'chip', text: 'live — updates as runs finish' }) : '',
