@@ -844,6 +844,7 @@ th .dir { font-size:9px; }
   color:var(--text-secondary); }
 .tgl.on { background:var(--accent-soft); border-color:var(--accent);
   color:var(--accent); font-weight:600; }
+.tgl:disabled { opacity:.45; cursor:not-allowed; }
 .tv { display:none; margin-top:12px; } .tv.open { display:block; }
 .small { font-size:12px; color:var(--text-secondary); }
 .up { color:var(--success-text); } .down { color:var(--critical); }
@@ -969,6 +970,7 @@ const state = {
   trRuns: [], trSeries: {}, trFetching: false,
   trQ: '', trStatus: 'all', trOrder: 'updated',            // runs-list filter/sort
   trMetricQ: '', trSecClosed: {}, trSecSig: '',            // metric panels filter / sections
+  trXAxis: 'step',                     // benchmark-join chart: step | tokens | compute
   cmpSel: [], cmpColors: {},                               // radar: compared models (≤CMP_MAX)
   accScale: 'raw',                     // task panels: 'raw' | 'chance' (diverging)
   cmpEvicted: '',                      // last model the compare FIFO dropped
@@ -2498,7 +2500,10 @@ const fmtv = v => !isFinite(v) ? '—' : Math.abs(v) >= 100 ? Math.round(v).toLo
 const fmtCount = v => v == null ? '—' : v < 1e3 ? String(Math.round(v))
               : v < 1e6 ? (v / 1e3).toFixed(v < 1e4 ? 1 : 0) + 'K'
               : v < 1e9 ? (v / 1e6).toFixed(v < 1e7 ? 1 : 0) + 'M'
-              : (v / 1e9).toFixed(2) + 'B';
+              // T matters now that this formats a token axis: modern runs are
+              // measured in trillions, and "11000.00B" is not a number anyone reads
+              : v < 1e12 ? (v / 1e9).toFixed(2) + 'B'
+              : (v / 1e12).toFixed(2) + 'T';
 const ema = (pts, a) => {
   if (!a) return pts;
   let s = null;
@@ -2514,12 +2519,20 @@ function lineChart(title, seriesList, o = {}) {
   let ys = allPts.map(p => p[1]);
   const logY = o.logY && ys.every(y => y > 0);
   if (logY) ys = ys.map(Math.log10);
-  const xmin = Math.min(...allPts.map(p => p[0])), xmax = Math.max(...allPts.map(p => p[0]));
+  // x can be a step (linear, the default) or a quantity that spans orders of
+  // magnitude — training tokens, or 6ND compute. Both are opt-in so every
+  // existing metric chart keeps exactly the code path it had.
+  const logX = !!o.logX && allPts.every(p => p[0] > 0);
+  const tx = x => logX ? Math.log10(x) : x;
+  const xfmt = o.xfmt || (v => Math.round(v).toLocaleString());
+  const xlabel = o.xlabel || 'step';
+  const xmin = Math.min(...allPts.map(p => tx(p[0]))),
+        xmax = Math.max(...allPts.map(p => tx(p[0])));
   let ymin = Math.min(...ys), ymax = Math.max(...ys);
   if (ymin === ymax) { ymin -= 0.5; ymax += 0.5; }
   const pad = (ymax - ymin) * 0.06;
   ymin -= pad; ymax += pad;
-  const X = x => L + (W - L - R) * (x - xmin) / ((xmax - xmin) || 1);
+  const X = x => L + (W - L - R) * (tx(x) - xmin) / ((xmax - xmin) || 1);
   const Y = v => { const t = logY ? Math.log10(Math.max(v, 1e-12)) : v;
                    return T + (H - T - B) * (1 - (t - ymin) / (ymax - ymin)); };
   const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img',
@@ -2543,12 +2556,15 @@ function lineChart(title, seriesList, o = {}) {
       text: logY ? fmtv(Math.pow(10, t)) : fmtv(t) }));
   }
   for (const xv of [xmin, (xmin + xmax) / 2, xmax]) {
-    svg.append(el('svg:text', { x: X(xv), y: H - 8, 'font-size': 10,
-      fill: 'var(--muted)', 'text-anchor': 'middle', text: Math.round(xv).toLocaleString() }));
+    // xv is in transformed space; place from it directly and label the real value
+    svg.append(el('svg:text', {
+      x: L + (W - L - R) * (xv - xmin) / ((xmax - xmin) || 1), y: H - 8,
+      'font-size': 10, fill: 'var(--muted)', 'text-anchor': 'middle',
+      text: xfmt(logX ? Math.pow(10, xv) : xv) }));
   }
   // checkpoint markers first (under the data)
   for (const s of smoothed) for (const ev of (s.events || [])) {
-    if (ev.step < xmin || ev.step > xmax) continue;
+    if (tx(ev.step) < xmin || tx(ev.step) > xmax) continue;
     svg.append(el('svg:line', { x1: X(ev.step), y1: T, x2: X(ev.step), y2: H - B,
       stroke: s.color, 'stroke-width': 1, 'stroke-dasharray': '3 3', opacity: 0.5 }));
   }
@@ -2571,16 +2587,19 @@ function lineChart(title, seriesList, o = {}) {
   const overlay = el('svg:rect', { class: 'hit', x: L, y: 0, width: W - L - R, height: H,
     onpointermove: e => {
       const box = svg.getBoundingClientRect();
-      const fx = xmin + ((e.clientX - box.left) / box.width * W - L) / (W - L - R) * (xmax - xmin);
+      // pointer position is in transformed space; bring it back before matching
+      // against the real x values so the readout names a real step/token/FLOP
+      const fxT = xmin + ((e.clientX - box.left) / box.width * W - L) / (W - L - R) * (xmax - xmin);
+      const fx = logX ? Math.pow(10, fxT) : fxT;
       let lo = 0, hi = steps.length - 1;
       while (lo < hi) { const mid = (lo + hi) >> 1; steps[mid] < fx ? lo = mid + 1 : hi = mid; }
       const stp = (lo > 0 && fx - steps[lo - 1] < steps[lo] - fx) ? steps[lo - 1] : steps[lo];
       hair.setAttribute('x1', X(stp)); hair.setAttribute('x2', X(stp));
-      const rows = [`step ${stp.toLocaleString()} — ${title}`];
+      const rows = [`${xlabel} ${xfmt(stp)} — ${title}`];
       for (const s of smoothed) {
         let best = null;
         for (const p of s.spts) if (best === null || Math.abs(p[0] - stp) < Math.abs(best[0] - stp)) best = p;
-        if (best && Math.abs(best[0] - stp) <= (xmax - xmin) * 0.05 + 1)
+        if (best && Math.abs(tx(best[0]) - tx(stp)) <= (xmax - xmin) * 0.05 + (logX ? 0 : 1))
           rows.push(`${s.label}: ${fmtv(best[1])}`);
         const ev = (s.events || []).find(ev => ev.step === stp);
         if (ev) rows.push(`⚑ checkpoint: ${ev.detail}`);
@@ -2830,11 +2849,53 @@ function vTraining() {
       // ---- benchmark join: single run selected → scores vs step ---------------
       if (selRuns.length === 1 && selRuns[0].det) {
         const evs = (selRuns[0].det.events || []).filter(e => e.kind === 'checkpoint');
+        // Same data, three x-axes. Step is what the trainer counts; tokens is what
+        // the model actually saw; compute (6ND) is the only one of the three that
+        // compares runs of DIFFERENT model sizes, which is the whole reason to
+        // want it. All three come from this run's own metrics — we never guess a
+        // token count, so a run that does not log `tokens` simply cannot offer
+        // the last two axes and says so.
+        const XA = state.trXAxis || 'step';
+        const tokSeries = ((selRuns[0].det.metrics || {}).tokens) || [];
+        const tokensAt = s => {          // last logged token count at or before s
+          let best = null;
+          for (const [st, v] of tokSeries) if (st <= s && (!best || st > best[0])) best = [st, v];
+          return best ? best[1] : null;
+        };
+        const xOf = ev => {
+          if (XA === 'step') return ev.step;
+          const d = tokensAt(ev.step);
+          if (!(d > 0)) return null;
+          if (XA === 'tokens') return d;
+          const mm = DATA.models.find(x => x.id === ev.detail), aa = (mm || {}).archinfo || {};
+          const N = aa.active_params || (mm || {}).params;   // sparse: ACTIVE params
+          return N ? 6 * N * d : null;
+        };
         const series = DATA.accTasks.map((t, i) => ({
           label: t, color: trColor(i),
-          pts: evs.map(ev => cell(t, ev.detail) ? [ev.step, cell(t, ev.detail).v] : null)
-                  .filter(Boolean),
+          pts: evs.map(ev => { const x = xOf(ev), c = cell(t, ev.detail);
+                               return (x != null && c) ? [x, c.v] : null; })
+                  .filter(Boolean).sort((p, q) => p[0] - q[0]),
         })).filter(s => s.pts.length);
+        const haveTokens = tokSeries.length > 0;
+        const axisBtn = (v, label, tip) => el('button', {
+          class: 'tgl' + (XA === v ? ' on' : ''), text: label,
+          title: tip, disabled: (v !== 'step' && !haveTokens) ? '' : null,
+          'aria-pressed': String(XA === v),
+          onclick: () => { state.trXAxis = v; render(); } });
+        const axisCtrl = el('div', { class: 'ctrl', style: 'margin:2px 0 8px' },
+          el('span', { class: 'small', text: 'x-axis' }),
+          axisBtn('step', 'step', 'optimizer steps, as the trainer counts them'),
+          axisBtn('tokens', 'tokens',
+            haveTokens ? 'training tokens seen, log scale'
+                       : 'this run does not log a `tokens` metric'),
+          axisBtn('compute', 'compute (6ND)',
+            haveTokens ? '6 x parameters x tokens, in FLOP, log scale — the axis that '
+                       + 'compares runs of different model sizes. Uses ACTIVE parameters '
+                       + 'for a sparse model.'
+                       : 'this run does not log a `tokens` metric'),
+          haveTokens ? '' : el('span', { class: 'small',
+            text: 'log a `tokens` metric to unlock the other two axes' }));
         const pendingEvs = evs.filter(ev => !DATA.accTasks.some(t => cell(t, ev.detail)));
         // honesty line: "finished" on a run means TRAINING finished — say where the
         // benchmarks are, so a green chip with an empty chart is never confusing
@@ -2848,14 +2909,22 @@ function vTraining() {
         if (inQueue) statusLine += `, ${inQueue} in the eval queue`;
         if (failedEvs) statusLine += `, ${failedEvs} failed (see Submit & Queue)`;
         if (series.length || evs.length) {
+          const XTITLE = { step: 'benchmark score vs step',
+                           tokens: 'benchmark score vs training tokens',
+                           compute: 'benchmark score vs training compute (6ND)' };
           const panel = series.length
-            ? lineChart('benchmark score vs step', series, {})
+            ? lineChart(XTITLE[XA], series, {
+                logX: XA !== 'step',
+                xlabel: XA === 'compute' ? 'compute' : XA === 'tokens' ? 'tokens' : 'step',
+                xfmt: XA === 'compute' ? (v => flop(v) + ' FLOP')
+                    : XA === 'tokens' ? fmtCount : undefined })
             : note('Checkpoints are queued — scores appear here when evaluation finishes.');
           out.push(el('div', { class: 'card' },
             el('h2', { text: 'Benchmarks along this run' }),
             el('p', { class: 'sub', text: statusLine + '. Every checkpoint this run submitted, '
-              + 'joined to its scores on the leaderboard — capability versus training step, '
-              + 'next to the loss.' }),
+              + 'joined to its scores on the leaderboard — capability against training '
+              + 'effort, next to the loss.' }),
+            axisCtrl,
             panel));
         }
       }
