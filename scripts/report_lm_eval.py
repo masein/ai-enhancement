@@ -806,6 +806,27 @@ th .dir { font-size:9px; }
 /* chip row under a task heading: what it measures, how many options, coverage,
    whether it separates anything, where the ceiling is. Every chip carries the
    long version in its title, so the row stays short. */
+/* model detail page */
+.backlink { display:inline-block; font-size:12.5px; color:var(--accent);
+  text-decoration:none; margin:10px 2px; }
+.backlink:hover { text-decoration:underline; }
+.mhead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.mtitle { margin:0; font-size:24px; letter-spacing:-0.01em; }
+.rankbadge { font-size:12px; font-weight:650; color:var(--accent);
+  background:var(--accent-soft); border-radius:6px; padding:1px 7px; }
+.mlink { color:inherit; text-decoration:none; border-bottom:1px dotted var(--border); }
+.mlink:hover { color:var(--accent); border-bottom-color:var(--accent); }
+.mtbl td, .mtbl th { vertical-align:middle; }
+.mtbl .tname { font-weight:550; cursor:help; }
+.mtbl .sbar { display:block; }
+.mtbl td.dimmed { color:var(--muted); }
+.mtbl tr.domrow td { font-size:11px; font-weight:650; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--muted); padding-top:14px; border-bottom:none; }
+.mtbl tr.flagrow td { font-size:11.5px; color:var(--muted); padding-top:0; border-bottom:none; }
+.provlist { display:grid; grid-template-columns:minmax(120px,max-content) 1fr;
+  gap:4px 16px; margin:8px 0 0; font-size:12.5px; }
+.provlist dt { color:var(--muted); }
+.provlist dd { margin:0; overflow-wrap:anywhere; }
 .domhead { font-size:12px; font-weight:650; letter-spacing:.06em; text-transform:uppercase;
   color:var(--muted); margin:18px 2px 8px; }
 .domhead .se { text-transform:none; letter-spacing:0; font-weight:400; }
@@ -934,6 +955,7 @@ let DATA = JSON.parse(document.getElementById('data').textContent || 'null');
 const LIVE = DATA === null;
 const state = {
   q: '', kind: 'all', tab: 'overview',
+  model: null,                         // open model detail page, by id (hash-routed)
   src: 'all',                          // All | Models | Checkpoints — a filter, nothing hidden by default
   panelOpen: {},                       // per-task "show all bars" toggles
   sort: { key: 'avg', dir: -1 },
@@ -1087,7 +1109,12 @@ function modelSentence(m) {
     out.push(`It has ${m.nhave} of ${m.nreq} required tasks, so it is preliminary `
       + `and carries no overall rank`
       + ((m.missing || []).length ? ` — still missing ${m.missing.join(', ')}.` : '.'));
+  // "best at" is only a claim on a task that separates anybody. Leading a task
+  // where no pair of models differs by more than their combined error is an
+  // artifact of the sort order, and it reads as praise — the weakest model on
+  // the board was being credited with winning the one task we flag as flat.
   const bestAt = DATA.accTasks.filter(t => {
+    if ((DATA.tasks[t] || {}).discriminates === false) return false;
     const mv = (cell(t, m.id) || {}).v;
     if (mv == null) return false;
     const vs = DATA.models.map(x => (cell(t, x.id) || {}).v).filter(v => v != null);
@@ -1363,6 +1390,120 @@ function barPanel(task, models, opts) {
 }
 
 // ---------- views ----------
+// One score on a full 0–100% track, with the two reference marks that make it
+// readable: where guessing sits, and where the published ceiling is. Perplexity
+// scales to its own data instead, and carries neither mark.
+function scoreBar(t, c) {
+  const i = DATA.tasks[t] || {}, W = 200, H = 14;
+  const hi = i.lower ? Math.max(c.v * 1.25, 0.1) : 1;
+  const X = v => Math.max(0, Math.min(W, (v / hi) * W));
+  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H,
+    class: 'sbar', role: 'img',
+    'aria-label': `${t}: ${i.lower ? num(c.v, 3) : pct(c.v)}` });
+  svg.append(el('svg:rect', { x: 0, y: H / 2 - 3, width: W, height: 6, rx: 3,
+    fill: 'var(--grid)' }));
+  svg.append(el('svg:rect', { x: 0, y: H / 2 - 3, width: Math.max(2, X(c.v)),
+    height: 6, rx: 3, fill: 'var(--s1)' }));
+  if (!i.lower && i.chance > 0)
+    svg.append(el('svg:line', { x1: X(i.chance), y1: 1, x2: X(i.chance), y2: H - 1,
+      stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '2 2' },
+      el('svg:title', { text: `chance ${pct(i.chance)}` })));
+  if (!i.lower && i.frontier)
+    svg.append(el('svg:line', { x1: X(i.frontier.v), y1: 1, x2: X(i.frontier.v), y2: H - 1,
+      stroke: 'var(--axis)', 'stroke-width': 1.5 },
+      el('svg:title', { text: `frontier ${pct(i.frontier.v)} — ${i.frontier.src}, `
+        + `as of ${i.frontier.asof}; a different protocol from ours` })));
+  return svg;
+}
+
+function vModel() {
+  const m = DATA.models.find(x => x.id === state.model);
+  if (!m) return [note('No such model.')];
+  const a = m.archinfo || {}, r = rankOf(m), avg = officialAvg(m), comp = computeOf(m);
+  const back = el('a', { class: 'backlink', href: '#tab=' + state.tab,
+    text: '← Back to ' + (TABS.find(([id]) => id === state.tab) || [, 'the board'])[1] });
+
+  const head = el('div', { class: 'card' },
+    el('div', { class: 'mhead' },
+      el('h2', { class: 'mtitle', text: m.name }),
+      ckBadge(m) || el('span', { class: 'badge' + (m.kind === 'instruct' ? ' instruct' : ''),
+        text: m.kind }),
+      prelimBadge(m) || '',
+      r ? el('span', { class: 'rankbadge', title: `${r.n} of ${r.of} ranked models`,
+        text: `#${r.n}` }) : ''),
+    el('p', { class: 'sub mono', text: m.id }),
+    el('p', { class: 'small', style: 'margin-top:8px', text: modelSentence(m) }),
+    el('div', { class: 'tiles', style: 'margin-top:14px' },
+      tile('Parameters', m.params ? P(m.params) : 'Unknown',
+        a.active_params ? `${P(a.active_params)} active · ${a.experts} experts, `
+                        + `${a.experts_per_tok}/token (${a.active_src})`
+                        : (m.paramsSrc ? 'from ' + m.paramsSrc : null)),
+      tile('Training compute', comp ? flop(comp.c) + ' FLOP' : 'Unknown',
+        comp ? `6ND · N ${P(comp.N)} ${comp.nsrc} · D ${fmtCount(comp.D)} tokens `
+             + `(run ${comp.run.name})`
+             : 'no tracked training run supplies a token count for this model'),
+      tile(state.avgMode === 'raw' ? 'Average (raw)' : 'Average (above chance)',
+        avg != null ? pct(avg) : '—',
+        r ? `${ord(r.n)} of ${r.of} ranked` : `preliminary · ${m.nhave}/${m.nreq} required`),
+      tile('Tasks', `${m.nhave}/${m.nreq}`,
+        (m.missing || []).length ? 'missing ' + m.missing.join(', ') : 'all required tasks')));
+
+  // results, grouped by domain the way the task panels are
+  const rows = [];
+  for (const [dom, ts] of domainGroups([...DATA.accTasks, ...DATA.pplTasks])) {
+    const have = ts.filter(t => cell(t, m.id));
+    if (!have.length) continue;
+    rows.push(el('tr', { class: 'domrow' },
+      el('td', { colspan: 5, text: dom })));
+    for (const t of have) {
+      const c = cell(t, m.id), i = DATA.tasks[t] || {};
+      const atChance = i.chance > 0 && (c.v - 1.96 * (c.se || 0)) <= i.chance;
+      rows.push(el('tr', {},
+        el('td', {}, el('span', { title: i.desc || '', class: 'tname',
+          text: taskLabel(t) })),
+        el('td', { class: 'num' + (atChance ? ' dimmed' : ''),
+          text: i.lower ? num(c.v, 3) : pct(c.v) },
+          c.se ? el('span', { class: 'se', text: ` ±${(100 * c.se).toFixed(1)}` }) : ''),
+        el('td', {}, scoreBar(t, c)),
+        el('td', { class: 'num se', text: c.shots != null ? c.shots + '-shot' : '—' }),
+        el('td', { class: 'num se', text: c.n != null ? String(c.n) : '—' })));
+      if (atChance) rows.push(el('tr', { class: 'flagrow' }, el('td', { colspan: 5,
+        text: '↑ within 1.96 standard errors of chance — not distinguishable '
+            + 'from guessing' })));
+    }
+  }
+  const results = el('div', { class: 'card' },
+    el('h2', { text: 'Results' }),
+    el('p', { class: 'sub', text: 'Dashed mark is chance; the solid mark, where one '
+      + 'exists, is the best published score — a different protocol from ours, shown '
+      + 'for orientation rather than comparison.' }),
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'lb mtbl' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'Benchmark' }),
+        el('th', { class: 'num', text: 'Score' }), el('th', { text: '' }),
+        el('th', { class: 'num', text: 'Shots' }), el('th', { class: 'num', text: 'Items' }))),
+      el('tbody', {}, rows))));
+
+  const prov = [
+    ['architecture', a.arch], ['shape', a.hidden ? `hidden ${a.hidden} · layers ${a.layers}`
+      + ` · heads ${a.heads} · ctx ${a.ctx}` : null],
+    ['vocab', a.vocab], ['backend', m.backend], ['dtype', m.dtype],
+    ['weights stored as', a.stored_dtype], ['batch size', m.batch],
+    ['chat template', m.chat ? `applied${a.tmpl_sha ? ' · ' + a.tmpl_sha : ''}` : 'none'],
+    ['kind decided by', m.kindReason], ['seed', m.seed], ['limit', m.limit],
+    ['model code', (a.code_sha || []).join(', ')],
+    ['eval wall clock', m.minutes != null ? m.minutes + ' min' : null],
+    ['last evaluated', m.date],
+  ].filter(([, v]) => v != null && v !== '' && v !== false);
+  const provCard = el('div', { class: 'card' },
+    el('h2', { text: 'Provenance' }),
+    el('p', { class: 'sub', text: 'What produced these numbers. Two runs whose '
+      + 'template id or harness differ are not comparable, whatever the scores say.' }),
+    el('dl', { class: 'provlist' }, prov.flatMap(([k, v]) =>
+      [el('dt', { text: k }), el('dd', { class: 'mono', text: String(v) })])));
+
+  return [back, head, results, provCard];
+}
+
 function vOverview(ms) {
   const frag = [];
   // only official models can be ranked — a preliminary model has no average
@@ -1434,6 +1575,68 @@ function vOverview(ms) {
     note('Whiskers are ±1 standard error. If two whiskers overlap, do not call a winner — every pairwise z-test verdict rides along in the JSON export (the "sig" field) when you need the arbiter.')));
   return frag;
 }
+// ---------------------------------------------------------------------------
+// Routing. The whole report is one file with no server, so the address bar is
+// the only place a view can live — and putting it there is what makes Back work.
+// A dashboard whose Back button leaves the page instead of returning to the list
+// you came from is the single most reported annoyance in apps shaped like this.
+// ---------------------------------------------------------------------------
+const hashFor = () => state.model ? 'model=' + encodeURIComponent(state.model)
+                                  : 'tab=' + state.tab;
+
+function routeFromHash() {
+  const h = decodeURIComponent(location.hash.replace(/^#/, ''));
+  const m = /^model=(.+)$/.exec(h);
+  if (m && DATA.models.some(x => x.id === m[1])) { state.model = m[1]; return; }
+  state.model = null;
+  const t = /^tab=(.+)$/.exec(h);
+  if (t && TABS.some(([id]) => id === t[1])) state.tab = t[1];
+}
+
+// every navigation goes through here, so history and state cannot disagree
+function navigate(patch) {
+  Object.assign(state, patch);
+  const want = hashFor();
+  // push history, then paint. Painting here rather than leaving it to the
+  // hashchange handler is deliberate: that handler ignores a hash which already
+  // agrees with state (it is our own write echoing back), so relying on it to
+  // render meant a tab click updated the URL and nothing else.
+  if (location.hash.slice(1) !== want) location.hash = want;
+  render();
+}
+
+window.addEventListener('hashchange', () => {
+  // a hash that already matches state is our own write echoing back; anything
+  // else is the user pressing Back or Forward, and we adopt it
+  if (location.hash.slice(1) === hashFor()) return;
+  routeFromHash();
+  render();
+});
+
+// FLOP with a readable exponent — 6ND spans twenty orders of magnitude across a
+// board that holds both a 14M probe and a 750M checkpoint
+const flop = v => {
+  if (!(v > 0) || !isFinite(v)) return null;
+  const e = Math.floor(Math.log10(v));
+  return `${(v / Math.pow(10, e)).toFixed(1)}e${e}`;
+};
+
+// Training compute for a model, or null. C ≈ 6ND is the standard dense estimate;
+// for a sparse model the N that matters is the ACTIVE parameter count, not the
+// total, so prefer it and say which was used. D only exists for checkpoints that
+// came from a tracked training run — for a Hub model we simply do not know, and
+// (per epoch.ai, whose job this is) neither does anyone else for most of them.
+function computeOf(m) {
+  const a = m.archinfo || {};
+  const N = a.active_params || m.params;
+  if (!N) return null;
+  const run = (state.trRuns || []).find(r =>
+    r.hf_prefix && (m.id === r.hf_prefix || m.id.startsWith(r.hf_prefix)));
+  if (!run || !(run.tokens > 0)) return null;
+  return { c: 6 * N * run.tokens, N, D: run.tokens, run,
+           nsrc: a.active_params ? `active (${a.active_src})` : 'total' };
+}
+
 const tile = (label, value, notetext) => el('div', { class: 'tile' },
   el('div', { class: 'label', text: label }),
   el('div', { class: 'value', text: value }),
@@ -1688,7 +1891,10 @@ function vLeaderboard(ms) {
           ? `\n${m.archinfo.arch || ''} · hidden ${m.archinfo.hidden} · layers ${m.archinfo.layers} · vocab ${m.archinfo.vocab}` : '') },
         // the name truncates, the badges never do: a long checkpoint id used to
         // set the column's min-content width and push every task off-screen
-        el('span', { class: 'mname', text: m.name }),
+        // a real link, not a click handler: middle-click, copy-link-address and
+        // the Back button all work for free because the view lives in the URL
+        el('a', { class: 'mname mlink', text: m.name,
+                  href: '#model=' + encodeURIComponent(m.id) }),
         ckBadge(m) || (m.kind === 'instruct'
           ? el('span', { class: 'badge instruct', text: 'instruct' })
           : el('span', { class: 'badge', text: 'base' })),
@@ -2877,10 +3083,12 @@ function render() {
     `${ms.length} of ${DATA.models.length} models shown`;
   const tabs = document.getElementById('tabs');
   tabs.replaceChildren(...TABS.map(([id, label]) =>
-    el('button', { role: 'tab', 'aria-selected': String(state.tab === id),
-      onclick: () => { state.tab = id; render(); }, text: label })));
+    el('button', { role: 'tab',
+      'aria-selected': String(!state.model && state.tab === id),
+      onclick: () => navigate({ tab: id, model: null }), text: label })));
   const view = document.getElementById('view');
   view.classList.remove('dimmed');
+  if (state.model) { view.replaceChildren(...vModel()); return; }
   const fn = TABS.find(([id]) => id === state.tab)[2];
   view.replaceChildren(...fn(ms));
 }
@@ -2925,6 +3133,9 @@ function renderStatic() {
 function initData(d) {
   DATA = d;
   renderStatic();
+  // adopt the address bar before the first paint, so a shared #model= link opens
+  // that model rather than the overview
+  routeFromHash();
   render();
 }
 
