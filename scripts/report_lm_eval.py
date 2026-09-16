@@ -806,6 +806,26 @@ th .dir { font-size:9px; }
 /* chip row under a task heading: what it measures, how many options, coverage,
    whether it separates anything, where the ceiling is. Every chip carries the
    long version in its title, so the row stays short. */
+/* heat legend + "about these benchmarks" */
+.hl { display:inline-flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:11.5px;
+  color:var(--text-secondary); }
+.hl-item { display:inline-flex; align-items:center; gap:4px; }
+.hl-sw { width:16px; height:11px; border-radius:3px; border:1px solid var(--border);
+  display:inline-block; }
+.lb th.hasinfo { cursor:help; }
+.lb th.hasinfo::after { content:"\2009\24D8"; font-size:9px; color:var(--muted);
+  vertical-align:1px; }
+.about { padding:0; }
+.about-toggle { font:inherit; font-size:13px; font-weight:600; width:100%; text-align:left;
+  background:none; border:0; color:var(--text-primary); padding:12px 16px; cursor:pointer;
+  border-radius:12px; }
+.about-toggle:hover { color:var(--accent); }
+.about-body { padding:0 16px 14px; display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:14px 22px; }
+.about-item { border-top:1px solid var(--border); padding-top:10px; }
+.about-head { display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-bottom:4px; }
+.about-name { font-weight:600; font-size:13px; }
+.about-desc { margin:0; font-size:12.5px; line-height:1.5; color:var(--text-secondary); }
 /* model detail page */
 .backlink { display:inline-block; font-size:12.5px; color:var(--accent);
   text-decoration:none; margin:10px 2px; }
@@ -976,6 +996,8 @@ const state = {
   cmpEvicted: '',                      // last model the compare FIFO dropped
   radarNorm: 'chance', radarAxes: 'tasks',                 // radar scaling / axis mode
   avgMode: 'chance',                   // official average: above-chance | raw
+  lbHeat: false,                       // leaderboard cells: plain | heat-shaded
+  lbAbout: false,                      // "about these benchmarks" panel open
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
   // focus from filter inputs and kill slider drags
@@ -1829,6 +1851,68 @@ function radarCard(ms) {
       el('div', { class: 'lb-wrap' }, table)));
 }
 
+// Cell shading. Polarity where a baseline exists, magnitude where it does not:
+// a task WITH a chance level gets a diverging fill centred on it (blue above,
+// red below, nothing at the line), because "which side of chance" is the fact
+// that decides whether a number means anything on this board. A task without
+// one — perplexity, gsm8k — gets a single-hue sequential fill across its own
+// column range.
+//
+// Not red-to-green, which was the obvious thing to copy: that scheme fails the
+// palette checks (the yellow sits outside the lightness band and hits 1.63:1
+// against the surface) and green/yellow separate by only ΔE 10 under
+// protanopia, which is roughly one man in twelve. The pair used here is the one
+// already validated for this palette. Intensity tops out well below opaque and
+// the number stays in a text token, so every cell is readable without colour.
+function heatBg(c, v, rng) {
+  if (v == null) return null;
+  const i = DATA.tasks[c.task] || {};
+  let hue, k;
+  if (!c.lower && i.chance > 0) {
+    const d = (v - i.chance) / (1 - i.chance);
+    if (Math.abs(d) < 0.005) return null;            // sitting on the line
+    const span = d > 0 ? 1 : (i.chance / (1 - i.chance)) || 1;
+    hue = d > 0 ? 'var(--s1)' : 'var(--s8)';
+    k = Math.abs(d) / span;
+  } else {
+    if (!rng || rng.hi === rng.lo) return null;
+    const t = (v - rng.lo) / (rng.hi - rng.lo);
+    k = c.lower ? 1 - t : t;                          // perplexity: lower is better
+    hue = 'var(--s1)';
+  }
+  const a = (8 + 52 * Math.max(0, Math.min(1, k))).toFixed(1);
+  return `color-mix(in srgb, ${hue} ${a}%, transparent)`;
+}
+
+// The benchmark descriptions, where someone reading the table can actually find
+// them. A tooltip alone is not an answer for a friend who has never seen the
+// board — this is collapsed by default so it costs nothing, and open it once and
+// every column has a sentence.
+function aboutBenchmarks(tasks) {
+  const body = el('div', { class: 'about-body' }, tasks.map(t => {
+    const i = DATA.tasks[t] || {};
+    return el('div', { class: 'about-item' },
+      el('div', { class: 'about-head' },
+        el('span', { class: 'about-name', text: taskLabel(t) }),
+        i.domain ? el('span', { class: 'tchip dom', text: i.domain }) : '',
+        i.options ? el('span', { class: 'tchip', text: i.options + '-choice' }) : '',
+        i.chance > 0 ? el('span', { class: 'tchip', text: 'chance ' + pct(i.chance) }) : '',
+        i.frontier ? el('span', { class: 'tchip front',
+          text: 'frontier ' + pct(i.frontier.v),
+          title: `${i.frontier.src}, as of ${i.frontier.asof} — a different protocol `
+               + `from ours` }) : '',
+        i.discriminates === false ? el('span', { class: 'tchip flat', text: 'no separation',
+          title: 'no pair of models here differs by more than their combined error' }) : ''),
+      el('p', { class: 'about-desc', text: i.desc || 'No description recorded for this task.' }));
+  }));
+  return el('div', { class: 'card about' },
+    el('button', { class: 'about-toggle', 'aria-expanded': String(state.lbAbout),
+      onclick: () => { state.lbAbout = !state.lbAbout; render(); },
+      text: (state.lbAbout ? '▾' : '▸')
+          + ` About these benchmarks (${tasks.length})` }),
+    state.lbAbout ? body : '');
+}
+
 function vLeaderboard(ms) {
   const cmpSet = new Set(cmpEffective(ms));
   const cols = [
@@ -1855,7 +1939,7 @@ function vLeaderboard(ms) {
   // within a tie band of the leader are all marked tied (≈) instead. The band
   // is a stated placeholder until bootstrap CIs exist — see the tab text.
   const pplBand = lead => Math.max(0.005, 0.01 * Math.abs(lead));
-  const best = {}, tiedCount = {};
+  const best = {}, tiedCount = {}, rng = {};
   for (const c of cols) {
     if (!c.num || c.key === 'params') continue;
     const vs = ms.map(m => val(m, c)).filter(v => v != null);
@@ -1863,6 +1947,8 @@ function vLeaderboard(ms) {
       best[c.key] = c.lower ? Math.min(...vs) : Math.max(...vs);
       tiedCount[c.key] = c.lower
         ? vs.filter(v => v <= best[c.key] + pplBand(best[c.key])).length : 1;
+      // column range drives the sequential fill for tasks with no chance level
+      if (c.task) rng[c.key] = { lo: Math.min(...vs), hi: Math.max(...vs) };
     }
   }
   const shotOf = t => {
@@ -1873,7 +1959,12 @@ function vLeaderboard(ms) {
     el('tr', {}, cols.map(c => c.nosort
       ? el('th', { title: 'tick to compare in the capability profile above', text: '' })
       : el('th', {
-      class: (c.num ? 'num ' : '') + 'sortable' + (c.key === 'name' ? ' model' : ''),
+      class: (c.num ? 'num ' : '') + 'sortable' + (c.key === 'name' ? ' model' : '')
+           + (c.task && (DATA.tasks[c.task] || {}).desc ? ' hasinfo' : ''),
+      // the description on the column itself; the full list is in the panel
+      // below the table, because a tooltip is not documentation
+      title: c.task ? [(DATA.tasks[c.task] || {}).domain,
+                       (DATA.tasks[c.task] || {}).desc].filter(Boolean).join(' — ') : null,
       onclick: () => { state.sort = { key: c.key,
         dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
         render(); },
@@ -1938,6 +2029,7 @@ function vLeaderboard(ms) {
         ? cc.v <= lead + pplBand(lead) : cc.v === lead);
       const mark = !within ? '' : (c.lower && tiedCount[c.key] > 1) ? ' tiebest' : ' best';
       return el('td', { class: 'num' + mark,
+        style: state.lbHeat ? `background:${heatBg(c, cc.v, rng[c.key]) || 'none'}` : null,
         title: mark === ' tiebest'
           ? 'tied for best — perplexity carries no standard error here, so a lead '
             + 'this small is not a difference' : '' },
@@ -1963,7 +2055,30 @@ function vLeaderboard(ms) {
       el('span', { class: 'count-note', text: state.avgMode === 'raw'
         ? 'raw: the number you quote, but a 2-option task starts at 50%'
         : 'chance = 0, perfect = 100% — comparable across tasks with different guess rates' })),
-    el('div', { class: 'lb-wrap' }, el('table', { class: 'lb' }, thead, tbody)))];
+    el('div', { class: 'ctrl', style: 'margin:2px 0 6px' },
+      el('span', { class: 'small', text: 'Cells' }),
+      el('div', { class: 'seg', role: 'group', 'aria-label': 'cell shading' },
+        [[false, 'numbers'], [true, 'heat']].map(([v, l]) =>
+          el('button', { 'aria-pressed': String(state.lbHeat === v), text: l,
+            onclick: () => { state.lbHeat = v; render(); } }))),
+      state.lbHeat ? heatLegend() : el('span', { class: 'count-note',
+        text: 'shade every score by how far it is from chance — useful once the '
+            + 'table is taller than the screen' })),
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'lb' }, thead, tbody))),
+    aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
+}
+
+// the key for the shading — colour alone is never the only encoding here (the
+// number is in every cell), but an unexplained colour is still a puzzle
+function heatLegend() {
+  const chip = (bg, label) => el('span', { class: 'hl-item' },
+    el('span', { class: 'hl-sw', style: `background:${bg}` }), label);
+  return el('span', { class: 'hl' },
+    chip('color-mix(in srgb, var(--s8) 52%, transparent)', 'below chance'),
+    chip('none', 'at chance'),
+    chip('color-mix(in srgb, var(--s1) 22%, transparent)', 'above'),
+    chip('color-mix(in srgb, var(--s1) 60%, transparent)', 'far above'),
+    el('span', { class: 'small', text: '· perplexity shades by column range' }));
 }
 
 // tasks under their domain, payload order preserved, undomained ones last
