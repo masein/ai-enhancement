@@ -1,0 +1,169 @@
+"""build_payload on the fixture: what the dashboard is handed."""
+
+from __future__ import annotations
+
+import json
+import os
+
+import make_fixture
+import report_lm_eval as report
+
+
+def _model(payload, mid):
+    return next(m for m in payload["models"] if m["id"] == mid)
+
+
+def test_every_fixture_model_is_on_the_board(payload, tree):
+    assert {m["id"] for m in payload["models"]} == set(tree["models"])
+    assert payload["accTasks"] == ["mmlu", "hellaswag", "arc_challenge", "arc_easy",
+                                   "winogrande", "piqa", "truthfulqa_mc2"]
+    # MMLU's subjects and categories are children of the group, never headline
+    assert not any(t.startswith("mmlu_") for t in payload["tasks"])
+    assert any(row[1] == "mmlu_econometrics" for row in payload["extra"])
+
+
+def test_official_requires_the_whole_protocol(payload, tree):
+    for mid, m in tree["models"].items():
+        row = _model(payload, mid)
+        if m["tasks"] == make_fixture.FULL:
+            assert row["official"] and row["avg"] is not None and row["missing"] == []
+        else:
+            assert not row["official"] and row["avg"] is None
+            assert set(row["missing"]) == set(payload["required"]) - set(m["tasks"])
+            assert row["partialAvg"] is not None      # a diagnostic, never a rank
+
+
+def test_local_artifact_id_is_normalised_and_marked(payload, tree):
+    row = _model(payload, tree["nodiag"])
+    assert row["source"] == "artifact" and row["name"] == "nodiag-step400"
+    assert all(_model(payload, mid)["source"] == "hub"
+               for mid in tree["models"] if mid.startswith("fx/"))
+
+
+def test_kind_follows_the_chat_template(payload):
+    assert _model(payload, "fx/below-135m-it")["kind"] == "instruct"
+    assert _model(payload, "fx/chance-160m")["kind"] == "base"
+    assert any("Chat template applied to some models" in w for w in payload["warnings"])
+
+
+def test_any_diag_and_salt(payload, tree, diag):
+    assert payload["meta"]["anyDiag"] is True
+    import diagnose as dx
+    assert payload["meta"]["diagSalt"] == dx.SPLIT_SALT
+    for mid in tree["models"]:
+        row = _model(payload, mid)
+        assert (row["diag"] is not None) == (mid in diag), mid
+    assert _model(payload, tree["nodiag"])["diag"] is None
+
+
+def test_any_diag_is_false_before_anyone_has_diagnosed(tmp_path):
+    m = make_fixture.build(tmp_path, diagnose=False)
+    runs = report.load_results(m["out_dir"])
+    p = report.build_payload(report.merge_runs(runs), "t", source="")
+    assert p["meta"]["anyDiag"] is False and p["meta"]["diagSalt"] is None
+    assert all(row["diag"] is None for row in p["models"])
+
+
+def test_trim_diag_caps_the_archive_for_the_page(diag):
+    raw = diag["fx/skewed-360m"]
+    t = report._trim_diag(raw)
+    assert t["split_salt"] == raw["split_salt"]
+    assert set(t["tasks"]) == set(raw["tasks"])
+    for task, v in t["tasks"].items():
+        for bucket, items in (v.get("examples") or {}).items():
+            assert len(items) <= report._DIAG_EXAMPLES
+            assert len(items) == min(len(raw["tasks"][task]["examples"][bucket]),
+                                     report._DIAG_EXAMPLES)
+            for e in items:
+                assert len(e["q"]) <= report._DIAG_Q
+                assert e["chose"] is None or len(e["chose"]) <= 70
+                assert e["answer"] is None or len(e["answer"]) <= 70
+                assert set(e) == {"group", "q", "chose", "answer", "p"}
+        # the archive keeps the counts the page reads; nothing else rides along
+        assert set(v) <= {"metric", "n", "n_report", "n_diagnose", "score_all",
+                          "score_report", "score_diagnose", "buckets", "approx_buckets",
+                          "groups", "answers", "examples"}
+
+
+def test_trim_diag_clips_long_text_and_drops_empty():
+    long_q = "q" * 500
+    raw = {"split_salt": "s", "tasks": {"t": {
+        "n": 1, "buckets": {"wrong": 1},
+        "examples": {"wrong": [{"q": long_q, "chose": "c" * 200, "answer": None, "p": 0.5,
+                                "group": "g"}] * 10, "right": []}}}}
+    t = report._trim_diag(raw)
+    ex = t["tasks"]["t"]["examples"]
+    assert list(ex) == ["wrong"] and len(ex["wrong"]) == report._DIAG_EXAMPLES
+    e = ex["wrong"][0]
+    assert len(e["q"]) == report._DIAG_Q and e["q"].endswith("…")
+    assert len(e["chose"]) == 70 and e["answer"] is None
+    assert report._trim_diag(None) is None
+    assert report._trim_diag({"tasks": {}}) is None
+    assert report._trim_diag({"split_salt": "s", "tasks": {"t": "not a dict"}}) == {
+        "split_salt": "s", "tasks": {}}
+
+
+def test_beside_rereads_a_rewritten_file_and_never_caches_a_miss(tmp_path):
+    """The service imports this module once and lives for weeks. A cache that
+    remembered 'no diagnose.json here' by path meant a diagnosis written after
+    startup never appeared until a restart. Real bug; keep the regression."""
+    src = tmp_path / "m" / "task_5shot" / "run" / "results_x.json"
+    src.parent.mkdir(parents=True)
+    src.write_text("{}")
+    report._META_CACHE.clear()
+    assert report._beside(src, "diagnose.json") is None
+    f = tmp_path / "m" / "diagnose.json"
+    f.write_text(json.dumps({"tasks": {"a": 1}}))
+    assert report._beside(src, "diagnose.json") == {"tasks": {"a": 1}}
+    # rewritten with different content: re-read, not served from cache
+    f.write_text(json.dumps({"tasks": {"a": 1, "b": 2}}))
+    assert report._beside(src, "diagnose.json") == {"tasks": {"a": 1, "b": 2}}
+    # same size, different content, newer mtime: still re-read
+    f.write_text(json.dumps({"tasks": {"a": 1, "b": 3}}))
+    st = f.stat()
+    os.utime(f, ns=(st.st_atime_ns, st.st_mtime_ns + 10_000_000_000))
+    assert report._beside(src, "diagnose.json") == {"tasks": {"a": 1, "b": 3}}
+    # one level up works too (results files sit one or two levels below the model)
+    assert report._beside(tmp_path / "m" / "task_5shot" / "results_y.json",
+                          "diagnose.json") == {"tasks": {"a": 1, "b": 3}}
+    # a file that is not JSON is a miss, not a crash
+    f.write_text("{not json")
+    os.utime(f, ns=(st.st_atime_ns, st.st_mtime_ns + 20_000_000_000))
+    assert report._beside(src, "diagnose.json") is None
+
+
+def test_item_count_disagreement_is_visible_in_the_payload(payload, diag, tree):
+    mc = tree["miscount"]
+    cell = payload["cells"][mc["task"]][mc["model"]]
+    assert cell["n"] == mc["declared"]
+    assert diag[mc["model"]]["tasks"][mc["task"]]["n"] == mc["logged"]
+    assert cell["n"] != diag[mc["model"]]["tasks"][mc["task"]]["n"]
+    # and every other model agrees with its own log on that task
+    for mid, d in diag.items():
+        if mid != mc["model"]:
+            assert payload["cells"][mc["task"]][mid]["n"] == d["tasks"][mc["task"]]["n"]
+
+
+def test_model_meta_reaches_archinfo(payload):
+    a = _model(payload, "fx/good-750m")["archinfo"]
+    assert a["arch"] == "FixtureForCausalLM" and a["kind"] == "base"
+    assert _model(payload, "fx/good-750m")["params"] == 750_000_000
+    assert _model(payload, "fx/good-750m")["paramsSrc"] == "config"
+
+
+def test_significance_is_pairwise_over_present_models(payload):
+    rows = payload["sig"]["mmlu"]
+    present = [m["id"] for m in payload["models"] if m["id"] in payload["cells"]["mmlu"]]
+    assert len(rows) == len(present) * (len(present) - 1) // 2
+    good_vs_chance = next(r for r in rows
+                          if {r[0], r[1]} == {"fx/good-750m", "fx/chance-160m"})
+    assert good_vs_chance[4] is True
+
+
+def test_build_report_embeds_the_payload(tree):
+    html = tree["report"].read_text(encoding="utf-8")
+    assert '<script id="data" type="application/json">' in html
+    blob = html.split('<script id="data" type="application/json">', 1)[1].split("</script>")[0]
+    data = json.loads(blob.replace("<\\/", "</"))
+    assert {m["id"] for m in data["models"]} == set(tree["models"])
+    assert "</script>" not in blob            # the one sequence that could end the tag early
