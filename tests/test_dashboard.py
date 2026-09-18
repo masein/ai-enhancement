@@ -233,6 +233,21 @@ def test_leaderboard_by_category_view(surface, diag):
     assert surface.errors == []
 
 
+def test_the_model_page_leads_with_the_exam(surface):
+    """The exam is the instrument, so it comes first; the multiple-choice
+    results and the per-item diagnosis follow as the second opinion."""
+    pg = surface.open(model_link("fx/good-750m"))
+    heads = [h.strip() for h in pg.locator("#view .card h2").all_text_contents()]
+    assert heads[0].startswith("good-750m") or heads[0] == ""      # the head card has no h2 title
+    order = [h for h in heads if h]
+    assert order.index("Judged free response — the exam") < order.index("Results")
+    assert order.index("Results") < order.index("Diagnose")
+    assert order[-1] == "Provenance"
+    dx = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+    assert "The second opinion, free" in dx.text_content()
+    assert surface.errors == []
+
+
 def test_judged_section_and_the_control_sentence(surface, tree):
     pg = surface.open(model_link("fx/skewed-360m"))
     card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))

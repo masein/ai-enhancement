@@ -285,7 +285,10 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
     assert good["judge"]["tasks"][TASK]["score_report"] is not None      # the score stays
     assert good["judgedAvg"] != before["fx/good-750m"][2]
     assert good["judgedAvg"] == report.judged_avg(good["judge"], [TASK])
-    assert good["taintCompare"] is None                        # no MC task to compare halves on
+    # the exam's own before/after wants a parent; this run recorded none
+    cmp = good["taintCompare"][TASK]
+    assert cmp["scale"] == "rubric" and cmp["parent"] is None
+    assert "recorded no parent" in cmp["missing"]
     skewed = next(m for m in after["models"] if m["id"] == "fx/skewed-360m")
     assert skewed["tainted"] == [TASK]                         # via hf_prefix
     for mid in ("fx/chance-160m", "fx/below-135m-it", "fx/short-pick-410m"):

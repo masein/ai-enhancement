@@ -197,6 +197,41 @@ def test_exam_curation_in_the_browser(live, page):
     assert page.errors == []
 
 
+def test_the_review_tab_starts_from_a_topic(live, page):
+    """Pick a topic, see where every model stands on it, read what the judge
+    wrote about the diagnosis-half answers, then propose."""
+    base = live["base"]
+    page.goto(base + "/#tab=review")
+    page.wait_for_selector(".card h2:has-text('Pick a topic')")
+    picker = page.locator(".card", has=page.locator("h2", has_text="Pick a topic"))
+    rows = picker.locator("tbody tr")
+    assert rows.count() >= 10
+    # weakest first, and the weakest model on each topic is named
+    scores = [float(x.split("/")[0]) for x in
+              picker.locator("tbody tr td:nth-child(3)").all_text_contents()]
+    assert scores == sorted(scores)
+    econ = picker.locator("tr[data-pick='economics']")
+    assert econ.locator("a.mlink").count() == 1
+    econ.get_by_role("button", name="choose").click()
+    detail = page.locator("[data-topic-detail='economics']")
+    detail.wait_for()
+    assert "across the board" in detail.text_content()
+    assert detail.locator("[data-topic-model]").count() >= 3
+    first = detail.locator("[data-topic-model]").first
+    assert "report-half questions" in first.text_content()
+    # the judge's own words, fetched on demand and labelled
+    first.locator("details.dxex summary").click()
+    page.wait_for_selector("[data-topic-model] details.dxex li", timeout=15000)
+    li = first.locator("details.dxex li").first
+    assert "scored" in li.text_content()
+    assert "question text removed" in first.text_content()
+    assert "diagnosis-half answers scored below 3 of 4" in first.text_content()
+    # and the propose button for the model that can be proposed from
+    good = detail.locator("[data-topic-model='fx/good-750m']")
+    assert good.locator("button.propose").is_enabled()
+    assert page.errors == []
+
+
 def test_review_flow_in_the_browser(live, page):
     base = live["base"]
     # the LLM card says what is configured and what today has cost
@@ -277,7 +312,20 @@ def test_review_flow_in_the_browser(live, page):
             page.set_viewport_size({"width": width, "height": 900})
             page.goto(base + "/#tab=review")
             page.wait_for_selector(".rv[data-dataset]")
-            page.locator(".rv[data-dataset] summary").first.click()
+            # the button toggles, so only choose when it is not already chosen
+            if page.locator("[data-topic-detail='economics']").count() == 0:
+                page.locator("tr[data-pick='economics'] button").click()
+            page.wait_for_selector("[data-topic-detail='economics']")
+            if page.locator("[data-topic-model] details.dxex[open]").count() == 0:
+                page.locator("[data-topic-model] details.dxex summary").first.click()
+                page.wait_for_selector("[data-topic-model] details.dxex li", timeout=15000)
+            if page.locator(".rv[data-dataset][open]").count() == 0:
+                page.locator(".rv[data-dataset] summary").first.click()
             page.screenshot(path=SCREENS / f"review-{scheme}-{width}.png", full_page=True)
+            assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
+            # the model page, exam first, with the before/after on the rubric scale
+            page.goto(base + "/#model=fx%2Fskewed-360m")
+            page.wait_for_selector(".card h2:has-text('Judged free response')")
+            page.screenshot(path=SCREENS / f"model-exam-first-{scheme}-{width}.png", full_page=True)
             assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
     assert page.errors == []

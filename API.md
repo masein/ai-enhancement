@@ -290,6 +290,12 @@ control set (no GPU).
 
 ### Judged free response
 
+`GET /api/judge/justifications?model=&topic=&limit=` — what the judge wrote
+about that model's answers on that topic: **diagnosis half only**, with any
+exam question text the judge quoted already removed. The same function a
+proposal is built from, so the page shows exactly what the LLM would be
+given.
+
 `GET /api/judge` — the judge's identity (`provider/model`, dated), its
 family, whether its provider clashes with the exam writer's or generator's
 (`provider_clash`, `single_provider_loop`), the canary threshold, the tasks
@@ -375,13 +381,16 @@ task **excluded from that model's official average exactly the way a missing
 required task is** — the per-task score stays visible, the model carries no
 rank. `examples/train_and_benchmark.py --gap-dataset <id>` shows the pattern.
 
-**What the training taught.** When the parent is on the board with a diagnosis,
-the tainted model carries `taintCompare[task]`: both halves before and after
+**What the training taught.** When the parent is on the board, the tainted
+model carries `taintCompare[task]`: both halves before and after
 (`{v, n, se}`), `dReport`, `dDiagnose`, their standard errors, a `verdict`
 (`skill` | `test` | `none` | `mixed`), the `ratio` of the two deltas, the
-derived `text`, and the same before/after per `categories`. `test` means the
-diagnosis half moved and the leaderboard half did not — the training taught
-the test — and the board carries a warning.
+derived `text`, and `scale`. `scale` is `"pct"` for a multiple-choice task
+(accuracy, with the per-`categories` breakdown) or `"rubric"` for an exam
+topic (the judge's 0–4 mean, from the per-half score distributions, and both
+sides must come from the same judge or the card says so instead of drawing
+it). `test` means the diagnosis half moved and the report half did not — the
+training taught the test — and the board carries a warning.
 
 ### GET /healthz
 

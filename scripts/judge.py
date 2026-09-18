@@ -445,12 +445,18 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
             by_len[length_bucket(it["answer_words"])].append(it["score"])
         rep = [it["score"] for it in items if it["half"] == "report"]
         dia = [it["score"] for it in items if it["half"] == "diagnose"]
+
+        def _dist(xs):
+            c = collections.Counter(xs)
+            return {str(k): c.get(k, 0) for k in range(MAX_SCORE + 1)}
         t = {"n": len(items), "mean": round(sum(it["score"] for it in items) / len(items), 4),
              "max": MAX_SCORE, "ungraded": sum(1 for it in items if not it["graded"]),
              "n_report": len(rep), "score_report": round(sum(rep) / len(rep), 4) if rep else None,
              "n_diagnose": len(dia),
              "score_diagnose": round(sum(dia) / len(dia), 4) if dia else None,
              "dist": {str(k): dist.get(str(k), 0) for k in range(MAX_SCORE + 1)},
+             # per half, so a before/after comparison can carry a standard error
+             "dist_report": _dist(rep), "dist_diagnose": _dist(dia),
              "score_vs_length": [{"bucket": label, "n": len(by_len[label]),
                                   "mean": round(sum(by_len[label]) / len(by_len[label]), 4)}
                                  for _, _, label in LENGTH_BUCKETS if by_len.get(label)],

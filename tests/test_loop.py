@@ -144,10 +144,16 @@ def test_join_dataset_to_run_to_checkpoint_to_model_picks_the_right_parent(tmp_p
                                 "fx/skewed-360m", "fx/short-pick-410m", "fx/one-option-70m"}
         assert all(v == ["exam_economics"] for v in tainted.values())
         assert rows["fx/one-option-70m"]["tainted"] == ["exam_economics"]
-        # the halves comparison is for a multiple-choice task; this dataset came
-        # from an exam topic, so there is nothing for it to compare (C5 adds the
-        # exam view of the same before/after)
-        assert rows["fx/good-750m-tuned-test"]["taintCompare"] is None
+        # the exam's own before/after: run C paired two judged models, so it is
+        # drawn in full; run A's checkpoint has never sat the exam, so its card
+        # says which piece is missing rather than guessing
+        full = rows["fx/skewed-360m"]["taintCompare"]["exam_economics"]
+        assert full["scale"] == "rubric" and full["parent"] == "fx/good-750m"
+        assert full["verdict"] in ("skill", "test", "none", "mixed")
+        assert full["before"]["report"]["n"] and full["after"]["diagnose"]["n"]
+        assert full["judge"] == "stub/overlap-v1"
+        missing = rows["fx/good-750m-tuned-test"]["taintCompare"]["exam_economics"]
+        assert "no judged answers on file" in missing["missing"]
         # the parents themselves are untouched
         for pid in ("fx/good-750m", "fx/chance-160m"):
             assert rows[pid]["tainted"] == [] and rows[pid]["taintCompare"] is None
@@ -172,3 +178,50 @@ def test_frozen_report_carries_the_comparison(tree):
     m = next(x for x in data["models"] if x["id"] == "fx/good-750m-tuned-test")
     assert m["taintCompare"]["mmlu"]["verdict"] == "test"
     assert make_fixture.TAINT == tree["taint"]
+
+
+# ---------------------------------------------------------------------------
+# the exam's before and after (C5)
+# ---------------------------------------------------------------------------
+
+def test_exam_before_and_after_reads_the_rubric_scale(diag, tree):
+    """The same three sentences, on the judge's 0-4 scale rather than
+    percentage points, from the per-half score distributions."""
+    good = json.loads((tree["models"]["fx/good-750m"]["dir"] / "judge.json").read_text())
+    trimmed = report._trim_judge(good)
+    t = trimmed["tasks"]["exam_economics"]
+    rep = report._rubric_half(t, "report")
+    assert rep["n"] == t["n_report"] and rep["v"] == pytest.approx(t["score_report"], abs=1e-3)
+    assert 0 < rep["se"] < 1
+    assert report._rubric_half({}, "report") is None
+
+    # a model that improved only on the half the spec came from
+    after = {"judge": {"id": "j"}, "tasks": {"exam_law": {
+        "dist_report": {"0": 0, "1": 0, "2": 20, "3": 20, "4": 0},
+        "dist_diagnose": {"0": 0, "1": 0, "2": 0, "3": 5, "4": 35}}}}
+    before = {"judge": {"id": "j"}, "tasks": {"exam_law": {
+        "dist_report": {"0": 0, "1": 0, "2": 22, "3": 18, "4": 0},
+        "dist_diagnose": {"0": 0, "1": 0, "2": 22, "3": 18, "4": 0}}}}
+    c = report.taint_exam_compare("exam_law", after, before, "fx/parent")
+    assert c["verdict"] == "test" and c["scale"] == "rubric" and c["judge"] == "j"
+    assert "of 4" in c["text"] and "points" not in c["text"]
+    assert c["dDiagnose"] > 1 and abs(c["dReport"]) < 0.1
+    assert c["before"]["report"]["n"] == 40 and c["after"]["diagnose"]["n"] == 40
+
+    # both halves up together is the skill
+    both = {"judge": {"id": "j"}, "tasks": {"exam_law": {
+        "dist_report": {"0": 0, "1": 0, "2": 0, "3": 8, "4": 32},
+        "dist_diagnose": {"0": 0, "1": 0, "2": 0, "3": 5, "4": 35}}}}
+    assert report.taint_exam_compare("exam_law", both, before, "p")["verdict"] == "skill"
+    # and nothing measurable is nothing measurable
+    assert report.taint_exam_compare("exam_law", before, before, "p")["verdict"] == "none"
+
+
+def test_a_comparison_across_two_judges_is_refused():
+    a = {"judge": {"id": "anthropic/claude-x-20250101"}, "tasks": {"exam_law": {
+        "dist_report": {"4": 40}, "dist_diagnose": {"4": 40}}}}
+    b = {"judge": {"id": "stub/overlap-v1"}, "tasks": {"exam_law": {
+        "dist_report": {"2": 40}, "dist_diagnose": {"2": 40}}}}
+    c = report.taint_exam_compare("exam_law", a, b, "p")
+    assert "two different instruments" in c["missing"] and "before" not in c
+    assert report.taint_exam_compare("exam_law", a, {"tasks": {}}, "p") is None

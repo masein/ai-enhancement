@@ -596,6 +596,19 @@ def exam_build_tasks(x_token: str = Header(default="")):
             "tasks_dir": str(exam_build.tasks_dir(config.EXAM_DIR))}
 
 
+@app.get("/api/judge/justifications")
+def judge_justifications(model: str, topic: str, limit: int = 8):
+    """What the judge wrote about one model's answers on one topic —
+    DIAGNOSIS half only, with any exam question text the judge quoted already
+    stripped. The same function a proposal is built from, so the page shows
+    exactly what the LLM would be given."""
+    task = exam_build.topic_task(topic)
+    items, counts = prop.justifications_for(config.OUT_DIR / model.replace("/", "__"), task)
+    return {"model": model, "topic": topic, "task": task, "counts": counts,
+            "items": items[:max(1, min(limit, prop.MAX_JUSTIFICATIONS))],
+            "note": "diagnosis half only; any exam question text the judge quoted is removed"}
+
+
 @app.get("/api/judge")
 def judge_status():
     """What the judged suite would run with: the pinned judge, its family,

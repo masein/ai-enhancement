@@ -184,6 +184,20 @@ What happens after the click (`service/proposals.py`):
    half and diagnosis half then move apart, that divergence is the alarm this
    whole design exists to raise — phase 6 makes it visible.
 
+## The dashboard, in the loop's order
+
+A model's page leads with **Judged free response — the exam**: per-topic
+scores on the report half, weakest first, with κ, the canary state, and the
+action that starts the next cycle. **What the training taught** follows for a
+model that trained on derived data. The multiple-choice **Results** and the
+per-item **Diagnose** section come after, as the second opinion: free, on our
+own GPU, and a different kind of evidence — a topic weak on the exam *and* at
+chance on MMLU is a different problem from one weak on the exam alone.
+
+The **Review** tab runs the loop in order: pick the weakest topic, see where
+every model stands on it, read what the judge wrote about the diagnosis-half
+answers that fell short (question text removed), propose, approve, generate.
+
 ## Close the loop, and watch the halves
 
 The payoff of the split. A training run that consumed a generated dataset
@@ -193,6 +207,11 @@ Every checkpoint of that run is tainted on the task the data came from, and
 its page opens with **What the training taught**: the leaderboard half and
 the diagnosis half, before (the parent) and after (this model), side by side
 with their standard errors, then one sentence derived from those four numbers:
+
+The same card covers an exam topic and a multiple-choice task. For a topic it
+reads on the judge's 0–4 scale, from the per-half score distributions, and
+both sides must have been graded by the same judge — two judges are two
+instruments, and the card says so rather than drawing a comparison.
 
 - **"The training taught the skill"** — both halves moved together. The half
   the training never saw moved too, which is what learning the subject looks

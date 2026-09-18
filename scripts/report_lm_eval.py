@@ -259,7 +259,8 @@ def _trim_judge(j: dict | None) -> dict | None:
         if not isinstance(t, dict):
             continue
         out["tasks"][task] = {k: t.get(k) for k in
-                              ("n", "mean", "max", "dist", "score_vs_length", "control",
+                              ("n", "mean", "max", "dist", "dist_report", "dist_diagnose",
+                               "score_vs_length", "control",
                                "n_report", "score_report", "n_diagnose", "score_diagnose",
                                # what the model actually wrote: the gate reads it
                                "answers", "ungraded")
@@ -378,14 +379,17 @@ def _half(t: dict, half: str) -> dict | None:
     return {"v": v, "n": n, "se": math.sqrt(max(v * (1 - v), 1e-9) / n)}
 
 
-def taint_verdict(task: str, d_rep: float, se_rep: float, d_dia: float, se_dia: float
-                  ) -> tuple[str, str, float | None]:
-    """(verdict, sentence, ratio). Verdicts: skill | test | none | mixed."""
+def taint_verdict(task: str, d_rep: float, se_rep: float, d_dia: float, se_dia: float,
+                  scale: str = "pct") -> tuple[str, str, float | None]:
+    """(verdict, sentence, ratio). Verdicts: skill | test | none | mixed.
+    `scale` is how a delta reads: accuracy in percentage points, or a rubric
+    mean out of four."""
     sig_rep, sig_dia = abs(d_rep) > _Z * se_rep, abs(d_dia) > _Z * se_dia
     z_rep = abs(d_rep) / se_rep if se_rep else 0.0
     z_dia = abs(d_dia) / se_dia if se_dia else 0.0
     ratio = (d_dia / d_rep) if abs(d_rep) > 1e-9 else None
-    pts = lambda d: f"{100 * d:+.1f} points"  # noqa: E731
+    pts = ((lambda d: f"{100 * d:+.1f} points") if scale == "pct"
+           else (lambda d: f"{d:+.2f} of 4"))
     if sig_dia and d_dia > 0 and not sig_rep:
         tail = (f"The diagnosis-half gain is {abs(ratio):.0f}× the leaderboard-half change."
                 if ratio is not None and abs(ratio) >= 1.5
@@ -407,10 +411,57 @@ def taint_verdict(task: str, d_rep: float, se_rep: float, d_dia: float, se_dia: 
                 f"{pts(d_rep)} (±{100 * _Z * se_rep:.1f}), diagnosis half {pts(d_dia)} "
                 f"(±{100 * _Z * se_dia:.1f}), both within noise.", ratio)
     return ("mixed",
-            f"An unusual pattern on {task}: the leaderboard half moved {pts(d_rep)} "
+            f"An unusual pattern on {task}: the report half moved {pts(d_rep)} "
             f"({z_rep:.1f} SE) and the diagnosis half {pts(d_dia)} ({z_dia:.1f} SE). Neither "
             f"reading fits; check that parent and child share a template and a harness build "
             f"before reading anything into it.", ratio)
+
+
+def _rubric_half(t: dict, half: str) -> dict | None:
+    """{v, n, se} for one half of a judged topic. The standard error is the
+    ordinary one for a mean of bounded scores, read off the per-half score
+    distribution the judge writes."""
+    dist = (t or {}).get(f"dist_{half}") or {}
+    n = sum(dist.values())
+    if not n:
+        return None
+    mean = sum(int(k) * v for k, v in dist.items()) / n
+    var = sum(v * (int(k) - mean) ** 2 for k, v in dist.items()) / n
+    return {"v": round(mean, 4), "n": n, "se": round(math.sqrt(var / n), 4)}
+
+
+def taint_exam_compare(task: str, after: dict, before: dict, parent: str,
+                       judge_id: str | None = None) -> dict | None:
+    """The same before/after for an exam topic: the published REPORT half
+    against the DIAGNOSE half the generator's spec came from, on the rubric's
+    0–4 scale. Both sides must come from the same judge, or the comparison is
+    two different instruments and says so."""
+    ta = ((after or {}).get("tasks") or {}).get(task)
+    tb = ((before or {}).get("tasks") or {}).get(task)
+    if not ta or not tb:
+        return None
+    ja = ((after or {}).get("judge") or {}).get("id")
+    jb = ((before or {}).get("judge") or {}).get("id")
+    if ja and jb and ja != jb:
+        return {"parent": parent, "scale": "rubric",
+                "missing": f"the parent was judged by {jb} and this model by {ja} — two "
+                           f"different instruments, so there is no before to compare"}
+    a_rep, a_dia = _rubric_half(ta, "report"), _rubric_half(ta, "diagnose")
+    b_rep, b_dia = _rubric_half(tb, "report"), _rubric_half(tb, "diagnose")
+    if not all((a_rep, a_dia, b_rep, b_dia)):
+        return None
+    d_rep, d_dia = a_rep["v"] - b_rep["v"], a_dia["v"] - b_dia["v"]
+    se_rep = math.sqrt(a_rep["se"] ** 2 + b_rep["se"] ** 2)
+    se_dia = math.sqrt(a_dia["se"] ** 2 + b_dia["se"] ** 2)
+    verdict, text, ratio = taint_verdict(EXAM_TOPICS.get(task, task), d_rep, se_rep,
+                                         d_dia, se_dia, scale="rubric")
+    return {"parent": parent, "scale": "rubric", "judge": ja or jb,
+            "before": {"report": b_rep, "diagnose": b_dia},
+            "after": {"report": a_rep, "diagnose": a_dia},
+            "dReport": round(d_rep, 6), "dDiagnose": round(d_dia, 6),
+            "seReport": round(se_rep, 6), "seDiagnose": round(se_dia, 6),
+            "verdict": verdict, "ratio": (round(ratio, 3) if ratio is not None else None),
+            "text": text, "categories": {}}
 
 
 def taint_compare(task: str, after: dict, before: dict, parent: str) -> dict | None:
@@ -448,7 +499,7 @@ def taint_compare(task: str, after: dict, before: dict, parent: str) -> dict | N
             "dReport": round(d_rep, 6), "dDiagnose": round(d_dia, 6),
             "seReport": round(se_rep, 6), "seDiagnose": round(se_dia, 6),
             "verdict": verdict, "ratio": (round(ratio, 3) if ratio is not None else None),
-            "text": text, "categories": cats}
+            "text": text, "categories": cats, "scale": "pct"}
 
 
 def load_results(path: Path) -> list[dict]:
@@ -937,6 +988,26 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         jstate = judged_state(judge, cal, current_judge) if judge else None
         diag = _trim_diag(r.get("diag"))
         compare = {}
+        for t in tainted:
+            if not t.startswith("exam_"):
+                continue
+            pid = parents.get(mid)
+            pjudge = _trim_judge(by_model[pid].get("judge")) if pid in by_model else None
+            cmp = taint_exam_compare(t, judge, pjudge, pid) if judge and pjudge else None
+            if cmp:
+                compare[t] = cmp
+            elif not pid:
+                compare[t] = {"parent": None, "scale": "rubric", "missing":
+                              "the training run recorded no parent (bench.init(parent=…) or "
+                              "base_model in its config), so there is no before to compare"}
+            elif pid not in by_model:
+                compare[t] = {"parent": pid, "scale": "rubric", "missing":
+                              f"the parent {pid} is not on this board, so there is no before to "
+                              f"compare — evaluate it with suite=judged"}
+            else:
+                compare[t] = {"parent": pid, "scale": "rubric", "missing":
+                              f"{'this model' if not judge else 'the parent'} has no judged "
+                              f"answers on file for this topic — submit it with suite=judged"}
         for t in tainted_acc:
             pid = parents.get(mid)
             pdiag = _trim_diag(by_model[pid].get("diag")) if pid in by_model else None
@@ -1639,7 +1710,8 @@ const state = {
   lbHeat: false,                       // leaderboard cells: plain | heat-shaded
   lbAbout: false,                      // "about these benchmarks" panel open
   lbView: 'tasks',                     // leaderboard columns: 'tasks' | 'cats' (MMLU by category)
-  rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '' },   // Review tab
+  rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '',
+        topic: '', just: {}, justOpen: '' },                               // Review tab
   ex: { status: null, candidates: [], loaded: false, msg: '', topic: '' },   // Exam tab
   rvName: '',                          // the name approvals are recorded under (remembered)
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
@@ -2485,7 +2557,7 @@ function vDiagnose(m) {
 
   const card = el('div', { class: 'card' },
     el('h2', { text: 'Diagnose' }),
-    el('p', { class: 'sub', text: 'Why the score is what it is, read off the per-item '
+    el('p', { class: 'sub', text: 'The second opinion, free: why the multiple-choice score is what it is, read off the per-item '
       + 'log. The finding is the cause, not the list of missed questions — most of what '
       + 'a score hides is not a knowledge gap, and the two want opposite responses.' }),
     el('p', { class: 'note', text: 'Every item is assigned by a hash of its own content '
@@ -2768,33 +2840,47 @@ function vTaint(m) {
   if (!tc || !Object.keys(tc).length) return null;
   const card = el('div', { class: 'card' },
     el('h2', { text: 'What the training taught' }),
-    el('p', { class: 'sub', text: 'This model trained on data derived from a benchmark\'s '
-      + 'diagnosis half. The leaderboard half was never touched by that data, so it is the '
-      + 'honest test: if the training taught the skill, both halves move together; if it '
-      + 'taught the test, only the half the generator\'s spec came from moves.' }));
+    el('p', { class: 'sub', text: 'This model trained on data derived from the diagnosis half '
+      + 'of an exam topic or a benchmark. The report half was never touched by that data, so '
+      + 'it is the honest test: if the training taught the skill, both halves move together; '
+      + 'if it taught the test, only the half the generator\'s spec came from moves.' }));
   for (const [t, c] of Object.entries(tc)) {
-    card.append(el('div', { class: 'dxh', text: taskLabel(t) }));
+    const rubric = c.scale === 'rubric';
+    card.append(el('div', { class: 'dxh', text: rubric ? `${tName(t)} — the exam`
+      : `${taskLabel(t)} — multiple choice` }));
     if (c.missing) { card.append(note(c.missing)); continue; }
     const parent = DATA.models.find(x => x.id === c.parent);
     const pm = parent ? parent.name : c.parent;
+    const val = v => rubric ? `${num(v, 2)} / 4` : pct(v);
+    const err = v => rubric ? ` ±${num(v, 2)}` : ` ±${(100 * v).toFixed(1)}`;
+    const dlt = d => rubric ? `${d >= 0 ? '+' : ''}${num(d, 2)}` : dpts(d);
     const half = (label, b, a, d, se) => el('tr', {},
       el('td', { text: label }),
-      el('td', { class: 'num', text: pct(b.v) }, el('span', { class: 'se', text: ` ±${(100 * b.se).toFixed(1)}` })),
-      el('td', { class: 'num', text: pct(a.v) }, el('span', { class: 'se', text: ` ±${(100 * a.se).toFixed(1)}` })),
-      el('td', { class: 'num', text: dpts(d) }),
+      el('td', { class: 'num', text: val(b.v) }, el('span', { class: 'se', text: err(b.se) }),
+        el('span', { class: 'se', text: ` · ${b.n}` })),
+      el('td', { class: 'num', text: val(a.v) }, el('span', { class: 'se', text: err(a.se) }),
+        el('span', { class: 'se', text: ` · ${a.n}` })),
+      el('td', { class: 'num', text: dlt(d) }),
       el('td', { class: 'num se', text: `${(Math.abs(d) / se).toFixed(1)} SE` }));
     card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
       el('thead', {}, el('tr', {}, el('th', { text: 'half' }),
         el('th', { class: 'num', text: `before — ${pm}` }), el('th', { class: 'num', text: `after — ${m.name}` }),
-        el('th', { class: 'num', text: 'Δ points' }), el('th', { class: 'num', text: 'moved by' }))),
+        el('th', { class: 'num', text: rubric ? 'Δ rubric' : 'Δ points' }),
+        el('th', { class: 'num', text: 'moved by' }))),
       el('tbody', {},
-        half('leaderboard half (never in the training data)', c.before.report, c.after.report, c.dReport, c.seReport),
+        half(rubric ? 'report half (the published score, never in the training data)'
+                    : 'leaderboard half (never in the training data)',
+             c.before.report, c.after.report, c.dReport, c.seReport),
         half('diagnosis half (the spec came from here)', c.before.diagnose, c.after.diagnose, c.dDiagnose, c.seDiagnose)))));
+    if (rubric && c.judge) card.append(el('p', { class: 'small',
+      text: `Both sides graded by ${c.judge}; a comparison across two judges is two `
+        + 'instruments, and the card says so instead of drawing it.' }));
     const warn = c.verdict === 'test' || c.verdict === 'mixed';
     card.append(el('p', { class: warn ? 'warn' : 'dxlead calm', 'data-verdict': c.verdict },
       el('b', { text: VERDICT[c.verdict] + '. ' }), c.text.replace(/^The training taught the (skill|test)\. |^Nothing measurable changed\. |^An unusual pattern[^:]*: /, '')));
     if (c.ratio != null && c.verdict === 'test')
-      card.append(el('p', { class: 'small', text: `Ratio of the two deltas (diagnosis / leaderboard): ${num(c.ratio, 1)}.` }));
+      card.append(el('p', { class: 'small', text: 'Ratio of the two deltas (diagnosis / '
+        + `report): ${num(c.ratio, 1)}.` }));
     const cats = Object.entries(c.categories || {})
       .sort((x, y) => (y[1].dDiagnose ?? 0) - (x[1].dDiagnose ?? 0));
     if (cats.length) {
@@ -2909,8 +2995,10 @@ function vModel() {
     el('dl', { class: 'provlist' }, prov.flatMap(([k, v]) =>
       [el('dt', { text: k }), el('dd', { class: 'mono', text: String(v) })])));
 
-  // vDiagnose / vJudged are null when no model on this board has that file
-  return [back, head, results, vTaint(m), vDiagnose(m), vJudged(m), provCard].filter(Boolean);
+  // The exam leads: it is the instrument the loop steers by. The
+  // multiple-choice results and the per-item diagnosis follow as the free
+  // second opinion — same GPU, no API call, and a different kind of evidence.
+  return [back, head, vJudged(m), vTaint(m), results, vDiagnose(m), provCard].filter(Boolean);
 }
 
 function vOverview(ms) {
@@ -4791,6 +4879,122 @@ function rvExamples(ev) {
   return det;
 }
 
+// ---------- the Review tab starts from a topic ----------
+// Pick the topic the exam says is weakest, see where every model stands on it
+// and what the judge wrote about the diagnosis-half answers that fell short,
+// then propose. The order here is the loop's order.
+async function loadJust(mid, topic) {
+  const key = mid + '|' + topic;
+  if (state.rv.just[key]) return;
+  state.rv.just[key] = { loading: true, items: [] };
+  try {
+    const r = await fetch(`api/judge/justifications?model=${encodeURIComponent(mid)}`
+      + `&topic=${encodeURIComponent(topic)}`);
+    state.rv.just[key] = await r.json();
+  } catch (e) { state.rv.just[key] = { items: [], error: 'could not load' }; }
+  if (state.tab === 'review' && !state.model) render();
+}
+
+function rvJust(mid, topic) {
+  const key = mid + '|' + topic;
+  const j = state.rv.just[key];
+  const det = el('details', { class: 'dxex', open: state.rv.justOpen === key ? '' : null },
+    el('summary', { text: 'What the judge wrote about the answers that fell short '
+      + '(diagnosis half only, question text removed)',
+      onclick: () => { state.rv.justOpen = state.rv.justOpen === key ? '' : key;
+                       loadJust(mid, topic); } }));
+  if (state.rv.justOpen !== key) return det;
+  if (!j || j.loading) { det.append(el('p', { class: 'small', text: 'loading…' })); return det; }
+  if (j.error || !(j.items || []).length) {
+    det.append(el('p', { class: 'small', text: j.error
+      || 'The judge wrote no assessment of a diagnosis-half answer that fell short here.' }));
+    return det;
+  }
+  det.append(el('p', { class: 'small', text: `${j.counts.diagnose_weak} of `
+    + `${j.counts.diagnose_items} diagnosis-half answers scored below 3 of 4; the first `
+    + `${j.items.length} are shown. This is exactly what a proposal would be built from.` }));
+  det.append(el('ul', {}, j.items.map(it => el('li', {},
+    el('span', { class: 'q', text: it.justification }),
+    el('span', { class: 'kv' }, el('b', { text: `scored ${it.score} of 4` }),
+      it.answer_words != null ? ` · the model wrote ${it.answer_words} words` : '')))));
+  return det;
+}
+
+function rvTopicPicker() {
+  const J = DATA.judged || {};
+  const rows = [];
+  for (const task of (J.exam || [])) {
+    const on = DATA.models
+      .filter(m => m.judge && m.judge.tasks[task] && pubScore(m.judge.tasks[task]) != null)
+      .map(m => ({ m, v: pubScore(m.judge.tasks[task]), t: m.judge.tasks[task] }))
+      .sort((a, b) => a.v - b.v);
+    if (on.length) rows.push({ task, topic: frName(task), on, weakest: on[0] });
+  }
+  rows.sort((a, b) => a.weakest.v - b.weakest.v);
+  if (!rows.length)
+    return el('div', { class: 'card' }, el('h2', { text: 'Pick a topic' }),
+      note('No model has sat the exam yet. Write the bank on the Exam tab, then submit a '
+        + 'model with suite=judged.'));
+  const card = el('div', { class: 'card' }, el('h2', { text: 'Pick a topic' }),
+    el('p', { class: 'sub', text: 'The exam is the instrument: it says, per topic, how good '
+      + 'each model is and why. Weakest first, on the report half — the diagnosis half is '
+      + 'what a proposal may read and is never the score.' }),
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'topic' }),
+        el('th', { class: 'num', text: 'weakest model' }), el('th', { class: 'num', text: 'its score' }),
+        el('th', { class: 'num', text: 'models judged' }),
+        el('th', { class: 'num', text: 'report-half questions' }), el('th', { text: '' }))),
+      el('tbody', {}, rows.map(r => {
+        const nr = r.weakest.t.n_report ?? r.weakest.t.n;
+        return el('tr', { class: (state.rv.topic === r.topic ? 'domrow' : null)
+                            + (nr < CAT_MIN_N ? ' dim' : ''), 'data-pick': r.topic },
+          el('td', { text: r.topic }),
+          el('td', { class: 'num' }, el('a', { class: 'mlink', text: r.weakest.m.name,
+            href: '#model=' + encodeURIComponent(r.weakest.m.id) })),
+          el('td', { class: 'num', text: `${num(r.weakest.v, 2)} / 4` }),
+          el('td', { class: 'num se', text: String(r.on.length) }),
+          el('td', { class: 'num se', text: String(nr) + (nr < CAT_MIN_N ? ' · noise' : '') }),
+          el('td', {}, el('button', { class: 'tgl' + (state.rv.topic === r.topic ? ' on' : ''),
+            text: state.rv.topic === r.topic ? 'chosen' : 'choose',
+            onclick: () => { state.rv.topic = state.rv.topic === r.topic ? '' : r.topic;
+                             state.rv.justOpen = ''; render(); } })));
+      })))));
+  return card;
+}
+
+function rvTopicDetail(llmOk) {
+  const topic = state.rv.topic;
+  if (!topic) return '';
+  const task = 'exam_' + topic.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const on = DATA.models
+    .filter(m => m.judge && m.judge.tasks[task] && pubScore(m.judge.tasks[task]) != null)
+    .map(m => ({ m, v: pubScore(m.judge.tasks[task]), t: m.judge.tasks[task] }))
+    .sort((a, b) => a.v - b.v);
+  const card = el('div', { class: 'card', 'data-topic-detail': topic },
+    el('h2', { text: topic + ' — across the board' }),
+    el('p', { class: 'sub', text: 'Every model that has sat this topic, weakest first. Read '
+      + 'the judge before proposing: if the answers are empty or the suite is preliminary, '
+      + 'there is no topic gap to fix here.' }));
+  for (const { m, v, t } of on) {
+    const g = t.propose;
+    const nr = t.n_report ?? t.n;
+    const row = el('div', { class: 'rv', 'data-topic-model': m.id },
+      el('div', { class: 'mhead' },
+        el('h3', {}, el('a', { class: 'mlink', text: m.name,
+          href: '#model=' + encodeURIComponent(m.id) })),
+        el('span', { class: 'small', text: `${num(v, 2)} / 4 on ${nr} report-half questions `
+          + `· ${num(t.score_diagnose, 2)} / 4 on ${t.n_diagnose} diagnosis-half`
+          + ((m.tainted || []).includes(task) ? ' · trained on this topic' : '') })),
+      el('div', { class: 'frm' }, g ? proposeBtn(m.id, topic, g) : '',
+        g && !g.ok ? el('span', { class: 'propwhy', title: g.why,
+          text: 'no proposal: ' + (g.short || g.why) }) : '',
+        g && g.caution ? el('span', { class: 'propwhy', text: 'caution — MMLU: ' + g.caution }) : ''),
+      rvJust(m.id, topic));
+    card.append(row);
+  }
+  return card;
+}
+
 function rvProposal(p, llmOk) {
   const ev = p.evidence || {};
   const head = el('div', { class: 'mhead' },
@@ -4944,7 +5148,7 @@ function vReview() {
   const sec = (title, sub, list, empty) => el('div', { class: 'card' },
     el('h2', { text: title }), el('p', { class: 'sub', text: sub }),
     list.length ? list.map(p => rvProposal(p, llmOk)) : el('p', { class: 'small', text: empty }));
-  return [llmCard,
+  return [llmCard, rvTopicPicker(), rvTopicDetail(llmOk),
     sec('Awaiting review', 'Read the judged numbers first: if the suite is preliminary or the '
       + 'model wrote nothing on this topic, the button that made this proposal should have '
       + 'been disabled — reject it.', waiting,
