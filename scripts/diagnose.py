@@ -76,6 +76,9 @@ DEGENERATE_SHARE = 0.80  # one option chosen for this fraction of items
 # contains. 0 is a model whose answers are distributed like the truth; SmolLM2-360M
 # measures 0.44 on MMLU, putting 92% of its picks on the first two of four options.
 POSITION_SKEW = 0.20
+# a model whose wrong answers are mostly *confident* wrong answers, which is a
+# different thing from not knowing and rarely wants the same response
+CONFIDENT_SHARE = 0.35
 
 
 def conf_lift(n: int) -> float:
@@ -407,7 +410,7 @@ def main() -> int:
         print(f"no such directory: {a.results}", file=sys.stderr)
         return 2
     want = {m.replace("/", "__") for m in a.model}
-    n, denied = 0, []
+    n, denied, found = 0, [], {}
     for d in sorted(p for p in a.results.iterdir() if p.is_dir()):
         if want and d.name not in want:
             continue
@@ -425,6 +428,19 @@ def main() -> int:
             denied.append((d.name, e.strerror or str(e)))
             continue
         n += 1
+        # findings, collected for the summary — a tool that detects a broken
+        # answer distribution should say so without being asked a second time
+        for t, v in sorted(out["tasks"].items()):
+            ans = v.get("answers") or {}
+            for label, on in (("answers one option", ans.get("degenerate")),
+                              ("answer positions skewed", ans.get("position_biased")),
+                              ("picks by option length", ans.get("length_biased"))):
+                if on:
+                    found.setdefault(label, []).append(f"{d.name}/{t}")
+            nb = v["n"] or 1
+            if v["buckets"].get("confident_wrong", 0) / nb >= CONFIDENT_SHARE:
+                found.setdefault("confidently wrong on most items", []).append(
+                    f"{d.name}/{t}")
         if not a.quiet:
             bits = []
             for t, v in sorted(out["tasks"].items()):
@@ -434,6 +450,18 @@ def main() -> int:
     if not a.quiet:
         print(f"\nwrote diagnose.json for {n} model(s) "
               f"· split salt {SPLIT_SALT!r}")
+        if found:
+            print("\nFINDINGS — failures a score cannot show:")
+            for label in sorted(found):
+                who = found[label]
+                print(f"\n  {label}  ({len(who)})")
+                for w in who[:12]:
+                    print(f"      {w}")
+                if len(who) > 12:
+                    print(f"      … and {len(who) - 12} more")
+            print("\n  None of these are fixed by more training data for the "
+                  "subject:\n  they are properties of the output distribution, "
+                  "not of what the model knows.")
     if denied:
         print(f"\ncould not write {len(denied)} model(s) — the results tree is "
               f"owned by whoever ran the eval:", file=sys.stderr)
