@@ -131,6 +131,18 @@ LLM_MAX_ITEMS_PER_BATCH = int(os.environ.get("LLM_MAX_ITEMS_PER_BATCH", "200"))
 LLM_DAILY_ITEM_CAP = int(os.environ.get("LLM_DAILY_ITEM_CAP", "2000"))
 LLM_POLL_S = float(os.environ.get("LLM_POLL_S", "60"))
 
+# The exam writer (scripts/exam_build.py draft): a SEPARATE identity from the
+# generator and the judge, because a loop whose questions, grades and training
+# data all come from one model family grades its own family's questions with
+# its own family's judge and fixes the result with its own family's data.
+# All three identities are recorded in every provenance record.
+EXAM_PROVIDER = os.environ.get("EXAM_PROVIDER", "").strip().lower()
+EXAM_MODEL = os.environ.get("EXAM_MODEL", "").strip()
+EXAM_API_KEY = os.environ.get("EXAM_API_KEY", "")
+# The exam itself: candidates await curation, the bank holds accepted
+# questions (split into halves by qid), tasks is what the harness runs
+EXAM_DIR = Path(os.environ.get("EXAM_DIR", BENCH_ROOT / "exam"))
+
 # Generated datasets live under BENCH_ROOT like artifacts do, with a quota for
 # the same reason — friends iterate, disks do not.
 DATASETS_DIR = Path(os.environ.get("DATASETS_DIR", BENCH_ROOT / "datasets"))
@@ -138,21 +150,20 @@ DATASET_QUOTA_GB = float(os.environ.get("DATASET_QUOTA_GB", "20"))
 
 
 # ---------------------------------------------------------------------------
-# The judged free-response suite (eval_tasks/fr, scripts/judge.py). The tasks
-# are BUILT into $BENCH_ROOT/eval_tasks/fr by scripts/fr_build.py (the control
-# set comes from the diagnose half of MMLU on disk), and the judge is a local
-# model in HF_HOME, pinned by weights hash. A suite=judged job runs the fr_*
-# generations and then the judge, all inside the same lock as any evaluation.
-# "stub" as the judge is the deterministic overlap stand-in — dry runs only.
+# The exam (scripts/exam_build.py, scripts/judge.py). The tasks are BUILT into
+# $BENCH_ROOT/exam/tasks from the curated bank — one per topic — plus the MMLU
+# control set from the diagnose half of MMLU on disk. A suite=judged job runs
+# the exam_* generations and then the judge, all inside the same lock as any
+# evaluation. "stub" as the judge is the deterministic overlap stand-in.
 # ---------------------------------------------------------------------------
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "").strip()
-JUDGED_TASKS_DIR = Path(os.environ.get("JUDGED_TASKS_DIR", BENCH_ROOT / "eval_tasks" / "fr"))
+JUDGED_TASKS_DIR = Path(os.environ.get("JUDGED_TASKS_DIR", EXAM_DIR / "tasks"))
 
 
 def judged_tasks() -> list[str]:
     if not JUDGED_TASKS_DIR.is_dir():
         return []
-    return sorted(y.stem for y in JUDGED_TASKS_DIR.glob("fr_*.yaml"))
+    return sorted(y.stem for y in JUDGED_TASKS_DIR.glob("*.yaml"))
 
 
 def judged_blocked() -> str:
@@ -161,8 +172,8 @@ def judged_blocked() -> str:
         return ("no judge is configured on this server (JUDGE_MODEL is unset) — the judged "
                 "suite is off")
     if not judged_tasks():
-        return (f"the free-response tasks have not been built: run scripts/fr_build.py "
-                f"results/full --out {JUDGED_TASKS_DIR}")
+        return (f"the exam tasks have not been built: curate the bank on the Exam tab, then "
+                f"run scripts/exam_build.py build results/full --root {EXAM_DIR}")
     return ""
 
 

@@ -208,14 +208,19 @@ and mostly for instruct-tuned ones; below that it produces near-zero
 free-response scores, honestly. The suite is built now so it is ready when
 those models arrive, and for one thing it does today: **the control**.
 
-`eval_tasks/fr/` holds four human-authored suites (ten SEED items each until
-someone writes the rest — `AUTHORING.md`), a rubric per category with written
-anchors and a length clause, and `scripts/fr_build.py`, which also builds
+The exam is one question bank across the topics in `scripts/categories.yaml`,
+drafted by an LLM (`scripts/exam_build.py draft`) and **curated by a person
+on the Exam tab** — accept, edit, reject, under a name. Every accepted
+question is split by the hash of its text into a **report half** (the
+published per-topic score) and a **diagnose half** (the only half a proposal
+may ever read); `eval_tasks/fr/AUTHORING.md` says why that line matters more
+than any other here. `exam_build.py build` writes the harness tasks and
 `fr_control_mmlu` from the **diagnosis half** of MMLU: the question only, no
 options, graded against the gold option's text. `scripts/judge.py` grades
-every answer 0–4 with a local judge pinned by weights hash, greedy, single
-answers never pairwise, and refuses to grade its own family. Judging twice
-writes the same bytes.
+every answer 0–4 against `rubrics/exam.md` with a local judge pinned by
+weights hash, greedy, single answers never pairwise, records each item's
+half, and refuses to grade its own family. Judging twice writes the same
+bytes.
 
 On a model's page, **Judged free response** leads with the control:
 

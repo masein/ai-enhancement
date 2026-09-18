@@ -86,7 +86,8 @@ def _job_scratch(sid: int, run_as: tuple[int, int] | None) -> Path:
 # Add a new secret's variable name here in the same commit that introduces it.
 SECRET_ENV_VARS = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN",
                    "HF_API_TOKEN", "AWS_SECRET_ACCESS_KEY", "OPENAI_API_KEY",
-                   "LLM_API_KEY", "ANTHROPIC_API_KEY", "SUBMIT_TOKEN")
+                   "LLM_API_KEY", "ANTHROPIC_API_KEY", "SUBMIT_TOKEN",
+                   "EXAM_API_KEY", "JUDGE_API_KEY")
 
 
 def _child_env(remote_code: bool, scratch: Path | None = None) -> dict:
@@ -305,7 +306,7 @@ def include_args_for(task: str) -> list[str]:
     other's yaml, so a stray file in one cannot rename a task in the other."""
     if task in config.CONTROL_TASKS:
         return ["--include_path", str(config.CONTROL_TASKS_DIR)]
-    if task.startswith("fr_"):
+    if task.startswith(("exam_", "fr_")):
         return ["--include_path", str(config.JUDGED_TASKS_DIR)]
     if config.EVAL_TASKS_DIR.is_dir() and any(config.EVAL_TASKS_DIR.glob("*.yaml")):
         return ["--include_path", str(config.EVAL_TASKS_DIR)]

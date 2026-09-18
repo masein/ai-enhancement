@@ -275,14 +275,30 @@ holds, plus `unmapped` for any subject the file does not know.
 from the per-item log; `score_report` is the leaderboard half only. Quote `bits_per_byte` for the perplexity tasks — it's the
 tokenizer-independent one.
 
+### The exam
+
+`GET /api/exam` — the exam writer's identity, the bank per topic (accepted,
+report half, diagnose half, awaiting curation, target), the tasks built, and
+the draft command. `GET /api/exam/candidates?topic=` — drafts awaiting a
+decision. `POST /api/exam/candidates/{cid}/accept` `{"approver", "prompt",
+"reference", "notes"}` (edits allowed; the accepted text is what gets hashed)
+and `…/reject` `{"approver", "reason"}` — a name is required and recorded.
+`GET /api/exam/bank?topic=` — the bank with **report-half text withheld**:
+those rows carry `qid`, `topic`, `half` and `withheld`, never the question.
+`POST /api/exam/build` — write the harness tasks from the bank plus the MMLU
+control set (no GPU).
+
 ### Judged free response
 
 `GET /api/judge` — the pinned judge, its family, the tasks built, and the
 calibration on file. In `/api/results`, a judged model carries
-`models[].judge`: per task `{n, mean, max: 4, dist, score_vs_length}` and,
+`models[].judge`: per task `{n, mean, max: 4, dist, score_vs_length,
+n_report, score_report, n_diagnose, score_diagnose}` — **`score_report` is
+the published number**; the diagnose half is what a proposal may read — and,
 for `fr_control_mmlu`, `control` per category (`mc_wrong`, `knew`, `didnt`);
 `judgedAvg` is the mean over the four authored categories. `judged`
-(top level) lists the tasks, the judge, and `calibration` (`kappa`, `n`,
+(top level) lists the tasks, the exam tasks in topic order (`exam`), the
+task → topic map (`topics`), the judge, and `calibration` (`kappa`, `n`,
 `calibrated`, `per_category`). Below κ 0.60 nothing judged is ranked or
 averaged; above it the leaderboard shows judged columns with κ in the
 header and a separate judged average — never part of `avg`.

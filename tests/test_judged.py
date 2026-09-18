@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 import diagnose as dx
-import fr_build
+import exam_build as fr_build
 import judge as jd
 import judge_calibrate as jc
 import make_fixture
@@ -22,7 +22,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 def _items(tree, task):
-    p = tree["judged"]["fr_dir"] / f"{task}.jsonl"
+    p = tree["judged"]["tasks_dir"] / f"{task}.jsonl"
     return [json.loads(x) for x in p.read_text(encoding="utf-8").splitlines() if x.strip()]
 
 
@@ -65,30 +65,36 @@ def test_control_set_is_diagnose_only_and_stratified(tree):
 def test_control_build_is_deterministic(tree, tmp_path):
     a = fr_build.build(tree["out_dir"], tmp_path / "a")
     b = fr_build.build(tree["out_dir"], tmp_path / "b")
-    assert (tmp_path / "a" / "fr_control_mmlu.jsonl").read_bytes() == \
-        (tmp_path / "b" / "fr_control_mmlu.jsonl").read_bytes()
+    assert (tmp_path / "a" / "tasks" / "fr_control_mmlu.jsonl").read_bytes() == \
+        (tmp_path / "b" / "tasks" / "fr_control_mmlu.jsonl").read_bytes()
     assert a["tasks"]["fr_control_mmlu"]["sha256"] == b["tasks"]["fr_control_mmlu"]["sha256"]
-    assert a["tasks"]["fr_control_mmlu"]["split"] == "diagnose"
+    assert a["tasks"]["fr_control_mmlu"]["built_from"] == "mmlu diagnose half"
+    assert a["tasks"]["fr_control_mmlu"]["report"] == 0
 
 
-def test_authored_tasks_ship_ten_marked_seeds_each(tree):
-    m = tree["judged"]["manifest"]
-    for t in fr_build.FR_TASKS:
-        assert m["tasks"][t]["items"] == 10 and m["tasks"][t]["seed_items"] == 10
-        assert m["tasks"][t]["authored"] is True
-        for it in _items(tree, t):
-            assert it["seed"] is True and it["prompt"] and it["reference"] and it["notes"]
-            assert it["category"] == t[3:] and it["id"].startswith(t)
-            assert len(it["reference"].split()) < 120
-    assert m["tasks"][fr_build.CONTROL_TASK]["authored"] is False
-    assert set(m["rubrics"]) == set(fr_build.CATEGORIES)
+def test_skill_suites_are_migrated_not_thrown_away(tree):
+    """The four skill suites' 40 items live on in the bank under `other`, as
+    they were, with their skill on the record; AUTHORING.md points at the exam."""
+    bank = fr_build.load_bank(tree["judged"]["exam_root"])
+    migrated = [r for r in bank["other"] if r["source"] == "migrated"]
+    assert len(migrated) == 40
+    assert {r["skill"] for r in migrated} == set(fr_build.SKILL_SUITES)
+    seeds = {}
+    for skill in fr_build.SKILL_SUITES:
+        for ln in (REPO / "eval_tasks" / "fr" / f"fr_{skill}.jsonl").read_text().splitlines():
+            it = json.loads(ln)
+            seeds[it["prompt"]] = it
+    for r in migrated:
+        assert r["prompt"] in seeds and r["reference"] == seeds[r["prompt"]]["reference"]
+        assert r["accepted_by"] == "migration" and r["accepted_at"] and r["edited"] is False
+    assert fr_build.migrate_seeds(tree["judged"]["exam_root"]) == 0          # idempotent
     guide = (REPO / "eval_tasks" / "fr" / "AUTHORING.md").read_text()
-    assert "fifty" in guide and "seed" in guide.lower() and "Do not generate" in guide
+    assert "Exam tab" in guide and "report half" in guide and "Do not" in guide
 
 
 def test_task_yamls_point_at_absolute_items_files(tree):
-    for t in fr_build.ALL_TASKS:
-        y = (tree["judged"]["fr_dir"] / f"{t}.yaml").read_text()
+    for t in tree["judged"]["manifest"]["tasks"]:
+        y = (tree["judged"]["tasks_dir"] / f"{t}.yaml").read_text()
         assert y.startswith(f"task: {t}\n")
         assert "output_type: generate_until" in y and "metric: bypass" in y
         assert "do_sample: false" in y and "temperature: 0.0" in y
@@ -97,14 +103,16 @@ def test_task_yamls_point_at_absolute_items_files(tree):
 
 
 def test_rubrics_have_anchors_and_a_length_clause():
-    for c in fr_build.CATEGORIES:
-        text, sha, ver = jd.rubric_for(f"fr_{c}")
+    for task in ("exam_economics", "exam_law", fr_build.CONTROL_TASK):
+        text, sha, ver = jd.rubric_for(task)
         assert ver == "1" and re.fullmatch(r"[0-9a-f]{64}", sha)
         for s in range(5):
-            assert re.search(rf"^- \*\*{s}\*\*", text, re.M), (c, s)
+            assert re.search(rf"^- \*\*{s}\*\*", text, re.M), (task, s)
         assert "Length" in text
-    # the control is graded with the factual rubric — it asks for a fact
-    assert jd.rubric_for(fr_build.CONTROL_TASK)[1] == jd.rubric_for("fr_factual_accuracy")[1]
+    # every exam topic shares one rubric; the control keeps the factual one
+    assert jd.rubric_for("exam_economics")[1] == jd.rubric_for("exam_history")[1]
+    assert jd.rubric_for(fr_build.CONTROL_TASK)[1] != jd.rubric_for("exam_economics")[1]
+    assert (REPO / "eval_tasks" / "fr" / "rubrics" / "exam.md").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +129,7 @@ def test_family_rule_and_refusal(tree):
     assert "same family as judge" in out["skipped"] and out["tasks"] == {}
     assert out["judge"]["family"] == "good" and out["model"] == "fx/good-750m"
     out = jd.judge_model(tree["models"]["fx/good-750m"]["dir"], jd.StubGrader(), "llama")
-    assert "skipped" not in out and len(out["tasks"]) == 5
+    assert "skipped" not in out and len(out["tasks"]) == len(tree["judged"]["manifest"]["tasks"])
     assert jd.judge_model(tree["models"][tree["nodiag"]]["dir"], jd.StubGrader(), "x") is None
 
 
@@ -140,12 +148,18 @@ def test_judge_json_shape_and_hashes(tree):
         assert re.fullmatch(r"[0-9a-f]{64}", jj["weights_sha256"])
         assert re.fullmatch(r"[0-9a-f]{64}", jj["prompt_sha256"]) and jj["prompt_sha256"] == jd.prompt_sha()
         assert jj["greedy"] is True and jj["stub"] is True and jj["id"] == "stub/overlap-v1"
-        assert set(jj["rubrics"]) == set(fr_build.ALL_TASKS)
+        assert set(jj["rubrics"]) == set(tree["judged"]["manifest"]["tasks"])
         assert all(r["version"] == "1" and len(r["sha256"]) == 64 for r in jj["rubrics"].values())
         assert j["split_salt"] == dx.SPLIT_SALT and j["correct_at"] == 3
         for t, v in j["tasks"].items():
             assert sum(v["dist"].values()) == v["n"] == len(v["items"])
             assert 0 <= v["mean"] <= 4 and v["max"] == 4
+            assert v["n_report"] + v["n_diagnose"] == v["n"]
+            assert all(it["half"] in ("report", "diagnose") for it in v["items"])
+            if t.startswith("exam_"):
+                assert all(it["qid"] and it["half"] == dx.split_of(it["qid"]) for it in v["items"])
+            else:
+                assert all(it["half"] == "diagnose" for it in v["items"])
             assert sum(b["n"] for b in v["score_vs_length"]) == v["n"]
             assert all(0 <= it["score"] <= 4 and it["doc_hash"] for it in v["items"])
         ctl = j["tasks"][fr_build.CONTROL_TASK]
@@ -247,7 +261,7 @@ def test_calibration_round_trip(tree, tmp_path):
 def test_fixture_calibration_clears_the_line(tree):
     cal = tree["judged"]["calibration"]
     assert cal["calibrated"] is True and cal["kappa"] >= 0.6 and cal["n"] == 60
-    assert set(cal["per_category"]) >= {"reasoning", "cultural"}
+    assert len(cal["per_category"]) >= 5 and set(cal["per_category"]) <= set(fr_build.TOPICS)
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +270,8 @@ def test_fixture_calibration_clears_the_line(tree):
 
 def test_payload_judged_block(payload, tree):
     J = payload["judged"]
-    assert set(J["tasks"]) == set(fr_build.ALL_TASKS)
+    assert set(J["tasks"]) == set(tree["judged"]["manifest"]["tasks"])
+    assert J["exam"] == fr_build.exam_tasks() and J["topics"]["exam_economics"] == "economics"
     assert J["calibration"]["calibrated"] is True and J["kappaMin"] == 0.6
     assert J["judge"]["stub"] is True
     for t in fr_build.ALL_TASKS:                        # never a leaderboard column
@@ -264,9 +279,12 @@ def test_payload_judged_block(payload, tree):
         assert t not in payload["cells"] and t not in payload["tasks"]
     assert not any(row[2] == "bypass" for row in payload["extra"])
     good = next(m for m in payload["models"] if m["id"] == "fx/good-750m")
-    assert set(good["judge"]["tasks"]) == set(fr_build.ALL_TASKS)
+    assert set(good["judge"]["tasks"]) == set(tree["judged"]["manifest"]["tasks"])
     assert good["judgedAvg"] is not None and 0 <= good["judgedAvg"] <= 4
-    assert "items" not in good["judge"]["tasks"]["fr_reasoning"]        # trimmed for the page
+    econ = good["judge"]["tasks"]["exam_economics"]
+    assert "items" not in econ and econ["score_report"] is not None      # trimmed; report half published
+    assert report.published_score(econ) == econ["score_report"]
+    assert report.published_score({"mean": 2.0}) == 2.0                  # an older judge.json
     assert good["official"] is True                                    # unchanged by judging
     nodiag = next(m for m in payload["models"] if m["id"] == tree["nodiag"])
     assert nodiag["judge"] is None and nodiag["judgedAvg"] is None
@@ -285,7 +303,7 @@ def test_preliminary_gating(tree):
     # judgedAvg exists in the data either way; the page decides what to rank
     assert next(m for m in p1["models"] if m["id"] == "fx/good-750m")["judgedAvg"] is not None
     assert report.judged_avg({"skipped": "x", "tasks": {}}) is None
-    assert report.judged_avg({"tasks": {"fr_reasoning": {"mean": 2}}}) is None   # partial: no avg
+    assert report.judged_avg({"tasks": {"exam_law": {"mean": 2}}}) is None   # one topic: no avg
 
 
 def test_judge_json_is_picked_up_without_a_restart(tmp_path, monkeypatch):
@@ -293,10 +311,10 @@ def test_judge_json_is_picked_up_without_a_restart(tmp_path, monkeypatch):
     try:
         p = client.get("/api/results").json()
         assert p["judged"]["tasks"] == [] and p["judged"]["calibration"] is None
-        make_fixture.write_judged(tmp_path, tree["out_dir"])
+        j = make_fixture.write_judged(tmp_path, tree["out_dir"])
         fresh(appmod)
         p = client.get("/api/results").json()
-        assert set(p["judged"]["tasks"]) == set(fr_build.ALL_TASKS)
+        assert set(p["judged"]["tasks"]) == set(j["manifest"]["tasks"])
         assert p["judged"]["calibration"]["calibrated"] is True
         good = next(m for m in p["models"] if m["id"] == "fx/good-750m")
         assert good["judge"]["tasks"]["fr_control_mmlu"]["control"]
@@ -310,7 +328,7 @@ def test_judged_suite_through_the_service(tmp_path, monkeypatch):
     try:
         st = client.get("/api/judge").json()
         assert st["configured"] is False and "JUDGE_MODEL is unset" in st["reason"]
-        assert set(st["tasks"]) == set(fr_build.ALL_TASKS)
+        assert set(st["tasks"]) == set(tree["judged"]["manifest"]["tasks"])
         r = client.post("/api/submissions", json={"hf_id": "org/model", "suite": "judged"})
         assert r.status_code == 503
         monkeypatch.setattr(config, "JUDGE_MODEL", "meta-llama/Llama-3.1-8B-Instruct")
@@ -319,13 +337,15 @@ def test_judged_suite_through_the_service(tmp_path, monkeypatch):
         assert st["calibration"]["calibrated"] is True
         r = client.post("/api/submissions", json={"hf_id": "org/model", "suite": "judged"})
         assert r.status_code == 200 and r.json()["status"] == "queued"
-        assert set(config.tasks_for_suite("judged")) == set(fr_build.ALL_TASKS)
-        assert runner.include_args_for("fr_reasoning") == ["--include_path",
-                                                           str(config.JUDGED_TASKS_DIR)]
+        assert set(config.tasks_for_suite("judged")) == set(tree["judged"]["manifest"]["tasks"])
+        assert runner.include_args_for("exam_economics") == ["--include_path",
+                                                             str(config.JUDGED_TASKS_DIR)]
+        assert runner.include_args_for("fr_control_mmlu") == ["--include_path",
+                                                              str(config.JUDGED_TASKS_DIR)]
         assert runner.judge_cmd("org/model")[-2:] == ["--judge", "meta-llama/Llama-3.1-8B-Instruct"]
         monkeypatch.setattr(config, "JUDGE_MODEL", "stub")
         assert runner.judge_cmd("org/model")[-1] == "--stub"
         monkeypatch.setattr(config, "JUDGED_TASKS_DIR", tmp_path / "nowhere")
-        assert "fr_build.py" in config.judged_blocked()
+        assert "exam_build.py" in config.judged_blocked()
     finally:
         client.__exit__(None, None, None)

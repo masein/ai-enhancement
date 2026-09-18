@@ -30,6 +30,7 @@ from . import proposals as prop
 # the report module is the single source of truth for parsing and for the page
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import report_lm_eval as report  # noqa: E402
+import exam_build  # noqa: E402
 
 _HF_ID_RE = re.compile(r"^[\w.\-]{1,96}/[\w.\-]{1,96}$")
 
@@ -499,6 +500,89 @@ def _llm_status() -> dict:
 @app.get("/api/llm")
 def llm_status():
     return _llm_status()
+
+
+# ---------------------------------------------------------------------------
+# the exam: drafted by an LLM, curated by a person, split by qid
+# ---------------------------------------------------------------------------
+
+class CandidateAccept(BaseModel):
+    approver: str
+    prompt: str | None = None
+    reference: str | None = None
+    notes: str | None = None
+
+
+class CandidateReject(BaseModel):
+    approver: str
+    reason: str = ""
+
+
+@app.get("/api/exam")
+def exam_status():
+    why = llm.blocked("exam")
+    return {"configured": not why, "reason": why,
+            "provider": config.EXAM_PROVIDER, "model": config.EXAM_MODEL,
+            "root": str(config.EXAM_DIR), "tasks_built": config.judged_tasks(),
+            "target_per_topic": exam_build.TARGET_PER_TOPIC,
+            "summary": exam_build.summary(config.EXAM_DIR),
+            "draft_command": f"python3 scripts/exam_build.py draft --root {config.EXAM_DIR} "
+                             f"--per-topic 8",
+            "note": "the published per-topic score comes from the report half; only the "
+                    "diagnose half is ever shown here or placed in a request"}
+
+
+@app.get("/api/exam/candidates")
+def exam_candidates(topic: str | None = None, status: str = "candidate"):
+    return exam_build.load_candidates(config.EXAM_DIR, topic or None,
+                                      None if status == "all" else status)
+
+
+@app.get("/api/exam/bank")
+def exam_bank(topic: str | None = None):
+    """The bank with report-half text withheld — see exam_build.public_bank."""
+    return exam_build.public_bank(config.EXAM_DIR, topic or None)
+
+
+@app.post("/api/exam/candidates/{cid}/accept")
+def exam_accept(cid: str, a: CandidateAccept, x_token: str = Header(default="")):
+    _check_token(x_token)
+    who = _name(a.approver, "accepting a question")
+    try:
+        rec = exam_build.accept(config.EXAM_DIR, cid, who, a.prompt, a.reference, a.notes)
+    except KeyError:
+        raise HTTPException(404, "no such candidate") from None
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from None
+    db.curation_add(cid, rec["topic"], rec["qid"], "accepted", who, rec["edited"])
+    return {"cid": cid, "qid": rec["qid"], "topic": rec["topic"],
+            "half": exam_build.half_of(rec["qid"]), "edited": rec["edited"], "accepted_by": who}
+
+
+@app.post("/api/exam/candidates/{cid}/reject")
+def exam_reject(cid: str, a: CandidateReject, x_token: str = Header(default="")):
+    _check_token(x_token)
+    who = _name(a.approver, "rejecting a question")
+    try:
+        rec = exam_build.reject(config.EXAM_DIR, cid, who, a.reason)
+    except KeyError:
+        raise HTTPException(404, "no such candidate") from None
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from None
+    db.curation_add(cid, rec["topic"], "", "rejected", who, False, rec.get("reason", ""))
+    return {"cid": cid, "status": "rejected"}
+
+
+@app.post("/api/exam/build")
+def exam_build_tasks(x_token: str = Header(default="")):
+    """Write the harness tasks from the bank (+ the MMLU control set). No GPU;
+    a curator does this after a round of accepting so suite=judged runs the
+    new questions."""
+    _check_token(x_token)
+    m = exam_build.build(config.OUT_DIR, config.EXAM_DIR)
+    return {"tasks": {t: {k: v[k] for k in ("items", "report", "diagnose")}
+                      for t, v in m["tasks"].items()},
+            "tasks_dir": str(exam_build.tasks_dir(config.EXAM_DIR))}
 
 
 @app.get("/api/judge")

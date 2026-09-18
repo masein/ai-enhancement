@@ -31,9 +31,11 @@ taught the test", the warning — and fx/good-750m-tuned-skill improved on both
 halves — "the training taught the skill". The frozen report carries their
 taint the way the service would compute it from the run/dataset join.
 
-Three models (good, skewed, chance) also answer the judged free-response
-suite: the seed items from eval_tasks/fr plus the MMLU control set that
-scripts/fr_build.py builds from the diagnose half of this very tree. Their
+Three models (good, skewed, chance) also sit the exam: a bank drafted by the
+fake exam writer across every topic in categories.yaml and accepted by the
+fixture (approver "fixture"), the four skill suites' 40 items migrated in
+under `other`, and the MMLU control set exam_build builds from the diagnose
+half of this very tree. Every question is split by qid. Their
 answers are graded by scripts/judge.py's STUB grader, and a synthetic
 calibration CSV (human = judge with every seventh row off by one) is
 imported so the board has a kappa over the line. The skewed model answers the
@@ -593,18 +595,35 @@ def _fr_answer(rng: random.Random, item: dict, p_right: float) -> str:
     return "I am not certain; it may depend on the context and on who is asking."
 
 
+EXAM_PER_TOPIC = 6          # drafted candidates per topic in the fixture bank
+
+
+def write_exam(root: Path, out_dir: Path) -> dict:
+    """Draft with the fake exam writer, accept everything as the fixture, add
+    the migrated skill items, build the harness tasks. Returns the manifest."""
+    import exam_build as eb
+    from service import llm
+    exam_root = root / "exam"
+    eb.migrate_seeds(exam_root)
+    fake = llm.FakeBatches("fake-exam", root)
+    eb.draft(exam_root, fake, eb.TOPICS, per_topic=EXAM_PER_TOPIC, wait=True, poll_s=0)
+    for c in eb.load_candidates(exam_root, status="candidate"):
+        eb.accept(exam_root, c["cid"], approver="fixture")
+    return eb.build(out_dir, exam_root)
+
+
 def write_judged(root: Path, out_dir: Path, seed: int = SEED) -> dict:
-    """Build the fr task dir from this tree, write generate_until samples for
-    the judged models, grade them with the stub, calibrate synthetically."""
+    """Build the exam from this tree, write generate_until samples for the
+    judged models, grade them with the stub, calibrate synthetically."""
     import csv
 
-    import fr_build
+    import exam_build as eb
     import judge as jd
     import judge_calibrate as jc
-    fr_dir = root / "eval_tasks" / "fr"
-    manifest = fr_build.build(out_dir, fr_dir)
-    items_by_task = {t: [json.loads(ln) for ln in (fr_dir / f"{t}.jsonl").read_text(
-        encoding="utf-8").splitlines() if ln.strip()] for t in fr_build.ALL_TASKS}
+    manifest = write_exam(root, out_dir)
+    tasks_dir = eb.tasks_dir(root / "exam")
+    items_by_task = {t: [json.loads(ln) for ln in (tasks_dir / f"{t}.jsonl").read_text(
+        encoding="utf-8").splitlines() if ln.strip()] for t in manifest["tasks"]}
     for model_id, p_right in JUDGED.items():
         rng = _rng(seed, "fr", model_id)
         for task, items in items_by_task.items():
@@ -654,8 +673,8 @@ def write_judged(root: Path, out_dir: Path, seed: int = SEED) -> dict:
         w.writeheader()
         w.writerows(rows)
     cal = jc.import_csv(out_dir, cal_csv)
-    return {"fr_dir": fr_dir, "manifest": manifest, "models": dict(JUDGED),
-            "calibration_csv": cal_csv, "calibration": cal}
+    return {"exam_root": root / "exam", "tasks_dir": tasks_dir, "manifest": manifest,
+            "models": dict(JUDGED), "calibration_csv": cal_csv, "calibration": cal}
 
 
 def frozen_report(root: Path, path: Path, title: str = "Fixture board") -> Path:

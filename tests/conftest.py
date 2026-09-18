@@ -72,7 +72,9 @@ def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: b
                       "LLM_API_KEY": "", "LLM_MAX_ITEMS_PER_BATCH": 200,
                       "LLM_DAILY_ITEM_CAP": 2000, "DATASET_QUOTA_GB": 20.0,
                       "JUDGE_MODEL": judge_model,
-                      "JUDGED_TASKS_DIR": root / "eval_tasks" / "fr"}.items():
+                      "EXAM_PROVIDER": "fake", "EXAM_MODEL": "fake-exam", "EXAM_API_KEY": "",
+                      "EXAM_DIR": root / "exam",
+                      "JUDGED_TASKS_DIR": root / "exam" / "tasks"}.items():
         monkeypatch.setattr(config, name, val)
     monkeypatch.setattr(worker, "start", lambda: None)
     monkeypatch.setattr(llm_poller, "start", lambda: None)

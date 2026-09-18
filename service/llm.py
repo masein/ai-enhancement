@@ -242,6 +242,31 @@ def default_responder(req: Request) -> str:
     of fresh items for a generation request. The wording deliberately shares
     no vocabulary with the fixture's questions, so nothing here can trip the
     contamination gate by accident — a test that wants a trip plants one."""
+    if req.custom_id.startswith("exam:"):
+        topic = req.meta.get("topic", "the topic")
+        n = int(req.meta.get("count", 4))
+        start = int(req.meta.get("start", 0))
+        shapes = [
+            "Explain why {a} in {t} tends to {b}, and name the one condition under which it "
+            "would not. (draft {k})",
+            "A student claims that {a} and {b} are the same thing in {t}. State the distinction "
+            "and give one consequence of confusing them. (draft {k})",
+            "In {t}, what is the standard argument that {a} leads to {b}? Give the mechanism in "
+            "two or three sentences. (draft {k})",
+            "Describe a situation in {t} where {b} follows from {a}, and what an expert would "
+            "measure to confirm it. (draft {k})",
+        ]
+        fill = ["rising demand", "a fixed constraint", "a change in incentives", "a new rule",
+                "an external shock", "a measurement error", "a common assumption", "a feedback loop"]
+        out = []
+        for i in range(start, start + n):
+            a, b = fill[i % len(fill)], fill[(i * 3 + 1) % len(fill)]
+            out.append({"prompt": shapes[i % len(shapes)].format(a=a, b=b, t=topic, k=i + 1),
+                        "reference": f"The standard account in {topic}: {a} works through the "
+                                     f"mechanism that produces {b}; the exception is when the "
+                                     f"constraint does not bind.",
+                        "notes": f"fake draft {i + 1} for {topic}; checks the mechanism, not recall"})
+        return json.dumps(out)
     if req.custom_id.startswith("proposal:"):
         cat = req.meta.get("category", "the category")
         return json.dumps({
@@ -385,56 +410,72 @@ class FakeBatches(Backend):
 PROVIDERS = ("anthropic", "openai", "fake")
 
 
-def blocked() -> str:
-    """'' when generation is available, else the reason — shown in the UI in
+# Three identities share this client: the generator (LLM_*), the exam writer
+# (EXAM_*) and, from C2, the judge (JUDGE_*). Each is a (provider, model, key)
+# triple in config; the same backends serve all three.
+ROLES = {"llm": ("LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "proposals and generation"),
+         "exam": ("EXAM_PROVIDER", "EXAM_MODEL", "EXAM_API_KEY", "exam drafting")}
+
+
+def identity(role: str = "llm") -> tuple[str, str, str]:
+    pv, mv, kv, _ = ROLES[role]
+    return (getattr(config, pv, "") or "", getattr(config, mv, "") or "",
+            getattr(config, kv, "") or "")
+
+
+def blocked(role: str = "llm") -> str:
+    """'' when that identity is usable, else the reason — shown in the UI in
     those words, so nobody wonders why a button is missing."""
-    p = config.LLM_PROVIDER
+    pv, mv, kv, what = ROLES[role]
+    p, m, k = identity(role)
     if not p:
-        return ("no LLM is configured on this server (LLM_PROVIDER is unset) — proposals "
-                "and generation are off")
+        return f"no LLM is configured for {what} on this server ({pv} is unset) — it is off"
     if p not in PROVIDERS:
-        return f"LLM_PROVIDER={p!r} is not one of {', '.join(PROVIDERS)}"
-    if p != "fake" and not config.LLM_MODEL:
-        return "LLM_MODEL is unset — the generator model must be pinned and recorded"
-    if p != "fake" and not config.LLM_API_KEY:
-        return "LLM_API_KEY is unset — put it in .env, never in docker-compose.yml"
+        return f"{pv}={p!r} is not one of {', '.join(PROVIDERS)}"
+    if p != "fake" and not m:
+        return f"{mv} is unset — the model must be pinned and recorded"
+    if p != "fake" and not k:
+        return f"{kv} is unset — put it in .env, never in docker-compose.yml"
     return ""
 
 
 def startup_check() -> None:
     """A provider that is set but broken fails the container at start, where
     the operator is looking, instead of at the first click days later."""
-    if config.LLM_PROVIDER and blocked():
-        raise RuntimeError("LLM misconfigured: " + blocked())
+    for role in ROLES:
+        if identity(role)[0] and blocked(role):
+            raise RuntimeError(f"{role.upper()} misconfigured: " + blocked(role))
 
 
-_client: Backend | None = None
-_client_key: tuple | None = None
+def backend_for(provider: str, model: str, key: str, root: Path | None = None) -> Backend:
+    if provider == "anthropic":
+        return AnthropicBatches(model, key)
+    if provider == "openai":
+        return OpenAIBatches(model, key)
+    if provider == "fake":
+        return FakeBatches(model, root or config.BENCH_ROOT)
+    raise LLMError(f"unknown provider {provider!r}")
 
 
-def client() -> Backend:
-    global _client, _client_key
-    key = (config.LLM_PROVIDER, config.LLM_MODEL, bool(config.LLM_API_KEY), str(config.BENCH_ROOT))
-    if _client is None or _client_key != key:
-        why = blocked()
+_clients: dict[str, tuple[tuple, Backend]] = {}
+
+
+def client(role: str = "llm") -> Backend:
+    p, m, k = identity(role)
+    key = (p, m, bool(k), str(config.BENCH_ROOT))
+    hit = _clients.get(role)
+    if hit is None or hit[0] != key:
+        why = blocked(role)
         if why:
             raise LLMError(why)
-        p = config.LLM_PROVIDER
-        if p == "anthropic":
-            _client = AnthropicBatches(config.LLM_MODEL, config.LLM_API_KEY)
-        elif p == "openai":
-            _client = OpenAIBatches(config.LLM_MODEL, config.LLM_API_KEY)
-        else:
-            _client = FakeBatches(config.LLM_MODEL, config.BENCH_ROOT)
-        _client_key = key
-    return _client
+        _clients[role] = (key, backend_for(p, m, k))
+    return _clients[role][1]
 
 
 def reset() -> None:
-    """Forget the cached client (tests re-point BENCH_ROOT between cases; a
+    """Forget the cached clients (tests re-point BENCH_ROOT between cases; a
     real restart gets this for free)."""
-    global _client, _client_key
-    _client, _client_key = None, None
+    _clients.clear()
 
 
 def now() -> float:

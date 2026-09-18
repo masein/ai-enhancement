@@ -77,7 +77,7 @@ def _judged_rows(results: Path, models: set[str]) -> list[dict]:
 
 def _answers(model_dir: Path) -> dict[tuple, dict]:
     from judge import _answer, _records
-    from fr_build import ALL_TASKS
+    from exam_build import ALL_TASKS
     out = {}
     for task in ALL_TASKS:
         for rec in _records(model_dir, task):

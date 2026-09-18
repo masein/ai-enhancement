@@ -229,8 +229,9 @@ def proposal_gate(task: str, t: dict, cell: dict | None, chance: float | None) -
 # SEPARATE judged average; they never touch the multiple-choice average.
 # ---------------------------------------------------------------------------
 KAPPA_MIN = 0.60
-FR_CATEGORIES = ["instruction_following", "factual_accuracy", "reasoning", "cultural"]
-FR_TASKS = [f"fr_{c}" for c in FR_CATEGORIES]
+# the exam's spine is the topic list in scripts/categories.yaml; one task each
+EXAM_TASKS = [f"exam_{_categories.topic_slug(c)}" for c in _categories.category_order()]
+EXAM_TOPICS = {f"exam_{_categories.topic_slug(c)}": c for c in _categories.category_order()}
 FR_CONTROL = "fr_control_mmlu"
 
 
@@ -247,18 +248,29 @@ def _trim_judge(j: dict | None) -> dict | None:
         if not isinstance(t, dict):
             continue
         out["tasks"][task] = {k: t.get(k) for k in
-                              ("n", "mean", "max", "dist", "score_vs_length", "control")
+                              ("n", "mean", "max", "dist", "score_vs_length", "control",
+                               "n_report", "score_report", "n_diagnose", "score_diagnose")
                               if t.get(k) is not None}
     return out
 
 
+def published_score(t: dict) -> float | None:
+    """The per-topic number the board shows: the REPORT half's mean. The
+    diagnose half is what a proposal may be built from and never the score.
+    Older judge.json files (no halves recorded) fall back to the overall mean."""
+    if t.get("score_report") is not None:
+        return t["score_report"]
+    return t.get("mean") if "n_report" not in t else None
+
+
 def judged_avg(trimmed: dict | None) -> float | None:
-    """Mean rubric score over the four authored categories, on the 0–4 scale.
-    None unless every category was judged — a partial average is not a rank."""
+    """Mean published (report-half) score over the exam topics this model sat,
+    on the 0–4 scale. None when fewer than three topics were judged."""
     if not trimmed or trimmed.get("skipped"):
         return None
-    means = [trimmed["tasks"][t]["mean"] for t in FR_TASKS if t in trimmed["tasks"]]
-    return round(sum(means) / len(means), 4) if len(means) == len(FR_TASKS) else None
+    vals = [published_score(trimmed["tasks"][t]) for t in EXAM_TASKS if t in trimmed["tasks"]]
+    vals = [v for v in vals if v is not None]
+    return round(sum(vals) / len(vals), 4) if len(vals) >= 3 else None
 
 
 # ---------------------------------------------------------------------------
@@ -809,7 +821,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
 
     # judged free-response tasks never have a harness metric (bypass) and so
     # never a cell; the guard keeps a future metric from putting them here
-    headline = [t for t in headline if not t.startswith("fr_")]
+    headline = [t for t in headline if not t.startswith(("fr_", "exam_"))]
     acc_tasks = [t for t in headline
                  if metric_used.get(t) in PROPORTION and not is_lower_better(t)]
     ppl_tasks = [t for t in headline if t not in acc_tasks]
@@ -1044,8 +1056,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         "sig": sig,
         # the judged suite: which tasks anyone ran, the judge, and whether a
         # person has agreed with it enough for the numbers to count
-        "judged": {"tasks": judged_tasks, "categories": FR_TASKS, "control": FR_CONTROL,
-                   "judge": judge_meta, "kappaMin": KAPPA_MIN,
+        "judged": {"tasks": judged_tasks, "exam": EXAM_TASKS, "topics": EXAM_TOPICS,
+                   "control": FR_CONTROL, "judge": judge_meta, "kappaMin": KAPPA_MIN,
                    "calibration": ({k: cal.get(k) for k in
                                     ("kappa", "n", "calibrated", "kappa_min", "per_category")}
                                    if cal else None)},
@@ -1501,6 +1513,7 @@ const state = {
   lbAbout: false,                      // "about these benchmarks" panel open
   lbView: 'tasks',                     // leaderboard columns: 'tasks' | 'cats' (MMLU by category)
   rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '' },   // Review tab
+  ex: { status: null, candidates: [], loaded: false, msg: '', topic: '' },   // Exam tab
   rvName: '',                          // the name approvals are recorded under (remembered)
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
@@ -2448,7 +2461,9 @@ function vDiagnose(m) {
 const SCORE_FILL = ['var(--s8)', 'color-mix(in srgb, var(--s8) 45%, var(--plane))', 'var(--axis)',
                     'color-mix(in srgb, var(--s1) 55%, var(--plane))', 'var(--s1)'];
 const frName = t => t === DATA.judged.control ? 'MMLU control (open-ended)'
-  : t.replace(/^fr_/, '').replace(/_/g, ' ');
+  : (DATA.judged.topics || {})[t] || t.replace(/^(fr_|exam_)/, '').replace(/_/g, ' ');
+// the published topic score is the REPORT half; older files carry only a mean
+const pubScore = v => v.score_report != null ? v.score_report : (v.n_report == null ? v.mean : null);
 
 function jBar(dist, n) {
   const bar = el('div', { class: 'jbar' });
@@ -2504,30 +2519,31 @@ function vJudged(m) {
   if (j.judge.stub) card.append(el('p', { class: 'warn', text: 'Graded by the STUB grader — a '
     + 'word-overlap stand-in for plumbing tests. Not a judgement of anything.' }));
 
-  // per category
-  const cats = J.categories.filter(t => j.tasks[t]);
+  // per topic, weakest first, on the REPORT half — the diagnose half is never the score
+  const cats = J.exam.filter(t => j.tasks[t] && pubScore(j.tasks[t]) != null)
+    .sort((a, b) => pubScore(j.tasks[a]) - pubScore(j.tasks[b]));
   if (cats.length) {
-    card.append(el('div', { class: 'dxh', text: 'By category (0–4)' }));
+    card.append(el('div', { class: 'dxh', text: 'By topic (0–4), weakest first — report half' }));
     card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
-      el('thead', {}, el('tr', {}, el('th', { text: 'category' }), el('th', { class: 'num', text: 'score' }),
-        el('th', { class: 'num', text: 'κ' }), el('th', { class: 'num', text: 'items' }),
-        el('th', { text: 'score distribution 0 → 4' }))),
+      el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { class: 'num', text: 'score' }),
+        el('th', { class: 'num', text: 'κ' }), el('th', { class: 'num', text: 'items (report half)' }),
+        el('th', { text: 'score distribution 0 → 4 (all items)' }))),
       el('tbody', {}, cats.map(t => { const v = j.tasks[t];
-        const k = cal && cal.per_category && cal.per_category[t.slice(3)];
-        return el('tr', {},
+        const k = cal && cal.per_category && cal.per_category[frName(t)];
+        const nr = v.n_report != null ? v.n_report : v.n;
+        return el('tr', { class: nr < CAT_MIN_N ? 'dim' : null },
           el('td', { text: frName(t) }),
-          el('td', { class: 'num', text: `${num(v.mean, 2)} / 4` }),
+          el('td', { class: 'num', text: `${num(pubScore(v), 2)} / 4` }),
           el('td', { class: 'num se', text: k ? String(k.kappa) : '—',
-            title: k ? `${k.n} human-graded answers in this category` : 'not calibrated per category' }),
-          el('td', { class: 'num se', text: String(v.n) + (v.n <= 10 ? ' (seed)' : '') }),
+            title: k ? `${k.n} human-graded answers in this topic` : 'not calibrated per topic' }),
+          el('td', { class: 'num se', text: String(nr) + (nr < CAT_MIN_N ? ' · under ' + CAT_MIN_N : '') }),
           el('td', {}, jBar(v.dist, v.n))); })))));
     if (m.judgedAvg != null)
       card.append(el('p', { class: 'small', text: `Judged average ${num(m.judgedAvg, 2)} / 4 over `
-        + `the four categories` + (ok ? '.' : ' — preliminary until the judge is calibrated.') }));
-    if (cats.some(t => j.tasks[t].n <= 10))
-      card.append(el('p', { class: 'small', text: 'Ten items per category are the SEED set: a '
-        + 'plumbing test, not a measurement. eval_tasks/fr/AUTHORING.md says how the rest get '
-        + 'written.' }));
+        + `${cats.length} topics, report half` + (ok ? '.' : ' — preliminary until the judge is calibrated.') }));
+    card.append(el('p', { class: 'small', text: `Topics under ${CAT_MIN_N} report-half questions `
+      + 'are greyed: the exam bank is still being written (Exam tab). The diagnose half of each '
+      + 'topic is what a proposal may read; it is never the score.' }));
     // score vs length
     const rows = [];
     for (const t of cats) for (const b of j.tasks[t].score_vs_length || [])
@@ -3135,16 +3151,16 @@ function vLeaderboard(ms) {
     // judged columns exist on the board only once a person has agreed with the
     // judge (kappa over the line); the kappa rides in the header
     ...(DATA.judged && DATA.judged.calibration && DATA.judged.calibration.calibrated
-      ? [...DATA.judged.categories.filter(t => DATA.judged.tasks.includes(t)).map(t => ({
-          key: 'j:' + t, label: t.slice(3).replace(/_/g, ' ') + ' κ'
-            + (((DATA.judged.calibration.per_category || {})[t.slice(3)] || {}).kappa
+      ? [...DATA.judged.exam.filter(t => DATA.judged.tasks.includes(t)).map(t => ({
+          key: 'j:' + t, label: frName(t) + ' κ'
+            + (((DATA.judged.calibration.per_category || {})[frName(t)] || {}).kappa
                ?? DATA.judged.calibration.kappa), num: true, judged: t })),
          { key: 'javg', label: `Judged avg κ${DATA.judged.calibration.kappa}`, num: true, judged: 'avg' }]
       : []),
     { key: 'date', label: 'Last eval', num: false },   // when its newest task ran
   ];
   const jval = (m, c) => c.judged === 'avg' ? m.judgedAvg
-    : (((m.judge || {}).tasks || {})[c.judged] || {}).mean;
+    : (((m.judge || {}).tasks || {})[c.judged] ? pubScore(m.judge.tasks[c.judged]) : null);
   const val = (m, c) => c.key === 'avg' ? officialAvg(m)
                       : c.judged ? jval(m, c)
                       : c.task ? (cell(c.task, m.id) || {}).v : m[c.key];
@@ -4774,6 +4790,125 @@ function vReview() {
       closed.map(p => rvProposal(p, llmOk))) : ''];
 }
 
+// ---------- Exam: write the instrument ----------
+// An LLM drafts candidate questions per topic (scripts/exam_build.py draft); a
+// person accepts, edits or rejects each one here, under a name; accepted
+// questions land in the bank, split by qid into a report half (the published
+// score) and a diagnose half (what a proposal may read). Nothing an LLM wrote
+// reaches the bank unread, and no report-half question is ever shown again.
+async function loadExam() {
+  try {
+    const q = state.ex.topic ? '?topic=' + encodeURIComponent(state.ex.topic) : '';
+    const [status, cands] = await Promise.all([
+      fetch('api/exam').then(r => r.json()),
+      fetch('api/exam/candidates' + q).then(r => r.json())]);
+    const changed = !state.ex.loaded || JSON.stringify([status.summary, cands])
+      !== JSON.stringify([(state.ex.status || {}).summary, state.ex.candidates]);
+    Object.assign(state.ex, { status, candidates: cands, loaded: true });
+    if (changed && state.tab === 'exam' && !state.model) render();
+  } catch (e) { /* server briefly away */ }
+}
+
+async function exPost(path, body) {
+  const r = await fetch(path, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+    body: JSON.stringify(body || {}) }).catch(() => null);
+  const j = r ? await r.json().catch(() => ({})) : {};
+  state.ex.msg = r && r.ok ? (j.qid ? `accepted → ${j.half} half (${j.topic})`
+    : j.status === 'rejected' ? 'rejected' : j.tasks ? 'tasks rebuilt: '
+      + Object.entries(j.tasks).map(([t, v]) => `${t.replace(/^exam_/, '')} ${v.items}`).join(', ') : 'ok')
+    : 'refused: ' + (j.detail || (r ? r.status : 'server unreachable'));
+  state.ex.loaded = false;
+  await loadExam(); render();
+}
+
+function exCandidate(c) {
+  const prompt = el('textarea', { 'aria-label': 'question' });
+  prompt.value = c.prompt;
+  const ref = el('textarea', { 'aria-label': 'reference answer', style: 'min-height:50px' });
+  ref.value = c.reference;
+  const reason = el('input', { type: 'text', placeholder: 'reason (for reject)',
+    style: 'flex:1;min-width:160px', 'aria-label': 'reject reason' });
+  const name = rvNameInput();
+  return el('div', { class: 'rv', 'data-candidate': c.cid },
+    el('div', { class: 'mhead' }, el('h3', { text: c.topic }),
+      el('span', { class: 'small', text: `drafted by ${c.drafted_by || '—'} · batch ${(c.batch_id || '').slice(0, 14)}` })),
+    c.notes ? el('p', { class: 'small', text: 'drafter\'s note: ' + c.notes }) : '',
+    el('div', { class: 'dxh', text: 'Question' }), prompt,
+    el('div', { class: 'dxh', text: 'Reference (what a full-marks answer must contain)' }), ref,
+    el('p', { class: 'small', text: 'Edit freely — the text you accept is what gets hashed, and '
+      + 'the hash decides which half it lands in. You will not see it again if it lands in '
+      + 'the report half.' }),
+    el('div', { class: 'frm' }, name,
+      el('button', { text: 'Accept into the bank', onclick: () => exPost(
+        `api/exam/candidates/${c.cid}/accept`, { approver: name.value, prompt: prompt.value,
+                                                 reference: ref.value }) }),
+      reason,
+      el('button', { text: 'Reject', onclick: () => exPost(
+        `api/exam/candidates/${c.cid}/reject`, { approver: name.value, reason: reason.value }) })));
+}
+
+function vExam() {
+  if (!state.ex.loaded) loadExam();
+  try { if (!state.rvName) state.rvName = localStorage.getItem('bench-name') || ''; } catch (e) { /* */ }
+  const st = state.ex.status || {};
+  const sum = st.summary || {};
+  const topics = Object.keys(sum);
+  const total = topics.reduce((a, t) => a + (sum[t].accepted || 0), 0);
+  const pending = topics.reduce((a, t) => a + (sum[t].pending || 0), 0);
+  const head = el('div', { class: 'card' },
+    el('h2', { text: 'Exam' }),
+    el('p', { class: 'sub', text: 'The instrument. One question bank across the topics in '
+      + 'scripts/categories.yaml; an LLM drafts candidates, a person accepts, edits or rejects '
+      + 'each one here. Every accepted question is split by the hash of its text into a report '
+      + 'half — the published per-topic score — and a diagnose half — the only half a proposal '
+      + 'may read. That split is what lets the loop train on what the exam finds and still '
+      + 'have an honest number.' }),
+    el('div', { class: 'kvs' },
+      el('span', {}, el('b', { text: 'exam writer ' }), st.configured
+        ? `${st.provider}/${st.model || '—'}` : 'not configured'),
+      el('span', {}, el('b', { text: 'bank ' }), `${total} questions across ${topics.filter(t => sum[t].accepted).length} of ${topics.length} topics`),
+      el('span', {}, el('b', { text: 'awaiting curation ' }), String(pending)),
+      el('span', {}, el('b', { text: 'tasks built ' }), String((st.tasks_built || []).length))),
+    !st.configured && st.reason ? el('p', { class: 'warn', text: st.reason }) : '',
+    el('p', { class: 'small' }, 'Draft more: ', el('code', { style: 'overflow-wrap:anywhere',
+      text: st.draft_command || 'scripts/exam_build.py draft' }),
+      ' on the server; candidates appear below within a poll.'),
+    el('div', { class: 'frm', style: 'margin-top:8px' }, rvNameInput(),
+      el('button', { text: 'Rebuild the harness tasks from the bank',
+        title: 'writes $EXAM_DIR/tasks from the accepted questions + the MMLU control set; no GPU',
+        onclick: () => exPost('api/exam/build') })),
+    state.ex.msg ? el('p', { class: 'small', text: state.ex.msg }) : '');
+  const table = el('div', { class: 'card' }, el('h2', { text: 'By topic' }),
+    el('p', { class: 'sub', text: `Target ${st.target_per_topic || 60} accepted questions per topic. `
+      + 'Under 30 in the report half the published score is noise and the page greys it.' }),
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { class: 'num', text: 'accepted' }),
+        el('th', { class: 'num', text: 'report half' }), el('th', { class: 'num', text: 'diagnose half' }),
+        el('th', { class: 'num', text: 'awaiting curation' }), el('th', { text: 'toward target' }))),
+      el('tbody', {}, topics.map(t => { const s = sum[t];
+        const bar = el('div', { class: 'dxbar', style: 'width:140px;height:8px' },
+          el('span', { style: `width:${Math.min(100, 100 * s.accepted / (s.target || 60)).toFixed(1)}%;background:var(--s1)` }));
+        return el('tr', { class: s.report < CAT_MIN_N ? 'dim' : null },
+          el('td', {}, el('a', { href: '#', text: t, onclick: e => { e.preventDefault();
+            state.ex.topic = state.ex.topic === t ? '' : t; state.ex.loaded = false; render(); } })),
+          el('td', { class: 'num', text: String(s.accepted) }),
+          el('td', { class: 'num', text: String(s.report) }),
+          el('td', { class: 'num', text: String(s.diagnose) }),
+          el('td', { class: 'num', text: String(s.pending) }),
+          el('td', {}, bar)); })))));
+  const cands = state.ex.candidates || [];
+  const cur = el('div', { class: 'card' },
+    el('h2', { text: 'Awaiting curation' + (state.ex.topic ? ` — ${state.ex.topic}` : '') }),
+    el('p', { class: 'sub', text: 'Read each against the rubric: does it ask for understanding, is '
+      + 'the reference the substance rather than a wording, is it answerable in five sentences, '
+      + 'is it new? Accept, edit and accept, or reject with a reason. Click a topic above to filter.' }),
+    cands.length ? cands.slice(0, 40).map(exCandidate)
+      : el('p', { class: 'small', text: 'Nothing waiting' + (state.ex.topic ? ' in this topic.' : '.') }),
+    cands.length > 40 ? el('p', { class: 'small', text: `${cands.length - 40} more after these.` }) : '');
+  return [head, table, cur];
+}
+
 function download(name, mime, text) {
   const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: mime })), download: name });
   document.body.append(a); a.click(); a.remove();
@@ -4809,6 +4944,7 @@ function exportJson() { download('benchmark.json', 'application/json', JSON.stri
 const TABS = [
   ['overview', 'Overview', vOverview],
   ...(LIVE ? [['training', 'Training', vTraining],
+              ['exam', 'Exam', vExam],
               ['review', 'Review', vReview],
               ['queue', 'Submit & Queue', vQueue]] : []),
   ['leaderboard', 'Leaderboard', vLeaderboard],
@@ -4942,7 +5078,8 @@ if (LIVE) {
   });
   loadQueue();
   setInterval(() => { loadQueue(); if (state.tab === 'training') loadTraining();
-                      if (state.tab === 'review') loadReview(); }, 5000);
+                      if (state.tab === 'review') loadReview();
+                      if (state.tab === 'exam') loadExam(); }, 5000);
 } else {
   initData(DATA);
 }

@@ -30,13 +30,16 @@ def live(tmp_path_factory):
     tree = make_fixture.build(root)
     saved = {k: getattr(config, k) for k in (
         "BENCH_ROOT", "RESULTS_ROOT", "OUT_DIR", "DB_PATH", "ARTIFACTS_DIR", "LOGS_DIR",
-        "DATASETS_DIR", "SUBMIT_TOKEN", "LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_POLL_S")}
+        "DATASETS_DIR", "SUBMIT_TOKEN", "LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_POLL_S",
+        "EXAM_DIR", "EXAM_PROVIDER", "EXAM_MODEL", "EXAM_API_KEY", "JUDGED_TASKS_DIR")}
     for k, v in {"BENCH_ROOT": root, "RESULTS_ROOT": root / "results",
                  "OUT_DIR": root / "results" / "full", "DB_PATH": root / "service.sqlite3",
                  "ARTIFACTS_DIR": root / "artifacts", "LOGS_DIR": root / "logs",
                  "DATASETS_DIR": root / "datasets", "SUBMIT_TOKEN": "",
                  "LLM_PROVIDER": "fake", "LLM_MODEL": "fake-1", "LLM_API_KEY": "",
-                 "LLM_POLL_S": 0.3}.items():
+                 "LLM_POLL_S": 0.3, "EXAM_DIR": root / "exam", "EXAM_PROVIDER": "fake",
+                 "EXAM_MODEL": "fake-exam", "EXAM_API_KEY": "",
+                 "JUDGED_TASKS_DIR": root / "exam" / "tasks"}.items():
         setattr(config, k, v)
     worker_start = worker.start
     worker.start = lambda: None
@@ -118,6 +121,64 @@ def test_propose_buttons_carry_their_reasons(live, page):
         btns = det.locator("button.propose")
         assert btns.count() > 0 and all(not b.is_enabled() for b in btns.all()), mid
         assert needle in det.locator(".propwhy").first.text_content(), mid
+    assert page.errors == []
+
+
+def test_exam_curation_in_the_browser(live, page):
+    """The Exam tab: the bank per topic, candidates awaiting a decision, accept
+    with an edit under a name, reject with a reason, rebuild the tasks."""
+    import exam_build as eb
+    from service import llm
+    base, root = live["base"], live["root"]
+    out = eb.draft(root / "exam", llm.FakeBatches("fake-exam", root), ["law", "history"],
+                   per_topic=2, wait=True, poll_s=0)
+    assert out["written"] == {"law": 2, "history": 2}
+    page.goto(base + "/#tab=exam")
+    page.wait_for_selector(".card h2:has-text('Exam')")
+    page.wait_for_selector(".rv[data-candidate]", timeout=15000)
+    text = page.locator("#view").text_content()
+    assert "fake/fake-exam" in text and "awaiting curation 4" in text
+    rows = page.locator("table.jd tbody tr")
+    assert rows.count() == 15                                      # one per topic in categories.yaml
+    assert "other" in text and "economics" in text
+    # filter to one topic by clicking it
+    page.locator("table.jd tbody tr a", has_text=re.compile(r"^law$")).click()
+    page.wait_for_selector(".card h2:has-text('Awaiting curation — law')")
+    cards = page.locator(".rv[data-candidate]")
+    assert cards.count() == 2
+    card = cards.first
+    cid = card.get_attribute("data-candidate")
+    q = card.get_by_label("question")
+    q.fill(q.input_value() + " Give one counterexample.")
+    card.get_by_label("your name").fill("Omar")
+    card.get_by_role("button", name="Accept into the bank").click()
+    page.wait_for_function("document.querySelector('#view').textContent.includes('accepted →')")
+    assert page.locator(f".rv[data-candidate='{cid}']").count() == 0
+    bank = eb.load_bank(root / "exam")["law"]
+    assert any(r["cid"] == cid and r["edited"] and r["accepted_by"] == "Omar" for r in bank)
+    card = page.locator(".rv[data-candidate]").first
+    card.get_by_label("your name").fill("Omar")
+    card.get_by_label("reject reason").fill("recall, not understanding")
+    card.get_by_role("button", name="Reject").click()
+    page.wait_for_function("document.querySelector('#view').textContent.includes('rejected')")
+    assert page.locator(".rv[data-candidate]").count() == 0
+    # rebuild the harness tasks from the bank, from the page
+    page.get_by_role("button", name="Rebuild the harness tasks from the bank").click()
+    page.wait_for_function("document.querySelector('#view').textContent.includes('tasks rebuilt')")
+    assert (root / "exam" / "tasks" / "exam_law.yaml").exists()
+    # screenshots: the Exam tab, light and dark, desktop and phone
+    SCREENS.mkdir(exist_ok=True)
+    eb.draft(root / "exam", llm.FakeBatches("fake-exam", root), ["economics"], per_topic=2,
+             wait=True, poll_s=0)
+    for scheme in ("light", "dark"):
+        page.emulate_media(color_scheme=scheme)
+        for width in (1240, 430):
+            page.set_viewport_size({"width": width, "height": 900})
+            page.goto(base + "/#tab=exam")
+            page.reload()
+            page.wait_for_selector(".rv[data-candidate]", timeout=15000)
+            page.screenshot(path=SCREENS / f"exam-{scheme}-{width}.png", full_page=True)
+            assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
     assert page.errors == []
 
 

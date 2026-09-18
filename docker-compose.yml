@@ -51,6 +51,11 @@ services:
       LLM_MAX_ITEMS_PER_BATCH: ${LLM_MAX_ITEMS_PER_BATCH:-200}
       LLM_DAILY_ITEM_CAP: ${LLM_DAILY_ITEM_CAP:-2000}
       DATASET_QUOTA_GB: ${DATASET_QUOTA_GB:-20}
+      # the exam writer — a separate identity from the generator (LLM_*) and
+      # the judge, so the loop is not one model family grading itself
+      EXAM_PROVIDER: ${EXAM_PROVIDER:-}
+      EXAM_MODEL: ${EXAM_MODEL:-}
+      EXAM_API_KEY: ${EXAM_API_KEY:-}
     volumes:
       - ${BENCH_ROOT}:${BENCH_ROOT}
       - ${HF_HOME}:${HF_HOME}

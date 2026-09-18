@@ -68,6 +68,11 @@ def category_order(path: Path = YAML_PATH) -> list[str]:
     return [c for c in cats if c != OTHER] + [OTHER]
 
 
+def topic_slug(name: str) -> str:
+    """'medicine & health' -> 'medicine_health': the topic as a task name."""
+    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
 def categorize(subject: str, path: Path = YAML_PATH) -> str | None:
     """The category, or None when the subject is not in the file. Callers
     that roll up decide what None means (diagnose.py: `other`, and listed)."""

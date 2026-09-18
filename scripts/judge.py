@@ -47,7 +47,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 sys.path.insert(0, str(HERE))
 import diagnose as dx  # noqa: E402
-from fr_build import ALL_TASKS, CONTROL_TASK  # noqa: E402
+from exam_build import ALL_TASKS, CONTROL_TASK  # noqa: E402
 
 RUBRIC_DIR = REPO / "eval_tasks" / "fr" / "rubrics"
 PROMPT_VERSION = 1
@@ -80,9 +80,10 @@ def family(model_id: str) -> str:
 
 
 def rubric_for(task: str) -> tuple[str, str, str]:
-    """(text, sha256, version) — the control set is graded with the factual
-    rubric: it asks for a fact, and the gold option is the reference."""
-    cat = "factual_accuracy" if task == CONTROL_TASK else task[len("fr_"):]
+    """(text, sha256, version). Every exam topic is graded with the exam
+    rubric; the control set with the factual one — it asks for a fact, and the
+    gold option is the reference."""
+    cat = "factual_accuracy" if task == CONTROL_TASK else "exam"
     p = RUBRIC_DIR / f"{cat}.md"
     text = p.read_text(encoding="utf-8")
     m = re.search(r"\(version (\d+)\)", text)
@@ -268,7 +269,13 @@ def judge_model(model_dir: Path, grader: Grader, judge_family: str) -> dict | No
             ans = _answer(rec)
             score = grader.grade(build_prompt(rubric, doc.get("prompt", ""),
                                               doc.get("reference", ""), ans))
-            item = {"doc_hash": rec.get("doc_hash"), "id": doc.get("id"),
+            # the question's own identity and half: the published topic score
+            # is the report half; the step that picks a topic may read only the
+            # diagnose half. The control set is diagnose-half by construction.
+            qid = doc.get("qid")
+            item = {"doc_hash": rec.get("doc_hash"), "id": doc.get("id"), "qid": qid,
+                    "half": ("diagnose" if task == CONTROL_TASK
+                             else dx.split_of(qid) if qid else None),
                     "category": doc.get("category"), "score": int(score),
                     "answer_words": words(ans)}
             if task == CONTROL_TASK:
@@ -281,8 +288,15 @@ def judge_model(model_dir: Path, grader: Grader, judge_family: str) -> dict | No
         by_len: dict[str, list[int]] = collections.defaultdict(list)
         for it in items:
             by_len[length_bucket(it["answer_words"])].append(it["score"])
+        rep = [it["score"] for it in items if it["half"] == "report"]
+        dia = [it["score"] for it in items if it["half"] == "diagnose"]
         t = {"n": len(items), "mean": round(sum(it["score"] for it in items) / len(items), 4),
              "max": MAX_SCORE,
+             # per half: the report half is the published score, the diagnose
+             # half is what a proposal may be built from
+             "n_report": len(rep), "score_report": round(sum(rep) / len(rep), 4) if rep else None,
+             "n_diagnose": len(dia),
+             "score_diagnose": round(sum(dia) / len(dia), 4) if dia else None,
              "dist": {str(k): dist.get(str(k), 0) for k in range(MAX_SCORE + 1)},
              "score_vs_length": [{"bucket": label, "n": len(by_len[label]),
                                   "mean": round(sum(by_len[label]) / len(by_len[label]), 4)}

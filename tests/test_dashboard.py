@@ -243,7 +243,8 @@ def test_judged_section_and_the_control_sentence(surface, tree):
     assert "Knew it, couldn't pick it" in text
     m = re.search(r"of the (\d+) control items this model got wrong as multiple choice, it answered (\d+)", text)
     assert m and int(m.group(2)) / int(m.group(1)) >= 0.5
-    assert "By category (0–4)" in text and "Score against answer length" in text
+    assert "By topic (0–4), weakest first — report half" in text
+    assert "Score against answer length" in text and "economics" in text
     assert card.locator("table.jd").count() == 3
     surface.open(model_link("fx/chance-160m"))
     card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
@@ -258,8 +259,9 @@ def test_judged_columns_appear_once_calibrated(surface):
     pg = surface.open("#tab=leaderboard")
     heads = pg.locator("table.lb thead tr").first.locator("th").all_text_contents()
     judged = [h for h in heads if "κ" in h]
-    assert len(judged) == 5 and any(h.startswith("Judged avg") for h in judged)
-    assert not any(h.startswith("fr_") for h in heads)           # never as a task column
+    assert len(judged) >= 4 and any(h.startswith("Judged avg") for h in judged)
+    assert any(h.startswith("economics") for h in judged)
+    assert not any(h.startswith(("fr_", "exam_")) for h in heads)   # never as a task column
     row = pg.locator("table.lb tbody tr", has_text="good-750m").first
     assert "/4" in row.text_content()
     assert surface.errors == []

@@ -100,6 +100,19 @@ CREATE TABLE IF NOT EXISTS datasets (
   created_at    REAL NOT NULL,
   finished_at   REAL
 );
+-- who accepted or rejected each drafted exam question, and when. The bank
+-- file carries the same name; this is the queryable record of the decisions
+CREATE TABLE IF NOT EXISTS exam_curation (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  cid         TEXT NOT NULL,
+  topic       TEXT NOT NULL,
+  qid         TEXT DEFAULT '',                  -- the accepted question's identity
+  decision    TEXT NOT NULL,                    -- accepted|rejected
+  approver    TEXT NOT NULL,
+  edited      INTEGER NOT NULL DEFAULT 0,
+  reason      TEXT DEFAULT '',
+  decided_at  REAL NOT NULL
+);
 -- every batch id, persisted before anything else happens: a restart resumes
 -- polling instead of re-submitting
 CREATE TABLE IF NOT EXISTS llm_batches (
@@ -513,3 +526,27 @@ def taint_stamp() -> tuple:
         b = c.execute("SELECT COUNT(*) FROM tevents").fetchone()
         d = c.execute("SELECT COUNT(*), COALESCE(MAX(finished_at), 0) FROM datasets").fetchone()
     return (a[0], a[1], b[0], d[0], d[1])
+
+
+# ---------------------------------------------------------------------------
+# exam curation — the human step of writing the exam
+# ---------------------------------------------------------------------------
+
+_CUR_COLS = ["id", "cid", "topic", "qid", "decision", "approver", "edited", "reason", "decided_at"]
+
+
+def curation_add(cid: str, topic: str, qid: str, decision: str, approver: str,
+                 edited: bool = False, reason: str = "") -> int:
+    with closing(_conn()) as c:
+        cur = c.execute("INSERT INTO exam_curation (cid, topic, qid, decision, approver, edited, "
+                        "reason, decided_at) VALUES (?,?,?,?,?,?,?,?)",
+                        (cid, topic, qid, decision, approver, int(edited), reason, time.time()))
+        c.commit()
+        return int(cur.lastrowid)
+
+
+def curation_list(limit: int = 500) -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute(f"SELECT {','.join(_CUR_COLS)} FROM exam_curation "
+                         "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    return [dict(zip(_CUR_COLS, r)) for r in rows]
