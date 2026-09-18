@@ -96,6 +96,38 @@ re-queued automatically and per-task resume repeats only the interrupted task.
 | `EVAL_USER` | benchjob | unprivileged account those jobs run as; required when the above is on |
 | `REMOTE_CODE_SHAS` | *(unset)* | if set, an allowlist: only these .py hashes may run |
 | `CONTROL_TASKS_DIR` | the repo's `eval_tasks/mmlu_perm` | where a `suite=control` run finds the permutation control's task yaml |
+| `LLM_PROVIDER` | *(unset — off)* | `anthropic` / `openai` / `fake`: the model behind skill-spec proposals and data generation (batch API only) |
+| `LLM_MODEL` | *(unset)* | the generator model id, pinned; recorded in every dataset's provenance |
+| `LLM_API_KEY` | *(unset)* | in `.env` only — see *The LLM key* below |
+| `LLM_MAX_ITEMS_PER_BATCH` / `LLM_DAILY_ITEM_CAP` | 200 / 2000 | spend guard, in batch requests (one per proposal, one per ten generated items); the Review tab shows today's use |
+| `DATASET_QUOTA_GB` | 20 | total generated-dataset storage under `$BENCH_ROOT/datasets` |
+
+## The LLM key
+
+Phase 4 of `DIAGNOSE.md` (find the gap, generate data) uses an external LLM
+through its batch API. The key is a secret, and this is exactly where it is
+and is not protected:
+
+- It lives in `.env`, which is gitignored, and reaches the container through
+  docker-compose `${LLM_API_KEY}` interpolation. It is **never a literal in
+  `docker-compose.yml`** and never in git — a test greps for both.
+- It is **stripped from every evaluation subprocess** (`SECRET_ENV_VARS` in
+  `service/runner.py`), so a submitted model's own code cannot read it. Add
+  any new secret's variable name to that list in the same commit that adds
+  the secret.
+- It is **not hidden from anyone with docker access on the box**:
+  `docker inspect aienh-bench-1` prints `Config.Env`, key included. That is
+  the trust model here — the tailnet and the docker group are the boundary —
+  and it is worth saying plainly: the key is protected from submitted code,
+  not from colleagues. Use a key with a spend limit set at the provider.
+
+Generation is off unless `LLM_PROVIDER` is set; the Review tab says so. A
+provider that is set with a missing model or key fails the container at
+startup, where the operator is looking, rather than at the first click.
+Everything the LLM produces goes through the contamination gate
+(`service/contamination.py`) before it can be stored, and every dataset
+carries a full provenance record. Who approved a spec is recorded as a
+typed name, the same way submissions record a submitter — there is no login.
 
 ## Custom model code (`trust_remote_code`)
 
@@ -243,6 +275,8 @@ up after `GPU_WAIT_MAX_S` with a resubmit-later message.
 
 ## Backup
 
-Three things hold all state: the `results/` tree, `service.sqlite3` (queue +
-training runs + metrics), and `artifacts/` (uploaded checkpoints). Copy those,
-and a fresh checkout of this repo reproduces the rest.
+Four things hold all state: the `results/` tree, `service.sqlite3` (queue +
+training runs + metrics + proposals and dataset records), `artifacts/`
+(uploaded checkpoints), and `datasets/` (generated data, each with its
+`provenance.json`). Copy those, and a fresh checkout of this repo reproduces
+the rest.

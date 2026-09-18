@@ -40,6 +40,17 @@ services:
       ALLOW_REMOTE_CODE: ${ALLOW_REMOTE_CODE:-0}
       EVAL_USER: ${EVAL_USER:-benchjob}
       REMOTE_CODE_SHAS: ${REMOTE_CODE_SHAS:-}
+      # the LLM behind "propose a skill spec" and data generation (batch API
+      # only). The key is INTERPOLATED from .env — never a literal here, never
+      # in git — and stripped from every evaluation subprocess. It is still
+      # visible to anyone with docker access on this box (docker inspect shows
+      # Config.Env): protected from submitted code, not from colleagues.
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MAX_ITEMS_PER_BATCH: ${LLM_MAX_ITEMS_PER_BATCH:-200}
+      LLM_DAILY_ITEM_CAP: ${LLM_DAILY_ITEM_CAP:-2000}
+      DATASET_QUOTA_GB: ${DATASET_QUOTA_GB:-20}
     volumes:
       - ${BENCH_ROOT}:${BENCH_ROOT}
       - ${HF_HOME}:${HF_HOME}

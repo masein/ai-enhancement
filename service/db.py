@@ -6,6 +6,7 @@ want (the API thread and the worker thread interleave short transactions).
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
 from contextlib import closing
@@ -64,6 +65,55 @@ CREATE TABLE IF NOT EXISTS submissions (
   load_missing TEXT DEFAULT ''                   -- JSON: checkpoint keys transformers had to invent
 );
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
+-- find-the-gap: an LLM proposes a skill spec from diagnose-half failures, a
+-- person approves it, a generator that saw only the spec makes data
+CREATE TABLE IF NOT EXISTS proposals (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  model         TEXT NOT NULL,
+  task          TEXT NOT NULL,
+  category      TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending',  -- pending|proposed|approved|rejected|failed
+  spec_text     TEXT DEFAULT '',                  -- the LLM's
+  edited_text   TEXT DEFAULT '',                  -- the human's, when edited
+  evidence      TEXT DEFAULT '{}',                -- JSON: counts, patterns, the examples shown
+  proposer      TEXT DEFAULT '',                  -- LLM id (provider/model)
+  requested_by  TEXT DEFAULT '',                  -- who clicked propose
+  approver      TEXT DEFAULT '',                  -- who approved or rejected (free text; the tailnet is the auth)
+  reject_reason TEXT DEFAULT '',
+  batch_id      TEXT DEFAULT '',
+  prompt_sha    TEXT DEFAULT '',
+  error         TEXT DEFAULT '',
+  created_at    REAL NOT NULL,
+  updated_at    REAL NOT NULL,
+  approved_at   REAL
+);
+CREATE TABLE IF NOT EXISTS datasets (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  proposal_id   INTEGER NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending',  -- pending|ready|rejected|failed
+  fmt           TEXT NOT NULL DEFAULT 'mc',       -- mc|free
+  count         INTEGER NOT NULL,
+  requester     TEXT DEFAULT '',
+  batch_id      TEXT DEFAULT '',
+  provenance    TEXT DEFAULT '{}',                -- JSON, the same record as provenance.json
+  error         TEXT DEFAULT '',
+  created_at    REAL NOT NULL,
+  finished_at   REAL
+);
+-- every batch id, persisted before anything else happens: a restart resumes
+-- polling instead of re-submitting
+CREATE TABLE IF NOT EXISTS llm_batches (
+  batch_id    TEXT PRIMARY KEY,
+  kind        TEXT NOT NULL,                      -- proposal|generation
+  ref_id      INTEGER NOT NULL,
+  n_items     INTEGER NOT NULL,
+  provider    TEXT NOT NULL,
+  model       TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'submitted',  -- submitted|done|failed
+  error       TEXT DEFAULT '',
+  created_at  REAL NOT NULL,
+  finished_at REAL
+);
 """
 
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
@@ -87,7 +137,8 @@ def init() -> None:
                      "ALTER TABLE truns ADD COLUMN n_updates INTEGER NOT NULL DEFAULT 0",
                      "ALTER TABLE submissions ADD COLUMN allow_remote_code "
                      "INTEGER NOT NULL DEFAULT 0",
-                     "ALTER TABLE submissions ADD COLUMN load_missing TEXT DEFAULT ''"):
+                     "ALTER TABLE submissions ADD COLUMN load_missing TEXT DEFAULT ''",
+                     "ALTER TABLE truns ADD COLUMN datasets TEXT DEFAULT '[]'"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:
@@ -165,16 +216,18 @@ def recent(limit: int = 100) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 _TRUN_COLS = ["id", "name", "project", "submitter", "config", "status",
-              "hf_prefix", "created_at", "updated_at", "finished_at"]
+              "hf_prefix", "created_at", "updated_at", "finished_at", "datasets"]
 
 
-def trun_create(name, project, submitter, config_json, hf_prefix) -> int:
+def trun_create(name, project, submitter, config_json, hf_prefix,
+                datasets: list[int] | None = None) -> int:
     now = time.time()
     with closing(_conn()) as c:
         cur = c.execute(
             "INSERT INTO truns (name, project, submitter, config, hf_prefix, "
-            "created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
-            (name, project, submitter, config_json, hf_prefix, now, now))
+            "created_at, updated_at, datasets) VALUES (?,?,?,?,?,?,?,?)",
+            (name, project, submitter, config_json, hf_prefix, now, now,
+             json.dumps(sorted(set(int(d) for d in (datasets or []))))))
         c.commit()
         return int(cur.lastrowid)
 
@@ -274,3 +327,180 @@ def trun_series(rid: int, max_points: int = 400) -> dict:
                       "SELECT step, kind, detail FROM tevents WHERE run_id=? "
                       "ORDER BY step", (rid,))]
     return {"metrics": out, "events": events}
+
+
+# ---------------------------------------------------------------------------
+# find-the-gap: proposals, datasets, batches — and the taint join
+# ---------------------------------------------------------------------------
+
+_PROP_COLS = ["id", "model", "task", "category", "status", "spec_text", "edited_text",
+              "evidence", "proposer", "requested_by", "approver", "reject_reason",
+              "batch_id", "prompt_sha", "error", "created_at", "updated_at", "approved_at"]
+_DS_COLS = ["id", "proposal_id", "status", "fmt", "count", "requester", "batch_id",
+            "provenance", "error", "created_at", "finished_at"]
+_BATCH_COLS = ["batch_id", "kind", "ref_id", "n_items", "provider", "model", "status",
+               "error", "created_at", "finished_at"]
+
+
+def proposal_create(model: str, task: str, category: str, requested_by: str,
+                    evidence: dict) -> int:
+    now = time.time()
+    with closing(_conn()) as c:
+        cur = c.execute(
+            "INSERT INTO proposals (model, task, category, requested_by, evidence, "
+            "created_at, updated_at) VALUES (?,?,?,?,?,?,?)",
+            (model, task, category, requested_by, json.dumps(evidence), now, now))
+        c.commit()
+        return int(cur.lastrowid)
+
+
+def proposal_get(pid: int) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute(f"SELECT {','.join(_PROP_COLS)} FROM proposals WHERE id=?",
+                        (pid,)).fetchone()
+    return dict(zip(_PROP_COLS, row)) if row else None
+
+
+def proposal_update(pid: int, **fields) -> None:
+    fields["updated_at"] = time.time()
+    keys = ", ".join(f"{k}=?" for k in fields)
+    with closing(_conn()) as c:
+        c.execute(f"UPDATE proposals SET {keys} WHERE id=?", (*fields.values(), pid))
+        c.commit()
+
+
+def proposal_list(status: str | None = None, limit: int = 200) -> list[dict]:
+    with closing(_conn()) as c:
+        q = f"SELECT {','.join(_PROP_COLS)} FROM proposals"
+        args: tuple = ()
+        if status:
+            q += " WHERE status=?"
+            args = (status,)
+        rows = c.execute(q + " ORDER BY id DESC LIMIT ?", (*args, limit)).fetchall()
+    return [dict(zip(_PROP_COLS, r)) for r in rows]
+
+
+def proposal_active(model: str, task: str, category: str) -> dict | None:
+    """A proposal for the same cell that is still in flight or awaiting review."""
+    with closing(_conn()) as c:
+        row = c.execute(
+            f"SELECT {','.join(_PROP_COLS)} FROM proposals WHERE model=? AND task=? AND "
+            "category=? AND status IN ('pending','proposed') ORDER BY id DESC LIMIT 1",
+            (model, task, category)).fetchone()
+    return dict(zip(_PROP_COLS, row)) if row else None
+
+
+def dataset_create(proposal_id: int, fmt: str, count: int, requester: str,
+                   provenance: dict) -> int:
+    with closing(_conn()) as c:
+        cur = c.execute(
+            "INSERT INTO datasets (proposal_id, fmt, count, requester, provenance, created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (proposal_id, fmt, count, requester, json.dumps(provenance), time.time()))
+        c.commit()
+        return int(cur.lastrowid)
+
+
+def dataset_get(did: int) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute(f"SELECT {','.join(_DS_COLS)} FROM datasets WHERE id=?",
+                        (did,)).fetchone()
+    return dict(zip(_DS_COLS, row)) if row else None
+
+
+def dataset_update(did: int, **fields) -> None:
+    keys = ", ".join(f"{k}=?" for k in fields)
+    with closing(_conn()) as c:
+        c.execute(f"UPDATE datasets SET {keys} WHERE id=?", (*fields.values(), did))
+        c.commit()
+
+
+def dataset_list(limit: int = 200) -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute(f"SELECT {','.join(_DS_COLS)} FROM datasets ORDER BY id DESC LIMIT ?",
+                         (limit,)).fetchall()
+    return [dict(zip(_DS_COLS, r)) for r in rows]
+
+
+def batch_add(batch_id: str, kind: str, ref_id: int, n_items: int, provider: str,
+              model: str) -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO llm_batches (batch_id, kind, ref_id, n_items, provider, model, "
+                  "created_at) VALUES (?,?,?,?,?,?,?)",
+                  (batch_id, kind, ref_id, n_items, provider, model, time.time()))
+        c.commit()
+
+
+def batch_finish(batch_id: str, status: str, error: str) -> None:
+    with closing(_conn()) as c:
+        c.execute("UPDATE llm_batches SET status=?, error=?, finished_at=? WHERE batch_id=?",
+                  (status, error, time.time(), batch_id))
+        c.commit()
+
+
+def batches_pending() -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute(f"SELECT {','.join(_BATCH_COLS)} FROM llm_batches "
+                         "WHERE status='submitted' ORDER BY created_at").fetchall()
+    return [dict(zip(_BATCH_COLS, r)) for r in rows]
+
+
+def batches_list(limit: int = 200) -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute(f"SELECT {','.join(_BATCH_COLS)} FROM llm_batches "
+                         "ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+    return [dict(zip(_BATCH_COLS, r)) for r in rows]
+
+
+def llm_items_today() -> int:
+    """Batch items submitted since local midnight — the number the spend
+    guard compares against LLM_DAILY_ITEM_CAP."""
+    lt = time.localtime()
+    midnight = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1))
+    with closing(_conn()) as c:
+        row = c.execute("SELECT COALESCE(SUM(n_items), 0) FROM llm_batches WHERE created_at>=?",
+                        (midnight,)).fetchone()
+    return int(row[0] or 0)
+
+
+def taint_links() -> list[dict]:
+    """Every training run that consumed a generated dataset, with the model
+    ids its checkpoints were submitted as and its hf_prefix. The join that
+    turns 'this run used dataset 3' into 'these checkpoints are tainted'."""
+    out = []
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT id, hf_prefix, datasets FROM truns "
+                         "WHERE datasets IS NOT NULL AND datasets != '[]'").fetchall()
+        for rid, prefix, ds in rows:
+            try:
+                ids = [int(x) for x in json.loads(ds or "[]")]
+            except (ValueError, TypeError):
+                ids = []
+            if not ids:
+                continue
+            ckpts = [r[0] for r in c.execute(
+                "SELECT DISTINCT detail FROM tevents WHERE run_id=? AND kind='checkpoint' "
+                "AND detail != ''", (rid,)).fetchall()]
+            tasks = []
+            for did in ids:
+                row = c.execute("SELECT provenance FROM datasets WHERE id=?", (did,)).fetchone()
+                if row:
+                    try:
+                        t = json.loads(row[0] or "{}").get("task")
+                    except (ValueError, TypeError):
+                        t = None
+                    if t:
+                        tasks.append(t)
+            out.append({"run_id": rid, "hf_prefix": prefix or "", "datasets": ids,
+                        "checkpoints": ckpts, "tasks": sorted(set(tasks))})
+    return out
+
+
+def taint_stamp() -> tuple:
+    """Changes whenever the taint join could: a cache key for the payload."""
+    with closing(_conn()) as c:
+        a = c.execute("SELECT COUNT(*), COALESCE(MAX(updated_at), 0) FROM truns "
+                      "WHERE datasets IS NOT NULL AND datasets != '[]'").fetchone()
+        b = c.execute("SELECT COUNT(*) FROM tevents").fetchone()
+        d = c.execute("SELECT COUNT(*), COALESCE(MAX(finished_at), 0) FROM datasets").fetchone()
+    return (a[0], a[1], b[0], d[0], d[1])

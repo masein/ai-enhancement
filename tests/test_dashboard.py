@@ -170,11 +170,13 @@ def test_categories_first_subjects_on_expand(surface, diag):
     cats = mmlu.locator("details.dxcat")
     expected = diag["fx/good-750m"]["tasks"]["mmlu"]["categories"]
     assert cats.count() == len(expected)
-    # weakest first, and the fixture plants econometrics as the gap
-    names = cats.locator(".dxcname").all_text_contents()
-    assert names[0] == "economics"
+    # weakest first; among the categories above the noise floor the planted
+    # gap (econometrics) puts economics lowest — the greyed one-subject rows
+    # may land anywhere, which is exactly why they are greyed
     scores = [float(x.rstrip("%")) for x in cats.locator("> summary > .num").all_text_contents()]
     assert scores == sorted(scores)
+    solid = mmlu.locator("details.dxcat:not(.dim) .dxcname").all_text_contents()
+    assert solid[0] == "economics"
     # the noise floor is visible: one-subject categories are greyed, two-subject ones are not
     dim = mmlu.locator("details.dxcat.dim .dxcname").all_text_contents()
     assert "economics" not in dim and "medicine & health" not in dim and len(dim) == 4

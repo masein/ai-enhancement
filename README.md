@@ -66,6 +66,10 @@ scripts/
   report_lm_eval.py   results tree -> interactive dashboard (live or frozen single file)
   diagnose.py         per-item diagnosis from --log_samples (held-out split; DIAGNOSE.md)
   categories.yaml     MMLU's 57 subjects -> fifteen human categories (+ categories.py)
+service/
+  llm.py, proposals.py, contamination.py, llm_poller.py
+                      find the gap: LLM proposals from the diagnosis half, human review,
+                      generation from the approved spec only, 13-gram gate, provenance, taint
   make_ppl_task.py    any corpus -> pinned perplexity task (records a sha256)
 eval_tasks/
   mmlu_perm/          the permutation control: MMLU with the options rotated (suite=control)

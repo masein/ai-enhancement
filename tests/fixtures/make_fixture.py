@@ -194,8 +194,11 @@ def make_docs(task: str, seed: int = SEED) -> list[dict]:
                 # then rotated by i mod 4, so every (key, shift) pair occurs
                 correct = (i // 4) % 4 if rotate else i % 4
                 opts = _options(rng, 4)
+                # long enough to carry a 13-gram: the contamination gate must
+                # have something to catch, and real MMLU questions are longer still
                 q = unique(f"Which of the following best describes {rng.choice(TOPICS)} "
-                           f"in {subject.replace('_', ' ')}?")
+                           f"in {subject.replace('_', ' ')}, as it is treated in a standard "
+                           f"introductory course on the subject?")
                 doc = {"question": q, "subject": subject, "choices": opts, "answer": correct}
                 if rotate:
                     doc = rotate(doc, i)

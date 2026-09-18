@@ -141,6 +141,38 @@ one position-skewed model per family.
 
 ---
 
+## From a gap to data: the Review tab
+
+Once the routine above has said "genuine gap" about a category, the Diagnose
+section offers **Propose a skill spec** on that category's row. The button is
+disabled, with the reason beside it, whenever the task has not cleared chance,
+has any distribution finding, or the category is under the noise floor —
+because those are format failures, and a generator offered for them would
+make the score move while the model learned nothing.
+
+What happens after the click (`service/proposals.py`):
+
+1. An LLM reads this model's **diagnosis-half** failures in that category —
+   never the leaderboard half — and proposes one to three sentences naming the
+   skill that is missing, the share of failures it explains, and the patterns
+   it saw.
+2. A person reads it on the **Review** tab next to everything this file says
+   they need: the category score and item count, the ceiling, the model's own
+   findings for the task, and eight of the diagnosis-half items the LLM saw.
+   They approve it, edit it, or reject it with a reason, under their name.
+3. Only the approved text reaches the generator. Not one item, hash, model
+   name or score goes with it. The generated items pass a 13-gram
+   contamination gate against both halves of every benchmark on disk; above
+   2% dropped the whole dataset is refused as an echo.
+4. The dataset lands under `$BENCH_ROOT/datasets/<id>/` with a full
+   `provenance.json`, downloadable from the tab and with `bench pull`.
+5. A training run that consumes it says so (`datasets=[id]` on the run), and
+   every checkpoint of that run carries the badge *trained on data derived
+   from mmlu diagnostics* and loses that task from its official average. The
+   per-task score stays; the ranking claim goes. If that model's leaderboard
+   half and diagnosis half then move apart, that divergence is the alarm this
+   whole design exists to raise — phase 6 makes it visible.
+
 ## The log
 
 The output of these weeks is this table, not a feeling. Fill one row per

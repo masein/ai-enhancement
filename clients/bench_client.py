@@ -138,18 +138,56 @@ class Bench:
 
 
     def init(self, name: str, project: str = "default", config: dict | None = None,
-             submitter: str = "", hf_prefix: str = "") -> "Run":
+             submitter: str = "", hf_prefix: str = "", datasets: list[int] | None = None) -> "Run":
         """Start a tracked training run. Use as a context manager:
 
             with bench.init("run7", config={"lr": 3e-4}) as run:
                 run.log({"loss": loss, "lr": lr}, step=step)
                 run.log_checkpoint(step, "local/run7-step200")   # marks + submits
 
-        finish() is called on exit (status "failed" if an exception escaped)."""
+        finish() is called on exit (status "failed" if an exception escaped).
+
+        datasets: ids of generated datasets (bench.datasets()) this run trains
+        on. Recording them is what marks every checkpoint of the run as trained
+        on benchmark-derived data — the task it came from leaves the official
+        average and the leaderboard says so. Leave it out and the board has no
+        way to know; put it in and the number stays honest."""
         r = self._call("/api/truns", {"name": name, "project": project,
                                       "config": config or {}, "submitter": submitter,
-                                      "hf_prefix": hf_prefix})
+                                      "hf_prefix": hf_prefix, "datasets": list(datasets or [])})
         return Run(self, int(r["id"]), name, submitter)
+
+    # -- generated datasets (the find-the-gap pipeline; see API.md § datasets) ----
+    def datasets(self) -> list[dict]:
+        """Every generated dataset with its status and provenance summary."""
+        return self._call("/api/datasets")
+
+    def dataset(self, did: int) -> dict:
+        """One dataset's record, provenance in full."""
+        return self._call(f"/api/datasets/{did}")
+
+    def pull_dataset(self, did: int, dest) -> "tuple[str, list[dict]]":
+        """Download items.jsonl and provenance.json into `dest`; returns
+        (path to items.jsonl, the items). Refuses a dataset that is not ready."""
+        import os
+        from pathlib import Path as _P
+        d = _P(dest)
+        d.mkdir(parents=True, exist_ok=True)
+        rec = self.dataset(did)
+        if rec.get("status") != "ready":
+            raise BenchError(f"dataset {did} is {rec.get('status')}: {rec.get('error') or ''}")
+        req = urllib.request.Request(f"{self.base}/api/datasets/{did}/items.jsonl",
+                                     headers={"X-Token": self.token})
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                body = r.read()
+        except urllib.error.HTTPError as e:
+            raise BenchError(f"{e.code} downloading dataset {did}") from None
+        items_path = d / "items.jsonl"
+        items_path.write_bytes(body)
+        (d / "provenance.json").write_text(json.dumps(rec.get("provenance") or {}, indent=2))
+        items = [json.loads(x) for x in body.decode("utf-8").splitlines() if x.strip()]
+        return os.fspath(items_path), items
 
     def upload_artifact(self, name: str, checkpoint_dir) -> str:
         """Zip a save_pretrained() directory and upload it as artifact `name`.
@@ -328,6 +366,9 @@ def main() -> int:
     sub.add_parser("queue")
     sc = sub.add_parser("scores"); sc.add_argument("hf_id")
     c = sub.add_parser("cancel"); c.add_argument("sid", type=int)
+    sub.add_parser("datasets", help="generated datasets: id, task, category, status, items")
+    pl = sub.add_parser("pull", help="download a generated dataset (items.jsonl + provenance.json)")
+    pl.add_argument("dataset_id", type=int); pl.add_argument("dest")
     a = ap.parse_args()
 
     b = Bench(a.base, a.token)
@@ -369,6 +410,17 @@ def main() -> int:
             print(json.dumps(b.scores(a.hf_id), indent=1))
         elif a.cmd == "cancel":
             print(b.cancel(a.sid))
+        elif a.cmd == "datasets":
+            for d in b.datasets():
+                pv = d.get("provenance") or {}
+                kept = (pv.get("items") or {}).get("kept")
+                print(f"#{d['id']:<4} {d['status']:<9} {d.get('task') or '—':<12} "
+                      f"{d.get('category') or '—':<24} {d['fmt']:<5} "
+                      f"{('%d items' % kept) if kept is not None else ''}"
+                      f"{(' | ' + d['error']) if d.get('error') else ''}")
+        elif a.cmd == "pull":
+            path, items = b.pull_dataset(a.dataset_id, a.dest)
+            print(f"wrote {len(items)} items to {path} (+ provenance.json)")
     except BenchError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

@@ -114,6 +114,29 @@ CONTROL_TASKS_DIR = Path(os.environ.get(
     Path(__file__).resolve().parent.parent / "eval_tasks" / "mmlu_perm"))
 
 
+# ---------------------------------------------------------------------------
+# The LLM behind proposals and data generation (service/llm.py). Batch API
+# only. Off unless LLM_PROVIDER is set; a provider that is set but incomplete
+# fails the container at startup rather than the first click. The key is read
+# from the environment (compose interpolates it from .env), stripped from every
+# evaluation subprocess (runner._child_env), and visible to anyone with docker
+# access on the box — SERVICE.md says so in those words.
+# ---------------------------------------------------------------------------
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "").strip().lower()   # anthropic | openai | fake
+LLM_MODEL = os.environ.get("LLM_MODEL", "").strip()                 # pinned; in every provenance
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
+# spend guard: 'items' are batch requests (one per proposal, one per ten
+# generated items); the UI shows today's use against the cap before anyone clicks
+LLM_MAX_ITEMS_PER_BATCH = int(os.environ.get("LLM_MAX_ITEMS_PER_BATCH", "200"))
+LLM_DAILY_ITEM_CAP = int(os.environ.get("LLM_DAILY_ITEM_CAP", "2000"))
+LLM_POLL_S = float(os.environ.get("LLM_POLL_S", "60"))
+
+# Generated datasets live under BENCH_ROOT like artifacts do, with a quota for
+# the same reason — friends iterate, disks do not.
+DATASETS_DIR = Path(os.environ.get("DATASETS_DIR", BENCH_ROOT / "datasets"))
+DATASET_QUOTA_GB = float(os.environ.get("DATASET_QUOTA_GB", "20"))
+
+
 def discovered_ppl_tasks() -> list[str]:
     if not EVAL_TASKS_DIR.is_dir():
         return []

@@ -30,6 +30,16 @@ service — useful for checking your environment before spending anything):
 
 Dependencies:  pip install torch transformers datasets huggingface_hub
 
+Training on a generated dataset (the find-the-gap pipeline, DIAGNOSE.md):
+
+    python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 \
+        --gap-dataset 3 --gap-ratio 0.25 --steps 200
+
+  pulls dataset #3 from the service, mixes its items into the text stream at
+  the given ratio, and registers the run with datasets=[3] — which is what
+  marks every checkpoint of this run as trained on benchmark-derived data on
+  the leaderboard. The ratio is recorded in the run's config.
+
 Two sharp edges, named:
   * Checkpoints are pushed as SEPARATE repos (…-step100, …-step200). The service
     identifies a run by repo id, so each checkpoint needs its own id — pushing
@@ -126,6 +136,18 @@ def train(args, bench):
 
     # run tracking: curves appear live on the dashboard's Training tab. If no
     # service is reachable, run=None and everything still works locally.
+    # a generated dataset, mixed in at a recorded ratio and REGISTERED on the
+    # run: the registration is the taint record, and the only reason the board
+    # can keep an honest number for a model trained this way
+    gap_items = []
+    if args.gap_dataset is not None:
+        if not bench:
+            print("--gap-dataset needs --bench (the dataset is pulled from the service)")
+            return []
+        _, gap_items = bench.pull_dataset(args.gap_dataset, Path(f"gap-dataset-{args.gap_dataset}"))
+        print(f"  gap dataset #{args.gap_dataset}: {len(gap_items)} items, mixed in at "
+              f"{args.gap_ratio:.0%}")
+
     run = None
     if bench:
         try:
@@ -138,8 +160,10 @@ def train(args, bench):
                                      "lr": args.lr, "batch_size": args.batch_size,
                                      "micro_batch_size": args.batch_size, "grad_accum": 1,
                                      "seq_len": args.seq_len, "steps": args.steps,
-                                     "device": device},
-                             hf_prefix=args.push_to or f"local/{run_name}")
+                                     "device": device,
+                                     "gap_dataset": args.gap_dataset, "gap_ratio": args.gap_ratio},
+                             hf_prefix=args.push_to or f"local/{run_name}",
+                             datasets=[args.gap_dataset] if args.gap_dataset is not None else [])
             print(f"  tracking as training run #{run.id} — watch the Training tab")
         except BenchError as e:
             print(f"  run tracking unavailable (non-fatal): {e}")
@@ -186,6 +210,9 @@ def train(args, bench):
 
     batches = packed_batches(args.dataset, args.field, tokenizer,
                              args.seq_len, args.batch_size)
+    if gap_items:
+        batches = mixed_batches(batches, gap_items, args.gap_ratio, tokenizer,
+                                args.seq_len, args.batch_size)
     t0, running, nan_warned = time.time(), None, False
     for step in range(1, args.steps + 1):
         lr_now = args.lr * min(1.0, step / warmup)
@@ -227,6 +254,42 @@ def train(args, bench):
     if run:
         run.finish()
     return submitted
+
+
+def gap_text(item: dict) -> str:
+    """One generated item as training text: question, options if any, answer,
+    rationale. Plain prose, no special tokens — the shape a small base model
+    is being trained on anyway."""
+    lines = [item["question"]]
+    for i, c in enumerate(item.get("choices") or []):
+        lines.append(f"{'ABCD'[i]}. {c}")
+    lines.append(f"Answer: {item['answer']}")
+    if item.get("rationale"):
+        lines.append(item["rationale"])
+    return "\n".join(lines)
+
+
+def mixed_batches(base, items, ratio, tokenizer, seq_len, batch_size):
+    """Yield the base batches, replacing `ratio` of them with batches packed
+    from the generated items (looped). Deterministic: every k-th batch."""
+    import random
+
+    import torch
+    rng = random.Random(1234)
+    texts = [gap_text(it) for it in items]
+    every = max(1, round(1 / ratio)) if ratio > 0 else 0
+    buf: list[int] = []
+    k = 0
+    while True:
+        k += 1
+        if every and k % every == 0:
+            while len(buf) < seq_len * batch_size:
+                buf += tokenizer(rng.choice(texts) + "\n\n")["input_ids"]
+            ids = torch.tensor(buf[:seq_len * batch_size]).view(batch_size, seq_len)
+            buf = buf[seq_len * batch_size:]
+            yield ids
+        else:
+            yield next(base)
 
 
 def collect(bench, submitted):
@@ -273,6 +336,10 @@ def main() -> int:
     ap.add_argument("--project", default="default")
     ap.add_argument("--base-model", default="EleutherAI/pythia-14m")
     ap.add_argument("--dataset", default="roneneldan/TinyStories")
+    ap.add_argument("--gap-dataset", type=int, default=None,
+                    help="id of a generated dataset from the service to mix in (bench datasets)")
+    ap.add_argument("--gap-ratio", type=float, default=0.25,
+                    help="share of batches drawn from the generated dataset")
     ap.add_argument("--field", default="text")
     ap.add_argument("--steps", type=int, default=200)
     ap.add_argument("--checkpoint-every", type=int, default=100)

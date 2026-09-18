@@ -81,12 +81,19 @@ def _job_scratch(sid: int, run_as: tuple[int, int] | None) -> Path:
     return d
 
 
+# Every secret the service process may hold. A submitted model's own code runs
+# in a child of this process, so anything not on this list is readable by it.
+# Add a new secret's variable name here in the same commit that introduces it.
+SECRET_ENV_VARS = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN",
+                   "HF_API_TOKEN", "AWS_SECRET_ACCESS_KEY", "OPENAI_API_KEY",
+                   "LLM_API_KEY", "ANTHROPIC_API_KEY", "SUBMIT_TOKEN")
+
+
 def _child_env(remote_code: bool, scratch: Path | None = None) -> dict:
     env = os.environ.copy()
     if not remote_code:
         return env
-    for var in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN",
-                "HF_API_TOKEN", "AWS_SECRET_ACCESS_KEY", "OPENAI_API_KEY"):
+    for var in SECRET_ENV_VARS:
         env.pop(var, None)
     env["HF_HUB_OFFLINE"] = "1"        # the artifact is on disk; nothing to fetch
     env["HF_HUB_DISABLE_TELEMETRY"] = "1"

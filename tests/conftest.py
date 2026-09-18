@@ -47,3 +47,40 @@ def payload(tree) -> dict:
     runs = report.load_results(tree["out_dir"])
     return report.build_payload(report.merge_runs(runs), "Fixture board",
                                 source=str(tree["out_dir"]))
+
+
+def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: bool = True,
+                 diagnose: bool = True):
+    """The app against `root` as BENCH_ROOT: fixture tree built (optionally
+    diagnosed), the GPU worker never started, the LLM poller not threaded
+    (tests drive llm_poller.tick() by hand), LLM backend as asked. Returns
+    (TestClient, app module, manifest)."""
+    from fastapi.testclient import TestClient
+
+    from service import config, llm, llm_poller, worker
+    import service.app as appmod
+    manifest = make_fixture.build(root, diagnose=diagnose) if tree else None
+    for name, val in {"BENCH_ROOT": root, "RESULTS_ROOT": root / "results",
+                      "OUT_DIR": root / "results" / "full", "DB_PATH": root / "service.sqlite3",
+                      "ARTIFACTS_DIR": root / "artifacts", "LOGS_DIR": root / "logs",
+                      "DATASETS_DIR": root / "datasets", "SUBMIT_TOKEN": "",
+                      "ALLOW_REMOTE_CODE": False, "LLM_PROVIDER": llm_provider,
+                      "LLM_MODEL": "fake-1" if llm_provider == "fake" else "",
+                      "LLM_API_KEY": "", "LLM_MAX_ITEMS_PER_BATCH": 200,
+                      "LLM_DAILY_ITEM_CAP": 2000, "DATASET_QUOTA_GB": 20.0}.items():
+        monkeypatch.setattr(config, name, val)
+    monkeypatch.setattr(worker, "start", lambda: None)
+    monkeypatch.setattr(llm_poller, "start", lambda: None)
+    monkeypatch.setattr(llm.FakeBatches, "polls_to_done", 1)
+    monkeypatch.setattr(llm.FakeBatches, "responder", staticmethod(llm.default_responder))
+    llm.reset()
+    appmod._cache.update(key=None, payload=None, at=0.0)
+    client = TestClient(appmod.app)
+    client.__enter__()
+    return client, appmod, manifest
+
+
+def fresh(appmod) -> None:
+    """Step past the payload's five-second debounce (load shedding, not the
+    property under test)."""
+    appmod._cache["at"] = 0.0

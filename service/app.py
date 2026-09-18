@@ -21,10 +21,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from . import config, db, worker
+from . import config, db, llm, llm_poller, worker
+from . import proposals as prop
 
 # the report module is the single source of truth for parsing and for the page
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -36,8 +37,11 @@ _HF_ID_RE = re.compile(r"^[\w.\-]{1,96}/[\w.\-]{1,96}$")
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     db.init()
+    llm.startup_check()          # a set-but-broken LLM config fails here, not at a click
     worker.start()
+    llm_poller.start()
     yield
+    llm_poller.stop()
     worker.stop()
 
 
@@ -59,10 +63,27 @@ _WATCH = ("results*.json", "diagnose.json", "model_meta.json")
 
 
 def _tree_key() -> tuple:
+    # the taint join reads the database, so its state is part of the key too:
+    # a training run registering a dataset changes what the board should show
     if not config.OUT_DIR.is_dir():
-        return (0, 0.0)
+        return (0, 0.0, db.taint_stamp())
     files = [f for pat in _WATCH for f in config.OUT_DIR.rglob(pat)]
-    return (len(files), max((f.stat().st_mtime for f in files), default=0.0))
+    return (len(files), max((f.stat().st_mtime for f in files), default=0.0),
+            db.taint_stamp())
+
+
+def taint_for(model_ids) -> dict[str, list[str]]:
+    """model id -> tasks its training data was derived from. A checkpoint is
+    tied to a run the way the Training tab ties it: submitted under the run as
+    a checkpoint event, or its id carries the run's hf_prefix."""
+    out: dict[str, set] = {}
+    links = db.taint_links()
+    for mid in model_ids:
+        for link in links:
+            pre = link["hf_prefix"]
+            if mid in link["checkpoints"] or (pre and (mid == pre or mid.startswith(pre))):
+                out.setdefault(mid, set()).update(link["tasks"])
+    return {k: sorted(v) for k, v in out.items()}
 
 
 def results_payload() -> dict:
@@ -72,8 +93,9 @@ def results_payload() -> dict:
     key = _tree_key()
     if key != _cache["key"] or _cache["payload"] is None:
         runs = report.load_results(config.OUT_DIR) if config.OUT_DIR.is_dir() else []
-        payload = report.build_payload(report.merge_runs(runs), config.TITLE,
-                                       source=str(config.OUT_DIR))
+        by_model = report.merge_runs(runs)
+        payload = report.build_payload(by_model, config.TITLE, source=str(config.OUT_DIR),
+                                       taint=taint_for(by_model.keys()))
         payload["live"] = True
         _cache.update(key=key, payload=payload)
     _cache["at"] = now
@@ -152,6 +174,7 @@ class TrunIn(BaseModel):
     submitter: str = ""
     config: dict = {}
     hf_prefix: str = ""
+    datasets: list[int] = []     # generated datasets this run trains on — the taint record
 
 
 class TrunLogIn(BaseModel):
@@ -179,9 +202,15 @@ def trun_create(t: TrunIn, x_token: str = Header(default="")):
     name = t.name.strip()[:120]
     if not name:
         raise HTTPException(422, "run needs a name")
+    for did in t.datasets:
+        ds = db.dataset_get(did)
+        if not ds or ds["status"] != "ready":
+            raise HTTPException(422, f"dataset {did} does not exist or is not ready — a run "
+                                     f"can only record data it could actually have trained on")
     rid = db.trun_create(name, t.project.strip()[:80] or "default",
                          t.submitter.strip()[:80],
-                         json.dumps(t.config)[:20000], t.hf_prefix.strip()[:200])
+                         json.dumps(t.config)[:20000], t.hf_prefix.strip()[:200],
+                         datasets=t.datasets)
     return {"id": rid}
 
 
@@ -223,9 +252,17 @@ def trun_finish(rid: int, f: TrunFinishIn, x_token: str = Header(default="")):
     return {"ok": True}
 
 
+def _parse_ds(run: dict) -> dict:
+    try:
+        run["datasets"] = [int(x) for x in json.loads(run.get("datasets") or "[]")]
+    except (ValueError, TypeError):
+        run["datasets"] = []
+    return run
+
+
 @app.get("/api/truns")
 def trun_index(project: str | None = None, limit: int = 200):
-    return db.trun_list(project, min(limit, 500))
+    return [_parse_ds(r) for r in db.trun_list(project, min(limit, 500))]
 
 
 # A finished run's series never changes, and a live one changes only when a log
@@ -243,6 +280,7 @@ def trun_detail(rid: int, max_points: int = 400):
     mp = max(50, min(max_points, 5000))
     key = (run["updated_at"], mp)
     hit = _SERIES_CACHE.get(rid)
+    _parse_ds(run)
     if hit and hit[0] == key:
         return {"run": run, **hit[1]}
     series = db.trun_series(rid, mp)
@@ -379,6 +417,280 @@ def artifact_delete(name: str, x_token: str = Header(default="")):
 @app.get("/api/results")
 def results():
     return JSONResponse(results_payload())
+
+
+# ---------------------------------------------------------------------------
+# find the gap, make data for it — see service/proposals.py for the pipeline
+# and the one rule every endpoint here enforces
+# ---------------------------------------------------------------------------
+
+class ProposalIn(BaseModel):
+    model: str
+    task: str
+    category: str
+    requested_by: str = ""
+
+
+class ApproveIn(BaseModel):
+    approver: str
+    edited_text: str = ""
+
+
+class RejectIn(BaseModel):
+    approver: str
+    reason: str = ""
+
+
+class GenerateIn(BaseModel):
+    requester: str
+    count: int = 50
+    fmt: str = "mc"
+
+
+def _llm_status() -> dict:
+    why = llm.blocked()
+    used = prop.dir_bytes(config.DATASETS_DIR)
+    return {"configured": not why, "reason": why,
+            "provider": config.LLM_PROVIDER, "model": config.LLM_MODEL,
+            "usage_today": db.llm_items_today(), "daily_cap": config.LLM_DAILY_ITEM_CAP,
+            "max_items_per_batch": config.LLM_MAX_ITEMS_PER_BATCH,
+            "items_per_generation_request": prop.GEN_ITEMS_PER_REQUEST,
+            "datasets_bytes": used, "datasets_quota_bytes": int(config.DATASET_QUOTA_GB * 1e9),
+            "note": "the tailnet is the auth boundary: approvals record a typed name, "
+                    "nothing more"}
+
+
+@app.get("/api/llm")
+def llm_status():
+    return _llm_status()
+
+
+def _spend_check(n_items: int) -> None:
+    if n_items > config.LLM_MAX_ITEMS_PER_BATCH:
+        raise HTTPException(422, f"{n_items} batch items exceeds LLM_MAX_ITEMS_PER_BATCH="
+                                 f"{config.LLM_MAX_ITEMS_PER_BATCH}")
+    used = db.llm_items_today()
+    if used + n_items > config.LLM_DAILY_ITEM_CAP:
+        raise HTTPException(429, f"today's LLM use ({used} items) plus this request "
+                                 f"({n_items}) would pass LLM_DAILY_ITEM_CAP="
+                                 f"{config.LLM_DAILY_ITEM_CAP}; try tomorrow or raise the cap")
+
+
+def _require_llm() -> llm.Backend:
+    why = llm.blocked()
+    if why:
+        raise HTTPException(503, why)
+    return llm.client()
+
+
+@app.post("/api/proposals")
+def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
+    """Ask the LLM what skill is missing, from DIAGNOSE-half failures only.
+    The gate is enforced here, not just on the button: a task at chance, a
+    format finding, or a category under the noise floor is refused with the
+    same words the page shows."""
+    _check_token(x_token)
+    backend = _require_llm()
+    payload = results_payload()
+    row = next((m for m in payload["models"] if m["id"] == p.model), None)
+    if not row:
+        raise HTTPException(404, f"no such model on the board: {p.model}")
+    t = ((row.get("diag") or {}).get("tasks") or {}).get(p.task)
+    if not t:
+        raise HTTPException(404, f"{p.model} has no diagnosis on file for {p.task} — run "
+                                 f"scripts/diagnose.py first")
+    gate = (t.get("propose") or {}).get("categories", {}).get(p.category)
+    if gate is None:
+        raise HTTPException(422, f"{p.category!r} is not a category of {p.task} for this model")
+    if not gate["ok"]:
+        raise HTTPException(409, gate["why"])
+    dup = db.proposal_active(p.model, p.task, p.category)
+    if dup:
+        raise HTTPException(409, f"proposal #{dup['id']} for this model, task and category is "
+                                 f"already {dup['status']} — review it in the Review tab")
+    _spend_check(1)
+    model_dir = config.OUT_DIR / p.model.replace("/", "__")
+    failures, counts = prop.failures_for(model_dir, p.task, p.category)
+    if not failures:
+        raise HTTPException(409, "no diagnosis-half failures on disk for that category — "
+                                 "nothing to propose from")
+    cat = (t.get("categories") or {}).get(p.category) or {}
+    evidence = {
+        "n_shown": len(failures), **counts,
+        "category_score_report": cat.get("score_report"), "category_n_report": cat.get("n_report"),
+        # what the reviewer sees of what the LLM saw — diagnosis half, and no hashes
+        "examples": [{k: v for k, v in f.items() if k != "doc_hash"}
+                     for f in failures[:prop.EXAMPLES_SHOWN]],
+    }
+    pid = db.proposal_create(p.model, p.task, p.category, p.requested_by.strip()[:80], evidence)
+    req = prop.proposal_request(pid, p.model, p.task, p.category, failures, counts)
+    try:
+        bid = backend.submit([req])
+    except llm.LLMError as e:
+        db.proposal_update(pid, status="failed", error=str(e)[:400])
+        raise HTTPException(502, f"the LLM batch could not be submitted: {e}") from None
+    db.batch_add(bid, "proposal", pid, 1, backend.name, backend.model)
+    db.proposal_update(pid, batch_id=bid, prompt_sha=llm.prompt_sha(req.system, req.user))
+    return {"id": pid, "status": "pending", "batch_id": bid}
+
+
+def _proposal_view(r: dict, datasets: list[dict] | None = None) -> dict:
+    out = dict(r)
+    try:
+        out["evidence"] = json.loads(r.get("evidence") or "{}")
+    except (ValueError, TypeError):
+        out["evidence"] = {}
+    out["datasets"] = [{"id": d["id"], "status": d["status"], "fmt": d["fmt"],
+                        "count": d["count"], "error": d["error"]}
+                       for d in (datasets or []) if d["proposal_id"] == r["id"]]
+    return out
+
+
+@app.get("/api/proposals")
+def proposal_index(status: str | None = None, limit: int = 200):
+    ds = db.dataset_list(500)
+    return [_proposal_view(r, ds) for r in db.proposal_list(status, min(limit, 500))]
+
+
+@app.get("/api/proposals/{pid}")
+def proposal_detail(pid: int):
+    r = db.proposal_get(pid)
+    if not r:
+        raise HTTPException(404, "no such proposal")
+    return _proposal_view(r, db.dataset_list(500))
+
+
+def _name(s: str, what: str) -> str:
+    s = s.strip()[:80]
+    if not s:
+        raise HTTPException(422, f"{what} needs a name — the tailnet is the auth boundary, "
+                                 f"so the record of who decided is the name you type")
+    return s
+
+
+@app.post("/api/proposals/{pid}/approve")
+def proposal_approve(pid: int, a: ApproveIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    r = db.proposal_get(pid)
+    if not r:
+        raise HTTPException(404, "no such proposal")
+    if r["status"] != "proposed":
+        raise HTTPException(409, f"proposal #{pid} is {r['status']}, not awaiting review")
+    who = _name(a.approver, "approving")
+    edited = a.edited_text.strip()[:2000]
+    if edited == r["spec_text"].strip():
+        edited = ""                                   # approved as written
+    db.proposal_update(pid, status="approved", approver=who, edited_text=edited,
+                       approved_at=time.time())
+    return {"id": pid, "status": "approved", "approver": who, "edited": bool(edited)}
+
+
+@app.post("/api/proposals/{pid}/reject")
+def proposal_reject(pid: int, a: RejectIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    r = db.proposal_get(pid)
+    if not r:
+        raise HTTPException(404, "no such proposal")
+    if r["status"] not in ("proposed", "approved"):
+        raise HTTPException(409, f"proposal #{pid} is {r['status']} and cannot be rejected")
+    who = _name(a.approver, "rejecting")
+    db.proposal_update(pid, status="rejected", approver=who, reject_reason=a.reason.strip()[:500])
+    return {"id": pid, "status": "rejected"}
+
+
+@app.post("/api/proposals/{pid}/generate")
+def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")):
+    """The generator receives the approved spec text, the category, a count,
+    a format and a style constraint. It receives no benchmark item in any
+    form — see proposals.generation_requests, and the test that reads the
+    recorded request bodies to prove it."""
+    _check_token(x_token)
+    backend = _require_llm()
+    r = db.proposal_get(pid)
+    if not r:
+        raise HTTPException(404, "no such proposal")
+    if r["status"] != "approved":
+        raise HTTPException(409, f"proposal #{pid} is {r['status']}; only an approved spec "
+                                 f"reaches the generator")
+    who = _name(g.requester, "generating")
+    if g.fmt not in prop.FORMATS:
+        raise HTTPException(422, "fmt must be mc or free")
+    if not 1 <= g.count <= 1000:
+        raise HTTPException(422, "count must be between 1 and 1000")
+    why = prop.quota_blocked()
+    if why:
+        raise HTTPException(507, why)
+    n_items = -(-g.count // prop.GEN_ITEMS_PER_REQUEST)
+    _spend_check(n_items)
+    spec = r["edited_text"] or r["spec_text"]
+    did = db.dataset_create(pid, g.fmt, g.count, who, {})
+    reqs = prop.generation_requests(did, spec, r["category"], g.count, g.fmt, seed=did)
+    sha = llm.prompt_sha(*[q.system + "\n" + q.user for q in reqs])
+    try:
+        bid = backend.submit(reqs)
+    except llm.LLMError as e:
+        db.dataset_update(did, status="failed", finished_at=time.time(), error=str(e)[:400])
+        raise HTTPException(502, f"the LLM batch could not be submitted: {e}") from None
+    db.batch_add(bid, "generation", did, len(reqs), backend.name, backend.model)
+    db.dataset_update(did, batch_id=bid, provenance=json.dumps({"prompt_sha256": sha}))
+    return {"dataset_id": did, "status": "pending", "batch_id": bid, "items": len(reqs)}
+
+
+def _dataset_view(d: dict, props: dict[int, dict]) -> dict:
+    out = dict(d)
+    try:
+        out["provenance"] = json.loads(d.get("provenance") or "{}")
+    except (ValueError, TypeError):
+        out["provenance"] = {}
+    p = props.get(d["proposal_id"]) or {}
+    out.update({"model": p.get("model"), "task": p.get("task"), "category": p.get("category"),
+                "download": f"/api/datasets/{d['id']}/items.jsonl" if d["status"] == "ready"
+                else None})
+    return out
+
+
+@app.get("/api/datasets")
+def dataset_index(limit: int = 200):
+    props = {p["id"]: p for p in db.proposal_list(None, 500)}
+    return [_dataset_view(d, props) for d in db.dataset_list(min(limit, 500))]
+
+
+@app.get("/api/datasets/{did}")
+def dataset_detail(did: int):
+    d = db.dataset_get(did)
+    if not d:
+        raise HTTPException(404, "no such dataset")
+    return _dataset_view(d, {p["id"]: p for p in db.proposal_list(None, 500)})
+
+
+@app.get("/api/datasets/{did}/items.jsonl")
+def dataset_items(did: int):
+    d = db.dataset_get(did)
+    if not d:
+        raise HTTPException(404, "no such dataset")
+    if d["status"] != "ready":
+        raise HTTPException(409, f"dataset {did} is {d['status']}" + (f": {d['error']}"
+                                                                     if d["error"] else ""))
+    path = prop.dataset_dir(did) / "items.jsonl"
+    if not path.exists():
+        raise HTTPException(404, "items.jsonl is missing on disk")
+    return FileResponse(path, media_type="application/x-ndjson",
+                        filename=f"dataset-{did}.jsonl")
+
+
+@app.delete("/api/datasets/{did}")
+def dataset_delete(did: int, x_token: str = Header(default="")):
+    _check_token(x_token)
+    d = db.dataset_get(did)
+    if not d:
+        raise HTTPException(404, "no such dataset")
+    if any(did in link["datasets"] for link in db.taint_links()):
+        raise HTTPException(409, "a training run recorded this dataset; its provenance must "
+                                 "stay on the record")
+    import shutil
+    shutil.rmtree(prop.dataset_dir(did), ignore_errors=True)
+    db.dataset_update(did, status="deleted", finished_at=time.time())
+    return {"deleted": did}
 
 
 @app.get("/api/runs/{sid}/log", response_class=PlainTextResponse)

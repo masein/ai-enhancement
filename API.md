@@ -243,6 +243,7 @@ The payload your tooling wants. The useful parts:
   "models": [ {"id": "myorg/my-model", "name": "my-model", "kind": "instruct",
                "params": 596049920,
                "official": true, "nhave": 7, "nreq": 7, "missing": [],
+               "tainted": [],                   // tasks its training data was derived from (see Taint)
                "avg": 0.321, "avgRaw": 0.514,   // required-list mean: above-chance, and raw
                "partialAvg": 0.455, "navg": 8,  // over whatever it ran — a diagnostic, never a rank
                "archinfo": {"arch": "Qwen3ForCausalLM", "hidden": 1024,   // captured at preflight from
@@ -271,6 +272,51 @@ holds, plus `unmapped` for any subject the file does not know.
 `meta.categories` is the category order. Every number in `diag` is computed
 from the per-item log; `score_report` is the leaderboard half only. Quote `bits_per_byte` for the perplexity tasks — it's the
 tokenizer-independent one.
+
+### Find the gap: proposals and generated datasets
+
+The pipeline behind the Diagnose section's **Propose a skill spec** button
+(DIAGNOSE.md, phase 4). Off unless the operator set `LLM_PROVIDER`; `GET
+/api/llm` says so, and shows today's batch-item use against the daily cap.
+
+- `POST /api/proposals` `{"model", "task", "category", "requested_by"}` — the
+  LLM reads this model's **diagnosis-half** failures in that category and
+  proposes a skill spec. Refused (409) with the page's own words when the task
+  has not cleared chance, has a distribution finding, or the category is under
+  30 leaderboard-half items — those are format failures and data will not fix
+  them. Returns `{"id", "status": "pending", "batch_id"}`; the poller turns it
+  into `proposed` when the batch completes.
+- `GET /api/proposals[?status=]`, `GET /api/proposals/{id}` — each with
+  `spec_text` (the LLM's), `edited_text` (the human's), `evidence`
+  (`share_explained`, `patterns`, counts, up to eight diagnosis-half
+  `examples`), `proposer`, `approver`, and its `datasets`.
+- `POST /api/proposals/{id}/approve` `{"approver", "edited_text"}` and
+  `…/reject` `{"approver", "reason"}` — a name is required: it is the record.
+- `POST /api/proposals/{id}/generate` `{"requester", "count", "fmt": "mc"|"free"}`
+  — only for an approved proposal. The generator receives the approved spec,
+  the category, the count, the format and a style constraint, **and no
+  benchmark item in any form**. Returns `{"dataset_id", "batch_id"}`. Refused
+  when the spend guard (429), the batch cap (422) or the dataset quota (507)
+  says so.
+- `GET /api/datasets`, `GET /api/datasets/{id}`, `GET /api/datasets/{id}/items.jsonl`,
+  `DELETE /api/datasets/{id}` (refused while a training run references it).
+  Every item passed the 13-gram contamination gate against both halves of
+  every benchmark on disk; a dataset losing more than 2% that way is
+  `rejected`. `provenance` is the full record: source model, task, category,
+  split, salt, proposal id and both spec texts, approver, generator provider +
+  model + batch id, prompt hash, timestamps, items generated / dropped / kept,
+  the gate result, the content sha256.
+
+  Client: `bench.datasets()`, `bench.dataset(id)`, `bench.pull_dataset(id, dest)`;
+  CLI `datasets` and `pull <id> <dir>`.
+
+**Taint.** `POST /api/truns` accepts `"datasets": [ids]`. A training run that
+records a generated dataset marks every checkpoint submitted under it (or
+carrying its `hf_prefix`) as trained on data derived from that dataset's task:
+`models[].tainted: ["mmlu"]` in `/api/results`, a badge on the board, and the
+task **excluded from that model's official average exactly the way a missing
+required task is** — the per-task score stays visible, the model carries no
+rank. `examples/train_and_benchmark.py --gap-dataset <id>` shows the pattern.
 
 ### GET /healthz
 

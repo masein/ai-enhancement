@@ -163,6 +163,62 @@ def _trim_diag(d: dict | None) -> dict | None:
     return out
 
 
+# ---------------------------------------------------------------------------
+# Proposal gating: when a "propose a skill spec" button may be live.
+#
+# The single most important piece of UX in the generation phase. Four of the
+# five things a diagnosis can find are properties of how we POSE a task or of
+# the output distribution, and more subject data moves the score without
+# teaching the model anything. A generator must not be offered for any of
+# them. The same function gates the API, so the button and the server cannot
+# disagree, and the reason is text the page shows as written.
+# ---------------------------------------------------------------------------
+PROPOSE_MIN_N = 30            # diagnose.MIN_GROUP_N — DIAGNOSE.md's noise floor
+_FORMAT_FLAGS = (("degenerate", "one option only"), ("position_biased", "answer positions"),
+                 ("length_biased", "option length"))
+_CONFIDENT_SHARE = 0.35       # diagnose.CONFIDENT_SHARE; the page's chip uses the same line
+
+
+def proposal_gate(task: str, t: dict, cell: dict | None, chance: float | None) -> dict:
+    """{ok, why, categories: {name: {ok, why}}} for one model x task, from the
+    trimmed diagnosis and the reported cell."""
+    a = t.get("answers") or {}
+    why = None
+    if a.get("unsupported"):
+        why = "per-item analysis does not apply to this task — " + str(a["unsupported"])
+    else:
+        # a format finding first: a position-skewed model is usually at chance
+        # too, and the skew is the cause — the reason should name the cause
+        flags = [label for key, label in _FORMAT_FLAGS if a.get(key)]
+        nb = t.get("n") or 1
+        if (t.get("buckets") or {}).get("confident_wrong", 0) / nb >= _CONFIDENT_SHARE:
+            flags.append("confidently wrong")
+        v = se = None
+        if cell and cell.get("se"):
+            v, se = cell["v"], cell["se"]
+        elif t.get("score_report") is not None and t.get("n_report"):
+            v = t["score_report"]
+            se = math.sqrt(max(v * (1 - v), 1e-9) / t["n_report"])
+        if flags:
+            why = ("a format failure, not a knowledge gap: " + ", ".join(flags)
+                   + " — see the finding above. Fix the posing; data will not")
+        elif chance and v is not None and v - 1.96 * se <= chance:
+            why = (f"the score ({100 * v:.1f}% ±{100 * se:.1f}) has not cleared chance "
+                   f"({100 * chance:.0f}%) — the breakdown describes how the model guesses, "
+                   f"not what it knows, so no category is evidence of a gap")
+    cats = {}
+    for name, g in (t.get("categories") or {}).items():
+        if why:
+            cats[name] = {"ok": False, "why": why}
+        elif (g.get("n_report") or 0) < PROPOSE_MIN_N:
+            cats[name] = {"ok": False, "why": f"{g.get('n_report') or 0} leaderboard-half items "
+                          f"— under the {PROPOSE_MIN_N}-item noise floor, so this score is not "
+                          f"evidence of a gap"}
+        else:
+            cats[name] = {"ok": True, "why": None}
+    return {"ok": why is None, "why": why, "categories": cats}
+
+
 def load_results(path: Path) -> list[dict]:
     """Find and parse every lm-eval results file under `path`."""
     files = sorted(path.rglob("results*.json")) if path.is_dir() else [path]
@@ -554,8 +610,14 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
     return by_model
 
 
-def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
+def build_payload(by_model: dict[str, dict], title: str, source: str,
+                  taint: dict[str, list[str]] | None = None) -> dict:
+    """`taint`: model id -> tasks whose diagnostics its training data was
+    derived from (the service computes it from the run/dataset join). A
+    tainted task is treated exactly like a missing required task: shown per
+    task, excluded from the official average, the model unranked."""
     models = list(by_model)
+    taint = taint or {}
 
     # display names: short unless two orgs publish the same repo name
     # (google/gemma-3-270m vs unsloth/gemma-3-270m must not collapse into one row)
@@ -607,12 +669,19 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
     required, req_absent = required_tasks(acc_tasks)
     model_rows = []
     for mid, r in by_model.items():
+        tainted = sorted(set(taint.get(mid, ())) & set(acc_tasks))
         have = [cells[t][mid]["v"] for t in acc_tasks
-                if mid in cells.get(t, {}) and t not in CONTROL_TASKS]
-        got_req = [t for t in required if mid in cells.get(t, {})]
-        missing = [t for t in required if t not in got_req]
-        official = bool(required) and not missing
+                if mid in cells.get(t, {}) and t not in CONTROL_TASKS and t not in tainted]
+        got_req = [t for t in required if mid in cells.get(t, {}) and t not in tainted]
+        missing = [t for t in required if mid not in cells.get(t, {})]
+        official = bool(required) and not missing and not (set(tainted) & set(required))
         params = r["num_params"] or params_from_name(mid)
+        diag = _trim_diag(r.get("diag"))
+        if diag:
+            for task, t in diag["tasks"].items():
+                if t.get("categories"):
+                    t["propose"] = proposal_gate(task, t, cells.get(task, {}).get(mid),
+                                                 _CHANCE.get(task))
         model_rows.append({
             "id": mid, "name": display[mid],
             "family": re.split(r"[^a-z0-9]", mid.split("/")[-1].lower())[0],
@@ -629,7 +698,10 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
             "minutes": round((r["eval_seconds"] or 0) / 60, 1),
             "hash": r["git_hash"], "date": r["date"],
             "archinfo": r.get("archinfo"),
-            "diag": _trim_diag(r.get("diag")),
+            "diag": diag,
+            # tasks whose diagnostics this model's training data was derived
+            # from: shown, badged, and out of the average
+            "tainted": tainted,
             "kindReason": (r.get("archinfo") or {}).get("kind_reason"),
             # official numbers only: normalized (the ranking key) and raw (the
             # number you quote), both over the required list, both None when the
@@ -725,6 +797,14 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
             + ", ".join(req_absent) + " were not run by anyone here, so 'official' "
             "means complete within this report, not complete under the full "
             "protocol.")
+    tainted_rows = [m for m in model_rows if m["tainted"]]
+    if tainted_rows:
+        warnings.append(
+            f"{len(tainted_rows)} model{'s' if len(tainted_rows) > 1 else ''} "
+            f"({', '.join(m['name'] for m in tainted_rows[:4])}"
+            f"{', …' if len(tainted_rows) > 4 else ''}) trained on data derived from "
+            f"benchmark diagnostics. The affected task is shown per model, badged, and "
+            f"excluded from that model's official average — it is not a ranking claim.")
     n_prelim = sum(1 for m in model_rows if not m["official"])
     if n_prelim and required:
         warnings.append(
@@ -1018,6 +1098,26 @@ th .dir { font-size:9px; }
 .dxperm { margin:14px 0 4px; }
 .dxperm .dxsub { width:auto; min-width:60%; }
 .lb td.dim { color:var(--muted); }
+.badge.taint { color:var(--s2); border-color:var(--s2); }
+/* the one button that can spend money and make training data: never colour alone */
+.propose { font:inherit; font-size:11.5px; padding:2px 9px; border-radius:6px;
+  border:1px solid var(--accent); background:var(--accent-soft); color:var(--accent);
+  cursor:pointer; margin-left:auto; }
+.propose:disabled { border-color:var(--border); background:var(--plane);
+  color:var(--muted); cursor:not-allowed; }
+.propwhy { flex-basis:100%; font-size:11.5px; color:var(--muted); margin:0 0 4px 20px; }
+.rv { border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:10px 0; }
+.rv h3 { margin:0 0 4px; font-size:15px; }
+.rv textarea { width:100%; box-sizing:border-box; min-height:70px; font:inherit;
+  font-size:13px; color:var(--text-primary); background:var(--surface-1);
+  border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:6px 0; }
+.rv .frm input { min-width:120px; }
+.rv .ex { border-left:2px solid var(--border); padding:2px 0 2px 10px; margin:0 0 8px;
+  font-size:12.5px; }
+.rv .ex .kv { color:var(--muted); font-size:11.5px; }
+.kvs { display:flex; flex-wrap:wrap; gap:4px 18px; font-size:12.5px; margin:4px 0; }
+.kvs b { font-weight:600; }
+.provlist.small dd { font-size:12px; }
 .dxex { margin-top:10px; font-size:12.5px; }
 .dxex > summary { cursor:pointer; color:var(--accent); font-size:12px; }
 .dxex ul { list-style:none; padding:0; margin:8px 0 0; }
@@ -1179,6 +1279,8 @@ const state = {
   lbHeat: false,                       // leaderboard cells: plain | heat-shaded
   lbAbout: false,                      // "about these benchmarks" panel open
   lbView: 'tasks',                     // leaderboard columns: 'tasks' | 'cats' (MMLU by category)
+  rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '' },   // Review tab
+  rvName: '',                          // the name approvals are recorded under (remembered)
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
   // focus from filter inputs and kill slider drags
@@ -1310,10 +1412,16 @@ function modelSentence(m) {
     out.push(`It averages ${pct(a)} `
       + `${state.avgMode === 'raw' ? 'raw' : 'above chance'} over the ${m.nreq} `
       + `required tasks, ranking ${ord(r.n)} of ${r.of} ranked models here.`);
+  else if ((m.tainted || []).length && !(m.missing || []).length)
+    out.push(`Its training consumed a dataset derived from ${m.tainted.join(' and ')} `
+      + `diagnostics, so ${m.tainted.join(' and ')} is excluded from its official average `
+      + 'and it carries no rank; the per-task score stands and is shown.');
   else
     out.push(`It has ${m.nhave} of ${m.nreq} required tasks, so it is preliminary `
       + `and carries no overall rank`
-      + ((m.missing || []).length ? ` — still missing ${m.missing.join(', ')}.` : '.'));
+      + ((m.missing || []).length ? ` — still missing ${m.missing.join(', ')}.` : '.')
+      + ((m.tainted || []).length ? ` ${m.tainted.join(', ')} is excluded as well: its `
+         + 'training data was derived from that task\'s diagnostics.' : ''));
   // "best at" is only a claim on a task that separates anybody. Leading a task
   // where no pair of models differs by more than their combined error is an
   // artifact of the sort order, and it reads as praise — the weakest model on
@@ -1347,6 +1455,14 @@ const prelimBadge = m => m.official ? null
         + '\nPer-task scores are valid; there is no overall average until the '
         + 'required suite completes.',
       text: `prelim ${m.nhave}/${m.nreq}` });
+// trained on data derived from a benchmark's diagnostics: the task stays on
+// the page and leaves the average. Not a punishment — the only honest way to
+// keep a board where some models have been tuned against it.
+const taintBadge = m => (m.tainted || []).length
+  ? el('span', { class: 'badge taint',
+      title: `trained on data derived from ${m.tainted.join(', ')} diagnostics — that task `
+        + 'is shown per model and excluded from the official average',
+      text: 'trained on ' + m.tainted.join(', ') + ' diagnostics' }) : null;
 const ckBadge = m => m.source === 'artifact'
   ? el('span', { class: 'badge ckpt', title: 'uploaded checkpoint (local artifact)',
                  text: 'ckpt' }) : null;
@@ -1851,7 +1967,30 @@ const CAT_MIN_N = 30;
 // act on, and it is what the generation phase will be asked about. Weakest
 // first, item counts on every row, and the same rule as the subject table: a
 // task that has not cleared chance is describing how the model guesses.
-function dxCategories(t, v, atChance) {
+function proposeBtn(mid, t, name, gate) {
+  const b = el('button', { class: 'propose', text: 'Propose a skill spec',
+    disabled: gate.ok ? null : '', title: gate.ok
+      ? 'ask the configured LLM what skill is missing here, from diagnosis-half failures '
+        + 'only — a person reviews the answer before anything is generated'
+      : gate.why,
+    onclick: async e => {
+      e.preventDefault();                     // do not toggle the <details>
+      b.disabled = true;
+      const r = await fetch('api/proposals', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+        body: JSON.stringify({ model: mid, task: t, category: name,
+                               requested_by: state.rvName }) }).catch(() => null);
+      const j = r ? await r.json().catch(() => ({})) : {};
+      state.rv.msg = r && r.ok ? `proposal #${j.id} submitted for ${mid} · ${t} · ${name} — `
+          + 'the LLM answer lands here when the batch completes'
+        : 'refused: ' + (j.detail || (r ? r.status : 'server unreachable'));
+      state.rv.loaded = false;
+      navigate({ tab: 'review', model: null });
+    } });
+  return b;
+}
+
+function dxCategories(mid, t, v, atChance) {
   const cats = Object.entries(v.categories || {}).filter(([, g]) => g.score_report != null)
     .sort((x, y) => x[1].score_report - y[1].score_report);
   if (!cats.length) return null;
@@ -1866,13 +2005,20 @@ function dxCategories(t, v, atChance) {
     const subs = (g.groups || []).map(s => [s, (v.groups || {})[s]])
       .filter(([, x]) => x && x.score_report != null)
       .sort((x, y) => x[1].score_report - y[1].score_report);
+    const gate = ((v.propose || {}).categories || {})[name];
     const det = el('details', { class: 'dxcat' + (dim ? ' dim' : ''), 'data-cat': name },
       el('summary', {},
         el('span', { class: 'dxcname', text: name }),
         el('span', { class: 'num', text: pct(g.score_report) }),
         el('span', { class: 'se', text: `${g.n_report} items`
           + (dim ? ` · under ${CAT_MIN_N}, noise` : '') }),
-        dxBar(g.buckets || {}, g.n || 1, true)));
+        dxBar(g.buckets || {}, g.n || 1, true),
+        // the button that starts the generation pipeline. Disabled WITH the
+        // reason on the row: a format failure or an at-chance score must say
+        // so and point at the finding, never quietly offer data instead
+        LIVE && gate ? proposeBtn(mid, t, name, gate) : '',
+        LIVE && gate && !gate.ok ? el('span', { class: 'propwhy',
+          text: 'no proposal: ' + gate.why }) : ''));
     if (subs.length)
       det.append(el('table', { class: 'dxsub' },
         el('thead', {}, el('tr', {},
@@ -2039,7 +2185,7 @@ function vDiagnose(m) {
       .filter(([, g]) => g.score_report != null)
       .sort((x, y) => x[1].score_report - y[1].score_report);
     if (v.categories && Object.keys(v.categories).length)
-      body.append(dxCategories(t, v, causes[t].some(c => c.key === 'atchance')));
+      body.append(dxCategories(m.id, t, v, causes[t].some(c => c.key === 'atchance')));
     else if (groups.length > 1) {
       body.append(el('div', { class: 'dxh', text: 'Weakest groups first' }));
       body.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'dxsub' },
@@ -2078,7 +2224,7 @@ function vModel() {
       el('h2', { class: 'mtitle', text: m.name }),
       ckBadge(m) || el('span', { class: 'badge' + (m.kind === 'instruct' ? ' instruct' : ''),
         text: m.kind }),
-      prelimBadge(m) || '',
+      prelimBadge(m) || '', taintBadge(m) || '',
       r ? el('span', { class: 'rankbadge', title: `${r.n} of ${r.of} ranked models`,
         text: `#${r.n}` }) : ''),
     el('p', { class: 'sub mono', text: m.id }),
@@ -2120,6 +2266,9 @@ function vModel() {
       if (atChance) rows.push(el('tr', { class: 'flagrow' }, el('td', { colspan: 5,
         text: '↑ within 1.96 standard errors of chance — not distinguishable '
             + 'from guessing' })));
+      if ((m.tainted || []).includes(t)) rows.push(el('tr', { class: 'flagrow' },
+        el('td', { colspan: 5, text: '↑ this model trained on data derived from this '
+          + 'task\'s diagnostics — shown, excluded from its official average' })));
     }
   }
   const results = el('div', { class: 'card' },
@@ -2619,7 +2768,7 @@ function vLeaderboard(ms) {
         ckBadge(m) || (m.kind === 'instruct'
           ? el('span', { class: 'badge instruct', text: 'instruct' })
           : el('span', { class: 'badge', text: 'base' })),
-        prelimBadge(m) || '');
+        prelimBadge(m) || '', taintBadge(m) || '');
       if (c.key === 'params') {
         const a = m.archinfo || {};
         // a sparse model loads every expert but routes each token through a few:
@@ -3933,6 +4082,243 @@ function vQueue() {
       qToolbar, qTableWrap, qEmpty)];
 }
 
+// ---------- Review: the human in the loop ----------
+// Proposals wait here for a person. Everything DIAGNOSE.md says that person
+// needs is on the card: the spec, the evidence counts, the category's score and
+// ceiling, the item counts, the model's own findings for the task, and up to
+// eight diagnosis-half items the LLM saw, labelled as such. Approve (edited or
+// not) under a typed name, or reject with a reason. Only an approved spec can
+// be sent to the generator, and only the spec text goes.
+async function loadReview() {
+  try {
+    const [llm, props, ds] = await Promise.all([
+      fetch('api/llm').then(r => r.json()),
+      fetch('api/proposals').then(r => r.json()),
+      fetch('api/datasets').then(r => r.json())]);
+    const changed = !state.rv.loaded || JSON.stringify([llm, props, ds])
+      !== JSON.stringify([state.rv.llm, state.rv.proposals, state.rv.datasets]);
+    Object.assign(state.rv, { llm, proposals: props, datasets: ds, loaded: true });
+    if (changed && state.tab === 'review' && !state.model) render();
+  } catch (e) { /* server briefly away */ }
+}
+
+async function rvPost(path, body) {
+  const r = await fetch(path, { method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+    body: JSON.stringify(body) }).catch(() => null);
+  const j = r ? await r.json().catch(() => ({})) : {};
+  state.rv.msg = r && r.ok ? '' : 'refused: ' + (j.detail || (r ? r.status : 'server unreachable'));
+  await loadReview(); render();
+}
+
+function rvNameInput() {
+  return el('input', { type: 'text', placeholder: 'your name (recorded)', value: state.rvName,
+    'aria-label': 'your name', oninput: e => { state.rvName = e.target.value;
+      try { localStorage.setItem('bench-name', state.rvName); } catch (err) { /* private mode */ } } });
+}
+
+function rvFindings(p) {
+  const m = DATA.models.find(x => x.id === p.model);
+  const t = m && m.diag && m.diag.tasks[p.task];
+  if (!t) return el('p', { class: 'small', text: 'The diagnosis this was proposed from is no '
+    + 'longer on the board (results moved or the model was removed).' });
+  const cat = (t.categories || {})[p.category] || {};
+  const s = pickStats(t.answers);
+  const c = cell(p.task, p.model);
+  const out = [el('div', { class: 'kvs' },
+    el('span', {}, el('b', { text: p.task + ' score ' }), c ? pct(c.v) + (c.se ? ` ±${(100 * c.se).toFixed(1)}` : '') : '—'),
+    el('span', {}, el('b', { text: p.category + ' ' }),
+      cat.score_report != null ? pct(cat.score_report) : '—',
+      el('span', { class: 'se', text: ` on ${cat.n_report ?? '—'} leaderboard-half items` })),
+    s ? el('span', {}, el('b', { text: 'ceiling ' }), pct(s.ceiling),
+      el('span', { class: 'se', text: ' for this answer distribution' })) : '',
+    el('span', {}, el('b', { text: 'diagnosis half ' }),
+      `${t.n_diagnose} items · ${pct(t.score_diagnose)}`))];
+  for (const cz of diagCauses(p.task, t, p.model))
+    out.push(el('p', { class: 'dxlead' + (cz.calm ? ' calm' : ''), text: cz.text }));
+  return el('div', {}, out);
+}
+
+function rvExamples(ev) {
+  const ex = ev.examples || [];
+  if (!ex.length) return '';
+  const det = el('details', {}, el('summary', { class: 'small', style: 'cursor:pointer',
+    text: `Show ${ex.length} of the ${ev.n_shown} diagnosis-half items the LLM saw (never `
+      + 'the leaderboard half)' }));
+  det.append(el('div', { style: 'margin-top:8px' }, ex.map(e => el('div', { class: 'ex' },
+    el('div', { text: e.question || '(no question text)' }),
+    el('div', { class: 'kv' }, `${e.subject} · ${e.bucket.replace('_', ' ')} · `,
+      e.chose ? [el('b', { text: 'chose ' }), e.chose + ' · '] : '',
+      e.answer ? [el('b', { text: 'answer ' }), e.answer] : '')))));
+  return det;
+}
+
+function rvProposal(p, llmOk) {
+  const ev = p.evidence || {};
+  const head = el('div', { class: 'mhead' },
+    el('h3', { text: `#${p.id} · ${p.model} · ${p.task} · ${p.category}` }),
+    el('span', { class: stClass(p.status === 'proposed' ? 'queued' : p.status === 'pending'
+      ? 'running' : p.status === 'approved' ? 'done' : p.status), text: p.status }));
+  const meta = el('p', { class: 'small', text:
+    `requested ${p.created_at ? rel(p.created_at) + ' ago' : ''}`
+    + (p.requested_by ? ` by ${p.requested_by}` : '')
+    + (p.proposer ? ` · proposed by ${p.proposer}` : '')
+    + (p.approver ? ` · ${p.status} by ${p.approver}` : '')
+    + (p.prompt_sha ? ` · prompt ${p.prompt_sha.slice(0, 12)}` : '') });
+  const card = el('div', { class: 'rv', 'data-proposal': p.id }, head, meta);
+  if (p.status === 'pending')
+    card.append(el('p', { class: 'small', text: 'Waiting for the LLM batch to complete '
+      + `(batch ${p.batch_id}). Batches take minutes to hours; this page polls.` }));
+  if (p.error) card.append(el('p', { class: 'warn', text: p.error }));
+  if (p.spec_text) {
+    card.append(el('div', { class: 'dxh', text: 'Proposed skill spec (the LLM\'s words)' }));
+    card.append(el('p', { class: 'spec', text: p.spec_text }));
+    card.append(el('div', { class: 'kvs' },
+      ev.share_explained != null ? el('span', {}, el('b', { text: 'explains ' }),
+        pct(ev.share_explained, 0) + ' of the failures shown') : '',
+      el('span', {}, el('b', { text: 'failures ' }),
+        `${ev.diagnose_wrong ?? '—'} of ${ev.diagnose_items ?? '—'} diagnosis-half items in `
+        + `${p.category}; ${ev.n_shown ?? '—'} shown to the LLM`)));
+    if ((ev.patterns || []).length)
+      card.append(el('ul', { class: 'small', style: 'margin:4px 0 6px' },
+        ev.patterns.map(x => el('li', { text: x }))));
+  }
+  if (p.edited_text) {
+    card.append(el('div', { class: 'dxh', text: 'Approved as edited' }));
+    card.append(el('p', { class: 'spec', text: p.edited_text }));
+  }
+  card.append(el('div', { class: 'dxh', text: 'What the diagnosis says about this task' }));
+  card.append(rvFindings(p));
+  card.append(rvExamples(ev));
+  if (p.status === 'proposed') {
+    const ta = el('textarea', { 'aria-label': 'skill spec to approve' });
+    ta.value = p.spec_text;
+    const reason = el('input', { type: 'text', placeholder: 'reason (for reject)',
+      style: 'flex:1;min-width:160px', 'aria-label': 'reject reason' });
+    const name = rvNameInput();
+    card.append(el('div', { class: 'dxh', text: 'Decide' }),
+      el('p', { class: 'small', text: 'Edit the spec if it names the wrong skill or leaks a '
+        + 'question. Whatever text is in the box is what the generator will receive — and '
+        + 'the only thing it receives.' }),
+      ta,
+      el('div', { class: 'frm' }, name,
+        el('button', { text: 'Approve this spec', onclick: () => rvPost(
+          `api/proposals/${p.id}/approve`, { approver: name.value, edited_text: ta.value }) }),
+        reason,
+        el('button', { text: 'Reject', onclick: () => rvPost(
+          `api/proposals/${p.id}/reject`, { approver: name.value, reason: reason.value }) })));
+  }
+  if (p.status === 'approved') {
+    const count = el('input', { type: 'number', value: '50', min: '1', max: '1000',
+      style: 'width:80px', 'aria-label': 'item count' });
+    const fmt = mkSel('format', [['mc', 'multiple choice (4 options)'], ['free', 'free response']],
+      'mc', () => {});
+    const name = rvNameInput();
+    const usage = state.rv.llm || {};
+    card.append(el('div', { class: 'dxh', text: 'Generate' }),
+      el('p', { class: 'small', text: 'The generator receives the approved spec above, the '
+        + 'category name, the count, the format and a style constraint. No benchmark item, '
+        + 'in any form. Every item then passes the 13-gram contamination gate against both '
+        + `halves of every benchmark on disk. Today: ${usage.usage_today ?? '—'} of `
+        + `${usage.daily_cap ?? '—'} batch items used (one per ten items generated).` }),
+      el('div', { class: 'frm' }, count, fmt, name,
+        el('button', { text: 'Generate data', disabled: llmOk ? null : '',
+          title: llmOk ? '' : (usage.reason || 'LLM not configured'),
+          onclick: () => rvPost(`api/proposals/${p.id}/generate`,
+            { requester: name.value, count: +count.value, fmt: fmt.value }) })));
+    if ((p.datasets || []).length)
+      card.append(el('p', { class: 'small', text: 'datasets: ' + p.datasets.map(d =>
+        `#${d.id} ${d.status}${d.error ? ' (' + d.error + ')' : ''}`).join(' · ') }));
+  }
+  if (p.status === 'rejected' && p.reject_reason)
+    card.append(el('p', { class: 'small', text: 'reason: ' + p.reject_reason }));
+  return card;
+}
+
+function rvDataset(d) {
+  const pv = d.provenance || {};
+  const g = pv.gate || {};
+  const det = el('details', { class: 'rv', 'data-dataset': d.id },
+    el('summary', { style: 'cursor:pointer' },
+      el('b', { text: `dataset #${d.id}` }), ` · ${d.model || '—'} · ${d.task || '—'} · `
+      + `${d.category || '—'} · ${d.fmt} · `,
+      el('span', { class: stClass(d.status === 'ready' ? 'done' : d.status === 'pending'
+        ? 'running' : 'failed'), text: d.status }),
+      pv.items ? ` · ${pv.items.kept} kept of ${pv.items.generated} generated` : '',
+      d.download ? [' · ', el('a', { href: d.download.replace(/^\//, ''), text: 'items.jsonl' })] : ''));
+  if (d.error) det.append(el('p', { class: 'warn', text: d.error }));
+  if (g.items_in != null)
+    det.append(el('p', { class: 'small', text: `Contamination gate: ${g.dropped_benchmark} of `
+      + `${g.items_in} items shared a ${g.ngram}-gram with a benchmark item `
+      + `(${pct(g.share_dropped_benchmark)}, line at ${pct(g.max_share, 0)}); `
+      + `${g.dropped_duplicate} near-duplicates collapsed; checked against ${g.benchmark_docs} `
+      + 'benchmark documents in both halves.'
+      + (g.offending_ngrams && g.offending_ngrams.length ? ' First offending n-gram: “'
+        + g.offending_ngrams[0] + '”.' : '') }));
+  const rows = [];
+  const walk = (o, pre) => { for (const [k, v] of Object.entries(o || {}))
+    if (v && typeof v === 'object' && !Array.isArray(v)) walk(v, pre + k + '.');
+    else rows.push([pre + k, Array.isArray(v) ? v.join(', ')
+      : pre === 'timestamps.' && v ? absT(v) : String(v)]); };
+  walk(pv, '');
+  if (rows.length) det.append(el('div', { class: 'dxh', text: 'Provenance, in full' }),
+    el('dl', { class: 'provlist small' }, rows.flatMap(([k, v]) =>
+      [el('dt', { text: k }), el('dd', { class: 'mono', text: v })])));
+  return det;
+}
+
+function vReview() {
+  if (!state.rv.loaded) { loadReview(); }
+  try { if (!state.rvName) state.rvName = localStorage.getItem('bench-name') || ''; } catch (e) { /* */ }
+  const llm = state.rv.llm || {};
+  const llmOk = !!llm.configured && (llm.usage_today || 0) < (llm.daily_cap || 0);
+  const llmCard = el('div', { class: 'card' },
+    el('h2', { text: 'Review' }),
+    el('p', { class: 'sub', text: 'The human in the loop. An LLM reads the DIAGNOSIS half of one '
+      + 'model\'s failures in one weak category and proposes the skill that is missing; '
+      + 'you approve, edit or reject that sentence; only the approved text reaches a '
+      + 'generator, which never sees a benchmark item. Every decision is recorded under '
+      + 'the name you type — the tailnet is the auth boundary, so that name is the record.' }),
+    el('div', { class: 'kvs' },
+      el('span', {}, el('b', { text: 'LLM ' }), llm.configured
+        ? `${llm.provider}/${llm.model || '—'}` : 'not configured'),
+      llm.configured ? el('span', {}, el('b', { text: 'today ' }),
+        `${llm.usage_today} of ${llm.daily_cap} batch items` + ((llm.usage_today || 0) >= (llm.daily_cap || 0)
+          ? ' — cap reached, generation paused until tomorrow' : '')) : '',
+      llm.datasets_quota_bytes ? el('span', {}, el('b', { text: 'dataset storage ' }),
+        `${(llm.datasets_bytes / 1e6).toFixed(1)} MB of ${(llm.datasets_quota_bytes / 1e9).toFixed(0)} GB`) : ''),
+    !llm.configured && llm.reason ? el('p', { class: 'warn', text: llm.reason }) : '',
+    // the name every decision on this page — and every propose click — is
+    // recorded under. Remembered in this browser; there is no login to read it from
+    el('div', { class: 'frm', style: 'margin-top:8px' }, rvNameInput(),
+      el('span', { class: 'small', text: 'recorded on proposals you request and specs you '
+        + 'approve or reject' })),
+    state.rv.msg ? el('p', { class: 'small', text: state.rv.msg }) : '');
+  const props = state.rv.proposals || [];
+  const waiting = props.filter(p => p.status === 'pending' || p.status === 'proposed');
+  const approved = props.filter(p => p.status === 'approved');
+  const closed = props.filter(p => p.status === 'rejected' || p.status === 'failed');
+  const sec = (title, sub, list, empty) => el('div', { class: 'card' },
+    el('h2', { text: title }), el('p', { class: 'sub', text: sub }),
+    list.length ? list.map(p => rvProposal(p, llmOk)) : el('p', { class: 'small', text: empty }));
+  return [llmCard,
+    sec('Awaiting review', 'Read the findings first: if the task has a format finding or has '
+      + 'not cleared chance, the button that made this proposal should have been disabled — '
+      + 'reject it.', waiting,
+      'Nothing waiting. A proposal starts from a category row in a model\'s Diagnose section.'),
+    sec('Approved — ready to generate', 'The spec below is exactly what the generator '
+      + 'receives.', approved, 'No approved specs.'),
+    el('div', { class: 'card' }, el('h2', { text: 'Datasets' }),
+      el('p', { class: 'sub', text: 'Generated, gated, and recorded. A training run that '
+        + 'consumes one registers it (datasets=[id] on the run), and every checkpoint of '
+        + 'that run then carries the taint badge and loses the task from its average.' }),
+      (state.rv.datasets || []).length ? (state.rv.datasets || []).map(rvDataset)
+        : el('p', { class: 'small', text: 'No datasets yet.' })),
+    closed.length ? el('details', { class: 'card' },
+      el('summary', { style: 'cursor:pointer', text: `${closed.length} rejected or failed` }),
+      closed.map(p => rvProposal(p, llmOk))) : ''];
+}
+
 function download(name, mime, text) {
   const a = el('a', { href: URL.createObjectURL(new Blob([text], { type: mime })), download: name });
   document.body.append(a); a.click(); a.remove();
@@ -3968,6 +4354,7 @@ function exportJson() { download('benchmark.json', 'application/json', JSON.stri
 const TABS = [
   ['overview', 'Overview', vOverview],
   ...(LIVE ? [['training', 'Training', vTraining],
+              ['review', 'Review', vReview],
               ['queue', 'Submit & Queue', vQueue]] : []),
   ['leaderboard', 'Leaderboard', vLeaderboard],
   ['tasks', 'Tasks', vTasks],
@@ -4099,7 +4486,8 @@ if (LIVE) {
     if (DATA && !DATA.models.length) { state.tab = 'queue'; render(); }
   });
   loadQueue();
-  setInterval(() => { loadQueue(); if (state.tab === 'training') loadTraining(); }, 5000);
+  setInterval(() => { loadQueue(); if (state.tab === 'training') loadTraining();
+                      if (state.tab === 'review') loadReview(); }, 5000);
 } else {
   initData(DATA);
 }
