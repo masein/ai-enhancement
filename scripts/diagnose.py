@@ -380,20 +380,33 @@ def main() -> int:
     ap.add_argument("results", type=Path, help="the results/full tree")
     ap.add_argument("-m", "--model", action="append", default=[],
                     help="only this model id (repeatable); default every model")
+    ap.add_argument("-o", "--out", type=Path, default=None,
+                    help="write diagnose.json under this directory instead of "
+                         "beside the results (use when the results tree is not "
+                         "yours to write)")
     ap.add_argument("-q", "--quiet", action="store_true")
     a = ap.parse_args()
     if not a.results.is_dir():
         print(f"no such directory: {a.results}", file=sys.stderr)
         return 2
     want = {m.replace("/", "__") for m in a.model}
-    n = 0
+    n, denied = 0, []
     for d in sorted(p for p in a.results.iterdir() if p.is_dir()):
         if want and d.name not in want:
             continue
         out = diagnose_model(d)
         if not out["tasks"]:
             continue
-        (d / "diagnose.json").write_text(json.dumps(out), encoding="utf-8")
+        dest = (a.out / d.name) if a.out else d
+        try:
+            dest.mkdir(parents=True, exist_ok=True)
+            (dest / "diagnose.json").write_text(json.dumps(out), encoding="utf-8")
+        except OSError as e:
+            # the service writes results as root, so a results tree is often not
+            # writable by the person running this. One unwritable model must not
+            # abandon the other twenty-nine.
+            denied.append((d.name, e.strerror or str(e)))
+            continue
         n += 1
         if not a.quiet:
             bits = []
@@ -404,6 +417,19 @@ def main() -> int:
     if not a.quiet:
         print(f"\nwrote diagnose.json for {n} model(s) "
               f"· split salt {SPLIT_SALT!r}")
+    if denied:
+        print(f"\ncould not write {len(denied)} model(s) — the results tree is "
+              f"owned by whoever ran the eval:", file=sys.stderr)
+        for name, why in denied[:8]:
+            print(f"  {name}: {why}", file=sys.stderr)
+        if len(denied) > 8:
+            print(f"  … and {len(denied) - 8} more", file=sys.stderr)
+        print("\nrun it the way the service does (inside the container), or send "
+              "the output elsewhere with --out:\n"
+              "  sudo docker compose exec -T bench python3 scripts/diagnose.py results/full\n"
+              "  python3 scripts/diagnose.py results/full --out ~/diagnose",
+              file=sys.stderr)
+        return 1
     return 0
 
 
