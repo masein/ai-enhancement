@@ -74,13 +74,13 @@ _METRIC_RE = re.compile(r"^(?P<metric>[a-zA-Z0-9_@\-]+?)(?P<stderr>_stderr)?,(?P
 _META_CACHE: dict = {}
 
 
-def _model_meta(source: Path) -> dict | None:
-    """model_meta.json sits at the model's directory level (the service writes
-    it at preflight); results files are one or two levels below it."""
+def _beside(source: Path, name: str) -> dict | None:
+    """Read a JSON file that sits at the MODEL's directory level. Results files
+    live one or two levels below it, so try both."""
     for up in (1, 2):
         if len(source.parents) <= up:
             continue
-        cand = source.parents[up] / "model_meta.json"
+        cand = source.parents[up] / name
         key = str(cand)
         if key not in _META_CACHE:
             try:
@@ -90,6 +90,60 @@ def _model_meta(source: Path) -> dict | None:
         if _META_CACHE[key] is not None:
             return _META_CACHE[key]
     return None
+
+
+def _model_meta(source: Path) -> dict | None:
+    """Written by the service at preflight: architecture, param count, template."""
+    return _beside(source, "model_meta.json")
+
+
+# Per-item diagnosis, written by scripts/diagnose.py from the harness's
+# --log_samples output. Absent until that has been run, which is why every
+# consumer treats it as optional.
+#
+# It is trimmed here rather than there. diagnose.json is the archive — it keeps
+# 8 examples per bucket per task with 240 characters of question — and this page
+# is a single file that has to load over a tailnet. Four examples is enough to
+# see the pattern; the file on disk still has the rest.
+_DIAG_EXAMPLES = 4
+_DIAG_Q = 180
+
+
+def _clip(v, n: int):
+    if not v:
+        return None
+    v = str(v)
+    return v if len(v) <= n else v[:n - 1].rstrip() + "\u2026"
+
+
+def _trim_diag(d: dict | None) -> dict | None:
+    if not isinstance(d, dict) or not d.get("tasks"):
+        return None
+    out = {"split_salt": d.get("split_salt"), "tasks": {}}
+    for task, v in d["tasks"].items():
+        if not isinstance(v, dict):
+            continue
+        t = {k: v.get(k) for k in
+             ("metric", "n", "n_report", "n_diagnose", "score_all", "score_report",
+              "score_diagnose", "buckets", "approx_buckets", "groups", "answers")
+             if v.get(k) is not None}
+        ex = {}
+        for bucket, items in (v.get("examples") or {}).items():
+            keep = []
+            for e in items[:_DIAG_EXAMPLES]:
+                keep.append({
+                    "group": e.get("group"),
+                    "q": _clip(e.get("q"), _DIAG_Q),
+                    "chose": _clip(e.get("chose"), 70),
+                    "answer": _clip(e.get("answer"), 70),
+                    "p": e.get("p"),
+                })
+            if keep:
+                ex[bucket] = keep
+        if ex:
+            t["examples"] = ex
+        out["tasks"][task] = t
+    return out
 
 
 def load_results(path: Path) -> list[dict]:
@@ -188,6 +242,7 @@ def parse_run(blob: dict, source: Path) -> dict:
         "transformers_version": blob.get("transformers_version"),
         "eval_seconds": _to_float(blob.get("total_evaluation_time_seconds")),
         "archinfo": _model_meta(source),
+        "diag": _beside(source, "diagnose.json"),
         "tasks": tasks,
     }
 
@@ -438,6 +493,7 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
         m["limit"] = m["limit"] or r["limit"]
         m["num_params"] = m["num_params"] or r["num_params"]
         m["archinfo"] = m.get("archinfo") or r.get("archinfo")
+        m["diag"] = m.get("diag") or r.get("diag")
     return by_model
 
 
@@ -515,6 +571,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
             "minutes": round((r["eval_seconds"] or 0) / 60, 1),
             "hash": r["git_hash"], "date": r["date"],
             "archinfo": r.get("archinfo"),
+            "diag": _trim_diag(r.get("diag")),
             "kindReason": (r.get("archinfo") or {}).get("kind_reason"),
             # official numbers only: normalized (the ranking key) and raw (the
             # number you quote), both over the required list, both None when the
@@ -652,6 +709,12 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
                                   for r in by_model.values()
                                   if r["transformers_version"]), None),
             "anyLimit": any(r["limit"] for r in by_model.values()),
+            # whether per-item diagnosis exists for anyone. When it does, a model
+            # without it says so instead of silently dropping the section — an
+            # absent diagnosis is a fact about the run, not a reason to hide it.
+            "anyDiag": any(r.get("diag") for r in by_model.values()),
+            "diagSalt": next((r["diag"].get("split_salt")
+                              for r in by_model.values() if r.get("diag")), None),
         },
     }
 
@@ -847,6 +910,48 @@ th .dir { font-size:9px; }
   gap:4px 16px; margin:8px 0 0; font-size:12.5px; }
 .provlist dt { color:var(--muted); }
 .provlist dd { margin:0; overflow-wrap:anywhere; }
+/* per-item diagnosis */
+.dxlead { margin:4px 0 0; padding:9px 12px; border-radius:10px; font-size:13px;
+  line-height:1.55; background:var(--accent-soft); color:var(--text-primary); }
+.dxlead + .dxlead { margin-top:7px; }
+.dxlead b { font-weight:650; }
+.dxlead.calm { background:var(--plane); color:var(--text-secondary); }
+.dx { border:1px solid var(--border); border-radius:10px; margin-top:8px;
+  background:var(--surface-1); }
+.dx > summary { cursor:pointer; padding:9px 12px; display:flex; align-items:center;
+  gap:10px; flex-wrap:wrap; font-size:13px; list-style:none; }
+.dx > summary::-webkit-details-marker { display:none; }
+.dx > summary::before { content:'▸'; color:var(--muted); font-size:11px; width:9px; }
+.dx[open] > summary::before { content:'▾'; }
+.dx[open] > summary { border-bottom:1px solid var(--border); }
+.dx > summary:hover { color:var(--accent); }
+.dx .dxname { font-weight:600; }
+.dx .dxbody { padding:10px 12px 14px; }
+.dxflag { font-size:10.5px; font-weight:650; letter-spacing:.03em; border-radius:5px;
+  padding:1px 6px; background:color-mix(in srgb, var(--s2) 16%, transparent);
+  color:var(--s2); border:1px solid color-mix(in srgb, var(--s2) 45%, transparent); }
+.dxbar { display:flex; height:12px; border-radius:6px; overflow:hidden;
+  background:var(--plane); min-width:120px; }
+.dxbar > span { display:block; height:100%; }
+.dxkey { display:flex; flex-wrap:wrap; gap:4px 16px; margin:9px 0 0; font-size:12px; }
+.dxkey > span { display:flex; align-items:baseline; gap:6px; cursor:help; }
+.dxkey i { display:inline-block; width:10px; height:10px; border-radius:3px;
+  border:1px solid var(--border); flex:none; transform:translateY(1px); }
+.dxkey b { font-weight:600; font-variant-numeric:tabular-nums; }
+.dxsub { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }
+.dxsub td, .dxsub th { padding:3px 8px 3px 0; border-bottom:1px solid var(--border);
+  text-align:left; }
+.dxsub th { font-size:11px; font-weight:600; color:var(--muted); }
+.dxsub td.num, .dxsub th.num { text-align:right; font-variant-numeric:tabular-nums; }
+.dxex { margin-top:10px; font-size:12.5px; }
+.dxex > summary { cursor:pointer; color:var(--accent); font-size:12px; }
+.dxex ul { list-style:none; padding:0; margin:8px 0 0; }
+.dxex li { border-left:2px solid var(--border); padding:2px 0 2px 10px; margin:0 0 9px; }
+.dxex .q { display:block; }
+.dxex .kv { color:var(--muted); font-size:11.5px; }
+.dxex .kv b { color:var(--text-secondary); font-weight:550; }
+.dxh { font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--muted); margin:16px 0 2px; }
 .domhead { font-size:12px; font-weight:650; letter-spacing:.06em; text-transform:uppercase;
   color:var(--muted); margin:18px 2px 8px; }
 .domhead .se { text-transform:none; letter-spacing:0; font-weight:400; }
@@ -1440,6 +1545,339 @@ function scoreBar(t, c) {
   return svg;
 }
 
+// ---------- per-item diagnosis ----------
+// Reads what scripts/diagnose.py wrote from the harness's --log_samples output.
+// Two things make this section worth acting on:
+//
+//   * Every item is assigned by a hash of its content to a leaderboard half or
+//     a diagnosis half, and ONLY the diagnosis half appears here. So a model
+//     retrained on anything read below still has an uncontaminated number — and
+//     if the two halves ever diverge, the divergence is itself the alarm.
+//
+//   * The headline is the CAUSE, not the item list. The failures that a score
+//     cannot show are mostly not knowledge gaps: a model that puts 92% of its
+//     answers on two of four slots is not ignorant of the subject, it cannot
+//     reach the other two slots, and generating subject data for it is wasted
+//     work. Leading with the item list invites exactly that mistake.
+
+const BUCKETS = [
+  ['right',           'right',             'var(--s1)'],
+  ['near_miss',       'near miss',         'color-mix(in srgb, var(--s1) 60%, var(--plane))'],
+  ['wrong',           'wrong',             'color-mix(in srgb, var(--s1) 32%, var(--plane))'],
+  ['at_chance',       'no information',    'var(--axis)'],
+  ['confident_wrong', 'confidently wrong', 'var(--s2)'],
+];
+// One accent hue ramped by lightness for "how far from the truth", a neutral
+// for "no signal", and a second hue for the one category that is different in
+// kind rather than degree. Blue/neutral/orange is the safest CVD pairing there
+// is, and every segment also carries its count in the key below it.
+const BUCKET_WHY = {
+  right: 'scored correct by the harness',
+  near_miss: 'the correct option ranked second and within 0.10 probability of the '
+    + 'top one — close enough that a nudge might move it',
+  wrong: 'wrong, with no cleaner story than that',
+  at_chance: 'the top option is barely above uniform: no opinion either way. This is '
+    + 'the honest-ignorance case, and the one where more training data is the right answer',
+  confident_wrong: 'backs a wrong option confidently AND rates the correct one below '
+    + 'chance. Something false was learned, or the prompt format is fighting the model — '
+    + 'more data on the subject fixes neither',
+};
+const slotName = i => i < 26 ? String.fromCharCode(65 + i) : '#' + (i + 1);
+const andList = xs => xs.length < 2 ? (xs[0] || '')
+  : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
+
+// Where the answers land, versus where the answer key says they should.
+function pickStats(a) {
+  if (!a || a.unsupported || !a.picks) return null;
+  const n = a.n_options || Object.keys(a.picks).length;
+  if (!n) return null;
+  const tp = Object.values(a.picks).reduce((x, y) => x + y, 0);
+  const tg = Object.values(a.gold || {}).reduce((x, y) => x + y, 0);
+  if (!tp) return null;
+  const p = [], g = [];
+  for (let i = 0; i < n; i++) {
+    p.push((a.picks[i] || 0) / tp);
+    g.push(tg ? (a.gold[i] || 0) / tg : 1 / n);
+  }
+  // The highest accuracy ANY model with this pick distribution could reach:
+  // sum over slots of min(picked share, correct share). That is exactly
+  // 1 - total variation distance, and it is a property of where the answers go,
+  // not of what the model knows — which is the whole point of showing it.
+  const ceiling = p.reduce((s, v, i) => s + Math.min(v, g[i]), 0);
+  const order = p.map((v, i) => [v, i]).sort((x, y) => y[0] - x[0]);
+  return { n, p, g, ceiling, order, tp, tg };
+}
+
+// A score that has not cleared chance is not a measurement of the subject, and
+// that fact outranks everything else this section could say about the task. It
+// uses the REPORTED score and its harness stderr where one exists, so it tells
+// the same story as the flag in the Results table rather than a second one.
+function atChanceLine(t, d, mid) {
+  const ch = (DATA.tasks[t] || {}).chance;
+  if (!(ch > 0)) return null;
+  const c = cell(t, mid);
+  let v, se, what;
+  if (c && c.se) { v = c.v; se = c.se; what = 'The reported score'; }
+  else if (d.score_report != null && d.n_report) {
+    v = d.score_report; what = 'Its leaderboard half';
+    se = Math.sqrt(Math.max(v * (1 - v), 1e-9) / d.n_report);
+  } else return null;
+  if (v - 1.96 * se > ch) return null;
+  return { key: 'atchance', calm: true, text:
+    `${what}, ${pct(v)} ±${(100 * se).toFixed(1)}, is not distinguishable from the `
+    + `${pct(ch)} you get by guessing. So the breakdown below describes how this model `
+    + `guesses on ${t}, not what it knows about it — and no number here is evidence `
+    + 'about the subject until the score clears chance.' };
+}
+
+// The cause sentences for one task, most conclusive first. Every number in them
+// is read off the diagnosis, so none of this can drift from the data.
+function diagCauses(t, d, mid) {
+  const a = d.answers || {}, out = [];
+  if (a.unsupported)
+    return [atChanceLine(t, d, mid), { key: 'unsupported', calm: true, text:
+      'Per-item analysis does not apply to this task — ' + a.unsupported + '. The '
+      + 'score is valid; the breakdown below is limited to right and wrong, and no '
+      + 'finding is claimed either way.' }].filter(Boolean);
+  const s = pickStats(a), nb = d.n || 1, b = d.buckets || {};
+  const cw = (b.confident_wrong || 0) / nb, ac = (b.at_chance || 0) / nb;
+  const sr = d.score_report;
+  if (a.degenerate)
+    out.push({ key: 'degenerate', flag: 'one option only', text:
+      `Answers ${slotName(a.top_choice)} on ${pct(a.top_share, 0)} of items. That is `
+      + 'not a weak subject — the output distribution has collapsed, and a model that '
+      + `never picks anything else scores about chance whatever ${t} data it is given.` });
+  else if (a.position_biased && s) {
+    // how few slots hold 80% of the picks, and how much of the key is there
+    let k = 0, acc = 0;
+    while (k < s.n && acc < 0.80) acc += s.order[k++][0];
+    const slots = s.order.slice(0, k).map(([, i]) => i).sort((x, y) => x - y);
+    const goldThere = slots.reduce((x, i) => x + s.g[i], 0);
+    const tight = sr != null && sr >= s.ceiling - 0.05;
+    out.push({ key: 'position', flag: 'answer positions', text:
+      `${pct(acc, 0)} of its answers land on ${andList(slots.map(slotName))}, where only `
+      + `${pct(goldThere, 0)} of the correct answers are. A model answering this way `
+      + `cannot score above ${pct(s.ceiling)} on ${t} however much it knows`
+      + (tight ? ` — and it scored ${pct(sr)}, so the answer distribution is what is `
+                 + 'capping this, not the subject.'
+               : `; it scored ${pct(sr)}, so the distribution explains part of the gap `
+                 + 'and the subject the rest.') });
+  }
+  if (a.length_biased)
+    out.push({ key: 'length', flag: 'option length', text:
+      `Picks the shortest option on ${pct(a.short_pick_rate, 0)} of items, where chance `
+      + `is ${pct(a.short_pick_baseline, 0)}. On a likelihood-scored task a short option `
+      + 'is cheap to say, so this is a choice about option length rather than content.' });
+  if (cw >= 0.35)
+    out.push({ key: 'confident', flag: 'confidently wrong', text:
+      `Wrong with conviction on ${pct(cw, 0)} of items: it backs another option and `
+      + 'rates the correct one below chance. That is a learned falsehood or a prompt '
+      + 'format fighting the model, and more data on the subject fixes neither.' });
+  if (ac >= 0.40)
+    out.push({ key: 'chance', calm: true, text:
+      `No opinion at all on ${pct(ac, 0)} of items — the options are near-`
+      + `indistinguishable to it. This is the one pattern here that more ${t} training `
+      + 'data is the right answer to.' });
+  const chance = atChanceLine(t, d, mid);
+  if (!out.length && !chance)
+    out.push({ key: 'clean', calm: true, text:
+      'Nothing anomalous in how the answers are distributed: the picks track the answer '
+      + 'key, length is not driving them, and the wrong answers are not confident ones. '
+      + 'What is left looks like ordinary subject gaps — see the breakdown below.' });
+  if (chance) out.unshift(chance);
+  return out;
+}
+
+// stacked composition of the buckets; `mini` is the version that rides in a
+// <summary> row, which carries no key of its own and so gets titles instead
+function dxBar(b, n, mini) {
+  const bar = el('div', { class: 'dxbar',
+    style: mini ? 'width:120px;height:8px;flex:none' : null });
+  for (const [k, label, fill] of BUCKETS) {
+    const v = b[k] || 0;
+    if (!v) continue;
+    bar.append(el('span', { style: `width:${(100 * v / n).toFixed(2)}%;background:${fill}`,
+      title: `${label}: ${v} of ${n} (${pct(v / n, 0)})` }));
+  }
+  return bar;
+}
+
+function dxKey(b, n) {
+  const row = el('div', { class: 'dxkey' });
+  for (const [k, label, fill] of BUCKETS) {
+    const v = b[k] || 0;
+    if (!v) continue;
+    row.append(el('span', { title: label + ' — ' + (BUCKET_WHY[k] || '') },
+      el('i', { style: 'background:' + fill }),
+      el('span', {}, el('b', { text: String(v) }), ' ', label,
+        el('span', { class: 'se', text: ' ' + pct(v / n, 0) }))));
+  }
+  return row;
+}
+
+// picked-vs-correct per answer slot. Zero-anchored, same scale for both series,
+// because the entire claim is "these two shapes do not match".
+function dxSlots(s) {
+  const RH = 22, W = 360, X0 = 26, X1 = 252, H = s.n * RH + 6;
+  const hi = Math.max(0.01, ...s.p, ...s.g);
+  const wide = v => Math.max(v > 0 ? 1.5 : 0, (v / hi) * (X1 - X0));
+  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%',
+    style: `max-width:${W}px;height:auto`, role: 'img',
+    'aria-label': 'share of answers picked versus share of correct answers, per option slot' });
+  for (let i = 0; i < s.n; i++) {
+    const y = i * RH + 3;
+    svg.append(el('svg:text', { x: 0, y: y + 12, 'font-size': 11,
+      fill: 'var(--text-secondary)', text: slotName(i) }));
+    svg.append(el('svg:rect', { x: X0, y: y, width: wide(s.p[i]), height: 7, rx: 2,
+      fill: 'var(--s1)' },
+      el('svg:title', { text: `picked ${slotName(i)} on ${pct(s.p[i], 1)} of items` })));
+    svg.append(el('svg:rect', { x: X0, y: y + 9, width: wide(s.g[i]), height: 7, rx: 2,
+      fill: 'var(--axis)' },
+      el('svg:title', { text: `${slotName(i)} is the correct answer on ${pct(s.g[i], 1)} `
+        + 'of items' })));
+    svg.append(el('svg:text', { x: X1 + 6, y: y + 13, 'font-size': 10.5,
+      fill: 'var(--muted)', text: pct(s.p[i], 0) + ' / ' + pct(s.g[i], 0) }));
+  }
+  return el('div', {},
+    el('div', { class: 'dxkey', style: 'margin:2px 0 4px' },
+      el('span', { title: 'the share of items on which the model chose this slot' },
+        el('i', { style: 'background:var(--s1)' }), 'picked'),
+      el('span', { title: "the share of items on which this slot is the answer key's choice" },
+        el('i', { style: 'background:var(--axis)' }), 'correct')),
+    svg);
+}
+
+function dxExamples(ex) {
+  const wrap = el('details', { class: 'dxex' },
+    el('summary', { text: 'Show the items it got wrong (diagnosis half only)' }));
+  for (const [k, label] of BUCKETS.map(x => [x[0], x[1]])) {
+    const items = ex[k];
+    if (!items || k === 'right') continue;
+    wrap.append(el('div', { class: 'dxh', text: label }));
+    wrap.append(el('ul', {}, items.map(e => el('li', {},
+      el('span', { class: 'q', text: e.q || '(no question text in the log)' }),
+      el('span', { class: 'kv' },
+        e.group ? e.group + ' · ' : '',
+        e.chose ? [el('b', { text: 'chose' }), ' ' + e.chose + ' · '] : '',
+        e.answer ? [el('b', { text: 'answer' }), ' ' + e.answer] : '',
+        e.p != null ? ' · p ' + num(e.p, 2) : '')))));
+  }
+  return wrap;
+}
+
+function vDiagnose(m) {
+  if (!DATA.meta.anyDiag) return null;
+  const d = m.diag;
+  if (!d || !Object.keys(d.tasks || {}).length)
+    return el('div', { class: 'card' },
+      el('h2', { text: 'Diagnose' }),
+      note('No per-item diagnosis on file for this model. It appears once '
+        + 'scripts/diagnose.py has read this run’s --log_samples output; nothing '
+        + 'needs re-evaluating, the per-item outcomes are already on disk.'));
+
+  // payload order first, so the section reads in the same order as Results
+  const order = [...DATA.accTasks, ...DATA.pplTasks].filter(t => d.tasks[t]);
+  for (const t of Object.keys(d.tasks)) if (!order.includes(t)) order.push(t);
+
+  const causes = {}, flagged = [];
+  for (const t of order) {
+    causes[t] = diagCauses(t, d.tasks[t], m.id);
+    if (causes[t].some(c => !c.calm)) flagged.push(t);
+  }
+
+  const card = el('div', { class: 'card' },
+    el('h2', { text: 'Diagnose' }),
+    el('p', { class: 'sub', text: 'Why the score is what it is, read off the per-item '
+      + 'log. The finding is the cause, not the list of missed questions — most of what '
+      + 'a score hides is not a knowledge gap, and the two want opposite responses.' }),
+    el('p', { class: 'note', text: 'Every item is assigned by a hash of its own content '
+      + 'to a leaderboard half or a diagnosis half, identically for every model and every '
+      + 'run. Only the diagnosis half is shown or exported here. A model retrained on '
+      + 'anything below therefore still has an honest leaderboard number — and if the two '
+      + 'halves start to diverge, that divergence is the alarm.' }));
+
+  // findings first: the reason someone opened this page
+  const lead = flagged.flatMap(t => causes[t].filter(c => !c.calm)
+    .map(c => el('p', { class: 'dxlead' }, el('b', { text: taskLabel(t) }), ' — ' + c.text)));
+  if (lead.length) {
+    card.append(el('div', { class: 'dxh', text: `${lead.length} finding`
+      + (lead.length > 1 ? 's' : '') + ' a score cannot show' }));
+    card.append(...lead.slice(0, 5));
+    if (lead.length > 5)
+      card.append(el('p', { class: 'small',
+        text: `…and ${lead.length - 5} more, under the benchmarks below.` }));
+  } else {
+    card.append(el('p', { class: 'dxlead calm', text: 'No distribution-level failure on '
+      + 'any task: the answers are shaped like the answer key, and what this model gets '
+      + 'wrong it gets wrong for ordinary reasons. Per-task detail below.' }));
+  }
+
+  card.append(el('div', { class: 'dxh', text: 'By benchmark' }));
+  for (const t of order) {
+    const v = d.tasks[t], b = v.buckets || {}, n = v.n || 1;
+    const s = pickStats(v.answers);
+    const flags = causes[t].filter(c => !c.calm);
+    const det = el('details', { class: 'dx' },
+      el('summary', {},
+        el('span', { class: 'dxname', text: taskLabel(t) }),
+        el('span', { class: 'se', text: v.score_report != null
+          ? pct(v.score_report) + ' on the leaderboard half' : '—' }),
+        dxBar(b, n, true),
+        ...flags.map(c => el('span', { class: 'dxflag', text: c.flag || c.key }))));
+    const body = el('div', { class: 'dxbody' });
+    for (const c of causes[t])
+      body.append(el('p', { class: 'dxlead calm', text: c.text }));
+    body.append(el('p', { class: 'small', style: 'margin:10px 0 0' },
+      `${n} items in the log · leaderboard half ${v.n_report} `
+      + `(${pct(v.score_report)}) · diagnosis half ${v.n_diagnose} `
+      + `(${pct(v.score_diagnose)})`));
+    const c0 = cell(t, m.id);
+    if (c0 && c0.n != null && Math.abs(c0.n - n) > Math.max(2, 0.02 * c0.n))
+      body.append(el('p', { class: 'warn', text: `The reported score covers ${c0.n} items, `
+        + `the per-item log ${n}. Everything below is computed from the log, so if this `
+        + 'gap is not one you can account for, the two are not describing the same run.' }));
+    if (v.approx_buckets)
+      body.append(el('p', { class: 'small', text: 'This task is scored by length-'
+        + 'normalised likelihood, but its options are not exposed in a shape this tool can '
+        + 'measure, so the buckets are computed on raw likelihoods and are approximate.' }));
+    body.append(el('div', { class: 'dxh', text: 'How the items went' }));
+    body.append(dxBar(b, n, false), dxKey(b, n));
+    if (s) {
+      body.append(el('div', { class: 'dxh', text: 'Where the answers went' }));
+      body.append(dxSlots(s));
+      body.append(el('p', { class: 'small', style: 'margin:6px 0 0',
+        text: `Ceiling for this answer distribution: ${pct(s.ceiling)} — the most any `
+          + 'model placing its answers this way could score here.' }));
+    }
+    const groups = Object.entries(v.groups || {})
+      .filter(([, g]) => g.score_report != null)
+      .sort((x, y) => x[1].score_report - y[1].score_report);
+    if (groups.length > 1) {
+      body.append(el('div', { class: 'dxh', text: 'Weakest groups first' }));
+      body.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'dxsub' },
+        el('thead', {}, el('tr', {},
+          el('th', { text: 'group' }), el('th', { class: 'num', text: 'score' }),
+          el('th', { class: 'num', text: 'items' }), el('th', { text: 'composition' }))),
+        el('tbody', {}, groups.slice(0, 12).map(([name, g]) => el('tr', {},
+          el('td', { text: name }),
+          el('td', { class: 'num', text: pct(g.score_report) }),
+          el('td', { class: 'num se', text: String(g.n_report) }),
+          el('td', {}, dxBar(g.buckets || {}, g.n || 1, true))))))));
+      if (groups.length > 12)
+        body.append(el('p', { class: 'small',
+          text: `${groups.length - 12} more groups scored at or above these.` }));
+    }
+    if (v.examples && Object.keys(v.examples).length) body.append(dxExamples(v.examples));
+    det.append(body);
+    card.append(det);
+  }
+  if (DATA.meta.diagSalt)
+    card.append(el('p', { class: 'small', style: 'margin-top:14px',
+      text: 'Split salt ' + DATA.meta.diagSalt + '. Changing it re-splits every benchmark '
+        + 'and invalidates every score already published against the old halves.' }));
+  return card;
+}
+
 function vModel() {
   const m = DATA.models.find(x => x.id === state.model);
   if (!m) return [note('No such model.')];
@@ -1525,7 +1963,8 @@ function vModel() {
     el('dl', { class: 'provlist' }, prov.flatMap(([k, v]) =>
       [el('dt', { text: k }), el('dd', { class: 'mono', text: String(v) })])));
 
-  return [back, head, results, provCard];
+  // vDiagnose is null when no model on this board has a per-item diagnosis
+  return [back, head, results, vDiagnose(m), provCard].filter(Boolean);
 }
 
 function vOverview(ms) {
