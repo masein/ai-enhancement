@@ -51,10 +51,17 @@ app = FastAPI(title="benchmark service", lifespan=lifespan)
 _cache: dict = {"key": None, "payload": None, "at": 0.0}
 
 
+# Files whose appearance or rewrite changes what the dashboard should show.
+# diagnose.json belongs here as much as results*.json does: scripts/diagnose.py
+# writes it long after the eval finished, and a key that ignores it means the
+# payload keeps being served from cache with no diagnosis in it.
+_WATCH = ("results*.json", "diagnose.json", "model_meta.json")
+
+
 def _tree_key() -> tuple:
     if not config.OUT_DIR.is_dir():
         return (0, 0.0)
-    files = list(config.OUT_DIR.rglob("results*.json"))
+    files = [f for pat in _WATCH for f in config.OUT_DIR.rglob(pat)]
     return (len(files), max((f.stat().st_mtime for f in files), default=0.0))
 
 
