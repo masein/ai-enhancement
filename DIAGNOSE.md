@@ -49,7 +49,11 @@ The order matters, because the most seductive part is the least informative.
    with the numbers it was derived from.
 3. **Where the answers went** — picked vs correct, per answer slot. This is the
    picture that settles a position-bias finding in one glance.
-4. **Weakest groups first.** Only meaningful when the task cleared chance.
+4. **Weakest categories first, subjects on expand.** MMLU's 57 subjects roll
+   up into fifteen categories (`scripts/categories.yaml`); "weak in economics"
+   is a sentence someone can act on, "weak in high_school_macroeconomics on
+   13 items" is not. A category under 30 leaderboard-half items is greyed.
+   Only meaningful when the task cleared chance — the section says so.
 5. **The failing items** — last, and mostly for models with *no* findings.
    Eight questions always look like a pattern. They are a cross-section of the
    diagnosis half, and they are the weakest evidence on the page.
@@ -81,7 +85,12 @@ subject to feed it.
 ## Telling a real finding from noise
 
 - **Group scores under ~30 items are noise.** A subject with 13 items in the
-  leaderboard half carries roughly ±13 points. Do not chase its ranking.
+  leaderboard half carries roughly ±13 points. Do not chase its ranking. The
+  page greys every category and subject under that floor (`MIN_GROUP_N` in
+  `scripts/diagnose.py`, `thresholds.min_group_n` in every `diagnose.json`).
+- **A category called `other` with an `unmapped` list** means the harness
+  produced a subject `scripts/categories.yaml` does not know. Add it to the
+  file and re-run `diagnose.py`; the CLI lists them at the end of its output.
 - **Position bias on a 2-option task** (Winogrande, PIQA) means much less than
   on a 4-option one — there are only two slots to skew between.
 - **A finding just over its threshold is weak.** The thresholds are in the
@@ -97,19 +106,38 @@ subject to feed it.
 
 ---
 
-## The one experiment worth running
+## The one experiment
 
 Every position-skewed model on the board is ≤360M, which is either a real
 property of small models or an artefact of how we pose MMLU. One cheap run
-settles it: re-evaluate `HuggingFaceTB/SmolLM2-360M` on MMLU with the answer
-options permuted.
+settles it: `mmlu_perm` (`eval_tasks/mmlu_perm/`) re-poses a fixed subset of
+twelve MMLU subjects with the answer options rotated by `doc_id mod 4`, so the
+correct answer visits every slot equally. Same five shots, same metric, option
+text untouched; only where the right answer sits changes. It is a **control,
+not a leaderboard task** — it never enters an average, however
+`REQUIRED_TASKS` is set — and it uses the card, so it goes through the same
+queue and lock as every evaluation:
 
-- Score **moves** → the bias is positional and it is ours. The fix is the prompt
-  format, and it applies to every model under ~400M on the board.
-- Score **holds** → the model genuinely cannot reach those slots, and the
-  ceiling shown on its page is its real ceiling.
+```bash
+python clients/bench_client.py --base http://<tailscale-ip>:8899 \
+    submit HuggingFaceTB/SmolLM2-360M --suite control --submitter you
+# or in the dashboard's Submit box: suite = control
+```
+
+About a fifth of a full MMLU. Then open the model's page → **Diagnose** →
+*The permutation control*: both scores, both standard errors, the gap in
+standard errors, and one sentence derived from them:
+
+- **"the format was hiding measurable knowledge"** — `mmlu_perm` cleared
+  chance while `mmlu` did not. The bias is positional and it is ours. The fix
+  is the prompt format, and it applies to every model under ~400M on the board.
+- **"the knowledge is not there to hide"** — both sit at chance. The model
+  genuinely cannot reach those slots, and the ceiling shown on its page is
+  its real ceiling.
 
 Either answer changes what phase 4 should be. Neither needs new training data.
+Run it on `SmolLM2-360M` first (TVD 0.44 on MMLU, the clearest case), then on
+one position-skewed model per family.
 
 ---
 

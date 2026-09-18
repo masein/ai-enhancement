@@ -5,7 +5,8 @@
 *.md
 !FRIENDS.md
 results/
-eval_tasks/
+eval_tasks/*
+!eval_tasks/mmlu_perm
 logs/
 artifacts/
 service.sqlite3*

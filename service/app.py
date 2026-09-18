@@ -87,7 +87,7 @@ def results_payload() -> dict:
 class SubmissionIn(BaseModel):
     hf_id: str
     kind: str = "auto"
-    suite: str = "full"
+    suite: str = "full"                # quick | full | control (the mmlu_perm experiment)
     submitter: str = ""
     note: str = ""
     allow_remote_code: bool = False    # execute the upload's own modeling code
@@ -106,8 +106,8 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "id, or local/<name> for an uploaded artifact")
     if s.kind not in ("auto", "base", "instruct"):
         raise HTTPException(422, "kind must be auto, base or instruct")
-    if s.suite not in ("quick", "full"):
-        raise HTTPException(422, "suite must be quick or full")
+    if s.suite not in ("quick", "full", "control"):
+        raise HTTPException(422, "suite must be quick, full, or control (mmlu_perm only)")
     if s.allow_remote_code:
         # the flag is only meaningful for uploads, and only when the operator has
         # configured the server to run other people's code at all. Checked here

@@ -134,6 +134,17 @@ def test_submission_lifecycle_without_a_worker(svc):
     assert c.get("/healthz").json()["queue"] == 0
 
 
+def test_control_suite_is_a_queueable_submission(svc):
+    c, _, _ = svc
+    r = c.post("/api/submissions", json={"hf_id": "HuggingFaceTB/SmolLM2-360M",
+                                          "suite": "control", "submitter": "tester"})
+    assert r.status_code == 200 and r.json()["status"] == "queued"
+    row = c.get("/api/submissions").json()[0]
+    assert row["suite"] == "control" and row["status"] == "queued"
+    bad = c.post("/api/submissions", json={"hf_id": "org/model", "suite": "perm"})
+    assert bad.status_code == 422 and "control" in bad.json()["detail"]
+
+
 def test_submit_token_gates_every_post_when_set(svc, monkeypatch):
     c, _, _ = svc
     from service import config

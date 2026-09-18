@@ -1,0 +1,10 @@
+# The group the CLI and the service run: --tasks mmlu_perm. Weighted by size
+# like the harness's own mmlu group, so the number is comparable in kind.
+group: mmlu_perm
+task:
+  - mmlu_perm_tasks
+aggregate_metric_list:
+  - metric: acc
+    weight_by_size: True
+metadata:
+  version: 1

@@ -35,6 +35,9 @@ COPY service/ service/
 # served over HTTP by the app: FRIENDS.md at /guide, bench_client.py at /client
 # (.dockerignore carries the FRIENDS.md exception)
 COPY clients/ clients/
+# the permutation control's task yaml + utils.py: a suite=control run passes
+# this directory to lm_eval --include_path (.dockerignore carries the exception)
+COPY eval_tasks/mmlu_perm/ eval_tasks/mmlu_perm/
 COPY FRIENDS.md ./
 
 ENV PYTHONPATH=/app \

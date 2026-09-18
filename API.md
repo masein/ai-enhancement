@@ -195,6 +195,8 @@ other*, not to public leaderboards (different n-shot conventions).
 ```json
 {"hf_id": "myorg/my-model",     // required — org/name on the HF Hub, OR local/<name> for an uploaded artifact
  "suite": "quick",              // "quick" (hellaswag+arc_easy+perplexity) | "full" (all tasks) — default full
+                                // | "control": mmlu_perm only — MMLU with the options rotated (DIAGNOSE.md
+                                //   § The one experiment); a control, never in the average
  "kind": "auto",                // "auto" | "base" | "instruct" — default auto
  "submitter": "masein",           // shows on the queue and in provenance
  "note": "run7 step 4000",      // free text, shows as a tooltip
@@ -249,7 +251,8 @@ The payload your tooling wants. The useful parts:
                "minutes": 61.2, "date": "2026-08-19 10:02:11", ...} ],
   "accTasks": ["mmlu", "hellaswag", ...],       // higher-is-better, proportions
   "pplTasks": ["ppl_code", "ppl_fineweb_edu"],  // lower-is-better, no stderr
-  "tasks":  { "hellaswag": {"metric": "acc_norm", "lower": false, "chance": 0.25}, ... },
+  "tasks":  { "hellaswag": {"metric": "acc_norm", "lower": false, "chance": 0.25, "control": false}, ... },
+              // control: true marks mmlu_perm — shown, never averaged
   "cells":  { "hellaswag": { "myorg/my-model": {"v": 0.412, "se": 0.005, "shots": 5, "n": 10042} } },
   "sig":    { "hellaswag": [ ["modelA", "modelB", 0.062, 3.1, true], ... ] },
               // pairwise [a, b, diff, z, significant_at_95%] — check before claiming a win
@@ -258,7 +261,15 @@ The payload your tooling wants. The useful parts:
 ```
 
 Read a score as `cells[task][hf_id].v ± .se`, with the metric name and direction
-from `tasks[task]`. Quote `bits_per_byte` for the perplexity tasks — it's the
+from `tasks[task]`.
+
+A model with a per-item diagnosis on file (`scripts/diagnose.py`) carries
+`models[].diag`: per task, the leaderboard-half and diagnosis-half scores,
+the failure buckets, `groups` (MMLU subjects) and `categories` — the same
+fields rolled up through `scripts/categories.yaml`, each with the `groups` it
+holds, plus `unmapped` for any subject the file does not know.
+`meta.categories` is the category order. Every number in `diag` is computed
+from the per-item log; `score_report` is the leaderboard half only. Quote `bits_per_byte` for the perplexity tasks — it's the
 tokenizer-independent one.
 
 ### GET /healthz

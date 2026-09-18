@@ -95,6 +95,7 @@ re-queued automatically and per-task resume repeats only the interrupted task.
 | `ALLOW_REMOTE_CODE` | 0 | permit uploads that carry their own modeling code — read the section below first |
 | `EVAL_USER` | benchjob | unprivileged account those jobs run as; required when the above is on |
 | `REMOTE_CODE_SHAS` | *(unset)* | if set, an allowlist: only these .py hashes may run |
+| `CONTROL_TASKS_DIR` | the repo's `eval_tasks/mmlu_perm` | where a `suite=control` run finds the permutation control's task yaml |
 
 ## Custom model code (`trust_remote_code`)
 
@@ -195,6 +196,10 @@ python bench_client.py --base http://…:8899 \
 → done | failed`. Failures carry a plain-language reason (gated repo, OOM, size
 cap, custom-code refusal) plus a `log` link with the raw output. Canceling is
 only possible while `queued` — a running job finishes its current task.
+
+A third suite, `control`, runs only `mmlu_perm` — MMLU with the answer options
+rotated, the experiment DIAGNOSE.md describes. It is a control, never part of
+the average, and it queues like anything else: one job at a time, same lock.
 
 Two properties worth telling teammates: submitting a model that is already on
 the leaderboard costs nothing (per-task resume sees the results and finishes in

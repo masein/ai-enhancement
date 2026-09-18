@@ -64,7 +64,11 @@ service/              FastAPI app, SQLite queue, worker, HF preflight
 scripts/
   run_benchmarks.sh   the same pipeline as a standalone CLI (lockfile, resume)
   report_lm_eval.py   results tree -> interactive dashboard (live or frozen single file)
+  diagnose.py         per-item diagnosis from --log_samples (held-out split; DIAGNOSE.md)
+  categories.yaml     MMLU's 57 subjects -> fifteen human categories (+ categories.py)
   make_ppl_task.py    any corpus -> pinned perplexity task (records a sha256)
+eval_tasks/
+  mmlu_perm/          the permutation control: MMLU with the options rotated (suite=control)
 clients/
   bench_client.py     stdlib-only API client + CLI
 examples/

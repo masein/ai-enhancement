@@ -24,6 +24,13 @@ What is in it, one model per behaviour:
   local/nodiag-step400   an uploaded checkpoint, quick suite only, and no
                          diagnose.json is written for it
 
+Three models also carry the permutation control (mmlu_perm, a control task
+that never enters an average): fx/skewed-360m clears chance on it while its
+mmlu sits at chance ("the format was hiding measurable knowledge"),
+fx/chance-160m sits at chance on both ("the knowledge is not there to hide"),
+and fx/good-750m clears both. The control's documents go through the real
+transform in eval_tasks/mmlu_perm/utils.py.
+
 Every model answers the SAME documents — a benchmark is the same questions
 for everyone — so doc_hash, and therefore the report/diagnose split, is
 identical across models. Only the responses differ. Seeded; byte-identical
@@ -61,10 +68,14 @@ MMLU_SUBJECTS = {
     "us_foreign_policy": "social_sciences", "world_religions": "humanities",
     "professional_law": "humanities", "nutrition": "other",
 }
-MMLU_PER_SUBJECT = 30
+MMLU_PER_SUBJECT = 40      # two-subject categories land above the 30-item noise floor,
+                           # one-subject ones below it, so the page shows both states
+PERM_SUBJECTS = ["anatomy", "econometrics", "us_foreign_policy", "world_religions"]
+PERM_PER_SUBJECT = 40
 
 TASKS = {
     "mmlu":           {"shots": 5, "metrics": ["acc"], "n_options": 4, "norm": False},
+    "mmlu_perm":      {"shots": 5, "metrics": ["acc"], "n_options": 4, "norm": False},
     "hellaswag":      {"shots": 5, "metrics": ["acc", "acc_norm"], "n": 80, "n_options": 4,
                        "norm": True},
     "arc_challenge":  {"shots": 5, "metrics": ["acc", "acc_norm"], "n": 60, "n_options": 4,
@@ -77,23 +88,26 @@ TASKS = {
     "truthfulqa_mc2": {"shots": 0, "metrics": ["acc"], "n": 40, "n_options": None,
                        "norm": False},
 }
-FULL = list(TASKS)
+CONTROL = ["mmlu_perm"]                    # a control: in no suite's average
+FULL = [t for t in TASKS if t not in CONTROL]
 QUICK = ["hellaswag", "arc_easy"]
 
 NODIAG = "local/nodiag-step400"
 MISCOUNT = {"model": "fx/miscount-1b", "task": "arc_easy", "declared": 80}
 STALE = {"model": "fx/good-750m", "task": "hellaswag", "lines": 10}
 
-# id, policy, kind, params, tasks
+# id, policy, kind, params, tasks, per-task policy overrides
 MODELS = [
-    ("fx/chance-160m",     "chance",     "base",     162_000_000, FULL),
-    ("fx/below-135m-it",   "below",      "instruct", 135_000_000, FULL),
-    ("fx/one-option-70m",  "one_option", "base",      70_000_000, FULL),
-    ("fx/skewed-360m",     "skewed",     "base",     360_000_000, FULL),
-    ("fx/short-pick-410m", "short_pick", "base",     410_000_000, FULL),
-    ("fx/good-750m",       "good",       "base",     750_000_000, FULL),
-    (MISCOUNT["model"],    "chance",     "base",   1_000_000_000, FULL),
-    (NODIAG,               "chance",     "base",      70_000_000, QUICK),
+    ("fx/chance-160m",     "chance",     "base",     162_000_000, FULL + CONTROL,
+     {"mmlu_perm": "chance"}),
+    ("fx/below-135m-it",   "below",      "instruct", 135_000_000, FULL, {}),
+    ("fx/one-option-70m",  "one_option", "base",      70_000_000, FULL, {}),
+    ("fx/skewed-360m",     "skewed",     "base",     360_000_000, FULL + CONTROL,
+     {"mmlu_perm": "good"}),          # the skew was the format: rotated, it knows things
+    ("fx/short-pick-410m", "short_pick", "base",     410_000_000, FULL, {}),
+    ("fx/good-750m",       "good",       "base",     750_000_000, FULL + CONTROL, {}),
+    (MISCOUNT["model"],    "chance",     "base",   1_000_000_000, FULL, {}),
+    (NODIAG,               "chance",     "base",      70_000_000, QUICK, {}),
 ]
 
 WORDS = ("ledger", "tariff", "enzyme", "monsoon", "quorum", "isotope", "vector", "treaty",
@@ -137,6 +151,17 @@ def _blen(s: str) -> int:
     return max(1, len(s.encode("utf-8")))
 
 
+def perm_rotate():
+    """The control's own transform, imported from where the harness loads it,
+    so the fixture cannot drift from what a real mmlu_perm run does."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "mmlu_perm_utils", REPO / "eval_tasks" / "mmlu_perm" / "utils.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.rotate
+
+
 # ---------------------------------------------------------------------------
 # documents — one benchmark, shared by every model
 # ---------------------------------------------------------------------------
@@ -158,16 +183,25 @@ def make_docs(task: str, seed: int = SEED) -> list[dict]:
         seen_q.add(q)
         return q
 
-    if task == "mmlu":
-        for subject in MMLU_SUBJECTS:
-            for i in range(MMLU_PER_SUBJECT):
-                correct = i % 4
+    if task in ("mmlu", "mmlu_perm"):
+        rotate = perm_rotate() if task == "mmlu_perm" else None
+        subjects = PERM_SUBJECTS if rotate else list(MMLU_SUBJECTS)
+        per = PERM_PER_SUBJECT if rotate else MMLU_PER_SUBJECT
+        for subject in subjects:
+            for i in range(per):
+                # gold uniform over the slots either way: round-robin for mmlu;
+                # for the control, a key that changes every four items and is
+                # then rotated by i mod 4, so every (key, shift) pair occurs
+                correct = (i // 4) % 4 if rotate else i % 4
                 opts = _options(rng, 4)
                 q = unique(f"Which of the following best describes {rng.choice(TOPICS)} "
                            f"in {subject.replace('_', ' ')}?")
                 doc = {"question": q, "subject": subject, "choices": opts, "answer": correct}
+                if rotate:
+                    doc = rotate(doc, i)
+                    opts, correct = doc["choices"], doc["answer"]
                 out.append({"doc": doc, "target": correct, "choices": opts, "correct": correct,
-                            "group": subject, "subtask": f"mmlu_{subject}", "q": q,
+                            "group": subject, "subtask": f"{task}_{subject}", "q": q,
                             "ctx": f"{q}\nA. {opts[0]}\nB. {opts[1]}\nC. {opts[2]}\n"
                                    f"D. {opts[3]}\nAnswer:"})
         return _hashed(out)
@@ -398,8 +432,9 @@ def write_task(out_dir: Path, model_id: str, kind: str, params: int, policy: str
             e[f"{m}_stderr,none"] = se
         return e
 
+    grouped = task in ("mmlu", "mmlu_perm")
     for st, recs in lines.items():
-        results[st] = entry(("  - " + st[5:]) if task == "mmlu" else task, recs)
+        results[st] = entry(("  - " + st[len(task) + 1:]) if grouped else task, recs)
         n = len(recs)
         if model_id == MISCOUNT["model"] and task == MISCOUNT["task"]:
             n = MISCOUNT["declared"]
@@ -416,6 +451,10 @@ def write_task(out_dir: Path, model_id: str, kind: str, params: int, policy: str
         results["mmlu"] = entry("mmlu", [r for recs in lines.values() for r in recs])
         hib["mmlu"] = {"acc": True}
         group_subtasks = {"mmlu": sorted(cats), **{c: kids for c, kids in cats.items()}}
+    elif grouped:                     # the control: one flat group of subjects
+        results[task] = entry(task, [r for recs in lines.values() for r in recs])
+        hib[task] = {"acc": True}
+        group_subtasks = {task: sorted(lines)}
     else:
         group_subtasks = {task: []}
 
@@ -438,7 +477,7 @@ def write_task(out_dir: Path, model_id: str, kind: str, params: int, policy: str
             "model_num_parameters": params, "model_dtype": "torch.bfloat16",
         },
         "git_hash": GIT_HASH,
-        "date": DATE + FULL.index(task) * 600,
+        "date": DATE + list(TASKS).index(task) * 600,
         "pretty_env_info": "fixture",
         "transformers_version": TRANSFORMERS,
         "upper_git_hash": None,
@@ -516,13 +555,14 @@ def build(root: Path, seed: int = SEED, diagnose: bool = True,
     out_dir = root / "results" / "full"
     docs = {task: make_docs(task, seed) for task in TASKS}
     models: dict[str, dict] = {}
-    for model_id, policy, kind, params, tasks in MODELS:
+    for model_id, policy, kind, params, tasks, overrides in MODELS:
         write_model_meta(out_dir, model_id, kind, params)
         for task in tasks:
-            write_task(out_dir, model_id, kind, params, policy, task, docs[task], seed)
+            write_task(out_dir, model_id, kind, params, overrides.get(task, policy), task,
+                       docs[task], seed)
         models[model_id] = {"policy": policy, "kind": kind, "params": params,
-                            "tasks": list(tasks), "safe": safe_name(model_id),
-                            "dir": out_dir / safe_name(model_id)}
+                            "tasks": list(tasks), "overrides": dict(overrides),
+                            "safe": safe_name(model_id), "dir": out_dir / safe_name(model_id)}
     manifest = {
         "root": root, "out_dir": out_dir, "models": models,
         "docs": {t: [{k: it[k] for k in ("doc_hash", "q", "group", "correct", "subtask")}

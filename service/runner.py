@@ -290,6 +290,19 @@ def _read_from(path: Path, offset: int) -> str:
 # the run
 # ---------------------------------------------------------------------------
 
+def include_args_for(task: str) -> list[str]:
+    """--include_path for a task the harness does not ship. The perplexity
+    slices live under BENCH_ROOT/eval_tasks; the permutation control ships with
+    this repo (eval_tasks/mmlu_perm). One task per lm_eval invocation means
+    each task gets exactly the directory it lives in — no task ever sees the
+    other's yaml, so a stray file in one cannot rename a task in the other."""
+    if task in config.CONTROL_TASKS:
+        return ["--include_path", str(config.CONTROL_TASKS_DIR)]
+    if config.EVAL_TASKS_DIR.is_dir() and any(config.EVAL_TASKS_DIR.glob("*.yaml")):
+        return ["--include_path", str(config.EVAL_TASKS_DIR)]
+    return []
+
+
 def _task_done(task_out: Path) -> bool:
     return any(task_out.glob("*/results*.json")) or any(task_out.glob("results*.json"))
 
@@ -359,10 +372,6 @@ def run_submission(sub: dict) -> None:
                 return
             time.sleep(config.GPU_POLL_S)
 
-        include_args = []
-        if config.EVAL_TASKS_DIR.is_dir() and any(config.EVAL_TASKS_DIR.glob("*.yaml")):
-            include_args = ["--include_path", str(config.EVAL_TASKS_DIR)]
-
         # resolve the job identity ONCE, before any task: a broken sandbox should
         # fail the submission with a service error, not four identical tracebacks
         # blamed on the submitter's model
@@ -420,7 +429,7 @@ def run_submission(sub: dict) -> None:
                    "--output_path", str(task_out),
                    "--log_samples",
                    "--device", "cuda:0",
-                   *include_args]
+                   *include_args_for(task)]
             if kind == "instruct":
                 cmd.append("--apply_chat_template")
 
