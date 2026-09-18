@@ -14,6 +14,7 @@ import diagnose as dx
 import exam_build as eb
 import judge as jd
 import report_lm_eval as report
+from service import proposals as prop_mod
 from conftest import fresh, make_service
 from service import contamination as ct
 from service import llm, llm_poller, runner
@@ -209,13 +210,15 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
 
     # -- generate: only the spec goes ---------------------------------------------
     r = client.post(f"/api/proposals/{pid}/generate",
-                    json={"requester": "Omar", "count": 30, "fmt": "mc"})
+                    json={"requester": "Omar", "count": 6})
     assert r.status_code == 200, r.text
     did = r.json()["dataset_id"]
-    assert r.json()["items"] == 3                              # ten items per request
+    assert r.json()["items"] == 3                              # documents are long: two per request
     assert client.get("/api/llm").json()["usage_today"] == 4
     gen = [q for q in fake.recorded() if q["custom_id"].startswith(f"gen:{did}:")]
     assert len(gen) == 3
+    assert all(q["meta"]["format"] == "doc" for q in gen)
+    assert all("never write a question-and-answer pair" in q["system"] for q in gen)
     ix = ct.index(tree["out_dir"])
     assert ix.grams
     for q in gen:
@@ -232,7 +235,8 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
     d = client.get(f"/api/datasets/{did}").json()
     assert d["status"] == "ready", d["error"]
     pv = d["provenance"]
-    assert pv["items"] == {"generated": 30, "dropped": 0, "kept": 30}
+    assert pv["items"] == {"generated": 6, "dropped": 0, "kept": 6}
+    assert pv["format"] == "doc"
     assert pv["gate"]["rejected"] is False and pv["gate"]["ngram"] == 13
     assert pv["approver"] == "Omar" and pv["requester"] == "Omar"
     assert pv["approved_spec"] == edited and pv["spec_text"] == p["spec_text"]
@@ -251,8 +255,11 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
     assert pv["items_sha256"] == hashlib.sha256(body).hexdigest()
     assert json.loads((items_path.parent / "provenance.json").read_text()) == pv
     items = [json.loads(x) for x in body.decode().splitlines()]
-    assert len(items) == 30 and all(len(it["choices"]) == 4 and it["answer"] in it["choices"]
-                                    for it in items)
+    assert len(items) == 6
+    # prose documents, not question-and-answer pairs
+    assert all(set(it) == {"title", "text"} for it in items)
+    assert all(len(it["text"].split()) >= prop_mod.DOC_MIN_WORDS for it in items)
+    assert len({it["title"] for it in items}) == 6
     dl = client.get(f"/api/datasets/{did}/items.jsonl")
     assert dl.status_code == 200 and dl.content == body
     lst = client.get("/api/datasets").json()
@@ -298,13 +305,17 @@ def test_generation_free_response_and_unreferenced_delete(gap):
     client.post(f"/api/proposals/{pid}/approve", json={"approver": "Omar"})
     p = client.get(f"/api/proposals/{pid}").json()
     assert p["edited_text"] == ""                              # approved as written
+    bad = client.post(f"/api/proposals/{pid}/generate",
+                      json={"requester": "Omar", "count": 12, "fmt": "mc"})
+    assert bad.status_code == 422 and "retired" in bad.json()["detail"]
     did = client.post(f"/api/proposals/{pid}/generate",
                       json={"requester": "Omar", "count": 12, "fmt": "free"}).json()["dataset_id"]
     llm_poller.tick()
     d = client.get(f"/api/datasets/{did}").json()
     assert d["status"] == "ready" and d["provenance"]["items"]["kept"] == 12
+    assert d["provenance"]["format"] == "free"
     items = [json.loads(x) for x in client.get(f"/api/datasets/{did}/items.jsonl").text.splitlines()]
-    assert all("choices" not in it for it in items)
+    assert all("choices" not in it and it["question"] for it in items)
     assert d["provenance"]["approved_spec"] == d["provenance"]["spec_text"]
     assert client.delete(f"/api/datasets/{did}").json() == {"deleted": did}
     assert client.get(f"/api/datasets/{did}").json()["status"] == "deleted"
@@ -328,22 +339,64 @@ def test_reject_records_who_and_why(gap):
     assert _propose(client).status_code == 200
 
 
+def test_parse_items_on_the_document_format():
+    doc = {"title": "Margins first", "text": "word " * 200}
+    assert prop_mod.parse_items(json.dumps([doc]), "doc") == [
+        {"title": "Margins first", "text": ("word " * 200).strip()}]
+    # malformed: no title, no body, a body too short to teach anything, not a
+    # dict, not an array, and a rogue question-shaped item
+    bad = [{"text": "word " * 200}, {"title": "t"}, {"title": "t", "text": "too short"},
+           "a string", 7, {"question": "q?", "answer": "a"}]
+    assert prop_mod.parse_items(json.dumps(bad), "doc") == []
+    assert prop_mod.parse_items("not json at all", "doc") == []
+    assert prop_mod.parse_items(json.dumps({"title": "t", "text": "word " * 200}), "doc") == []
+    # `body` is accepted as a synonym, and the title is capped
+    alt = {"title": "T" * 400, "body": "word " * 200}
+    got = prop_mod.parse_items(json.dumps([alt]), "doc")
+    assert len(got) == 1 and len(got[0]["title"]) == 300
+    # the free format is unchanged; mc is gone
+    free = {"question": "q?", "answer": "a", "rationale": "r"}
+    assert prop_mod.parse_items(json.dumps([free]), "free") == [free]
+    assert prop_mod.FORMATS == ("doc", "free") and prop_mod.DEFAULT_FORMAT == "doc"
+    assert prop_mod.items_per_request("doc") == 2 and prop_mod.items_per_request("free") == 10
+
+
+def test_the_generation_request_asks_for_prose_and_nothing_exam_shaped():
+    reqs = prop_mod.generation_requests(7, "The model cannot separate a rule from its purpose.",
+                                        "law", 5, "doc", seed=7)
+    assert [r.meta["count"] for r in reqs] == [2, 2, 1]
+    body = reqs[0].system + "\n" + reqs[0].user
+    assert "never write a question-and-answer pair" in body and "not a quiz" in body
+    assert "Topic: law" in body and "Write 2 documents" in body
+    assert "The model cannot separate a rule from its purpose." in body
+    assert "multiple-choice" in body and str(prop_mod.DOC_TARGET_WORDS) in body
+    # the spec and the topic are all it gets: no model, no score, no question
+    assert "fx/" not in body and "qid" not in body
+
+
 # ---------------------------------------------------------------------------
 # the gate on real output, the spend guard, the quota, the poller
 # ---------------------------------------------------------------------------
 
-def _echoing_responder(tree, share):
-    """A generator that copies benchmark questions into `share` of its items."""
-    qs = [d["q"] for d in tree["docs"]["mmlu"]]
+def _echoing_responder(tree, share, source="mmlu"):
+    """A generator that buries a benchmark question — or an exam question — in
+    the body of `share` of its documents, the way a leak would actually look."""
+    if source == "mmlu":
+        qs = [d["q"] for d in tree["docs"]["mmlu"]]
+    else:
+        qs = [b["prompt"] for b in eb.load_bank(tree["judged"]["exam_root"])[TOPIC]]
+    assert qs
 
     def responder(req):
-        if req.custom_id.startswith("proposal:"):
+        if not req.custom_id.startswith("gen:"):
             return llm.default_responder(req)
         items = json.loads(llm.default_responder(req))
         start = int(req.meta.get("start", 0))
         for i, it in enumerate(items):
             if (start + i) % round(1 / share) == 0:
-                it["question"] = qs[(start + i) % len(qs)]
+                q = qs[(start + i) % len(qs)]
+                it["text"] = (it["text"].split("\n\n")[0] + "\n\nA question of the kind this "
+                              f"teaches: {q}\n\n" + "\n\n".join(it["text"].split("\n\n")[1:]))
         return json.dumps(items)
     return responder
 
@@ -361,6 +414,7 @@ def test_dataset_echoing_the_benchmark_is_rejected(gap, monkeypatch):
     assert d["status"] == "rejected" and "echoing the test" in d["error"]
     g = d["provenance"]["gate"]
     assert g["rejected"] is True and g["dropped_benchmark"] == 10 and g["offending_ngrams"]
+    assert g["exam_questions"] > 0                     # the exam is indexed too
     assert d["provenance"]["items"] == {"generated": 100, "dropped": 100, "kept": 0}
     assert not (tree["root"] / "datasets" / str(did) / "items.jsonl").exists()
     assert client.get(f"/api/datasets/{did}/items.jsonl").status_code == 409
@@ -390,7 +444,7 @@ def test_spend_guard(gap, monkeypatch):
     r = client.post(f"/api/proposals/{pid}/generate", json={"requester": "Omar", "count": 50})
     assert r.status_code == 422 and "LLM_MAX_ITEMS_PER_BATCH" in r.json()["detail"]
     assert client.post(f"/api/proposals/{pid}/generate",
-                       json={"requester": "Omar", "count": 20}).status_code == 200
+                       json={"requester": "Omar", "count": 4}).status_code == 200
 
 
 def test_quota_refusal(gap, monkeypatch):
@@ -502,3 +556,8 @@ def test_backends_shape_the_provider_requests_without_the_network(monkeypatch):
     assert llm.extract_json('Sure! ```json\n{"a": 1}\n```') == {"a": 1}
     assert llm.extract_json("[1, 2] trailing") == [1, 2]
     assert llm.extract_json("no json here") is None
+    # a one-element array of objects is an array, not the object inside it —
+    # a request for a single document returns exactly this
+    assert llm.extract_json('[{"title": "t"}]') == [{"title": "t"}]
+    assert llm.extract_json('[{"a": 1}, {"b": 2}]') == [{"a": 1}, {"b": 2}]
+    assert llm.extract_json('{"items": [1]}') == {"items": [1]}

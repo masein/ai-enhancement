@@ -490,8 +490,8 @@ class RejectIn(BaseModel):
 
 class GenerateIn(BaseModel):
     requester: str
-    count: int = 50
-    fmt: str = "mc"
+    count: int = 20
+    fmt: str = prop.DEFAULT_FORMAT      # prose documents, not question-and-answer pairs
 
 
 def _llm_status() -> dict:
@@ -501,7 +501,8 @@ def _llm_status() -> dict:
             "provider": config.LLM_PROVIDER, "model": config.LLM_MODEL,
             "usage_today": db.llm_items_today(), "daily_cap": config.LLM_DAILY_ITEM_CAP,
             "max_items_per_batch": config.LLM_MAX_ITEMS_PER_BATCH,
-            "items_per_generation_request": prop.GEN_ITEMS_PER_REQUEST,
+            "items_per_generation_request": prop.ITEMS_PER_REQUEST,
+            "formats": list(prop.FORMATS), "default_format": prop.DEFAULT_FORMAT,
             "datasets_bytes": used, "datasets_quota_bytes": int(config.DATASET_QUOTA_GB * 1e9),
             "note": "the tailnet is the auth boundary: approvals record a typed name, "
                     "nothing more"}
@@ -774,13 +775,15 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
                                  f"reaches the generator")
     who = _name(g.requester, "generating")
     if g.fmt not in prop.FORMATS:
-        raise HTTPException(422, "fmt must be mc or free")
+        raise HTTPException(422, f"fmt must be one of {', '.join(prop.FORMATS)} — question-"
+                                 f"shaped training data teaches the exam more readily than "
+                                 f"prose does, so 'doc' is the default and 'mc' is retired")
     if not 1 <= g.count <= 1000:
         raise HTTPException(422, "count must be between 1 and 1000")
     why = prop.quota_blocked()
     if why:
         raise HTTPException(507, why)
-    n_items = -(-g.count // prop.GEN_ITEMS_PER_REQUEST)
+    n_items = -(-g.count // prop.items_per_request(g.fmt))
     _spend_check(n_items)
     spec = r["edited_text"] or r["spec_text"]
     did = db.dataset_create(pid, g.fmt, g.count, who, {})

@@ -260,9 +260,11 @@ def train(args, bench):
 
 
 def gap_text(item: dict) -> str:
-    """One generated item as training text: question, options if any, answer,
-    rationale. Plain prose, no special tokens — the shape a small base model
-    is being trained on anyway."""
+    """One generated item as training text. A document is already prose — the
+    shape a base model is trained on anyway — so it needs nothing but its
+    title and body. The older question-shaped formats are laid out plainly."""
+    if item.get("text"):
+        return f"{item.get('title', '')}\n\n{item['text']}".strip()
     lines = [item["question"]]
     for i, c in enumerate(item.get("choices") or []):
         lines.append(f"{'ABCD'[i]}. {c}")

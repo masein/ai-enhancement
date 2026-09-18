@@ -4847,18 +4847,21 @@ function rvProposal(p, llmOk) {
           `api/proposals/${p.id}/reject`, { approver: name.value, reason: reason.value }) })));
   }
   if (p.status === 'approved') {
-    const count = el('input', { type: 'number', value: '50', min: '1', max: '1000',
+    const count = el('input', { type: 'number', value: '20', min: '1', max: '1000',
       style: 'width:80px', 'aria-label': 'item count' });
-    const fmt = mkSel('format', [['mc', 'multiple choice (4 options)'], ['free', 'free response']],
-      'mc', () => {});
+    const fmt = mkSel('format', [['doc', 'documents — prose that teaches the skill'],
+                                 ['free', 'question and answer (comparison only)']],
+      'doc', () => {});
     const name = rvNameInput();
     const usage = state.rv.llm || {};
     card.append(el('div', { class: 'dxh', text: 'Generate' }),
       el('p', { class: 'small', text: 'The generator receives the approved spec above, the '
-        + 'category name, the count, the format and a style constraint. No benchmark item, '
-        + 'in any form. Every item then passes the 13-gram contamination gate against both '
-        + `halves of every benchmark on disk. Today: ${usage.usage_today ?? '—'} of `
-        + `${usage.daily_cap ?? '—'} batch items used (one per ten items generated).` }),
+        + 'topic, the count, the format and a style constraint. No benchmark item and no exam '
+        + 'question, in any form. Documents are the default: prose a person could learn from, '
+        + 'because question-and-answer pairs shaped like the exam are the most direct route to '
+        + 'teaching the test there is. Every document then passes the 13-gram contamination '
+        + 'gate against both halves of every benchmark AND every exam question. Today: '
+        + `${usage.usage_today ?? '—'} of ${usage.daily_cap ?? '—'} batch items used.` }),
       el('div', { class: 'frm' }, count, fmt, name,
         el('button', { text: 'Generate data', disabled: llmOk ? null : '',
           title: llmOk ? '' : (usage.reason || 'LLM not configured'),
@@ -4887,10 +4890,11 @@ function rvDataset(d) {
   if (d.error) det.append(el('p', { class: 'warn', text: d.error }));
   if (g.items_in != null)
     det.append(el('p', { class: 'small', text: `Contamination gate: ${g.dropped_benchmark} of `
-      + `${g.items_in} items shared a ${g.ngram}-gram with a benchmark item `
-      + `(${pct(g.share_dropped_benchmark)}, line at ${pct(g.max_share, 0)}); `
+      + `${g.items_in} items shared a ${g.ngram}-gram with something we evaluate on `
+      + `(${pct(g.share_dropped_benchmark)}, line at ${pct(g.max_share, 0)}`
+      + (g.dropped_exam ? `; ${g.dropped_exam} of them with an EXAM question` : '') + '); '
       + `${g.dropped_duplicate} near-duplicates collapsed; checked against ${g.benchmark_docs} `
-      + 'benchmark documents in both halves.'
+      + `benchmark documents and ${g.exam_questions ?? 0} exam questions, both halves of each.`
       + (g.offending_ngrams && g.offending_ngrams.length ? ' First offending n-gram: “'
         + g.offending_ngrams[0] + '”.' : '') }));
   const rows = [];

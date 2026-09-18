@@ -62,7 +62,7 @@ def _finish_generation(row: dict, results: dict[str, llm.Result], backend: llm.B
                           error=("the generator returned no parseable items"
                                  + (f"; errors: {errors[0]}" if errors else ""))[:400])
         return
-    ix = contamination.index(config.OUT_DIR)
+    ix = contamination.index(config.OUT_DIR, config.EXAM_DIR)
     gate = contamination.check(items, ix)
     prov_stub = json.loads(ds["provenance"] or "{}")
     prompt_hash = prov_stub.get("prompt_sha256", "")

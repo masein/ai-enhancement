@@ -166,9 +166,13 @@ What happens after the click (`service/proposals.py`):
    findings for the task, and eight of the diagnosis-half items the LLM saw.
    They approve it, edit it, or reject it with a reason, under their name.
 3. Only the approved text reaches the generator. Not one question, hash,
-   model name or score goes with it. The generated items pass a 13-gram
-   contamination gate against both halves of every benchmark on disk; above
-   2% dropped the whole dataset is refused as an echo.
+   model name or score goes with it, and what comes back is **prose
+   documents** — a short explainer, a worked discussion, a piece of reference
+   writing — not question-and-answer pairs: a model trained on exam-shaped
+   text learns the exam rather than the skill. The documents pass a 13-gram
+   contamination gate against both halves of every benchmark on disk **and
+   every exam question in the bank**; above 2% dropped the whole dataset is
+   refused as an echo.
 4. The dataset lands under `$BENCH_ROOT/datasets/<id>/` with a full
    `provenance.json`, downloadable from the tab and with `bench pull`.
 5. A training run that consumes it says so (`datasets=[id]` on the run), and

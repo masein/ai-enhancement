@@ -14,10 +14,87 @@ def test_normalize_and_windows():
     assert list(ct.windows(toks, 13)) == []               # too short to carry one
 
 
+def test_item_text_covers_every_format():
+    doc = {"title": "Margins first", "text": "A long body about margins."}
+    assert ct.item_text(doc) == "Margins first\nA long body about margins."
+    free = {"question": "q", "answer": "a", "rationale": "r"}
+    assert ct.item_text(free) == "q\na\nr"
+    assert ct.item_text({"question": "q", "choices": ["x", "y"], "answer": "a",
+                         "rationale": ""}) == "q\nx\ny\na"
+
+
 def test_doc_strings_walk_every_shape():
     doc = {"question": "q", "choices": {"text": ["a", "b"], "label": ["A", "B"]},
            "mc2_targets": {"choices": ["c"], "labels": [1]}, "n": 3}
     assert sorted(ct.doc_strings(doc)) == ["A", "B", "a", "b", "c", "q"]
+
+
+def test_the_exam_is_indexed_in_both_halves(tree, tmp_path_factory):
+    """A generated document that repeats an exam question teaches the test
+    directly, and the exam is our own questions — nothing outside protects it."""
+    import exam_build as eb
+    # questions the models have SAT are already in the samples logs; the bank
+    # index is what covers every accepted question, including ones written
+    # since the last run — which is the gap a generator would echo into
+    empty = ct.BenchmarkIndex(tmp_path_factory.mktemp("noresults"),
+                              tree["judged"]["exam_root"]).refresh()
+    ix = ct.index(tree["out_dir"], tree["judged"]["exam_root"])
+    bank = [b for rows in eb.load_bank(tree["judged"]["exam_root"]).values() for b in rows]
+    assert ix.n_exam == len(bank) >= 100
+    assert ix.exam_grams and not ct.BenchmarkIndex(tree['out_dir']).refresh().exam_grams
+    halves = {eb.half_of(b["qid"]) for b in bank}
+    assert halves == {"report", "diagnose"}
+    assert empty.n_exam == ix.n_exam and not empty.grams
+    for half in ("report", "diagnose"):
+        q = next(b["prompt"] for b in sorted(bank, key=lambda b: b["qid"])
+                 if eb.half_of(b["qid"]) == half)
+        hits = ix.hits(q)
+        assert hits and ix.source_of(hits[0]) == "exam", half
+        assert empty.hits(q)                           # from the bank alone
+    # a benchmark n-gram is still named as one
+    bench = ix.hits(tree["docs"]["mmlu"][0]["q"])
+    assert bench and ix.source_of(bench[0]) == "benchmark"
+    # the index is keyed on the bank too: accepting a question rebuilds it
+    assert ct.index(tree["out_dir"], tree["judged"]["exam_root"]) is ix
+
+
+def test_a_document_quoting_an_exam_question_is_dropped(tree):
+    import exam_build as eb
+    ix = ct.index(tree["out_dir"], tree["judged"]["exam_root"])
+    q = sorted(eb.load_bank(tree["judged"]["exam_root"])["economics"],
+               key=lambda b: b["qid"])[0]["prompt"]
+    body = ("Margins respond before totals do, and the reason is worth setting out slowly. "
+            + "Consider a firm that changes one input price and nothing else. " * 6)
+    clean = {"title": "Margins first", "text": body}
+    echo = {"title": "Margins again", "text": body + " A question of the kind this teaches: " + q}
+    out = ct.check([clean, echo], ix)
+    assert out["report"]["items_kept"] == 1 and out["report"]["dropped_benchmark"] == 1
+    assert out["report"]["dropped_exam"] == 1
+    assert out["dropped"][0]["source"] == "exam" and out["dropped"][0]["index"] == 1
+    assert out["kept"][0]["title"] == "Margins first"
+    # three per cent of a set rejects the whole dataset, whichever corpus it echoed
+    docs = [{"title": f"Note {i}", "text": body + f" Case {i} closes here."} for i in range(97)]
+    docs += [{"title": f"Echo {i}", "text": body + " " + q} for i in range(3)]
+    rep = ct.check(docs, ix)["report"]
+    assert rep["dropped_exam"] == 3 and rep["rejected"] is True
+    assert rep["share_dropped_benchmark"] == 0.03
+
+
+def test_near_duplicate_documents_collapse(tree):
+    ix = ct.index(tree["out_dir"], tree["judged"]["exam_root"])
+    body = ("The first quantity to move is the one closest to the change, which is usually a "
+            "margin and rarely a total. Totals are sums of parts that move at different "
+            "speeds, so they are the last place to look and the first place people look. ")
+    a = {"title": "Margins first", "text": body * 3}
+    b = {"title": "Margins first, again", "text": body * 3 + " "}      # the same document
+    c = {"title": "Rules and purposes", "text":
+         ("A rule written for one situation gets applied in another, and the two come apart "
+          "exactly where the reasoning is interesting. Ask what a constraint was for before "
+          "asking whether it binds today. ") * 3}
+    out = ct.check([a, b, c], ix)
+    assert out["report"]["items_kept"] == 2 and out["report"]["dropped_duplicate"] == 1
+    assert out["dropped"][0]["reason"] == "duplicate" and out["dropped"][0]["of"] == 0
+    assert [k["title"] for k in out["kept"]] == ["Margins first", "Rules and purposes"]
 
 
 def test_index_covers_both_halves_once_per_document(tree):

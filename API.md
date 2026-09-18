@@ -338,17 +338,22 @@ The pipeline behind the Diagnose section's **Propose a skill spec** button
   (`exam_<topic>`) and `category` is the topic.
 - `POST /api/proposals/{id}/approve` `{"approver", "edited_text"}` and
   `…/reject` `{"approver", "reason"}` — a name is required: it is the record.
-- `POST /api/proposals/{id}/generate` `{"requester", "count", "fmt": "mc"|"free"}`
+- `POST /api/proposals/{id}/generate` `{"requester", "count", "fmt": "doc"|"free"}`
   — only for an approved proposal. The generator receives the approved spec,
-  the category, the count, the format and a style constraint, **and no
-  benchmark item in any form**. Returns `{"dataset_id", "batch_id"}`. Refused
-  when the spend guard (429), the batch cap (422) or the dataset quota (507)
-  says so.
+  the topic, the count, the format and a style constraint, **and no benchmark
+  item and no exam question in any form**. `doc` is the default and writes
+  prose **training documents** (`{"title", "text"}`, around 600 words, two per
+  request): question-and-answer pairs shaped like the exam are the most direct
+  route to teaching the test, and prose does not have that shape. `free` stays
+  for comparison; `mc` is retired and refused with that reason. Returns
+  `{"dataset_id", "batch_id"}`. Refused when the spend guard (429), the batch
+  cap (422) or the dataset quota (507) says so.
 - `GET /api/datasets`, `GET /api/datasets/{id}`, `GET /api/datasets/{id}/items.jsonl`,
   `DELETE /api/datasets/{id}` (refused while a training run references it).
   Every item passed the 13-gram contamination gate against both halves of
-  every benchmark on disk; a dataset losing more than 2% that way is
-  `rejected`. `provenance` is the full record: source model, task, category,
+  every benchmark on disk **and every exam question in the bank**; the gate
+  report names how many were dropped for each (`dropped_benchmark`,
+  `dropped_exam`), and a dataset losing more than 2% that way is `rejected`. `provenance` is the full record: source model, task, category,
   split, salt, proposal id and both spec texts, approver, generator provider +
   model + batch id, prompt hash, timestamps, items generated / dropped / kept,
   the gate result, the content sha256.

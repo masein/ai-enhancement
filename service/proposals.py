@@ -13,10 +13,14 @@ The pipeline, and where each safety property lives:
     → HUMAN     approves / edits / rejects in the dashboard's Review tab.
                 The spec text is the airlock; a name is recorded.
     → GENERATOR receives ONLY the approved spec, the topic, a count, a format
-                and a style constraint.     generation_requests() takes no
+                and a style constraint, and writes prose DOCUMENTS — not
+                question-and-answer pairs, because exam-shaped training data
+                is the most direct route to teaching the test there is.
+                                            generation_requests() takes no
                                             item, no hash, no model name
-    → GATE      13-gram overlap against every benchmark item on disk, both
-                halves; near-duplicates collapsed.  service/contamination.py
+    → GATE      13-gram overlap against every benchmark item AND every exam
+                question on disk, both halves of each; near-duplicates
+                collapsed.                  service/contamination.py
     → PROVENANCE who, what, which judge run, which model, which batch, hashes
     → TAINT     a training run that consumes the dataset says so; its
                 checkpoints lose the task from their official average.
@@ -50,8 +54,17 @@ import exam_build as _exam  # noqa: E402
 
 MAX_JUSTIFICATIONS = 60          # enough to see a pattern; one batch item either way
 EXAMPLES_SHOWN = 8               # what the Review tab shows of what the LLM saw
-GEN_ITEMS_PER_REQUEST = 10
-FORMATS = ("mc", "free")
+# Training DOCUMENTS, not question-and-answer pairs. Generating items shaped
+# like the exam is the most direct route to teaching the test there is; prose
+# does not have that shape. `free` stays for comparison and is not the
+# default; `mc` is retired.
+DEFAULT_FORMAT = "doc"
+FORMATS = ("doc", "free")
+# documents are long, so fewer per request
+ITEMS_PER_REQUEST = {"doc": 2, "free": 10}
+GEN_ITEMS_PER_REQUEST = ITEMS_PER_REQUEST[DEFAULT_FORMAT]
+DOC_MIN_WORDS = 120              # shorter than this is a note, not a teaching document
+DOC_TARGET_WORDS = 600           # ~800 tokens of body
 WEAK_SCORE = 3                   # judge.CORRECT_AT: below this the answer did not land
 # Six consecutive words of an exam question inside a justification is a
 # quotation, not a coincidence. Redacting a few innocent words costs nothing;
@@ -243,37 +256,48 @@ def parse_proposal(text: str) -> dict:
 # ---------------------------------------------------------------------------
 
 GEN_SYSTEM = (
-    "You write original training items that teach a specific skill to a small language "
-    "model. You are given a skill specification, a category name, a count and a format. "
-    "Invent fresh scenarios; vary surface form deliberately — sentence length, register, "
-    "question type (definition, application, comparison, calculation, cause and effect), "
-    "named entities and settings — so no two items share a template. Never reproduce or "
-    "closely paraphrase any existing exam or benchmark question. Reply with one JSON array "
-    "of objects and nothing else.")
+    "You write original TRAINING DOCUMENTS that teach a specific skill to a small language "
+    "model. You are given a skill specification, a topic and a count. A document is prose a "
+    "person could learn from — a short explainer, a worked discussion, a piece of reference "
+    "writing — not a quiz: never write a question-and-answer pair, a multiple-choice item, "
+    "or anything shaped like an exam, because a model trained on exam-shaped text learns the "
+    "exam rather than the skill. Invent fresh material and vary surface form deliberately "
+    "across the set: register (textbook, briefing note, worked example, dialogue, case "
+    "study), length, framing, named entities and settings, so no two documents share a "
+    "template. Never reproduce or closely paraphrase any existing exam or benchmark text. "
+    "Reply with one JSON array of objects and nothing else.")
 
 STYLE = {
-    "mc": ("Each object: {\"question\": ..., \"choices\": [exactly four options, one correct, "
-           "the correct one in a varying position], \"answer\": <the correct option's text, "
-           "verbatim>, \"rationale\": <one or two sentences>}."),
+    "doc": (f"Each object: {{\"title\": <a short descriptive title>, \"text\": <the document "
+            f"body, around {DOC_TARGET_WORDS} words of continuous prose that teaches the "
+            f"specification's skill; paragraphs separated by blank lines; no questions posed "
+            f"to the reader, no answer keys, no bullet lists of Q/A>}}."),
     "free": ("Each object: {\"question\": ..., \"answer\": <a short free-text answer>, "
-             "\"rationale\": <one or two sentences>}."),
+             "\"rationale\": <one or two sentences>}. This format is for comparison only: "
+             "question-shaped training data teaches the test more readily than prose does."),
 }
+
+
+def items_per_request(fmt: str) -> int:
+    return ITEMS_PER_REQUEST.get(fmt, GEN_ITEMS_PER_REQUEST)
 
 
 def generation_requests(did: int, spec_text: str, category: str, count: int,
                         fmt: str, seed: int) -> list[llm.Request]:
-    """One request per GEN_ITEMS_PER_REQUEST items. Contains the approved spec,
-    the category, the count, the format and a style constraint — and no
-    benchmark item, hash, model name or score, in any form."""
+    """One request per few items. Contains the approved spec, the topic, the
+    count, the format and a style constraint — and no benchmark item, no exam
+    question, no hash, no model name and no score, in any form."""
+    per = items_per_request(fmt)
     reqs = []
-    for k, start in enumerate(range(0, count, GEN_ITEMS_PER_REQUEST)):
-        n = min(GEN_ITEMS_PER_REQUEST, count - start)
+    for k, start in enumerate(range(0, count, per)):
+        n = min(per, count - start)
+        what = "documents" if fmt == "doc" else "items"
         user = (f"Skill specification:\n{spec_text.strip()}\n\n"
-                f"Category: {category}\nFormat: {fmt}\nWrite {n} items.\n{STYLE[fmt]}\n"
-                f"Style seed {seed}-{k}: make this set differ in scenario and phrasing from "
-                f"any other set you might write for the same specification.")
+                f"Topic: {category}\nFormat: {fmt}\nWrite {n} {what}.\n{STYLE[fmt]}\n"
+                f"Style seed {seed}-{k}: make this set differ in scenario, register and "
+                f"phrasing from any other set you might write for the same specification.")
         reqs.append(llm.Request(
-            custom_id=f"gen:{did}:{k}", system=GEN_SYSTEM, user=user, max_tokens=4096,
+            custom_id=f"gen:{did}:{k}", system=GEN_SYSTEM, user=user, max_tokens=8192,
             meta={"kind": "generation", "dataset_id": did, "count": n, "start": start,
                   "format": fmt}))
     return reqs
@@ -287,18 +311,21 @@ def parse_items(text: str, fmt: str) -> list[dict]:
     for o in arr:
         if not isinstance(o, dict):
             continue
+        if fmt == "doc":
+            title = str(o.get("title") or "").strip()
+            body = str(o.get("text") or o.get("body") or "").strip()
+            # a title alone, or a paragraph too short to teach anything, is not
+            # a training document — and neither is a quiz wearing prose
+            if not title or len(body.split()) < DOC_MIN_WORDS:
+                continue
+            out.append({"title": title[:300], "text": body})
+            continue
         q = str(o.get("question") or "").strip()
         a = str(o.get("answer") or "").strip()
         r = str(o.get("rationale") or "").strip()
         if not q or not a:
             continue
-        item = {"question": q, "answer": a, "rationale": r}
-        if fmt == "mc":
-            ch = [str(c).strip() for c in (o.get("choices") or []) if str(c).strip()]
-            if len(ch) != 4 or a not in ch:
-                continue
-            item["choices"] = ch
-        out.append(item)
+        out.append({"question": q, "answer": a, "rationale": r})
     return out
 
 

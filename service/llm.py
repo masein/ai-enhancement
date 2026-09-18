@@ -70,7 +70,12 @@ def extract_json(text: str):
     m = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
     if m:
         text = m.group(1).strip()
-    for opener, closer in (("{", "}"), ("[", "]")):
+    # try whichever bracket opens FIRST. Taking the object first would read a
+    # one-element array of objects as the object itself — which is exactly what
+    # a request for a single item returns, and losing it is silent.
+    pairs = [("{", "}"), ("[", "]")]
+    pairs.sort(key=lambda p: (text.find(p[0]) if p[0] in text else len(text) + 1))
+    for opener, closer in pairs:
         i = text.find(opener)
         j = text.rfind(closer)
         if i != -1 and j > i:
@@ -237,6 +242,84 @@ class OpenAIBatches(Backend):
         return out
 
 
+_DOC_SUBJECTS = ["a regional bakery", "a shipping cooperative", "a teaching hospital",
+                 "a municipal water board", "a family vineyard", "a second-hand bookshop",
+                 "a night school", "a ferry operator"]
+_DOC_MOVES = ["raises its prices", "signs a long lease", "loses its largest customer",
+              "adopts a faster machine", "faces a new duty", "hires a second shift",
+              "opens a second site", "changes its supplier"]
+# Twelve paragraph shapes, five to a document, rotated so that two documents
+# rarely share more than one. A real generator told to vary register does
+# this; the fake has to as well, or the near-duplicate rule would collapse
+# every set it writes and the tests would be measuring the wrong thing.
+_DOC_PARAS = [
+    "Start with what is held fixed. When {who} {move}, nothing else about it changed: the "
+    "same suppliers, the same customers, the same building, the same people. That assumption "
+    "carries the argument, and it is worth stating out loud rather than leaving implicit, "
+    "because the moment it fails everything downstream fails with it.",
+    "Trace the first effect before the large one. The quantity that responds first is the one "
+    "closest to the change — usually a margin, occasionally a volume, rarely a total. Totals "
+    "are sums of parts that move at different speeds, which is why they are the last place to "
+    "look and the first place people look.",
+    "A worked case helps. Suppose {who} {move} in the second week of a quarter. By the fourth "
+    "week two things have moved and three have not; naming which is which, before opening the "
+    "figures, is the exercise. Prediction first, then arithmetic, is the order that catches "
+    "a wrong mechanism.",
+    "The common error is reasoning backwards from the outcome one expected. If the numbers "
+    "fall where a rise was predicted, the discipline is to ask which assumption was wrong, "
+    "not which cell was mistyped. Direction of effect is a claim about mechanism, and a "
+    "mechanism can be stated, checked, and found wanting.",
+    "Say what would settle it. For {who} the measurable thing is the per-unit figure over the "
+    "following weeks, set against the same figure beforehand with the seasonal pattern "
+    "removed. If it moves as the mechanism predicts, the account survives; if it does not, "
+    "something else was doing the work.",
+    "Distinguish the rule from its purpose. A rule written for one situation is applied in "
+    "another, and the two come apart precisely where the reasoning gets interesting. When "
+    "{who} {move}, ask what the constraint was for before asking whether it binds.",
+    "Two quantities moving together are not thereby related by cause. The third thing that "
+    "moved both is usually unglamorous — a season, a price index, a holiday — and it is "
+    "almost always cheaper to find than the elaborate story that does without it.",
+    "Scale matters more than sign in practice. An effect in the right direction and two "
+    "orders of magnitude too small is, for any decision anyone has to take, no effect. Saying "
+    "roughly how large, before saying which way, is the harder and more useful half.",
+    "Consider the counterexample deliberately. If {who} {move} and the expected consequence "
+    "does not follow, what would have had to be true? Naming that condition converts a "
+    "confident claim into a testable one, which is the only kind worth arguing about.",
+    "Reference case: a firm in a crowded market has less room than the same firm alone in "
+    "one, and the difference shows up in how quickly a change is matched. The number of "
+    "competitors is not decoration on the problem; it is part of the mechanism.",
+    "Write the assumption list before the conclusion. Three or four lines are enough, and the "
+    "reader who disagrees can then say which line they reject rather than disputing the "
+    "conclusion in general. Arguments that hide their premises cannot be corrected.",
+    "In the end, the account has to name a quantity, a direction, a rough size and a way of "
+    "being wrong. An explanation missing any of those is a story. The habit of supplying all "
+    "four is most of what separates useful reasoning from fluent reasoning.",
+]
+
+
+def _fake_document(i: int) -> dict:
+    """A prose training document, long enough and varied enough to pass the
+    parser and the near-duplicate rule — the shape a real generator returns.
+    Every paragraph carries the case number and two case-specific figures, so
+    two documents in a long set do not share 5-word windows the way a
+    templated fake otherwise would."""
+    who = _DOC_SUBJECTS[i % len(_DOC_SUBJECTS)]
+    move = _DOC_MOVES[(i * 3 + i // len(_DOC_SUBJECTS)) % len(_DOC_MOVES)]
+    n, week, pct = i + 1, 2 + (i * 5) % 11, 3 + (i * 7) % 17
+    picks = [(i * 7 + k * (2 + i % 4)) % len(_DOC_PARAS) for k in range(4 + i % 3)]
+    paras = []
+    for j, k in enumerate(picks):
+        body = _DOC_PARAS[k].format(who=who, move=move)
+        tail = (f" In case {n} the figure to watch is the {pct} per cent gap that opened in "
+                f"week {week}, and paragraph {j + 1} of note {n} is where that shows.")
+        paras.append(body + tail)
+    paras.insert(0, f"Case {n}. This note works through what changes, and what does not, when "
+                    f"{who} {move} in week {week} of the quarter, and why the order of the "
+                    f"steps is the point rather than the arithmetic.")
+    return {"title": f"{who.title()} and the first-order effect (case {n})",
+            "text": "\n\n".join(paras)}
+
+
 def default_responder(req: Request) -> str:
     """Canned answers for the fake: a skill spec for a proposal request, a list
     of fresh items for a generation request. The wording deliberately shares
@@ -285,8 +368,10 @@ def default_responder(req: Request) -> str:
                          "reverses the direction of an effect",
                          "prefers the option that repeats a word from the question"]})
     n = int(req.meta.get("count", 10))
-    fmt = req.meta.get("format", "mc")
+    fmt = req.meta.get("format", "doc")
     start = int(req.meta.get("start", 0))
+    if fmt == "doc":
+        return json.dumps([_fake_document(i) for i in range(start, start + n)])
     nouns = ["a bakery", "a shipping line", "a vineyard", "a bicycle workshop", "a hospital",
              "a fishing cooperative", "a software studio", "a city council", "a dairy farm",
              "a book printer", "a taxi firm", "a night school"]
