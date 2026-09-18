@@ -138,7 +138,8 @@ def init() -> None:
                      "ALTER TABLE submissions ADD COLUMN allow_remote_code "
                      "INTEGER NOT NULL DEFAULT 0",
                      "ALTER TABLE submissions ADD COLUMN load_missing TEXT DEFAULT ''",
-                     "ALTER TABLE truns ADD COLUMN datasets TEXT DEFAULT '[]'"):
+                     "ALTER TABLE truns ADD COLUMN datasets TEXT DEFAULT '[]'",
+                     "ALTER TABLE truns ADD COLUMN parent TEXT DEFAULT ''"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:
@@ -216,18 +217,18 @@ def recent(limit: int = 100) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 _TRUN_COLS = ["id", "name", "project", "submitter", "config", "status",
-              "hf_prefix", "created_at", "updated_at", "finished_at", "datasets"]
+              "hf_prefix", "created_at", "updated_at", "finished_at", "datasets", "parent"]
 
 
 def trun_create(name, project, submitter, config_json, hf_prefix,
-                datasets: list[int] | None = None) -> int:
+                datasets: list[int] | None = None, parent: str = "") -> int:
     now = time.time()
     with closing(_conn()) as c:
         cur = c.execute(
             "INSERT INTO truns (name, project, submitter, config, hf_prefix, "
-            "created_at, updated_at, datasets) VALUES (?,?,?,?,?,?,?,?)",
+            "created_at, updated_at, datasets, parent) VALUES (?,?,?,?,?,?,?,?,?)",
             (name, project, submitter, config_json, hf_prefix, now, now,
-             json.dumps(sorted(set(int(d) for d in (datasets or []))))))
+             json.dumps(sorted(set(int(d) for d in (datasets or [])))), parent))
         c.commit()
         return int(cur.lastrowid)
 
@@ -469,9 +470,16 @@ def taint_links() -> list[dict]:
     turns 'this run used dataset 3' into 'these checkpoints are tainted'."""
     out = []
     with closing(_conn()) as c:
-        rows = c.execute("SELECT id, hf_prefix, datasets FROM truns "
+        rows = c.execute("SELECT id, hf_prefix, datasets, parent, config FROM truns "
                          "WHERE datasets IS NOT NULL AND datasets != '[]'").fetchall()
-        for rid, prefix, ds in rows:
+        for rid, prefix, ds, parent, cfg in rows:
+            # the "before" of the comparison: the model the run started from,
+            # recorded explicitly, else the base_model its config names
+            if not parent:
+                try:
+                    parent = str(json.loads(cfg or "{}").get("base_model") or "")
+                except (ValueError, TypeError):
+                    parent = ""
             try:
                 ids = [int(x) for x in json.loads(ds or "[]")]
             except (ValueError, TypeError):
@@ -492,7 +500,8 @@ def taint_links() -> list[dict]:
                     if t:
                         tasks.append(t)
             out.append({"run_id": rid, "hf_prefix": prefix or "", "datasets": ids,
-                        "checkpoints": ckpts, "tasks": sorted(set(tasks))})
+                        "checkpoints": ckpts, "tasks": sorted(set(tasks)),
+                        "parent": parent or ""})
     return out
 
 

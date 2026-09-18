@@ -24,6 +24,13 @@ What is in it, one model per behaviour:
   local/nodiag-step400   an uploaded checkpoint, quick suite only, and no
                          diagnose.json is written for it
 
+Two children of fx/good-750m close the loop. Both trained on a dataset
+derived from MMLU's diagnosis half (tainted on mmlu, parent recorded):
+fx/good-750m-tuned-test improved only on the diagnosis half — "the training
+taught the test", the warning — and fx/good-750m-tuned-skill improved on both
+halves — "the training taught the skill". The frozen report carries their
+taint the way the service would compute it from the run/dataset join.
+
 Three models (good, skewed, chance) also answer the judged free-response
 suite: the seed items from eval_tasks/fr plus the MMLU control set that
 scripts/fr_build.py builds from the diagnose half of this very tree. Their
@@ -62,6 +69,7 @@ HERE = Path(__file__).resolve()
 REPO = HERE.parents[2]
 if str(REPO / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO / "scripts"))
+import diagnose as dx  # noqa: E402
 
 SEED = 1234
 TS = "2026-08-19T10-02-11.000000"          # the harness's filename timestamp
@@ -123,7 +131,12 @@ MODELS = [
     ("fx/good-750m",       "good",       "base",     750_000_000, FULL + CONTROL, {}),
     (MISCOUNT["model"],    "chance",     "base",   1_000_000_000, FULL, {}),
     (NODIAG,               "chance",     "base",      70_000_000, QUICK, {}),
+    ("fx/good-750m-tuned-test",  "good_test",  "base", 750_000_000, FULL, {}),
+    ("fx/good-750m-tuned-skill", "good_skill", "base", 750_000_000, FULL, {}),
 ]
+# what the service's run/dataset join would say about the two children
+TAINT = {"fx/good-750m-tuned-test": ["mmlu"], "fx/good-750m-tuned-skill": ["mmlu"]}
+PARENTS = {"fx/good-750m-tuned-test": "fx/good-750m", "fx/good-750m-tuned-skill": "fx/good-750m"}
 
 WORDS = ("ledger", "tariff", "enzyme", "monsoon", "quorum", "isotope", "vector", "treaty",
          "kernel", "plateau", "synapse", "dividend", "glacier", "rhetoric", "lattice",
@@ -299,7 +312,7 @@ def _hashed(items: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def policy_probs(rng: random.Random, policy: str, n: int, c: int | None,
-                 shortest: int, group: str) -> list[float]:
+                 shortest: int, group: str, half: str = "report") -> list[float]:
     """Per-option probabilities (after any length normalisation) for one item.
     Thresholds are diagnose.py's: lift = p * n, chance is 1.0, 'confident'
     starts at conf_lift(n), at-chance ends at 1.30."""
@@ -332,8 +345,13 @@ def policy_probs(rng: random.Random, policy: str, n: int, c: int | None,
     if policy == "short_pick":
         i = shortest if rng.random() < 0.7 else rng.randrange(n)
         return wobble(peaked(i, 0.5))
-    if policy == "good":
+    if policy in ("good", "good_test", "good_skill"):
         p_right = 0.30 if group == "econometrics" else 0.72
+        # the children: trained on data derived from the DIAGNOSIS half. One
+        # learned the test (only that half improves), one learned the skill
+        # (both halves improve — the half the training never saw moved too)
+        if policy == "good_skill" or (policy == "good_test" and half == "diagnose"):
+            p_right = 0.93
         r = rng.random()
         if r < p_right:
             return wobble(peaked(c, 0.6 if n > 2 else 0.8))
@@ -358,7 +376,8 @@ def respond(rng: random.Random, policy: str, item: dict, task: str) -> dict:
     n = len(choices)
     L = [_blen(s) for s in choices]
     shortest = min(range(n), key=lambda i: L[i])
-    probs = policy_probs(rng, policy, n, item["correct"], shortest, item["group"])
+    probs = policy_probs(rng, policy, n, item["correct"], shortest, item["group"],
+                         dx.split_of(item["doc_hash"]))
     z = [math.log(max(p, 1e-9)) for p in probs]
     # acc_norm tasks: the harness scores loglikelihood / byte length, so the
     # planted behaviour lives in normalised space and the raw logprob is that
@@ -645,7 +664,8 @@ def frozen_report(root: Path, path: Path, title: str = "Fixture board") -> Path:
     runs = report.load_results(out_dir)
     cal_path = out_dir / "judge_calibration.json"
     cal = json.loads(cal_path.read_text(encoding="utf-8")) if cal_path.exists() else None
-    return report.build_report(runs, path, title, calibration=cal)
+    return report.build_report(runs, path, title, calibration=cal,
+                               taint=TAINT, parents=PARENTS)
 
 
 def build(root: Path, seed: int = SEED, diagnose: bool = True,
@@ -675,6 +695,7 @@ def build(root: Path, seed: int = SEED, diagnose: bool = True,
         "stale": {**STALE, "n": TASKS[STALE["task"]]["n"]},
         "diagnosed": write_diagnoses(root) if diagnose else [],
         "judged": write_judged(root, out_dir, seed) if judged else None,
+        "taint": dict(TAINT), "parents": dict(PARENTS),
         "report": None,
     }
     if report is not None:

@@ -324,13 +324,22 @@ The pipeline behind the Diagnose section's **Propose a skill spec** button
   Client: `bench.datasets()`, `bench.dataset(id)`, `bench.pull_dataset(id, dest)`;
   CLI `datasets` and `pull <id> <dir>`.
 
-**Taint.** `POST /api/truns` accepts `"datasets": [ids]`. A training run that
+**Taint.** `POST /api/truns` accepts `"datasets": [ids]` and `"parent"` (the model
+id the run started from; defaults to `config.base_model`). A training run that
 records a generated dataset marks every checkpoint submitted under it (or
 carrying its `hf_prefix`) as trained on data derived from that dataset's task:
 `models[].tainted: ["mmlu"]` in `/api/results`, a badge on the board, and the
 task **excluded from that model's official average exactly the way a missing
 required task is** — the per-task score stays visible, the model carries no
 rank. `examples/train_and_benchmark.py --gap-dataset <id>` shows the pattern.
+
+**What the training taught.** When the parent is on the board with a diagnosis,
+the tainted model carries `taintCompare[task]`: both halves before and after
+(`{v, n, se}`), `dReport`, `dDiagnose`, their standard errors, a `verdict`
+(`skill` | `test` | `none` | `mixed`), the `ratio` of the two deltas, the
+derived `text`, and the same before/after per `categories`. `test` means the
+diagnosis half moved and the leaderboard half did not — the training taught
+the test — and the board carries a warning.
 
 ### GET /healthz
 

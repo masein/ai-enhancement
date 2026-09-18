@@ -265,6 +265,38 @@ def test_judged_columns_appear_once_calibrated(surface):
     assert surface.errors == []
 
 
+def test_what_the_training_taught(surface, tree):
+    pg = surface.open(model_link("fx/good-750m-tuned-test"))
+    card = pg.locator(".card", has=pg.locator("h2", has_text="What the training taught"))
+    assert card.count() == 1
+    text = card.text_content()
+    assert "before — good-750m" in text and "after — good-750m-tuned-test" in text
+    assert "leaderboard half (never in the training data)" in text
+    v = card.locator("[data-verdict]")
+    assert v.get_attribute("data-verdict") == "test" and "warn" in v.get_attribute("class")
+    assert "The training taught the test" in text and "Ratio of the two deltas" in text
+    assert "By category — the half we never touched" in text
+    assert card.locator("table.jd").nth(1).locator("tbody tr").count() >= 4
+    # the category rows in Diagnose carry the same deltas
+    det = pg.locator("details.dx", has=pg.locator(".dxname", has_text=re.compile(r"^mmlu[^_]"))).first
+    det.locator("> summary").click()
+    assert det.locator(".taintdelta").count() >= 4
+    assert "vs parent: lb" in det.locator(".taintdelta").first.text_content()
+    # the badge and the head sentence
+    head = pg.locator("#view .card").first
+    assert head.locator(".badge.taint").count() == 1
+    assert "excluded from its official average" in head.text_content()
+
+    surface.open(model_link("fx/good-750m-tuned-skill"))
+    card = pg.locator(".card", has=pg.locator("h2", has_text="What the training taught"))
+    v = card.locator("[data-verdict]")
+    assert v.get_attribute("data-verdict") == "skill" and "calm" in v.get_attribute("class")
+    assert "The training taught the skill" in card.text_content()
+    surface.open(model_link("fx/good-750m"))
+    assert pg.locator(".card", has=pg.locator("h2", has_text="What the training taught")).count() == 0
+    assert surface.errors == []
+
+
 def test_screenshots_for_the_pr(surface):
     """Not an assertion beyond 'it rendered': the pictures a reviewer wants."""
     SCREENS.mkdir(exist_ok=True)
@@ -283,5 +315,8 @@ def test_screenshots_for_the_pr(surface):
             pg.get_by_role("button", name="MMLU by category", exact=True).click()
             pg.screenshot(path=SCREENS / f"leaderboard-categories-{scheme}-{width}.png",
                           full_page=True)
-    assert len(list(SCREENS.glob("*.png"))) >= 12
+            surface.open(model_link("fx/good-750m-tuned-test"))
+            pg.locator(".card", has=pg.locator("h2", has_text="What the training taught")) \
+              .screenshot(path=SCREENS / f"taught-the-test-{scheme}-{width}.png")
+    assert len(list(SCREENS.glob("*.png"))) >= 16
     assert surface.errors == []

@@ -98,6 +98,22 @@ def taint_for(model_ids) -> dict[str, list[str]]:
     return {k: sorted(v) for k, v in out.items()}
 
 
+def parents_for(model_ids) -> dict[str, str]:
+    """tainted model id -> the model its training run started from (the run's
+    `parent`, else its config's base_model). The first run that claims a
+    checkpoint wins; a checkpoint belongs to one run."""
+    out: dict[str, str] = {}
+    links = db.taint_links()
+    for mid in model_ids:
+        for link in links:
+            pre = link["hf_prefix"]
+            if mid in link["checkpoints"] or (pre and (mid == pre or mid.startswith(pre))):
+                if link["parent"]:
+                    out[mid] = link["parent"]
+                    break
+    return out
+
+
 def results_payload() -> dict:
     now = time.time()
     if _cache["payload"] is not None and now - _cache["at"] < 5:
@@ -108,6 +124,7 @@ def results_payload() -> dict:
         by_model = report.merge_runs(runs)
         payload = report.build_payload(by_model, config.TITLE, source=str(config.OUT_DIR),
                                        taint=taint_for(by_model.keys()),
+                                       parents=parents_for(by_model.keys()),
                                        calibration=_calibration())
         payload["live"] = True
         _cache.update(key=key, payload=payload)
@@ -193,6 +210,7 @@ class TrunIn(BaseModel):
     config: dict = {}
     hf_prefix: str = ""
     datasets: list[int] = []     # generated datasets this run trains on — the taint record
+    parent: str = ""             # the model this run started from — the "before" of the comparison
 
 
 class TrunLogIn(BaseModel):
@@ -228,7 +246,7 @@ def trun_create(t: TrunIn, x_token: str = Header(default="")):
     rid = db.trun_create(name, t.project.strip()[:80] or "default",
                          t.submitter.strip()[:80],
                          json.dumps(t.config)[:20000], t.hf_prefix.strip()[:200],
-                         datasets=t.datasets)
+                         datasets=t.datasets, parent=t.parent.strip()[:200])
     return {"id": rid}
 
 

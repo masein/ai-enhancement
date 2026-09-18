@@ -138,7 +138,8 @@ class Bench:
 
 
     def init(self, name: str, project: str = "default", config: dict | None = None,
-             submitter: str = "", hf_prefix: str = "", datasets: list[int] | None = None) -> "Run":
+             submitter: str = "", hf_prefix: str = "", datasets: list[int] | None = None,
+             parent: str = "") -> "Run":
         """Start a tracked training run. Use as a context manager:
 
             with bench.init("run7", config={"lr": 3e-4}) as run:
@@ -151,10 +152,16 @@ class Bench:
         on. Recording them is what marks every checkpoint of the run as trained
         on benchmark-derived data — the task it came from leaves the official
         average and the leaderboard says so. Leave it out and the board has no
-        way to know; put it in and the number stays honest."""
+        way to know; put it in and the number stays honest.
+
+        parent: the model id this run started from (the base checkpoint). With
+        it, the board can show what the training taught: both halves of the
+        tainted task before and after, side by side. Defaults to
+        config["base_model"] when that is a model id on the board."""
         r = self._call("/api/truns", {"name": name, "project": project,
                                       "config": config or {}, "submitter": submitter,
-                                      "hf_prefix": hf_prefix, "datasets": list(datasets or [])})
+                                      "hf_prefix": hf_prefix, "datasets": list(datasets or []),
+                                      "parent": parent})
         return Run(self, int(r["id"]), name, submitter)
 
     # -- generated datasets (the find-the-gap pipeline; see API.md § datasets) ----

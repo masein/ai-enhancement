@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-for p in (ROOT, ROOT / "scripts", ROOT / "tests" / "fixtures"):
+for p in (ROOT, ROOT / "scripts", ROOT / "clients", ROOT / "tests" / "fixtures"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
@@ -48,7 +48,8 @@ def payload(tree) -> dict:
     cal_path = tree["out_dir"] / "judge_calibration.json"
     cal = json.loads(cal_path.read_text(encoding="utf-8")) if cal_path.exists() else None
     return report.build_payload(report.merge_runs(runs), "Fixture board",
-                                source=str(tree["out_dir"]), calibration=cal)
+                                source=str(tree["out_dir"]), calibration=cal,
+                                taint=tree["taint"], parents=tree["parents"])
 
 
 def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: bool = True,

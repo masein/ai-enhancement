@@ -163,7 +163,10 @@ def train(args, bench):
                                      "device": device,
                                      "gap_dataset": args.gap_dataset, "gap_ratio": args.gap_ratio},
                              hf_prefix=args.push_to or f"local/{run_name}",
-                             datasets=[args.gap_dataset] if args.gap_dataset is not None else [])
+                             datasets=[args.gap_dataset] if args.gap_dataset is not None else [],
+                             # the "before" for the taught-the-skill / taught-the-test
+                             # comparison: evaluate the base model too and the page draws it
+                             parent=args.base_model)
             print(f"  tracking as training run #{run.id} — watch the Training tab")
         except BenchError as e:
             print(f"  run tracking unavailable (non-fatal): {e}")

@@ -25,6 +25,9 @@ def test_every_fixture_model_is_on_the_board(payload, tree):
 def test_official_requires_the_whole_protocol(payload, tree):
     for mid, m in tree["models"].items():
         row = _model(payload, mid)
+        if mid in tree["taint"]:
+            assert not row["official"] and row["avg"] is None and row["tainted"] == ["mmlu"]
+            continue
         if set(make_fixture.FULL) <= set(m["tasks"]):
             assert row["official"] and row["avg"] is not None and row["missing"] == []
         else:

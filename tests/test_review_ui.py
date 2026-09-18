@@ -180,7 +180,8 @@ def test_review_flow_in_the_browser(live, page):
     page.goto(base + "/#tab=leaderboard")
     page.reload()
     page.wait_for_selector("table.lb")
-    row = page.locator("table.lb tbody tr", has_text="good-750m").first
+    row = page.locator("table.lb tbody tr",
+                       has=page.locator("a.mname", has_text=re.compile(r"^good-750m$"))).first
     assert "trained on mmlu diagnostics" in row.locator(".badge.taint").text_content()
     page.goto(model_url(base, "fx/good-750m"))
     page.wait_for_selector(".backlink")

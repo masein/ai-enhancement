@@ -173,6 +173,34 @@ What happens after the click (`service/proposals.py`):
    half and diagnosis half then move apart, that divergence is the alarm this
    whole design exists to raise — phase 6 makes it visible.
 
+## Close the loop, and watch the halves
+
+The payoff of the split. A training run that consumed a generated dataset
+records it and its parent (`bench.init(..., datasets=[id], parent=<base
+model id>)`; `examples/train_and_benchmark.py --gap-dataset <id>` does both).
+Every checkpoint of that run is tainted on the task the data came from, and
+its page opens with **What the training taught**: the leaderboard half and
+the diagnosis half, before (the parent) and after (this model), side by side
+with their standard errors, then one sentence derived from those four numbers:
+
+- **"The training taught the skill"** — both halves moved together. The half
+  the training never saw moved too, which is what learning the subject looks
+  like.
+- **"The training taught the test"** — the diagnosis half rose and the
+  leaderboard half sat still. Rendered as a warning, with the ratio of the two
+  deltas; the board carries a warning too. The score moved; the model did not
+  learn the subject. This is the alarm the split exists to raise.
+- **"Nothing measurable changed"** — both within noise.
+
+Below it, the same before/after by category on the half we never touched, so
+"we were weak in economics" becomes "economics moved by Δ on the half the
+training never saw". The Diagnose section's category rows carry the same
+deltas beside their scores. Categories under the noise floor are greyed: a
+delta there is noise.
+
+Evaluate the parent too. Without a parent on the board with a diagnosis
+there is no before, and the card says exactly which piece is missing.
+
 ## Judged free response, and the control that answers "knew it?"
 
 Multiple choice stops separating models somewhere above a billion parameters

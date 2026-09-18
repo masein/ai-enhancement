@@ -261,10 +261,13 @@ def rollup_categories(groups: dict) -> tuple[dict, list[str]]:
         else:
             mapped += 1
         c = cats.setdefault(cat, {"n": 0, "n_report": 0, "hit_report": 0.0,
+                                  "n_diagnose": 0, "hit_diagnose": 0.0,
                                   "buckets": collections.Counter(), "groups": []})
         c["n"] += g["n"]
         c["n_report"] += g["n_report"]
         c["hit_report"] += g["hit_report"]
+        c["n_diagnose"] += g["n_diagnose"]
+        c["hit_diagnose"] += g["hit_diagnose"]
         c["buckets"].update(g["buckets"])
         c["groups"].append(name)
     if not mapped:
@@ -274,9 +277,11 @@ def rollup_categories(groups: dict) -> tuple[dict, list[str]]:
         c = cats.get(cat)
         if not c:
             continue
-        out[cat] = {"n": c["n"], "n_report": c["n_report"],
+        out[cat] = {"n": c["n"], "n_report": c["n_report"], "n_diagnose": c["n_diagnose"],
                     "score_report": (round(c["hit_report"] / c["n_report"], 6)
                                      if c["n_report"] else None),
+                    "score_diagnose": (round(c["hit_diagnose"] / c["n_diagnose"], 6)
+                                       if c["n_diagnose"] else None),
                     "buckets": dict(c["buckets"]), "groups": c["groups"]}
     return out, unmapped
 
@@ -371,12 +376,19 @@ def diagnose_task(files: list[Path]) -> dict | None:
                 agg["buckets"][b] += 1
                 g = agg["groups"].setdefault(group, {
                     "n": 0, "n_report": 0, "hit_report": 0.0,
+                    "n_diagnose": 0, "hit_diagnose": 0.0,
                     "buckets": collections.Counter()})
                 g["n"] += 1
                 g["buckets"][b] += 1
+                # both halves per group: the before/after comparison of a
+                # retrained model needs the half the training saw AND the half
+                # it never did, per category
                 if half == "report":
                     g["n_report"] += 1
                     g["hit_report"] += 1.0 if right else 0.0
+                else:
+                    g["n_diagnose"] += 1
+                    g["hit_diagnose"] += 1.0 if right else 0.0
 
                 # examples come from the DIAGNOSE half only. This is the whole
                 # safety property: a report item is never shown to a human and
@@ -485,9 +497,11 @@ def diagnose_task(files: list[Path]) -> dict | None:
             out["answers"]["length_biased"] = bool(base and rate >= base * 1.6)
     for name, g in sorted(agg["groups"].items()):
         out["groups"][name] = {
-            "n": g["n"], "n_report": g["n_report"],
+            "n": g["n"], "n_report": g["n_report"], "n_diagnose": g["n_diagnose"],
             "score_report": (round(g["hit_report"] / g["n_report"], 6)
                              if g["n_report"] else None),
+            "score_diagnose": (round(g["hit_diagnose"] / g["n_diagnose"], 6)
+                               if g["n_diagnose"] else None),
             "buckets": dict(g["buckets"]),
         }
     if len(out["groups"]) < 2:        # a single "—" group carries no information

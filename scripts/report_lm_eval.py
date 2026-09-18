@@ -261,6 +261,100 @@ def judged_avg(trimmed: dict | None) -> float | None:
     return round(sum(means) / len(means), 4) if len(means) == len(FR_TASKS) else None
 
 
+# ---------------------------------------------------------------------------
+# Close the loop: what did the training teach?
+#
+# A tainted model trained on data derived from a task's DIAGNOSIS half. Its
+# parent did not. The leaderboard half was never touched by that data, so it
+# is the honest test: if the training taught the skill, both halves move
+# together; if it taught the test, the half the generator saw moves and the
+# other sits still — and that divergence is the alarm this whole design exists
+# to raise. The sentence is derived from the four numbers and their errors and
+# from nothing else.
+# ---------------------------------------------------------------------------
+_Z = 1.96
+
+
+def _half(t: dict, half: str) -> dict | None:
+    v, n = t.get(f"score_{half}"), t.get(f"n_{half}")
+    if v is None or not n:
+        return None
+    return {"v": v, "n": n, "se": math.sqrt(max(v * (1 - v), 1e-9) / n)}
+
+
+def taint_verdict(task: str, d_rep: float, se_rep: float, d_dia: float, se_dia: float
+                  ) -> tuple[str, str, float | None]:
+    """(verdict, sentence, ratio). Verdicts: skill | test | none | mixed."""
+    sig_rep, sig_dia = abs(d_rep) > _Z * se_rep, abs(d_dia) > _Z * se_dia
+    z_rep = abs(d_rep) / se_rep if se_rep else 0.0
+    z_dia = abs(d_dia) / se_dia if se_dia else 0.0
+    ratio = (d_dia / d_rep) if abs(d_rep) > 1e-9 else None
+    pts = lambda d: f"{100 * d:+.1f} points"  # noqa: E731
+    if sig_dia and d_dia > 0 and not sig_rep:
+        tail = (f"The diagnosis-half gain is {abs(ratio):.0f}× the leaderboard-half change."
+                if ratio is not None and abs(ratio) >= 1.5
+                else "The leaderboard half did not move at all.")
+        return ("test",
+                f"The training taught the test. On {task}, the half the generator's spec was "
+                f"derived from rose {pts(d_dia)} ({z_dia:.1f} standard errors) while the half "
+                f"it never saw moved {pts(d_rep)} ({z_rep:.1f} SE), within noise. {tail} The "
+                f"score moved; the model did not learn the subject.", ratio)
+    if sig_rep and sig_dia and (d_rep > 0) == (d_dia > 0):
+        return ("skill",
+                f"The training taught the skill. On {task} both halves moved together: the "
+                f"leaderboard half {pts(d_rep)} ({z_rep:.1f} SE), the diagnosis half "
+                f"{pts(d_dia)} ({z_dia:.1f} SE). The half the training never saw moved too, "
+                f"which is what learning the subject looks like.", ratio)
+    if not sig_rep and not sig_dia:
+        return ("none",
+                f"The training changed nothing measurable on {task}: leaderboard half "
+                f"{pts(d_rep)} (±{100 * _Z * se_rep:.1f}), diagnosis half {pts(d_dia)} "
+                f"(±{100 * _Z * se_dia:.1f}), both within noise.", ratio)
+    return ("mixed",
+            f"An unusual pattern on {task}: the leaderboard half moved {pts(d_rep)} "
+            f"({z_rep:.1f} SE) and the diagnosis half {pts(d_dia)} ({z_dia:.1f} SE). Neither "
+            f"reading fits; check that parent and child share a template and a harness build "
+            f"before reading anything into it.", ratio)
+
+
+def taint_compare(task: str, after: dict, before: dict, parent: str) -> dict | None:
+    """The per-task, per-half, per-category comparison of a tainted model
+    against its parent, from the two trimmed diagnoses."""
+    ta, tb = (after.get("tasks") or {}).get(task), (before.get("tasks") or {}).get(task)
+    if not ta or not tb:
+        return None
+    a_rep, a_dia, b_rep, b_dia = _half(ta, "report"), _half(ta, "diagnose"), \
+        _half(tb, "report"), _half(tb, "diagnose")
+    if not all((a_rep, a_dia, b_rep, b_dia)):
+        return None
+    d_rep, d_dia = a_rep["v"] - b_rep["v"], a_dia["v"] - b_dia["v"]
+    se_rep = math.sqrt(a_rep["se"] ** 2 + b_rep["se"] ** 2)
+    se_dia = math.sqrt(a_dia["se"] ** 2 + b_dia["se"] ** 2)
+    verdict, text, ratio = taint_verdict(task, d_rep, se_rep, d_dia, se_dia)
+    cats = {}
+    for name, ca in (ta.get("categories") or {}).items():
+        cb = (tb.get("categories") or {}).get(name)
+        if not cb or ca.get("score_report") is None or cb.get("score_report") is None:
+            continue
+        cats[name] = {
+            "before": {k: cb.get(k) for k in ("score_report", "score_diagnose", "n_report",
+                                              "n_diagnose")},
+            "after": {k: ca.get(k) for k in ("score_report", "score_diagnose", "n_report",
+                                             "n_diagnose")},
+            "dReport": round(ca["score_report"] - cb["score_report"], 6),
+            "dDiagnose": (round(ca["score_diagnose"] - cb["score_diagnose"], 6)
+                          if ca.get("score_diagnose") is not None
+                          and cb.get("score_diagnose") is not None else None),
+        }
+    return {"parent": parent,
+            "before": {"report": b_rep, "diagnose": b_dia},
+            "after": {"report": a_rep, "diagnose": a_dia},
+            "dReport": round(d_rep, 6), "dDiagnose": round(d_dia, 6),
+            "seReport": round(se_rep, 6), "seDiagnose": round(se_dia, 6),
+            "verdict": verdict, "ratio": (round(ratio, 3) if ratio is not None else None),
+            "text": text, "categories": cats}
+
+
 def load_results(path: Path) -> list[dict]:
     """Find and parse every lm-eval results file under `path`."""
     files = sorted(path.rglob("results*.json")) if path.is_dir() else [path]
@@ -662,13 +756,15 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
 
 def build_payload(by_model: dict[str, dict], title: str, source: str,
                   taint: dict[str, list[str]] | None = None,
-                  calibration: dict | None = None) -> dict:
+                  calibration: dict | None = None,
+                  parents: dict[str, str] | None = None) -> dict:
     """`taint`: model id -> tasks whose diagnostics its training data was
     derived from (the service computes it from the run/dataset join). A
     tainted task is treated exactly like a missing required task: shown per
     task, excluded from the official average, the model unranked."""
     models = list(by_model)
     taint = taint or {}
+    parents = parents or {}      # tainted model id -> the model its training run started from
 
     # display names: short unless two orgs publish the same repo name
     # (google/gemma-3-270m vs unsloth/gemma-3-270m must not collapse into one row)
@@ -732,6 +828,25 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         params = r["num_params"] or params_from_name(mid)
         judge = _trim_judge(r.get("judge"))
         diag = _trim_diag(r.get("diag"))
+        compare = {}
+        for t in tainted:
+            pid = parents.get(mid)
+            pdiag = _trim_diag(by_model[pid].get("diag")) if pid in by_model else None
+            cmp = taint_compare(t, diag, pdiag, pid) if diag and pdiag else None
+            if cmp:
+                compare[t] = cmp
+            elif not pid:
+                compare[t] = {"parent": None, "missing":
+                              "the training run recorded no parent (bench.init(parent=…) or "
+                              "base_model in its config), so there is no before to compare"}
+            elif pid not in by_model:
+                compare[t] = {"parent": pid, "missing":
+                              f"the parent {pid} is not on this board, so there is no before to "
+                              f"compare — evaluate it"}
+            else:
+                compare[t] = {"parent": pid, "missing":
+                              f"{'this model' if not diag else 'the parent'} has no diagnosis "
+                              f"on file for {t} — run scripts/diagnose.py"}
         if diag:
             for task, t in diag["tasks"].items():
                 if t.get("categories"):
@@ -761,6 +876,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             # judged average exists only when every category was judged
             "judge": judge,
             "judgedAvg": judged_avg(judge),
+            # per tainted task: both halves before and after training, and
+            # the sentence derived from them
+            "taintCompare": compare or None,
             "kindReason": (r.get("archinfo") or {}).get("kind_reason"),
             # official numbers only: normalized (the ranking key) and raw (the
             # number you quote), both over the required list, both None when the
@@ -856,6 +974,15 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             + ", ".join(req_absent) + " were not run by anyone here, so 'official' "
             "means complete within this report, not complete under the full "
             "protocol.")
+    alarms = [m for m in model_rows
+              if any(c.get("verdict") == "test" for c in (m["taintCompare"] or {}).values())]
+    if alarms:
+        warnings.append(
+            f"{len(alarms)} model{'s' if len(alarms) > 1 else ''} "
+            f"({', '.join(m['name'] for m in alarms[:4])}) moved on the diagnosis half and not "
+            f"on the leaderboard half after training on derived data — the training taught the "
+            f"test, not the skill. This is the alarm the split exists to raise; see the model's "
+            f"page.")
     tainted_rows = [m for m in model_rows if m["tainted"]]
     if tainted_rows:
         warnings.append(
@@ -2100,12 +2227,17 @@ function dxCategories(mid, t, v, atChance) {
       .filter(([, x]) => x && x.score_report != null)
       .sort((x, y) => x[1].score_report - y[1].score_report);
     const gate = ((v.propose || {}).categories || {})[name];
+    const mm = DATA.models.find(x => x.id === mid);
+    const cmp = ((((mm || {}).taintCompare || {})[t] || {}).categories || {})[name];
     const det = el('details', { class: 'dxcat' + (dim ? ' dim' : ''), 'data-cat': name },
       el('summary', {},
         el('span', { class: 'dxcname', text: name }),
         el('span', { class: 'num', text: pct(g.score_report) }),
         el('span', { class: 'se', text: `${g.n_report} items`
           + (dim ? ` · under ${CAT_MIN_N}, noise` : '') }),
+        cmp ? el('span', { class: 'se taintdelta', title: 'change against the parent model, '
+          + 'leaderboard half (never in the training data) and diagnosis half',
+          text: `vs parent: lb ${dpts(cmp.dReport)} · dx ${cmp.dDiagnose == null ? '—' : dpts(cmp.dDiagnose)}` }) : '',
         dxBar(g.buckets || {}, g.n || 1, true),
         // the button that starts the generation pipeline. Disabled WITH the
         // reason on the row: a format failure or an at-chance score must say
@@ -2448,6 +2580,72 @@ function vJudged(m) {
   return card;
 }
 
+// ---------- close the loop: what did the training teach? ----------
+// For a tainted model with its parent on the board: both halves, before and
+// after, side by side with their errors, and the sentence the numbers derive.
+// "Taught the test" is rendered as a warning — it is the alarm.
+const VERDICT = { skill: 'The training taught the skill', test: 'The training taught the test',
+                  none: 'Nothing measurable changed', mixed: 'An unusual pattern' };
+const dpts = d => (d >= 0 ? '+' : '') + (100 * d).toFixed(1);
+
+function vTaint(m) {
+  const tc = m.taintCompare;
+  if (!tc || !Object.keys(tc).length) return null;
+  const card = el('div', { class: 'card' },
+    el('h2', { text: 'What the training taught' }),
+    el('p', { class: 'sub', text: 'This model trained on data derived from a benchmark\'s '
+      + 'diagnosis half. The leaderboard half was never touched by that data, so it is the '
+      + 'honest test: if the training taught the skill, both halves move together; if it '
+      + 'taught the test, only the half the generator\'s spec came from moves.' }));
+  for (const [t, c] of Object.entries(tc)) {
+    card.append(el('div', { class: 'dxh', text: taskLabel(t) }));
+    if (c.missing) { card.append(note(c.missing)); continue; }
+    const parent = DATA.models.find(x => x.id === c.parent);
+    const pm = parent ? parent.name : c.parent;
+    const half = (label, b, a, d, se) => el('tr', {},
+      el('td', { text: label }),
+      el('td', { class: 'num', text: pct(b.v) }, el('span', { class: 'se', text: ` ±${(100 * b.se).toFixed(1)}` })),
+      el('td', { class: 'num', text: pct(a.v) }, el('span', { class: 'se', text: ` ±${(100 * a.se).toFixed(1)}` })),
+      el('td', { class: 'num', text: dpts(d) }),
+      el('td', { class: 'num se', text: `${(Math.abs(d) / se).toFixed(1)} SE` }));
+    card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'half' }),
+        el('th', { class: 'num', text: `before — ${pm}` }), el('th', { class: 'num', text: `after — ${m.name}` }),
+        el('th', { class: 'num', text: 'Δ points' }), el('th', { class: 'num', text: 'moved by' }))),
+      el('tbody', {},
+        half('leaderboard half (never in the training data)', c.before.report, c.after.report, c.dReport, c.seReport),
+        half('diagnosis half (the spec came from here)', c.before.diagnose, c.after.diagnose, c.dDiagnose, c.seDiagnose)))));
+    const warn = c.verdict === 'test' || c.verdict === 'mixed';
+    card.append(el('p', { class: warn ? 'warn' : 'dxlead calm', 'data-verdict': c.verdict },
+      el('b', { text: VERDICT[c.verdict] + '. ' }), c.text.replace(/^The training taught the (skill|test)\. |^Nothing measurable changed\. |^An unusual pattern[^:]*: /, '')));
+    if (c.ratio != null && c.verdict === 'test')
+      card.append(el('p', { class: 'small', text: `Ratio of the two deltas (diagnosis / leaderboard): ${num(c.ratio, 1)}.` }));
+    const cats = Object.entries(c.categories || {})
+      .sort((x, y) => (y[1].dDiagnose ?? 0) - (x[1].dDiagnose ?? 0));
+    if (cats.length) {
+      card.append(el('div', { class: 'dxh', text: 'By category — the half we never touched' }));
+      card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+        el('thead', {}, el('tr', {}, el('th', { text: 'category' }),
+          el('th', { class: 'num', text: 'leaderboard half before → after' }), el('th', { class: 'num', text: 'Δ' }),
+          el('th', { class: 'num', text: 'diagnosis half before → after' }), el('th', { class: 'num', text: 'Δ' }),
+          el('th', { class: 'num', text: 'items (lb half)' }))),
+        el('tbody', {}, cats.map(([name, v]) => el('tr', {
+            class: (v.after.n_report || 0) < CAT_MIN_N ? 'dim' : null },
+          el('td', { text: name }),
+          el('td', { class: 'num', text: `${pct(v.before.score_report)} → ${pct(v.after.score_report)}` }),
+          el('td', { class: 'num', text: dpts(v.dReport) }),
+          el('td', { class: 'num', text: v.dDiagnose == null ? '—'
+            : `${pct(v.before.score_diagnose)} → ${pct(v.after.score_diagnose)}` }),
+          el('td', { class: 'num', text: v.dDiagnose == null ? '—' : dpts(v.dDiagnose) }),
+          el('td', { class: 'num se', text: String(v.after.n_report) })))))));
+      card.append(el('p', { class: 'small', text: `Categories under ${CAT_MIN_N} leaderboard-half `
+        + 'items are greyed: a delta there is noise. "We were weak in economics" becomes '
+        + '"economics moved by Δ on the half we never touched" — read that column.' }));
+    }
+  }
+  return card;
+}
+
 function vModel() {
   const m = DATA.models.find(x => x.id === state.model);
   if (!m) return [note('No such model.')];
@@ -2537,7 +2735,7 @@ function vModel() {
       [el('dt', { text: k }), el('dd', { class: 'mono', text: String(v) })])));
 
   // vDiagnose / vJudged are null when no model on this board has that file
-  return [back, head, results, vDiagnose(m), vJudged(m), provCard].filter(Boolean);
+  return [back, head, results, vTaint(m), vDiagnose(m), vJudged(m), provCard].filter(Boolean);
 }
 
 function vOverview(ms) {
@@ -4791,12 +4989,14 @@ TEMPLATE = """<!doctype html>
 
 
 def build_report(runs: list[dict], out_path: Path, title: str,
-                 calibration: dict | None = None) -> Path:
+                 calibration: dict | None = None, taint: dict | None = None,
+                 parents: dict | None = None) -> Path:
     if not runs:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text("<h1>No lm-eval results found.</h1>", encoding="utf-8")
         return out_path
-    payload = build_payload(merge_runs(runs), title, source="", calibration=calibration)
+    payload = build_payload(merge_runs(runs), title, source="", calibration=calibration,
+                            taint=taint, parents=parents)
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     page = (TEMPLATE
             .replace("__TITLE__", html.escape(title))

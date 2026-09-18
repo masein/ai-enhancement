@@ -244,7 +244,9 @@ def test_findings_land_on_the_model_they_were_planted_in(diag):
     assert weakest == "econometrics"
     assert set(good["groups"]) == set(make_fixture.MMLU_SUBJECTS)
     for g in good["groups"].values():
-        assert set(g) == {"n", "n_report", "score_report", "buckets"}
+        assert set(g) == {"n", "n_report", "n_diagnose", "score_report", "score_diagnose",
+                          "buckets"}
+        assert g["n_report"] + g["n_diagnose"] == g["n"]
 
 
 def test_item_count_disagreement_shows_in_the_log_count(diag, tree):
