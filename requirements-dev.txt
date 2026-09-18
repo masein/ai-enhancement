@@ -1,0 +1,13 @@
+# Test and lint tooling. Nothing here reaches the GPU or the Hub, and the
+# service's own imports are listed so the API tests run without torch or
+# lm_eval installed (the runner shells out to lm_eval; it never imports it).
+#
+#   pip install -r requirements-dev.txt && playwright install chromium
+#   pytest -q && ruff check .
+pytest>=8
+ruff>=0.6
+playwright>=1.50
+fastapi
+uvicorn
+httpx            # fastapi.testclient
+pydantic

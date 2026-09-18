@@ -1,0 +1,27 @@
+# Tooling config only — this repo is a service and a set of scripts, not a
+# package. Python 3.12: the version the service container runs (Ubuntu's
+# system Python in the pytorch base image) and the version CI tests against.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "gpu: needs the RTX 5090 — deselected in CI",
+    "network: needs the Hub or the internet — deselected in CI",
+    "dashboard: drives the page in Playwright's Chromium (run `playwright install chromium` once)",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 92
+extend-exclude = ["runs", "Claude outputs", "artifacts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+# E501: the dashboard's CSS and JS live inside Python string literals and wrap
+#       on their own terms; a Python line-length rule has nothing to say there.
+# E702/E731/E741: the code uses compact one-liners, small lambdas and `l` for a
+#       length on purpose where the comment beside them says why. Style, not
+#       correctness — the rules that catch real mistakes (F*, the rest of E)
+#       stay on.
+ignore = ["E501", "E702", "E731", "E741"]

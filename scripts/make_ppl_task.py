@@ -208,8 +208,8 @@ def main() -> int:
     print(f"wrote {jsonl}  ({len(docs)} docs, {total_bytes / 1e6:.2f} MB of text)")
     print(f"wrote {yaml_path}")
     print(f"item set sha256: {digest}   <- record this; it identifies the eval set")
-    print(f"\nverify it registers, cheaply:")
-    print(f"  lm_eval --model hf --model_args pretrained=EleutherAI/pythia-160m \\")
+    print("\nverify it registers, cheaply:")
+    print("  lm_eval --model hf --model_args pretrained=EleutherAI/pythia-160m \\")
     print(f"      --include_path {args.out_dir} --tasks {args.name} --limit 5 --device cuda:0")
     return 0
 
