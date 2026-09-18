@@ -64,6 +64,11 @@ _WATCH = ("results*.json", "diagnose.json", "model_meta.json", "judge.json",
           "judge_calibration.json")
 
 
+def _judge_identity() -> dict:
+    import judge as _judge
+    return _judge.identity()
+
+
 def _calibration() -> dict | None:
     """results/full/judge_calibration.json, written by scripts/judge_calibrate.py
     import — the judge's agreement with a person, without which nothing judged
@@ -126,7 +131,8 @@ def results_payload() -> dict:
         payload = report.build_payload(by_model, config.TITLE, source=str(config.OUT_DIR),
                                        taint=taint_for(by_model.keys()),
                                        parents=parents_for(by_model.keys()),
-                                       calibration=_calibration())
+                                       calibration=_calibration(),
+                                       judge_identity=_judge_identity())
         payload["live"] = True
         _cache.update(key=key, payload=payload)
     _cache["at"] = now
@@ -592,10 +598,17 @@ def judge_status():
     why = config.judged_blocked()
     import judge as _judge      # scripts/, on sys.path above
     cal = _calibration() or {}
+    ident = _judge.identity()
     return {"configured": not why, "reason": why, "judge_model": config.JUDGE_MODEL,
-            "judge_family": _judge.family(config.JUDGE_MODEL) if config.JUDGE_MODEL else "",
+            "judge_provider": config.JUDGE_PROVIDER, "judge_id": ident["id"],
+            "judge_family": ident["family"],
+            "single_provider_loop": _judge.single_provider_loop(),
+            "provider_clash": _judge.provider_clash(),
+            "canary_max_drift": config.JUDGE_CANARY_MAX_DRIFT,
             "tasks": config.judged_tasks(), "tasks_dir": str(config.JUDGED_TASKS_DIR),
+            "runs": db.judge_runs(20),
             "calibration": {k: cal.get(k) for k in ("kappa", "n", "calibrated", "kappa_min")}
+            | ({"judge_id": (cal.get("judge") or {}).get("id")} if cal else {})
             if cal else None}
 
 

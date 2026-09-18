@@ -266,6 +266,18 @@ def write_items(did: int, items: list[dict]) -> tuple[Path, str]:
     return p, hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
+def identities(generator_id: str) -> dict:
+    """All three LLM identities, in every provenance record: the loop is only
+    honest if the exam writer, the judge and the generator are not one family."""
+    import judge as _judge
+    from . import llm
+    ex = llm.identity("exam")
+    jd = _judge.identity()
+    return {"exam_writer": f"{ex[0]}/{ex[1]}" if ex[0] else "",
+            "judge": jd["id"], "generator": generator_id,
+            "single_provider_loop": _judge.single_provider_loop()}
+
+
 def provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash: str,
                gate: dict, sha: str, n_generated: int, n_kept: int) -> dict:
     return {
@@ -285,6 +297,7 @@ def provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash
         "generator": {"provider": backend_id.split("/", 1)[0],
                       "model": backend_id.split("/", 1)[1] if "/" in backend_id else "",
                       "batch_id": batch_id, "id": backend_id},
+        "identities": identities(backend_id),
         "prompt_sha256": prompt_hash,
         "format": ds["fmt"],
         "count_requested": ds["count"],
@@ -312,8 +325,11 @@ def provenance_complete(p: dict) -> list[str]:
             holes.append(path)
     walk(p, "")
     # edited_text is legitimately empty when the human approved the spec as
-    # written; a clean gate legitimately has no offending n-grams to list
-    return [h for h in holes if h not in ("edited_text", "gate.offending_ngrams")]
+    # written; a clean gate legitimately has no offending n-grams to list; an
+    # identity may legitimately be unconfigured, and False is a value
+    return [h for h in holes if h not in ("edited_text", "gate.offending_ngrams",
+                                          "identities.exam_writer", "identities.judge",
+                                          "identities.single_provider_loop")]
 
 
 def slug(s: str) -> str:

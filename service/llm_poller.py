@@ -14,7 +14,13 @@ import threading
 import time
 import traceback
 
+import sys
+from pathlib import Path
+
 from . import config, contamination, db, llm, proposals
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+import judge as _judge  # noqa: E402
 
 _stop = threading.Event()
 
@@ -87,19 +93,38 @@ def _finish_generation(row: dict, results: dict[str, llm.Result], backend: llm.B
                       provenance=json.dumps(prov))
 
 
+def _finish_judge(row: dict, results: dict[str, llm.Result]) -> None:
+    run = db.judge_run_get(row["ref_id"])
+    if not run:
+        return
+    _judge.finish_run(run, results, config.OUT_DIR)
+    db.judge_run_update(run["id"], status="done", finished_at=time.time())
+
+
+def _mark_failed(r: dict, why: str) -> None:
+    if r["kind"] == "proposal":
+        db.proposal_update(r["ref_id"], status="failed", error=why[:400])
+    elif r["kind"] == "generation":
+        db.dataset_update(r["ref_id"], status="failed", finished_at=time.time(), error=why[:400])
+    elif r["kind"] == "judge":
+        db.judge_run_update(r["ref_id"], status="failed", finished_at=time.time(), error=why[:400])
+
+
 def tick() -> int:
-    """Poll every submitted batch once. Returns how many finished."""
+    """Poll every submitted batch once. Returns how many finished. Each batch
+    is polled with the identity that submitted it — judge batches belong to
+    the judge, the rest to the generator."""
     rows = db.batches_pending()
     if not rows:
         return 0
-    try:
-        backend = llm.client()
-    except llm.LLMError as e:
-        for r in rows:
-            db.batch_finish(r["batch_id"], "failed", f"LLM unavailable: {e}")
-        return 0
     done = 0
     for r in rows:
+        try:
+            backend = llm.client("judge" if r["kind"] == "judge" else "llm")
+        except llm.LLMError as e:
+            db.batch_finish(r["batch_id"], "failed", f"LLM unavailable: {e}")
+            _mark_failed(r, f"LLM unavailable: {e}")
+            continue
         try:
             state, detail = backend.status(r["batch_id"])
         except llm.LLMError as e:
@@ -109,28 +134,22 @@ def tick() -> int:
             continue
         if state == "failed":
             db.batch_finish(r["batch_id"], "failed", detail)
-            if r["kind"] == "proposal":
-                db.proposal_update(r["ref_id"], status="failed", error=f"batch failed: {detail}")
-            else:
-                db.dataset_update(r["ref_id"], status="failed", finished_at=time.time(),
-                                  error=f"batch failed: {detail}")
+            _mark_failed(r, f"batch failed: {detail}")
             done += 1
             continue
         try:
             results = backend.fetch(r["batch_id"])
             if r["kind"] == "proposal":
                 _finish_proposal(r, results, backend)
-            else:
+            elif r["kind"] == "generation":
                 _finish_generation(r, results, backend)
+            elif r["kind"] == "judge":
+                _finish_judge(r, results)
             db.batch_finish(r["batch_id"], "done", "")
         except Exception as e:                       # noqa: BLE001 — one batch must not kill the loop
             traceback.print_exc()
             db.batch_finish(r["batch_id"], "failed", repr(e)[:400])
-            if r["kind"] == "proposal":
-                db.proposal_update(r["ref_id"], status="failed", error=repr(e)[:400])
-            else:
-                db.dataset_update(r["ref_id"], status="failed", finished_at=time.time(),
-                                  error=repr(e)[:400])
+            _mark_failed(r, repr(e))
         done += 1
     return done
 
@@ -145,7 +164,7 @@ def loop() -> None:
 
 
 def start() -> threading.Thread | None:
-    if not config.LLM_PROVIDER:
+    if not (config.LLM_PROVIDER or config.JUDGE_PROVIDER):
         return None
     _stop.clear()
     t = threading.Thread(target=loop, name="llm-poller", daemon=True)

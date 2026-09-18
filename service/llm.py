@@ -242,6 +242,13 @@ def default_responder(req: Request) -> str:
     of fresh items for a generation request. The wording deliberately shares
     no vocabulary with the fixture's questions, so nothing here can trip the
     contamination gate by accident — a test that wants a trip plants one."""
+    if req.custom_id.startswith(("judge:", "canary:")):
+        try:
+            from judge import StubGrader              # scripts/, on sys.path in the service
+            s, j = StubGrader.grade(req.user)
+        except Exception:                             # noqa: BLE001 — a fixed grade beats a crash
+            s, j = 2, "fake grade"
+        return json.dumps({"score": s, "justification": j})
     if req.custom_id.startswith("exam:"):
         topic = req.meta.get("topic", "the topic")
         n = int(req.meta.get("count", 4))
@@ -414,7 +421,8 @@ PROVIDERS = ("anthropic", "openai", "fake")
 # (EXAM_*) and, from C2, the judge (JUDGE_*). Each is a (provider, model, key)
 # triple in config; the same backends serve all three.
 ROLES = {"llm": ("LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "proposals and generation"),
-         "exam": ("EXAM_PROVIDER", "EXAM_MODEL", "EXAM_API_KEY", "exam drafting")}
+         "exam": ("EXAM_PROVIDER", "EXAM_MODEL", "EXAM_API_KEY", "exam drafting"),
+         "judge": ("JUDGE_PROVIDER", "JUDGE_MODEL", "JUDGE_API_KEY", "judging")}
 
 
 def identity(role: str = "llm") -> tuple[str, str, str]:
@@ -443,6 +451,8 @@ def startup_check() -> None:
     """A provider that is set but broken fails the container at start, where
     the operator is looking, instead of at the first click days later."""
     for role in ROLES:
+        if role == "judge":
+            continue          # the judge's refusals are shown on the page, not fatal (judge.blocked)
         if identity(role)[0] and blocked(role):
             raise RuntimeError(f"{role.upper()} misconfigured: " + blocked(role))
 

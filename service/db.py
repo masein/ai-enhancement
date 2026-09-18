@@ -113,6 +113,20 @@ CREATE TABLE IF NOT EXISTS exam_curation (
   reason      TEXT DEFAULT '',
   decided_at  REAL NOT NULL
 );
+-- a judged run in flight: the plan the results are assembled against, so
+-- the poller can finish it in another process
+CREATE TABLE IF NOT EXISTS judge_runs (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  model       TEXT NOT NULL,
+  batch_id    TEXT NOT NULL,
+  n_items     INTEGER NOT NULL,
+  judge_id    TEXT NOT NULL,
+  plan        TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'submitted',  -- submitted|done|failed
+  error       TEXT DEFAULT '',
+  created_at  REAL NOT NULL,
+  finished_at REAL
+);
 -- every batch id, persisted before anything else happens: a restart resumes
 -- polling instead of re-submitting
 CREATE TABLE IF NOT EXISTS llm_batches (
@@ -550,3 +564,41 @@ def curation_list(limit: int = 500) -> list[dict]:
         rows = c.execute(f"SELECT {','.join(_CUR_COLS)} FROM exam_curation "
                          "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
     return [dict(zip(_CUR_COLS, r)) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# judged runs in flight
+# ---------------------------------------------------------------------------
+
+_JR_COLS = ["id", "model", "batch_id", "n_items", "judge_id", "plan", "status", "error",
+            "created_at", "finished_at"]
+
+
+def judge_run_create(model: str, batch_id: str, n_items: int, judge_id: str, plan: str) -> int:
+    with closing(_conn()) as c:
+        cur = c.execute("INSERT INTO judge_runs (model, batch_id, n_items, judge_id, plan, "
+                        "created_at) VALUES (?,?,?,?,?,?)",
+                        (model, batch_id, n_items, judge_id, plan, time.time()))
+        c.commit()
+        return int(cur.lastrowid)
+
+
+def judge_run_get(rid: int) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute(f"SELECT {','.join(_JR_COLS)} FROM judge_runs WHERE id=?", (rid,)).fetchone()
+    return dict(zip(_JR_COLS, row)) if row else None
+
+
+def judge_run_update(rid: int, **fields) -> None:
+    keys = ", ".join(f"{k}=?" for k in fields)
+    with closing(_conn()) as c:
+        c.execute(f"UPDATE judge_runs SET {keys} WHERE id=?", (*fields.values(), rid))
+        c.commit()
+
+
+def judge_runs(limit: int = 100) -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute(f"SELECT {','.join(k for k in _JR_COLS if k != 'plan')} FROM judge_runs "
+                         "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    cols = [k for k in _JR_COLS if k != "plan"]
+    return [dict(zip(cols, r)) for r in rows]

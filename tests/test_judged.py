@@ -125,29 +125,19 @@ def test_family_rule_and_refusal(tree):
     assert jd.family("EleutherAI/pythia-160m") == "pythia"
     assert jd.family("mistralai/Mistral-7B-Instruct-v0.3") == "mistral"
     assert jd.family("local/run7-step400") == "run7"
-    out = jd.judge_model(tree["models"]["fx/good-750m"]["dir"], jd.StubGrader(), "good")
-    assert "same family as judge" in out["skipped"] and out["tasks"] == {}
-    assert out["judge"]["family"] == "good" and out["model"] == "fx/good-750m"
-    out = jd.judge_model(tree["models"]["fx/good-750m"]["dir"], jd.StubGrader(), "llama")
+    _, plan = jd.plan_requests(tree["models"]["fx/good-750m"]["dir"], "good")
+    assert "same family as judge" in plan["skipped"]
+    out = jd.run_stub(tree["models"]["fx/good-750m"]["dir"], tree["root"] / "h")
     assert "skipped" not in out and len(out["tasks"]) == len(tree["judged"]["manifest"]["tasks"])
-    assert jd.judge_model(tree["models"][tree["nodiag"]]["dir"], jd.StubGrader(), "x") is None
-
-
-def test_judging_twice_is_byte_identical(tree, tmp_path):
-    d = tree["models"]["fx/skewed-360m"]["dir"]
-    a = jd.write_judge(d, jd.judge_model(d, jd.StubGrader(), "stub"), tmp_path / "a")
-    b = jd.write_judge(d, jd.judge_model(d, jd.StubGrader(), "stub"), tmp_path / "b")
-    assert a.read_bytes() == b.read_bytes()
-    assert a.read_bytes() == (d / "judge.json").read_bytes()      # and what the fixture wrote
+    assert jd.run_stub(tree["models"][tree["nodiag"]]["dir"], tree["root"] / "h2") is None
 
 
 def test_judge_json_shape_and_hashes(tree):
     for mid in make_fixture.JUDGED:
         j = json.loads((tree["models"][mid]["dir"] / "judge.json").read_text())
         jj = j["judge"]
-        assert re.fullmatch(r"[0-9a-f]{64}", jj["weights_sha256"])
         assert re.fullmatch(r"[0-9a-f]{64}", jj["prompt_sha256"]) and jj["prompt_sha256"] == jd.prompt_sha()
-        assert jj["greedy"] is True and jj["stub"] is True and jj["id"] == "stub/overlap-v1"
+        assert jj["stub"] is True and jj["id"] == "stub/overlap-v1"
         assert set(jj["rubrics"]) == set(tree["judged"]["manifest"]["tasks"])
         assert all(r["version"] == "1" and len(r["sha256"]) == 64 for r in jj["rubrics"].values())
         assert j["split_salt"] == dx.SPLIT_SALT and j["correct_at"] == 3
@@ -185,11 +175,12 @@ def test_stub_grader_and_the_length_clause():
     g = jd.StubGrader()
     ref = "The femur (thigh bone)."
     p = lambda ans: jd.build_prompt("rubric", "q", ref, ans)  # noqa: E731
-    assert g.grade(p("The femur, the thigh bone.")) == 4
-    assert g.grade(p("The femur, the thigh bone. " + make_fixture.FILLER)) == 3
-    assert g.grade(p("")) == 0
-    assert g.grade(p("Paris is the capital of France, and it is lovely in spring.")) <= 1
-    assert g.grade(p("The largest bone is in the leg.")) in (1, 2)
+    assert g.grade(p("The femur, the thigh bone."))[0] == 4
+    assert g.grade(p("The femur, the thigh bone. " + make_fixture.FILLER))[0] == 3
+    assert g.grade(p(""))[0] == 0
+    assert g.grade(p("Paris is the capital of France, and it is lovely in spring."))[0] <= 1
+    assert g.grade(p("The largest bone is in the leg."))[0] in (1, 2)
+    assert "length clause" in g.grade(p("The femur, the thigh bone. " + make_fixture.FILLER))[1]
 
 
 def test_judge_cli(tree, tmp_path, monkeypatch, capsys):
@@ -200,9 +191,10 @@ def test_judge_cli(tree, tmp_path, monkeypatch, capsys):
     assert "STUB" in out and "fx__skewed-360m" in out
     assert (tmp_path / "fx__skewed-360m" / "judge.json").exists()
     assert not (tmp_path / "fx__below-135m-it").exists()             # no fr answers → no file
+    from service import config
+    monkeypatch.setattr(config, "JUDGE_MODEL", "")
     monkeypatch.setattr(sys, "argv", ["judge.py", str(tree["out_dir"])])
-    monkeypatch.delenv("JUDGE_MODEL", raising=False)
-    assert jd.main() == 2                                             # no judge named
+    assert jd.main() == 2                                             # no judge configured
 
 
 # ---------------------------------------------------------------------------
@@ -331,9 +323,11 @@ def test_judged_suite_through_the_service(tmp_path, monkeypatch):
         assert set(st["tasks"]) == set(tree["judged"]["manifest"]["tasks"])
         r = client.post("/api/submissions", json={"hf_id": "org/model", "suite": "judged"})
         assert r.status_code == 503
-        monkeypatch.setattr(config, "JUDGE_MODEL", "meta-llama/Llama-3.1-8B-Instruct")
+        monkeypatch.setattr(config, "JUDGE_PROVIDER", "anthropic")
+        monkeypatch.setattr(config, "JUDGE_MODEL", "claude-sonnet-4-5-20250929")
+        monkeypatch.setattr(config, "JUDGE_API_KEY", "k")
         st = client.get("/api/judge").json()
-        assert st["configured"] and st["judge_family"] == "llama"
+        assert st["configured"] and st["judge_family"] == "claude", st["reason"]
         assert st["calibration"]["calibrated"] is True
         r = client.post("/api/submissions", json={"hf_id": "org/model", "suite": "judged"})
         assert r.status_code == 200 and r.json()["status"] == "queued"
@@ -342,9 +336,6 @@ def test_judged_suite_through_the_service(tmp_path, monkeypatch):
                                                              str(config.JUDGED_TASKS_DIR)]
         assert runner.include_args_for("fr_control_mmlu") == ["--include_path",
                                                               str(config.JUDGED_TASKS_DIR)]
-        assert runner.judge_cmd("org/model")[-2:] == ["--judge", "meta-llama/Llama-3.1-8B-Instruct"]
-        monkeypatch.setattr(config, "JUDGE_MODEL", "stub")
-        assert runner.judge_cmd("org/model")[-1] == "--stub"
         monkeypatch.setattr(config, "JUDGED_TASKS_DIR", tmp_path / "nowhere")
         assert "exam_build.py" in config.judged_blocked()
     finally:

@@ -103,7 +103,9 @@ re-queued automatically and per-task resume repeats only the interrupted task.
 | `DATASET_QUOTA_GB` | 20 | total generated-dataset storage under `$BENCH_ROOT/datasets` |
 | `EXAM_PROVIDER` / `EXAM_MODEL` / `EXAM_API_KEY` | *(unset — off)* | the exam writer behind `scripts/exam_build.py draft`. A different identity from the generator and the judge, on purpose |
 | `EXAM_DIR` | `$BENCH_ROOT/exam` | `candidates/` awaiting curation, `bank/` accepted questions (split by qid), `tasks/` what the harness runs |
-| `JUDGE_MODEL` | *(unset — off)* | the local judge for `suite=judged` (an HF id in `HF_HOME`; `stub` for a dry run). Never the same family as a model on the board — those cells say so |
+| `JUDGE_PROVIDER` / `JUDGE_MODEL` / `JUDGE_API_KEY` | *(unset — off)* | the judge: an API call, batch mode. A **dated** model id, never an alias; a **different provider** from the exam writer and the generator; `stub` for a dry run. The page states the reason when any rule fails |
+| `JUDGE_CANARY_MAX_DRIFT` | 0.5 | thirty fixed scripts are re-graded every run; if their grades move more than this from the previous run the run is preliminary |
+| `ALLOW_SINGLE_PROVIDER_LOOP` | 0 | the documented override for a one-provider trial; every judged score is then stamped "single-provider loop" |
 | `JUDGED_TASKS_DIR` | `$EXAM_DIR/tasks` | where `scripts/exam_build.py build` put the exam tasks |
 
 ## The LLM key
@@ -234,8 +236,12 @@ cap, custom-code refusal) plus a `log` link with the raw output. Canceling is
 only possible while `queued` — a running job finishes its current task.
 
 A fourth suite, `judged`, runs the exam (`exam_<topic>` tasks built from the
-curated bank, plus `fr_control_mmlu`) and then the judge, all inside the same
-lock — the judge uses the card, so it never runs beside an evaluation.
+curated bank, plus `fr_control_mmlu`) inside the lock, then **submits** the
+answers to the API judge as one batch (seconds, no GPU) and releases the
+card; the service's poller writes `judge.json` when the provider completes
+the batch. A judge that waits on an API never holds the card. Files written
+by the earlier local judge are kept, labelled `local`, and shown as their own
+series — never merged with API-judged scores.
 Nothing judged is ranked until `scripts/judge_calibrate.py` has a human
 sample with Cohen's κ ≥ 0.60 on file; see DIAGNOSE.md.
 

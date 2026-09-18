@@ -238,7 +238,9 @@ def test_judged_section_and_the_control_sentence(surface, tree):
     card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
     assert card.count() == 1
     text = card.text_content()
-    assert "Calibrated." in text and "Cohen's κ" in text
+    assert "Counts." in text and "Cohen's κ" in text and "for judge stub/overlap-v1" in text
+    assert "Canary steady." in text and "fixed scripts re-graded" in text
+    assert card.locator("[data-canary='steady']").count() == 1
     assert "STUB grader" in text                                  # never mistaken for a judgement
     assert "Knew it, couldn't pick it" in text
     m = re.search(r"of the (\d+) control items this model got wrong as multiple choice, it answered (\d+)", text)

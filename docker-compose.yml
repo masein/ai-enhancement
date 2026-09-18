@@ -56,6 +56,13 @@ services:
       EXAM_PROVIDER: ${EXAM_PROVIDER:-}
       EXAM_MODEL: ${EXAM_MODEL:-}
       EXAM_API_KEY: ${EXAM_API_KEY:-}
+      # the judge — an API call, batch mode, its own identity; a DATED model id;
+      # a different provider from the exam writer and the generator
+      JUDGE_PROVIDER: ${JUDGE_PROVIDER:-}
+      JUDGE_MODEL: ${JUDGE_MODEL:-}
+      JUDGE_API_KEY: ${JUDGE_API_KEY:-}
+      JUDGE_CANARY_MAX_DRIFT: ${JUDGE_CANARY_MAX_DRIFT:-0.5}
+      ALLOW_SINGLE_PROVIDER_LOOP: ${ALLOW_SINGLE_PROVIDER_LOOP:-0}
     volumes:
       - ${BENCH_ROOT}:${BENCH_ROOT}
       - ${HF_HOME}:${HF_HOME}

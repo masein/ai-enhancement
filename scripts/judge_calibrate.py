@@ -147,8 +147,8 @@ def import_csv(results: Path, csv_path: Path) -> dict:
            "calibrated": overall is not None and overall >= KAPPA_MIN,
            "per_category": per_cat, "rows_skipped": skipped,
            "csv_sha256": hashlib.sha256(csv_path.read_bytes()).hexdigest(),
-           "judge": {k: judge_meta.get(k) for k in ("id", "weights_sha256", "prompt_sha256",
-                                                    "rubrics", "stub")},
+           "judge": {k: judge_meta.get(k) for k in ("id", "provider", "model", "weights_sha256",
+                                                    "prompt_sha256", "rubrics", "stub")},
            "note": (f"below kappa {KAPPA_MIN:.2f} the judged suite is preliminary: shown, never "
                     f"ranked, never in an average")}
     (results / CALIBRATION_FILE).write_text(json.dumps(out, indent=2, sort_keys=True),

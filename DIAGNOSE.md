@@ -217,10 +217,15 @@ may ever read); `eval_tasks/fr/AUTHORING.md` says why that line matters more
 than any other here. `exam_build.py build` writes the harness tasks and
 `fr_control_mmlu` from the **diagnosis half** of MMLU: the question only, no
 options, graded against the gold option's text. `scripts/judge.py` grades
-every answer 0–4 against `rubrics/exam.md` with a local judge pinned by
-weights hash, greedy, single answers never pairwise, records each item's
-half, and refuses to grade its own family. Judging twice writes the same
-bytes.
+every answer 0–4 against `rubrics/exam.md` through the batch API with a
+judge pinned to a **dated** model id, single answers never pairwise, records
+each item's half and a written justification, and refuses to grade its own
+family or to run on the exam writer's or generator's provider. Because an
+API judge cannot promise the same bytes twice, a **canary** of thirty
+answer scripts with human marks is re-graded at the start of every run; the
+page shows its deviation from the marks and from the previous run, and a
+run whose canary moved past the threshold is preliminary with the reason
+stated.
 
 On a model's page, **Judged free response** leads with the control:
 

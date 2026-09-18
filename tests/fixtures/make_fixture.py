@@ -658,7 +658,7 @@ def write_judged(root: Path, out_dir: Path, seed: int = SEED) -> dict:
                     "chat_template": None, "total_evaluation_time_seconds": "40.0"}
             (task_dir / f"results_{TS}.json").write_text(json.dumps(blob, indent=2),
                                                          encoding="utf-8")
-        out = jd.judge_model(out_dir / safe_name(model_id), jd.StubGrader(), "stub")
+        out = jd.run_stub(out_dir / safe_name(model_id), out_dir, record=True)
         jd.write_judge(out_dir / safe_name(model_id), out)
     # calibration: a person who agrees with the stub on six rows in seven
     cal_csv = root / "calibration.csv"
@@ -684,7 +684,9 @@ def frozen_report(root: Path, path: Path, title: str = "Fixture board") -> Path:
     cal_path = out_dir / "judge_calibration.json"
     cal = json.loads(cal_path.read_text(encoding="utf-8")) if cal_path.exists() else None
     return report.build_report(runs, path, title, calibration=cal,
-                               taint=TAINT, parents=PARENTS)
+                               taint=TAINT, parents=PARENTS,
+                               judge_identity={"provider": "stub", "model": "overlap-v1",
+                                               "id": "stub/overlap-v1", "family": "stub"})
 
 
 def build(root: Path, seed: int = SEED, diagnose: bool = True,

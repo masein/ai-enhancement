@@ -236,14 +236,25 @@ FR_CONTROL = "fr_control_mmlu"
 
 
 def _trim_judge(j: dict | None) -> dict | None:
-    """The per-item lists stay on disk (the calibration tool reads them);
-    the page gets the summaries."""
+    """The per-item lists stay on disk (the calibration tool and the proposal
+    step read them); the page gets the summaries. A file from the phase-5
+    local judge has no provider: it is labelled `local`, kept, and shown as a
+    different series from API-judged scores rather than merged."""
     if not isinstance(j, dict) or "judge" not in j:
         return None
-    out = {"judge": {k: j["judge"].get(k) for k in
-                     ("id", "family", "stub", "weights_sha256", "prompt_sha256",
-                      "prompt_version", "rubrics", "greedy")},
-           "skipped": j.get("skipped"), "correct_at": j.get("correct_at"), "tasks": {}}
+    jj = dict(j["judge"])
+    if not jj.get("provider"):
+        jj["provider"] = "stub" if jj.get("stub") else "local"
+        jj["model"] = jj.get("id", "")
+    out = {"judge": {k: jj.get(k) for k in
+                     ("id", "provider", "model", "family", "stub", "weights_sha256",
+                      "prompt_sha256", "prompt_version", "rubrics", "greedy", "batch_id",
+                      "single_provider_loop")},
+           "skipped": j.get("skipped"), "correct_at": j.get("correct_at"),
+           "canary": ({k: v for k, v in (j.get("canary") or {}).items()
+                       if k in ("n", "graded", "mad_vs_human", "mad_vs_previous", "threshold",
+                                "drifted")} if j.get("canary") else None),
+           "preliminaryReasons": list(j.get("preliminary_reasons") or []), "tasks": {}}
     for task, t in (j.get("tasks") or {}).items():
         if not isinstance(t, dict):
             continue
@@ -261,6 +272,31 @@ def published_score(t: dict) -> float | None:
     if t.get("score_report") is not None:
         return t["score_report"]
     return t.get("mean") if "n_report" not in t else None
+
+
+def judged_state(trimmed: dict | None, cal: dict | None, current_id: str | None) -> dict:
+    """Whether this model's judged numbers may be ranked: {ok, reasons,
+    current}. Preliminary when the judge is uncalibrated, calibrated as a
+    different judge, not the judge this server runs now, or when its canary
+    moved. The single-provider caveat is a stamp, not a reason."""
+    reasons = []
+    if not trimmed:
+        return {"ok": False, "reasons": ["not judged"], "current": False}
+    jid = (trimmed.get("judge") or {}).get("id")
+    current = bool(current_id) and jid == current_id
+    if current_id and not current:
+        reasons.append(f"judged by {jid}, not the judge this server runs now ({current_id}) — "
+                       f"a different series, not comparable")
+    if not cal:
+        reasons.append("the judge has not been calibrated against a person")
+    elif not cal.get("calibrated"):
+        reasons.append(f"Cohen's kappa {cal.get('kappa')} is below {KAPPA_MIN}")
+    elif cal.get("judge_id") and jid and cal["judge_id"] != jid:
+        reasons.append(f"the calibration on file is for {cal['judge_id']}, not {jid}")
+    reasons.extend(trimmed.get("preliminaryReasons") or [])
+    if trimmed.get("skipped"):
+        reasons.append(trimmed["skipped"])
+    return {"ok": not reasons, "reasons": reasons, "current": current}
 
 
 def judged_avg(trimmed: dict | None) -> float | None:
@@ -769,7 +805,8 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
 def build_payload(by_model: dict[str, dict], title: str, source: str,
                   taint: dict[str, list[str]] | None = None,
                   calibration: dict | None = None,
-                  parents: dict[str, str] | None = None) -> dict:
+                  parents: dict[str, str] | None = None,
+                  judge_identity: dict | None = None) -> dict:
     """`taint`: model id -> tasks whose diagnostics its training data was
     derived from (the service computes it from the run/dataset join). A
     tainted task is treated exactly like a missing required task: shown per
@@ -777,6 +814,12 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     models = list(by_model)
     taint = taint or {}
     parents = parents or {}      # tainted model id -> the model its training run started from
+    current_judge = (judge_identity or {}).get("id") or None
+    cal = calibration if isinstance(calibration, dict) and calibration.get("kappa") is not None \
+        else None
+    if cal is not None:
+        cal = {**{k: cal.get(k) for k in ("kappa", "n", "calibrated", "kappa_min", "per_category")},
+               "judge_id": (cal.get("judge") or {}).get("id")}
 
     # display names: short unless two orgs publish the same repo name
     # (google/gemma-3-270m vs unsloth/gemma-3-270m must not collapse into one row)
@@ -888,6 +931,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             # judged average exists only when every category was judged
             "judge": judge,
             "judgedAvg": judged_avg(judge),
+            # may these judged numbers be ranked? uncalibrated, a different
+            # judge, or a moved canary all say no, in words
+            "judgeState": judged_state(judge, cal, current_judge) if judge else None,
             # per tainted task: both halves before and after training, and
             # the sentence derived from them
             "taintCompare": compare or None,
@@ -1019,10 +1065,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
 
     judged_tasks = sorted({t for r in by_model.values()
                            for t in ((r.get("judge") or {}).get("tasks") or {})})
-    judge_meta = next(((r["judge"] or {}).get("judge") for r in by_model.values()
-                       if r.get("judge")), None)
-    cal = calibration if isinstance(calibration, dict) and calibration.get("kappa") is not None \
-        else None
+    judge_meta = next(((m["judge"] or {}).get("judge") for m in model_rows if m.get("judge")), None)
     if judged_tasks and cal is None:
         warnings.append(
             "Judged free-response scores are on file but the judge has not been calibrated "
@@ -1037,6 +1080,27 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         warnings.append(
             "Judged scores on this board come from the STUB grader (a word-overlap stand-in "
             "used for plumbing tests). They are not judgements of anything.")
+    drifted = [m["name"] for m in model_rows if m.get("judge")
+               and (m["judge"].get("canary") or {}).get("drifted")]
+    if drifted:
+        warnings.append(
+            f"The judge's canary moved on {len(drifted)} run{'s' if len(drifted) > 1 else ''} "
+            f"({', '.join(drifted[:4])}): the same thirty scripts were graded differently from "
+            f"the previous run. Those judged scores are preliminary — a vendor may have changed "
+            f"the model behind the id.")
+    if any((m.get("judge") or {}).get("judge", {}).get("single_provider_loop") for m in model_rows):
+        warnings.append(
+            "Single-provider loop: the judge shares a provider with the exam writer or the "
+            "generator (ALLOW_SINGLE_PROVIDER_LOOP). Every judged score carries that caveat; "
+            "self-preference in LLM judges is documented and large.")
+    other_judges = sorted({(m["judge"]["judge"] or {}).get("id") for m in model_rows
+                           if m.get("judge")} - {current_judge, None})
+    if current_judge and other_judges:
+        warnings.append(
+            f"Some judged scores come from a different judge ({', '.join(other_judges)}) than "
+            f"the one this server runs now ({current_judge}). They are shown as their own "
+            f"series and never ranked against the current judge's — resubmit with suite=judged "
+            f"to re-grade.")
 
     dates = sorted(str(r["date"]) for r in by_model.values() if r["date"])
     return {
@@ -1058,9 +1122,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         # person has agreed with it enough for the numbers to count
         "judged": {"tasks": judged_tasks, "exam": EXAM_TASKS, "topics": EXAM_TOPICS,
                    "control": FR_CONTROL, "judge": judge_meta, "kappaMin": KAPPA_MIN,
-                   "calibration": ({k: cal.get(k) for k in
-                                    ("kappa", "n", "calibrated", "kappa_min", "per_category")}
-                                   if cal else None)},
+                   # the judge this server runs now; files from other judges are their own series
+                   "current": judge_identity or None,
+                   "calibration": cal},
         "extra": extra,
         "warnings": warnings,
         "meta": {
@@ -2495,22 +2559,24 @@ function controlSentence(c) {
 function vJudged(m) {
   const J = DATA.judged;
   if (!J || !J.tasks.length) return null;
-  const cal = J.calibration, ok = !!(cal && cal.calibrated);
+  const cal = J.calibration;
+  const st = m.judgeState || { ok: false, reasons: ['not judged'], current: false };
+  const ok = st.ok;
   const card = el('div', { class: 'card' },
-    el('h2', { text: 'Judged free response' }),
-    el('p', { class: 'sub', text: 'Open questions per category, answered in writing, graded 0–4 '
-      + 'against a written rubric by a local judge pinned by weights hash — single answers, '
-      + 'never pairwise. Length is in the rubric and is reported below so a longer-is-better '
-      + 'judge would show.' }));
+    el('h2', { text: 'Judged free response — the exam' }),
+    el('p', { class: 'sub', text: 'Open questions per topic, answered in writing, graded 0–4 '
+      + 'against a written rubric by an API judge pinned to a dated model id — single answers, '
+      + 'never pairwise. Length is in the rubric and reported below; a thirty-script canary is '
+      + 're-graded every run so a vendor changing the model behind the id would show.' }));
   card.append(el('p', { class: ok ? 'note' : 'warn' },
-    el('b', { text: ok ? 'Calibrated. ' : 'Preliminary. ' }),
+    el('b', { text: ok ? 'Counts. ' : 'Preliminary. ' }),
     cal ? `Cohen's κ ${cal.kappa} against a human grader over ${cal.n} answers `
-        + `(line at ${J.kappaMin}). ` + (ok
-          ? 'Category scores may enter the separate judged average; they never enter the '
-            + 'multiple-choice average.'
-          : 'Below the line: shown, never ranked, never averaged.')
-        : 'No calibration on file — a person has not yet graded a sample against the judge '
-          + '(scripts/judge_calibrate.py). Shown, never ranked, never averaged.'));
+        + `(line at ${J.kappaMin})` + (cal.judge_id ? `, for judge ${cal.judge_id}` : '') + '. '
+        : 'No calibration on file for this judge (scripts/judge_calibrate.py). ',
+    ok ? 'Topic scores may enter the separate judged average; they never enter the '
+       + 'multiple-choice average.'
+       : st.reasons.length ? 'Shown, never ranked, never averaged: ' + st.reasons.join('; ') + '.'
+       : 'Shown, never ranked, never averaged.'));
   const j = m.judge;
   if (!j) { card.append(note('Not judged: this model has no judge.json on file. Submit it with '
     + 'suite=judged, or run scripts/judge.py over its fr_* answers.')); return card; }
@@ -2518,6 +2584,16 @@ function vJudged(m) {
     + 'cell stays empty rather than flattering.')); return card; }
   if (j.judge.stub) card.append(el('p', { class: 'warn', text: 'Graded by the STUB grader — a '
     + 'word-overlap stand-in for plumbing tests. Not a judgement of anything.' }));
+  if (j.judge.single_provider_loop) card.append(el('p', { class: 'warn', text: 'Single-provider '
+    + 'loop: the judge shares a provider with the exam writer or the generator. Every score here '
+    + 'carries that caveat — a judge scores its own family higher.' }));
+  const cn = j.canary;
+  if (cn) card.append(el('p', { class: cn.drifted ? 'warn' : 'small', 'data-canary': cn.drifted ? 'drifted' : 'steady' },
+    el('b', { text: cn.drifted ? 'Canary moved. ' : 'Canary steady. ' }),
+    `${cn.graded} of ${cn.n} fixed scripts re-graded: mean absolute deviation `
+    + `${cn.mad_vs_human} from the human marks` + (cn.mad_vs_previous != null
+      ? `, ${cn.mad_vs_previous} from the previous run (limit ${cn.threshold})` : ', first run for this judge')
+    + (cn.drifted ? ' — the judge is not the judge it was; these scores are preliminary.' : '.')));
 
   // per topic, weakest first, on the REPORT half — the diagnose half is never the score
   const cats = J.exam.filter(t => j.tasks[t] && pubScore(j.tasks[t]) != null)
@@ -2589,10 +2665,12 @@ function vJudged(m) {
       + 'join to.' : '') }));
   }
   card.append(el('p', { class: 'small', style: 'margin-top:12px' },
-    `Judge ${j.judge.id} · weights ${String(j.judge.weights_sha256 || '').slice(0, 12)} · `
-    + `prompt v${j.judge.prompt_version} ${String(j.judge.prompt_sha256 || '').slice(0, 12)} · rubrics `
-    + Object.entries(j.judge.rubrics || {}).map(([t, r]) => `${t.replace(/^fr_/, '')} v${r.version}`).join(', ')
-    + ' · greedy'));
+    `Judge ${j.judge.id} (${j.judge.provider})`
+    + (j.judge.batch_id ? ` · batch ${String(j.judge.batch_id).slice(0, 18)}` : '')
+    + (j.judge.weights_sha256 ? ` · weights ${String(j.judge.weights_sha256).slice(0, 12)}` : '')
+    + ` · prompt v${j.judge.prompt_version} ${String(j.judge.prompt_sha256 || '').slice(0, 12)} · rubrics `
+    + [...new Set(Object.values(j.judge.rubrics || {}).map(r => `v${r.version}`))].join(', ')
+    + (st.current ? '' : ` · not the judge this server runs now${J.current ? ` (${J.current.id})` : ''}`)));
   return card;
 }
 
@@ -3151,6 +3229,7 @@ function vLeaderboard(ms) {
     // judged columns exist on the board only once a person has agreed with the
     // judge (kappa over the line); the kappa rides in the header
     ...(DATA.judged && DATA.judged.calibration && DATA.judged.calibration.calibrated
+        && DATA.models.some(m => m.judgeState && m.judgeState.ok)
       ? [...DATA.judged.exam.filter(t => DATA.judged.tasks.includes(t)).map(t => ({
           key: 'j:' + t, label: frName(t) + ' κ'
             + (((DATA.judged.calibration.per_category || {})[frName(t)] || {}).kappa
@@ -3159,7 +3238,7 @@ function vLeaderboard(ms) {
       : []),
     { key: 'date', label: 'Last eval', num: false },   // when its newest task ran
   ];
-  const jval = (m, c) => c.judged === 'avg' ? m.judgedAvg
+  const jval = (m, c) => !(m.judgeState && m.judgeState.ok) ? null : c.judged === 'avg' ? m.judgedAvg
     : (((m.judge || {}).tasks || {})[c.judged] ? pubScore(m.judge.tasks[c.judged]) : null);
   const val = (m, c) => c.key === 'avg' ? officialAvg(m)
                       : c.judged ? jval(m, c)
@@ -3266,7 +3345,7 @@ function vLeaderboard(ms) {
       if (c.judged) {
         const v = jval(m, c);
         if (v == null) return el('td', { class: 'num se', text: '—',
-          title: (m.judge || {}).skipped || 'not judged' });
+          title: m.judgeState ? m.judgeState.reasons.join('; ') : 'not judged' });
         return el('td', { class: 'num' + (v === best[c.key] ? ' best' : ''), text: num(v, 2) },
           el('span', { class: 'se', text: ' /4' }));
       }
@@ -5127,13 +5206,13 @@ TEMPLATE = """<!doctype html>
 
 def build_report(runs: list[dict], out_path: Path, title: str,
                  calibration: dict | None = None, taint: dict | None = None,
-                 parents: dict | None = None) -> Path:
+                 parents: dict | None = None, judge_identity: dict | None = None) -> Path:
     if not runs:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text("<h1>No lm-eval results found.</h1>", encoding="utf-8")
         return out_path
     payload = build_payload(merge_runs(runs), title, source="", calibration=calibration,
-                            taint=taint, parents=parents)
+                            taint=taint, parents=parents, judge_identity=judge_identity)
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     page = (TEMPLATE
             .replace("__TITLE__", html.escape(title))

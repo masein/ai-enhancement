@@ -156,7 +156,20 @@ DATASET_QUOTA_GB = float(os.environ.get("DATASET_QUOTA_GB", "20"))
 # the exam_* generations and then the judge, all inside the same lock as any
 # evaluation. "stub" as the judge is the deterministic overlap stand-in.
 # ---------------------------------------------------------------------------
+# The judge is an API call (scripts/judge.py), batch mode, with its OWN
+# identity: JUDGE_PROVIDER must differ from the exam writer's and the
+# generator's, or a loop whose questions, grades and data come from one family
+# grades itself. JUDGE_MODEL must be a DATED model id, never a floating alias
+# — a vendor update behind an alias would silently re-base every score. A
+# thirty-script canary is re-graded every run; movement past
+# JUDGE_CANARY_MAX_DRIFT marks the run preliminary. "stub" is the stand-in.
+JUDGE_PROVIDER = os.environ.get("JUDGE_PROVIDER", "").strip().lower()
 JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "").strip()
+JUDGE_API_KEY = os.environ.get("JUDGE_API_KEY", "")
+JUDGE_CANARY_MAX_DRIFT = float(os.environ.get("JUDGE_CANARY_MAX_DRIFT", "0.5"))
+# the documented override for a single-provider trial: every judged score is
+# then stamped "single-provider loop" on the page and in provenance
+ALLOW_SINGLE_PROVIDER_LOOP = os.environ.get("ALLOW_SINGLE_PROVIDER_LOOP", "0") == "1"
 JUDGED_TASKS_DIR = Path(os.environ.get("JUDGED_TASKS_DIR", EXAM_DIR / "tasks"))
 
 
@@ -167,10 +180,14 @@ def judged_tasks() -> list[str]:
 
 
 def judged_blocked() -> str:
-    """'' when a suite=judged run can proceed, else the reason."""
-    if not JUDGE_MODEL:
-        return ("no judge is configured on this server (JUDGE_MODEL is unset) — the judged "
-                "suite is off")
+    """'' when a suite=judged run can proceed, else the reason (the judge's own
+    refusals — unpinned model, provider clash — live in scripts/judge.py)."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import judge as _judge
+    why = _judge.blocked()
+    if why:
+        return why
     if not judged_tasks():
         return (f"the exam tasks have not been built: curate the bank on the Exam tab, then "
                 f"run scripts/exam_build.py build results/full --root {EXAM_DIR}")

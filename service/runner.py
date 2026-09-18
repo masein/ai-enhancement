@@ -313,19 +313,6 @@ def include_args_for(task: str) -> list[str]:
     return []
 
 
-def judge_cmd(hf_id: str) -> list[str]:
-    """scripts/judge.py over one model, with the configured judge. Our own
-    code, run with the service's own environment — nothing submitted runs here."""
-    repo = Path(__file__).resolve().parent.parent
-    cmd = [sys.executable, str(repo / "scripts" / "judge.py"), str(config.OUT_DIR),
-           "-m", hf_id]
-    if config.JUDGE_MODEL == "stub":
-        cmd.append("--stub")
-    else:
-        cmd += ["--judge", config.JUDGE_MODEL]
-    return cmd
-
-
 def _task_done(task_out: Path) -> bool:
     return any(task_out.glob("*/results*.json")) or any(task_out.glob("results*.json"))
 
@@ -520,34 +507,37 @@ def run_submission(sub: dict) -> None:
                 if re.search(r"No space left on device|Errno 28", tail, re.I):
                     break            # operator fault — every task fails the same
 
-        # the judge is the last step of a judged run and it uses the card, so
-        # it runs HERE, inside the lock, never beside an evaluation
+        # the judge is an API batch now: SUBMIT it here (seconds, no GPU) and
+        # let the poller finish it — a judge that waits on a provider must
+        # never hold the card. With JUDGE_MODEL=stub the file is written now.
+        judge_note = ""
         if sub["suite"] == "judged" and not failed_tasks:
-            db.update(sid, status="running", progress="judging the answers")
-            t_j = time.time()
-            with open(log_path, "a") as lf:
-                lf.write(f"\n===== [{sid}] judge ({config.JUDGE_MODEL}) =====\n")
-                lf.flush()
-                try:
-                    proc = subprocess.run(judge_cmd(sub["hf_id"]), stdout=lf,
-                                          stderr=subprocess.STDOUT, cwd=config.BENCH_ROOT,
-                                          env=os.environ.copy(), timeout=config.TASK_TIMEOUT_S)
-                    jstatus = proc.returncode
-                except subprocess.TimeoutExpired:
-                    jstatus = -1
-                    lf.write(f"\n[service] judge killed after {config.TASK_TIMEOUT_S}s\n")
-            gpu_seconds += time.time() - t_j
-            db.update(sid, gpu_seconds=gpu_seconds)
-            if jstatus != 0:
+            db.update(sid, status="running", progress="submitting the answers to the judge")
+            sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+            import judge as _judge
+            try:
+                jr = _judge.start_run(config.OUT_DIR / safe, config.OUT_DIR)
+                if jr.get("skipped"):
+                    judge_note = f" · {jr['skipped']}"
+                elif jr.get("batch_id"):
+                    judge_note = (f" · judge batch {jr['batch_id']} submitted ({jr['n']} answers); "
+                                  f"judge.json lands when it completes")
+                elif jr.get("written"):
+                    judge_note = " · judged"
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n===== [{sid}] judge: {json.dumps(jr)} =====\n")
+            except Exception as e:                      # noqa: BLE001 — the answers are on disk
                 failed_tasks.append("judge")
-                db.update(sid, error=f"judge: {classify(_tail(log_path))}")
+                db.update(sid, error=f"judge: {e}")
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] judge could not be submitted: {e!r}\n")
 
         if failed_tasks:
             db.update(sid, status="failed", finished_at=time.time(),
                       progress=f"failed on: {', '.join(failed_tasks)}")
         else:
             db.update(sid, status="done", finished_at=time.time(),
-                      progress=f"all {len(tasks)} tasks done", error="")
+                      progress=f"all {len(tasks)} tasks done{judge_note}", error="")
     finally:
         release_lock()
         if remote_code:

@@ -49,7 +49,9 @@ def payload(tree) -> dict:
     cal = json.loads(cal_path.read_text(encoding="utf-8")) if cal_path.exists() else None
     return report.build_payload(report.merge_runs(runs), "Fixture board",
                                 source=str(tree["out_dir"]), calibration=cal,
-                                taint=tree["taint"], parents=tree["parents"])
+                                taint=tree["taint"], parents=tree["parents"],
+                                judge_identity={"provider": "stub", "model": "overlap-v1",
+                                                "id": "stub/overlap-v1", "family": "stub"})
 
 
 def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: bool = True,

@@ -290,8 +290,16 @@ control set (no GPU).
 
 ### Judged free response
 
-`GET /api/judge` — the pinned judge, its family, the tasks built, and the
-calibration on file. In `/api/results`, a judged model carries
+`GET /api/judge` — the judge's identity (`provider/model`, dated), its
+family, whether its provider clashes with the exam writer's or generator's
+(`provider_clash`, `single_provider_loop`), the canary threshold, the tasks
+built, judged runs in flight, and the calibration on file with the judge it
+was made for. `models[].judgeState` in `/api/results` says whether a model's
+judged numbers may be ranked and, if not, why in words: uncalibrated, κ
+below the line, calibrated for a different judge, judged by a judge other
+than the one this server runs now, or a moved canary. `models[].judge.canary`
+carries the canary's mean absolute deviation from the human marks and from
+the previous run. In `/api/results`, a judged model carries
 `models[].judge`: per task `{n, mean, max: 4, dist, score_vs_length,
 n_report, score_report, n_diagnose, score_diagnose}` — **`score_report` is
 the published number**; the diagnose half is what a proposal may read — and,
