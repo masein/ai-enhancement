@@ -45,6 +45,8 @@ import os
 import re
 from pathlib import Path
 
+import categories as _categories   # scripts/categories.yaml: MMLU subjects -> categories
+
 # Timestamps render in TZ (e.g. TZ=Asia/Qatar) when set — otherwise whatever
 # this process's local time is. Inside a container that defaults to UTC, which
 # reads three hours wrong in Doha; docker-compose sets TZ for exactly that.
@@ -139,7 +141,8 @@ def _trim_diag(d: dict | None) -> dict | None:
             continue
         t = {k: v.get(k) for k in
              ("metric", "n", "n_report", "n_diagnose", "score_all", "score_report",
-              "score_diagnose", "buckets", "approx_buckets", "groups", "answers")
+              "score_diagnose", "buckets", "approx_buckets", "groups", "answers",
+              "categories", "unmapped")
              if v.get(k) is not None}
         ex = {}
         for bucket, items in (v.get("examples") or {}).items():
@@ -330,10 +333,16 @@ def significant(a: float, sa: float, b: float, sb: float, z: float = 1.96) -> tu
 # 4-option tasks, 50% on the 2-option ones — the single most misread thing on a
 # small-model chart. truthfulqa_mc2 has no clean chance level (multi-true, weighted),
 # and gsm8k's is 0.
-_CANON = ["mmlu", "hellaswag", "arc_challenge", "arc_easy",
+_CANON = ["mmlu", "mmlu_perm", "hellaswag", "arc_challenge", "arc_easy",
           "winogrande", "piqa", "truthfulqa_mc2", "gsm8k"]
-_CHANCE = {"mmlu": 0.25, "hellaswag": 0.25, "arc_challenge": 0.25, "arc_easy": 0.25,
-           "winogrande": 0.5, "piqa": 0.5, "gsm8k": 0.0}
+_CHANCE = {"mmlu": 0.25, "mmlu_perm": 0.25, "hellaswag": 0.25, "arc_challenge": 0.25,
+           "arc_easy": 0.25, "winogrande": 0.5, "piqa": 0.5, "gsm8k": 0.0}
+
+# Controls: tasks run to test how we POSE a benchmark, not what a model knows.
+# They are shown wherever the task they control for is shown, and they never
+# enter an average — official or partial — however REQUIRED_TASKS is set,
+# because a control that could move a rank would stop being a control.
+CONTROL_TASKS = {"mmlu_perm"}
 
 # ---------------------------------------------------------------------------
 # What each task is, AS WE RUN IT.
@@ -353,6 +362,12 @@ _TASK_META = {
              "subjects. 5-shot, acc. Breadth of recall rather than depth of "
              "reasoning — and the task where a sub-1B model most often sits at "
              "chance, so read it against the chance line, not against 0%."),
+    "mmlu_perm": ("knowledge (control)",
+                  "MMLU re-posed: a fixed subset of subjects with the answer options "
+                  "rotated by item index, so the correct answer visits every slot "
+                  "equally. Same 5-shot, same acc. A control, not a leaderboard task: "
+                  "it tells you whether a position-skewed model's MMLU score is about "
+                  "the format or about the knowledge, and it never enters an average."),
     "hellaswag": ("commonsense",
                   "Four-choice sentence completion about everyday situations. "
                   "5-shot, acc_norm — length-normalized on purpose, because raw "
@@ -427,6 +442,7 @@ def _task_facts(task: str, cells: dict, sig: dict) -> dict:
         # looks exactly like one that works.
         "discriminates": (any(r[4] for r in rows) if rows else None),
         "frontier": _FRONTIER.get(task),
+        "control": task in CONTROL_TASKS,
     }
 
 # ---------------------------------------------------------------------------
@@ -455,6 +471,7 @@ def required_tasks(acc_tasks: list[str]) -> tuple[list[str], list[str]]:
     env = os.environ.get("REQUIRED_TASKS", "").strip()
     want = ([t.strip() for t in env.split(",") if t.strip()] if env
             else list(_REQUIRED_DEFAULT))
+    want = [t for t in want if t not in CONTROL_TASKS]      # never, whatever the env says
     return [t for t in want if t in acc_tasks], [t for t in want if t not in acc_tasks]
 
 
@@ -564,7 +581,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
     required, req_absent = required_tasks(acc_tasks)
     model_rows = []
     for mid, r in by_model.items():
-        have = [cells[t][mid]["v"] for t in acc_tasks if mid in cells.get(t, {})]
+        have = [cells[t][mid]["v"] for t in acc_tasks
+                if mid in cells.get(t, {}) and t not in CONTROL_TASKS]
         got_req = [t for t in required if mid in cells.get(t, {})]
         missing = [t for t in required if t not in got_req]
         official = bool(required) and not missing
@@ -727,6 +745,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str) -> dict:
             # without it says so instead of silently dropping the section — an
             # absent diagnosis is a fact about the run, not a reason to hide it.
             "anyDiag": any(r.get("diag") for r in by_model.values()),
+            # the category order the page lays MMLU out in (scripts/categories.yaml)
+            "categories": _categories.category_order(),
             "diagSalt": next((r["diag"].get("split_salt")
                               for r in by_model.values() if r.get("diag")), None),
         },
@@ -957,6 +977,21 @@ th .dir { font-size:9px; }
   text-align:left; }
 .dxsub th { font-size:11px; font-weight:600; color:var(--muted); }
 .dxsub td.num, .dxsub th.num { text-align:right; font-variant-numeric:tabular-nums; }
+/* categories first, subjects on expand; a dim row is under the noise floor */
+.dxcat { border-bottom:1px solid var(--border); }
+.dxcat > summary { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:5px 0; cursor:pointer; font-size:12.5px; list-style:none; }
+.dxcat > summary::-webkit-details-marker { display:none; }
+.dxcat > summary::before { content:"\25B8"; color:var(--muted); font-size:10px; width:10px; }
+.dxcat[open] > summary::before { content:"\25BE"; }
+.dxcat .dxcname { font-weight:600; min-width:15ch; }
+.dxcat .num { font-variant-numeric:tabular-nums; min-width:6ch; text-align:right; }
+.dxcat.dim > summary { color:var(--muted); }
+.dxcat.dim .dxcname { font-weight:500; }
+.dxcat .dxsub { margin:2px 0 8px 20px; width:auto; min-width:60%; }
+.dxperm { margin:14px 0 4px; }
+.dxperm .dxsub { width:auto; min-width:60%; }
+.lb td.dim { color:var(--muted); }
 .dxex { margin-top:10px; font-size:12.5px; }
 .dxex > summary { cursor:pointer; color:var(--accent); font-size:12px; }
 .dxex ul { list-style:none; padding:0; margin:8px 0 0; }
@@ -1117,6 +1152,7 @@ const state = {
   avgMode: 'chance',                   // official average: above-chance | raw
   lbHeat: false,                       // leaderboard cells: plain | heat-shaded
   lbAbout: false,                      // "about these benchmarks" panel open
+  lbView: 'tasks',                     // leaderboard columns: 'tasks' | 'cats' (MMLU by category)
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
   // focus from filter inputs and kill slider drags
@@ -1779,6 +1815,113 @@ function dxExamples(ex) {
   return wrap;
 }
 
+// DIAGNOSE.md's noise floor: a category or subject with fewer leaderboard-half
+// items than this carries about ±13 points and is shown greyed, never ranked.
+// Mirrors MIN_GROUP_N in scripts/diagnose.py (also in every file's thresholds).
+const CAT_MIN_N = 30;
+
+// Categories first, subjects on expand. MMLU's 57 subjects are not the
+// categories a person thinks in; "weak in economics" is a sentence someone can
+// act on, and it is what the generation phase will be asked about. Weakest
+// first, item counts on every row, and the same rule as the subject table: a
+// task that has not cleared chance is describing how the model guesses.
+function dxCategories(t, v, atChance) {
+  const cats = Object.entries(v.categories || {}).filter(([, g]) => g.score_report != null)
+    .sort((x, y) => x[1].score_report - y[1].score_report);
+  if (!cats.length) return null;
+  const wrap = el('div', {}, el('div', { class: 'dxh', text: 'Weakest categories first' }));
+  wrap.append(el('p', { class: 'small', style: 'margin:2px 0 6px', text: atChance
+    ? 'The score has not cleared chance, so these rows say how the model guesses per '
+      + 'category, not what it knows about it. No row below is a subject claim.'
+    : `Leaderboard-half items per row. Under ${CAT_MIN_N} is greyed: that few items carry `
+      + 'about ±13 points, and ranking them ranks the dice. Open a category for its subjects.' }));
+  for (const [name, g] of cats) {
+    const dim = g.n_report < CAT_MIN_N;
+    const subs = (g.groups || []).map(s => [s, (v.groups || {})[s]])
+      .filter(([, x]) => x && x.score_report != null)
+      .sort((x, y) => x[1].score_report - y[1].score_report);
+    const det = el('details', { class: 'dxcat' + (dim ? ' dim' : ''), 'data-cat': name },
+      el('summary', {},
+        el('span', { class: 'dxcname', text: name }),
+        el('span', { class: 'num', text: pct(g.score_report) }),
+        el('span', { class: 'se', text: `${g.n_report} items`
+          + (dim ? ` · under ${CAT_MIN_N}, noise` : '') }),
+        dxBar(g.buckets || {}, g.n || 1, true)));
+    if (subs.length)
+      det.append(el('table', { class: 'dxsub' },
+        el('thead', {}, el('tr', {},
+          el('th', { text: 'subject' }), el('th', { class: 'num', text: 'score' }),
+          el('th', { class: 'num', text: 'items' }), el('th', { text: 'composition' }))),
+        el('tbody', {}, subs.map(([s, x]) => el('tr', {
+            class: x.n_report < CAT_MIN_N ? 'dim' : null },
+          el('td', { text: s }),
+          el('td', { class: 'num', text: pct(x.score_report) }),
+          el('td', { class: 'num se', text: String(x.n_report) }),
+          el('td', {}, dxBar(x.buckets || {}, x.n || 1, true)))))));
+    wrap.append(det);
+  }
+  if (v.unmapped && v.unmapped.length)
+    wrap.append(el('p', { class: 'warn' }, el('b', { text: 'Mapping gap: ' }),
+      `${v.unmapped.length} group${v.unmapped.length > 1 ? 's' : ''} not in `
+      + `scripts/categories.yaml rolled into "other": ${v.unmapped.join(', ')}. `
+      + 'Add them to the file and re-run diagnose.py.'));
+  return wrap;
+}
+
+// The one experiment (DIAGNOSE.md). mmlu_perm re-poses a fixed subset of MMLU
+// with the options rotated so the correct answer visits every slot equally —
+// the same knowledge asked in a way a position-skewed model can reach. Both
+// scores, both errors and the gap in standard errors are on the page; the
+// sentence is derived from them and from nothing else.
+function permControl(m) {
+  const a = cell('mmlu', m.id), b = cell('mmlu_perm', m.id);
+  if (!a || !b) return null;
+  const ch = (DATA.tasks.mmlu || {}).chance || 0.25;
+  const clears = c => c.v - 1.96 * (c.se || 0) > ch;
+  const ca = clears(a), cb = clears(b);
+  const se = Math.sqrt((a.se || 0) ** 2 + (b.se || 0) ** 2);
+  const d = b.v - a.v, z = se ? d / se : null;
+  const zs = z == null ? '' : ` — ${Math.abs(z).toFixed(1)} standard errors`;
+  let text, calm = true;
+  if (cb && !ca) {
+    text = `The format was hiding measurable knowledge: with the options rotated the model `
+      + `clears chance (${pct(b.v)}) where the standard posing does not (${pct(a.v)})${zs}. `
+      + 'The fix is the prompt format, not training data.';
+    calm = false;
+  } else if (!ca && !cb) {
+    text = `The knowledge is not there to hide: rotating the options leaves it at chance `
+      + `(${pct(b.v)} against ${pct(a.v)}${zs}). Whatever the answer distribution looks `
+      + 'like, the ceiling on its page is not what is capping this model.';
+  } else if (ca && cb) {
+    text = `Both posings clear chance (${pct(a.v)} standard, ${pct(b.v)} rotated${zs}). `
+      + 'The MMLU number is measuring knowledge, not slot preference.';
+  } else {
+    text = `The standard posing clears chance (${pct(a.v)}) and the rotated one does not `
+      + `(${pct(b.v)})${zs}. That is the unexpected direction: check the two runs share a `
+      + 'template and a harness build before reading anything into it.';
+    calm = false;
+  }
+  const row = (label, c, ok) => el('tr', {},
+    el('td', { text: label }),
+    el('td', { class: 'num', text: pct(c.v) }),
+    el('td', { class: 'num se', text: c.se ? `±${(100 * c.se).toFixed(1)}` : '—' }),
+    el('td', { class: 'num se', text: c.n != null ? String(c.n) : '—' }),
+    el('td', { text: ok ? 'clears chance' : 'at chance' }));
+  return el('div', { class: 'dxperm' },
+    el('div', { class: 'dxh', text: 'The permutation control' }),
+    el('table', { class: 'dxsub' },
+      el('thead', {}, el('tr', {},
+        el('th', { text: 'posing' }), el('th', { class: 'num', text: 'score' }),
+        el('th', { class: 'num', text: 'stderr' }), el('th', { class: 'num', text: 'items' }),
+        el('th', { text: `vs ${pct(ch)} chance` }))),
+      el('tbody', {}, row('mmlu — options as published', a, ca),
+                      row('mmlu_perm — options rotated by item', b, cb))),
+    el('p', { class: 'dxlead' + (calm ? ' calm' : ''), text: text }),
+    el('p', { class: 'small', text: `Difference ${d >= 0 ? '+' : ''}${(100 * d).toFixed(1)} `
+      + `points${zs}. mmlu_perm covers a fixed subset of subjects, so read the direction and `
+      + 'the chance line, not the decimals.' }));
+}
+
 function vDiagnose(m) {
   if (!DATA.meta.anyDiag) return null;
   const d = m.diag;
@@ -1826,6 +1969,9 @@ function vDiagnose(m) {
       + 'wrong it gets wrong for ordinary reasons. Per-task detail below.' }));
   }
 
+  const perm = permControl(m);
+  if (perm) card.append(perm);
+
   card.append(el('div', { class: 'dxh', text: 'By benchmark' }));
   for (const t of order) {
     const v = d.tasks[t], b = v.buckets || {}, n = v.n || 1;
@@ -1866,7 +2012,9 @@ function vDiagnose(m) {
     const groups = Object.entries(v.groups || {})
       .filter(([, g]) => g.score_report != null)
       .sort((x, y) => x[1].score_report - y[1].score_report);
-    if (groups.length > 1) {
+    if (v.categories && Object.keys(v.categories).length)
+      body.append(dxCategories(t, v, causes[t].some(c => c.key === 'atchance')));
+    else if (groups.length > 1) {
       body.append(el('div', { class: 'dxh', text: 'Weakest groups first' }));
       body.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'dxsub' },
         el('thead', {}, el('tr', {},
@@ -2416,7 +2564,8 @@ function vLeaderboard(ms) {
            + (c.task && (DATA.tasks[c.task] || {}).desc ? ' hasinfo' : ''),
       // the description on the column itself; the full list is in the panel
       // below the table, because a tooltip is not documentation
-      title: c.task ? [(DATA.tasks[c.task] || {}).domain,
+      title: c.task ? [(DATA.tasks[c.task] || {}).control ? 'CONTROL — never in Avg' : null,
+                       (DATA.tasks[c.task] || {}).domain,
                        (DATA.tasks[c.task] || {}).desc].filter(Boolean).join(' — ') : null,
       onclick: () => { state.sort = { key: c.key,
         dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
@@ -2517,8 +2666,94 @@ function vLeaderboard(ms) {
       state.lbHeat ? heatLegend() : el('span', { class: 'count-note',
         text: 'shade every score by how far it is from chance — useful once the '
             + 'table is taller than the screen' })),
-    el('div', { class: 'lb-wrap' }, el('table', { class: 'lb' }, thead, tbody))),
+    lbViewCtrl(ms),
+    state.lbView === 'cats' ? lbCategoryTable(ms)
+      : el('div', { class: 'lb-wrap' }, el('table', { class: 'lb' }, thead, tbody))),
     aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
+}
+
+// The optional "MMLU by category" view: one column per category from
+// scripts/categories.yaml, one row per model that has a diagnosis, so a trained
+// checkpoint's profile can be set against the reference models. Every number
+// is a LEADERBOARD-half score read from diagnose.json — the same half the MMLU
+// column comes from — so nothing here is a diagnosis-half claim.
+const mmluCats = m => ((((m.diag || {}).tasks || {}).mmlu || {}).categories) || null;
+
+function lbViewCtrl(ms) {
+  const n = ms.filter(mmluCats).length;
+  return el('div', { class: 'ctrl', style: 'margin:2px 0 6px' },
+    el('span', { class: 'small', text: 'Columns' }),
+    el('div', { class: 'seg', role: 'group', 'aria-label': 'leaderboard columns' },
+      [['tasks', 'tasks'], ['cats', 'MMLU by category']].map(([v, l]) =>
+        el('button', { 'aria-pressed': String(state.lbView === v), text: l,
+          disabled: (v === 'cats' && !n) ? '' : null,
+          title: v === 'cats' && !n ? 'no model here has an MMLU diagnosis on file' : null,
+          onclick: () => { state.lbView = v; render(); } }))),
+    el('span', { class: 'count-note', text: state.lbView === 'cats'
+      ? `leaderboard-half MMLU score per category, from each model's diagnosis (${n} of `
+        + `${ms.length} have one) — categories under ${CAT_MIN_N} items are greyed`
+      : 'switch to see MMLU broken down by category for every diagnosed model' }));
+}
+
+function lbCategoryTable(ms) {
+  const have = ms.filter(mmluCats);
+  const cats = (DATA.meta.categories || []).filter(c => have.some(m => mmluCats(m)[c]));
+  const cols = [{ key: 'name', label: 'Model' }, { key: 'mmlu', label: 'mmlu', task: true },
+                ...cats.map(c => ({ key: 'cat:' + c, label: c, cat: c }))];
+  const val = (m, c) => c.key === 'name' ? m.name
+    : c.task ? (cell('mmlu', m.id) || {}).v
+    : ((mmluCats(m)[c.cat] || {}).score_report);
+  const sortKey = cols.some(c => c.key === state.sort.key) ? state.sort.key : 'mmlu';
+  const dir = sortKey === state.sort.key ? state.sort.dir : -1;
+  const rows = [...have].sort((a, b) => {
+    const c = cols.find(c => c.key === sortKey);
+    const va = val(a, c), vb = val(b, c);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1; if (vb == null) return -1;
+    return typeof va === 'string' ? dir * natCmp(va, vb) : dir * (va - vb);
+  });
+  const best = {};
+  for (const c of cols) if (c.key !== 'name') {
+    const vs = have.map(m => val(m, c)).filter(v => v != null);
+    if (vs.length > 1) best[c.key] = Math.max(...vs);
+  }
+  const th = c => el('th', {
+    class: (c.key === 'name' ? 'model ' : 'num ') + 'sortable',
+    'aria-sort': sortKey === c.key ? (dir > 0 ? 'ascending' : 'descending') : 'none',
+    onclick: () => { state.sort = { key: c.key,
+      dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : -1) };
+      render(); } },
+    c.label + ' ', sortKey === c.key ? el('span', { class: 'dir', text: dir > 0 ? '▲' : '▼' }) : '');
+  const table = el('table', { class: 'lb lbcats' },
+    el('thead', {}, el('tr', {}, cols.map(th))),
+    el('tbody', {}, rows.map(m => el('tr', {}, cols.map(c => {
+      if (c.key === 'name') return el('td', { class: 'model', 'data-model': m.id },
+        el('a', { class: 'mname mlink', text: m.name, href: '#model=' + encodeURIComponent(m.id) }),
+        prelimBadge(m) || '');
+      if (c.task) {
+        const cc = cell('mmlu', m.id);
+        return el('td', { class: 'num' + (cc && cc.v === best.mmlu ? ' best' : ''),
+          style: state.lbHeat && cc ? `background:${heatBg({ task: 'mmlu' }, cc.v) || 'none'}` : null },
+          cc ? pct(cc.v) : '—',
+          cc && cc.se ? el('span', { class: 'se', text: ` ±${(100 * cc.se).toFixed(1)}` }) : '');
+      }
+      const g = mmluCats(m)[c.cat];
+      if (!g || g.score_report == null) return el('td', { class: 'num', text: '—' });
+      const dim = g.n_report < CAT_MIN_N;
+      return el('td', { class: 'num' + (dim ? ' dim' : '')
+          + (!dim && g.score_report === best[c.key] ? ' best' : ''),
+        style: state.lbHeat && !dim ? `background:${heatBg({ task: 'mmlu' }, g.score_report) || 'none'}` : null,
+        title: `${g.n_report} leaderboard-half items` + (dim ? ` — under ${CAT_MIN_N}, treat as noise` : '')
+          + ` · subjects: ${(g.groups || []).join(', ')}` },
+        pct(g.score_report), el('span', { class: 'se', text: ` ${g.n_report}` }));
+    })))));
+  const skipped = ms.length - have.length;
+  return el('div', {},
+    el('div', { class: 'lb-wrap' }, table),
+    el('p', { class: 'small', style: 'margin:8px 0 0', text:
+      'Each cell: leaderboard-half accuracy on that category, then its item count. '
+      + (skipped ? `${skipped} model${skipped > 1 ? 's' : ''} without a diagnosis on file `
+                 + '(run scripts/diagnose.py) are not shown in this view.' : '') }));
 }
 
 // the key for the shading — colour alone is never the only encoding here (the
@@ -3546,7 +3781,9 @@ function vQueue() {
       el('option', { value: v, text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
     suite: el('select', {},
       el('option', { value: 'full', text: 'full — all tasks, comparable' }),
-      el('option', { value: 'quick', text: 'quick — hellaswag + arc_easy + ppl, minutes' })),
+      el('option', { value: 'quick', text: 'quick — hellaswag + arc_easy + ppl, minutes' }),
+      el('option', { value: 'control', text: 'control — mmlu_perm only: MMLU with the '
+        + 'options rotated (the position-bias experiment), ~a fifth of a full MMLU' })),
     submitter: el('input', { type: 'text', placeholder: 'your name', style: 'width:130px' }),
     note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px' }),
   };

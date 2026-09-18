@@ -1,0 +1,24 @@
+# mmlu_perm — MMLU with the answer options rotated by doc_id mod 4 (see utils.py).
+# Identical to the harness's own lm_eval/tasks/mmlu/default/_default_template_yaml
+# at 0.4.12 except for the process_docs hook, so the only thing that differs
+# between mmlu and mmlu_perm is where the correct answer sits.
+#
+# Run it through the service as suite=control (same lock, same queue as every
+# evaluation) or by hand with:
+#   lm_eval … --tasks mmlu_perm --num_fewshot 5 --include_path <repo>/eval_tasks/mmlu_perm
+dataset_path: cais/mmlu
+test_split: test
+fewshot_split: dev
+fewshot_config:
+  sampler: first_n
+process_docs: !function utils.process_docs
+output_type: multiple_choice
+doc_to_text: "{{question.strip()}}\nA. {{choices[0]}}\nB. {{choices[1]}}\nC. {{choices[2]}}\nD. {{choices[3]}}\nAnswer:"
+doc_to_choice: ["A", "B", "C", "D"]
+doc_to_target: answer
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0

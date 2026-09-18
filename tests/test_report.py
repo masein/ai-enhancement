@@ -15,17 +15,17 @@ def _model(payload, mid):
 
 def test_every_fixture_model_is_on_the_board(payload, tree):
     assert {m["id"] for m in payload["models"]} == set(tree["models"])
-    assert payload["accTasks"] == ["mmlu", "hellaswag", "arc_challenge", "arc_easy",
-                                   "winogrande", "piqa", "truthfulqa_mc2"]
+    assert payload["accTasks"] == ["mmlu", "mmlu_perm", "hellaswag", "arc_challenge",
+                                   "arc_easy", "winogrande", "piqa", "truthfulqa_mc2"]
     # MMLU's subjects and categories are children of the group, never headline
-    assert not any(t.startswith("mmlu_") for t in payload["tasks"])
+    assert not any(t.startswith("mmlu_") and t != "mmlu_perm" for t in payload["tasks"])
     assert any(row[1] == "mmlu_econometrics" for row in payload["extra"])
 
 
 def test_official_requires_the_whole_protocol(payload, tree):
     for mid, m in tree["models"].items():
         row = _model(payload, mid)
-        if m["tasks"] == make_fixture.FULL:
+        if set(make_fixture.FULL) <= set(m["tasks"]):
             assert row["official"] and row["avg"] is not None and row["missing"] == []
         else:
             assert not row["official"] and row["avg"] is None
@@ -82,7 +82,7 @@ def test_trim_diag_caps_the_archive_for_the_page(diag):
         # the archive keeps the counts the page reads; nothing else rides along
         assert set(v) <= {"metric", "n", "n_report", "n_diagnose", "score_all",
                           "score_report", "score_diagnose", "buckets", "approx_buckets",
-                          "groups", "answers", "examples"}
+                          "groups", "answers", "examples", "categories", "unmapped"}
 
 
 def test_trim_diag_clips_long_text_and_drops_empty():

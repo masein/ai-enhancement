@@ -1,0 +1,102 @@
+# MMLU's 57 subjects, rolled up into the categories a person actually thinks in.
+#
+# "We are weak in economics" is a sentence someone can act on; "we are weak in
+# high_school_macroeconomics (13 leaderboard-half items)" is not — it is noise
+# with a subject name attached. scripts/diagnose.py writes a `categories` block
+# per task from this file, beside the raw `groups`, and the dashboard shows
+# categories first with the subjects on expand.
+#
+# Rules, enforced by tests/test_categories.py:
+#   * every one of the harness's 57 subjects appears exactly once
+#   * the file stays this shape — `category:` lines and `  - subject` lines,
+#     nothing else — because scripts/categories.py reads it without pyyaml
+#     (these scripts run with the box's system python)
+# A subject the harness knows and this file does not rolls into `other` and is
+# listed in diagnose.json under `unmapped`, so the gap is visible, not silent.
+
+economics:
+  - econometrics
+  - high_school_macroeconomics
+  - high_school_microeconomics
+
+law:
+  - international_law
+  - jurisprudence
+  - professional_law
+
+medicine & health:
+  - anatomy
+  - clinical_knowledge
+  - college_medicine
+  - human_aging
+  - medical_genetics
+  - nutrition
+  - professional_medicine
+  - virology
+
+mathematics:
+  - abstract_algebra
+  - college_mathematics
+  - elementary_mathematics
+  - high_school_mathematics
+  - high_school_statistics
+
+computer science:
+  - college_computer_science
+  - computer_security
+  - high_school_computer_science
+  - machine_learning
+
+physics & engineering:
+  - astronomy
+  - college_physics
+  - conceptual_physics
+  - electrical_engineering
+  - high_school_physics
+
+chemistry & biology:
+  - college_biology
+  - college_chemistry
+  - high_school_biology
+  - high_school_chemistry
+
+history:
+  - high_school_european_history
+  - high_school_us_history
+  - high_school_world_history
+  - prehistory
+
+philosophy & religion:
+  - moral_disputes
+  - moral_scenarios
+  - philosophy
+  - world_religions
+
+politics & government:
+  - high_school_government_and_politics
+  - security_studies
+  - us_foreign_policy
+
+psychology & sociology:
+  - high_school_psychology
+  - human_sexuality
+  - professional_psychology
+  - sociology
+
+business & accounting:
+  - business_ethics
+  - management
+  - marketing
+  - professional_accounting
+  - public_relations
+
+geography & world facts:
+  - global_facts
+  - high_school_geography
+
+language & logic:
+  - formal_logic
+  - logical_fallacies
+
+other:
+  - miscellaneous

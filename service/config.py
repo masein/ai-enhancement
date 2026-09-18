@@ -97,10 +97,21 @@ def remote_code_blocked() -> str:
 NFEWSHOT = {
     "mmlu": 5, "hellaswag": 5, "arc_challenge": 5, "arc_easy": 5,
     "winogrande": 5, "piqa": 0, "truthfulqa_mc2": 0, "gsm8k": 5,
+    "mmlu_perm": 5,          # the control poses MMLU exactly as mmlu does, shots included
 }
 FULL_TASKS = ["mmlu", "hellaswag", "arc_challenge", "arc_easy",
               "winogrande", "piqa", "truthfulqa_mc2", "gsm8k"]
 QUICK_TASKS = ["hellaswag", "arc_easy"]
+
+# The permutation control (eval_tasks/mmlu_perm in this repo): MMLU with the
+# answer options rotated so the correct one visits every slot equally. It uses
+# the card, so it is a suite of its own and goes through the same worker, lock
+# and free-VRAM gate as everything else — never a side channel to the GPU. It
+# is in no other suite because it is a control, not a leaderboard task.
+CONTROL_TASKS = ["mmlu_perm"]
+CONTROL_TASKS_DIR = Path(os.environ.get(
+    "CONTROL_TASKS_DIR",
+    Path(__file__).resolve().parent.parent / "eval_tasks" / "mmlu_perm"))
 
 
 def discovered_ppl_tasks() -> list[str]:
@@ -110,5 +121,7 @@ def discovered_ppl_tasks() -> list[str]:
 
 
 def tasks_for_suite(suite: str) -> list[str]:
+    if suite == "control":
+        return list(CONTROL_TASKS)
     base = QUICK_TASKS if suite == "quick" else FULL_TASKS
     return base + discovered_ppl_tasks()

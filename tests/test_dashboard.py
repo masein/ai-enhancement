@@ -82,6 +82,10 @@ def test_every_tab_renders_with_zero_console_errors(surface):
     assert surface.errors == []
 
 
+def _mmlu_details(pg, card):
+    return card.locator("details.dx", has=pg.locator(".dxname", has_text=re.compile(r"^mmlu[^_]", re.I))).first
+
+
 def test_model_page_shows_the_diagnose_card(surface, diag):
     pg = surface.open(model_link("fx/skewed-360m"))
     card = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
@@ -92,7 +96,7 @@ def test_model_page_shows_the_diagnose_card(surface, diag):
     assert "of its answers land on" in lead and "cannot score above" in lead
     assert "answer positions" in card.locator(".dxflag").all_text_contents()
     # the ceiling on the page is 1 - TVD from the diagnosis file, to the shown precision
-    mmlu = card.locator("details.dx", has=pg.locator(".dxname", has_text=re.compile("mmlu", re.I)))
+    mmlu = _mmlu_details(pg, card)
     m = re.search(r"Ceiling for this answer distribution: ([\d.]+)%", mmlu.text_content())
     assert m, "no ceiling sentence for mmlu"
     tvd = diag["fx/skewed-360m"]["tasks"]["mmlu"]["answers"]["pick_skew"]
@@ -158,6 +162,75 @@ def test_no_horizontal_scroll_at_phone_width(surface):
     assert surface.errors == []
 
 
+def test_categories_first_subjects_on_expand(surface, diag):
+    pg = surface.open(model_link("fx/good-750m"))
+    card = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+    mmlu = _mmlu_details(pg, card)
+    mmlu.locator("> summary").click()
+    cats = mmlu.locator("details.dxcat")
+    expected = diag["fx/good-750m"]["tasks"]["mmlu"]["categories"]
+    assert cats.count() == len(expected)
+    # weakest first, and the fixture plants econometrics as the gap
+    names = cats.locator(".dxcname").all_text_contents()
+    assert names[0] == "economics"
+    scores = [float(x.rstrip("%")) for x in cats.locator("> summary > .num").all_text_contents()]
+    assert scores == sorted(scores)
+    # the noise floor is visible: one-subject categories are greyed, two-subject ones are not
+    dim = mmlu.locator("details.dxcat.dim .dxcname").all_text_contents()
+    assert "economics" not in dim and "medicine & health" not in dim and len(dim) == 4
+    assert "under 30, noise" in mmlu.locator("details.dxcat.dim").first.text_content()
+    # subjects live under the category, not beside it, until you open one
+    econ = mmlu.locator("details.dxcat[data-cat='economics']")
+    assert econ.locator("table.dxsub").is_hidden()
+    econ.locator("summary").click()
+    rows = econ.locator("tbody tr td:first-child").all_text_contents()
+    assert set(rows) == {"econometrics", "high_school_macroeconomics"}
+    assert "Weakest groups first" not in mmlu.text_content()        # replaced, not doubled
+    assert "Mapping gap" not in mmlu.text_content()
+    assert surface.errors == []
+
+
+def test_categories_under_a_score_at_chance_are_not_a_claim(surface):
+    pg = surface.open(model_link("fx/chance-160m"))
+    card = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+    mmlu = _mmlu_details(pg, card)
+    assert "how the model guesses per category" in mmlu.text_content()
+
+
+def test_permutation_control_sentence(surface):
+    def perm_text(mid):
+        pg = surface.open(model_link(mid))
+        card = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+        p = card.locator(".dxperm")
+        return p.text_content() if p.count() else None
+    skewed = perm_text("fx/skewed-360m")
+    assert "The format was hiding measurable knowledge" in skewed
+    assert "mmlu — options as published" in skewed and "options rotated by item" in skewed
+    assert re.search(r"\d+\.\d standard errors", skewed) and "±" in skewed
+    chance = perm_text("fx/chance-160m")
+    assert "The knowledge is not there to hide" in chance
+    good = perm_text("fx/good-750m")
+    assert "Both posings clear chance" in good
+    assert perm_text("fx/below-135m-it") is None            # no control run: no section
+    assert surface.errors == []
+
+
+def test_leaderboard_by_category_view(surface, diag):
+    pg = surface.open("#tab=leaderboard")
+    pg.get_by_role("button", name="MMLU by category", exact=True).click()
+    table = pg.locator("table.lbcats")
+    heads = table.locator("thead th").all_text_contents()
+    assert any(h.startswith("economics") for h in heads) and any(h.startswith("mmlu") for h in heads)
+    assert table.locator("tbody tr").count() == len(diag)     # diagnosed models only
+    assert "1 model without a diagnosis on file" in pg.locator("#view").text_content()
+    assert table.locator("td.dim").count() > 0 and table.locator("td.num.best").count() > 0
+    # the control column carries its warning in the task view
+    pg.get_by_label("leaderboard columns").get_by_role("button", name="tasks", exact=True).click()
+    th = pg.locator("table.lb thead th", has_text=re.compile(r"^mmlu_perm"))
+    assert "CONTROL" in th.get_attribute("title")
+    assert surface.errors == []
+
+
 def test_screenshots_for_the_pr(surface):
     """Not an assertion beyond 'it rendered': the pictures a reviewer wants."""
     SCREENS.mkdir(exist_ok=True)
@@ -170,6 +243,11 @@ def test_screenshots_for_the_pr(surface):
             pg.screenshot(path=SCREENS / f"overview-{scheme}-{width}.png", full_page=True)
             surface.open(model_link("fx/skewed-360m"))
             pg.locator("details.dx > summary").first.click()
+            pg.locator("details.dxcat > summary").first.click()
             pg.screenshot(path=SCREENS / f"model-skewed-{scheme}-{width}.png", full_page=True)
-    assert len(list(SCREENS.glob("*.png"))) >= 8
+            surface.open("#tab=leaderboard")
+            pg.get_by_role("button", name="MMLU by category", exact=True).click()
+            pg.screenshot(path=SCREENS / f"leaderboard-categories-{scheme}-{width}.png",
+                          full_page=True)
+    assert len(list(SCREENS.glob("*.png"))) >= 12
     assert surface.errors == []

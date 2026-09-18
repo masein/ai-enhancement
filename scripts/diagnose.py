@@ -47,6 +47,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))    # scripts/, for categories.py
+import categories as _categories  # noqa: E402
+
 # Changing this re-splits every benchmark, which invalidates comparisons against
 # every score already published. It is a constant, not a setting.
 SPLIT_SALT = "evalboard-split-v1"
@@ -65,6 +68,10 @@ SPLIT_SALT = "evalboard-split-v1"
 CHANCE_LIFT   = 1.30     # top option barely above uniform ⇒ no information
 NEAR_MISS_GAP = 0.10     # correct ranked 2nd, within this much probability
 MAX_EXAMPLES  = 8        # per bucket per task, diagnose half only
+# A group or category with fewer leaderboard-half items than this is noise: 13
+# items carry about ±13 points, and a ranking of such groups ranks the dice.
+# Written into diagnose.json so the page and this file agree on the floor.
+MIN_GROUP_N   = 30
 
 # A model that answers the same letter for nearly every question scores about
 # chance and looks exactly like an ignorant model on the leaderboard. It is not
@@ -230,6 +237,48 @@ def spread_examples(by_bucket_group: dict) -> dict:
         if picked:
             out[b] = picked
     return out
+
+
+def rollup_categories(groups: dict) -> tuple[dict, list[str]]:
+    """Roll the per-group tallies (MMLU's 57 subjects) up into the categories a
+    person thinks in, from scripts/categories.yaml. Same fields as `groups`,
+    plus the list of subjects each category holds so the page can expand it.
+
+    A group the mapping does not know goes into `other` AND into the returned
+    `unmapped` list. Dropping it would hide a gap in the mapping; folding it in
+    silently would misfile it. Listing it is what lets someone fix the file.
+    Returns ({}, []) when nothing maps at all — the groups are then not MMLU
+    subjects and a categories block would be one row called `other`.
+    """
+    cats: dict[str, dict] = {}
+    unmapped: list[str] = []
+    mapped = 0
+    for name, g in sorted(groups.items()):
+        cat = _categories.categorize(name)
+        if cat is None:
+            unmapped.append(name)
+            cat = _categories.OTHER
+        else:
+            mapped += 1
+        c = cats.setdefault(cat, {"n": 0, "n_report": 0, "hit_report": 0.0,
+                                  "buckets": collections.Counter(), "groups": []})
+        c["n"] += g["n"]
+        c["n_report"] += g["n_report"]
+        c["hit_report"] += g["hit_report"]
+        c["buckets"].update(g["buckets"])
+        c["groups"].append(name)
+    if not mapped:
+        return {}, []
+    out = {}
+    for cat in _categories.category_order():
+        c = cats.get(cat)
+        if not c:
+            continue
+        out[cat] = {"n": c["n"], "n_report": c["n_report"],
+                    "score_report": (round(c["hit_report"] / c["n_report"], 6)
+                                     if c["n_report"] else None),
+                    "buckets": dict(c["buckets"]), "groups": c["groups"]}
+    return out, unmapped
 
 
 def diagnose_task(files: list[Path]) -> dict | None:
@@ -443,6 +492,10 @@ def diagnose_task(files: list[Path]) -> dict | None:
         }
     if len(out["groups"]) < 2:        # a single "—" group carries no information
         out["groups"] = {}
+    if out["groups"]:
+        cats, unmapped = rollup_categories(agg["groups"])
+        if cats:
+            out["categories"], out["unmapped"] = cats, unmapped
     return out
 
 
@@ -460,6 +513,7 @@ def diagnose_model(model_dir: Path) -> dict:
             "thresholds": {"chance_lift": CHANCE_LIFT,
                            "near_miss_gap": NEAR_MISS_GAP,
                            "degenerate_share": DEGENERATE_SHARE,
+                           "min_group_n": MIN_GROUP_N,
                            "note": "lift = probability x n_options; 1.0 is chance"}}
 
 
@@ -480,6 +534,7 @@ def main() -> int:
         return 2
     want = {m.replace("/", "__") for m in a.model}
     n, denied, found = 0, [], {}
+    unmapped: dict[str, set] = {}
     for d in sorted(p for p in a.results.iterdir() if p.is_dir()):
         if want and d.name not in want:
             continue
@@ -512,6 +567,8 @@ def main() -> int:
             if v["buckets"].get("confident_wrong", 0) / nb >= CONFIDENT_SHARE:
                 found.setdefault("confidently wrong on most items", []).append(
                     f"{d.name}/{t}")
+            for g in v.get("unmapped", []):
+                unmapped.setdefault(g, set()).add(t)
         if not a.quiet:
             bits = []
             for t, v in sorted(out["tasks"].items()):
@@ -533,6 +590,13 @@ def main() -> int:
             print("\n  None of these are fixed by more training data for the "
                   "subject:\n  they are properties of the output distribution, "
                   "not of what the model knows.")
+        if unmapped:
+            # a mapping gap is a fact about scripts/categories.yaml, not about
+            # any model — say it once, board-wide, where it will be read
+            print(f"\n{len(unmapped)} group(s) are not in scripts/categories.yaml and "
+                  f"were rolled into 'other':")
+            for g in sorted(unmapped):
+                print(f"      {g}  ({', '.join(sorted(unmapped[g]))})")
     if denied:
         print(f"\ncould not write {len(denied)} model(s) — the results tree is "
               f"owned by whoever ran the eval:", file=sys.stderr)
