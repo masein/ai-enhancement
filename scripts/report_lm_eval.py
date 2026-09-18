@@ -76,12 +76,26 @@ _META_CACHE: dict = {}
 
 def _beside(source: Path, name: str) -> dict | None:
     """Read a JSON file that sits at the MODEL's directory level. Results files
-    live one or two levels below it, so try both."""
+    live one or two levels below it, so try both.
+
+    The cache is keyed on (path, mtime, size) and an ABSENT file is never
+    cached. That matters because the service imports this module once and lives
+    for weeks: caching "no diagnose.json here" by path alone means a model whose
+    diagnosis is written after the service started never shows one until someone
+    restarts the container, and the same goes for a diagnosis that gets
+    regenerated. A stat per candidate per rebuild is nothing next to that.
+    """
+    if len(_META_CACHE) > 4096:           # one entry per rewrite; keep it bounded
+        _META_CACHE.clear()
     for up in (1, 2):
         if len(source.parents) <= up:
             continue
         cand = source.parents[up] / name
-        key = str(cand)
+        try:
+            st = cand.stat()
+        except OSError:
+            continue                      # not here (yet) — nothing to remember
+        key = (str(cand), st.st_mtime_ns, st.st_size)
         if key not in _META_CACHE:
             try:
                 _META_CACHE[key] = json.loads(cand.read_text(encoding="utf-8"))
