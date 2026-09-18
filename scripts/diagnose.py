@@ -218,6 +218,7 @@ def diagnose_task(files: list[Path]) -> dict | None:
         "gold": collections.Counter(),    # which index was correct
         "n_len": 0, "short_pick": 0,      # did it pick the shortest option?
         "opts": collections.Counter(),
+        "n_scored": 0, "n_target_ok": 0, "multi_true": 0,
     }
     for f in files:
         with open(f, encoding="utf-8", errors="replace") as fh:
@@ -259,6 +260,18 @@ def diagnose_task(files: list[Path]) -> dict | None:
                             agg["approx_buckets"] = True
                     probs = softmax(lps)
                     ci = target_index(rec, len(lps))
+                    agg["n_scored"] += 1
+                    if ci is not None:
+                        agg["n_target_ok"] += 1
+                    # multi-true tasks (TruthfulQA mc2) score the total mass on
+                    # ALL correct options — there is no single right index, so
+                    # every statistic below is meaningless for them
+                    for k in ("mc2_targets", "mc1_targets"):
+                        tv = doc.get(k)
+                        if isinstance(tv, dict) and isinstance(tv.get("labels"), list):
+                            if sum(1 for x in tv["labels"] if x) > 1:
+                                agg["multi_true"] += 1
+                            break
                     b = bucket(probs, ci, right)
                     pick = max(range(len(probs)), key=lambda i: probs[i])
                     agg["opts"][len(probs)] += 1
@@ -328,7 +341,32 @@ def diagnose_task(files: list[Path]) -> dict | None:
         "groups": {},
     }
     # ---- how the answers are shaped, not just how many were right ----------
+    #
+    # Everything below assumes ONE correct option per item and a stable option
+    # count. TruthfulQA mc2 satisfies neither: several options are true and the
+    # metric is the mass on all of them, so "the correct index" does not exist
+    # and every statistic derived from it is noise. Reporting a finding that
+    # fires on every model — including the strongest — is worse than reporting
+    # none, so say the analysis does not apply and stop.
     npick = sum(agg["picks"].values())
+    ok_share = (agg["n_target_ok"] / agg["n_scored"]) if agg["n_scored"] else 0.0
+    modal_share = ((agg["opts"].most_common(1)[0][1] / sum(agg["opts"].values()))
+                   if agg["opts"] else 0.0)
+    why = None
+    if agg["multi_true"]:
+        why = "multi-true task: several options are correct, so there is no single answer index"
+    elif agg["n_scored"] and ok_share < 0.90:
+        why = f"only {ok_share:.0%} of items expose a single answer index"
+    elif agg["opts"] and modal_share < 0.80:
+        why = "the number of options varies across items"
+    if why:
+        out["answers"] = {"unsupported": why}
+        # buckets computed against a nonexistent correct index are not evidence
+        out["buckets"] = {"right": agg["buckets"].get("right", 0),
+                          "wrong": sum(v for k, v in agg["buckets"].items()
+                                       if k != "right")}
+        out["examples"] = {}
+        npick = 0
     if npick:
         nopt = (agg["opts"].most_common(1)[0][0]) if agg["opts"] else 0
         top_i, top_n = agg["picks"].most_common(1)[0]
@@ -432,6 +470,8 @@ def main() -> int:
         # answer distribution should say so without being asked a second time
         for t, v in sorted(out["tasks"].items()):
             ans = v.get("answers") or {}
+            if ans.get("unsupported"):
+                continue
             for label, on in (("answers one option", ans.get("degenerate")),
                               ("answer positions skewed", ans.get("position_biased")),
                               ("picks by option length", ans.get("length_biased"))):
