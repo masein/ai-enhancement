@@ -2,27 +2,35 @@
 
 The pipeline, and where each safety property lives:
 
-  diagnose (categories)
-    → PROPOSAL     an LLM reads DIAGNOSE-HALF failures for one weak category
-                   and proposes a skill spec: what is missing, not which
-                   questions were missed.           failures_for() filters by
-                                                     split_of() == "diagnose"
-    → HUMAN        approves / edits / rejects in the dashboard's Review tab.
-                   The spec text is the airlock; a name is recorded.
-    → GENERATOR    receives ONLY the approved spec, the category, a count, a
-                   format and a style constraint.  generation_requests() takes
-                                                     no item, no hash, no model
-    → GATE         13-gram overlap against every benchmark item on disk, both
-                   halves; near-duplicates collapsed.  service/contamination.py
-    → PROVENANCE   who, what, which model, which prompt, which batch, hashes.
-    → TAINT        a training run that consumes the dataset says so; its
-                   checkpoints lose the task from their official average.
+  the exam      the checkpoint sits it; an LLM judge grades every answer 0-4
+                against the rubric AND writes why it scored what it did
+    → PROPOSAL  an LLM reads the judge's WRITTEN JUSTIFICATIONS for one weak
+                topic's DIAGNOSE-HALF low-scoring answers, and proposes a
+                skill spec: what is missing, not which questions were missed.
+                justifications_for() filters by split_of(qid) == "diagnose"
+                and strips any exam question text the judge quoted — the
+                justification is about the answer, not the question
+    → HUMAN     approves / edits / rejects in the dashboard's Review tab.
+                The spec text is the airlock; a name is recorded.
+    → GENERATOR receives ONLY the approved spec, the topic, a count, a format
+                and a style constraint.     generation_requests() takes no
+                                            item, no hash, no model name
+    → GATE      13-gram overlap against every benchmark item on disk, both
+                halves; near-duplicates collapsed.  service/contamination.py
+    → PROVENANCE who, what, which judge run, which model, which batch, hashes
+    → TAINT     a training run that consumes the dataset says so; its
+                checkpoints lose the task from their official average.
 
-The proposal request is the only place benchmark text meets the LLM, and it
-is diagnose-half text about ONE model, ONE task, ONE category. The failed
-items never reach the generator: the request that makes data is built from
-the spec string and nothing else, and test_proposals.py proves both with the
-recorded request bodies.
+The exam already says, per topic, in a person's vocabulary, how good the
+model is and why it is not better — so nothing here reads MMLU to decide what
+to train. MMLU's distribution findings ride along as a CAUTION beside the
+topic (a topic weak on the exam and at chance on MMLU is a different problem
+from one weak on the exam alone), never as the evidence and never as a gate.
+
+The proposal request is the only place exam-derived text meets an LLM, and it
+carries judged reasoning about DIAGNOSE-half answers only, with question text
+removed. The generator's request is built from the approved spec string and
+nothing else. test_gap.py proves both from the recorded request bodies.
 """
 
 from __future__ import annotations
@@ -37,125 +45,183 @@ from pathlib import Path
 from . import config, llm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import categories as _categories  # noqa: E402
 import diagnose as dx  # noqa: E402
+import exam_build as _exam  # noqa: E402
 
-MAX_FAILURES_IN_PROMPT = 60      # enough to see a pattern; one batch item either way
+MAX_JUSTIFICATIONS = 60          # enough to see a pattern; one batch item either way
 EXAMPLES_SHOWN = 8               # what the Review tab shows of what the LLM saw
 GEN_ITEMS_PER_REQUEST = 10
 FORMATS = ("mc", "free")
-
-BUCKET_WORDS = {"at_chance": "no preference among the options",
-                "confident_wrong": "confidently picked a wrong option",
-                "near_miss": "correct option ranked second, narrowly",
-                "wrong": "wrong"}
+WEAK_SCORE = 3                   # judge.CORRECT_AT: below this the answer did not land
+# Six consecutive words of an exam question inside a justification is a
+# quotation, not a coincidence. Redacting a few innocent words costs nothing;
+# letting question text through costs the exam.
+QUOTE_NGRAM = 6
+REDACTED = "[question text removed]"
 
 
 # ---------------------------------------------------------------------------
 # what the proposal LLM is allowed to see
 # ---------------------------------------------------------------------------
 
-def failures_for(model_dir: Path, task: str, category: str,
-                 limit: int = MAX_FAILURES_IN_PROMPT) -> tuple[list[dict], dict]:
-    """The DIAGNOSE-half items this model got wrong in this category, from the
-    per-item log on disk. Deterministic: sorted by doc_hash, first `limit`.
-    Returns (items, counts) where counts covers every diagnose-half item in
-    the category so 'share of failures' means something."""
-    out: list[dict] = []
-    counts = {"diagnose_items": 0, "diagnose_wrong": 0, "buckets": {}}
-    task_dirs = sorted(d for d in model_dir.glob(f"{task}_*shot")
-                       if re.fullmatch(rf"{re.escape(task)}_\d+shot", d.name))
-    files = dx.newest_per_subtask(sorted(f for d in task_dirs for f in d.rglob("samples_*.jsonl")))
-    for f in files:
-        with open(f, encoding="utf-8", errors="replace") as fh:
-            for line in fh:
-                try:
-                    rec = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                pm = dx.primary_metric(rec)
-                dh = rec.get("doc_hash") or rec.get("prompt_hash")
-                if pm is None or not dh:
-                    continue
-                if dx.split_of(str(dh)) != "diagnose":     # the whole safety property
-                    continue
-                doc = rec.get("doc") or {}
-                group = doc.get("subject") or doc.get("category") or "—"
-                if (_categories.categorize(group) or _categories.OTHER) != category:
-                    continue
-                metric, value = pm
-                right = value >= 0.5
-                counts["diagnose_items"] += 1
-                if right:
-                    continue
-                counts["diagnose_wrong"] += 1
-                resps = rec.get("filtered_resps") or rec.get("resps") or []
-                lps = []
-                for r in resps:
-                    if isinstance(r, list) and r and isinstance(r[0], list):
-                        r = r[0]
-                    lps.append(dx._f(r[0] if isinstance(r, list) else r))
-                probs, pick, bucket = [], None, "wrong"
-                if len(lps) >= 2:
-                    if metric == "acc_norm":
-                        L = dx.norm_lengths(doc, len(lps))
-                        if L:
-                            lps = [x / l for x, l in zip(lps, L)]
-                    probs = dx.softmax(lps)
-                    ci = dx.target_index(rec, len(lps))
-                    bucket = dx.bucket(probs, ci, False)
-                    pick = max(range(len(probs)), key=lambda i: probs[i])
-                else:
-                    ci = dx.target_index(rec, 4)
-                ch = doc.get("choices")
-                if isinstance(ch, dict):
-                    ch = ch.get("text")
-                ch = ch if isinstance(ch, list) else []
-                counts["buckets"][bucket] = counts["buckets"].get(bucket, 0) + 1
-                out.append({
-                    "doc_hash": str(dh), "subject": group, "bucket": bucket,
-                    "question": str(doc.get("question") or doc.get("query") or doc.get("ctx")
-                                    or doc.get("goal") or "")[:600],
-                    "choices": [str(c)[:200] for c in ch],
-                    "chose": str(ch[pick])[:200] if pick is not None and pick < len(ch) else None,
-                    "answer": str(ch[ci])[:200] if ci is not None and ci < len(ch) else None,
-                    "p": round(max(probs), 3) if probs else None,
-                })
-    out.sort(key=lambda x: x["doc_hash"])
+def _judge_file(model_dir: Path) -> dict | None:
+    p = Path(model_dir) / "judge.json"
+    try:
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def weak_topics(model_dir: Path) -> list[dict]:
+    """Every exam topic this model sat, weakest first, from judge.json: the
+    published REPORT-half score and count, the diagnose half behind it, what
+    the model actually wrote, and the topic's rank. This is the whole
+    gap-finding signal — no benchmark item is read to produce it."""
+    j = _judge_file(model_dir)
+    if not j or j.get("skipped"):
+        return []
+    rows = []
+    for task, t in (j.get("tasks") or {}).items():
+        if not task.startswith("exam_"):
+            continue
+        score = t.get("score_report")
+        rows.append({
+            "task": task, "topic": _exam.TASK_TOPIC.get(task, task[len("exam_"):]),
+            "score_report": score, "n_report": t.get("n_report") or 0,
+            "score_diagnose": t.get("score_diagnose"), "n_diagnose": t.get("n_diagnose") or 0,
+            "mean": t.get("mean"), "max": t.get("max", 4), "n": t.get("n") or 0,
+            "answers": t.get("answers") or {},
+            "weak_diagnose": sum(1 for it in (t.get("items") or [])
+                                 if it.get("half") == "diagnose" and it.get("graded")
+                                 and it.get("score", 0) < WEAK_SCORE),
+        })
+    rows.sort(key=lambda r: (r["score_report"] is None, r["score_report"], r["task"]))
+    for i, r in enumerate(rows, 1):
+        r["rank"] = i
+        r["of"] = len(rows)
+    return rows
+
+
+def _norm_words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", (text or "").lower())
+
+
+def question_ngrams(prompts, n: int = QUOTE_NGRAM) -> set[str]:
+    out: set[str] = set()
+    for p in prompts:
+        toks = _norm_words(p)
+        for i in range(len(toks) - n + 1):
+            out.add(" ".join(toks[i:i + n]))
+    return out
+
+
+def strip_question_quotes(text: str, grams: set[str], n: int = QUOTE_NGRAM) -> str:
+    """Remove any run of words the judge lifted from an exam question. The
+    n-gram set is built from the topic's questions in BOTH halves: this
+    function only ever deletes text, so knowing a report-half question here
+    is what keeps it out of the request."""
+    words = [(m.group(0).lower(), m.start(), m.end())
+             for m in re.finditer(r"[A-Za-z0-9]+", text or "")]
+    if len(words) < n or not grams:
+        return text
+    flagged = [False] * len(words)
+    for i in range(len(words) - n + 1):
+        if " ".join(w for w, _, _ in words[i:i + n]) in grams:
+            for j in range(i, i + n):
+                flagged[j] = True
+    if not any(flagged):
+        return text
+    out, pos, i = [], 0, 0
+    while i < len(words):
+        if flagged[i]:
+            j = i
+            while j + 1 < len(words) and flagged[j + 1]:
+                j += 1
+            out.append(text[pos:words[i][1]])
+            out.append(REDACTED)
+            pos = words[j][2]
+            i = j + 1
+        else:
+            i += 1
+    out.append(text[pos:])
+    return re.sub(r"\s+", " ", "".join(out)).strip()
+
+
+def topic_question_grams(task: str) -> set[str]:
+    """Every question of one exam task, as n-grams, for the strip above."""
+    p = _exam.tasks_dir(config.EXAM_DIR) / f"{task}.jsonl"
+    if not p.exists():
+        return set()
+    prompts = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            try:
+                prompts.append(json.loads(line).get("prompt") or "")
+            except json.JSONDecodeError:
+                continue
+    return question_ngrams(prompts)
+
+
+def justifications_for(model_dir: Path, task: str,
+                       limit: int = MAX_JUSTIFICATIONS) -> tuple[list[dict], dict]:
+    """The judge's written reasoning for this topic's DIAGNOSE-half answers
+    that did not land, with any quoted question text removed. Deterministic:
+    sorted by qid, first `limit`. Returns (items, counts)."""
+    j = _judge_file(model_dir)
+    counts = {"diagnose_items": 0, "diagnose_weak": 0, "scores": {}}
+    if not j or j.get("skipped"):
+        return [], counts
+    t = (j.get("tasks") or {}).get(task) or {}
+    grams = topic_question_grams(task)
+    out = []
+    for it in sorted(t.get("items") or [], key=lambda x: str(x.get("qid"))):
+        if it.get("half") != "diagnose":        # the whole safety property
+            continue
+        counts["diagnose_items"] += 1
+        score = it.get("score")
+        counts["scores"][str(score)] = counts["scores"].get(str(score), 0) + 1
+        if not it.get("graded") or score is None or score >= WEAK_SCORE:
+            continue
+        counts["diagnose_weak"] += 1
+        text = strip_question_quotes(str(it.get("justification") or ""), grams)
+        if not text:
+            continue
+        out.append({"qid": it.get("qid"), "score": score, "justification": text[:600],
+                    "answer_words": it.get("answer_words")})
     return out[:limit], counts
 
 
 PROPOSAL_SYSTEM = (
-    "You analyse a small language model's failures on a benchmark category and describe "
-    "the SKILL or KNOWLEDGE that is missing. You are writing a specification for a data "
-    "generator that will never see these questions: describe what the model cannot do, "
-    "in general terms a teacher would use, never the questions themselves. Do not quote, "
-    "paraphrase or allude to any specific item. Reply with one JSON object and nothing "
-    "else: {\"spec\": <one to three sentences>, \"share_explained\": <0..1, the share of "
-    "the failures below your spec accounts for>, \"patterns\": [<two or three short "
-    "failure patterns you saw>]}.")
+    "You read a judge's written assessments of one small language model's answers on one "
+    "topic of a written exam, and describe the SKILL or KNOWLEDGE the model is missing. "
+    "You are writing a specification for a data generator that will never see the exam: "
+    "describe what the model cannot do, in general terms a teacher would use. You are not "
+    "given the questions and must not invent them, quote them, or write any exam-shaped "
+    "question yourself. Reply with one JSON object and nothing else: "
+    "{\"spec\": <one to three sentences>, \"share_explained\": <0..1, the share of the "
+    "assessments below your spec accounts for>, \"patterns\": [<two or three short failure "
+    "patterns you saw>]}.")
 
 
-def proposal_request(pid: int, model: str, task: str, category: str,
-                     failures: list[dict], counts: dict) -> llm.Request:
-    lines = [f"Model: {model}", f"Benchmark: {task}", f"Category: {category}",
-             f"Diagnosis-half items in this category: {counts['diagnose_items']}; "
-             f"wrong: {counts['diagnose_wrong']}; shown below: {len(failures)}.", "",
-             "Each failure: the question, the options, what the model chose, the correct "
-             "answer, and how it was wrong.", ""]
-    for i, f in enumerate(failures, 1):
-        lines.append(f"[{i}] ({f['subject']}; {BUCKET_WORDS.get(f['bucket'], f['bucket'])})")
-        lines.append("Q: " + f["question"])
-        if f["choices"]:
-            lines.append("Options: " + " | ".join(f["choices"]))
-        lines.append(f"Chose: {f['chose']}    Correct: {f['answer']}")
-        lines.append("")
-    lines.append("Write the skill spec now, as the JSON object described.")
+def proposal_request(pid: int, model: str, task: str, topic: str,
+                     justifications: list[dict], counts: dict, rubric: str) -> llm.Request:
+    """The judge's reasoning, the topic and the rubric. No question text: the
+    justification is about the ANSWER, and anything the judge quoted from a
+    question has already been stripped."""
+    lines = [f"Topic: {topic}", f"Model under assessment: {model}",
+             f"Diagnosis-half answers on this topic: {counts['diagnose_items']}; "
+             f"scoring below {WEAK_SCORE} of 4: {counts['diagnose_weak']}; "
+             f"shown below: {len(justifications)}.", "",
+             "The rubric the judge graded against:", rubric.strip(), "",
+             "The judge's assessment of each answer that did not land, with its score:", ""]
+    for i, f in enumerate(justifications, 1):
+        lines.append(f"[{i}] scored {f['score']} of 4 — {f['justification']}")
+    lines += ["", "Write the skill spec now, as the JSON object described."]
     return llm.Request(
         custom_id=f"proposal:{pid}", system=PROPOSAL_SYSTEM, user="\n".join(lines),
         max_tokens=1024,
         meta={"kind": "proposal", "proposal_id": pid, "model": model, "task": task,
-              "category": category, "doc_hashes": [f["doc_hash"] for f in failures]})
+              "topic": topic, "qids": [f["qid"] for f in justifications]})
 
 
 def parse_proposal(text: str) -> dict:
@@ -266,6 +332,18 @@ def write_items(did: int, items: list[dict]) -> tuple[Path, str]:
     return p, hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
+def judge_run_of(prop: dict) -> dict:
+    """Which judge run the proposal was derived from. A proposal made before
+    the exam drove this loop says so rather than leaving a hole."""
+    try:
+        jr = json.loads(prop.get("judge_run") or "{}")
+    except (ValueError, TypeError):
+        jr = {}
+    return {"judge_id": jr.get("judge_id") or "unrecorded",
+            "batch_id": jr.get("batch_id") or "unrecorded",
+            "prompt_sha256": jr.get("prompt_sha256") or "unrecorded"}
+
+
 def identities(generator_id: str) -> dict:
     """All three LLM identities, in every provenance record: the loop is only
     honest if the exam writer, the judge and the generator are not one family."""
@@ -288,6 +366,7 @@ def provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash
         "split": "diagnose",
         "split_salt": dx.SPLIT_SALT,
         "proposal_id": prop["id"],
+        "judge_run": judge_run_of(prop),
         "spec_text": prop["spec_text"],
         "edited_text": prop["edited_text"],
         "approved_spec": prop["edited_text"] or prop["spec_text"],

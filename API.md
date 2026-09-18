@@ -317,17 +317,25 @@ The pipeline behind the Diagnose section's **Propose a skill spec** button
 (DIAGNOSE.md, phase 4). Off unless the operator set `LLM_PROVIDER`; `GET
 /api/llm` says so, and shows today's batch-item use against the daily cap.
 
-- `POST /api/proposals` `{"model", "task", "category", "requested_by"}` — the
-  LLM reads this model's **diagnosis-half** failures in that category and
-  proposes a skill spec. Refused (409) with the page's own words when the task
-  has not cleared chance, has a distribution finding, or the category is under
-  30 leaderboard-half items — those are format failures and data will not fix
-  them. Returns `{"id", "status": "pending", "batch_id"}`; the poller turns it
-  into `proposed` when the batch completes.
+- `POST /api/proposals` `{"model", "topic", "requested_by"}` — the LLM reads
+  the **judge's written assessments** of this model's **diagnosis-half**
+  answers on that exam topic and proposes a skill spec. No exam question text
+  goes with them: anything the judge quoted from a question is stripped, and a
+  test proves it from the recorded request body. Refused (409) with the page's
+  own words when the judged suite is preliminary (κ, a moved canary, a
+  different judge), when the topic has under 30 report-half questions, or when
+  the model wrote nothing usable on it. MMLU's distribution finding for the
+  matching category rides along as `caution` — context, never a gate. Returns
+  `{"id", "status": "pending", "batch_id", "task"}`; the poller turns it into
+  `proposed` when the batch completes.
 - `GET /api/proposals[?status=]`, `GET /api/proposals/{id}` — each with
   `spec_text` (the LLM's), `edited_text` (the human's), `evidence`
-  (`share_explained`, `patterns`, counts, up to eight diagnosis-half
-  `examples`), `proposer`, `approver`, and its `datasets`.
+  (`share_explained`, `patterns`, the topic's report- and diagnosis-half
+  scores and counts, the judge id, the MMLU caution, and up to eight
+  diagnosis-half `examples`, each a judge assessment with its score),
+  `proposer`, `approver`, `judge_run` (the judge id, batch and prompt sha the
+  evidence came from), and its `datasets`. `task` is the exam task
+  (`exam_<topic>`) and `category` is the topic.
 - `POST /api/proposals/{id}/approve` `{"approver", "edited_text"}` and
   `…/reject` `{"approver", "reason"}` — a name is required: it is the record.
 - `POST /api/proposals/{id}/generate` `{"requester", "count", "fmt": "mc"|"free"}`
@@ -349,7 +357,12 @@ The pipeline behind the Diagnose section's **Propose a skill spec** button
   CLI `datasets` and `pull <id> <dir>`.
 
 **Taint.** `POST /api/truns` accepts `"datasets": [ids]` and `"parent"` (the model
-id the run started from; defaults to `config.base_model`). A training run that
+id the run started from; defaults to `config.base_model`). A dataset derived
+from an **exam topic** taints that topic: the score is still shown on the
+model page, the topic leaves `judgedAvg` and its leaderboard column, and the
+badge says so. A dataset derived from a **multiple-choice** task keeps the
+Phase 4 behaviour: the task leaves the official average and the model is
+unranked. A training run that
 records a generated dataset marks every checkpoint submitted under it (or
 carrying its `hf_prefix`) as trained on data derived from that dataset's task:
 `models[].tainted: ["mmlu"]` in `/api/results`, a badge on the board, and the

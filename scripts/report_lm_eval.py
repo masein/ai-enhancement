@@ -260,7 +260,9 @@ def _trim_judge(j: dict | None) -> dict | None:
             continue
         out["tasks"][task] = {k: t.get(k) for k in
                               ("n", "mean", "max", "dist", "score_vs_length", "control",
-                               "n_report", "score_report", "n_diagnose", "score_diagnose")
+                               "n_report", "score_report", "n_diagnose", "score_diagnose",
+                               # what the model actually wrote: the gate reads it
+                               "answers", "ungraded")
                               if t.get(k) is not None}
     return out
 
@@ -299,12 +301,58 @@ def judged_state(trimmed: dict | None, cal: dict | None, current_id: str | None)
     return {"ok": not reasons, "reasons": reasons, "current": current}
 
 
-def judged_avg(trimmed: dict | None) -> float | None:
+# A model that wrote nothing on a topic has not revealed a gap in it.
+EMPTY_SHARE = 0.5          # empty or near-empty answers, as a share of the topic
+DEGENERATE_DISTINCT = 2    # distinct answers, at or below which it wrote one thing
+
+
+def topic_gate(task: str, t: dict, state: dict | None, caution: str | None) -> dict:
+    """{ok, why, caution} for proposing a skill spec from one exam topic.
+    Broadest reason first: if the judged suite cannot be believed, no topic
+    score is evidence of anything; then whether this topic has enough
+    report-half questions to have a score at all; then whether the model
+    wrote enough for the judge to have assessed anything. `caution` is
+    MMLU's finding for the same category — context, never a gate."""
+    why = short = None
+    if not state or not state.get("ok"):
+        rs = "; ".join((state or {}).get("reasons") or ["the judged suite is preliminary"])
+        why = f"the judged suite is preliminary, so no topic score is evidence yet: {rs}"
+        short = "the judged suite is preliminary"
+    else:
+        n_rep = t.get("n_report") or 0
+        a = t.get("answers") or {}
+        n = a.get("n") or 0
+        blank = (a.get("empty", 0) + a.get("short", 0))
+        if n_rep < PROPOSE_MIN_N:
+            why = (f"{n_rep} report-half questions in this topic — under the {PROPOSE_MIN_N} "
+                   f"floor, so the score is noise. Write more questions on the Exam tab")
+            short = f"under the {PROPOSE_MIN_N}-question floor — write more on the Exam tab"
+        elif n and blank / n >= EMPTY_SHARE:
+            why = (f"the model wrote nothing usable on {blank} of {n} answers here — that "
+                   f"is a generation failure, not a topic gap; multiple choice is the "
+                   f"instrument for this model")
+            short = f"the model wrote nothing usable on {blank} of {n} answers"
+        elif n >= 8 and (a.get("distinct") or n) <= DEGENERATE_DISTINCT:
+            why = (f"the model gave the same answer on nearly every question here "
+                   f"({a.get('distinct')} distinct answers in {n}) — the output has "
+                   f"collapsed, and no data for this topic fixes that")
+            short = "the model gave the same answer on nearly every question"
+    # the caution is decision-relevant only where a decision is possible; on a
+    # row that is already refused it would be one more line of noise
+    return {"ok": why is None, "why": why, "short": short,
+            "caution": caution if why is None else None}
+
+
+def judged_avg(trimmed: dict | None, tainted: list[str] | None = None) -> float | None:
     """Mean published (report-half) score over the exam topics this model sat,
-    on the 0–4 scale. None when fewer than three topics were judged."""
+    on the 0–4 scale. None when fewer than three topics were judged. A topic
+    whose diagnostics trained this model is left out: its score is shown, it
+    is not a ranking claim."""
     if not trimmed or trimmed.get("skipped"):
         return None
-    vals = [published_score(trimmed["tasks"][t]) for t in EXAM_TASKS if t in trimmed["tasks"]]
+    skip = set(tainted or ())
+    vals = [published_score(trimmed["tasks"][t]) for t in EXAM_TASKS
+            if t in trimmed["tasks"] and t not in skip]
     vals = [v for v in vals if v is not None]
     return round(sum(vals) / len(vals), 4) if len(vals) >= 3 else None
 
@@ -874,17 +922,22 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     required, req_absent = required_tasks(acc_tasks)
     model_rows = []
     for mid, r in by_model.items():
-        tainted = sorted(set(taint.get(mid, ())) & set(acc_tasks))
+        # every task whose diagnostics this model's training data came from —
+        # a multiple-choice benchmark, an exam topic, or both. The two are
+        # treated the same way (shown, never ranked) in their own averages.
+        tainted = sorted(set(taint.get(mid, ())))
+        tainted_acc = [t for t in tainted if t in acc_tasks]
         have = [cells[t][mid]["v"] for t in acc_tasks
-                if mid in cells.get(t, {}) and t not in CONTROL_TASKS and t not in tainted]
-        got_req = [t for t in required if mid in cells.get(t, {}) and t not in tainted]
+                if mid in cells.get(t, {}) and t not in CONTROL_TASKS and t not in tainted_acc]
+        got_req = [t for t in required if mid in cells.get(t, {}) and t not in tainted_acc]
         missing = [t for t in required if mid not in cells.get(t, {})]
-        official = bool(required) and not missing and not (set(tainted) & set(required))
+        official = bool(required) and not missing and not (set(tainted_acc) & set(required))
         params = r["num_params"] or params_from_name(mid)
         judge = _trim_judge(r.get("judge"))
+        jstate = judged_state(judge, cal, current_judge) if judge else None
         diag = _trim_diag(r.get("diag"))
         compare = {}
-        for t in tainted:
+        for t in tainted_acc:
             pid = parents.get(mid)
             pdiag = _trim_diag(by_model[pid].get("diag")) if pid in by_model else None
             cmp = taint_compare(t, diag, pdiag, pid) if diag and pdiag else None
@@ -905,8 +958,18 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         if diag:
             for task, t in diag["tasks"].items():
                 if t.get("categories"):
+                    # MMLU's own gate stays, but it no longer offers anything:
+                    # its findings are the caution beside an exam topic
                     t["propose"] = proposal_gate(task, t, cells.get(task, {}).get(mid),
                                                  _CHANCE.get(task))
+        if judge:
+            mmlu_cats = (((diag or {}).get("tasks") or {}).get("mmlu") or {}).get("propose") or {}
+            for task, t in judge["tasks"].items():
+                if not task.startswith("exam_"):
+                    continue
+                topic = EXAM_TOPICS.get(task)
+                mc = (mmlu_cats.get("categories") or {}).get(topic) or {}
+                t["propose"] = topic_gate(task, t, jstate, mc.get("why"))
         model_rows.append({
             "id": mid, "name": display[mid],
             "family": re.split(r"[^a-z0-9]", mid.split("/")[-1].lower())[0],
@@ -930,10 +993,10 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             # rubric scores from the pinned judge, summarised; the separate
             # judged average exists only when every category was judged
             "judge": judge,
-            "judgedAvg": judged_avg(judge),
+            "judgedAvg": judged_avg(judge, tainted),
             # may these judged numbers be ranked? uncalibrated, a different
             # judge, or a moved canary all say no, in words
-            "judgeState": judged_state(judge, cal, current_judge) if judge else None,
+            "judgeState": jstate,
             # per tainted task: both halves before and after training, and
             # the sentence derived from them
             "taintCompare": compare or None,
@@ -1706,20 +1769,23 @@ function modelSentence(m) {
                                               : 'base (no chat template)'}`
     + (m.params ? `, ${P(m.params)} parameters` : '') + '.');
   const r = rankOf(m), a = officialAvg(m);
-  if (r && a != null)
+  const tn = (m.tainted || []).map(tName).join(' and ');
+  if (r && a != null) {
     out.push(`It averages ${pct(a)} `
       + `${state.avgMode === 'raw' ? 'raw' : 'above chance'} over the ${m.nreq} `
       + `required tasks, ranking ${ord(r.n)} of ${r.of} ranked models here.`);
-  else if ((m.tainted || []).length && !(m.missing || []).length)
-    out.push(`Its training consumed a dataset derived from ${m.tainted.join(' and ')} `
-      + `diagnostics, so ${m.tainted.join(' and ')} is excluded from its official average `
-      + 'and it carries no rank; the per-task score stands and is shown.');
+    // the multiple-choice average can be intact while an exam topic is not
+    if (tn) out.push(`Its training consumed a dataset derived from ${tn} diagnostics, so that `
+      + 'score is shown and never ranked.');
+  } else if (tn && !(m.missing || []).length)
+    out.push(`Its training consumed a dataset derived from ${tn} diagnostics, so ${tn} is `
+      + 'excluded from its averages and never ranked; the score itself stands and is shown.');
   else
     out.push(`It has ${m.nhave} of ${m.nreq} required tasks, so it is preliminary `
       + `and carries no overall rank`
       + ((m.missing || []).length ? ` — still missing ${m.missing.join(', ')}.` : '.')
-      + ((m.tainted || []).length ? ` ${m.tainted.join(', ')} is excluded as well: its `
-         + 'training data was derived from that task\'s diagnostics.' : ''));
+      + ((m.tainted || []).length ? ` ${m.tainted.map(tName).join(', ')} is excluded as well: `
+         + 'its training data was derived from that task\'s diagnostics.' : ''));
   // "best at" is only a claim on a task that separates anybody. Leading a task
   // where no pair of models differs by more than their combined error is an
   // artifact of the sort order, and it reads as praise — the weakest model on
@@ -1756,11 +1822,13 @@ const prelimBadge = m => m.official ? null
 // trained on data derived from a benchmark's diagnostics: the task stays on
 // the page and leaves the average. Not a punishment — the only honest way to
 // keep a board where some models have been tuned against it.
+// an exam task reads as its topic wherever a person sees it
+const tName = t => ((DATA.judged || {}).topics || {})[t] || t;
 const taintBadge = m => (m.tainted || []).length
   ? el('span', { class: 'badge taint',
-      title: `trained on data derived from ${m.tainted.join(', ')} diagnostics — that task `
-        + 'is shown per model and excluded from the official average',
-      text: 'trained on ' + m.tainted.join(', ') + ' diagnostics' }) : null;
+      title: `trained on data derived from the diagnosis half of ${m.tainted.map(tName).join(', ')}`
+        + ' — that score is shown per model and never ranked',
+      text: 'trained on ' + m.tainted.map(tName).join(', ') + ' diagnostics' }) : null;
 const ckBadge = m => m.source === 'artifact'
   ? el('span', { class: 'badge ckpt', title: 'uploaded checkpoint (local artifact)',
                  text: 'ckpt' }) : null;
@@ -2265,21 +2333,26 @@ const CAT_MIN_N = 30;
 // act on, and it is what the generation phase will be asked about. Weakest
 // first, item counts on every row, and the same rule as the subject table: a
 // task that has not cleared chance is describing how the model guesses.
-function proposeBtn(mid, t, name, gate) {
+// The action that starts the generation pipeline, on the exam topic it is
+// about. Disabled WITH the reason on the row: a preliminary judged suite, a
+// topic under the noise floor, or a model that wrote nothing must say so and
+// never quietly offer data instead.
+function proposeBtn(mid, topic, gate) {
   const b = el('button', { class: 'propose', text: 'Propose a skill spec',
     disabled: gate.ok ? null : '', title: gate.ok
-      ? 'ask the configured LLM what skill is missing here, from diagnosis-half failures '
-        + 'only — a person reviews the answer before anything is generated'
+      ? 'ask the configured LLM what skill is missing here, from the judge\'s written '
+        + 'assessments of diagnosis-half answers only — a person reviews the answer '
+        + 'before anything is generated'
       : gate.why,
     onclick: async e => {
-      e.preventDefault();                     // do not toggle the <details>
+      e.preventDefault();
       b.disabled = true;
       const r = await fetch('api/proposals', { method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
-        body: JSON.stringify({ model: mid, task: t, category: name,
+        body: JSON.stringify({ model: mid, topic: topic,
                                requested_by: state.rvName }) }).catch(() => null);
       const j = r ? await r.json().catch(() => ({})) : {};
-      state.rv.msg = r && r.ok ? `proposal #${j.id} submitted for ${mid} · ${t} · ${name} — `
+      state.rv.msg = r && r.ok ? `proposal #${j.id} submitted for ${mid} · ${topic} — `
           + 'the LLM answer lands here when the batch completes'
         : 'refused: ' + (j.detail || (r ? r.status : 'server unreachable'));
       state.rv.loaded = false;
@@ -2303,7 +2376,6 @@ function dxCategories(mid, t, v, atChance) {
     const subs = (g.groups || []).map(s => [s, (v.groups || {})[s]])
       .filter(([, x]) => x && x.score_report != null)
       .sort((x, y) => x[1].score_report - y[1].score_report);
-    const gate = ((v.propose || {}).categories || {})[name];
     const mm = DATA.models.find(x => x.id === mid);
     const cmp = ((((mm || {}).taintCompare || {})[t] || {}).categories || {})[name];
     const det = el('details', { class: 'dxcat' + (dim ? ' dim' : ''), 'data-cat': name },
@@ -2315,13 +2387,7 @@ function dxCategories(mid, t, v, atChance) {
         cmp ? el('span', { class: 'se taintdelta', title: 'change against the parent model, '
           + 'leaderboard half (never in the training data) and diagnosis half',
           text: `vs parent: lb ${dpts(cmp.dReport)} · dx ${cmp.dDiagnose == null ? '—' : dpts(cmp.dDiagnose)}` }) : '',
-        dxBar(g.buckets || {}, g.n || 1, true),
-        // the button that starts the generation pipeline. Disabled WITH the
-        // reason on the row: a format failure or an at-chance score must say
-        // so and point at the finding, never quietly offer data instead
-        LIVE && gate ? proposeBtn(mid, t, name, gate) : '',
-        LIVE && gate && !gate.ok ? el('span', { class: 'propwhy',
-          text: 'no proposal: ' + gate.why }) : ''));
+        dxBar(g.buckets || {}, g.n || 1, true)));
     if (subs.length)
       det.append(el('table', { class: 'dxsub' },
         el('thead', {}, el('tr', {},
@@ -2603,20 +2669,35 @@ function vJudged(m) {
     card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
       el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { class: 'num', text: 'score' }),
         el('th', { class: 'num', text: 'κ' }), el('th', { class: 'num', text: 'items (report half)' }),
-        el('th', { text: 'score distribution 0 → 4 (all items)' }))),
+        el('th', { text: 'score distribution 0 → 4 (all items)' }),
+        LIVE ? el('th', { text: 'what to do' }) : '')),
       el('tbody', {}, cats.map(t => { const v = j.tasks[t];
         const k = cal && cal.per_category && cal.per_category[frName(t)];
         const nr = v.n_report != null ? v.n_report : v.n;
-        return el('tr', { class: nr < CAT_MIN_N ? 'dim' : null },
-          el('td', { text: frName(t) }),
+        const g = v.propose;
+        const tainted = (m.tainted || []).includes(t);
+        return el('tr', { class: nr < CAT_MIN_N ? 'dim' : null, 'data-topic': frName(t) },
+          el('td', {}, frName(t), tainted ? el('span', { class: 'badge taint',
+            title: 'this model trained on data derived from this topic\'s diagnosis half — the '
+              + 'score is shown and is not a ranking claim',
+            text: 'trained on it' }) : ''),
           el('td', { class: 'num', text: `${num(pubScore(v), 2)} / 4` }),
           el('td', { class: 'num se', text: k ? String(k.kappa) : '—',
             title: k ? `${k.n} human-graded answers in this topic` : 'not calibrated per topic' }),
           el('td', { class: 'num se', text: String(nr) + (nr < CAT_MIN_N ? ' · under ' + CAT_MIN_N : '') }),
-          el('td', {}, jBar(v.dist, v.n))); })))));
+          el('td', {}, jBar(v.dist, v.n)),
+          LIVE ? el('td', {}, g ? proposeBtn(m.id, frName(t), g) : '',
+            g && !g.ok ? el('div', { class: 'propwhy', title: g.why,
+              text: 'no proposal: ' + (g.short || g.why) }) : '',
+            g && g.caution ? el('div', { class: 'propwhy', text: 'caution — MMLU for this '
+              + 'category: ' + g.caution }) : '') : ''); })))));
     if (m.judgedAvg != null)
       card.append(el('p', { class: 'small', text: `Judged average ${num(m.judgedAvg, 2)} / 4 over `
-        + `${cats.length} topics, report half` + (ok ? '.' : ' — preliminary until the judge is calibrated.') }));
+        + `${cats.filter(t => !(m.tainted || []).includes(t)).length} topics, report half`
+        + ((m.tainted || []).some(t => cats.includes(t))
+           ? `, excluding ${(m.tainted || []).filter(t => cats.includes(t)).map(frName).join(', ')} `
+             + '— this model trained on data derived from that topic' : '')
+        + (ok ? '.' : ' — preliminary until the judge is calibrated.') }));
     card.append(el('p', { class: 'small', text: `Topics under ${CAT_MIN_N} report-half questions `
       + 'are greyed: the exam bank is still being written (Exam tab). The diagnose half of each '
       + 'topic is what a proposal may read; it is never the score.' }));
@@ -3239,6 +3320,7 @@ function vLeaderboard(ms) {
     { key: 'date', label: 'Last eval', num: false },   // when its newest task ran
   ];
   const jval = (m, c) => !(m.judgeState && m.judgeState.ok) ? null : c.judged === 'avg' ? m.judgedAvg
+    : (m.tainted || []).includes(c.judged) ? null      // shown on the page, never ranked here
     : (((m.judge || {}).tasks || {})[c.judged] ? pubScore(m.judge.tasks[c.judged]) : null);
   const val = (m, c) => c.key === 'avg' ? officialAvg(m)
                       : c.judged ? jval(m, c)
@@ -3345,7 +3427,9 @@ function vLeaderboard(ms) {
       if (c.judged) {
         const v = jval(m, c);
         if (v == null) return el('td', { class: 'num se', text: '—',
-          title: m.judgeState ? m.judgeState.reasons.join('; ') : 'not judged' });
+          title: (m.tainted || []).includes(c.judged)
+            ? 'trained on data derived from this topic — shown on the model page, not ranked'
+            : m.judgeState ? m.judgeState.reasons.join('; ') : 'not judged' });
         return el('td', { class: 'num' + (v === best[c.key] ? ' best' : ''), text: num(v, 2) },
           el('span', { class: 'se', text: ' /4' }));
       }
@@ -4668,24 +4752,28 @@ function rvNameInput() {
 }
 
 function rvFindings(p) {
+  const ev = p.evidence || {};
   const m = DATA.models.find(x => x.id === p.model);
-  const t = m && m.diag && m.diag.tasks[p.task];
-  if (!t) return el('p', { class: 'small', text: 'The diagnosis this was proposed from is no '
-    + 'longer on the board (results moved or the model was removed).' });
-  const cat = (t.categories || {})[p.category] || {};
-  const s = pickStats(t.answers);
-  const c = cell(p.task, p.model);
+  const t = m && m.judge && m.judge.tasks[p.task];
   const out = [el('div', { class: 'kvs' },
-    el('span', {}, el('b', { text: p.task + ' score ' }), c ? pct(c.v) + (c.se ? ` ±${(100 * c.se).toFixed(1)}` : '') : '—'),
     el('span', {}, el('b', { text: p.category + ' ' }),
-      cat.score_report != null ? pct(cat.score_report) : '—',
-      el('span', { class: 'se', text: ` on ${cat.n_report ?? '—'} leaderboard-half items` })),
-    s ? el('span', {}, el('b', { text: 'ceiling ' }), pct(s.ceiling),
-      el('span', { class: 'se', text: ' for this answer distribution' })) : '',
+      ev.topic_score_report != null ? `${num(ev.topic_score_report, 2)} / 4` : '—',
+      el('span', { class: 'se', text: ` on ${ev.topic_n_report ?? '—'} report-half questions` })),
     el('span', {}, el('b', { text: 'diagnosis half ' }),
-      `${t.n_diagnose} items · ${pct(t.score_diagnose)}`))];
-  for (const cz of diagCauses(p.task, t, p.model))
-    out.push(el('p', { class: 'dxlead' + (cz.calm ? ' calm' : ''), text: cz.text }));
+      ev.topic_score_diagnose != null ? `${num(ev.topic_score_diagnose, 2)} / 4` : '—',
+      el('span', { class: 'se', text: ` on ${ev.topic_n_diagnose ?? '—'} answers · `
+        + `${ev.diagnose_weak ?? '—'} fell short` })),
+    el('span', {}, el('b', { text: 'judge ' }), ev.judge_id || '—'))];
+  const caution = (t && t.propose && t.propose.caution) || ev.mmlu_caution;
+  if (caution)
+    out.push(el('p', { class: 'small' }, el('b', { text: 'MMLU for this category: ' }), caution));
+  if (m && m.judgeState && !m.judgeState.ok)
+    out.push(el('p', { class: 'warn', text: 'This model\'s judged numbers are preliminary: '
+      + m.judgeState.reasons.join('; ') + '. Read the spec, but do not treat the topic score '
+      + 'as established.' }));
+  if (!t)
+    out.push(el('p', { class: 'small', text: 'The judged run this was proposed from is no longer '
+      + 'on the board (re-judged, or the model was removed).' }));
   return el('div', {}, out);
 }
 
@@ -4693,13 +4781,13 @@ function rvExamples(ev) {
   const ex = ev.examples || [];
   if (!ex.length) return '';
   const det = el('details', {}, el('summary', { class: 'small', style: 'cursor:pointer',
-    text: `Show ${ex.length} of the ${ev.n_shown} diagnosis-half items the LLM saw (never `
-      + 'the leaderboard half)' }));
+    text: `Show ${ex.length} of the ${ev.n_shown} judge assessments the LLM saw — diagnosis `
+      + 'half only, question text removed' }));
   det.append(el('div', { style: 'margin-top:8px' }, ex.map(e => el('div', { class: 'ex' },
-    el('div', { text: e.question || '(no question text)' }),
-    el('div', { class: 'kv' }, `${e.subject} · ${e.bucket.replace('_', ' ')} · `,
-      e.chose ? [el('b', { text: 'chose ' }), e.chose + ' · '] : '',
-      e.answer ? [el('b', { text: 'answer ' }), e.answer] : '')))));
+    el('div', { text: e.justification }),
+    el('div', { class: 'kv' }, el('b', { text: `scored ${e.score} of 4` }),
+      e.answer_words != null ? ` · the model wrote ${e.answer_words} words` : '',
+      e.qid ? ` · ${String(e.qid).slice(0, 10)}` : '')))));
   return det;
 }
 
@@ -4824,11 +4912,12 @@ function vReview() {
   const llmOk = !!llm.configured && (llm.usage_today || 0) < (llm.daily_cap || 0);
   const llmCard = el('div', { class: 'card' },
     el('h2', { text: 'Review' }),
-    el('p', { class: 'sub', text: 'The human in the loop. An LLM reads the DIAGNOSIS half of one '
-      + 'model\'s failures in one weak category and proposes the skill that is missing; '
-      + 'you approve, edit or reject that sentence; only the approved text reaches a '
-      + 'generator, which never sees a benchmark item. Every decision is recorded under '
-      + 'the name you type — the tailnet is the auth boundary, so that name is the record.' }),
+    el('p', { class: 'sub', text: 'The human in the loop. An LLM reads the judge\'s written '
+      + 'assessments of one model\'s DIAGNOSIS-half answers on one weak exam topic and '
+      + 'proposes the skill that is missing; you approve, edit or reject that sentence; only '
+      + 'the approved text reaches a generator, which never sees an exam question. Every '
+      + 'decision is recorded under the name you type — the tailnet is the auth boundary, so '
+      + 'that name is the record.' }),
     el('div', { class: 'kvs' },
       el('span', {}, el('b', { text: 'LLM ' }), llm.configured
         ? `${llm.provider}/${llm.model || '—'}` : 'not configured'),
@@ -4852,10 +4941,10 @@ function vReview() {
     el('h2', { text: title }), el('p', { class: 'sub', text: sub }),
     list.length ? list.map(p => rvProposal(p, llmOk)) : el('p', { class: 'small', text: empty }));
   return [llmCard,
-    sec('Awaiting review', 'Read the findings first: if the task has a format finding or has '
-      + 'not cleared chance, the button that made this proposal should have been disabled — '
-      + 'reject it.', waiting,
-      'Nothing waiting. A proposal starts from a category row in a model\'s Diagnose section.'),
+    sec('Awaiting review', 'Read the judged numbers first: if the suite is preliminary or the '
+      + 'model wrote nothing on this topic, the button that made this proposal should have '
+      + 'been disabled — reject it.', waiting,
+      'Nothing waiting. A proposal starts from a topic row in a model\'s Judged section.'),
     sec('Approved — ready to generate', 'The spec below is exactly what the generator '
       + 'receives.', approved, 'No approved specs.'),
     el('div', { class: 'card' }, el('h2', { text: 'Datasets' }),

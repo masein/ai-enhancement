@@ -275,7 +275,7 @@ def default_responder(req: Request) -> str:
                         "notes": f"fake draft {i + 1} for {topic}; checks the mechanism, not recall"})
         return json.dumps(out)
     if req.custom_id.startswith("proposal:"):
-        cat = req.meta.get("category", "the category")
+        cat = req.meta.get("topic") or req.meta.get("category") or "the topic"
         return json.dumps({
             "spec": f"The model lacks the working definitions behind introductory {cat} "
                     f"reasoning: it cannot map a described mechanism to the term that "

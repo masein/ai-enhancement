@@ -289,7 +289,8 @@ def test_what_the_training_taught(surface, tree):
     # the badge and the head sentence
     head = pg.locator("#view .card").first
     assert head.locator(".badge.taint").count() == 1
-    assert "excluded from its official average" in head.text_content()
+    assert "derived from mmlu diagnostics" in head.text_content()
+    assert "never ranked" in head.text_content()
 
     surface.open(model_link("fx/good-750m-tuned-skill"))
     card = pg.locator(".card", has=pg.locator("h2", has_text="What the training taught"))

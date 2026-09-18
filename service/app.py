@@ -32,6 +32,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import report_lm_eval as report  # noqa: E402
 import exam_build  # noqa: E402
 
+
+def _judge_rubric(task: str) -> str:
+    import judge as _judge
+    return _judge.rubric_for(task)[0]
+
 _HF_ID_RE = re.compile(r"^[\w.\-]{1,96}/[\w.\-]{1,96}$")
 
 
@@ -469,8 +474,7 @@ def results():
 
 class ProposalIn(BaseModel):
     model: str
-    task: str
-    category: str
+    topic: str                   # an exam topic from scripts/categories.yaml
     requested_by: str = ""
 
 
@@ -632,53 +636,62 @@ def _require_llm() -> llm.Backend:
 
 @app.post("/api/proposals")
 def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
-    """Ask the LLM what skill is missing, from DIAGNOSE-half failures only.
-    The gate is enforced here, not just on the button: a task at chance, a
-    format finding, or a category under the noise floor is refused with the
-    same words the page shows."""
+    """Ask the LLM what skill is missing, from the judge's written assessments
+    of this topic's DIAGNOSE-half answers. The gate is enforced here, not just
+    on the button: a preliminary judged suite, a topic under the noise floor,
+    or a model that wrote nothing is refused with the same words the page
+    shows."""
     _check_token(x_token)
     backend = _require_llm()
     payload = results_payload()
     row = next((m for m in payload["models"] if m["id"] == p.model), None)
     if not row:
         raise HTTPException(404, f"no such model on the board: {p.model}")
-    t = ((row.get("diag") or {}).get("tasks") or {}).get(p.task)
+    task = exam_build.topic_task(p.topic)
+    judge = row.get("judge") or {}
+    t = (judge.get("tasks") or {}).get(task)
     if not t:
-        raise HTTPException(404, f"{p.model} has no diagnosis on file for {p.task} — run "
-                                 f"scripts/diagnose.py first")
-    gate = (t.get("propose") or {}).get("categories", {}).get(p.category)
+        raise HTTPException(404, f"{p.model} has no judged answers on file for {p.topic!r} — "
+                                 f"submit it with suite=judged first")
+    gate = t.get("propose")
     if gate is None:
-        raise HTTPException(422, f"{p.category!r} is not a category of {p.task} for this model")
+        raise HTTPException(422, f"{p.topic!r} is not an exam topic")
     if not gate["ok"]:
         raise HTTPException(409, gate["why"])
-    dup = db.proposal_active(p.model, p.task, p.category)
+    dup = db.proposal_active(p.model, task, p.topic)
     if dup:
-        raise HTTPException(409, f"proposal #{dup['id']} for this model, task and category is "
-                                 f"already {dup['status']} — review it in the Review tab")
+        raise HTTPException(409, f"proposal #{dup['id']} for this model and topic is already "
+                                 f"{dup['status']} — review it in the Review tab")
     _spend_check(1)
     model_dir = config.OUT_DIR / p.model.replace("/", "__")
-    failures, counts = prop.failures_for(model_dir, p.task, p.category)
-    if not failures:
-        raise HTTPException(409, "no diagnosis-half failures on disk for that category — "
-                                 "nothing to propose from")
-    cat = (t.get("categories") or {}).get(p.category) or {}
+    justifications, counts = prop.justifications_for(model_dir, task)
+    if not justifications:
+        raise HTTPException(409, "the judge wrote no assessment of a diagnosis-half answer "
+                                 "that fell short on this topic — nothing to propose from")
+    jmeta = judge.get("judge") or {}
     evidence = {
-        "n_shown": len(failures), **counts,
-        "category_score_report": cat.get("score_report"), "category_n_report": cat.get("n_report"),
-        # what the reviewer sees of what the LLM saw — diagnosis half, and no hashes
-        "examples": [{k: v for k, v in f.items() if k != "doc_hash"}
-                     for f in failures[:prop.EXAMPLES_SHOWN]],
+        "n_shown": len(justifications), **counts,
+        "topic_score_report": t.get("score_report"), "topic_n_report": t.get("n_report"),
+        "topic_score_diagnose": t.get("score_diagnose"), "topic_n_diagnose": t.get("n_diagnose"),
+        "judge_id": jmeta.get("id"), "mmlu_caution": gate.get("caution"),
+        # what the reviewer sees of what the LLM saw — diagnosis half, with any
+        # question text the judge quoted already stripped
+        "examples": justifications[:prop.EXAMPLES_SHOWN],
     }
-    pid = db.proposal_create(p.model, p.task, p.category, p.requested_by.strip()[:80], evidence)
-    req = prop.proposal_request(pid, p.model, p.task, p.category, failures, counts)
+    pid = db.proposal_create(p.model, task, p.topic, p.requested_by.strip()[:80], evidence)
+    req = prop.proposal_request(pid, p.model, task, p.topic, justifications, counts,
+                                _judge_rubric(task))
     try:
         bid = backend.submit([req])
     except llm.LLMError as e:
         db.proposal_update(pid, status="failed", error=str(e)[:400])
         raise HTTPException(502, f"the LLM batch could not be submitted: {e}") from None
     db.batch_add(bid, "proposal", pid, 1, backend.name, backend.model)
-    db.proposal_update(pid, batch_id=bid, prompt_sha=llm.prompt_sha(req.system, req.user))
-    return {"id": pid, "status": "pending", "batch_id": bid}
+    db.proposal_update(pid, batch_id=bid, prompt_sha=llm.prompt_sha(req.system, req.user),
+                       judge_run=json.dumps({"judge_id": jmeta.get("id"),
+                                             "batch_id": jmeta.get("batch_id"),
+                                             "prompt_sha256": jmeta.get("prompt_sha256")}))
+    return {"id": pid, "status": "pending", "batch_id": bid, "task": task}
 
 
 def _proposal_view(r: dict, datasets: list[dict] | None = None) -> dict:

@@ -89,8 +89,9 @@ def test_diagnose_groups_and_categories_carry_both_halves(diag):
 
 
 def _ready_dataset(client):
-    r = client.post("/api/proposals", json={"model": "fx/good-750m", "task": "mmlu",
-                                            "category": "economics", "requested_by": "t"})
+    r = client.post("/api/proposals", json={"model": "fx/good-750m", "topic": "economics",
+                                            "requested_by": "t"})
+    assert r.status_code == 200, r.text
     pid = r.json()["id"]
     llm_poller.tick()
     client.post(f"/api/proposals/{pid}/approve", json={"approver": "Omar"})
@@ -102,7 +103,7 @@ def _ready_dataset(client):
 
 
 def test_join_dataset_to_run_to_checkpoint_to_model_picks_the_right_parent(tmp_path, monkeypatch):
-    client, appmod, tree = make_service(tmp_path, monkeypatch, judged=False)
+    client, appmod, tree = make_service(tmp_path, monkeypatch)
     try:
         did = _ready_dataset(client)
         # run A: explicit parent, checkpoint by event
@@ -127,14 +128,26 @@ def test_join_dataset_to_run_to_checkpoint_to_model_picks_the_right_parent(tmp_p
         assert client.get(f"/api/truns/{a}").json()["run"]["parent"] == "fx/good-750m"
         fresh(appmod)
         rows = {m["id"]: m for m in client.get("/api/results").json()["models"]}
-        assert rows["fx/good-750m-tuned-test"]["taintCompare"]["mmlu"]["parent"] == "fx/good-750m"
-        assert rows["fx/good-750m-tuned-test"]["taintCompare"]["mmlu"]["verdict"] == "test"
-        assert rows["fx/good-750m-tuned-skill"]["taintCompare"]["mmlu"]["parent"] == "fx/chance-160m"
-        assert rows["fx/skewed-360m"]["taintCompare"]["mmlu"]["parent"] == "fx/good-750m"
-        missing = rows["fx/short-pick-410m"]["taintCompare"]["mmlu"]
-        assert missing["parent"] == "org/never-evaluated" and "not on this board" in missing["missing"]
-        none = rows["fx/one-option-70m"]["taintCompare"]["mmlu"]
-        assert none["parent"] is None and "recorded no parent" in none["missing"]
+        ids = list(rows)
+        # the join itself: each checkpoint finds the parent its own run recorded —
+        # explicitly, by hf_prefix, or from the base_model in its config
+        assert appmod.parents_for(ids) == {
+            "fx/good-750m-tuned-test": "fx/good-750m",
+            "fx/good-750m-tuned-skill": "fx/chance-160m",
+            "fx/skewed-360m": "fx/good-750m",
+            "fx/short-pick-410m": "org/never-evaluated"}
+        # run E recorded no parent at all, so its checkpoint has none to find
+        assert "fx/one-option-70m" not in appmod.parents_for(ids)
+        # and every one of them is tainted on the topic the dataset came from
+        tainted = appmod.taint_for(ids)
+        assert set(tainted) == {"fx/good-750m-tuned-test", "fx/good-750m-tuned-skill",
+                                "fx/skewed-360m", "fx/short-pick-410m", "fx/one-option-70m"}
+        assert all(v == ["exam_economics"] for v in tainted.values())
+        assert rows["fx/one-option-70m"]["tainted"] == ["exam_economics"]
+        # the halves comparison is for a multiple-choice task; this dataset came
+        # from an exam topic, so there is nothing for it to compare (C5 adds the
+        # exam view of the same before/after)
+        assert rows["fx/good-750m-tuned-test"]["taintCompare"] is None
         # the parents themselves are untouched
         for pid in ("fx/good-750m", "fx/chance-160m"):
             assert rows[pid]["tainted"] == [] and rows[pid]["taintCompare"] is None

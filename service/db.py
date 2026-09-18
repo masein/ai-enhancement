@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS proposals (
   reject_reason TEXT DEFAULT '',
   batch_id      TEXT DEFAULT '',
   prompt_sha    TEXT DEFAULT '',
+  judge_run     TEXT DEFAULT '{}',                -- JSON: the judge id, batch and prompt it was derived from
   error         TEXT DEFAULT '',
   created_at    REAL NOT NULL,
   updated_at    REAL NOT NULL,
@@ -166,7 +167,8 @@ def init() -> None:
                      "INTEGER NOT NULL DEFAULT 0",
                      "ALTER TABLE submissions ADD COLUMN load_missing TEXT DEFAULT ''",
                      "ALTER TABLE truns ADD COLUMN datasets TEXT DEFAULT '[]'",
-                     "ALTER TABLE truns ADD COLUMN parent TEXT DEFAULT ''"):
+                     "ALTER TABLE truns ADD COLUMN parent TEXT DEFAULT ''",
+                     "ALTER TABLE proposals ADD COLUMN judge_run TEXT DEFAULT '{}'"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:
@@ -363,7 +365,8 @@ def trun_series(rid: int, max_points: int = 400) -> dict:
 
 _PROP_COLS = ["id", "model", "task", "category", "status", "spec_text", "edited_text",
               "evidence", "proposer", "requested_by", "approver", "reject_reason",
-              "batch_id", "prompt_sha", "error", "created_at", "updated_at", "approved_at"]
+              "batch_id", "prompt_sha", "judge_run", "error", "created_at", "updated_at",
+              "approved_at"]
 _DS_COLS = ["id", "proposal_id", "status", "fmt", "count", "requester", "batch_id",
             "provenance", "error", "created_at", "finished_at"]
 _BATCH_COLS = ["batch_id", "kind", "ref_id", "n_items", "provider", "model", "status",

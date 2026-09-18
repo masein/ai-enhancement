@@ -105,22 +105,37 @@ def open_mmlu(pg, base, mid):
     return det
 
 
+def open_topics(pg, base, mid):
+    """The Judged card's per-topic table — where the loop's action lives."""
+    pg.goto(model_url(base, mid))
+    pg.wait_for_selector(".card h2:has-text('Judged free response')")
+    return pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
+
+
 def test_propose_buttons_carry_their_reasons(live, page):
+    """The action is on the exam topic, and every refusal says why on the row."""
     base = live["base"]
-    det = open_mmlu(page, base, "fx/good-750m")
-    econ = det.locator("details.dxcat[data-cat='economics']")
+    card = open_topics(page, base, "fx/good-750m")
+    econ = card.locator("tr[data-topic='economics']")
     assert econ.locator("button.propose").is_enabled()
     assert econ.locator(".propwhy").count() == 0
-    law = det.locator("details.dxcat[data-cat='law']")
+    law = card.locator("tr[data-topic='law']")
     assert law.locator("button.propose").is_disabled()
-    assert "noise floor" in law.locator(".propwhy").text_content()
-    for mid, needle in (("fx/chance-160m", "not cleared chance"),
-                        ("fx/skewed-360m", "answer positions"),
-                        ("fx/below-135m-it", "confidently wrong")):
-        det = open_mmlu(page, base, mid)
-        btns = det.locator("button.propose")
-        assert btns.count() > 0 and all(not b.is_enabled() for b in btns.all()), mid
-        assert needle in det.locator(".propwhy").first.text_content(), mid
+    assert "under the 30" in law.locator(".propwhy").first.text_content()
+    # a model that wrote the same sentence every time has revealed no topic gap
+    card = open_topics(page, base, "fx/chance-160m")
+    econ = card.locator("tr[data-topic='economics']")
+    assert econ.locator("button.propose").is_disabled()
+    assert "same answer on nearly every question" in econ.locator(".propwhy").first.text_content()
+    # MMLU's finding for the same category rides along as a caution, not a gate
+    card = open_topics(page, base, "fx/skewed-360m")
+    econ = card.locator("tr[data-topic='economics']")
+    assert econ.locator("button.propose").is_enabled()
+    assert "caution — MMLU for this category" in econ.text_content()
+    assert "answer positions" in econ.locator(".propwhy").first.text_content()
+    # and the Diagnose section no longer offers one: MMLU does not pick the topic
+    det = open_mmlu(page, base, "fx/good-750m")
+    assert det.locator("button.propose").count() == 0
     assert page.errors == []
 
 
@@ -192,19 +207,21 @@ def test_review_flow_in_the_browser(live, page):
     # a name, remembered for every decision on this page
     page.get_by_label("your name").first.fill("Omar")
 
-    det = open_mmlu(page, base, "fx/good-750m")
-    det.locator("details.dxcat[data-cat='economics'] button.propose").click()
+    card = open_topics(page, base, "fx/good-750m")
+    card.locator("tr[data-topic='economics'] button.propose").click()
     page.wait_for_selector(".card h2:has-text('Review')")
     assert "proposal #" in page.locator("#view").text_content()
     card = page.locator(".rv[data-proposal]").first
     card.locator("textarea").wait_for(timeout=20000)          # the poller and the 5 s poll
     text = card.text_content()
-    assert "introductory economics" in text and "diagnosis-half items the LLM saw" in text
-    assert "economics" in text and "ceiling" in text and "leaderboard-half items" in text
-    assert "fx/good-750m · mmlu · economics" in text
-    assert card.locator(".dxlead").count() >= 1                # the model's own findings
+    assert "introductory economics" in text
+    assert "judge assessments the LLM saw" in text and "question text removed" in text
+    assert "report-half questions" in text and "fell short" in text
+    assert "fx/good-750m · exam_economics · economics" in text
+    assert "judge stub/overlap-v1" in text
     card.locator("details summary").first.click()
     assert card.locator(".ex").count() == 8
+    assert "scored" in card.locator(".ex").first.text_content()
     # approve, edited
     ta = card.locator("textarea")
     ta.fill(ta.input_value() + " Emphasise direction of effect.")
@@ -243,12 +260,15 @@ def test_review_flow_in_the_browser(live, page):
     page.wait_for_selector("table.lb")
     row = page.locator("table.lb tbody tr",
                        has=page.locator("a.mname", has_text=re.compile(r"^good-750m$"))).first
-    assert "trained on mmlu diagnostics" in row.locator(".badge.taint").text_content()
+    assert "trained on economics diagnostics" in row.locator(".badge.taint").text_content()
     page.goto(model_url(base, "fx/good-750m"))
     page.wait_for_selector(".backlink")
     head = page.locator("#view .card").first.text_content()
-    assert "excluded from its official average" in head and "carries no rank" in head
-    assert "trained on data derived from this task" in page.locator("#view").text_content()
+    assert "derived from economics diagnostics" in head and "never ranked" in head
+    # the topic itself is badged on the Judged card and drops out of the judged average
+    econ = page.locator("tr[data-topic='economics']")
+    assert "trained on it" in econ.locator(".badge.taint").text_content()
+    assert "excluding economics" in page.locator("#view").text_content()
     # screenshots for the PR: the Review tab, light and dark, desktop and phone
     SCREENS.mkdir(exist_ok=True)
     for scheme in ("light", "dark"):

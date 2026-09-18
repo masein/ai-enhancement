@@ -596,6 +596,10 @@ def _fr_answer(rng: random.Random, item: dict, p_right: float) -> str:
 
 
 EXAM_PER_TOPIC = 6          # drafted candidates per topic in the fixture bank
+# one topic carries enough questions for its report half to clear the 30-item
+# floor, so the gate that guards a proposal has a case that passes
+BIG_TOPIC = "economics"
+EXAM_BIG_EXTRA = 70
 
 
 def write_exam(root: Path, out_dir: Path) -> dict:
@@ -607,6 +611,7 @@ def write_exam(root: Path, out_dir: Path) -> dict:
     eb.migrate_seeds(exam_root)
     fake = llm.FakeBatches("fake-exam", root)
     eb.draft(exam_root, fake, eb.TOPICS, per_topic=EXAM_PER_TOPIC, wait=True, poll_s=0)
+    eb.draft(exam_root, fake, [BIG_TOPIC], per_topic=EXAM_BIG_EXTRA, wait=True, poll_s=0)
     for c in eb.load_candidates(exam_root, status="candidate"):
         eb.accept(exam_root, c["cid"], approver="fixture")
     return eb.build(out_dir, exam_root)

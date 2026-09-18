@@ -314,9 +314,15 @@ def plan_requests(model_dir: Path, judge_family: str) -> tuple[list, dict]:
         plan["canary"].append({"cid": cid, "id": c["id"], "human_score": c["human_score"]})
     mc = mmlu_outcomes(model_dir) if CONTROL_TASK in tasks_present else {}
     safe = model_dir.name
+    plan["answer_stats"] = {}
     for task in tasks_present:
         rubric, _, _ = rubric_for(task)
         items = []
+        # what the model actually wrote, in aggregate. A model that wrote
+        # nothing on a topic has not revealed a gap in that topic, and the
+        # step that picks what to train must be able to say so.
+        stats = {"n": 0, "empty": 0, "short": 0, "words": 0}
+        seen: set[str] = set()
         for i, rec in enumerate(sorted(_records(model_dir, task), key=lambda r: str(r.get("doc_hash")))):
             doc = rec.get("doc") or {}
             ans = _answer(rec)
@@ -326,6 +332,14 @@ def plan_requests(model_dir: Path, judge_family: str) -> tuple[list, dict]:
                                     user=build_prompt(rubric, doc.get("prompt", ""),
                                                       doc.get("reference", ""), ans),
                                     meta={"kind": "judge", "task": task, "qid": qid}))
+            stats["n"] += 1
+            stats["words"] += words(ans)
+            norm = re.sub(r"\s+", " ", (ans or "").strip().lower())
+            if not norm:
+                stats["empty"] += 1
+            elif words(ans) < 3:
+                stats["short"] += 1
+            seen.add(norm)
             item = {"cid": cid, "doc_hash": rec.get("doc_hash"), "id": doc.get("id"), "qid": qid,
                     "half": ("diagnose" if task == CONTROL_TASK
                              else dx.split_of(qid) if qid else None),
@@ -334,6 +348,9 @@ def plan_requests(model_dir: Path, judge_family: str) -> tuple[list, dict]:
                 item["mmlu_doc_hash"] = doc.get("mmlu_doc_hash")
                 item["mc_right"] = mc.get(doc.get("mmlu_doc_hash"))
             items.append(item)
+        stats["distinct"] = len(seen)
+        stats["mean_words"] = round(stats["words"] / stats["n"], 2) if stats["n"] else 0
+        plan["answer_stats"][task] = stats
         plan["tasks"][task] = items
     return reqs, plan
 
@@ -438,6 +455,9 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
                                   "mean": round(sum(by_len[label]) / len(by_len[label]), 4)}
                                  for _, _, label in LENGTH_BUCKETS if by_len.get(label)],
              "items": items}
+        stats = (plan.get("answer_stats") or {}).get(task)
+        if stats:
+            t["answers"] = stats
         if task == CONTROL_TASK:
             ctl: dict[str, dict] = {}
             for it in items:

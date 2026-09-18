@@ -268,13 +268,14 @@ def test_an_old_local_judge_file_is_labelled_local():
 
 
 def test_all_three_identities_reach_provenance(tmp_path, monkeypatch):
-    from service import config
-    client, appmod, _ = make_service(tmp_path, monkeypatch, judged=False)
+    # the judge this server runs must be the one that graded the board, or the
+    # gate refuses the proposal — so the fixture's stub judge is configured here
+    client, appmod, _ = make_service(tmp_path, monkeypatch, judge_model="stub")
     try:
-        monkeypatch.setattr(config, "JUDGE_PROVIDER", "fake")
-        monkeypatch.setattr(config, "JUDGE_MODEL", "fake-judge-20250101")
-        pid = client.post("/api/proposals", json={"model": "fx/good-750m", "task": "mmlu",
-                                                  "category": "economics", "requested_by": "t"}).json()["id"]
+        r = client.post("/api/proposals", json={"model": "fx/good-750m", "topic": "economics",
+                                                "requested_by": "t"})
+        assert r.status_code == 200, r.text
+        pid = r.json()["id"]
         llm_poller.tick()
         client.post(f"/api/proposals/{pid}/approve", json={"approver": "Omar"})
         did = client.post(f"/api/proposals/{pid}/generate",
@@ -283,8 +284,9 @@ def test_all_three_identities_reach_provenance(tmp_path, monkeypatch):
         d = client.get(f"/api/datasets/{did}").json()
         assert d["status"] == "ready", d["error"]
         ids = d["provenance"]["identities"]
-        assert ids == {"exam_writer": "fake/fake-exam", "judge": "fake/fake-judge-20250101",
+        assert ids == {"exam_writer": "fake/fake-exam", "judge": "stub/overlap-v1",
                        "generator": "fake/fake-1", "single_provider_loop": False}
+        assert d["provenance"]["judge_run"]["judge_id"] == "stub/overlap-v1"
     finally:
         client.__exit__(None, None, None)
 

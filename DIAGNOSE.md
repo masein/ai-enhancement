@@ -143,33 +143,40 @@ one position-skewed model per family.
 
 ## From a gap to data: the Review tab
 
-Once the routine above has said "genuine gap" about a category, the Diagnose
-section offers **Propose a skill spec** on that category's row. The button is
-disabled, with the reason beside it, whenever the task has not cleared chance,
-has any distribution finding, or the category is under the noise floor —
-because those are format failures, and a generator offered for them would
-make the score move while the model learned nothing.
+The exam picks the topic. On a model's **Judged free response** card each
+topic row carries **Propose a skill spec**, disabled with the reason beside
+it whenever the judged suite is preliminary (κ below the line, a moved
+canary, or a judge other than the one this server runs), the topic has fewer
+than 30 report-half questions, or the model wrote nothing usable on it — a
+model that wrote nothing has not revealed a topic gap. MMLU's distribution
+finding for the same category is shown beside the row as a **caution**: a
+topic weak on the exam *and* at chance on MMLU is a different problem from
+one weak on the exam alone. It is context, never a gate.
 
 What happens after the click (`service/proposals.py`):
 
-1. An LLM reads this model's **diagnosis-half** failures in that category —
-   never the leaderboard half — and proposes one to three sentences naming the
-   skill that is missing, the share of failures it explains, and the patterns
-   it saw.
+1. An LLM reads the judge's **written assessments** of this model's
+   **diagnosis-half** answers on that topic — never the report half, and
+   never the questions themselves; anything the judge quoted from a question
+   is stripped first — and proposes one to three sentences naming the skill
+   that is missing, the share of assessments it explains, and the patterns it
+   saw.
 2. A person reads it on the **Review** tab next to everything this file says
    they need: the category score and item count, the ceiling, the model's own
    findings for the task, and eight of the diagnosis-half items the LLM saw.
    They approve it, edit it, or reject it with a reason, under their name.
-3. Only the approved text reaches the generator. Not one item, hash, model
-   name or score goes with it. The generated items pass a 13-gram
+3. Only the approved text reaches the generator. Not one question, hash,
+   model name or score goes with it. The generated items pass a 13-gram
    contamination gate against both halves of every benchmark on disk; above
    2% dropped the whole dataset is refused as an echo.
 4. The dataset lands under `$BENCH_ROOT/datasets/<id>/` with a full
    `provenance.json`, downloadable from the tab and with `bench pull`.
 5. A training run that consumes it says so (`datasets=[id]` on the run), and
-   every checkpoint of that run carries the badge *trained on data derived
-   from mmlu diagnostics* and loses that task from its official average. The
-   per-task score stays; the ranking claim goes. If that model's leaderboard
+   every checkpoint of that run carries the badge *trained on economics
+   diagnostics*. That topic's exam score is still shown on its page and drops
+   out of the judged average and the board's column; a dataset derived from a
+   multiple-choice task loses that task from the official average the same
+   way. The score stays; the ranking claim goes. If that model's leaderboard
    half and diagnosis half then move apart, that divergence is the alarm this
    whole design exists to raise — phase 6 makes it visible.
 

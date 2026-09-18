@@ -11,6 +11,9 @@ from pathlib import Path
 import pytest
 
 import diagnose as dx
+import exam_build as eb
+import judge as jd
+import report_lm_eval as report
 from conftest import fresh, make_service
 from service import contamination as ct
 from service import llm, llm_poller, runner
@@ -29,9 +32,13 @@ def _row(client, mid):
     return next(m for m in client.get("/api/results").json()["models"] if m["id"] == mid)
 
 
-def _propose(client, model="fx/good-750m", task="mmlu", category="economics", who="tester"):
-    return client.post("/api/proposals", json={"model": model, "task": task,
-                                                "category": category, "requested_by": who})
+TOPIC = "economics"          # the fixture's one topic above the 30-question floor
+TASK = "exam_economics"
+
+
+def _propose(client, model="fx/good-750m", topic=TOPIC, who="tester"):
+    return client.post("/api/proposals", json={"model": model, "topic": topic,
+                                                "requested_by": who})
 
 
 # ---------------------------------------------------------------------------
@@ -77,42 +84,65 @@ def test_llm_status_reports_usage_and_quota(gap):
 # the gate, on the payload and on the API
 # ---------------------------------------------------------------------------
 
-def test_proposal_gate_on_the_payload(payload):
-    def gate(mid):
+def test_topic_gate_on_the_payload(payload):
+    """The gate is per EXAM TOPIC now: the judged suite must be believable,
+    the topic must have enough report-half questions, and the model must have
+    written something. MMLU rides along as a caution, never as a gate."""
+    def topics(mid):
         row = next(m for m in payload["models"] if m["id"] == mid)
-        return row["diag"]["tasks"]["mmlu"]["propose"]
-    g = gate("fx/good-750m")
-    assert g["ok"] and g["why"] is None
-    assert g["categories"]["economics"]["ok"] is True
-    assert g["categories"]["law"]["ok"] is False and "noise floor" in g["categories"]["law"]["why"]
-    for mid, needle in (("fx/chance-160m", "not cleared chance"),
-                        ("fx/skewed-360m", "answer positions"),
-                        ("fx/one-option-70m", "one option only"),
-                        ("fx/short-pick-410m", "option length"),
-                        ("fx/below-135m-it", "confidently wrong")):
-        g = gate(mid)
-        assert g["ok"] is False and needle in g["why"], (mid, g["why"])
-        assert all(not c["ok"] and needle in c["why"] for c in g["categories"].values()), mid
-    # a format finding names itself as such, never as a subject gap
-    assert "format failure" in gate("fx/skewed-360m")["why"]
-    # the frozen report carries the gate too, but no task without categories has one
+        return {t: v["propose"] for t, v in (row["judge"] or {})["tasks"].items()
+                if t.startswith("exam_")}
+    g = topics("fx/good-750m")
+    assert g[TASK]["ok"] is True and g[TASK]["why"] is None
+    thin = g["exam_law"]
+    assert thin["ok"] is False and "under the 30" in thin["why"] and "Exam tab" in thin["why"]
+    assert thin["short"] and len(thin["short"]) < len(thin["why"])
+    assert thin["caution"] is None                       # noise on a row already refused
+    # the model that wrote the same sentence every time: the output collapsed
+    c = topics("fx/chance-160m")[TASK]
+    assert c["ok"] is False and "same answer on nearly every question" in c["why"]
+    # MMLU's finding for the matching category is the caution, and only that
+    assert g[TASK]["caution"] is None                     # good-750m has no mmlu finding
+    skew = topics("fx/skewed-360m")[TASK]
+    assert skew["caution"] and "answer positions" in skew["caution"]
+    # the control task is not a topic and carries no action
     row = next(m for m in payload["models"] if m["id"] == "fx/good-750m")
-    assert "propose" not in row["diag"]["tasks"]["hellaswag"]
+    assert "propose" not in row["judge"]["tasks"]["fr_control_mmlu"]
+    # MMLU's own gate still computes — it is where the caution comes from
+    assert row["diag"]["tasks"]["mmlu"]["propose"]["categories"]["economics"]["ok"] is True
+
+
+def test_topic_gate_refuses_a_preliminary_suite_and_an_empty_writer(tree):
+    import report_lm_eval as rep
+    ok_state = {"ok": True, "reasons": [], "current": True}
+    good = {"n_report": 40, "answers": {"n": 80, "empty": 0, "short": 1, "distinct": 70}}
+    assert rep.topic_gate(TASK, good, ok_state, None)["ok"] is True
+    bad = rep.topic_gate(TASK, good, {"ok": False, "reasons": ["kappa 0.4 is below 0.6"]}, None)
+    assert bad["ok"] is False and "preliminary" in bad["why"] and "0.4" in bad["why"]
+    assert rep.topic_gate(TASK, good, None, None)["ok"] is False
+    thin = rep.topic_gate(TASK, {**good, "n_report": 12}, ok_state, None)
+    assert "12 report-half questions" in thin["why"]
+    empty = rep.topic_gate(TASK, {"n_report": 40, "answers": {"n": 40, "empty": 18, "short": 4,
+                                                              "distinct": 20}}, ok_state, None)
+    assert "wrote nothing usable on 22 of 40" in empty["why"] and "multiple choice" in empty["why"]
+    same = rep.topic_gate(TASK, {"n_report": 40, "answers": {"n": 40, "empty": 0, "short": 0,
+                                                             "distinct": 1}}, ok_state, None)
+    assert "same answer on nearly every question" in same["why"]
+    assert rep.topic_gate(TASK, good, ok_state, "picks by option length")["caution"] == \
+        "picks by option length"
 
 
 def test_api_enforces_the_same_gate(gap):
     client, _, tree = gap
-    r = _propose(client, "fx/skewed-360m")
-    assert r.status_code == 409 and "answer positions" in r.json()["detail"]
     r = _propose(client, "fx/chance-160m")
-    assert r.status_code == 409 and "not cleared chance" in r.json()["detail"]
-    r = _propose(client, "fx/good-750m", category="law")
-    assert r.status_code == 409 and "noise floor" in r.json()["detail"]
-    r = _propose(client, "fx/good-750m", category="astrology")
-    assert r.status_code == 422
+    assert r.status_code == 409 and "same answer on nearly every question" in r.json()["detail"]
+    r = _propose(client, topic="law")
+    assert r.status_code == 409 and "under the 30" in r.json()["detail"]
+    r = _propose(client, topic="astrology")
+    assert r.status_code == 404 and "no judged answers on file" in r.json()["detail"]
     assert _propose(client, "nobody/nothing").status_code == 404
-    r = _propose(client, tree["nodiag"], task="hellaswag")
-    assert r.status_code == 404 and "no diagnosis on file" in r.json()["detail"]
+    r = _propose(client, tree["nodiag"])
+    assert r.status_code == 404 and "suite=judged" in r.json()["detail"]
     assert client.get("/api/proposals").json() == []          # nothing was recorded
 
 
@@ -125,38 +155,42 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
     fake = llm.client()
     assert isinstance(fake, llm.FakeBatches)
 
-    # -- propose: diagnose-half failures only ------------------------------------
+    # -- propose: the judge's reasoning about diagnose-half answers only ---------
     r = _propose(client)
     assert r.status_code == 200, r.text
     pid = r.json()["id"]
     assert r.json()["status"] == "pending" and r.json()["batch_id"].startswith("fake_")
+    assert r.json()["task"] == TASK
     assert _propose(client).status_code == 409                # already pending
     assert client.get("/api/llm").json()["usage_today"] == 1
     assert llm_poller.tick() == 1
     p = client.get(f"/api/proposals/{pid}").json()
     assert p["status"] == "proposed" and p["proposer"] == "fake/fake-1"
+    assert p["task"] == TASK and p["category"] == TOPIC
     assert "introductory economics" in p["spec_text"]
     ev = p["evidence"]
-    assert 0 < ev["n_shown"] <= 60 and ev["diagnose_wrong"] <= ev["diagnose_items"]
+    assert 0 < ev["n_shown"] <= 60 and ev["diagnose_weak"] <= ev["diagnose_items"]
     assert 1 <= len(ev["examples"]) <= 8 and ev["patterns"] and ev["share_explained"] == 0.6
-    assert all("doc_hash" not in e for e in ev["examples"])
-    assert all(e["subject"] in ("econometrics", "high_school_macroeconomics") for e in ev["examples"])
-    assert ev["category_n_report"] >= 30
+    assert ev["topic_n_report"] >= 30 and ev["judge_id"] == "stub/overlap-v1"
+    assert all(e["justification"] and e["score"] < 3 for e in ev["examples"])
+    # the proposal row records which judge run it was derived from
+    assert json.loads(p["judge_run"]) == {"judge_id": "stub/overlap-v1", "batch_id": "stub",
+                                          "prompt_sha256": jd.prompt_sha()}
 
-    # THE RULE (a): every hash behind the request splits to diagnose, and every
-    # question in the prompt is a diagnose-half document of this task
+    # THE RULE (a): every qid behind the request splits to diagnose, and NO exam
+    # question — of either half — appears anywhere in the request body
     reqs = [q for q in fake.recorded() if q["custom_id"] == f"proposal:{pid}"]
     assert len(reqs) == 1
     req = reqs[0]
-    hashes = req["meta"]["doc_hashes"]
-    assert hashes and all(dx.split_of(h) == "diagnose" for h in hashes)
-    by_q = {d["q"]: d for d in tree["docs"]["mmlu"]}
-    quoted = [q for q in by_q if q in req["user"]]
-    assert len(quoted) == len(hashes)
-    assert all(dx.split_of(by_q[q]["doc_hash"]) == "diagnose" for q in quoted)
-    assert all(by_q[q]["group"] in ("econometrics", "high_school_macroeconomics") for q in quoted)
-    report_qs = [q for q, d in by_q.items() if dx.split_of(d["doc_hash"]) == "report"]
-    assert report_qs and not any(q in req["user"] for q in report_qs)
+    qids = req["meta"]["qids"]
+    assert qids and all(dx.split_of(q) == "diagnose" for q in qids)
+    body = req["system"] + "\n" + req["user"]
+    bank = eb.load_bank(tree["judged"]["exam_root"])[TOPIC]
+    halves = {eb.half_of(b["qid"]) for b in bank}
+    assert halves == {"report", "diagnose"}               # both are on file…
+    for b in bank:                                       # …and neither is in the request
+        assert b["prompt"] not in body, b["qid"]
+    assert TOPIC in body and "rubric the judge graded against" in body
     assert p["prompt_sha"] == llm.prompt_sha(req["system"], req["user"])
 
     # -- the human: a name is the record; generation waits for approval ---------
@@ -205,8 +239,9 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
     assert pv["generator"] == {"provider": "fake", "model": "fake-1",
                                "batch_id": d["batch_id"], "id": "fake/fake-1"}
     assert pv["split"] == "diagnose" and pv["split_salt"] == dx.SPLIT_SALT
-    assert pv["source_model"] == "fx/good-750m" and pv["task"] == "mmlu"
-    assert pv["category"] == "economics" and pv["proposal_id"] == pid
+    assert pv["source_model"] == "fx/good-750m" and pv["task"] == TASK
+    assert pv["category"] == TOPIC and pv["proposal_id"] == pid
+    assert pv["judge_run"]["judge_id"] == "stub/overlap-v1"
     assert re.fullmatch(r"[0-9a-f]{64}", pv["prompt_sha256"])
     from service import proposals as prop
     assert prop.provenance_complete(pv) == []
@@ -222,10 +257,11 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
     assert dl.status_code == 200 and dl.content == body
     lst = client.get("/api/datasets").json()
     assert lst[0]["id"] == did and lst[0]["download"] == f"/api/datasets/{did}/items.jsonl"
-    assert lst[0]["task"] == "mmlu" and lst[0]["category"] == "economics"
+    assert lst[0]["task"] == TASK and lst[0]["category"] == TOPIC
 
     # -- taint: through truns -> tevents -> model, and by hf_prefix ---------------
-    before = {m["id"]: (m["official"], m["avg"]) for m in client.get("/api/results").json()["models"]}
+    before = {m["id"]: (m["official"], m["avg"], m["judgedAvg"])
+              for m in client.get("/api/results").json()["models"]}
     assert before["fx/good-750m"][0] is True
     r = client.post("/api/truns", json={"name": "gap-run", "datasets": [did],
                                         "hf_prefix": "fx/skewed"})
@@ -235,14 +271,19 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
     fresh(appmod)
     after = client.get("/api/results").json()
     good = next(m for m in after["models"] if m["id"] == "fx/good-750m")
-    assert good["tainted"] == ["mmlu"] and good["official"] is False and good["avg"] is None
-    assert good["missing"] == [] and good["nhave"] == 6 and good["nreq"] == 7
-    assert "mmlu" in after["cells"] and "fx/good-750m" in after["cells"]["mmlu"]   # score stays
+    # the data came from an EXAM topic, so the multiple-choice average is
+    # untouched — and that topic stops counting toward the judged average
+    assert good["tainted"] == [TASK] and good["official"] is True
+    assert good["avg"] == before["fx/good-750m"][1]
+    assert good["judge"]["tasks"][TASK]["score_report"] is not None      # the score stays
+    assert good["judgedAvg"] != before["fx/good-750m"][2]
+    assert good["judgedAvg"] == report.judged_avg(good["judge"], [TASK])
+    assert good["taintCompare"] is None                        # no MC task to compare halves on
     skewed = next(m for m in after["models"] if m["id"] == "fx/skewed-360m")
-    assert skewed["tainted"] == ["mmlu"]                       # via hf_prefix
+    assert skewed["tainted"] == [TASK]                         # via hf_prefix
     for mid in ("fx/chance-160m", "fx/below-135m-it", "fx/short-pick-410m"):
         m = next(x for x in after["models"] if x["id"] == mid)
-        assert m["tainted"] == [] and (m["official"], m["avg"]) == before[mid], mid
+        assert m["tainted"] == [] and (m["official"], m["avg"], m["judgedAvg"]) == before[mid], mid
     assert any("trained on data derived from benchmark diagnostics" in w for w in after["warnings"])
     # a run may only record data it could have trained on
     assert client.post("/api/truns", json={"name": "x", "datasets": [999]}).status_code == 422
@@ -252,7 +293,7 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
 
 def test_generation_free_response_and_unreferenced_delete(gap):
     client, appmod, tree = gap
-    pid = _propose(client, category="medicine & health").json()["id"]
+    pid = _propose(client).json()["id"]
     llm_poller.tick()
     client.post(f"/api/proposals/{pid}/approve", json={"approver": "Omar"})
     p = client.get(f"/api/proposals/{pid}").json()
@@ -339,7 +380,7 @@ def test_spend_guard(gap, monkeypatch):
     from service import config
     monkeypatch.setattr(config, "LLM_DAILY_ITEM_CAP", 1)
     assert _propose(client).status_code == 200
-    r = _propose(client, category="medicine & health")
+    r = _propose(client, "fx/skewed-360m")          # a different cell, so the dup check passes
     assert r.status_code == 429 and "LLM_DAILY_ITEM_CAP" in r.json()["detail"]
     monkeypatch.setattr(config, "LLM_DAILY_ITEM_CAP", 2000)
     monkeypatch.setattr(config, "LLM_MAX_ITEMS_PER_BATCH", 2)
