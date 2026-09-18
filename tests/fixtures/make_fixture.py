@@ -24,6 +24,15 @@ What is in it, one model per behaviour:
   local/nodiag-step400   an uploaded checkpoint, quick suite only, and no
                          diagnose.json is written for it
 
+Three models (good, skewed, chance) also answer the judged free-response
+suite: the seed items from eval_tasks/fr plus the MMLU control set that
+scripts/fr_build.py builds from the diagnose half of this very tree. Their
+answers are graded by scripts/judge.py's STUB grader, and a synthetic
+calibration CSV (human = judge with every seventh row off by one) is
+imported so the board has a kappa over the line. The skewed model answers the
+control items correctly ("knew it, couldn't pick it"); the chance model does
+not ("didn't know it either way").
+
 Three models also carry the permutation control (mmlu_perm, a control task
 that never enters an average): fx/skewed-360m clears chance on it while its
 mmlu sits at chance ("the format was hiding measurable knowledge"),
@@ -93,6 +102,12 @@ FULL = [t for t in TASKS if t not in CONTROL]
 QUICK = ["hellaswag", "arc_easy"]
 
 NODIAG = "local/nodiag-step400"
+# judged free response: which models answered, and how well
+JUDGED = {"fx/good-750m": 0.75, "fx/skewed-360m": 0.8, "fx/chance-160m": 0.0}
+FILLER = ("To put this in context, there are several considerations that could be raised "
+          "here, and each of them would take some time to lay out fully; nevertheless the "
+          "essential point stands as stated above, and the remaining detail does not alter it "
+          "in any material way, which is why the summary given first is the one to keep.")
 MISCOUNT = {"model": "fx/miscount-1b", "task": "arc_easy", "declared": 80}
 STALE = {"model": "fx/good-750m", "task": "hellaswag", "lines": 10}
 
@@ -545,14 +560,96 @@ def write_diagnoses(root: Path, skip: tuple[str, ...] = (NODIAG,),
     return written
 
 
+def _fr_answer(rng: random.Random, item: dict, p_right: float) -> str:
+    """A generated answer the stub grader can score: mostly the reference in
+    other words (right), sometimes padded (right but long), else off-topic."""
+    r = rng.random()
+    if r < p_right:
+        ans = f"{item['reference']} In short, that is the answer."
+        if rng.random() < 0.25:
+            ans += " " + FILLER                        # long: the rubric's length clause
+        return ans
+    if r < p_right + 0.1:
+        return " ".join(item["reference"].split()[:3]) + ", perhaps, though other readings exist."
+    return "I am not certain; it may depend on the context and on who is asking."
+
+
+def write_judged(root: Path, out_dir: Path, seed: int = SEED) -> dict:
+    """Build the fr task dir from this tree, write generate_until samples for
+    the judged models, grade them with the stub, calibrate synthetically."""
+    import csv
+
+    import fr_build
+    import judge as jd
+    import judge_calibrate as jc
+    fr_dir = root / "eval_tasks" / "fr"
+    manifest = fr_build.build(out_dir, fr_dir)
+    items_by_task = {t: [json.loads(ln) for ln in (fr_dir / f"{t}.jsonl").read_text(
+        encoding="utf-8").splitlines() if ln.strip()] for t in fr_build.ALL_TASKS}
+    for model_id, p_right in JUDGED.items():
+        rng = _rng(seed, "fr", model_id)
+        for task, items in items_by_task.items():
+            task_dir = (out_dir / safe_name(model_id) / f"{task}_0shot"
+                        / _SANITIZE.sub("__", model_args(model_id)))
+            task_dir.mkdir(parents=True, exist_ok=True)
+            recs = []
+            for i, it in enumerate(items):
+                ans = _fr_answer(rng, it, p_right)
+                ctx = it["prompt"] + "\n\nAnswer:"
+                recs.append({"doc_id": i, "doc": it, "target": it["reference"],
+                             "arguments": [[ctx, {"until": ["\n\n\n"], "max_gen_toks": 256,
+                                                  "do_sample": False, "temperature": 0.0}]],
+                             "resps": [[ans]], "filtered_resps": [ans],
+                             "doc_hash": _sha(json.dumps(it, sort_keys=True, ensure_ascii=False)),
+                             "prompt_hash": _sha(ctx), "target_hash": _sha(it["reference"]),
+                             "filter": "none", "metrics": ["bypass"], "bypass": 999})
+            with open(task_dir / f"samples_{task}_{TS}.jsonl", "w", encoding="utf-8") as fh:
+                for r in recs:
+                    fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+            blob = {"results": {task: {"alias": task, "bypass,none": 999}},
+                    "group_subtasks": {task: []},
+                    "configs": {task: {"task": task, "output_type": "generate_until",
+                                       "metric_list": [{"metric": "bypass"}]}},
+                    "versions": {task: 1.0}, "n-shot": {task: 0},
+                    "higher_is_better": {task: {"bypass": True}},
+                    "n-samples": {task: {"original": len(recs), "effective": len(recs)}},
+                    "config": {"model": "hf", "model_args": model_args(model_id), "batch_size": "8",
+                               "device": "cuda:0", "limit": None, "random_seed": 1234,
+                               "model_num_parameters": dict((m[0], m[3]) for m in MODELS)[model_id]},
+                    "git_hash": GIT_HASH, "date": DATE + 9000, "transformers_version": TRANSFORMERS,
+                    "chat_template": None, "total_evaluation_time_seconds": "40.0"}
+            (task_dir / f"results_{TS}.json").write_text(json.dumps(blob, indent=2),
+                                                         encoding="utf-8")
+        out = jd.judge_model(out_dir / safe_name(model_id), jd.StubGrader(), "stub")
+        jd.write_judge(out_dir / safe_name(model_id), out)
+    # calibration: a person who agrees with the stub on six rows in seven
+    cal_csv = root / "calibration.csv"
+    jc.export(out_dir, cal_csv, [], 60, seed)
+    rows = list(csv.DictReader(open(cal_csv, newline="", encoding="utf-8")))
+    judged = {r["id"]: r for r in jc._judged_rows(out_dir, set())}
+    for k, r in enumerate(rows):
+        js = judged[r["id"]]["judge_score"]
+        r["human_score"] = str(min(4, js + 1) if k % 7 == 6 else js)
+    with open(cal_csv, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=jc.FIELDS)
+        w.writeheader()
+        w.writerows(rows)
+    cal = jc.import_csv(out_dir, cal_csv)
+    return {"fr_dir": fr_dir, "manifest": manifest, "models": dict(JUDGED),
+            "calibration_csv": cal_csv, "calibration": cal}
+
+
 def frozen_report(root: Path, path: Path, title: str = "Fixture board") -> Path:
     import report_lm_eval as report
-    runs = report.load_results(root / "results" / "full")
-    return report.build_report(runs, path, title)
+    out_dir = root / "results" / "full"
+    runs = report.load_results(out_dir)
+    cal_path = out_dir / "judge_calibration.json"
+    cal = json.loads(cal_path.read_text(encoding="utf-8")) if cal_path.exists() else None
+    return report.build_report(runs, path, title, calibration=cal)
 
 
 def build(root: Path, seed: int = SEED, diagnose: bool = True,
-          report: Path | None = None) -> dict:
+          report: Path | None = None, judged: bool = True) -> dict:
     """Write the whole tree under root/results/full and return a manifest the
     tests read: models and their planted policies, the shared documents per
     task (with doc_hash and the question text as diagnose.py prints it), and
@@ -577,6 +674,7 @@ def build(root: Path, seed: int = SEED, diagnose: bool = True,
         "miscount": {**MISCOUNT, "logged": TASKS[MISCOUNT["task"]]["n"]},
         "stale": {**STALE, "n": TASKS[STALE["task"]]["n"]},
         "diagnosed": write_diagnoses(root) if diagnose else [],
+        "judged": write_judged(root, out_dir, seed) if judged else None,
         "report": None,
     }
     if report is not None:

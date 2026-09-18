@@ -45,12 +45,14 @@ def payload(tree) -> dict:
     """What GET /api/results would serve for the fixture tree."""
     import report_lm_eval as report
     runs = report.load_results(tree["out_dir"])
+    cal_path = tree["out_dir"] / "judge_calibration.json"
+    cal = json.loads(cal_path.read_text(encoding="utf-8")) if cal_path.exists() else None
     return report.build_payload(report.merge_runs(runs), "Fixture board",
-                                source=str(tree["out_dir"]))
+                                source=str(tree["out_dir"]), calibration=cal)
 
 
 def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: bool = True,
-                 diagnose: bool = True):
+                 diagnose: bool = True, judged: bool = True, judge_model: str = ""):
     """The app against `root` as BENCH_ROOT: fixture tree built (optionally
     diagnosed), the GPU worker never started, the LLM poller not threaded
     (tests drive llm_poller.tick() by hand), LLM backend as asked. Returns
@@ -59,7 +61,7 @@ def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: b
 
     from service import config, llm, llm_poller, worker
     import service.app as appmod
-    manifest = make_fixture.build(root, diagnose=diagnose) if tree else None
+    manifest = make_fixture.build(root, diagnose=diagnose, judged=judged) if tree else None
     for name, val in {"BENCH_ROOT": root, "RESULTS_ROOT": root / "results",
                       "OUT_DIR": root / "results" / "full", "DB_PATH": root / "service.sqlite3",
                       "ARTIFACTS_DIR": root / "artifacts", "LOGS_DIR": root / "logs",
@@ -67,7 +69,9 @@ def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: b
                       "ALLOW_REMOTE_CODE": False, "LLM_PROVIDER": llm_provider,
                       "LLM_MODEL": "fake-1" if llm_provider == "fake" else "",
                       "LLM_API_KEY": "", "LLM_MAX_ITEMS_PER_BATCH": 200,
-                      "LLM_DAILY_ITEM_CAP": 2000, "DATASET_QUOTA_GB": 20.0}.items():
+                      "LLM_DAILY_ITEM_CAP": 2000, "DATASET_QUOTA_GB": 20.0,
+                      "JUDGE_MODEL": judge_model,
+                      "JUDGED_TASKS_DIR": root / "eval_tasks" / "fr"}.items():
         monkeypatch.setattr(config, name, val)
     monkeypatch.setattr(worker, "start", lambda: None)
     monkeypatch.setattr(llm_poller, "start", lambda: None)

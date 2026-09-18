@@ -137,6 +137,35 @@ DATASETS_DIR = Path(os.environ.get("DATASETS_DIR", BENCH_ROOT / "datasets"))
 DATASET_QUOTA_GB = float(os.environ.get("DATASET_QUOTA_GB", "20"))
 
 
+# ---------------------------------------------------------------------------
+# The judged free-response suite (eval_tasks/fr, scripts/judge.py). The tasks
+# are BUILT into $BENCH_ROOT/eval_tasks/fr by scripts/fr_build.py (the control
+# set comes from the diagnose half of MMLU on disk), and the judge is a local
+# model in HF_HOME, pinned by weights hash. A suite=judged job runs the fr_*
+# generations and then the judge, all inside the same lock as any evaluation.
+# "stub" as the judge is the deterministic overlap stand-in — dry runs only.
+# ---------------------------------------------------------------------------
+JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "").strip()
+JUDGED_TASKS_DIR = Path(os.environ.get("JUDGED_TASKS_DIR", BENCH_ROOT / "eval_tasks" / "fr"))
+
+
+def judged_tasks() -> list[str]:
+    if not JUDGED_TASKS_DIR.is_dir():
+        return []
+    return sorted(y.stem for y in JUDGED_TASKS_DIR.glob("fr_*.yaml"))
+
+
+def judged_blocked() -> str:
+    """'' when a suite=judged run can proceed, else the reason."""
+    if not JUDGE_MODEL:
+        return ("no judge is configured on this server (JUDGE_MODEL is unset) — the judged "
+                "suite is off")
+    if not judged_tasks():
+        return (f"the free-response tasks have not been built: run scripts/fr_build.py "
+                f"results/full --out {JUDGED_TASKS_DIR}")
+    return ""
+
+
 def discovered_ppl_tasks() -> list[str]:
     if not EVAL_TASKS_DIR.is_dir():
         return []
@@ -146,5 +175,7 @@ def discovered_ppl_tasks() -> list[str]:
 def tasks_for_suite(suite: str) -> list[str]:
     if suite == "control":
         return list(CONTROL_TASKS)
+    if suite == "judged":
+        return judged_tasks()
     base = QUICK_TASKS if suite == "quick" else FULL_TASKS
     return base + discovered_ppl_tasks()

@@ -173,6 +173,39 @@ What happens after the click (`service/proposals.py`):
    half and diagnosis half then move apart, that divergence is the alarm this
    whole design exists to raise — phase 6 makes it visible.
 
+## Judged free response, and the control that answers "knew it?"
+
+Multiple choice stops separating models somewhere above a billion parameters
+and mostly for instruct-tuned ones; below that it produces near-zero
+free-response scores, honestly. The suite is built now so it is ready when
+those models arrive, and for one thing it does today: **the control**.
+
+`eval_tasks/fr/` holds four human-authored suites (ten SEED items each until
+someone writes the rest — `AUTHORING.md`), a rubric per category with written
+anchors and a length clause, and `scripts/fr_build.py`, which also builds
+`fr_control_mmlu` from the **diagnosis half** of MMLU: the question only, no
+options, graded against the gold option's text. `scripts/judge.py` grades
+every answer 0–4 with a local judge pinned by weights hash, greedy, single
+answers never pairwise, and refuses to grade its own family. Judging twice
+writes the same bytes.
+
+On a model's page, **Judged free response** leads with the control:
+
+- **"Knew it, couldn't pick it"** — of the control items the model got wrong
+  as multiple choice, half or more were answered correctly when asked openly.
+  The knowledge was there under the format; this is the per-model, per-category
+  answer to "is missing knowledge actually the problem?" that phase 4 needs.
+- **"Didn't know it either way"** — most were wrong both ways. Missing
+  knowledge is the problem, and a generated dataset is the right response.
+
+**Calibration is not optional.** `scripts/judge_calibrate.py export` writes a
+hundred judged answers to a CSV with the rubric beside each and the judge's
+score hidden; a person fills in `human_score`; `import` computes Cohen's κ
+per category and overall and writes `results/full/judge_calibration.json`.
+Below κ 0.60 every judged number is preliminary — shown, never ranked, never
+averaged. Above it, the leaderboard gains judged columns with κ in the header
+and a separate judged average that never touches the multiple-choice one.
+
 ## The log
 
 The output of these weeks is this table, not a feeling. Fill one row per

@@ -197,6 +197,8 @@ other*, not to public leaderboards (different n-shot conventions).
  "suite": "quick",              // "quick" (hellaswag+arc_easy+perplexity) | "full" (all tasks) — default full
                                 // | "control": mmlu_perm only — MMLU with the options rotated (DIAGNOSE.md
                                 //   § The one experiment); a control, never in the average
+                                // | "judged": the free-response tasks + the local judge (needs JUDGE_MODEL and
+                                //   scripts/fr_build.py on the server); never in the MC average
  "kind": "auto",                // "auto" | "base" | "instruct" — default auto
  "submitter": "masein",           // shows on the queue and in provenance
  "note": "run7 step 4000",      // free text, shows as a tooltip
@@ -272,6 +274,18 @@ holds, plus `unmapped` for any subject the file does not know.
 `meta.categories` is the category order. Every number in `diag` is computed
 from the per-item log; `score_report` is the leaderboard half only. Quote `bits_per_byte` for the perplexity tasks — it's the
 tokenizer-independent one.
+
+### Judged free response
+
+`GET /api/judge` — the pinned judge, its family, the tasks built, and the
+calibration on file. In `/api/results`, a judged model carries
+`models[].judge`: per task `{n, mean, max: 4, dist, score_vs_length}` and,
+for `fr_control_mmlu`, `control` per category (`mc_wrong`, `knew`, `didnt`);
+`judgedAvg` is the mean over the four authored categories. `judged`
+(top level) lists the tasks, the judge, and `calibration` (`kappa`, `n`,
+`calibrated`, `per_category`). Below κ 0.60 nothing judged is ranked or
+averaged; above it the leaderboard shows judged columns with κ in the
+header and a separate judged average — never part of `avg`.
 
 ### Find the gap: proposals and generated datasets
 

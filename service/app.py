@@ -59,7 +59,19 @@ _cache: dict = {"key": None, "payload": None, "at": 0.0}
 # diagnose.json belongs here as much as results*.json does: scripts/diagnose.py
 # writes it long after the eval finished, and a key that ignores it means the
 # payload keeps being served from cache with no diagnosis in it.
-_WATCH = ("results*.json", "diagnose.json", "model_meta.json")
+_WATCH = ("results*.json", "diagnose.json", "model_meta.json", "judge.json",
+          "judge_calibration.json")
+
+
+def _calibration() -> dict | None:
+    """results/full/judge_calibration.json, written by scripts/judge_calibrate.py
+    import — the judge's agreement with a person, without which nothing judged
+    is ranked."""
+    p = config.OUT_DIR / "judge_calibration.json"
+    try:
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    except (OSError, json.JSONDecodeError):
+        return None
 
 
 def _tree_key() -> tuple:
@@ -95,7 +107,8 @@ def results_payload() -> dict:
         runs = report.load_results(config.OUT_DIR) if config.OUT_DIR.is_dir() else []
         by_model = report.merge_runs(runs)
         payload = report.build_payload(by_model, config.TITLE, source=str(config.OUT_DIR),
-                                       taint=taint_for(by_model.keys()))
+                                       taint=taint_for(by_model.keys()),
+                                       calibration=_calibration())
         payload["live"] = True
         _cache.update(key=key, payload=payload)
     _cache["at"] = now
@@ -128,8 +141,13 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "id, or local/<name> for an uploaded artifact")
     if s.kind not in ("auto", "base", "instruct"):
         raise HTTPException(422, "kind must be auto, base or instruct")
-    if s.suite not in ("quick", "full", "control"):
-        raise HTTPException(422, "suite must be quick, full, or control (mmlu_perm only)")
+    if s.suite not in ("quick", "full", "control", "judged"):
+        raise HTTPException(422, "suite must be quick, full, control (mmlu_perm only) or "
+                                 "judged (free response + judge)")
+    if s.suite == "judged":
+        why = config.judged_blocked()
+        if why:
+            raise HTTPException(503, why)
     if s.allow_remote_code:
         # the flag is only meaningful for uploads, and only when the operator has
         # configured the server to run other people's code at all. Checked here
@@ -463,6 +481,20 @@ def _llm_status() -> dict:
 @app.get("/api/llm")
 def llm_status():
     return _llm_status()
+
+
+@app.get("/api/judge")
+def judge_status():
+    """What the judged suite would run with: the pinned judge, its family,
+    the tasks built, and the calibration on file."""
+    why = config.judged_blocked()
+    import judge as _judge      # scripts/, on sys.path above
+    cal = _calibration() or {}
+    return {"configured": not why, "reason": why, "judge_model": config.JUDGE_MODEL,
+            "judge_family": _judge.family(config.JUDGE_MODEL) if config.JUDGE_MODEL else "",
+            "tasks": config.judged_tasks(), "tasks_dir": str(config.JUDGED_TASKS_DIR),
+            "calibration": {k: cal.get(k) for k in ("kappa", "n", "calibrated", "kappa_min")}
+            if cal else None}
 
 
 def _spend_check(n_items: int) -> None:

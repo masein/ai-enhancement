@@ -101,6 +101,8 @@ re-queued automatically and per-task resume repeats only the interrupted task.
 | `LLM_API_KEY` | *(unset)* | in `.env` only — see *The LLM key* below |
 | `LLM_MAX_ITEMS_PER_BATCH` / `LLM_DAILY_ITEM_CAP` | 200 / 2000 | spend guard, in batch requests (one per proposal, one per ten generated items); the Review tab shows today's use |
 | `DATASET_QUOTA_GB` | 20 | total generated-dataset storage under `$BENCH_ROOT/datasets` |
+| `JUDGE_MODEL` | *(unset — off)* | the local judge for `suite=judged` (an HF id in `HF_HOME`; `stub` for a dry run). Never the same family as a model on the board — those cells say so |
+| `JUDGED_TASKS_DIR` | `$BENCH_ROOT/eval_tasks/fr` | where `scripts/fr_build.py` put the free-response tasks |
 
 ## The LLM key
 
@@ -228,6 +230,19 @@ python bench_client.py --base http://…:8899 \
 → done | failed`. Failures carry a plain-language reason (gated repo, OOM, size
 cap, custom-code refusal) plus a `log` link with the raw output. Canceling is
 only possible while `queued` — a running job finishes its current task.
+
+A fourth suite, `judged`, runs the free-response tasks (`fr_*`, built into
+`$BENCH_ROOT/eval_tasks/fr` by `scripts/fr_build.py`) and then the judge, all
+inside the same lock — the judge uses the card, so it never runs beside an
+evaluation. Nothing judged is ranked until `scripts/judge_calibrate.py` has a
+human sample with Cohen's κ ≥ 0.60 on file; see DIAGNOSE.md.
+
+```bash
+# once, and again whenever eval_tasks/fr changes:
+sudo docker compose exec -T bench python3 scripts/fr_build.py results/full --out /home/masein/benchmarks/eval_tasks/fr
+# then per model:
+python clients/bench_client.py --base http://<ip>:8899 submit <model> --suite judged --submitter you
+```
 
 A third suite, `control`, runs only `mmlu_perm` — MMLU with the answer options
 rotated, the experiment DIAGNOSE.md describes. It is a control, never part of

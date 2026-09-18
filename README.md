@@ -73,6 +73,11 @@ service/
   make_ppl_task.py    any corpus -> pinned perplexity task (records a sha256)
 eval_tasks/
   mmlu_perm/          the permutation control: MMLU with the options rotated (suite=control)
+  fr/                 judged free response: seed items, rubrics, AUTHORING.md (suite=judged)
+scripts/
+  fr_build.py         builds the fr tasks + the MMLU control set (diagnose half) for the harness
+  judge.py            the local, pinned judge -> judge.json beside each model's results
+  judge_calibrate.py  human vs judge: export a CSV, import it, Cohen's kappa gates the suite
 clients/
   bench_client.py     stdlib-only API client + CLI
 examples/

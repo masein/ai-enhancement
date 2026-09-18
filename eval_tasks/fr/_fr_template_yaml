@@ -1,0 +1,23 @@
+# Free-response task template. scripts/fr_build.py copies this into
+# $BENCH_ROOT/eval_tasks/fr/<task>.yaml with the absolute path of the items
+# file filled in — the same pattern scripts/make_ppl_task.py uses, because
+# lm_eval resolves data_files relative to nothing useful.
+dataset_path: json
+dataset_kwargs:
+  data_files:
+    test: __ITEMS_PATH__
+test_split: test
+output_type: generate_until
+doc_to_text: "{{prompt}}\n\nAnswer:"
+doc_to_target: "{{reference}}"
+generation_kwargs:
+  until: ["\n\n\n"]
+  max_gen_toks: 256
+  do_sample: false
+  temperature: 0.0
+# no metric: the judge scores these afterwards and writes judge.json beside
+# the model's results; the harness only has to record the generations
+metric_list:
+  - metric: bypass
+metadata:
+  version: 1.0

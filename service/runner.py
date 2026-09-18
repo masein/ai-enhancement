@@ -305,9 +305,24 @@ def include_args_for(task: str) -> list[str]:
     other's yaml, so a stray file in one cannot rename a task in the other."""
     if task in config.CONTROL_TASKS:
         return ["--include_path", str(config.CONTROL_TASKS_DIR)]
+    if task.startswith("fr_"):
+        return ["--include_path", str(config.JUDGED_TASKS_DIR)]
     if config.EVAL_TASKS_DIR.is_dir() and any(config.EVAL_TASKS_DIR.glob("*.yaml")):
         return ["--include_path", str(config.EVAL_TASKS_DIR)]
     return []
+
+
+def judge_cmd(hf_id: str) -> list[str]:
+    """scripts/judge.py over one model, with the configured judge. Our own
+    code, run with the service's own environment — nothing submitted runs here."""
+    repo = Path(__file__).resolve().parent.parent
+    cmd = [sys.executable, str(repo / "scripts" / "judge.py"), str(config.OUT_DIR),
+           "-m", hf_id]
+    if config.JUDGE_MODEL == "stub":
+        cmd.append("--stub")
+    else:
+        cmd += ["--judge", config.JUDGE_MODEL]
+    return cmd
 
 
 def _task_done(task_out: Path) -> bool:
@@ -503,6 +518,28 @@ def run_submission(sub: dict) -> None:
                     break            # environment — fails for every task
                 if re.search(r"No space left on device|Errno 28", tail, re.I):
                     break            # operator fault — every task fails the same
+
+        # the judge is the last step of a judged run and it uses the card, so
+        # it runs HERE, inside the lock, never beside an evaluation
+        if sub["suite"] == "judged" and not failed_tasks:
+            db.update(sid, status="running", progress="judging the answers")
+            t_j = time.time()
+            with open(log_path, "a") as lf:
+                lf.write(f"\n===== [{sid}] judge ({config.JUDGE_MODEL}) =====\n")
+                lf.flush()
+                try:
+                    proc = subprocess.run(judge_cmd(sub["hf_id"]), stdout=lf,
+                                          stderr=subprocess.STDOUT, cwd=config.BENCH_ROOT,
+                                          env=os.environ.copy(), timeout=config.TASK_TIMEOUT_S)
+                    jstatus = proc.returncode
+                except subprocess.TimeoutExpired:
+                    jstatus = -1
+                    lf.write(f"\n[service] judge killed after {config.TASK_TIMEOUT_S}s\n")
+            gpu_seconds += time.time() - t_j
+            db.update(sid, gpu_seconds=gpu_seconds)
+            if jstatus != 0:
+                failed_tasks.append("judge")
+                db.update(sid, error=f"judge: {classify(_tail(log_path))}")
 
         if failed_tasks:
             db.update(sid, status="failed", finished_at=time.time(),

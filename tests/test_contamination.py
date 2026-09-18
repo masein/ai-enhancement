@@ -23,7 +23,8 @@ def test_doc_strings_walk_every_shape():
 def test_index_covers_both_halves_once_per_document(tree):
     ix = ct.index(tree["out_dir"])
     n_docs = sum(len(d) for d in tree["docs"].values())
-    assert ix.n_docs == n_docs                            # eight models, one benchmark
+    n_fr = sum(v["items"] for v in tree["judged"]["manifest"]["tasks"].values())
+    assert ix.n_docs == n_docs + n_fr                     # eight models, one benchmark (+ fr items)
     assert ix.n_files > 8 and len(ix.grams) > 1000
     # a report-half question is in the index too — the gate guards the half nobody sees
     import diagnose as dx

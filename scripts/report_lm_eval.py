@@ -219,6 +219,48 @@ def proposal_gate(task: str, t: dict, cell: dict | None, chance: float | None) -
     return {"ok": why is None, "why": why, "categories": cats}
 
 
+# ---------------------------------------------------------------------------
+# Judged free response (scripts/judge.py, scripts/judge_calibrate.py).
+#
+# The judge's scores are a benchmark only once a person has graded a sample
+# and agreement (Cohen's kappa) clears KAPPA_MIN. Below that the numbers are
+# shown, marked preliminary, and never ranked or averaged — the same mechanism
+# a model missing required tasks gets. Above it, category scores may enter a
+# SEPARATE judged average; they never touch the multiple-choice average.
+# ---------------------------------------------------------------------------
+KAPPA_MIN = 0.60
+FR_CATEGORIES = ["instruction_following", "factual_accuracy", "reasoning", "cultural"]
+FR_TASKS = [f"fr_{c}" for c in FR_CATEGORIES]
+FR_CONTROL = "fr_control_mmlu"
+
+
+def _trim_judge(j: dict | None) -> dict | None:
+    """The per-item lists stay on disk (the calibration tool reads them);
+    the page gets the summaries."""
+    if not isinstance(j, dict) or "judge" not in j:
+        return None
+    out = {"judge": {k: j["judge"].get(k) for k in
+                     ("id", "family", "stub", "weights_sha256", "prompt_sha256",
+                      "prompt_version", "rubrics", "greedy")},
+           "skipped": j.get("skipped"), "correct_at": j.get("correct_at"), "tasks": {}}
+    for task, t in (j.get("tasks") or {}).items():
+        if not isinstance(t, dict):
+            continue
+        out["tasks"][task] = {k: t.get(k) for k in
+                              ("n", "mean", "max", "dist", "score_vs_length", "control")
+                              if t.get(k) is not None}
+    return out
+
+
+def judged_avg(trimmed: dict | None) -> float | None:
+    """Mean rubric score over the four authored categories, on the 0–4 scale.
+    None unless every category was judged — a partial average is not a rank."""
+    if not trimmed or trimmed.get("skipped"):
+        return None
+    means = [trimmed["tasks"][t]["mean"] for t in FR_TASKS if t in trimmed["tasks"]]
+    return round(sum(means) / len(means), 4) if len(means) == len(FR_TASKS) else None
+
+
 def load_results(path: Path) -> list[dict]:
     """Find and parse every lm-eval results file under `path`."""
     files = sorted(path.rglob("results*.json")) if path.is_dir() else [path]
@@ -264,6 +306,11 @@ def parse_run(blob: dict, source: Path) -> dict:
             if not math.isfinite(float(val)):
                 continue
             name = mm.group("metric")
+            # generate_until tasks that a judge scores afterwards carry the
+            # harness's `bypass` sentinel (999), not a score; nothing here may
+            # read it as one
+            if name == "bypass":
+                continue
             slot = "stderr" if mm.group("stderr") else "value"
             # keep the first filter seen per metric, but prefer flexible-extract for
             # generative tasks (gsm8k reports strict-match AND flexible-extract; the
@@ -334,6 +381,8 @@ def parse_run(blob: dict, source: Path) -> dict:
         "eval_seconds": _to_float(blob.get("total_evaluation_time_seconds")),
         "archinfo": _model_meta(source),
         "diag": _beside(source, "diagnose.json"),
+        # rubric scores from scripts/judge.py, same place and pattern as the diagnosis
+        "judge": _beside(source, "judge.json"),
         "tasks": tasks,
     }
 
@@ -607,11 +656,13 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
         m["num_params"] = m["num_params"] or r["num_params"]
         m["archinfo"] = m.get("archinfo") or r.get("archinfo")
         m["diag"] = m.get("diag") or r.get("diag")
+        m["judge"] = m.get("judge") or r.get("judge")
     return by_model
 
 
 def build_payload(by_model: dict[str, dict], title: str, source: str,
-                  taint: dict[str, list[str]] | None = None) -> dict:
+                  taint: dict[str, list[str]] | None = None,
+                  calibration: dict | None = None) -> dict:
     """`taint`: model id -> tasks whose diagnostics its training data was
     derived from (the service computes it from the run/dataset join). A
     tainted task is treated exactly like a missing required task: shown per
@@ -660,6 +711,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         return any(r["higher_is_better"].get(t, {}).get(met) is False
                    for r in by_model.values())
 
+    # judged free-response tasks never have a harness metric (bypass) and so
+    # never a cell; the guard keeps a future metric from putting them here
+    headline = [t for t in headline if not t.startswith("fr_")]
     acc_tasks = [t for t in headline
                  if metric_used.get(t) in PROPORTION and not is_lower_better(t)]
     ppl_tasks = [t for t in headline if t not in acc_tasks]
@@ -676,6 +730,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         missing = [t for t in required if mid not in cells.get(t, {})]
         official = bool(required) and not missing and not (set(tainted) & set(required))
         params = r["num_params"] or params_from_name(mid)
+        judge = _trim_judge(r.get("judge"))
         diag = _trim_diag(r.get("diag"))
         if diag:
             for task, t in diag["tasks"].items():
@@ -702,6 +757,10 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             # tasks whose diagnostics this model's training data was derived
             # from: shown, badged, and out of the average
             "tainted": tainted,
+            # rubric scores from the pinned judge, summarised; the separate
+            # judged average exists only when every category was judged
+            "judge": judge,
+            "judgedAvg": judged_avg(judge),
             "kindReason": (r.get("archinfo") or {}).get("kind_reason"),
             # official numbers only: normalized (the ranking key) and raw (the
             # number you quote), both over the required list, both None when the
@@ -819,6 +878,27 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             f"({', '.join(hashes)}). A benchmark whose code changed is a different "
             f"benchmark — treat cross-build comparisons with suspicion.")
 
+    judged_tasks = sorted({t for r in by_model.values()
+                           for t in ((r.get("judge") or {}).get("tasks") or {})})
+    judge_meta = next(((r["judge"] or {}).get("judge") for r in by_model.values()
+                       if r.get("judge")), None)
+    cal = calibration if isinstance(calibration, dict) and calibration.get("kappa") is not None \
+        else None
+    if judged_tasks and cal is None:
+        warnings.append(
+            "Judged free-response scores are on file but the judge has not been calibrated "
+            "against a person (scripts/judge_calibrate.py). They are shown as preliminary and "
+            "enter no average and no rank.")
+    elif cal and not cal.get("calibrated"):
+        warnings.append(
+            f"The judge's agreement with a human grader is Cohen's kappa {cal['kappa']} over "
+            f"{cal.get('n')} answers, below the {KAPPA_MIN} line. Judged scores are preliminary: "
+            f"shown, never ranked, never averaged.")
+    if judge_meta and judge_meta.get("stub"):
+        warnings.append(
+            "Judged scores on this board come from the STUB grader (a word-overlap stand-in "
+            "used for plumbing tests). They are not judgements of anything.")
+
     dates = sorted(str(r["date"]) for r in by_model.values() if r["date"])
     return {
         "title": title,
@@ -835,6 +915,13 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                       **_task_facts(t, cells, sig)} for t in headline},
         "cells": cells,
         "sig": sig,
+        # the judged suite: which tasks anyone ran, the judge, and whether a
+        # person has agreed with it enough for the numbers to count
+        "judged": {"tasks": judged_tasks, "categories": FR_TASKS, "control": FR_CONTROL,
+                   "judge": judge_meta, "kappaMin": KAPPA_MIN,
+                   "calibration": ({k: cal.get(k) for k in
+                                    ("kappa", "n", "calibrated", "kappa_min", "per_category")}
+                                   if cal else None)},
         "extra": extra,
         "warnings": warnings,
         "meta": {
@@ -1099,6 +1186,13 @@ th .dir { font-size:9px; }
 .dxperm .dxsub { width:auto; min-width:60%; }
 .lb td.dim { color:var(--muted); }
 .badge.taint { color:var(--s2); border-color:var(--s2); }
+.jbar { display:flex; height:10px; border-radius:5px; overflow:hidden; background:var(--plane); min-width:110px; }
+.jbar > span { display:block; height:100%; }
+.jd { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }
+.jd td, .jd th { padding:4px 8px 4px 0; border-bottom:1px solid var(--border); text-align:left; }
+.jd th { font-size:11px; font-weight:600; color:var(--muted); }
+.jd td.num, .jd th.num { text-align:right; font-variant-numeric:tabular-nums; }
+.lb th.judged { color:var(--text-secondary); font-style:italic; }
 /* the one button that can spend money and make training data: never colour alone */
 .propose { font:inherit; font-size:11.5px; padding:2px 9px; border-radius:6px;
   border:1px solid var(--accent); background:var(--accent-soft); color:var(--accent);
@@ -2212,6 +2306,148 @@ function vDiagnose(m) {
   return card;
 }
 
+// ---------- judged free response ----------
+// Rubric scores 0–4 from a local, pinned judge (scripts/judge.py), one card
+// per model. Three things the card has to make impossible to miss: whether
+// a person has agreed with the judge (kappa), whether longer answers scored
+// higher (length bias), and the control result — of the MMLU items this
+// model got wrong as multiple choice, how many did it answer correctly when
+// asked openly. That last number is what phase 4 depends on.
+const SCORE_FILL = ['var(--s8)', 'color-mix(in srgb, var(--s8) 45%, var(--plane))', 'var(--axis)',
+                    'color-mix(in srgb, var(--s1) 55%, var(--plane))', 'var(--s1)'];
+const frName = t => t === DATA.judged.control ? 'MMLU control (open-ended)'
+  : t.replace(/^fr_/, '').replace(/_/g, ' ');
+
+function jBar(dist, n) {
+  const bar = el('div', { class: 'jbar' });
+  for (let s = 0; s <= 4; s++) {
+    const v = (dist || {})[String(s)] || 0;
+    if (v) bar.append(el('span', { style: `width:${(100 * v / n).toFixed(2)}%;background:${SCORE_FILL[s]}`,
+      title: `score ${s}: ${v} of ${n}` }));
+  }
+  return bar;
+}
+
+function controlSentence(c) {
+  const tot = { n: 0, mc_wrong: 0, knew: 0, didnt: 0, unjoined: 0 };
+  for (const v of Object.values(c || {})) for (const k of Object.keys(tot)) tot[k] += v[k] || 0;
+  if (!tot.mc_wrong) return { text: `Every one of the ${tot.n} control items this model saw was `
+    + 'right as multiple choice, so the control has nothing to compare.', lead: null, tot };
+  const share = tot.knew / tot.mc_wrong;
+  const lead = share >= 0.5 ? 'Knew it, couldn\'t pick it' : 'Didn\'t know it either way';
+  const text = share >= 0.5
+    ? `: of the ${tot.mc_wrong} control items this model got wrong as multiple choice, it `
+      + `answered ${tot.knew} (${pct(share, 0)}) correctly when asked openly (rubric ≥ 3). The `
+      + 'knowledge was there under the format.'
+    : `: of the ${tot.mc_wrong} control items wrong as multiple choice, ${tot.didnt} were wrong `
+      + `open-ended too; only ${tot.knew} (${pct(share, 0)}) were answered correctly when asked `
+      + 'openly. Missing knowledge is the problem here, not the posing.';
+  return { lead, text, tot };
+}
+
+function vJudged(m) {
+  const J = DATA.judged;
+  if (!J || !J.tasks.length) return null;
+  const cal = J.calibration, ok = !!(cal && cal.calibrated);
+  const card = el('div', { class: 'card' },
+    el('h2', { text: 'Judged free response' }),
+    el('p', { class: 'sub', text: 'Open questions per category, answered in writing, graded 0–4 '
+      + 'against a written rubric by a local judge pinned by weights hash — single answers, '
+      + 'never pairwise. Length is in the rubric and is reported below so a longer-is-better '
+      + 'judge would show.' }));
+  card.append(el('p', { class: ok ? 'note' : 'warn' },
+    el('b', { text: ok ? 'Calibrated. ' : 'Preliminary. ' }),
+    cal ? `Cohen's κ ${cal.kappa} against a human grader over ${cal.n} answers `
+        + `(line at ${J.kappaMin}). ` + (ok
+          ? 'Category scores may enter the separate judged average; they never enter the '
+            + 'multiple-choice average.'
+          : 'Below the line: shown, never ranked, never averaged.')
+        : 'No calibration on file — a person has not yet graded a sample against the judge '
+          + '(scripts/judge_calibrate.py). Shown, never ranked, never averaged.'));
+  const j = m.judge;
+  if (!j) { card.append(note('Not judged: this model has no judge.json on file. Submit it with '
+    + 'suite=judged, or run scripts/judge.py over its fr_* answers.')); return card; }
+  if (j.skipped) { card.append(note(j.skipped + '. A judge scores its own family higher; the '
+    + 'cell stays empty rather than flattering.')); return card; }
+  if (j.judge.stub) card.append(el('p', { class: 'warn', text: 'Graded by the STUB grader — a '
+    + 'word-overlap stand-in for plumbing tests. Not a judgement of anything.' }));
+
+  // per category
+  const cats = J.categories.filter(t => j.tasks[t]);
+  if (cats.length) {
+    card.append(el('div', { class: 'dxh', text: 'By category (0–4)' }));
+    card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'category' }), el('th', { class: 'num', text: 'score' }),
+        el('th', { class: 'num', text: 'κ' }), el('th', { class: 'num', text: 'items' }),
+        el('th', { text: 'score distribution 0 → 4' }))),
+      el('tbody', {}, cats.map(t => { const v = j.tasks[t];
+        const k = cal && cal.per_category && cal.per_category[t.slice(3)];
+        return el('tr', {},
+          el('td', { text: frName(t) }),
+          el('td', { class: 'num', text: `${num(v.mean, 2)} / 4` }),
+          el('td', { class: 'num se', text: k ? String(k.kappa) : '—',
+            title: k ? `${k.n} human-graded answers in this category` : 'not calibrated per category' }),
+          el('td', { class: 'num se', text: String(v.n) + (v.n <= 10 ? ' (seed)' : '') }),
+          el('td', {}, jBar(v.dist, v.n))); })))));
+    if (m.judgedAvg != null)
+      card.append(el('p', { class: 'small', text: `Judged average ${num(m.judgedAvg, 2)} / 4 over `
+        + `the four categories` + (ok ? '.' : ' — preliminary until the judge is calibrated.') }));
+    if (cats.some(t => j.tasks[t].n <= 10))
+      card.append(el('p', { class: 'small', text: 'Ten items per category are the SEED set: a '
+        + 'plumbing test, not a measurement. eval_tasks/fr/AUTHORING.md says how the rest get '
+        + 'written.' }));
+    // score vs length
+    const rows = [];
+    for (const t of cats) for (const b of j.tasks[t].score_vs_length || [])
+      rows.push([frName(t), b.bucket, b.n, b.mean]);
+    if (rows.length) {
+      const drift = cats.map(t => { const b = j.tasks[t].score_vs_length || [];
+        return b.length > 1 ? b[b.length - 1].mean - b[0].mean : 0; });
+      const worst = Math.max(...drift);
+      card.append(el('div', { class: 'dxh', text: 'Score against answer length' }));
+      card.append(el('p', { class: 'small', text: worst >= 1
+        ? `Longer answers score up to ${num(worst, 1)} points higher in at least one category — `
+          + 'length may be driving the judge. Check the rubric\'s length clause before believing '
+          + 'the category scores.'
+        : 'No category rewards length by a point or more; the length clause is holding.' }));
+      card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+        el('thead', {}, el('tr', {}, el('th', { text: 'category' }), el('th', { text: 'answer length' }),
+          el('th', { class: 'num', text: 'items' }), el('th', { class: 'num', text: 'mean score' }))),
+        el('tbody', {}, rows.map(([c, b, n, s]) => el('tr', {}, el('td', { text: c }),
+          el('td', { text: b }), el('td', { class: 'num se', text: String(n) }),
+          el('td', { class: 'num', text: num(s, 2) })))))));
+    }
+  }
+  // the control
+  const ctl = j.tasks[J.control];
+  if (ctl && ctl.control) {
+    const s = controlSentence(ctl.control);
+    card.append(el('div', { class: 'dxh', text: 'The control: MMLU asked openly' }));
+    card.append(el('p', { class: 'dxlead' + (s.lead && s.lead.startsWith('Knew') ? '' : ' calm') },
+      s.lead ? el('b', { text: s.lead }) : '', s.text));
+    card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'category' }), el('th', { class: 'num', text: 'items' }),
+        el('th', { class: 'num', text: 'wrong as MC' }), el('th', { class: 'num', text: 'knew it' }),
+        el('th', { class: 'num', text: "didn't know" }))),
+      el('tbody', {}, Object.entries(ctl.control).sort((a, b) => b[1].mc_wrong - a[1].mc_wrong)
+        .map(([c, v]) => el('tr', {}, el('td', { text: c }),
+          el('td', { class: 'num se', text: String(v.n) }),
+          el('td', { class: 'num', text: String(v.mc_wrong) }),
+          el('td', { class: 'num', text: String(v.knew) }),
+          el('td', { class: 'num', text: String(v.didnt) })))))));
+    card.append(el('p', { class: 'small', text: `Diagnosis-half MMLU items only, asked without `
+      + `their options and graded against the gold option's text; "knew it" is a rubric score of `
+      + `${j.correct_at} or more.` + (s.tot.unjoined ? ` ${s.tot.unjoined} items had no MMLU run to `
+      + 'join to.' : '') }));
+  }
+  card.append(el('p', { class: 'small', style: 'margin-top:12px' },
+    `Judge ${j.judge.id} · weights ${String(j.judge.weights_sha256 || '').slice(0, 12)} · `
+    + `prompt v${j.judge.prompt_version} ${String(j.judge.prompt_sha256 || '').slice(0, 12)} · rubrics `
+    + Object.entries(j.judge.rubrics || {}).map(([t, r]) => `${t.replace(/^fr_/, '')} v${r.version}`).join(', ')
+    + ' · greedy'));
+  return card;
+}
+
 function vModel() {
   const m = DATA.models.find(x => x.id === state.model);
   if (!m) return [note('No such model.')];
@@ -2300,8 +2536,8 @@ function vModel() {
     el('dl', { class: 'provlist' }, prov.flatMap(([k, v]) =>
       [el('dt', { text: k }), el('dd', { class: 'mono', text: String(v) })])));
 
-  // vDiagnose is null when no model on this board has a per-item diagnosis
-  return [back, head, results, vDiagnose(m), provCard].filter(Boolean);
+  // vDiagnose / vJudged are null when no model on this board has that file
+  return [back, head, results, vDiagnose(m), vJudged(m), provCard].filter(Boolean);
 }
 
 function vOverview(ms) {
@@ -2698,9 +2934,21 @@ function vLeaderboard(ms) {
     { key: 'avg',    label: 'Avg',    num: true },
     ...DATA.accTasks.map(t => ({ key: t, label: t, num: true, task: t })),
     ...DATA.pplTasks.map(t => ({ key: t, label: t, num: true, task: t, lower: true })),
+    // judged columns exist on the board only once a person has agreed with the
+    // judge (kappa over the line); the kappa rides in the header
+    ...(DATA.judged && DATA.judged.calibration && DATA.judged.calibration.calibrated
+      ? [...DATA.judged.categories.filter(t => DATA.judged.tasks.includes(t)).map(t => ({
+          key: 'j:' + t, label: t.slice(3).replace(/_/g, ' ') + ' κ'
+            + (((DATA.judged.calibration.per_category || {})[t.slice(3)] || {}).kappa
+               ?? DATA.judged.calibration.kappa), num: true, judged: t })),
+         { key: 'javg', label: `Judged avg κ${DATA.judged.calibration.kappa}`, num: true, judged: 'avg' }]
+      : []),
     { key: 'date', label: 'Last eval', num: false },   // when its newest task ran
   ];
+  const jval = (m, c) => c.judged === 'avg' ? m.judgedAvg
+    : (((m.judge || {}).tasks || {})[c.judged] || {}).mean;
   const val = (m, c) => c.key === 'avg' ? officialAvg(m)
+                      : c.judged ? jval(m, c)
                       : c.task ? (cell(c.task, m.id) || {}).v : m[c.key];
   const rows = [...ms].sort((a, b) => {
     const c = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg');
@@ -2736,10 +2984,12 @@ function vLeaderboard(ms) {
       ? el('th', { title: 'tick to compare in the capability profile above', text: '' })
       : el('th', {
       class: (c.num ? 'num ' : '') + 'sortable' + (c.key === 'name' ? ' model' : '')
+           + (c.judged ? ' judged' : '')
            + (c.task && (DATA.tasks[c.task] || {}).desc ? ' hasinfo' : ''),
       // the description on the column itself; the full list is in the panel
       // below the table, because a tooltip is not documentation
-      title: c.task ? [(DATA.tasks[c.task] || {}).control ? 'CONTROL — never in Avg' : null,
+      title: c.judged ? 'rubric score 0–4 from the calibrated judge — a separate judged average, '
+          + 'never part of Avg' : c.task ? [(DATA.tasks[c.task] || {}).control ? 'CONTROL — never in Avg' : null,
                        (DATA.tasks[c.task] || {}).domain,
                        (DATA.tasks[c.task] || {}).desc].filter(Boolean).join(' — ') : null,
       onclick: () => { state.sort = { key: c.key,
@@ -2750,7 +3000,7 @@ function vLeaderboard(ms) {
         ? el('span', { class: 'dir', text: state.sort.dir > 0 ? '▲' : '▼' }) : ''))),
     el('tr', {}, cols.map(c => el('th', {
       class: (c.num ? 'num' : '') + (c.key === 'name' ? ' model' : ''),
-      text: c.task ? (c.lower ? DATA.tasks[c.task].metric : shotOf(c.task)) : '' }))));
+      text: c.judged ? 'rubric 0–4' : c.task ? (c.lower ? DATA.tasks[c.task].metric : shotOf(c.task)) : '' }))));
   const tbody = el('tbody', {}, rows.map(m => el('tr', {},
     cols.map(c => {
       if (c.key === 'cmp') return el('td', {}, el('input', { type: 'checkbox',
@@ -2798,6 +3048,13 @@ function vLeaderboard(ms) {
           // the rank is over the whole board, so it does not move when you filter
           r ? el('span', { class: 'se', text: ` #${r.n}/${r.of}` })
             : el('span', { class: 'se', text: ` ${m.nreq}/${m.nreq}` }));
+      }
+      if (c.judged) {
+        const v = jval(m, c);
+        if (v == null) return el('td', { class: 'num se', text: '—',
+          title: (m.judge || {}).skipped || 'not judged' });
+        return el('td', { class: 'num' + (v === best[c.key] ? ' best' : ''), text: num(v, 2) },
+          el('span', { class: 'se', text: ' /4' }));
       }
       const cc = cell(c.task, m.id);
       if (!cc) return el('td', { class: 'num', text: '—' });
@@ -4533,12 +4790,13 @@ TEMPLATE = """<!doctype html>
 </body></html>"""
 
 
-def build_report(runs: list[dict], out_path: Path, title: str) -> Path:
+def build_report(runs: list[dict], out_path: Path, title: str,
+                 calibration: dict | None = None) -> Path:
     if not runs:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text("<h1>No lm-eval results found.</h1>", encoding="utf-8")
         return out_path
-    payload = build_payload(merge_runs(runs), title, source="")
+    payload = build_payload(merge_runs(runs), title, source="", calibration=calibration)
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     page = (TEMPLATE
             .replace("__TITLE__", html.escape(title))
@@ -4573,7 +4831,15 @@ def main() -> int:
                             if v and len(t) < 20 and v[0] in PROPORTION)
         print(f"  {mid:<45} {summary[:90]}")
 
-    out = build_report(runs, args.out, args.title)
+    # the judge's calibration lives at the root of the results tree
+    cal_path = args.results / "judge_calibration.json"
+    cal = None
+    if cal_path.exists():
+        try:
+            cal = json.loads(cal_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            cal = None
+    out = build_report(runs, args.out, args.title, calibration=cal)
     print(f"\nwrote {out}  ({out.stat().st_size / 1024:.1f} KB)")
 
     if args.csv:
