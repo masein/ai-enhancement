@@ -1,0 +1,175 @@
+"""Playwright smoke against the frozen report built from the fixture.
+
+The page is one file with the payload embedded, so file:// is the honest way
+to load it — nothing is fetched in that mode. Every test collects console
+errors and uncaught exceptions and fails on any. Screenshots land in
+tests/_screens/ (gitignored; CI uploads them) so a PR can show the page in
+light and dark at desktop and phone width.
+
+    pytest -q -m dashboard        # needs: playwright install chromium
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+from urllib.parse import quote
+
+import pytest
+
+pytestmark = pytest.mark.dashboard
+
+# the tabs the FROZEN page has (the live one adds Training and Submit & Queue)
+FROZEN_TABS = ["Overview", "Leaderboard", "Tasks", "Perplexity & Loss", "Evals"]
+SCREENS = Path(__file__).resolve().parent / "_screens"
+
+
+def model_link(mid: str) -> str:
+    return "#model=" + quote(mid, safe="")           # what encodeURIComponent writes
+
+
+@pytest.fixture(scope="module")
+def browser():
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        yield b
+        b.close()
+
+
+class Surface:
+    def __init__(self, page, url):
+        self.page, self.url, self.errors = page, url, []
+        page.on("pageerror", lambda e: self.errors.append(f"pageerror: {e}"))
+        page.on("console", lambda m: self.errors.append(f"console.error: {m.text}")
+                if m.type == "error" else None)
+
+    def open(self, frag: str = ""):
+        self.page.goto(self.url + frag)
+        self.page.wait_for_selector("#view > *")
+        return self.page
+
+    def tab(self, label: str):
+        self.page.get_by_role("tab", name=label, exact=True).click()
+        self.page.wait_for_selector("#view > *")
+
+    def selected_tab(self) -> str:
+        return self.page.locator("#tabs button[aria-selected='true']").inner_text()
+
+    def fits(self) -> bool:
+        return self.page.evaluate(
+            "document.documentElement.scrollWidth <= document.documentElement.clientWidth")
+
+
+@pytest.fixture
+def surface(browser, tree, request):
+    width = getattr(request, "param", 1240)
+    ctx = browser.new_context(viewport={"width": width, "height": 900})
+    s = Surface(ctx.new_page(), tree["report"].as_uri())
+    yield s
+    ctx.close()
+
+
+def test_every_tab_renders_with_zero_console_errors(surface):
+    pg = surface.open()
+    assert surface.selected_tab() == "Overview"
+    for label in FROZEN_TABS:
+        surface.tab(label)
+        assert surface.selected_tab() == label
+        assert pg.locator("#view > *").count() > 0, label
+        assert pg.evaluate("location.hash") == "#tab=" + {
+            "Perplexity & Loss": "perplexity", "Evals": "runs"}.get(label, label.lower())
+    assert surface.errors == []
+
+
+def test_model_page_shows_the_diagnose_card(surface, diag):
+    pg = surface.open(model_link("fx/skewed-360m"))
+    card = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+    assert card.count() == 1
+    assert "No per-item diagnosis on file" not in card.text_content()
+    # the finding planted in this model is the one the card leads with
+    lead = card.locator(".dxlead").first.text_content()
+    assert "of its answers land on" in lead and "cannot score above" in lead
+    assert "answer positions" in card.locator(".dxflag").all_text_contents()
+    # the ceiling on the page is 1 - TVD from the diagnosis file, to the shown precision
+    mmlu = card.locator("details.dx", has=pg.locator(".dxname", has_text=re.compile("mmlu", re.I)))
+    m = re.search(r"Ceiling for this answer distribution: ([\d.]+)%", mmlu.text_content())
+    assert m, "no ceiling sentence for mmlu"
+    tvd = diag["fx/skewed-360m"]["tasks"]["mmlu"]["answers"]["pick_skew"]
+    assert abs(float(m.group(1)) - 100 * (1 - tvd)) < 0.15
+    # the examples are labelled as the diagnosis half, and there are some
+    assert mmlu.locator("details.dxex summary").text_content().endswith("(diagnosis half only)")
+    assert mmlu.locator("details.dxex li").count() > 0
+    assert surface.errors == []
+
+
+def test_model_without_a_diagnosis_says_so(surface, tree):
+    pg = surface.open(model_link(tree["nodiag"]))
+    card = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+    assert card.count() == 1
+    assert "No per-item diagnosis on file for this model" in card.inner_text()
+    assert card.locator("details.dx").count() == 0
+    assert surface.errors == []
+
+
+def test_deep_link_and_back_forward(surface):
+    pg = surface.open("#tab=leaderboard")
+    assert surface.selected_tab() == "Leaderboard"
+    surface.tab("Tasks")
+    assert pg.evaluate("location.hash") == "#tab=tasks"
+    pg.go_back()
+    pg.wait_for_function("location.hash === '#tab=leaderboard'")
+    assert surface.selected_tab() == "Leaderboard"
+    assert pg.locator("#view > *").count() > 0
+    pg.go_forward()
+    pg.wait_for_function("location.hash === '#tab=tasks'")
+    assert surface.selected_tab() == "Tasks"
+
+    # into a model page from wherever the board links one, and Back out again
+    surface.tab("Leaderboard")
+    link = pg.locator('#view a[href^="#model="]').first
+    href = link.get_attribute("href")
+    link.click()
+    pg.wait_for_selector(".backlink")
+    assert pg.evaluate("location.hash") == href
+    assert pg.locator("#tabs button[aria-selected='true']").count() == 0
+    pg.go_back()
+    pg.wait_for_function("location.hash === '#tab=leaderboard'")
+    assert pg.locator(".backlink").count() == 0
+    assert surface.selected_tab() == "Leaderboard"
+    assert surface.errors == []
+
+
+def test_unknown_model_link_falls_back_to_the_board(surface):
+    surface.open(model_link("nobody/nothing"))
+    assert surface.selected_tab() == "Overview"
+    assert surface.errors == []
+
+
+@pytest.mark.parametrize("surface", [430], indirect=True)
+def test_no_horizontal_scroll_at_phone_width(surface):
+    pg = surface.open()
+    for label in FROZEN_TABS:
+        surface.tab(label)
+        assert surface.fits(), f"{label} overflows 430px"
+    surface.open(model_link("fx/skewed-360m"))
+    pg.locator("details.dx > summary").first.click()               # open a task's detail
+    assert surface.fits(), "model page overflows 430px"
+    assert surface.errors == []
+
+
+def test_screenshots_for_the_pr(surface):
+    """Not an assertion beyond 'it rendered': the pictures a reviewer wants."""
+    SCREENS.mkdir(exist_ok=True)
+    pg = surface.page
+    for scheme in ("light", "dark"):
+        pg.emulate_media(color_scheme=scheme)
+        for width in (1240, 430):
+            pg.set_viewport_size({"width": width, "height": 900})
+            surface.open("#tab=overview")
+            pg.screenshot(path=SCREENS / f"overview-{scheme}-{width}.png", full_page=True)
+            surface.open(model_link("fx/skewed-360m"))
+            pg.locator("details.dx > summary").first.click()
+            pg.screenshot(path=SCREENS / f"model-skewed-{scheme}-{width}.png", full_page=True)
+    assert len(list(SCREENS.glob("*.png"))) >= 8
+    assert surface.errors == []

@@ -73,6 +73,28 @@ Dockerfile / docker-compose.yml / .env.example
 SERVICE.md            operate it     API.md  integrate it     BENCHMARK-RUN.md  run it by hand
 ```
 
+## Tests and CI
+
+Nothing in the suite touches the GPU or the Hub. It runs against a synthetic
+`results/full` tree (`tests/fixtures/make_fixture.py`) in the harness's real
+0.4.12 on-disk shape, with one model per failure mode `scripts/diagnose.py`
+detects — so every later feature is tested against the same eight models,
+and a test can say "this model, this finding" and mean it.
+
+```bash
+python3.12 -m venv .venv && . .venv/bin/activate
+pip install -r requirements-dev.txt && playwright install chromium
+pytest -q            # under a minute; the dashboard smoke drives Chromium
+ruff check .
+```
+
+`.github/workflows/ci.yml` runs ruff, a compile pass over `scripts/ service/
+clients/`, pytest, then the Playwright smoke on every push and PR; tests
+marked `gpu` or `network` are deselected there. The Docker image build is a
+separate `workflow_dispatch` job (the base image is multi-GB). The screenshots
+the smoke takes — light and dark, desktop and phone width — are uploaded as a
+CI artifact.
+
 ## Guarantees worth knowing
 
 One evaluation at a time (an atomic lock shared with the CLI script — a service
