@@ -200,8 +200,11 @@ def make_docs(task: str, seed: int = SEED) -> list[dict]:
                 if rotate:
                     doc = rotate(doc, i)
                     opts, correct = doc["choices"], doc["answer"]
-                out.append({"doc": doc, "target": correct, "choices": opts, "correct": correct,
-                            "group": subject, "subtask": f"{task}_{subject}", "q": q,
+                # the harness logs MMLU's target as the digit string ('0'), not an
+                # int — checked against a real samples file on the server
+                out.append({"doc": doc, "target": str(correct), "choices": opts,
+                            "correct": correct, "group": subject,
+                            "subtask": f"{task}_{subject}", "q": q,
                             "ctx": f"{q}\nA. {opts[0]}\nB. {opts[1]}\nC. {opts[2]}\n"
                                    f"D. {opts[3]}\nAnswer:"})
         return _hashed(out)

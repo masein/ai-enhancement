@@ -220,14 +220,33 @@ def parse_run(blob: dict, source: Path) -> dict:
                 bucket[f"_filt_{slot}"] = filt
         tasks[task] = entry
 
-    n_samples = blob.get("n-samples") or {}
+    n_samples = {k: (v.get("effective") if isinstance(v, dict) else v)
+                 for k, v in (blob.get("n-samples") or {}).items()}
+    n_shot = dict(blob.get("n-shot") or {})
     # The harness tells us which tasks are children of a group (MMLU's 57 subjects,
     # its four category roll-ups, etc). Use it rather than pattern-matching names.
+    group_subtasks = blob.get("group_subtasks") or {}
     subtasks: set[str] = set()
-    for parent, kids in (blob.get("group_subtasks") or {}).items():
+    for parent, kids in group_subtasks.items():
         for k in kids or []:
             if k != parent:
                 subtasks.add(k)
+    # n-samples and n-shot are recorded per LEAF task only (checked against a
+    # real 0.4.12 results file). A group such as mmlu therefore had no item or
+    # shot count of its own, and the biggest task on the board showed "—" for
+    # both. Items are the sum over the group's leaves; shots are the one value
+    # the leaves agree on — and nothing when they disagree, because a mixed
+    # shot count is a warning, not a number.
+    for g in group_subtasks:
+        lv = _leaves(g, group_subtasks)
+        if lv == [g]:
+            continue
+        if g not in n_samples and all(isinstance(n_samples.get(t), int) for t in lv):
+            n_samples[g] = sum(n_samples[t] for t in lv)
+        if g not in n_shot:
+            shots = {n_shot.get(t) for t in lv}
+            if len(shots) == 1 and None not in shots:
+                n_shot[g] = shots.pop()
     # The harness tells us the direction of every metric. Use it rather than guessing
     # from the name: perplexity and bits-per-byte are LOWER-is-better and are not
     # proportions, so they must not share a chart with accuracies, and the
@@ -251,9 +270,8 @@ def parse_run(blob: dict, source: Path) -> dict:
         "fewshot_seed": cfg.get("fewshot_seed"),
         "chat_template": bool(blob.get("chat_template") or cfg.get("apply_chat_template")),
         "num_params": _to_float(cfg.get("model_num_parameters")),
-        "n_shot": blob.get("n-shot") or {},
-        "n_samples": {k: (v.get("effective") if isinstance(v, dict) else v)
-                      for k, v in n_samples.items()},
+        "n_shot": n_shot,
+        "n_samples": n_samples,
         "git_hash": blob.get("git_hash"),
         "date": _norm_date(blob.get("date")),
         "transformers_version": blob.get("transformers_version"),
@@ -262,6 +280,14 @@ def parse_run(blob: dict, source: Path) -> dict:
         "diag": _beside(source, "diagnose.json"),
         "tasks": tasks,
     }
+
+
+def _leaves(task: str, group_subtasks: dict, seen: tuple = ()) -> list[str]:
+    """The leaf tasks under a group, through any depth of sub-groups."""
+    kids = [k for k in (group_subtasks.get(task) or []) if k != task and k not in seen]
+    if not kids:
+        return [task]
+    return [x for k in kids for x in _leaves(k, group_subtasks, seen + (task,))]
 
 
 def _extract(args: str, key: str):

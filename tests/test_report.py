@@ -144,6 +144,35 @@ def test_item_count_disagreement_is_visible_in_the_payload(payload, diag, tree):
             assert payload["cells"][mc["task"]][mid]["n"] == d["tasks"][mc["task"]]["n"]
 
 
+def test_group_task_counts_come_from_its_leaves(payload, tree, diag):
+    """The harness records n-samples and n-shot per leaf only; the group must
+    still show an item count and a shot count, and they must agree with the
+    per-item log so the Diagnose item-count check covers MMLU too."""
+    for mid in tree["models"]:
+        if "mmlu" not in tree["models"][mid]["tasks"]:
+            continue
+        c = payload["cells"]["mmlu"][mid]
+        assert c["n"] == len(make_fixture.MMLU_SUBJECTS) * make_fixture.MMLU_PER_SUBJECT
+        assert c["shots"] == 5
+        if mid in diag:
+            assert c["n"] == diag[mid]["tasks"]["mmlu"]["n"]
+    c = payload["cells"]["mmlu_perm"]["fx/good-750m"]
+    assert c["n"] == len(make_fixture.PERM_SUBJECTS) * make_fixture.PERM_PER_SUBJECT
+    assert c["shots"] == 5
+    # leaves keep their own counts; a lone task is untouched
+    assert payload["cells"]["arc_easy"]["fx/good-750m"]["n"] == make_fixture.TASKS["arc_easy"]["n"]
+    assert report._leaves("mmlu", {"mmlu": ["a", "b"], "a": ["a1", "a2"], "b": []}) == [
+        "a1", "a2", "b"]
+    assert report._leaves("x", {}) == ["x"]
+    assert report._leaves("x", {"x": ["x"]}) == ["x"]                 # self-reference is not a child
+    # disagreeing leaf shot counts produce no group shot count
+    run = report.parse_run({"results": {}, "group_subtasks": {"g": ["a", "b"]},
+                            "n-shot": {"a": 5, "b": 0},
+                            "n-samples": {"a": {"effective": 10}, "b": {"effective": 5}}},
+                           tree["out_dir"] / "x" / "y" / "z.json")
+    assert run["n_samples"]["g"] == 15 and "g" not in run["n_shot"]
+
+
 def test_model_meta_reaches_archinfo(payload):
     a = _model(payload, "fx/good-750m")["archinfo"]
     assert a["arch"] == "FixtureForCausalLM" and a["kind"] == "base"
