@@ -12,3 +12,7 @@ service.sqlite3*
 __pycache__/
 *.pyc
 .venv/
+tests/
+.github/
+pyproject.toml
+requirements-dev.txt

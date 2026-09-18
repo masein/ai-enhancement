@@ -16,3 +16,11 @@ eval_tasks/*.lock
 # service + docker local state
 .env
 service.sqlite3*
+
+# tests and tooling
+.pytest_cache/
+.ruff_cache/
+tests/_screens/
+
+# session notes and screenshots kept beside the repo, not in it
+Claude outputs/
