@@ -421,7 +421,7 @@ def test_the_key_is_interpolated_never_literal():
 
 def test_the_key_is_stripped_from_evaluation_subprocesses(monkeypatch):
     assert "LLM_API_KEY" in runner.SECRET_ENV_VARS and "ANTHROPIC_API_KEY" in runner.SECRET_ENV_VARS
-    monkeypatch.setenv("LLM_API_KEY", "sk-ant-not-a-real-key-000000")
+    monkeypatch.setenv("LLM_API_KEY", "not-a-real-key")
     monkeypatch.setenv("HF_TOKEN", "hf_x")
     env = runner._child_env(remote_code=True)
     assert "LLM_API_KEY" not in env and "HF_TOKEN" not in env and env["HF_HUB_OFFLINE"] == "1"
@@ -445,19 +445,19 @@ def test_backends_shape_the_provider_requests_without_the_network(monkeypatch):
         raise AssertionError(url)
     monkeypatch.setattr(llm, "_http", fake_http)
     req = llm.Request("proposal:1", "sys", "user text", 100, {"doc_hashes": ["x"]})
-    a = llm.AnthropicBatches("claude-x", "sk-ant-test")
+    a = llm.AnthropicBatches("claude-x", "key-a")
     assert a.submit([req]) == "msgbatch_1"
     body = json.loads(sent[-1][3])
     assert body["requests"][0]["custom_id"] == "proposal:1"
     assert body["requests"][0]["params"]["model"] == "claude-x"
     assert "meta" not in json.dumps(body) and "doc_hashes" not in json.dumps(body)
-    assert sent[-1][2]["x-api-key"] == "sk-ant-test"
-    o = llm.OpenAIBatches("gpt-x", "sk-test")
+    assert sent[-1][2]["x-api-key"] == "key-a"
+    o = llm.OpenAIBatches("gpt-x", "key-o")
     assert o.submit([req]) == "batch_1"
     upload = sent[-2][3].decode()
     assert '"custom_id": "proposal:1"' in upload and "doc_hashes" not in upload
     assert '"response_format": {"type": "json_object"}' in upload
-    assert sent[-2][2]["authorization"] == "Bearer sk-test"
+    assert sent[-2][2]["authorization"] == "Bearer key-o"
     assert llm.extract_json('Sure! ```json\n{"a": 1}\n```') == {"a": 1}
     assert llm.extract_json("[1, 2] trailing") == [1, 2]
     assert llm.extract_json("no json here") is None
