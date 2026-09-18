@@ -205,6 +205,33 @@ def newest_per_subtask(files: list[Path]) -> list[Path]:
     return sorted(keep.values())
 
 
+def spread_examples(by_bucket_group: dict) -> dict:
+    """MAX_EXAMPLES per bucket, taken round-robin across groups.
+
+    Collecting in file order gives every example the same subject — whichever
+    one sorts first — and a list of eight abstract_algebra questions reads as a
+    finding about abstract_algebra when it is nothing of the kind. Rotating
+    across groups makes the sample say what it is: a cross-section.
+    """
+    pools: dict[str, list[list]] = {}
+    for (b, _group), items in sorted(by_bucket_group.items()):
+        if items:
+            pools.setdefault(b, []).append(list(items))
+    out: dict[str, list] = {}
+    for b, groups in pools.items():
+        picked, i = [], 0
+        while len(picked) < MAX_EXAMPLES and any(groups):
+            g = groups[i % len(groups)]
+            if g:
+                picked.append(g.pop(0))
+            i += 1
+            if i > MAX_EXAMPLES * (len(groups) + 1):     # belt and braces
+                break
+        if picked:
+            out[b] = picked
+    return out
+
+
 def diagnose_task(files: list[Path]) -> dict | None:
     agg = {
         "n": 0, "n_report": 0, "n_diagnose": 0,
@@ -306,14 +333,18 @@ def diagnose_task(files: list[Path]) -> dict | None:
                 # safety property: a report item is never shown to a human and
                 # never reaches a generator, so nothing downstream can be
                 # derived from it.
-                if (half == "diagnose" and b not in ("right",)
-                        and len(agg["examples"][b]) < MAX_EXAMPLES):
+                # Keep a few candidates per group and thin them at the end.
+                # Taking the first MAX_EXAMPLES in file order means every
+                # example comes from whichever subject sorts first, which makes
+                # the list look like a subject finding when it is not one.
+                if (half == "diagnose" and b != "right"
+                        and len(agg["examples"][(b, group)]) < MAX_EXAMPLES):
                     ci = target_index(rec, len(lps) or 4)
                     ch = doc.get("choices")
                     if isinstance(ch, dict):
                         ch = ch.get("text")
                     pick = max(range(len(probs)), key=lambda i: probs[i]) if probs else None
-                    agg["examples"][b].append({
+                    agg["examples"][(b, group)].append({
                         "group": group,
                         "q": str(doc.get("question") or doc.get("query")
                                  or doc.get("ctx") or doc.get("goal") or "")[:240],
@@ -337,7 +368,7 @@ def diagnose_task(files: list[Path]) -> dict | None:
                            if agg["n_diagnose"] else None),
         "buckets": dict(agg["buckets"]),
         "approx_buckets": agg["approx_buckets"],
-        "examples": {k: v for k, v in agg["examples"].items() if v},
+        "examples": spread_examples(agg["examples"]),
         "groups": {},
     }
     # ---- how the answers are shaped, not just how many were right ----------
