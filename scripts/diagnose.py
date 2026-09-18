@@ -72,6 +72,10 @@ MAX_EXAMPLES  = 8        # per bucket per task, diagnose half only
 # data for the "weak subject" will fix it. Two checkpoints on this board do this
 # today (ptop50 = 1.000, pcorr50 = 0.000), which is why it earns a flag.
 DEGENERATE_SHARE = 0.80  # one option chosen for this fraction of items
+# Total variation distance between what the model picks and what the answer key
+# contains. 0 is a model whose answers are distributed like the truth; SmolLM2-360M
+# measures 0.44 on MMLU, putting 92% of its picks on the first two of four options.
+POSITION_SKEW = 0.20
 
 
 def conf_lift(n: int) -> float:
@@ -337,6 +341,19 @@ def diagnose_task(files: list[Path]) -> dict | None:
             # and not fixable with more subject data.
             "degenerate": bool(share >= DEGENERATE_SHARE),
         }
+        # How far the answers are from the answer key's own distribution, as
+        # total variation distance. This is the general form of the degeneracy
+        # check and it catches what the single-option version cannot: a model
+        # spreading 92% of its picks over A and B while the gold answer is
+        # uniform over four is not ignorant, it cannot reach half the slots —
+        # and its ceiling is about 0.47 x chance no matter what it knows.
+        gtot = sum(agg["gold"].values())
+        if gtot and nopt:
+            tv = 0.5 * sum(abs(agg["picks"].get(i, 0) / npick
+                               - agg["gold"].get(i, 0) / gtot)
+                           for i in range(nopt))
+            out["answers"]["pick_skew"] = round(tv, 4)
+            out["answers"]["position_biased"] = bool(tv >= POSITION_SKEW)
         if agg["n_len"]:
             rate = agg["short_pick"] / agg["n_len"]
             base = 1.0 / nopt if nopt else None
