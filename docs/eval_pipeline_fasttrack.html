@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Eval & Finetune Pipeline — Fast Track</title>
+<style>
+:root{
+  --bg:#faf9f6; --surface:#ffffff; --surface-2:#f1efe8;
+  --text:#242320; --text-2:#5f5e5a; --text-muted:#888780;
+  --border:#e3e1d8; --accent:#185fa5; --accent-bg:#e6f1fb; --accent-text:#0c447c;
+  --green:#3b6d11; --green-bg:#eaf3de; --green-text:#27500a;
+  --amber:#854f0b; --amber-bg:#faeeda; --amber-text:#633806;
+  --coral:#993c1d; --coral-bg:#faece7; --coral-text:#712b13;
+  --pink:#993556; --pink-bg:#fbeaf0;
+  font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif, "Noto Sans";
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1c1b18; --surface:#242320; --surface-2:#2c2b27;
+    --text:#efeee8; --text-2:#c2c0b6; --text-muted:#918f86;
+    --border:#3a3934; --accent:#85b7eb; --accent-bg:#0c447c; --accent-text:#e6f1fb;
+    --green:#97c459; --green-bg:#27500a; --green-text:#eaf3de;
+    --amber:#ef9f27; --amber-bg:#633806; --amber-text:#faeeda;
+    --coral:#f0997b; --coral-bg:#4a1b0c; --coral-text:#faece7;
+    --pink:#ed93b1; --pink-bg:#4b1528;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1c1b18; --surface:#242320; --surface-2:#2c2b27;
+  --text:#efeee8; --text-2:#c2c0b6; --text-muted:#918f86;
+  --border:#3a3934; --accent:#85b7eb; --accent-bg:#0c447c; --accent-text:#e6f1fb;
+  --green:#97c459; --green-bg:#27500a; --green-text:#eaf3de;
+  --amber:#ef9f27; --amber-bg:#633806; --amber-text:#faeeda;
+  --coral:#f0997b; --coral-bg:#4a1b0c; --coral-text:#faece7;
+  --pink:#ed93b1; --pink-bg:#4b1528;
+}
+*{box-sizing:border-box;}
+html{height:100%;}
+body{margin:0;background:var(--bg);color:var(--text);
+  min-height:100dvh; display:flex; flex-direction:column; justify-content:center;}
+.deck{max-width:min(1280px, 90vw); width:100%; margin:0 auto; padding:24px 20px 0;}
+.slide{
+  display:none; background:var(--surface); border:1px solid var(--border);
+  border-radius:16px; padding:38px 44px 34px; min-height:clamp(520px, 64vh, 800px);
+}
+.slide.active{display:flex; flex-direction:column;}
+/* the closing line sits at the foot of the card, so the slack lands in one
+   deliberate gap instead of trailing off the bottom of the page */
+.slide.active > :last-child{margin-top:auto; margin-bottom:0;}
+.eyebrow{font-size:13px; font-weight:500; color:var(--accent); text-transform:uppercase; letter-spacing:.04em; margin:0 0 8px;}
+h1{font-size:clamp(26px, 2.05vw, 40px); font-weight:500; margin:0 0 6px; line-height:1.25;}
+h2{font-size:clamp(20px, 1.55vw, 30px); font-weight:500; margin:0 0 20px;}
+.sub{color:var(--text-2); font-size:clamp(14.5px, 1.02vw, 19px); line-height:1.55; margin:0 0 24px;}
+p{font-size:clamp(14.5px, 1.02vw, 19px); line-height:1.6; color:var(--text-2);}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:stretch;}
+.card{background:var(--surface-2); border:1px solid var(--border); border-radius:12px; padding:18px 20px;}
+.card h3{font-size:clamp(14.5px, 1vw, 18px); font-weight:500; margin:0 0 10px; display:flex; align-items:center; gap:8px;}
+.card ul{margin:0; padding-left:18px; font-size:clamp(13.5px, .95vw, 17.5px); color:var(--text-2); line-height:1.75;}
+.tag{display:inline-block; font-size:11px; font-weight:500; padding:2px 8px; border-radius:20px;}
+.tag-accent{background:var(--accent-bg); color:var(--accent-text);}
+.tag-green{background:var(--green-bg); color:var(--green-text);}
+.tag-amber{background:var(--amber-bg); color:var(--amber-text);}
+.tag-coral{background:var(--coral-bg); color:var(--coral-text);}
+.timeline{display:flex; flex-direction:column; gap:10px; margin-top:10px;}
+.trow{display:grid; grid-template-columns:78px 1fr; gap:14px; align-items:stretch;}
+.day{font-size:12px; font-weight:500; color:var(--text-muted); padding-top:10px;}
+.bar{border-radius:10px; padding:10px 14px; font-size:13.5px; display:flex; justify-content:space-between; align-items:center; gap:10px;}
+.bar .who{font-size:11px; opacity:.8; white-space:nowrap;}
+table{width:100%; border-collapse:collapse; font-size:clamp(13px, .93vw, 17px); margin-top:10px;}
+th,td{text-align:left; padding:10px 10px; border-bottom:1px solid var(--border);}
+th{color:var(--text-muted); font-weight:500; font-size:12px; text-transform:uppercase; letter-spacing:.03em;}
+td{color:var(--text-2);}
+.q{background:var(--amber-bg); color:var(--amber-text); border-radius:10px; padding:15px 17px; font-size:clamp(13.5px, .96vw, 17.5px); margin-bottom:10px; display:flex; gap:10px;}
+.nav{display:flex; justify-content:space-between; align-items:center; max-width:min(1280px, 90vw); width:100%; margin:16px auto 0; padding:0 20px;}
+.nav button{background:var(--surface-2); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:8px 16px; font-size:14px; cursor:pointer;}
+.nav button:disabled{opacity:.35; cursor:default;}
+.dots{display:flex; gap:6px;}
+.dot{width:7px; height:7px; border-radius:50%; background:var(--border);}
+.dot.active{background:var(--accent);}
+.footer-note{color:var(--text-muted); font-size:clamp(12px, .85vw, 15px); line-height:1.55; padding-top:20px;}
+.stats{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:0 0 20px;}
+.stat{background:var(--surface-2); border:1px solid var(--border); border-radius:12px;
+  padding:14px 16px;}
+.stat b{display:block; font-size:clamp(24px, 1.75vw, 34px); font-weight:500; line-height:1.15; color:var(--text);}
+.stat span{font-size:clamp(12.5px, .88vw, 16px); color:var(--text-2);}
+.loop{display:flex; flex-direction:column; gap:7px; margin-top:6px;}
+.lstep{display:flex; align-items:center; gap:13px; background:var(--surface-2);
+  border:1px solid var(--border); border-radius:10px; padding:10px 15px;}
+.lstep.lonce{border-style:dashed;}
+.lnum{flex:none; width:25px; height:25px; border-radius:50%; background:var(--accent-bg);
+  color:var(--accent-text); font-size:12.5px; font-weight:600; display:flex;
+  align-items:center; justify-content:center;}
+.ltext{flex:1; display:flex; flex-direction:column; gap:1px; min-width:0;}
+.ltext b{font-size:clamp(14px, .98vw, 18px); font-weight:500; color:var(--text);}
+.ltext span{font-size:clamp(12.5px, .88vw, 16px); color:var(--text-2); line-height:1.45;}
+.lrule{display:flex; align-items:center; gap:10px; margin:3px 0 1px;
+  font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em;}
+.lrule::before,.lrule::after{content:""; flex:1; height:1px; background:var(--border);}
+.lback{font-size:clamp(12.5px, .9vw, 16px); color:var(--accent); padding:5px 2px 0 40px;}
+.q span:last-child{flex:1;}
+@media (max-width:720px){
+  .grid2{grid-template-columns:1fr;} .stats{grid-template-columns:1fr 1fr;}
+  .slide{padding:26px 22px 24px; min-height:0;}
+  h1{font-size:26px;} h2{font-size:20px;}
+}
+</style>
+</head>
+<body>
+<div class="deck" id="deck"></div>
+<div class="nav">
+  <button id="prevBtn" onclick="go(-1)">&larr; Prev</button>
+  <div class="dots" id="dots"></div>
+  <button id="nextBtn" onclick="go(1)">Next &rarr;</button>
+</div>
+
+<script>
+const slides = [
+`
+<div class="eyebrow">Eval &amp; finetune pipeline</div>
+<h1>It's built. Here's what it does.</h1>
+<p class="sub">Everything in the plan is merged, including the rewrite that turned the loop the right way round. What is left is curation, not code.</p>
+<div class="stats">
+  <div class="stat"><b>14</b><span>commits merged to <code>evalboard/main</code></span></div>
+  <div class="stat"><b>185</b><span>tests green in CI, from none last week</span></div>
+  <div class="stat"><b>~$10</b><span>per full cycle, batch pricing</span></div>
+</div>
+<div class="grid2">
+  <div class="card">
+    <h3><span class="tag tag-green">Shipped</span> End to end, on main</h3>
+    <ul>
+      <li>Test suite + CI from nothing &mdash; 123 passing</li>
+      <li>Topic categories, and the permutation control</li>
+      <li>Find the gap &rarr; generate data &rarr; human approves</li>
+      <li>Contamination gate, provenance, taint flag</li>
+      <li>Judged free-response + the "knew it?" control</li>
+      <li>Before/after: did training teach the skill, or the test?</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3><span class="tag tag-amber">Next</span> Not code &mdash; curation and a first live run</h3>
+    <ul>
+      <li>Two API providers in <code>.env</code>, judge on a dated model id</li>
+      <li>Draft and curate the exam &mdash; the real first task</li>
+      <li>One judged run, then calibrate against a human sample</li>
+      <li>Then the loop turns: weakest topic &rarr; propose &rarr; generate &rarr; train</li>
+    </ul>
+  </div>
+</div>
+<p class="footer-note">Phase 7 added the exam as the instrument, the API judge with its drift canary, topics read from the judge's own words, prose documents instead of Q&amp;A, and the dashboard to match. Thinking-trace export still is not built and still is not planned.</p>
+`,
+`
+<div class="eyebrow">The loop</div>
+<h2>Write the exam once. Then go round.</h2>
+<div class="loop">
+  <div class="lstep lonce">
+    <div class="lnum">0</div>
+    <div class="ltext"><b>Write the exam</b><span>An LLM drafts questions across every topic; a human curates. Paid once.</span></div>
+    <span class="tag tag-coral">API</span>
+  </div>
+  <div class="lrule"><span>every cycle</span></div>
+  <div class="lstep">
+    <div class="lnum">1</div>
+    <div class="ltext"><b>Sit the exam</b><span>The checkpoint answers, and explains its answers. On our own 5090.</span></div>
+    <span class="tag tag-green">free</span>
+  </div>
+  <div class="lstep">
+    <div class="lnum">2</div>
+    <div class="ltext"><b>Judge the answers</b><span>A score per topic &mdash; and written evaluation of what went wrong.</span></div>
+    <span class="tag tag-coral">API</span>
+  </div>
+  <div class="lstep">
+    <div class="lnum">3</div>
+    <div class="ltext"><b>Choose the topic</b><span>A person reads the scores and the judge's notes, picks one topic, approves a spec.</span></div>
+    <span class="tag tag-accent">human</span>
+  </div>
+  <div class="lstep">
+    <div class="lnum">4</div>
+    <div class="ltext"><b>Generate the dataset</b><span>Training documents for that topic. The generator sees the spec and nothing else.</span></div>
+    <span class="tag tag-coral">API</span>
+  </div>
+  <div class="lstep">
+    <div class="lnum">5</div>
+    <div class="ltext"><b>Fine-tune and resubmit</b><span>Roohi trains, submits the checkpoint back to the board.</span></div>
+    <span class="tag tag-green">free</span>
+  </div>
+  <div class="lback">&#8629;&nbsp; back to 1 &mdash; same exam, and the before/after says whether it worked</div>
+</div>
+<p class="footer-note">MMLU and the standard suite keep running alongside, still at zero API cost, still explained per item. They stay as the comparable public number and a second opinion &mdash; they just stop being what picks the topic.</p>
+`,
+`
+<div class="eyebrow">The one rule</div>
+<h2>Half the exam is never shown to anyone</h2>
+<p>Every question &mdash; in the benchmarks and in our own exam &mdash; is assigned by a hash of its content to one of two halves. The assignment is identical on every machine and for every model, and costs nothing to apply retroactively.</p>
+<div class="grid2" style="margin-top:20px">
+  <div class="card" style="border-color:var(--green)">
+    <h3><span class="tag tag-green">report half</span></h3>
+    <ul>
+      <li>The score we publish on the board</li>
+      <li>Never shown to a person</li>
+      <li>Never placed in an LLM request</li>
+      <li>Never used to derive training data</li>
+    </ul>
+  </div>
+  <div class="card" style="border-color:var(--accent)">
+    <h3><span class="tag tag-accent">diagnose half</span></h3>
+    <ul>
+      <li>The half step 3 may read</li>
+      <li>The only half the generator's brief comes from</li>
+      <li>Where the failing examples on the dashboard come from</li>
+    </ul>
+  </div>
+</div>
+<div class="q" style="margin-top:22px"><span class="tag tag-amber">!</span> <span>This matters <b>more</b> for our own exam than for MMLU. The exam is questions we generated ourselves &mdash; nothing external would catch a loop that quietly trained on its own test. The split is the only thing standing in the way, and it is what makes "economics went up 8 points" a fact rather than an artefact.</span></div>
+`,
+`
+<div class="eyebrow">Rollout</div>
+<h2>Four steps, in this order</h2>
+<table>
+  <tr><th style="width:34px"></th><th>Step</th><th>Until it is done</th></tr>
+  <tr><td><span class="tag tag-accent">1</span></td><td>Deploy, then <code>EXAM_*</code> and <code>JUDGE_*</code> in <code>.env</code> on <b>two different providers</b>, judge pinned to a dated model id</td><td>The service refuses to judge, and says why</td></tr>
+  <tr><td><span class="tag tag-accent">2</span></td><td><code>exam_build.py</code> migrate &rarr; draft &rarr; <b>curate on the Exam tab</b></td><td>A topic needs 30 accepted report-half questions before anything can be proposed from it</td></tr>
+  <tr><td><span class="tag tag-accent">3</span></td><td>Submit a model with <code>--suite judged</code>, then calibrate with the CSV round trip</td><td>Nothing is ranked below &kappa; 0.60</td></tr>
+  <tr><td><span class="tag tag-accent">4</span></td><td>The loop turns: weakest topic &rarr; propose &rarr; approve &rarr; generate &rarr; train with <code>--gap-dataset</code></td><td>&mdash;</td></tr>
+</table>
+<div class="q" style="margin-top:18px"><span class="tag tag-amber">!</span> <span><b>The glue is untested against anything real.</b> The Anthropic and OpenAI batch clients and the judge have only ever run against fakes and stubs. The first live proposal, the first judged run and the first real generation are where that gets its test &mdash; budget a day for things to not work the first time.</span></div>
+`,
+`
+<div class="eyebrow">Timeline</div>
+<h2>Curation is the critical path now</h2>
+<div class="grid2">
+  <div class="card">
+    <h3><span class="tag tag-coral">The problem</span> All 15 topics at once</h3>
+    <ul>
+      <li>A topic needs <b>30 report-half</b> questions to be proposable</li>
+      <li>The split is even, so that is <b>60 accepted</b> per topic</li>
+      <li>15 topics &rarr; <b>900 accepted</b>, ~1,350 candidates to read</li>
+      <li>At 45 seconds each that is <b>~17 hours</b> of expert time</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3><span class="tag tag-green">The proposal</span> Three topics first</h3>
+    <ul>
+      <li>~270 candidates, <b>3&ndash;4 hours</b> &mdash; one focused day</li>
+      <li>The gate is per topic, so three ready topics work while twelve sit empty</li>
+      <li>The loop turns <b>this week</b> instead of in three</li>
+      <li>Add topics as the rubrics get written</li>
+    </ul>
+  </div>
+</div>
+<div class="timeline" style="margin-top:20px">
+  <div class="trow"><div class="day">Sun</div>
+    <div class="bar" style="background:var(--accent-bg); color:var(--accent-text)">
+      <span>Deploy, two providers in <code>.env</code>, exam migrate + draft</span><span class="who">You</span></div></div>
+  <div class="trow"><div class="day">Sun&ndash;Mon</div>
+    <div class="bar" style="background:var(--green-bg); color:var(--green-text)">
+      <span>Rubrics for the first three topics &mdash; what a 0 and a 4 look like</span><span class="who">Dr. Hossein</span></div></div>
+  <div class="trow"><div class="day">Mon&ndash;Tue</div>
+    <div class="bar" style="background:var(--green-bg); color:var(--green-text)">
+      <span>Curate those three topics to 60 accepted each</span><span class="who">Dr. Hossein</span></div></div>
+  <div class="trow"><div class="day">Tue&ndash;Wed</div>
+    <div class="bar" style="background:var(--coral-bg); color:var(--coral-text)">
+      <span>First judged run, then &kappa; calibration on a 100-answer sample</span><span class="who">You + Dr. Hossein</span></div></div>
+  <div class="trow"><div class="day">Wed&ndash;Thu</div>
+    <div class="bar" style="background:var(--amber-bg); color:var(--amber-text)">
+      <span>First real cycle &rarr; dataset &rarr; finetune</span><span class="who">Roohi</span></div></div>
+</div>
+<p class="footer-note">Which three topics? Pick where we most want the model to be good, not where it happens to be worst &mdash; the first cycle is as much a test of the loop as of the model.</p>
+`,
+`
+<div class="eyebrow">Costs &mdash; verified 18 Sep 2026</div>
+<h2>Roughly $10 a cycle. Always batch.</h2>
+<table>
+  <tr><th>Step</th><th>Model</th><th>Batch in / out per 1M tok</th><th>Per cycle</th></tr>
+  <tr><td>Judge the answers <span class="tag tag-coral">quality matters</span></td><td>Claude Opus 5<br><span style="color:var(--text-muted)">or gpt-5.6-sol</span></td><td>$2.50 / $12.50<br><span style="color:var(--text-muted)">$2.00 / $10.00</span></td><td>$6.14<br><span style="color:var(--text-muted)">$3.78</span></td></tr>
+  <tr><td>Choose topic, write the spec</td><td>same as judge</td><td>&mdash;</td><td>$0.04</td></tr>
+  <tr><td>Generate the dataset <span class="tag tag-accent">bulk</span></td><td>Claude Sonnet 5<br><span style="color:var(--text-muted)">or gpt-5.6-terra</span></td><td>$1.00 / $5.00<br><span style="color:var(--text-muted)">$1.00 / $6.00</span></td><td>$5.66<br><span style="color:var(--text-muted)">$5.15</span></td></tr>
+  <tr><td><b>One full cycle</b></td><td></td><td></td><td><b>$11.84</b><br><span style="color:var(--text-muted)">$8.96</span></td></tr>
+  <tr><td>Write the exam &mdash; paid once</td><td>strongest tier</td><td>&mdash;</td><td>$9.56<br><span style="color:var(--text-muted)">$5.89</span></td></tr>
+</table>
+<p class="sub" style="margin-top:16px">Batch is a flat 50% off input <em>and</em> output on both providers &mdash; default to it everywhere. Most batches finish inside an hour; nothing here is latency-sensitive. Sitting the exam and fine-tuning cost nothing: our own GPU.</p>
+<p class="footer-note">Anthropic and OpenAI rates read off their own pricing pages today; the earlier GPT-4.1/nano/mini figures were correct batch rates for that generation, but newer tiers are better value now. Gemini, Moonshot, Together, Fireworks and Mistral still unverified &mdash; don't cost-model against them.</p>
+`,
+`
+<div class="eyebrow">A decision for the room</div>
+<h2>The three LLMs must not be the same family</h2>
+<p>Three models now touch the loop. If all three come from one family, it grades its own family's questions with its own family's judge and fixes the result with its own family's data &mdash; and every number moves the right way for the wrong reason, invisibly.</p>
+<div class="grid2" style="margin-top:18px">
+  <div class="card">
+    <h3><span class="tag tag-green">Provider A</span> writes &amp; generates</h3>
+    <ul>
+      <li>Step 0 &mdash; drafts the exam questions</li>
+      <li>Step 4 &mdash; writes the training documents</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3><span class="tag tag-coral">Provider B</span> judges</h3>
+    <ul>
+      <li>Step 2 &mdash; grades every answer script</li>
+      <li>Must differ from A, or self-preference is unmeasurable</li>
+    </ul>
+  </div>
+</div>
+<p class="sub" style="margin-top:20px">So the answer to "do we need Claude in the mix?" is <b>yes</b> &mdash; not for capability, but because we need two independent families. This is now enforced: the service refuses to judge when the providers match, and refuses a floating model alias like <code>-latest</code> &mdash; the judge must be pinned to a dated id, or last month's scores stop meaning the same thing as this month's.</p>
+<p class="footer-note">Both keys live in <code>.env</code> only, never in <code>docker-compose.yml</code>, and both names go in the strip list so a submitted model's own code can't read them. A colleague with docker access still can &mdash; that's a known limit, not a solved problem.</p>
+`,
+`
+<div class="eyebrow">Open questions for the meeting</div>
+<h2>What we need from the room</h2>
+<div class="q"><span class="tag tag-amber">?</span> <span><b>Dr. Hossein</b> &mdash; which three topics do we start with, and can the rubrics for them land by Monday? Everything else waits on this.</span></div>
+<div class="q"><span class="tag tag-amber">?</span> <span><b>Roohi</b> &mdash; how long is one finetuning cycle, start to finished checkpoint? Still the one number we do not have.</span></div>
+<div class="q"><span class="tag tag-amber">?</span> <span><b>Roohi</b> &mdash; we hand you <b>prose documents</b>, JSONL, ~800 tokens each, via <code>--gap-dataset</code>. Does that drop into your training mix as-is?</span></div>
+<div class="q"><span class="tag tag-amber">?</span> <span><b>Everyone</b> &mdash; how much training text moves a topic? We start at 1,000 documents a cycle and we are guessing.</span></div>
+<div class="q"><span class="tag tag-green">&#10003;</span> <span><b>Answered</b> &mdash; yes to both Claude and OpenAI: the judge has to be a different family from the exam writer, and the code now enforces it.</span></div>
+<p class="sub" style="margin-top:16px">The build is done and tested against fakes. What decides whether this works is the rubrics, the curation, and one honest calibration number.</p>
+`
+];
+
+let i = 0;
+function render(){
+  const deck = document.getElementById('deck');
+  deck.innerHTML = slides.map((s,idx) => `<div class="slide${idx===i?' active':''}">${s}</div>`).join('');
+  document.getElementById('prevBtn').disabled = i===0;
+  document.getElementById('nextBtn').disabled = i===slides.length-1;
+  document.getElementById('dots').innerHTML = slides.map((_,idx)=>`<div class="dot${idx===i?' active':''}"></div>`).join('');
+}
+function go(d){ i = Math.min(slides.length-1, Math.max(0, i+d)); render(); }
+document.addEventListener('keydown', e=>{
+  if(e.key==='ArrowRight') go(1);
+  if(e.key==='ArrowLeft') go(-1);
+});
+render();
+</script>
+</body>
+</html>
