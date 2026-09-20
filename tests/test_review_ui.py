@@ -159,6 +159,9 @@ def test_exam_curation_in_the_browser(live, page):
     # filter to one topic by clicking it
     page.locator("table.jd tbody tr a", has_text=re.compile(r"^law$")).click()
     page.wait_for_selector(".card h2:has-text('Awaiting curation — law')")
+    # the list is dropped with the filter and re-fetched, so wait for it to
+    # land rather than counting whatever is on screen this frame
+    page.wait_for_function("document.querySelectorAll('.rv[data-candidate]').length === 2")
     cards = page.locator(".rv[data-candidate]")
     assert cards.count() == 2
     card = cards.first

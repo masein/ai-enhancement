@@ -75,6 +75,7 @@ eval_tasks/
   mmlu_perm/          the permutation control: MMLU with the options rotated (suite=control)
   fr/                 the exam: rubrics, the migrated skill items, AUTHORING.md (suite=judged)
 scripts/
+  demo_loop.py        the whole loop in one narrated command, against the local model (DEMO.md)
   exam_build.py       draft (LLM) -> curate (human, Exam tab) -> split by qid -> build harness tasks
   judge.py            the local, pinned judge -> judge.json beside each model's results
   judge_calibrate.py  human vs judge: export a CSV, import it, Cohen's kappa gates the suite
@@ -84,6 +85,7 @@ examples/
   train_and_benchmark.py   real mini training run -> push checkpoints -> benchmark each
 Dockerfile / docker-compose.yml / .env.example
 SERVICE.md            operate it     API.md  integrate it     BENCHMARK-RUN.md  run it by hand
+DEMO.md               watch the whole loop turn once, and what a green run does not prove
 ```
 
 ## Tests and CI

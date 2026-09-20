@@ -7,135 +7,31 @@ has no GPU, and none of this may need one."""
 
 from __future__ import annotations
 
-import http.server
 import json
 import re
 import socket
-import socketserver
 import threading
 import time
 from collections import Counter
+from pathlib import Path
 
 import pytest
 
 import exam_build as eb
 import judge as jd
 import report_lm_eval as report
+import vllm_stub
 from conftest import fresh, make_service
 from service import config, db, llm, llm_poller, proposals
 
-WEIGHTS = "google/gemma-4-E4B-it"
+REPO = Path(__file__).resolve().parents[1]
+WEIGHTS = vllm_stub.WEIGHTS
 REASON = "graded by a local model — not a pinned benchmark"
-
-
-# ---------------------------------------------------------------------------
-# the stub server
-# ---------------------------------------------------------------------------
-
-def answer(body: dict) -> str:
-    """What the local model says. The judge grades like the stub grader; the
-    proposer writes a spec; the generator and the exam writer answer the way
-    a model under JSON mode does — an object wrapping the array they were
-    asked for. Anything else is echoed."""
-    msgs = body["messages"]
-    system = msgs[0]["content"] if msgs[0]["role"] == "system" else ""
-    user = msgs[-1]["content"]
-    if "CANDIDATE ANSWER" in user:
-        s, j = jd.StubGrader.grade(user)
-        return json.dumps({"score": s, "justification": j})
-    if system == proposals.PROPOSAL_SYSTEM:
-        return json.dumps({"spec": "The model cannot trace a change to the first quantity that "
-                                   "responds, and reverses the direction of an effect.",
-                           "share_explained": 0.5, "patterns": ["reverses direction", "skips steps"]})
-    if system == proposals.GEN_SYSTEM:
-        n = int(re.search(r"Write (\d+) documents", user).group(1))
-        k = int(re.search(r"Style seed \d+-(\d+)", user).group(1))
-        return json.dumps({"documents": [llm._fake_document(i) for i in range(2 * k, 2 * k + n)]})
-    if system == eb.DRAFT_SYSTEM:
-        topic = re.search(r"Topic: (.+)", user).group(1)
-        n, k = map(int, re.search(r"Write (\d+) new questions\. Set (\d+)", user).groups())
-        return json.dumps({"questions": [
-            {"prompt": f"In {topic}, explain mechanism {k}-{i} and the one condition under which "
-                       f"it fails.", "reference": f"Mechanism {k}-{i} runs through the binding "
-                                                  f"constraint; it fails when the constraint is slack.",
-             "notes": "local draft"} for i in range(n)]})
-    return "echo: " + user
-
-
-class Stub:
-    def __init__(self):
-        self.lock = threading.Lock()
-        self.served = [{"id": "chat", "object": "model", "owned_by": "vllm", "root": WEIGHTS}]
-        self.bodies: list[dict] = []
-        self.hits: Counter = Counter()          # user text -> attempts seen
-        self.inflight = self.max_inflight = 0
-        self.delay = 0.0
-        self.gate: threading.Event | None = None
-        self.always: dict[str, tuple[int, str]] = {}    # marker in the user text -> every attempt fails
-        self.first: dict[str, list[tuple[int, str]]] = {}   # marker -> these attempts fail, then it answers
-        self.url = ""
-
-    def handler(self):
-        stub = self
-
-        class H(http.server.BaseHTTPRequestHandler):
-            def log_message(self, *a):
-                pass
-
-            def _send(self, code: int, obj: dict) -> None:
-                raw = json.dumps(obj).encode()
-                self.send_response(code)
-                self.send_header("content-type", "application/json")
-                self.send_header("content-length", str(len(raw)))
-                self.end_headers()
-                self.wfile.write(raw)
-
-            def do_GET(self):
-                if self.path == "/v1/models":
-                    return self._send(200, {"object": "list", "data": stub.served})
-                self._send(404, {"error": {"message": "no route"}})
-
-            def do_POST(self):
-                body = json.loads(self.rfile.read(int(self.headers["content-length"])))
-                user = body["messages"][-1]["content"]
-                with stub.lock:
-                    stub.bodies.append(body)
-                    stub.hits[user] += 1
-                    attempt = stub.hits[user]
-                    stub.inflight += 1
-                    stub.max_inflight = max(stub.max_inflight, stub.inflight)
-                if stub.gate is not None:
-                    stub.gate.wait(10)
-                if stub.delay:
-                    time.sleep(stub.delay)
-                fail = next((v for m, v in stub.always.items() if m in user), None)
-                planned = next((v for m, v in stub.first.items() if m in user), None)
-                if fail is None and planned and attempt <= len(planned):
-                    fail = planned[attempt - 1]
-                with stub.lock:
-                    stub.inflight -= 1
-                if fail:
-                    return self._send(fail[0], {"error": {"message": fail[1]}})
-                self._send(200, {"choices": [{"index": 0, "finish_reason": "stop",
-                                              "message": {"role": "assistant",
-                                                          "content": answer(body)}}]})
-        return H
-
-
-class _Server(http.server.ThreadingHTTPServer):
-    def server_bind(self):
-        # HTTPServer's own bind does a reverse lookup (socket.getfqdn) that can
-        # hang for half a minute on a laptop's resolver; loopback needs none
-        socketserver.TCPServer.server_bind(self)
-        self.server_name, self.server_port = "127.0.0.1", self.server_address[1]
 
 
 @pytest.fixture
 def vllm(monkeypatch):
-    stub = Stub()
-    srv = _Server(("127.0.0.1", 0), stub.handler())
-    threading.Thread(target=srv.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
-    stub.url = f"http://127.0.0.1:{srv.server_address[1]}/v1"
+    stub, srv = vllm_stub.serve()
     monkeypatch.setattr(config, "LOCAL_BASE_URL", stub.url)
     monkeypatch.setattr(config, "LOCAL_CONCURRENCY", 2)
     monkeypatch.setattr(config, "LOCAL_MAX_TOKENS", 1024)
@@ -327,6 +223,35 @@ def test_every_caller_that_parses_json_asks_for_it(tree, tmp_path):
     fb = llm.FakeBatches("fake-1", tmp_path)
     fb.submit([prop, req("prose, please")])
     assert [r["json"] for r in fb.recorded()] == [True, False]
+
+
+def test_a_local_generator_is_asked_for_one_document_at_a_time(monkeypatch):
+    # two ~600-word documents is ~1700 tokens and LOCAL_MAX_TOKENS caps the
+    # reply at 1024: asking for two truncates the JSON and nothing parses
+    monkeypatch.setattr(config, "LLM_PROVIDER", "local")
+    assert proposals.items_per_request("doc") == 1
+    assert proposals.items_per_request("free") == 10          # short; two fit easily
+    reqs = proposals.generation_requests(1, "spec", "economics", 4, "doc", 7)
+    assert len(reqs) == 4 and all("Write 1 document." in r.user for r in reqs)
+    monkeypatch.setattr(config, "LLM_PROVIDER", "anthropic")
+    assert proposals.items_per_request("doc") == 2
+    reqs = proposals.generation_requests(1, "spec", "economics", 4, "doc", 7)
+    assert len(reqs) == 2 and all("Write 2 documents." in r.user for r in reqs)
+    # and one document comes back as the object itself, not in an array
+    doc = {"title": "Margins first", "text": "word " * 200}
+    assert proposals.parse_items(json.dumps(doc), "doc") == [
+        {"title": "Margins first", "text": ("word " * 200).strip()}]
+
+
+def test_the_container_reaches_the_box_through_the_host_gateway():
+    compose = (REPO / "docker-compose.yml").read_text(encoding="utf-8")
+    assert '"host.docker.internal:host-gateway"' in compose
+    assert "LOCAL_BASE_URL: ${LOCAL_BASE_URL:-http://host.docker.internal:8000/v1}" in compose
+    # host networking would reach it too and would undo the ${BIND} publish line
+    assert not re.search(r"(?m)^\s*network_mode:", compose)
+    assert config.LOCAL_BASE_URL == "http://localhost:8000/v1"       # the code default: the host
+    env = (REPO / ".env.example").read_text(encoding="utf-8")
+    assert "LOCAL_BASE_URL" in env and "LOCAL_CONCURRENCY" in env and "LOCAL_MAX_TOKENS" in env
 
 
 def test_a_json_mode_object_wrapping_the_array_reads_as_the_array():

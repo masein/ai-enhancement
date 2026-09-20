@@ -352,7 +352,11 @@ def test_parse_items_on_the_document_format():
            "a string", 7, {"question": "q?", "answer": "a"}]
     assert prop_mod.parse_items(json.dumps(bad), "doc") == []
     assert prop_mod.parse_items("not json at all", "doc") == []
-    assert prop_mod.parse_items(json.dumps({"title": "t", "text": "word " * 200}), "doc") == []
+    # a lone object IS one document: a request for a single document (what a
+    # local generator gets) comes back bare under JSON mode, not in an array
+    assert prop_mod.parse_items(json.dumps({"title": "t", "text": "word " * 200}), "doc") == [
+        {"title": "t", "text": ("word " * 200).strip()}]
+    assert prop_mod.parse_items(json.dumps({"nothing": "doc shaped"}), "doc") == []
     # `body` is accepted as a synonym, and the title is capped
     alt = {"title": "T" * 400, "body": "word " * 200}
     got = prop_mod.parse_items(json.dumps([alt]), "doc")

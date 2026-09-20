@@ -635,7 +635,9 @@ class LocalOpenAI(Backend):
                 raise LLMError(f"the local model server at {self.base} refused GET /models: {e}",
                                status=e.status) from None
             inside = (" This process is in a container, where localhost is the container "
-                      "itself, not the box." if Path("/.dockerenv").exists() else "")
+                      "itself: reach the box through the host gateway "
+                      "(LOCAL_BASE_URL=http://host.docker.internal:8000/v1, which is what "
+                      "docker-compose.yml sets)." if Path("/.dockerenv").exists() else "")
             raise LocalUnreachable(
                 f"nothing is answering at {self.base} ({e}).{inside} The vLLM server listens on "
                 f"the deploy box's loopback only; from another machine, tunnel it first: "

@@ -5318,21 +5318,26 @@ function vExam() {
           el('span', { style: `width:${Math.min(100, 100 * s.accepted / (s.target || 60)).toFixed(1)}%;background:var(--s1)` }));
         return el('tr', { class: s.report < CAT_MIN_N ? 'dim' : null },
           el('td', {}, el('a', { href: '#', text: t, onclick: e => { e.preventDefault();
-            state.ex.topic = state.ex.topic === t ? '' : t; state.ex.loaded = false; render(); } })),
+            state.ex.topic = state.ex.topic === t ? '' : t; state.ex.loaded = false;
+            // drop the list with the filter: showing another topic's questions
+            // under this topic's heading, until the fetch lands, is a lie
+            state.ex.candidates = null; render(); } })),
           el('td', { class: 'num', text: String(s.accepted) }),
           el('td', { class: 'num', text: String(s.report) }),
           el('td', { class: 'num', text: String(s.diagnose) }),
           el('td', { class: 'num', text: String(s.pending) }),
           el('td', {}, bar)); })))));
-  const cands = state.ex.candidates || [];
+  const cands = state.ex.candidates;
   const cur = el('div', { class: 'card' },
     el('h2', { text: 'Awaiting curation' + (state.ex.topic ? ` — ${state.ex.topic}` : '') }),
     el('p', { class: 'sub', text: 'Read each against the rubric: does it ask for understanding, is '
       + 'the reference the substance rather than a wording, is it answerable in five sentences, '
       + 'is it new? Accept, edit and accept, or reject with a reason. Click a topic above to filter.' }),
-    cands.length ? cands.slice(0, 40).map(exCandidate)
+    cands == null ? el('p', { class: 'small', 'data-loading': 'candidates', text: 'Loading…' })
+      : cands.length ? cands.slice(0, 40).map(exCandidate)
       : el('p', { class: 'small', text: 'Nothing waiting' + (state.ex.topic ? ' in this topic.' : '.') }),
-    cands.length > 40 ? el('p', { class: 'small', text: `${cands.length - 40} more after these.` }) : '');
+    cands && cands.length > 40
+      ? el('p', { class: 'small', text: `${cands.length - 40} more after these.` }) : '');
   return [head, table, cur];
 }
 

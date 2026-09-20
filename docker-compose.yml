@@ -25,6 +25,13 @@ services:
     build: .
     image: aienh-bench
     pid: "host"
+    # the box's loopback, reachable from inside the container: the `local`
+    # provider talks to a vLLM bound to 127.0.0.1 on the host. network_mode:
+    # host would also reach it and would throw away the ${BIND} publish line
+    # that keeps this service off the LAN, so it is the gateway, not host
+    # networking.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       TZ: ${TZ:-Asia/Qatar}
       BENCH_ROOT: ${BENCH_ROOT}
@@ -63,10 +70,11 @@ services:
       JUDGE_API_KEY: ${JUDGE_API_KEY:-}
       JUDGE_CANARY_MAX_DRIFT: ${JUDGE_CANARY_MAX_DRIFT:-0.5}
       ALLOW_SINGLE_PROVIDER_LOOP: ${ALLOW_SINGLE_PROVIDER_LOOP:-0}
-      # the `local` provider (vLLM). NOTE: inside this container localhost is
-      # the container, so a vLLM listening on the box's loopback is NOT
-      # reachable at the default URL — SERVICE.md § The local model
-      LOCAL_BASE_URL: ${LOCAL_BASE_URL:-http://localhost:8000/v1}
+      # the `local` provider (vLLM). Inside this container localhost is the
+      # container, so the box's loopback is reached through the host gateway
+      # below — vLLM stays bound to 127.0.0.1 on the box and nothing new is
+      # exposed. On the host the code default (localhost) is the right one.
+      LOCAL_BASE_URL: ${LOCAL_BASE_URL:-http://host.docker.internal:8000/v1}
       LOCAL_CONCURRENCY: ${LOCAL_CONCURRENCY:-2}
       LOCAL_MAX_TOKENS: ${LOCAL_MAX_TOKENS:-1024}
       LOCAL_TIMEOUT_S: ${LOCAL_TIMEOUT_S:-180}

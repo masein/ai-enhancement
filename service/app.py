@@ -501,7 +501,9 @@ def _llm_status() -> dict:
             "provider": config.LLM_PROVIDER, "model": config.LLM_MODEL,
             "usage_today": db.llm_items_today(), "daily_cap": config.LLM_DAILY_ITEM_CAP,
             "max_items_per_batch": config.LLM_MAX_ITEMS_PER_BATCH,
-            "items_per_generation_request": prop.ITEMS_PER_REQUEST,
+            # what THIS provider is asked for per request: a local generator
+            # gets one document, because its replies are capped
+            "items_per_generation_request": {f: prop.items_per_request(f) for f in prop.FORMATS},
             "formats": list(prop.FORMATS), "default_format": prop.DEFAULT_FORMAT,
             "datasets_bytes": used, "datasets_quota_bytes": int(config.DATASET_QUOTA_GB * 1e9),
             "note": "the tailnet is the auth boundary: approvals record a typed name, "

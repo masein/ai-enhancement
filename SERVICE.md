@@ -153,13 +153,17 @@ run against it, so the loop can be driven end to end today.
   ssh -L 8000:localhost:8000 <box>
   ```
 
-- **Not from inside the container.** In the service container `localhost` is
-  the container, not the box, so the dockerized service cannot reach a
-  loopback-only vLLM at the default URL. The client says so when it cannot
-  connect. Drive the loop from the host (`scripts/exam_build.py draft`,
-  `scripts/judge.py --wait`, or the manual no-Docker service) — or, as a
-  deliberate choice, expose vLLM to the docker bridge and point
-  `LOCAL_BASE_URL` there; that gives up "loopback only".
+- **From inside the container, through the host gateway.** In the service
+  container `localhost` is the container, not the box, so compose maps the
+  box's loopback in as `host.docker.internal` (`extra_hosts:
+  host.docker.internal:host-gateway`) and defaults `LOCAL_BASE_URL` to
+  `http://host.docker.internal:8000/v1`. vLLM stays bound to 127.0.0.1 and
+  nothing new is exposed on the tailnet or the LAN. `network_mode: host`
+  would also reach it and would throw away the `${BIND}` publish line that
+  keeps the service off the LAN, so it is the gateway, not host networking.
+  On the host — the demo script, `exam_build.py draft`, `judge.py --wait` —
+  the code default `http://localhost:8000/v1` is the right one. If the URL is
+  wrong the client says so plainly instead of failing at the first click.
 - **No key.** vLLM ignores one unless it was launched with `--api-key`; if it
   was, the role's `*_API_KEY` is sent. A missing key is fine for `local` and
   still fatal for `anthropic` and `openai`. A missing model id is fatal for all.
@@ -205,6 +209,16 @@ also not a judge anyone publishes scores from. So:
 A green run against the local model exercises the callers, the split, the
 airlock, the gate and the dashboard. It does **not** exercise the Anthropic or
 OpenAI batch clients, which stay untested until real keys exist.
+
+To watch the whole loop turn once against it, in one command:
+
+```bash
+python3 scripts/demo_loop.py --topics economics --model EleutherAI/pythia-160m
+```
+
+That is `scripts/demo_loop.py`, and [`DEMO.md`](DEMO.md) is its page: the
+`.env` block to paste, what each of its nine steps shows, and — plainly —
+what a green run does not prove.
 
 ## Custom model code (`trust_remote_code`)
 

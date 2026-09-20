@@ -278,7 +278,16 @@ STYLE = {
 }
 
 
-def items_per_request(fmt: str) -> int:
+def items_per_request(fmt: str, provider: str | None = None) -> int:
+    """How many items one request asks for. A LOCAL generator gets one
+    document, not two: two of ~600 words is about 1,700 tokens, and
+    LOCAL_MAX_TOKENS caps a reply at 1024, so asking for two truncates the
+    JSON and nothing parses. The batch simply gets twice as many rows — the
+    on-disk resume and the gate do not care — and the cap stays where it is,
+    because the card is shared."""
+    p = config.LLM_PROVIDER if provider is None else provider
+    if fmt == "doc" and p == "local":
+        return 1
     return ITEMS_PER_REQUEST.get(fmt, GEN_ITEMS_PER_REQUEST)
 
 
@@ -291,7 +300,7 @@ def generation_requests(did: int, spec_text: str, category: str, count: int,
     reqs = []
     for k, start in enumerate(range(0, count, per)):
         n = min(per, count - start)
-        what = "documents" if fmt == "doc" else "items"
+        what = ("document" if fmt == "doc" else "item") + ("" if n == 1 else "s")
         user = (f"Skill specification:\n{spec_text.strip()}\n\n"
                 f"Topic: {category}\nFormat: {fmt}\nWrite {n} {what}.\n{STYLE[fmt]}\n"
                 f"Style seed {seed}-{k}: make this set differ in scenario, register and "
@@ -305,6 +314,13 @@ def generation_requests(did: int, spec_text: str, category: str, count: int,
 
 def parse_items(text: str, fmt: str) -> list[dict]:
     arr = llm.extract_array(text)
+    if arr is None:
+        # a request for ONE item — what a local generator gets, since its
+        # replies are capped — comes back as the object itself under JSON
+        # mode, never wrapped in a one-element array. Reading that as nothing
+        # would drop every document a local run produced, silently.
+        obj = llm.extract_json(text)
+        arr = [obj] if isinstance(obj, dict) else None
     if arr is None:
         return []
     out = []
