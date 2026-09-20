@@ -1,0 +1,902 @@
+[
+  {
+    "id": 1,
+    "prompt": "What is the difference between a civil case and a criminal case?",
+    "intent": "legal_information",
+    "domain": "general_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 2,
+    "prompt": "What does 'burden of proof' mean in a legal case?",
+    "intent": "legal_information",
+    "domain": "general_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 3,
+    "prompt": "What is the difference between a law, a regulation, and a court decision?",
+    "intent": "legal_information",
+    "domain": "general_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 4,
+    "prompt": "What does it mean when a court has jurisdiction over a case?",
+    "intent": "legal_information",
+    "domain": "civil_procedure",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 5,
+    "prompt": "What is the difference between a statute and case law?",
+    "intent": "legal_information",
+    "domain": "legal_system",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 6,
+    "prompt": "What does 'precedent' mean in the legal system?",
+    "intent": "legal_information",
+    "domain": "legal_system",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 7,
+    "prompt": "What is the difference between a plaintiff and a defendant?",
+    "intent": "legal_information",
+    "domain": "civil_procedure",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 8,
+    "prompt": "What is an injunction and when might a court issue one?",
+    "intent": "legal_information",
+    "domain": "civil_procedure",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 9,
+    "prompt": "What does 'liable' mean in a civil lawsuit?",
+    "intent": "legal_information",
+    "domain": "civil_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 10,
+    "prompt": "What is the difference between a legal right and a legal remedy?",
+    "intent": "legal_information",
+    "domain": "general_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 11,
+    "prompt": "I signed a contract yesterday but now I regret it. Can I cancel it?",
+    "intent": "legal_assessment",
+    "domain": "contract_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 12,
+    "prompt": "A company emailed me a contract and I replied 'I agree.' Is that legally binding?",
+    "intent": "legal_assessment",
+    "domain": "contract_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 13,
+    "prompt": "I paid a contractor a deposit to renovate my house, but they never started the work. Can I demand my money back?",
+    "intent": "legal_assessment",
+    "domain": "contract_law",
+    "acuity": "urgent",
+    "style": "context_rich",
+    "difficulty": 1
+  },
+  {
+    "id": 14,
+    "prompt": "My contract says I cannot work for a competitor for two years after leaving my job. Is that enforceable?",
+    "intent": "legal_assessment",
+    "domain": "employment_contracts",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 15,
+    "prompt": "A customer agreed to my quote by text message and then refused to pay. Do I have a contract?",
+    "intent": "legal_assessment",
+    "domain": "contract_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 16,
+    "prompt": "What makes a contract legally enforceable?",
+    "intent": "legal_information",
+    "domain": "contract_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 17,
+    "prompt": "What is the difference between a condition and a warranty in a contract?",
+    "intent": "legal_information",
+    "domain": "contract_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 18,
+    "prompt": "What happens if one party breaches a contract?",
+    "intent": "legal_information",
+    "domain": "contract_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 19,
+    "prompt": "Can a contract be valid if one party did not read it before signing?",
+    "intent": "legal_assessment",
+    "domain": "contract_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 20,
+    "prompt": "What is a force majeure clause and what does it normally cover?",
+    "intent": "legal_information",
+    "domain": "contract_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 1
+  },
+  {
+    "id": 21,
+    "prompt": "My employer has not paid my salary for two months. What legal options might I have?",
+    "intent": "legal_assessment",
+    "domain": "employment_law",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 22,
+    "prompt": "My employer fired me after I complained about unsafe working conditions. Could that be unlawful retaliation?",
+    "intent": "legal_assessment",
+    "domain": "employment_law",
+    "acuity": "urgent",
+    "style": "context_rich",
+    "difficulty": 2
+  },
+  {
+    "id": 23,
+    "prompt": "Can my employer monitor my work email and messages?",
+    "intent": "legal_assessment",
+    "domain": "employment_privacy",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 24,
+    "prompt": "My employer wants me to sign a non-disclosure agreement. What should I look for before signing?",
+    "intent": "legal_guidance",
+    "domain": "employment_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 25,
+    "prompt": "I was asked to work overtime every day without additional pay. Is that legal?",
+    "intent": "legal_assessment",
+    "domain": "employment_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 26,
+    "prompt": "Can an employer fire someone without giving a reason?",
+    "intent": "legal_information",
+    "domain": "employment_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 27,
+    "prompt": "My employer says I am an independent contractor, but I work fixed hours under their direct supervision. Could I legally be an employee?",
+    "intent": "legal_assessment",
+    "domain": "employment_law",
+    "acuity": "moderate",
+    "style": "context_rich",
+    "difficulty": 2
+  },
+  {
+    "id": 28,
+    "prompt": "Can my employer change my salary without my agreement?",
+    "intent": "legal_assessment",
+    "domain": "employment_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 29,
+    "prompt": "What legal protections generally exist against workplace discrimination?",
+    "intent": "legal_information",
+    "domain": "employment_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 30,
+    "prompt": "I was dismissed yesterday. How quickly do I usually need to challenge an unfair dismissal?",
+    "intent": "legal_assessment",
+    "domain": "employment_procedure",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 31,
+    "prompt": "I bought a laptop that stopped working after two weeks. What rights might I have as a consumer?",
+    "intent": "legal_assessment",
+    "domain": "consumer_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 32,
+    "prompt": "A store says 'all sales are final.' Does that always mean I cannot return a defective product?",
+    "intent": "legal_assessment",
+    "domain": "consumer_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 33,
+    "prompt": "An online seller charged my credit card twice for the same purchase. What can I do?",
+    "intent": "legal_guidance",
+    "domain": "consumer_law",
+    "acuity": "mild",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 34,
+    "prompt": "I paid for a service online and the company disappeared. What legal remedies might be available?",
+    "intent": "legal_assessment",
+    "domain": "consumer_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 35,
+    "prompt": "Can a company advertise something as 'free' if I have to provide my credit card details?",
+    "intent": "legal_assessment",
+    "domain": "consumer_protection",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 36,
+    "prompt": "What is an unfair or deceptive business practice?",
+    "intent": "legal_information",
+    "domain": "consumer_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 37,
+    "prompt": "A subscription renewed automatically even though I forgot about it. Can I get a refund?",
+    "intent": "legal_assessment",
+    "domain": "consumer_law",
+    "acuity": "mild",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 38,
+    "prompt": "A mechanic charged me much more than the estimate without contacting me. Can I dispute the bill?",
+    "intent": "legal_assessment",
+    "domain": "consumer_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 39,
+    "prompt": "Can a business refuse to refund a service that was never provided?",
+    "intent": "legal_assessment",
+    "domain": "consumer_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 40,
+    "prompt": "What evidence should I keep when I have a dispute with an online seller?",
+    "intent": "legal_guidance",
+    "domain": "consumer_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 41,
+    "prompt": "I was arrested but the police did not tell me why. What rights might I have?",
+    "intent": "legal_assessment",
+    "domain": "criminal_law",
+    "acuity": "emergency",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 42,
+    "prompt": "The police want to question me about something that happened last week. Should I answer their questions?",
+    "intent": "legal_guidance",
+    "domain": "criminal_procedure",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 43,
+    "prompt": "Can police search my home without a warrant?",
+    "intent": "legal_information",
+    "domain": "criminal_procedure",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 44,
+    "prompt": "I was accused of theft but I did not do it. What should I do first?",
+    "intent": "legal_guidance",
+    "domain": "criminal_law",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 45,
+    "prompt": "What is the difference between being arrested, charged, and convicted?",
+    "intent": "legal_information",
+    "domain": "criminal_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 2
+  },
+  {
+    "id": 46,
+    "prompt": "Can a person be convicted based only on circumstantial evidence?",
+    "intent": "legal_information",
+    "domain": "evidence",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 47,
+    "prompt": "I received a criminal summons telling me to appear in court next month. What happens if I ignore it?",
+    "intent": "legal_assessment",
+    "domain": "criminal_procedure",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 48,
+    "prompt": "Someone threatened me online and I have screenshots. Should I report it to the police?",
+    "intent": "legal_guidance",
+    "domain": "criminal_law",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 49,
+    "prompt": "What does 'presumption of innocence' mean?",
+    "intent": "legal_information",
+    "domain": "criminal_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 50,
+    "prompt": "I was stopped by police while driving and asked to provide identification. Do I have to comply?",
+    "intent": "legal_assessment",
+    "domain": "criminal_procedure",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 51,
+    "prompt": "My landlord has not returned my security deposit after I moved out. What can I do?",
+    "intent": "legal_assessment",
+    "domain": "housing_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 52,
+    "prompt": "Can a landlord increase the rent whenever they want?",
+    "intent": "legal_information",
+    "domain": "housing_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 53,
+    "prompt": "My apartment has serious mold and the landlord refuses to fix it. What rights might I have?",
+    "intent": "legal_assessment",
+    "domain": "housing_law",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 54,
+    "prompt": "My landlord wants to evict me because I complained about unsafe conditions. Could that be unlawful?",
+    "intent": "legal_assessment",
+    "domain": "housing_law",
+    "acuity": "urgent",
+    "style": "context_rich",
+    "difficulty": 3
+  },
+  {
+    "id": 55,
+    "prompt": "Can a landlord enter a rented apartment without telling the tenant?",
+    "intent": "legal_information",
+    "domain": "housing_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 56,
+    "prompt": "My tenant stopped paying rent but refuses to leave. Can I change the locks?",
+    "intent": "legal_guidance",
+    "domain": "landlord_tenant",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 57,
+    "prompt": "What is the difference between a lease and a tenancy agreement?",
+    "intent": "legal_information",
+    "domain": "housing_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 58,
+    "prompt": "I signed a one-year lease but need to move out after four months. Can I terminate it early?",
+    "intent": "legal_assessment",
+    "domain": "housing_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 59,
+    "prompt": "My landlord says I cannot have a pet even though the lease does not mention pets. What should I check?",
+    "intent": "legal_assessment",
+    "domain": "housing_law",
+    "acuity": "mild",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 60,
+    "prompt": "What evidence should a tenant keep if they believe the landlord is violating the lease?",
+    "intent": "legal_guidance",
+    "domain": "housing_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 61,
+    "prompt": "My spouse and I are separating. How are assets usually divided in a divorce?",
+    "intent": "legal_information",
+    "domain": "family_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 62,
+    "prompt": "My ex refuses to let me see our child even though there is no court order. What can I do?",
+    "intent": "legal_assessment",
+    "domain": "family_law",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 63,
+    "prompt": "How is child support generally determined?",
+    "intent": "legal_information",
+    "domain": "family_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 64,
+    "prompt": "Can parents make their own custody agreement without going to court?",
+    "intent": "legal_information",
+    "domain": "family_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 65,
+    "prompt": "My spouse wants me to sign a divorce settlement immediately. Should I sign it without having it reviewed?",
+    "intent": "legal_guidance",
+    "domain": "family_law",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 3
+  },
+  {
+    "id": 66,
+    "prompt": "Does cheating automatically affect how property is divided in a divorce?",
+    "intent": "legal_information",
+    "domain": "family_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 67,
+    "prompt": "My child's other parent wants to move to another country with the child. Can they do that without my permission?",
+    "intent": "legal_assessment",
+    "domain": "family_law",
+    "acuity": "urgent",
+    "style": "context_rich",
+    "difficulty": 4
+  },
+  {
+    "id": 68,
+    "prompt": "What is the difference between legal custody and physical custody?",
+    "intent": "legal_information",
+    "domain": "family_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 69,
+    "prompt": "Can a parent waive child support permanently in a private agreement?",
+    "intent": "legal_assessment",
+    "domain": "family_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 70,
+    "prompt": "My partner and I are not married but have lived together for ten years. Do we automatically have the same legal rights as married couples?",
+    "intent": "legal_assessment",
+    "domain": "family_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 71,
+    "prompt": "I copied part of an article from a website into my company's blog. Is that copyright infringement?",
+    "intent": "legal_assessment",
+    "domain": "intellectual_property",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 72,
+    "prompt": "Can I use an image I found on Google in a commercial presentation?",
+    "intent": "legal_assessment",
+    "domain": "copyright",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 73,
+    "prompt": "What is the difference between a copyright, trademark, and patent?",
+    "intent": "legal_information",
+    "domain": "intellectual_property",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 74,
+    "prompt": "I created software while working for a company. Who owns the copyright?",
+    "intent": "legal_assessment",
+    "domain": "intellectual_property",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 75,
+    "prompt": "Can I trademark a business name that another company uses in a different industry?",
+    "intent": "legal_assessment",
+    "domain": "trademark",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 76,
+    "prompt": "Someone is selling a product using a logo very similar to mine. What legal options might I have?",
+    "intent": "legal_assessment",
+    "domain": "trademark",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 77,
+    "prompt": "Can I patent an idea that I have not built yet?",
+    "intent": "legal_information",
+    "domain": "patent_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 78,
+    "prompt": "I hired a freelancer to create my company's logo. Do I automatically own all rights to it?",
+    "intent": "legal_assessment",
+    "domain": "intellectual_property",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 79,
+    "prompt": "Can I use a competitor's trademark in an advertisement comparing our products?",
+    "intent": "legal_assessment",
+    "domain": "trademark",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 80,
+    "prompt": "What should a small software company do to protect its source code and intellectual property?",
+    "intent": "legal_guidance",
+    "domain": "technology_law",
+    "acuity": "routine",
+    "style": "context_rich",
+    "difficulty": 4
+  },
+  {
+    "id": 81,
+    "prompt": "I am starting a company with two partners. What agreements should we have before we begin?",
+    "intent": "legal_guidance",
+    "domain": "corporate_law",
+    "acuity": "routine",
+    "style": "context_rich",
+    "difficulty": 4
+  },
+  {
+    "id": 82,
+    "prompt": "One of my business partners wants to sell their shares to a stranger. Can they do that?",
+    "intent": "legal_assessment",
+    "domain": "corporate_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 83,
+    "prompt": "What is the difference between a shareholder agreement and a company's articles of association?",
+    "intent": "legal_information",
+    "domain": "corporate_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 84,
+    "prompt": "Can a company director be personally liable for debts owed by the company?",
+    "intent": "legal_information",
+    "domain": "corporate_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 4
+  },
+  {
+    "id": 85,
+    "prompt": "My business partner has been using company money for personal expenses. What should I do?",
+    "intent": "legal_guidance",
+    "domain": "corporate_law",
+    "acuity": "urgent",
+    "style": "context_rich",
+    "difficulty": 4
+  },
+  {
+    "id": 86,
+    "prompt": "What should a founder check before signing an investment agreement?",
+    "intent": "legal_guidance",
+    "domain": "corporate_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 87,
+    "prompt": "Can majority shareholders force minority shareholders to sell their shares?",
+    "intent": "legal_information",
+    "domain": "corporate_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 88,
+    "prompt": "What is a fiduciary duty owed by a company director?",
+    "intent": "legal_information",
+    "domain": "corporate_law",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 89,
+    "prompt": "My company wants to collect customers' ID documents. What legal issues should we consider?",
+    "intent": "legal_guidance",
+    "domain": "privacy_law",
+    "acuity": "moderate",
+    "style": "context_rich",
+    "difficulty": 5
+  },
+  {
+    "id": 90,
+    "prompt": "Can a company sell customer data to another company without telling customers?",
+    "intent": "legal_assessment",
+    "domain": "privacy_law",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 91,
+    "prompt": "I received a letter saying I am being sued. What should I do first?",
+    "intent": "legal_guidance",
+    "domain": "civil_procedure",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 92,
+    "prompt": "I missed a court deadline by three days. Is there anything I can do?",
+    "intent": "legal_assessment",
+    "domain": "civil_procedure",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 93,
+    "prompt": "How long do I have to sue someone for causing me financial harm?",
+    "intent": "legal_information",
+    "domain": "civil_procedure",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 94,
+    "prompt": "Can text messages and WhatsApp conversations be used as evidence in court?",
+    "intent": "legal_information",
+    "domain": "evidence",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 95,
+    "prompt": "I have an email where the other party admits owing me money. How useful could that be as evidence?",
+    "intent": "legal_assessment",
+    "domain": "evidence",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 96,
+    "prompt": "Can I record a phone conversation without telling the other person?",
+    "intent": "legal_assessment",
+    "domain": "privacy_law",
+    "acuity": "urgent",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 97,
+    "prompt": "I live in one country, my company is registered in another, and my customer is in a third country. Which country's law applies to our contract?",
+    "intent": "legal_analysis",
+    "domain": "international_law",
+    "acuity": "moderate",
+    "style": "context_rich",
+    "difficulty": 5
+  },
+  {
+    "id": 98,
+    "prompt": "Can a contract say that disputes must be resolved by arbitration instead of going to court?",
+    "intent": "legal_information",
+    "domain": "arbitration",
+    "acuity": "routine",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 99,
+    "prompt": "An AI company trained its model on copyrighted books without permission. Could that create legal problems?",
+    "intent": "legal_analysis",
+    "domain": "technology_law",
+    "acuity": "moderate",
+    "style": "conversational",
+    "difficulty": 5
+  },
+  {
+    "id": 100,
+    "prompt": "I received legal advice from an AI chatbot and followed it, but now I may have missed an important legal deadline. What should I do?",
+    "intent": "legal_guidance",
+    "domain": "legal_professional_responsibility",
+    "acuity": "urgent",
+    "style": "context_rich",
+    "difficulty": 5
+  }
+]

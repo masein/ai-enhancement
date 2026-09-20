@@ -1158,7 +1158,7 @@ max-width:46em;padding:0 16px"><h1>No demo run yet</h1>
 numbers, none of them on the leaderboard. Run one on the box:</p>
 <pre style="background:#f4f4f5;padding:12px;border-radius:6px;overflow:auto">cd $BENCH_ROOT &amp;&amp; python3 aienh/scripts/demo_loop.py \\
     --topic "medicine &amp; health" \\
-    --import aienh/eval_tasks/fr/hossein_medicine_v1.json \\
+    --import aienh/eval_tasks/fr/hossein_medicine_v2.json \\
     --approver "Dr. Hossein" --model HuggingFaceTB/SmolLM2-360M-Instruct</pre>
 <p>It prints this URL when it finishes. See <code>DEMO.md</code> for the rest, including
 what a green run does not prove.</p>

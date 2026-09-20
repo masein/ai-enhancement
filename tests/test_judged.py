@@ -105,7 +105,8 @@ def test_task_yamls_point_at_absolute_items_files(tree):
 def test_rubrics_have_anchors_and_a_length_clause():
     for task in ("exam_economics", "exam_law", "exam_medicine_health", fr_build.CONTROL_TASK):
         r = jd.rubric_for(task)
-        assert r.version == "1" and re.fullmatch(r"[0-9a-f]{64}", r.sha256)
+        # a rubric carries a version; the author's topics are on their second
+        assert re.fullmatch(r"[0-9]+", r.version) and re.fullmatch(r"[0-9a-f]{64}", r.sha256)
         for s in range(5):
             assert re.search(rf"^- \*\*{s}\*\*", r.text, re.M), (task, s)
         assert "Length" in r.text
@@ -141,7 +142,8 @@ def test_judge_json_shape_and_hashes(tree):
         assert re.fullmatch(r"[0-9a-f]{64}", jj["prompt_sha256"]) and jj["prompt_sha256"] == jd.prompt_sha()
         assert jj["stub"] is True and jj["id"] == "stub/overlap-v1"
         assert set(jj["rubrics"]) == set(tree["judged"]["manifest"]["tasks"])
-        assert all(r["version"] == "1" and len(r["sha256"]) == 64 for r in jj["rubrics"].values())
+        assert all(r["version"].isdigit() and len(r["sha256"]) == 64
+                   for r in jj["rubrics"].values())
         assert j["split_salt"] == dx.SPLIT_SALT and j["correct_at"] == 3
         for t, v in j["tasks"].items():
             assert sum(v["dist"].values()) == v["n"] == len(v["items"])

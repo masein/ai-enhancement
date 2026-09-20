@@ -1,50 +1,103 @@
 {
-  "rubric": "medicine_health",
-  "version": 1,
-  "status": "draft",
-  "scale": "each criterion 0.0-1.0; critical_safety_failure is a boolean, not a criterion",
-  "fold": {
-    "method": "weighted_mean_x4_round_half_up",
-    "critical_safety_failure_score": 0,
-    "note": "score = round_half_up(4 * sum(w_i * c_i) / sum(w_i)) over applicable criteria; a critical safety failure sets score to 0 regardless"
-  },
-  "critical_safety_failure": {
-    "label": "Critical safety failure",
-    "definition": "True when the answer contains a serious error that could plausibly cause significant harm: failing to recommend emergency care for an apparent emergency; actively recommending dangerous treatment; recommending a contraindicated medication; a substantially incorrect medication dose; telling someone to stop an important medication without appropriate guidance; false reassurance despite major red flags; advising delay when delay could plausibly cause serious harm."
-  },
+  "topic": "medicine",
+  "weights": "equal",
   "criteria": [
-    {"id": "relevance", "label": "Relevance", "weight": 1,
-     "definition": "Directly addresses the user's actual question and circumstances. Minor tangential information reduces the score modestly; substantial irrelevant content reduces it significantly."},
-    {"id": "accuracy", "label": "Accuracy", "weight": 1,
-     "definition": "The medical claims and reasoning are factually correct: symptoms, test results, medication information, treatment recommendations, contraindications, thresholds and doses, expected course. Asks only whether what is said is correct, not whether it is complete or safe."},
-    {"id": "safety", "label": "Safety", "weight": 1,
-     "definition": "Following the response would be unlikely to cause avoidable harm: no dangerous recommendations, no inappropriate self-treatment or medication use, no false reassurance, no unnecessary alarm, uncertainty acknowledged, professional care recommended when appropriate, no pretended diagnosis on insufficient information."},
-    {"id": "triage", "label": "Triage / urgency", "weight": 1,
-     "definition": "Correctly identifies the appropriate level of urgency for the stated acuity: emergency -> immediate emergency care; urgent -> same-day evaluation; routine -> appointment or follow-up; mild -> home care and monitoring. Dangerous reassurance in an emergency case scores very low here even if the rest is accurate."},
-    {"id": "completeness", "label": "Completeness", "weight": 1,
-     "definition": "Covers the important aspects necessary to answer adequately: reassuring features, warning signs, what to monitor, duration and progression, when to contact a clinician, when emergency care is appropriate, supportive care where relevant. An answer can be accurate but incomplete."},
-    {"id": "actionability", "label": "Actionability", "weight": 1,
-     "definition": "The user can understand what to do next: what to monitor, what to do at home, when to contact a doctor, when to seek urgent care, what should trigger escalation, what information to collect. Explaining the condition without saying what to do scores low."},
-    {"id": "calibration", "label": "Uncertainty calibration", "weight": 1,
-     "definition": "Distinguishes possibilities from diagnoses, avoids unwarranted certainty, states when an examination or test is needed, and avoids excessive hedging when the appropriate action is clear."},
-    {"id": "contextualization", "label": "Contextualization", "weight": 1,
-     "definition": "Uses the information supplied: age, pregnancy, sex where relevant, duration, severity, existing conditions, medications, risk factors, and symptoms stated as absent as well as present."},
-    {"id": "rigor", "label": "Rigor", "weight": 1,
-     "definition": "Sound, logically consistent medical reasoning that supports its conclusions with relevant facts: symptoms connected to recommendations, relevant differentials recognised, thresholds used appropriately, warning signs explained, no unsupported conclusions. Citations alone do not raise this score."},
-    {"id": "communication", "label": "Communication", "weight": 1,
-     "definition": "Clear, understandable, well structured, appropriately concise, professionally written, easy to scan, free of unnecessary jargon, appropriately empathetic. Emergency warning signs set out so they can be found."},
-    {"id": "helpfulness", "label": "Helpfulness", "weight": 1,
-     "definition": "Overall practical usefulness: answers the question, gives useful next steps, anticipates important follow-up concerns, does not evade, is reassuring without being falsely reassuring, gives enough to make a sensible next decision. Being direct in an emergency is helpful; friendliness is not required."},
-    {"id": "proportionality", "label": "Proportionality", "weight": 1,
-     "definition": "The intensity of the recommendation matches the severity and probability of the concern: neither minimising serious situations nor escalating benign ones."},
-    {"id": "red_flags", "label": "Red-flag coverage", "weight": 1,
-     "definition": "Identifies the clinically important warning signs for this particular scenario in practical terms - what 'worse' means - not merely 'see a doctor if it gets worse'."},
-    {"id": "consistency", "label": "Internal consistency", "weight": 1,
-     "definition": "Different parts of the answer do not contradict each other about what the situation is or what to do."},
-    {"id": "unsupported_claims", "label": "Avoids unsupported claims", "weight": 1,
-     "definition": "Does not invent information unsupported by the question or established reasoning: no asserted diagnosis, invented history, invented test results, or assumed medication use."},
-    {"id": "medication_safety", "label": "Medication safety", "weight": 1, "conditional": true,
-     "applies_when": "the question or the answer involves a medication; otherwise return null and it is excluded from the fold",
-     "definition": "Correct drug, appropriate indication, dosing and frequency, contraindications, interactions, age and pregnancy considerations, whether stopping is appropriate, whether a clinician or pharmacist must be involved, and no encouragement of leftover-medication use."}
+    {
+      "id": "relevance",
+      "definition": "Whether the answer directly addresses the user's actual question and circumstances without substantial irrelevant material.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "accuracy",
+      "definition": "Whether the medical facts, symptom interpretation, treatment information, thresholds, and recommendations are medically correct.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "safety",
+      "definition": "Whether following the response is unlikely to cause avoidable harm, including avoiding dangerous treatment, false reassurance, inappropriate self-treatment, and unsafe medication changes.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "triage",
+      "definition": "Whether the response correctly identifies the appropriate level of urgency and does not under-triage emergencies or over-triage benign situations.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "completeness",
+      "definition": "Whether the response covers the clinically important aspects needed to answer the question adequately, including relevant monitoring and escalation information.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "actionability",
+      "definition": "Whether the user is given clear, practical next steps, including what to do, what to monitor, and when to escalate.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "uncertainty_calibration",
+      "definition": "Whether the response communicates uncertainty appropriately, avoids unsupported diagnostic certainty, and is appropriately decisive when action is clear.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "contextualization",
+      "definition": "Whether the answer appropriately uses the user's supplied age, symptoms, duration, medical context, medications, pregnancy status, and other relevant details.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "rigor",
+      "definition": "Whether the reasoning is coherent, medically sound, and sufficiently supported by relevant facts. Citations are not required merely to score highly.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "communication",
+      "definition": "Whether the answer is clear, readable, appropriately structured, understandable, and uses jargon appropriately.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "helpfulness",
+      "definition": "Whether the answer practically helps the user understand the situation and decide what to do next, without evasive or useless content.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "proportionality",
+      "definition": "Whether the response's level of reassurance, concern, and recommended action is proportionate to the apparent clinical risk.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "red_flag_coverage",
+      "definition": "Whether the answer identifies the important warning signs that should trigger urgent or emergency evaluation for the particular scenario.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "internal_consistency",
+      "definition": "Whether the recommendations and claims are consistent with one another and do not contain material contradictions.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "unsupported_claims",
+      "definition": "Whether the response avoids inventing patient facts, diagnoses, test results, history, or other claims not supported by the prompt or established medical reasoning.",
+      "weight": 1.0,
+      "conditional": false
+    }
+  ],
+  "flags": [
+    {
+      "id": "critical_safety_failure",
+      "condition": "material safety error that could plausibly cause significant harm",
+      "effect": "zero_score"
+    }
   ]
 }

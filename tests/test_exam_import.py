@@ -1,6 +1,6 @@
-"""Phase 8b P4a: a human-written bank, and a rubric per topic.
+"""Phases 8b P4a and 8d: a human-written bank, and a rubric per topic.
 
-Dr. Hossein's 50 consumer health questions come with metadata instead of
+Dr. Hossein's 100 consumer health questions come with metadata instead of
 reference answers, and with their own rubric. These tests are over the real
 delivered files — if the file changes, they are what says so."""
 
@@ -18,7 +18,7 @@ import judge as jd
 from service import llm
 
 REPO = Path(__file__).resolve().parents[1]
-MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v1.json"
+MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v2.json"
 TOPIC = "medicine & health"
 TASK = "exam_medicine_health"
 
@@ -36,19 +36,24 @@ def bank(tmp_path) -> tuple[Path, dict]:
 
 def test_the_delivered_file_is_what_the_import_expects():
     items = json.loads(MEDICINE.read_text(encoding="utf-8"))
-    assert isinstance(items, list) and len(items) == 50
+    assert isinstance(items, list) and len(items) == 100
     assert all(isinstance(it, dict) and it.get("prompt") for it in items)
     assert not any(it.get("reference") for it in items)      # metadata instead
     assert {it["acuity"] for it in items} == {"emergency", "urgent", "moderate", "mild", "routine"}
+    # v2 gave every item the author's own difficulty level
+    assert all(isinstance(it.get("difficulty"), int) for it in items)
+    law = json.loads((REPO / "eval_tasks" / "fr" / "hossein_law_v1.json").read_text("utf-8"))
+    assert len(law) == 100 and all(it.get("prompt") and it.get("difficulty") for it in law)
+    assert sorted({it["difficulty"] for it in law}) == [1, 2, 3, 4, 5]
 
 
-def test_import_round_trips_fifty_items_and_is_idempotent(bank):
+def test_import_round_trips_the_whole_file_and_is_idempotent(bank):
     root, r = bank
-    assert (r["imported"], r["skipped"], r["invalid"]) == (50, 0, 0)
-    assert r["report"] + r["diagnose"] == 50 and r["report"] > 10 and r["diagnose"] > 10
-    assert sum(r["acuity"].values()) == 50 and r["acuity"]["emergency"] == 3
+    assert (r["imported"], r["skipped"], r["invalid"]) == (100, 0, 0)
+    assert r["report"] + r["diagnose"] == 100 and r["report"] > 20 and r["diagnose"] > 20
+    assert sum(r["acuity"].values()) == 100 and r["acuity"]["emergency"] == 9
     rows = eb.load_bank(root)[TOPIC]
-    assert len(rows) == 50
+    assert len(rows) == 100
     one = next(x for x in rows if x["meta"]["id"] == 1)
     assert one["source"] == "hossein_v1" and one["accepted_by"] == "Dr. Hossein"
     assert one["edited"] is False and one["notes"] == "" and one["accepted_at"] > 0
@@ -56,25 +61,49 @@ def test_import_round_trips_fifty_items_and_is_idempotent(bank):
     # his metadata is kept whole, under meta
     assert one["meta"] == {"id": 1, "intent": "symptom_assessment_triage", "subject": "child",
                            "age_group": "5-12", "sex": "male", "acuity": "moderate",
-                           "domain": "respiratory_infectious", "style": "conversational"}
+                           "domain": "respiratory_infectious", "style": "conversational",
+                           "difficulty": 2}
     again = eb.import_bank(root, MEDICINE, TOPIC, "Dr. Hossein", "hossein_v1")
-    assert (again["imported"], again["skipped"]) == (0, 50)
-    assert len(eb.load_bank(root)[TOPIC]) == 50
+    assert (again["imported"], again["skipped"]) == (0, 100)
+    assert len(eb.load_bank(root)[TOPIC]) == 100
+
+
+def test_a_second_delivery_adds_only_what_is_new(tmp_path):
+    """v2 is v1's fifty questions unchanged plus fifty more. On a bank that
+    already holds the first delivery, the second imports half and skips half
+    — which is the idempotence the qid is for, and the shape every later
+    delivery from the author will have."""
+    root = tmp_path / "exam"
+    items = json.loads(MEDICINE.read_text(encoding="utf-8"))
+    first, second = tmp_path / "v1.json", MEDICINE
+    first.write_text(json.dumps(items[:50]), encoding="utf-8")
+    r1 = eb.import_bank(root, first, TOPIC, "Dr. Hossein", "hossein_v1")
+    assert (r1["imported"], r1["skipped"]) == (50, 0)
+    r2 = eb.import_bank(root, second, TOPIC, "Dr. Hossein", "hossein_v2")
+    assert (r2["imported"], r2["skipped"]) == (50, 50)
+    rows = eb.load_bank(root)[TOPIC]
+    assert len(rows) == 100
+    # the first fifty keep the source they arrived under, and their qids and
+    # halves did not move: the published score stays comparable across the
+    # delivery, which is the whole point of hashing the prompt
+    kept = [x for x in rows if x["source"] == "hossein_v1"]
+    assert len(kept) == 50
+    assert {x["qid"] for x in kept} == {eb.qid_of(it["prompt"]) for it in items[:50]}
 
 
 def test_the_reference_is_the_metadata_in_a_stable_order(bank):
     root, _ = bank
     one = next(x for x in eb.load_bank(root)[TOPIC] if x["meta"]["id"] == 1)
     assert one["reference"] == ("Acuity: moderate. Intent: symptom_assessment_triage. "
-                                "Domain: respiratory_infectious. Subject: child (male, 5-12). "
-                                "Style: conversational.")
+                                "Domain: respiratory_infectious. Difficulty: 2. "
+                                "Subject: child (male, 5-12). Style: conversational.")
     # field order is fixed, not dict order, so the same item always hashes the same
     scrambled = {"style": "telegraphic", "domain": "cardiovascular", "sex": "male",
                  "acuity": "emergency", "age_group": "45-59", "subject": "self",
-                 "intent": "symptom_assessment_triage"}
+                 "difficulty": 4, "intent": "symptom_assessment_triage"}
     assert eb.metadata_reference(scrambled) == (
         "Acuity: emergency. Intent: symptom_assessment_triage. Domain: cardiovascular. "
-        "Subject: self (male, 45-59). Style: telegraphic.")
+        "Difficulty: 4. Subject: self (male, 45-59). Style: telegraphic.")
     # only what is there appears
     assert eb.metadata_reference({"acuity": "mild"}) == "Acuity: mild."
     assert eb.metadata_reference({"subject": "self"}) == "Subject: self."
@@ -116,8 +145,8 @@ def test_the_cli_imports_and_says_what_it_did(tmp_path):
                         "--topic", TOPIC, "--approver", "Dr. Hossein", "--source", "hossein_v1"],
                        capture_output=True, text=True, timeout=120, cwd=REPO)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "imported 50, skipped 0" in r.stdout and "report" in r.stdout
-    assert "acuity: emergency 3" in r.stdout
+    assert "imported 100, skipped 0" in r.stdout and "report" in r.stdout
+    assert "acuity: emergency 9" in r.stdout
     bad = subprocess.run([sys.executable, str(REPO / "scripts" / "exam_build.py"),
                           "--root", str(tmp_path / "exam2"), "import", str(MEDICINE),
                           "--topic", TOPIC, "--approver", " "],
@@ -131,15 +160,16 @@ def test_the_built_task_carries_the_metadata_the_judge_reads(bank, tmp_path):
     m = eb.build(tmp_path / "results", root)
     items = [json.loads(x) for x in
              (eb.tasks_dir(root) / f"{TASK}.jsonl").read_text().splitlines() if x.strip()]
-    assert m["tasks"][TASK]["items"] == 50 and len(items) == 50
-    assert all(it["meta"]["acuity"] for it in items)
+    assert m["tasks"][TASK]["items"] == 100 and len(items) == 100
+    assert all(it["meta"]["acuity"] and it["meta"]["difficulty"] for it in items)
     assert items[0]["prompt"] and items[0]["reference"].startswith("Acuity: ")
+    assert "Difficulty: " in items[0]["reference"]
 
 
 def test_a_report_half_import_is_as_withheld_as_any_other_question(bank):
     root, _ = bank
     public = eb.public_bank(root, TOPIC)
-    assert len(public) == 50
+    assert len(public) == 100
     for row in public:
         if row["half"] == "report":
             assert row["prompt"] is None and row["reference"] is None and row["meta"] is None
@@ -159,8 +189,11 @@ def test_the_rubric_follows_the_topic_and_falls_back(tmp_path):
     assert jd.rubric_name(eb.CONTROL_TASK) == "factual_accuracy"
     med, exam = jd.rubric_for(TASK), jd.rubric_for("exam_economics")
     assert "consumer health question" in med.text and med.sha256 != exam.sha256
-    assert med.version == "1" and med.status == "draft"        # until its author signs it off
+    assert med.version == "2" and med.status == "draft"        # until its author signs it off
     assert exam.status == ""
+    # the second topic with a file of its own, delivered in the same round
+    assert jd.rubric_name("exam_law") == "law"
+    assert jd.rubric_for("exam_law").criteria is not None
     # the canary is graded with the shared rubric, as before
     assert jd.rubric_for("exam_x").sha256 == exam.sha256
 
@@ -201,6 +234,33 @@ def test_a_bank_with_no_draft_rubric_carries_no_draft_stamp(tmp_path):
 # ---------------------------------------------------------------------------
 # the split holds for an imported bank too
 # ---------------------------------------------------------------------------
+
+def test_both_delivered_banks_keep_their_report_half_out_of_every_request(bank, tmp_path,
+                                                                            monkeypatch):
+    """Two topics, two criteria files, one rule: over the bodies actually
+    sent, no report-half question from either bank appears."""
+    from service import config, proposals as prop
+    root, _ = bank
+    law_file = REPO / "eval_tasks" / "fr" / "hossein_law_v1.json"
+    eb.import_bank(root, law_file, "law", "Dr. Hossein", "hossein_v1")
+    monkeypatch.setattr(config, "EXAM_DIR", root)
+    monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)
+    fake = llm.FakeBatches("fake-exam", tmp_path)
+    for topic, task in ((TOPIC, TASK), ("law", "exam_law")):
+        fake.submit(eb.draft_requests(root, topic, 2))
+        fake.submit([prop.proposal_request(1, "m", task, topic,
+                                           [{"qid": "q", "score": 1,
+                                             "justification": "vague on escalation"}],
+                                           {"diagnose_items": 1, "diagnose_weak": 1}, "rubric")])
+    sent = "\n".join(r["system"] + "\n" + r["user"] for r in fake.recorded())
+    for topic in (TOPIC, "law"):
+        rows = eb.load_bank(root)[topic]
+        report = [r for r in rows if eb.half_of(r["qid"]) == "report"]
+        assert report, f"the split put nothing in the report half of {topic}"
+        for r in report:
+            assert r["prompt"] not in sent and r["prompt"][:60] not in sent
+        assert any(r["prompt"] in sent for r in rows if eb.half_of(r["qid"]) == "diagnose")
+
 
 def test_an_imported_report_half_question_never_leaves_the_bank(bank, tmp_path, monkeypatch):
     """The same rule as any other question, over the bodies actually sent:

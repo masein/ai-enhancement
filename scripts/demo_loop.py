@@ -336,6 +336,10 @@ def import_step(a, ctx) -> str:
             f"can be proposed from. The ask back to the author is at least {2 * short} more "
             f"items",
             "(the split is by qid, so about half of what arrives lands in the report half).")
+    else:
+        say("", f"{r['report']} report-half questions — at or above the {report.PROPOSE_MIN_N} "
+                f"this topic needs",
+            "before anything may be proposed from it. The floor is cleared.")
     for row in eb.load_bank(config.EXAM_DIR).get(topic, [])[:1]:
         print()
         say("One item as it was imported — the reference is its metadata, which is the "
@@ -520,10 +524,12 @@ def judge_step(a, ctx) -> str:
 
 def _criteria_report(task: str, v: dict, jj: dict) -> None:
     """What a topic graded criterion by criterion looks like: where it was
-    weak, how often it was dangerous, on which acuities, and one graded
+    weak, which flags fired and what they did to the score, the same numbers
+    broken down by every metadata field the topic carries, and one graded
     answer in full so a person can see what a grade actually is."""
     labels = v.get("criteria_labels") or {}
     counts = v.get("criteria_n") or {}
+    flags = v.get("flags") or {}
     rub = (jj.get("rubrics") or {}).get(task) or {}
     print()
     say(f"{task} is graded criterion by criterion, and the 0-4 above is a fold of them:",
@@ -535,25 +541,32 @@ def _criteria_report(task: str, v: dict, jj: dict) -> None:
     for cid, m in sorted(v["criteria_mean"].items(), key=lambda kv_: (kv_[1] is None, kv_[1])):
         print(f"   {(labels.get(cid) or cid):<28}{('—' if m is None else f'{m:.2f}'):>7}"
               f"{counts.get(cid, 0):>9}")
-    csf = v.get("critical_safety_failures") or {}
-    say("", f"critical safety failures: {csf.get('n', 0)} of {v['n']} answers"
-            + (f" ({', '.join(csf.get('acuities') or [])})" if csf.get("acuities") else "")
-            + " — each folds to 0 whatever else was right.")
-    if v.get("by_acuity"):
+    if flags:
+        say("", "flags — decided per answer, applied to the score in code:")
+        for fid, f in flags.items():
+            print(f"   {(f.get('label') or fid):<28}{f['n']:>3} of {v['n']} answers"
+                  f" — each {f.get('effect_words', 'changes the score')}")
+    for field, cells in (v.get("breakdowns") or {}).items():
         print()
-        print(f"   {'acuity':<28}{'mean':>7}{'answers':>9}{'critical':>10}")
-        for acuity, b in v["by_acuity"].items():
-            print(f"   {acuity:<28}{b['mean']:>7.2f}{b['n']:>9}"
-                  f"{b['critical_safety_failures']:>10}")
+        head = f"{field:<28}{'mean':>7}{'answers':>9}"
+        print(f"   {head}" + "".join(f"{(flags[fid].get('label') or fid)[:14]:>16}"
+                                     for fid in flags))
+        for value, b in cells.items():
+            print(f"   {value:<28}{b['mean']:>7.2f}{b['n']:>9}"
+                  + "".join(f"{(b.get('flags') or {}).get(fid, 0):>16}" for fid in flags))
+        if field == "difficulty":
+            say("", "the author's own level, 1 easiest: does the model do well only on basic "
+                    "questions,", "or can it reason about the ambiguous and high-risk ones too?")
     graded = [it for it in v.get("items") or []
               if it.get("half") == "diagnose" and it.get("criteria")]
     if graded:
         it = min(graded, key=lambda x: x["score"])
+        fired = (it.get("fold") or {}).get("effects_applied") or []
         print()
         say("One graded answer in full — the diagnosis half, so it may be shown:",
             f"  score {it['score']}/4, folded from {it['fold']['applicable']} applicable "
             f"criteria"
-            + (", CRITICAL SAFETY FAILURE" if it.get("critical_safety_failure") else ""))
+            + (f", FLAGGED: {', '.join(fired)}" if fired else ""))
         quote(", ".join(f"{cid} {'null' if val is None else val}"
                         for cid, val in sorted(it["criteria"].items())))
         quote(it.get("justification") or "(no justification)")
@@ -636,8 +649,9 @@ def propose(a, ctx) -> str:
                              {"n_shown": len(items), **counts, "demo": True})
     crit = prop.criteria_evidence(ctx["model_dir"], task)
     if crit.get("weakest_criteria"):
+        fields = ", ".join(crit.get("breakdowns") or {}) or "no metadata field"
         say("", "This topic is graded criterion by criterion, so the request also carries the",
-            "three weakest criteria and the per-acuity means — labels and numbers only:")
+            f"three weakest criteria and the means by {fields} — labels and numbers only:")
         for c in crit["weakest_criteria"]:
             say(f"  {c['label']}: {c['mean']} over {c['n']} answers")
     req = prop.proposal_request(pid, a.model, task, topic, items, counts,

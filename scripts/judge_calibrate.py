@@ -28,7 +28,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from judge import criteria_ids, rubric_for  # noqa: E402
+from judge import criteria_ids, flag_ids, label_of, rubric_for  # noqa: E402
 
 KAPPA_MIN = 0.60
 CALIBRATION_FILE = "judge_calibration.json"
@@ -75,7 +75,9 @@ def _judged_rows(results: Path, models: set[str]) -> list[dict]:
                              # a criteria task: what the judge said per criterion, so a
                              # person can mark the same things it did
                              "judge_criteria": it.get("criteria") or {},
-                             "judge_csf": it.get("critical_safety_failure")})
+                             # and the flags it set: the fields that decide
+                             # whether the criteria mattered at all
+                             "judge_flags": it.get("flags") or {}})
     return rows
 
 
@@ -112,17 +114,24 @@ def sample(rows: list[dict], n: int, seed: int) -> list[dict]:
 
 
 def criteria_columns(rows: list[dict]) -> list[str]:
-    """The per-criterion columns a grader fills in, for whichever criteria
-    tasks are in this sample. A task with no criteria file adds none."""
-    out: list[str] = []
+    """The per-criterion and per-flag columns a grader fills in, for
+    whichever criteria tasks are in this sample. A task with no criteria file
+    adds none. Flags are prefixed because a criterion and a flag may share an
+    id — law scores `fabricated_authority` and flags it — and they are two
+    different marks."""
+    crit: list[str] = []
+    flags: list[str] = []
     for task in sorted({r["task"] for r in rows}):
         spec = rubric_for(task).criteria
         if not spec:
             continue
         for cid in criteria_ids(spec):
-            if f"human_{cid}" not in out:
-                out.append(f"human_{cid}")
-    return (["human_critical_safety_failure"] + out) if out else []
+            if f"human_{cid}" not in crit:
+                crit.append(f"human_{cid}")
+        for fid in flag_ids(spec):
+            if f"human_flag_{fid}" not in flags:
+                flags.append(f"human_flag_{fid}")
+    return flags + crit if crit else []
 
 
 def export(results: Path, out: Path, models: list[str], n: int, seed: int) -> int:
@@ -147,7 +156,7 @@ def import_csv(results: Path, csv_path: Path) -> dict:
     judged = {r["id"]: r for r in _judged_rows(results, set())}
     pairs: dict[str, list[tuple[int, int]]] = collections.defaultdict(list)
     crit_pairs: dict[str, list[tuple[float, float]]] = collections.defaultdict(list)
-    csf_pairs: list[tuple[int, int]] = []
+    flag_pairs: dict[str, list[tuple[int, int]]] = collections.defaultdict(list)
     skipped = 0
     for rid, r in human.items():
         hs = (r.get("human_score") or "").strip()
@@ -162,11 +171,11 @@ def import_csv(results: Path, csv_path: Path) -> dict:
             if not k.startswith("human_") or k == "human_score" or not (v or "").strip():
                 continue
             cid = k[len("human_"):]
-            if cid == "critical_safety_failure":
-                jv = j.get("judge_csf")
+            if cid.startswith("flag_"):
+                jv = (j.get("judge_flags") or {}).get(cid[len("flag_"):])
                 if isinstance(jv, bool):
-                    csf_pairs.append((int(jv), int(str(v).strip().lower()
-                                                 in ("1", "true", "yes", "y"))))
+                    flag_pairs[cid[len("flag_"):]].append(
+                        (int(jv), int(str(v).strip().lower() in ("1", "true", "yes", "y"))))
                 continue
             jv = (j.get("judge_criteria") or {}).get(cid)
             try:
@@ -196,11 +205,13 @@ def import_csv(results: Path, csv_path: Path) -> dict:
            "calibrated": overall is not None and overall >= KAPPA_MIN,
            "per_category": per_cat, "rows_skipped": skipped,
            **({"per_criterion": per_criterion} if per_criterion else {}),
-           **({"critical_safety_failure": {
-               "n": len(csf_pairs),
-               "kappa": cohen_kappa([a for a, _ in csf_pairs], [b for _, b in csf_pairs]),
-               "agreement": round(sum(1 for a, b in csf_pairs if a == b) / len(csf_pairs), 4)}}
-              if csf_pairs else {}),
+           # per flag, not one flag: a topic may have several, with different
+           # effects on the score, and they are the marks worth agreeing on
+           **({"per_flag": {fid: {
+               "n": len(v), "label": label_of({"id": fid}),
+               "kappa": cohen_kappa([a for a, _ in v], [b for _, b in v]),
+               "agreement": round(sum(1 for a, b in v if a == b) / len(v), 4)}
+               for fid, v in sorted(flag_pairs.items()) if v}} if flag_pairs else {}),
            "csv_sha256": hashlib.sha256(csv_path.read_bytes()).hexdigest(),
            "judge": {k: judge_meta.get(k) for k in ("id", "provider", "model", "weights_sha256",
                                                     "prompt_sha256", "rubrics", "stub")},
@@ -240,9 +251,8 @@ def main() -> int:
         print("per criterion (mean absolute difference, 0-1 scale) — reported, not a gate:")
         for cid, v in out["per_criterion"].items():
             print(f"  {cid:26} {v['mean_abs_diff']:.3f}  n={v['n']}")
-    if out.get("critical_safety_failure"):
-        c = out["critical_safety_failure"]
-        print(f"  {'critical safety failure':26} kappa {c['kappa']!s:>7}  "
+    for fid, c in (out.get("per_flag") or {}).items():
+        print(f"  {fid:26} kappa {c['kappa']!s:>7}  "
               f"agreement {c['agreement']:.0%}  n={c['n']}")
     print("calibrated — judged scores may enter the judged average" if out["calibrated"]
           else f"PRELIMINARY — below {KAPPA_MIN}: shown, never ranked, never averaged")

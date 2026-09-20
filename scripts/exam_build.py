@@ -431,9 +431,9 @@ def reject(root: Path, cid: str, approver: str, reason: str = "") -> dict:
 # the order metadata is written in, so the same item always hashes the same
 # way. Subject carries sex and age group in brackets; only present fields
 # appear at all.
-META_ORDER = ("acuity", "intent", "domain", "subject", "style")
+META_ORDER = ("acuity", "intent", "domain", "difficulty", "subject", "style")
 META_LABEL = {"acuity": "Acuity", "intent": "Intent", "domain": "Domain",
-              "subject": "Subject", "style": "Style"}
+              "difficulty": "Difficulty", "subject": "Subject", "style": "Style"}
 
 
 def metadata_reference(item: dict) -> str:
@@ -441,7 +441,12 @@ def metadata_reference(item: dict) -> str:
     rubric asks the judge to check the answer against — above all the acuity.
 
         Acuity: emergency. Intent: symptom_assessment_triage.
-        Domain: cardiovascular. Subject: self (male, 45-59). Style: telegraphic.
+        Domain: cardiovascular. Difficulty: 3. Subject: self (male, 45-59).
+        Style: telegraphic.
+
+    Difficulty is the author's own level for the item (1 easiest), and the
+    judge reads it the same way it reads acuity: as ground truth about the
+    question, not as an instruction about how hard to mark.
     """
     bits = []
     for field in META_ORDER:

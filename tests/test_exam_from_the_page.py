@@ -17,7 +17,7 @@ import judge as jd
 from conftest import make_service
 
 REPO = Path(__file__).resolve().parents[1]
-MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v1.json"
+MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v2.json"
 TOPIC = "medicine & health"
 ITEMS = json.loads(MEDICINE.read_text(encoding="utf-8"))
 
@@ -50,10 +50,10 @@ def test_preview_writes_nothing_and_says_what_would_land(svc):
              source="hossein_v1", items=ITEMS)
     assert r.status_code == 200, r.text
     p = r.json()
-    assert p["imported"] == 50 and p["skipped"] == 0 and p["invalid"] == 0
-    assert p["report"] + p["diagnose"] == 50 and p["report"] > 10
-    assert p["acuity"]["emergency"] == 3 and p["intent"]["symptom_assessment_triage"] == 17
-    assert len(p["items"]) == 50
+    assert p["imported"] == 100 and p["skipped"] == 0 and p["invalid"] == 0
+    assert p["report"] + p["diagnose"] == 100 and p["report"] > 20
+    assert p["acuity"]["emergency"] == 9 and p["intent"]["symptom_assessment_triage"] > 20
+    assert len(p["items"]) == 100
     assert len(eb.load_bank(config.EXAM_DIR).get(TOPIC, [])) == before      # nothing written
 
 
@@ -82,7 +82,7 @@ def test_commit_writes_the_same_records_as_the_cli(svc, tmp_path):
     r = post(client, "/api/exam/import", topic=TOPIC, approver="Dr. Hossein",
              source="hossein_v1", items=ITEMS)
     assert r.status_code == 200, r.text
-    assert r.json()["imported"] == 50
+    assert r.json()["imported"] == 100
     # the fixture's bank already holds drafted questions for this topic; the
     # imported ones are the ones to compare
     from_page = [r for r in eb.load_bank(config.EXAM_DIR)[TOPIC]
@@ -91,7 +91,7 @@ def test_commit_writes_the_same_records_as_the_cli(svc, tmp_path):
     cli_root = tmp_path / "cli-exam"
     eb.import_bank(cli_root, MEDICINE, TOPIC, "Dr. Hossein", "hossein_v1")
     from_cli = eb.load_bank(cli_root)[TOPIC]
-    assert len(from_page) == len(from_cli) == 50
+    assert len(from_page) == len(from_cli) == 100
     drop = lambda rows: [{k: v for k, v in r.items() if k != "accepted_at"}      # noqa: E731
                          for r in sorted(rows, key=lambda x: x["qid"])]
     assert drop(from_page) == drop(from_cli)
@@ -99,7 +99,7 @@ def test_commit_writes_the_same_records_as_the_cli(svc, tmp_path):
     from service import db
     row = db.curation_list(5)[0]
     assert row["decision"] == "imported" and row["approver"] == "Dr. Hossein"
-    assert row["topic"] == TOPIC and "50 imported" in row["reason"]
+    assert row["topic"] == TOPIC and "100 imported" in row["reason"]
 
 
 def test_a_second_import_of_the_same_file_changes_nothing(svc):
@@ -107,10 +107,10 @@ def test_a_second_import_of_the_same_file_changes_nothing(svc):
     post(client, "/api/exam/import", topic=TOPIC, approver="Dr. Hossein", items=ITEMS)
     again = post(client, "/api/exam/import", topic=TOPIC, approver="Dr. Hossein",
                  items=ITEMS).json()
-    assert (again["imported"], again["skipped"]) == (0, 50)
+    assert (again["imported"], again["skipped"]) == (0, 100)
     pre = post(client, "/api/exam/import/preview", topic=TOPIC, approver="Dr. Hossein",
                items=ITEMS).json()
-    assert pre["skipped"] == 50 and len(pre["duplicates"]) == 50
+    assert pre["skipped"] == 100 and len(pre["duplicates"]) == 50   # the list is capped
 
 
 def test_what_the_import_refuses(svc):
@@ -144,7 +144,8 @@ def test_the_page_says_which_rubric_grades_each_topic(svc):
     med = rows[TOPIC]
     assert med["name"] == "medicine_health" and med["own"] is True
     assert med["status"] == "draft" and med["scoring"] == "criteria"
-    assert med["criteria_count"] == 16 and len(med["criteria_sha256"]) == 64
+    assert med["criteria_count"] == 15 and len(med["criteria_sha256"]) == 64
+    assert rows["law"]["name"] == "law" and rows["law"]["criteria_count"] == 23
     assert rows["history"]["name"] == "exam" and rows["history"]["own"] is False
     assert rows["history"]["scoring"] == "single"
     assert r["store"] and isinstance(r["in_repo"], bool)
@@ -152,28 +153,32 @@ def test_the_page_says_which_rubric_grades_each_topic(svc):
     md = client.get("/api/exam/rubrics/medicine_health")
     assert md.status_code == 200 and md.text.startswith("# Rubric — medicine & health")
     spec = client.get("/api/exam/rubrics/medicine_health?kind=criteria")
-    assert json.loads(spec.text)["rubric"] == "medicine_health"
+    assert json.loads(spec.text)["topic"] and len(json.loads(spec.text)["criteria"]) == 15
     assert client.get("/api/exam/rubrics/nothing_here").status_code == 404
 
 
 def test_a_criteria_upload_is_checked_before_it_can_be_saved(svc):
     client, _ = svc
     good = json.loads(jd.rubric_path("medicine_health", ".criteria.json").read_text())
-    bad = {**good, "criteria": [
-        {"id": "Relevance", "label": "", "definition": "", "weight": 0},
-        {"id": "triage", "label": "T", "definition": "d", "weight": 1, "conditional": True},
-        {"id": "triage", "label": "T", "definition": "d", "weight": "heavy"}]}
-    bad.pop("critical_safety_failure")
-    bad["fold"] = {"method": "vibes"}
+    bad = {**good,
+           "weights": "softmax",
+           "criteria": [
+               {"id": "Relevance", "definition": "", "weight": 0},
+               {"id": "triage", "definition": "d", "weight": 1},
+               {"id": "triage", "definition": "d", "weight": "heavy"}],
+           "flags": [{"id": "critical_safety_failure", "condition": "", "effect": "melt"}],
+           "breakdowns": "acuity"}
     r = post(client, "/api/exam/rubrics/preview", name="medicine_health", kind="criteria",
              content=json.dumps(bad), approver="Dr. Hossein").json()
     joined = " | ".join(r["problems"])
     assert r["ok"] is False
-    assert "fold.method 'vibes' is not one this judge knows" in joined
-    assert "critical_safety_failure needs a definition" in joined
+    assert "weights 'softmax'" in joined
     assert "an id is lower-case letters" in joined and "duplicate id" in joined
-    assert "has no label" in joined and "weight must be greater than 0" in joined
-    assert "weight is not a number" in joined and "needs applies_when" in joined
+    assert "has no definition" in joined and "weight must be greater than 0" in joined
+    assert "weight is not a number" in joined
+    assert "flag critical_safety_failure has no condition" in joined
+    assert "effect 'melt' is not one this judge can apply" in joined
+    assert "'breakdowns' is a list of metadata field names" in joined
     # and the commit refuses too — the preview is not the only gate
     assert post(client, "/api/exam/rubrics", name="medicine_health", kind="criteria",
                 content=json.dumps(bad), approver="Dr. Hossein").status_code == 422
@@ -196,7 +201,7 @@ def test_committing_a_rubric_changes_what_the_judge_reads_and_is_recorded(svc):
     from service import config, db
     before = jd.rubric_for("exam_medicine_health")
     text = jd.rubric_path("medicine_health").read_text(encoding="utf-8")
-    signed_off = text.replace(", DRAFT — awaiting Dr. Hossein's sign-off", "")
+    signed_off = text.split(", DRAFT")[0] + ")" + text.split(")", 1)[1]
     pre = post(client, "/api/exam/rubrics/preview", name="medicine_health", kind="rubric",
                content=signed_off, approver="Dr. Hossein").json()
     assert pre["ok"] and pre["changed"] and pre["existed"]

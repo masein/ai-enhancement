@@ -188,7 +188,7 @@ def test_a_model_answering_in_an_uncurable_shape_says_how_many(tmp_path, monkeyp
         srv.server_close()
 
 
-MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v1.json"
+MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v2.json"
 
 
 def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
@@ -201,11 +201,13 @@ def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
     out = r.stdout
     assert "Import the exam — a human-written bank, not an LLM's drafts" in out
     assert "Draft the exam" not in out and "NOT curation" not in out
-    assert re.search(r"imported\s+50 items", out)
+    assert re.search(r"imported\s+100 items", out)
     assert re.search(r"split by qid\s+report \d+ / diagnose \d+", out)
-    assert re.search(r"acuity\s+emergency 3,", out)
-    assert "a real run needs 30 before this topic" in out
-    assert "the ask back to the author is at least" in out.lower()
+    assert re.search(r"acuity\s+emergency 9,", out)
+    # 100 questions clears the floor, so the step says so instead of asking
+    assert "at or above the 30 this topic needs" in out
+    assert "The floor is cleared." in out
+    assert "the ask back to the author is at least" not in out.lower()
     # the evidence shown is a sample, and says so rather than looking like all of it
     assert re.search(r"in a person's vocabulary \(3 of \d+ shown\):", out)
     # the next step after a demo of an imported bank is one paste
@@ -222,20 +224,29 @@ def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
     assert j["judge"]["rubric_status"] == "draft"
     bank = [json.loads(x) for x in (root / "demo" / "exam" / "bank" / "medicine_health.jsonl")
             .read_text().splitlines() if x.strip()]
-    assert len(bank) == 50 and all(b["accepted_by"] == "Dr. Hossein" for b in bank)
-    assert all(b["source"] == "hossein_medicine_v1" for b in bank)   # the file's stem
+    assert len(bank) == 100 and all(b["accepted_by"] == "Dr. Hossein" for b in bank)
+    assert all(b["source"] == "hossein_medicine_v2" for b in bank)   # the file's stem
     # the judge graded it criterion by criterion, and the demo shows what that is
     assert "is graded criterion by criterion, and the 0-4 above is a fold of them" in out
-    assert re.search(r"medicine_health\.criteria\.json \([0-9a-f]{12}, draft\)", out)
-    assert re.search(r"Triage / urgency\s+[01]\.\d\d\s+\d+", out)
-    assert re.search(r"critical safety failures: \d+ of 50 answers", out)
-    assert re.search(r"emergency\s+\d\.\d\d\s+3\s+\d", out)          # the by-acuity table
+    # the criteria file is the author's own and carries no draft stamp; the
+    # prose rubric beside it still does, and the caveat above says which
+    assert re.search(r"medicine_health\.criteria\.json \([0-9a-f]{12}, signed off\)", out)
+    assert re.search(r"Triage\s+[01]\.\d\d\s+\d+", out)
+    # one line per flag, in the author's words, with what it does to a score
+    assert re.search(r"Critical safety failure\s+\d+ of 100 answers", out)
+    assert "each sets the whole score to 0" in out
+    # a table per metadata field the topic carries, acuity first
+    assert re.search(r"emergency\s+\d\.\d\d\s+9\s+\d", out)
+    assert re.search(r"difficulty\s+mean\s+answers", out)
+    assert "the author's own level, 1 easiest" in out
     assert "One graded answer in full — the diagnosis half, so it may be shown:" in out
-    assert "folded from" in out and "medication_safety" in out
+    assert "folded from" in out and "red_flag_coverage" in out
     # and the spec request carried the weakest criteria, as labels and numbers
-    assert "three weakest criteria and the per-acuity means — labels and numbers only" in out
+    assert "the means by acuity, difficulty, intent — labels and numbers only" in out
     t = j["tasks"]["exam_medicine_health"]
-    assert t["criteria_mean"] and t["by_acuity"] and t["unparseable"] == 0
+    assert t["criteria_mean"] and t["breakdowns"]["acuity"] and t["unparseable"] == 0
+    assert list(t["breakdowns"]) == ["acuity", "difficulty", "intent"]
+    assert set(t["flags"]) == {"critical_safety_failure"}
     assert all(it.get("fold") for it in t["items"])
 
 
@@ -338,11 +349,15 @@ def test_demo_md_says_what_a_green_run_does_not_prove():
     for other in ("README.md", "SERVICE.md"):
         assert "DEMO.md" in (REPO / other).read_text(encoding="utf-8"), other
     # the medicine run, and the two things a criteria-graded score is not
-    assert '--import eval_tasks/fr/hossein_medicine_v1.json --approver "Dr. Hossein"' in doc
+    assert '--import eval_tasks/fr/hossein_medicine_v2.json --approver "Dr. Hossein"' in doc
+    # and the second bank delivered in the same round, as its own run
+    assert '--import eval_tasks/fr/hossein_law_v1.json --approver "Dr. Hossein"' in doc
     assert "HuggingFaceTB/SmolLM2-360M-Instruct" in doc
-    assert "criteria file are drafts" in doc and "pending Dr." in doc
-    assert "deterministic fold of the 15 criteria" in doc
+    assert "rubrics are drafts" in doc and "pending Dr." in doc
+    assert "deterministic fold of that topic's\n  criteria" in doc
     assert "Per-criterion agreement with a human has **not** been measured" in doc
+    # the rule applied to this repo's own numbers
+    assert "do not compare to the ones\n  after it" in doc
 
 
 def test_the_author_docs_carry_the_import_and_criteria_rules():
@@ -352,11 +367,17 @@ def test_the_author_docs_carry_the_import_and_criteria_rules():
     assert "Metadata is the reference" in doc and "Acuity: emergency." in doc
     assert "rubrics/<slug>.md" in doc and "rubrics/exam.md" in doc
     assert "round_half_up(4 × Σ w·c / Σ w)" in doc
-    assert "conditional" in doc and "critical_safety_failure" in doc
+    assert "conditional" in doc and "zero_score" in doc and "cap_at_N_of_4" in doc
+    # the schema is the author's, and the doc shows it as he writes it
+    assert '"flags": [{"id": "critical_legal_error"' in doc
+    assert "refuses to load" in doc
     hand = (REPO / "HANDOFF.md").read_text(encoding="utf-8")
     # the two open asks back to the author, and the file that holds his criteria
-    assert "hossein_medicine_v1.json" in hand and "medicine_health.criteria.json" in hand
-    assert "At least 10 more questions" in hand and "Rubric and criteria sign-off" in hand
+    assert "hossein_medicine_v2.json" in hand and "medicine_health.criteria.json" in hand
+    # the asks that are still open, and the one that was closed by delivery
+    assert "The question floor is cleared." in hand
+    assert "Rubric sign-off." in hand and "The law difficulty levels." in hand
+    assert "jurisdiction_required" in hand
     assert "phase-8b-hossein-medicine.md" in hand
 
 

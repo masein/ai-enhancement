@@ -306,10 +306,11 @@ upload would land — and the recent changes.
 `GET /api/exam/rubrics/{name}?kind=rubric|criteria` — the file itself.
 `POST /api/exam/rubrics/preview` and `POST /api/exam/rubrics`
 `{"name", "kind", "content", "approver", "note"}` — the preview validates a
-criteria file the way `judge.py` does (ids unique and lower-case, weights
-positive, a known fold method, `critical_safety_failure` defined,
-conditional criteria with `applies_when`) or a prose rubric (heading with a
-version, five anchors), diffs it against the file in use and says in words
+criteria file the way `judge.py` does (criterion and flag ids unique and
+lower-case, definitions and conditions present, weights positive, and every
+flag effect one this judge can apply — `zero_score` or `cap_at_N_of_4`) or a
+prose rubric (heading with a version, five anchors), diffs it against the
+file in use and says in words
 that a new sha makes earlier judged runs on that topic non-comparable. The
 commit writes the file and records who, when and both shas in
 `rubric_changes`. It never touches git.

@@ -179,7 +179,9 @@ def test_exam_curation_in_the_browser(live, page):
     page.wait_for_function("document.querySelector('#view').textContent.includes('accepted →')")
     assert page.locator(f".rv[data-candidate='{cid}']").count() == 0
     bank = eb.load_bank(root / "exam")["law"]
-    assert any(r["cid"] == cid and r["edited"] and r["accepted_by"] == "Omar" for r in bank)
+    # the law bank also holds imported items, which carry no candidate id
+    assert any(r.get("cid") == cid and r["edited"] and r["accepted_by"] == "Omar"
+               for r in bank)
     card = page.locator(".rv[data-candidate]").first
     card.get_by_label("your name").fill("Omar")
     card.get_by_label("reject reason").fill("recall, not understanding")
@@ -341,7 +343,7 @@ def test_review_flow_in_the_browser(live, page):
 
 
 REPO = Path(__file__).resolve().parents[1]
-MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v1.json"
+MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v2.json"
 
 
 def upload(pg, label, name, mime, text):
@@ -360,7 +362,7 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     page.goto(base + "/#tab=exam")
     page.wait_for_selector("[data-panel='import']")
     panel = page.locator("[data-panel='import']")
-    upload(page, "questions file", "hossein_medicine_v1.json", "application/json", raw)
+    upload(page, "questions file", "hossein_medicine_v2.json", "application/json", raw)
     panel.get_by_label("topic").select_option(topic)
     panel.get_by_label("source").fill("hossein_v1")
     panel.get_by_label("your name").first.fill("Dr. Hossein")
@@ -368,7 +370,7 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     panel.get_by_role("button", name="Preview").click()
     page.wait_for_selector("[data-preview='counts']")
     counts = panel.locator("[data-preview='counts']").text_content()
-    assert "would import 50" in counts and "unusable 0" in counts
+    assert "would import 100" in counts and "unusable 0" in counts
     # a preview writes nothing: that is the whole point of two steps
     assert len(eb.load_bank(root / "exam").get(topic, [])) == before
     # the report half is on the table as a qid, and its text is nowhere on the
@@ -382,10 +384,10 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     # commit, and the bank on disk holds his records under his name
     panel.locator("button[data-commit='import']").click()
     page.wait_for_selector("[data-import-msg]")
-    assert "imported 50" in panel.locator("[data-import-msg]").text_content()
+    assert "imported 100" in panel.locator("[data-import-msg]").text_content()
     bank = eb.load_bank(root / "exam")[topic]
     mine = [r for r in bank if r.get("source") == "hossein_v1"]
-    assert len(mine) == 50
+    assert len(mine) == 100
     assert all(r["accepted_by"] == "Dr. Hossein" and not r["edited"] for r in mine)
     assert {eb.half_of(r["qid"]) for r in mine} == {"report", "diagnose"}
     assert page.errors == []
@@ -401,9 +403,11 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
     page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
     panel = page.locator("[data-panel='rubrics']")
     row = panel.locator("tr[data-rubric-row='medicine & health']")
-    assert "medicine_health.md v1" in row.text_content()
-    assert "16 criteria" in row.text_content()
-    assert row.locator(".badge.taint", has_text="DRAFT").count() == 2   # both files are drafts
+    assert "medicine_health.md v2" in row.text_content()
+    assert "15 criteria" in row.text_content()
+    # the prose rubric is a draft; the criteria file is the author's own and
+    # carries no status at all, so nothing claims it is one
+    assert row.locator(".badge.taint", has_text="DRAFT").count() == 1
     # a topic without a rubric of its own says which one grades it instead
     assert "exam.md" in panel.locator("tr[data-rubric-row='history']").text_content()
     # a criteria file the judge would refuse never gets a commit button
@@ -412,22 +416,22 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
     up = page.locator("[data-upload='medicine_health']")
     up.get_by_label("which file").select_option("criteria")
     spec = json.loads(jd.rubric_path("medicine_health", ".criteria.json").read_text("utf-8"))
-    spec.pop("critical_safety_failure")
-    spec["fold"] = {"method": "vibes"}
+    spec["flags"][0]["effect"] = "melt_the_score"
+    spec["criteria"][0]["id"] = "Relevance"
     upload(page, "new file", "medicine_health.criteria.json", "application/json",
            json.dumps(spec))
     up.get_by_label("your name").first.fill("Dr. Hossein")
     up.get_by_role("button", name="Check it").click()
     page.wait_for_selector("[data-problems]")
     problems = up.locator("[data-problems]").text_content()
-    assert "not one this judge knows" in problems
-    assert "critical_safety_failure needs a definition" in problems
+    assert "effect 'melt_the_score' is not one this judge can apply" in problems
+    assert "an id is lower-case letters" in problems
     assert up.locator("button[data-commit='rubric']").count() == 0
     # the prose rubric, signed off: valid, changed, and the page says the cost
     up.get_by_label("which file").select_option("rubric")
     text = jd.rubric_path("medicine_health").read_text(encoding="utf-8")
-    signed = text.replace(", DRAFT — awaiting Dr. Hossein's sign-off", "")
-    assert signed != text
+    signed = text.split(", DRAFT")[0] + ")" + text.split(")", 1)[1]
+    assert signed != text and "DRAFT" not in signed.split("\n", 1)[0]
     upload(page, "new file", "medicine_health.md", "text/markdown", signed)
     up.get_by_label("note").fill("signed off in the meeting")
     up.get_by_role("button", name="Check it").click()
@@ -454,5 +458,5 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
     page.wait_for_function(
         "sha => document.querySelector(\"tr[data-rubric-row='medicine & health']\")"
         ".textContent.includes(sha)", arg=sha)
-    assert row.locator(".badge.taint", has_text="DRAFT").count() == 1
+    assert row.locator(".badge.taint", has_text="DRAFT").count() == 0
     assert page.errors == []

@@ -264,12 +264,13 @@ def test_judged_section_and_the_control_sentence(surface, tree):
     assert "By topic (0–4), weakest first — report half" in text
     assert "Score against answer length" in text and "economics" in text
     # topics, score-vs-length, the control — plus one per-criterion table for
-    # every topic graded criterion by criterion, and a by-acuity table for
-    # every one of those whose bank carries an acuity
+    # every topic graded criterion by criterion, and one breakdown table per
+    # metadata field those topics' banks carry
     crit = card.locator("table.jd[data-criteria-table]").count()
-    acuity = card.locator("table.jd[data-acuity-table]").count()
-    assert crit >= 1 and acuity >= 1
-    assert card.locator("table.jd").count() == 3 + crit + acuity
+    breakdown = card.locator("table.jd[data-breakdown-table]").count()
+    assert crit >= 1 and breakdown >= crit
+    assert card.locator("table.jd[data-breakdown-table='acuity']").count() >= 1
+    assert card.locator("table.jd").count() == 3 + crit + breakdown
     assert card.locator("table.jd[data-criteria-table='medicine & health']").count() == 1
     surface.open(model_link("fx/chance-160m"))
     card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
@@ -341,7 +342,7 @@ def local_judged(tmp_path_factory) -> Path:
     med = [m for m in plan["tasks"]["exam_medicine_health"] if m["half"] == "diagnose"]
     spec = jd.rubric_for("exam_medicine_health").criteria
     results[med[0]["cid"]] = type(results[med[0]["cid"]])(text=json.dumps({
-        "critical_safety_failure": True,
+        "flags": {fid: True for fid in jd.flag_ids(spec)},
         "criteria": {cid: 1.0 for cid in jd.criteria_ids(spec)},
         "justification": "told an emergency to wait until morning"}))
     plan["provisional"] = {"provisional": True,
@@ -408,24 +409,33 @@ def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browse
         # every criterion in THIS topic's file has a row, weakest first
         table = card.locator("table.jd[data-criteria-table='medicine & health']")
         rows = table.locator("tr[data-criterion]")
-        assert rows.count() == 16
+        assert rows.count() == 15                      # the author's own file, verbatim
         means = [float(rows.nth(i).locator("td").nth(1).inner_text())
                  for i in range(rows.count())
                  if rows.nth(i).locator("td").nth(1).inner_text() != "—"]
         assert means == sorted(means)
-        cond = table.locator("tr[data-criterion='medication_safety']")
-        assert "conditional" in cond.text_content()
-        # the critical failure is stated in words, not only coloured
-        csf = card.locator("[data-csf-topic='medicine & health']")
-        assert csf.count() == 1
-        text = csf.text_content()
-        assert text.startswith("Critical safety failures.")
-        assert "could plausibly have caused harm" in text
-        assert "Each is a 0 whatever else the answer got right" in text
-        # and the acuity table says which kind of question it happened on
-        acuity = card.locator("table.jd[data-acuity-table='medicine & health'] tr[data-acuity]")
+        # the flag is stated in words, not only coloured, and says what it did
+        flag = card.locator("[data-flag='critical_safety_failure'][data-flag-topic='medicine & health']")
+        assert flag.count() == 1
+        text = flag.text_content()
+        assert text.startswith("Critical safety failure.")
+        assert "were flagged" in text and "sets the whole score to 0" in text
+        assert "applied here and not by the judge" in text
+        # law's two flags say different things, because its file does
+        law = card.locator("[data-flag-topic='law']")
+        assert law.count() == 2
+        assert "caps the whole score at 1 of 4" in law.nth(1).text_content()
+        # a table per metadata field, acuity first, with a column per flag
+        fields = card.locator("table.jd[data-breakdown-topic='medicine & health']")
+        assert [fields.nth(i).get_attribute("data-breakdown-table")
+                for i in range(fields.count())] == ["acuity", "difficulty", "intent"]
+        acuity = fields.nth(0).locator("tr[data-value]")
         assert acuity.count() >= 3
-        assert any("see above" in acuity.nth(i).text_content() for i in range(acuity.count()))
+        assert acuity.first.get_attribute("data-value") == "emergency"   # most severe first
+        assert "Critical safety failure" in fields.nth(0).locator("thead").text_content()
+        # and the difficulty table carries the question its author asked of it
+        assert card.locator("[data-difficulty-note]").count() >= 1
+        assert "only on basic questions" in card.locator("[data-difficulty-note]").first.text_content()
         SCREENS.mkdir(exist_ok=True)
         card.screenshot(path=SCREENS / "criteria-medicine.png")
         assert s.errors == []
@@ -450,7 +460,7 @@ def demo_report(tmp_path_factory) -> Path:
     repo = Path(__file__).resolve().parents[1]
     r = subprocess.run(
         [sys.executable, str(repo / "scripts" / "demo_loop.py"), "--topic", "medicine & health",
-         "--import", str(repo / "eval_tasks" / "fr" / "hossein_medicine_v1.json"),
+         "--import", str(repo / "eval_tasks" / "fr" / "hossein_medicine_v2.json"),
          "--approver", "Dr. Hossein", "--sit", "stub", "--count", "4", "--keep"],
         capture_output=True, text=True, timeout=300, env=env, cwd=repo)
     assert r.returncode == 0, r.stdout + r.stderr
@@ -479,21 +489,24 @@ def test_the_demo_page_says_what_it_is_and_shows_the_criteria(browser, demo_repo
         assert "Provisional." not in text                 # the fake judge is not local…
         assert "Draft rubric." in text                    # …but the rubric is still a draft
         assert "medicine & health is graded against a rubric its author has not signed off" in text
-        # the criteria row, the failures in words, the acuity table
+        # the criteria row, the flag in words, the tables by acuity and by
+        # difficulty — the author's own file decides all three
         med = card.locator("table.jd[data-criteria-table='medicine & health']")
         assert card.locator("[data-criteria='medicine & health']").count() == 1
-        assert med.locator("tr[data-criterion]").count() == 16
-        assert "conditional" in med.locator("tr[data-criterion='medication_safety']").text_content()
-        assert card.locator("[data-csf-topic='medicine & health']").count() == 1
+        assert med.locator("tr[data-criterion]").count() == 15
+        assert card.locator("[data-flag='critical_safety_failure']").count() == 1
         assert "critical safety failure" in text.lower()
-        assert card.locator("table.jd[data-acuity-table='medicine & health'] tr[data-acuity]"
+        assert card.locator("table.jd[data-breakdown-table='acuity'] tr[data-value]"
                             ).count() == 5
-        # the folded score is shown, greyed and not counted: 29 report-half
-        # questions is under the floor, and nothing is calibrated
+        assert card.locator("table.jd[data-breakdown-table='difficulty'] tr[data-value]"
+                            ).count() == 3
+        # the folded score is shown and not counted: 100 questions clear the
+        #30-item floor, so the row is no longer greyed for being thin — the
+        # whole suite is still preliminary, because nothing is calibrated
         assert "Preliminary." in text and "never ranked, never averaged" in text
         row = card.locator("tr[data-topic='medicine & health']")
-        assert row.count() == 1 and "dim" in (row.get_attribute("class") or "")
-        assert "· under 30" in row.text_content()
+        assert row.count() == 1 and "dim" not in (row.get_attribute("class") or "")
+        assert "· under 30" not in row.text_content()
         SCREENS.mkdir(exist_ok=True)
         card.screenshot(path=SCREENS / "demo-judged-medicine.png")
         pg.goto(demo_report.as_uri())

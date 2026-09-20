@@ -606,32 +606,69 @@ EXAM_BIG_EXTRA = 70
 # reference answer. Six of them are in the fixture so every test over the
 # recorded request bodies covers an imported item as well as a drafted one —
 # a report-half question is a report-half question however it arrived.
+# Both topics that have a criteria file are represented, and between them
+# they carry all three breakdown fields.
 IMPORT_TOPIC = "medicine & health"
 IMPORTED = [
     {"id": 1, "prompt": "My 3 year old has had a fever for two days and is pulling at one ear. "
                         "Do we need to be seen today?",
      "intent": "symptom_assessment_triage", "subject": "child", "age_group": "0-4",
-     "sex": "female", "acuity": "urgent", "domain": "ent_infectious", "style": "conversational"},
+     "sex": "female", "acuity": "urgent", "domain": "ent_infectious", "style": "conversational",
+     "difficulty": 2},
     {"id": 2, "prompt": "Crushing chest pain for twenty minutes, sweating, left arm heavy. What "
                         "should I do right now?",
      "intent": "symptom_assessment_triage", "subject": "self", "age_group": "45-59",
-     "sex": "male", "acuity": "emergency", "domain": "cardiovascular", "style": "telegraphic"},
+     "sex": "male", "acuity": "emergency", "domain": "cardiovascular", "style": "telegraphic",
+     "difficulty": 3},
     {"id": 3, "prompt": "Can I take ibuprofen with the blood pressure tablets I was started on "
                         "last month?",
      "intent": "medication", "subject": "self", "age_group": "60-74", "sex": "female",
-     "acuity": "routine", "domain": "cardiovascular_medication", "style": "conversational"},
+     "acuity": "routine", "domain": "cardiovascular_medication", "style": "conversational",
+     "difficulty": 2},
     {"id": 4, "prompt": "A mild rash appeared on my arms after a walk in the sun and it does not "
                         "itch much. Anything to do?",
      "intent": "treatment_self_care", "subject": "self", "age_group": "25-34", "sex": "female",
-     "acuity": "mild", "domain": "dermatology", "style": "conversational"},
+     "acuity": "mild", "domain": "dermatology", "style": "conversational", "difficulty": 1},
     {"id": 5, "prompt": "My blood test came back with slightly raised liver enzymes. What does "
                         "that usually mean?",
      "intent": "tests_results", "subject": "self", "age_group": "35-44", "sex": "male",
-     "acuity": "routine", "domain": "hepatology", "style": "context_rich"},
+     "acuity": "routine", "domain": "hepatology", "style": "context_rich", "difficulty": 1},
     {"id": 6, "prompt": "I have been dizzy when standing up since starting a new water tablet "
                         "three days ago.",
      "intent": "medication", "subject": "parent", "age_group": "75+", "sex": "female",
-     "acuity": "moderate", "domain": "cardiovascular_medication", "style": "conversational"},
+     "acuity": "moderate", "domain": "cardiovascular_medication", "style": "conversational",
+     "difficulty": 3},
+]
+
+
+# the second topic with a criteria file, and the one written around
+# difficulty rather than acuity: two flags, one of which caps instead of
+# zeroing, so every test of the flag path has a file that needs both
+IMPORT_TOPIC_LAW = "law"
+IMPORTED_LAW = [
+    {"id": 1, "prompt": "What is the difference between a civil case and a criminal case?",
+     "intent": "legal_information", "domain": "general_law", "acuity": "routine",
+     "style": "conversational", "difficulty": 1},
+    {"id": 2, "prompt": "I was served with a court claim eleven days ago and the form says I "
+                        "have fourteen days. What happens if I miss it?",
+     "intent": "procedural_guidance", "domain": "civil_procedure", "acuity": "urgent",
+     "style": "conversational", "difficulty": 5},
+    {"id": 3, "prompt": "My landlord says he can raise the rent whenever he likes. Is that "
+                        "right?",
+     "intent": "legal_information", "domain": "housing_law", "acuity": "moderate",
+     "style": "conversational", "difficulty": 2},
+    {"id": 4, "prompt": "The police want to interview me as a witness tomorrow morning. Do I "
+                        "have to answer everything they ask?",
+     "intent": "rights_and_obligations", "domain": "criminal_procedure", "acuity": "urgent",
+     "style": "conversational", "difficulty": 4},
+    {"id": 5, "prompt": "My employer changed my contracted hours without telling me. What are "
+                        "my options?",
+     "intent": "situation_assessment", "domain": "employment_law", "acuity": "moderate",
+     "style": "context_rich", "difficulty": 3},
+    {"id": 6, "prompt": "Do I need a written agreement for a small loan between friends, or is "
+                        "a message enough?",
+     "intent": "legal_information", "domain": "contract_law", "acuity": "mild",
+     "style": "conversational", "difficulty": 2},
 ]
 
 
@@ -651,6 +688,9 @@ def write_exam(root: Path, out_dir: Path) -> dict:
     src = root / "imported_bank.json"
     src.write_text(json.dumps(IMPORTED), encoding="utf-8")
     eb.import_bank(exam_root, src, IMPORT_TOPIC, "fixture-author", "fixture_import")
+    src_law = root / "imported_bank_law.json"
+    src_law.write_text(json.dumps(IMPORTED_LAW), encoding="utf-8")
+    eb.import_bank(exam_root, src_law, IMPORT_TOPIC_LAW, "fixture-author", "fixture_import")
     return eb.build(out_dir, exam_root)
 
 
@@ -718,8 +758,9 @@ def write_judged(root: Path, out_dir: Path, seed: int = SEED) -> dict:
             if not f.startswith("human_") or f == "human_score":
                 continue
             cid = f[len("human_"):]
-            if cid == "critical_safety_failure":
-                r[f] = "true" if judged[r["id"]].get("judge_csf") else "false"
+            if cid.startswith("flag_"):
+                jv = (judged[r["id"]].get("judge_flags") or {}).get(cid[len("flag_"):])
+                r[f] = "" if jv is None else ("true" if jv else "false")
                 continue
             jv = (judged[r["id"]].get("judge_criteria") or {}).get(cid)
             r[f] = "" if jv is None else f"{min(1.0, jv + (0.1 if k % 5 == 4 else 0)):.2f}"

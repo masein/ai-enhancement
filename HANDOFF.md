@@ -100,7 +100,13 @@ docs/
   prompts/phase-7-exam-driven-loop.md brief that turned the loop around — implemented
   prompts/phase-8-local-backend.md    the local vLLM backend + the narrated demo — implemented
   prompts/phase-8b-hossein-medicine.md Dr. Hossein's medicine bank + per-criterion grading — implemented
-  hossein-evaluation-criteria.md      his 15 criteria and the critical-failure rule, as delivered
+  prompts/phase-8c-dashboard-and-demo-visibility.md the demo's own page, the page as found, import from it — implemented
+  prompts/phase-8d-law-topic.md       the law topic, his criteria schema, generalised flags and breakdowns — implemented
+  prompts/phase-8e-loop-ux.md         next: the loop's UX
+  hossein-evaluation-criteria.md      his first 15 criteria, as delivered (superseded by the v2 notes)
+  hossein-medicine-criteria-v2.md     his medicine criteria and the critical-failure rule, as delivered
+  hossein-law-criteria.md             his law dataset and criteria suggestions, as delivered
+  hossein-law-criteria-v2.md          his 23 law criteria and two flags, as delivered
 DIAGNOSE.md              how to read a diagnosis; the finding→action table; the log to keep
 DEMO.md                  the whole loop in one command against the local model — and what it does not prove
 SERVICE.md               how to run the service; Docker; troubleshooting
@@ -319,30 +325,45 @@ A rubric is the marking scheme: anchored 0–4 descriptions, a stated priority
 length). Example: `eval_tasks/fr/rubrics/reasoning.md`. Its hash goes into every
 `judge.json`; change the rubric and scores before/after are not comparable.
 
-**Dr. Hossein's first delivery (phase 8b) is in the repo and in the loop:**
+**Dr. Hossein's delivery is in the repo and in the loop (phases 8b and 8d):**
 
 | What | Where |
 |---|---|
-| 50 consumer health questions with metadata, as delivered | `eval_tasks/fr/hossein_medicine_v1.json` |
-| his 15 criteria and the critical-failure rule, as delivered | `docs/hossein-evaluation-criteria.md` |
-| the 0–4 rubric derived from them — **DRAFT** | `eval_tasks/fr/rubrics/medicine_health.md` |
-| the same criteria, machine-readable: ids, weights, the conditional one, the fold | `eval_tasks/fr/rubrics/medicine_health.criteria.json` |
+| 100 consumer health questions with metadata, as delivered | `eval_tasks/fr/hossein_medicine_v2.json` |
+| 100 law questions with metadata and his difficulty levels | `eval_tasks/fr/hossein_law_v1.json` |
+| his criteria files, **verbatim** — the platform's schema is his | `eval_tasks/fr/rubrics/medicine_health.criteria.json`, `law.criteria.json` |
+| his scoring notes for each, as delivered | `docs/hossein-medicine-criteria-v2.md`, `docs/hossein-law-criteria-v2.md` |
+| the 0–4 rubrics derived from them — **DRAFT**, anchors not yet reviewed | `eval_tasks/fr/rubrics/medicine_health.md`, `law.md` |
 
-They import into the `medicine & health` bank with him as the approver
-(`exam_build.py import`, AUTHORING.md), the judge grades that topic criterion
-by criterion and folds the 0–4 in code, and the page shows the per-criterion
-row, the critical-failure count and the by-acuity table.
+They import into their topics with him as the approver (`exam_build.py
+import`, AUTHORING.md, or the Exam tab's import panel), the judge grades
+those topics criterion by criterion and folds the 0–4 in code, and the page
+shows the per-criterion row, one line per flag in words, and one breakdown
+table per metadata field the topic carries. A criteria file names its own
+flags and their effects (`zero_score`, `cap_at_N_of_4`); nothing about
+medicine or law is special-cased in the code.
 
-**Two things are open with him, and both are blockers for calling any medicine
-score a result:**
+**The question floor is cleared.** Both topics are at 100 questions, about 50
+report-half each, over the 30 a topic needs before anything may be proposed
+from it. The demo says so rather than asking for more.
 
-1. **At least 10 more questions.** The 50 split 29 report / 21 diagnose, and
-   30 report-half questions is the floor below which a topic cannot be
-   proposed from. The demo prints the shortfall every run.
-2. **Rubric and criteria sign-off.** Both files say DRAFT; until he removes
-   the word, every judged score for the topic is stamped draft on the page
-   beside the provisional stamp. Removing it changes their hashes, which is
-   correct — scores from before and after are then not comparable.
+**Three things are open with him, and the first two are blockers for calling
+any score on these topics a result:**
+
+1. **Rubric sign-off.** Both prose rubrics say DRAFT: their 0–4 anchors were
+   derived from his criteria and he has not reviewed them. Until he removes
+   the word, every judged score for the topic is stamped draft on the page.
+   Removing it changes the rubric's hash, which is correct — scores from
+   before and after are then not comparable. The criteria files themselves
+   are his own and need no sign-off.
+2. **The law difficulty levels.** Every law item carries a `difficulty`
+   assigned from the id-range table in his §5 note (1–20 → 1, 21–45 → 2,
+   46–65 → 3, 66–85 → 4, 86–100 → 5). It matches that table exactly, but
+   the levels are ours to confirm with him, or for him to resend the way he
+   sent medicine's.
+3. **`jurisdiction_required` per law item.** His notes say the criteria read
+   it "where present", and it is present on no item yet. Nothing breaks
+   without it — a field the items do not carry is simply not tabulated.
 
 Not yet done and worth planning with him: per-criterion calibration. The
 export writes a column per criterion and the flag, and the import reports the
@@ -380,7 +401,10 @@ it has the `.env` block, the one command, and what a green run does not prove.
 What landed: the `local` provider (`service/llm.py::LocalOpenAI`), the
 provisional stamp on every artefact a local identity makes,
 `scripts/demo_loop.py`, `exam_build.py import` with a rubric per topic, and
-per-criterion grading folded to a 0–4 in code. What is still true of the box:
+per-criterion grading folded to a 0–4 in code. Phase 8c gave the demo its own
+page and the Exam tab an import panel; phase 8d made the criteria-file schema
+the author's own, with a list of flags per topic and a breakdown table per
+metadata field. What is still true of the box:
 
 - vLLM OpenAI-compatible server at `http://localhost:8000/v1`, **loopback only**
   (tunnel with `ssh -L 8000:localhost:8000`)

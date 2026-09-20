@@ -266,20 +266,21 @@ def _trim_judge(j: dict | None) -> dict | None:
             continue
         # the flagged qids stay on disk: the page has no use for them, and a
         # qid list is the one thing this file must not hand out casually
-        if isinstance(t.get("critical_safety_failures"), dict):
-            t = {**t, "critical_safety_failures":
-                 {k: v for k, v in t["critical_safety_failures"].items() if k != "qids"}}
+        if isinstance(t.get("flags"), dict):
+            t = {**t, "flags": {fid: {k: v for k, v in f.items() if k != "qids"}
+                                for fid, f in t["flags"].items()}}
         out["tasks"][task] = {k: t.get(k) for k in
                               ("n", "mean", "max", "dist", "dist_report", "dist_diagnose",
                                "score_vs_length", "control",
                                "n_report", "score_report", "n_diagnose", "score_diagnose",
                                # what the model actually wrote: the gate reads it
                                "answers", "ungraded",
-                               # a task graded criterion by criterion (P4b): how
-                               # each one did, the flag that overrides them all,
-                               # and the acuity it fell on. No per-item lists.
+                               # a task graded criterion by criterion: how each
+                               # one did, the flags that override them all, and
+                               # the breakdown by whichever metadata fields the
+                               # topic carries. No per-item lists.
                                "criteria_mean", "criteria_n", "criteria_labels",
-                               "critical_safety_failures", "by_acuity", "unparseable")
+                               "criteria_conditional", "flags", "breakdowns", "unparseable")
                               if t.get(k) is not None}
     return out
 
@@ -2928,9 +2929,12 @@ function vJudged(m) {
           el('th', { text: '0 → 1' }))),
         el('tbody', {}, ids.map(id => {
           const m = v.criteria_mean[id], n = (v.criteria_n || {})[id] || 0;
+          // only the file says a criterion may be skipped; a low count on any
+          // other one means replies that could not be read, counted above
+          const cond = (v.criteria_conditional || []).includes(id);
           return el('tr', { class: n ? null : 'dim', 'data-criterion': id },
             el('td', {}, labels[id] || id,
-              n && n < v.n ? el('span', { class: 'se', text: ` · conditional, ${n} of ${v.n}` }) : ''),
+              cond ? el('span', { class: 'se', text: ` · conditional, ${n} of ${v.n}` }) : ''),
             el('td', { class: 'num', text: m == null ? '—' : num(m, 2) }),
             el('td', { class: 'num se', text: String(n) }),
             // zero-anchored, one hue: the mean beside it is the encoding
@@ -2938,32 +2942,50 @@ function vJudged(m) {
               m == null ? '' : el('span', { style: `width:${(100 * m).toFixed(1)}%;`
                 + 'background:var(--s1)' }))));
         })))));
-      const csf = v.critical_safety_failures || { n: 0, share: 0 };
-      card.append(el('p', { class: csf.n ? 'warn' : 'note', 'data-csf': String(csf.n),
-        'data-csf-topic': frName(t) },
-        el('b', { text: csf.n ? 'Critical safety failures. ' : 'No critical safety failure. ' }),
-        csf.n
-          ? `${csf.n} of ${v.n} answers (${pct(csf.share, 0)}) could plausibly have caused harm`
-            + (csf.acuities && csf.acuities.length ? `, on ${csf.acuities.join(' and ')} questions`
-                                                   : '')
-            + '. Each is a 0 whatever else the answer got right — that is the rule in the '
-            + 'criteria file, applied here and not by the judge.'
-          : `None of the ${v.n} answers was flagged as one. The flag is decided per answer `
-            + 'before the criteria are scored, and it sets the score to 0 when it is true.'));
-      if (v.by_acuity) {
-        card.append(el('div', { class: 'dxh', text: 'By acuity — the axis this bank was written around' }));
+      const flags = v.flags || {};
+      const fids = Object.keys(flags);
+      if (!fids.length) card.append(el('p', { class: 'note', 'data-flags': '0' },
+        'This topic\'s criteria file names no flag: the score is the fold of the criteria '
+        + 'above and nothing overrides it.'));
+      // one line per flag, in words: what it is, how often it fired, and what
+      // it did to the score — the effect is the file's, applied in code
+      fids.forEach(fid => {
+        const f = flags[fid];
+        card.append(el('p', { class: f.n ? 'warn' : 'note', 'data-flag': fid,
+          'data-flag-n': String(f.n), 'data-flag-topic': frName(t) },
+          el('b', { text: `${f.label || fid}${f.n ? '. ' : ' — none. '}` }),
+          f.n
+            ? `${f.n} of ${v.n} answers (${pct(f.share, 0)}) were flagged, and each one `
+              + `${f.effect_words || 'changes the score'}. That is the rule in the criteria `
+              + 'file, applied here and not by the judge.'
+            : `None of the ${v.n} answers was flagged. When it is true it `
+              + `${f.effect_words || 'changes the score'}, whatever the criteria said.`));
+      });
+      // one table per metadata field the topic carries: acuity for a medical
+      // bank, difficulty for a legal one, and no special case for either
+      const order = ['acuity', 'difficulty', 'intent'];
+      const fields = Object.keys(v.breakdowns || {}).sort(
+        (a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
+      fields.forEach(field => {
+        const cells = v.breakdowns[field];
+        card.append(el('div', { class: 'dxh', text: `By ${field}` }));
+        if (field === 'difficulty') card.append(el('p', { class: 'small',
+          'data-difficulty-note': '1', text: 'The author\'s own level for each question, 1 '
+            + 'easiest: does the model do well only on basic questions, or can it reason about '
+            + 'the ambiguous and high-risk ones too?' }));
         card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd',
-          'data-acuity-table': frName(t) },
-          el('thead', {}, el('tr', {}, el('th', { text: 'acuity' }),
+          'data-breakdown-table': field, 'data-breakdown-topic': frName(t) },
+          el('thead', {}, el('tr', {}, el('th', { text: field }),
             el('th', { class: 'num', text: 'answers' }), el('th', { class: 'num', text: 'mean' }),
-            el('th', { class: 'num', text: 'critical failures' }))),
-          el('tbody', {}, Object.entries(v.by_acuity).map(([k, b]) =>
-            el('tr', { 'data-acuity': k }, el('td', { text: k }),
+            ...fids.map(fid => el('th', { class: 'num',
+              text: flags[fid].label || fid })))),
+          el('tbody', {}, Object.entries(cells).map(([k, b]) =>
+            el('tr', { 'data-value': k }, el('td', { text: k }),
               el('td', { class: 'num se', text: String(b.n) }),
               el('td', { class: 'num', text: `${num(b.mean, 2)} / 4` }),
-              el('td', { class: 'num', text: b.critical_safety_failures
-                ? `${b.critical_safety_failures} — see above` : '0' })))))));
-      }
+              ...fids.map(fid => el('td', { class: 'num',
+                text: String((b.flags || {})[fid] || 0) }))))))));
+      });
     }
   }
   // the control

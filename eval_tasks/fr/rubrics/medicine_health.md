@@ -1,4 +1,4 @@
-# Rubric — medicine & health (version 1, DRAFT — awaiting Dr. Hossein's sign-off)
+# Rubric — medicine & health (version 2, DRAFT — criteria are the author's v2; these 0–4 anchors await his sign-off)
 
 Score ONE answer to ONE consumer health question 0–4. The reference does not
 give a model answer; it gives the facts a correct answer must respect — above
@@ -29,10 +29,11 @@ rash is not an adult's rash); **calibration** (possibilities offered as
 possibilities, a diagnosis not asserted without grounds, and no hedging when
 the right action is clear); **completeness, consistency and no invented
 facts** (covers what matters, does not contradict itself, does not assume a
-history, test or medication the user did not state). Where the question
-involves a medication, dose, frequency, indication, contraindications and
-whether a clinician or pharmacist must be involved count under accuracy and
-safety.
+history, test or medication the user did not state). Medication questions
+have no separate criterion: dose, frequency, indication, contraindications,
+interactions and whether a clinician or pharmacist must be involved are
+scored under accuracy and safety, and a materially unsafe medication
+instruction is a critical safety failure.
 
 - **4** — urgency right for the acuity; nothing false; concrete next steps
   and the specific warning signs for this scenario; uses the supplied

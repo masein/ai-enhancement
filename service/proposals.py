@@ -208,8 +208,9 @@ WEAKEST_CRITERIA = 3
 
 
 def criteria_evidence(model_dir: Path, task: str) -> dict:
-    """For a topic graded criterion by criterion: the weakest criteria and the
-    per-acuity means, as labels and numbers. No question text, no qids, no
+    """For a topic graded criterion by criterion: the weakest criteria, the
+    means by every metadata field the topic is broken down by, and the flags
+    that fired — as labels and numbers. No question text, no qids, no
     justifications — this is the shape of the failure, not its contents."""
     j = _judge_file(model_dir)
     t = ((j or {}).get("tasks") or {}).get(task) or {}
@@ -222,13 +223,15 @@ def criteria_evidence(model_dir: Path, task: str) -> dict:
     out = {"weakest_criteria": [{"id": k, "label": labels.get(k, k), "mean": v,
                                  "n": counts.get(k, 0)}
                                 for v, k in scored[:WEAKEST_CRITERIA]]}
-    if t.get("by_acuity"):
-        out["by_acuity"] = {k: {"n": v.get("n"), "mean": v.get("mean")}
-                            for k, v in t["by_acuity"].items()}
-    csf = t.get("critical_safety_failures") or {}
-    if csf.get("n"):
-        out["critical_safety_failures"] = {"n": csf["n"], "share": csf.get("share"),
-                                           "acuities": csf.get("acuities") or []}
+    if t.get("breakdowns"):
+        out["breakdowns"] = {field: {k: {"n": v.get("n"), "mean": v.get("mean")}
+                                     for k, v in cells.items()}
+                             for field, cells in t["breakdowns"].items()}
+    fired = {fid: {"n": f["n"], "share": f.get("share"), "label": f.get("label", fid),
+                   "effect_words": f.get("effect_words", "")}
+             for fid, f in (t.get("flags") or {}).items() if f.get("n")}
+    if fired:
+        out["flags"] = fired
     return out
 
 
@@ -250,8 +253,9 @@ def proposal_request(pid: int, model: str, task: str, topic: str,
     """The judge's reasoning, the topic and the rubric. No question text: the
     justification is about the ANSWER, and anything the judge quoted from a
     question has already been stripped. For a topic graded criterion by
-    criterion, the weakest criteria and the per-acuity means ride along —
-    labels and numbers, nothing from the bank."""
+    criterion, the weakest criteria, the means by each of the topic's own
+    metadata fields and the flags that fired ride along — labels and numbers,
+    nothing from the bank."""
     lines = [f"Topic: {topic}", f"Model under assessment: {model}",
              f"Diagnosis-half answers on this topic: {counts['diagnose_items']}; "
              f"scoring below {WEAK_SCORE} of 4: {counts['diagnose_weak']}; "
@@ -261,15 +265,13 @@ def proposal_request(pid: int, model: str, task: str, topic: str,
         lines.append("Where this topic scored lowest, criterion by criterion (0-1):")
         for c in criteria["weakest_criteria"]:
             lines.append(f"- {c['label']}: {c['mean']} over {c['n']} answers")
-        if criteria.get("by_acuity"):
-            lines.append("Mean score of 4 by how urgent the question was: "
-                         + ", ".join(f"{k} {v['mean']} ({v['n']})"
-                                     for k, v in criteria["by_acuity"].items()))
-        csf = criteria.get("critical_safety_failures")
-        if csf:
-            lines.append(f"{csf['n']} answers were flagged as a critical safety failure"
-                         + (f" ({', '.join(csf['acuities'])})" if csf.get("acuities") else "")
-                         + " — each scored 0.")
+        for field, cells in (criteria.get("breakdowns") or {}).items():
+            lines.append(f"Mean score of 4 by {field}: "
+                         + ", ".join(f"{k} {v['mean']} ({v['n']})" for k, v in cells.items()))
+        for f in (criteria.get("flags") or {}).values():
+            lines.append(f"{f['n']} answers were flagged — {f['label'].lower()}"
+                         + (f", which {f['effect_words']}" if f.get("effect_words") else "")
+                         + ".")
         lines.append("")
     lines += ["The judge's assessment of each answer that did not land, with its score:", ""]
     for i, f in enumerate(justifications, 1):

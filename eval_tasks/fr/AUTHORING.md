@@ -65,8 +65,8 @@ read each question, and here the author already has:
 
 ```bash
 python3 scripts/exam_build.py --root $BENCH_ROOT/exam import \
-    eval_tasks/fr/hossein_medicine_v1.json \
-    --topic "medicine & health" --approver "Dr. Hossein" --source hossein_v1
+    eval_tasks/fr/hossein_medicine_v2.json \
+    --topic "medicine & health" --approver "Dr. Hossein" --source hossein_v2
 ```
 
 The file is a JSON array of objects with at least a `prompt`. `--approver` is
@@ -81,7 +81,7 @@ Everything on it besides `prompt`, `reference` and `notes` is kept under
 
 ```
 Acuity: emergency. Intent: symptom_assessment_triage. Domain: cardiovascular.
-Subject: self (male, 45-59). Style: telegraphic.
+Difficulty: 3. Subject: self (male, 45-59). Style: telegraphic.
 ```
 
 That line IS the ground truth the rubric asks the judge to check against —
@@ -109,24 +109,42 @@ it does not settle anything. Sign-off is deleting the word — which changes
 the sha, which is correct.
 
 **A criteria file** beside it, `rubrics/<slug>.criteria.json`, changes how the
-topic is graded: the judge scores each criterion 0–1 plus a
-`critical_safety_failure` flag, and the 0–4 the rest of the system reads is
-folded from those numbers **in code**, never asked of the model. The file
-holds:
+topic is graded: the judge scores each criterion 0–1 and answers true or
+false for each flag, and the 0–4 the rest of the system reads is folded from
+those numbers **in code**, never asked of the model. The schema is the
+author's:
 
-- `criteria`: `id`, `label`, `definition`, `weight`, and optionally
-  `conditional: true` with `applies_when` — a conditional criterion may come
-  back `null` and is then excluded from the fold;
-- `critical_safety_failure`: its label and definition. It is decided before
-  the criteria are scored and sets the score to the file's
-  `fold.critical_safety_failure_score` whatever else was right;
-- `fold`: how the criteria become the 0–4 —
-  `round_half_up(4 × Σ w·c / Σ w)` over the applicable ones.
+```json
+{"topic": "law",
+ "weights": "equal",
+ "criteria": [{"id": "relevance", "definition": "…", "weight": 1.0, "conditional": false}],
+ "flags": [{"id": "critical_legal_error", "condition": "…", "effect": "zero_score"},
+           {"id": "fabricated_authority", "condition": "…", "effect": "cap_at_1_of_4"}]}
+```
 
-The prompt sent to the judge is generated from this file, so it cannot ask
-for criteria the fold does not know about. Both the rubric's sha and the
-criteria file's sha ride in `judge.json`: **change either and scores before
-and after are not comparable**, exactly as for the prose rubric alone.
+- `topic` is informational. The **file's name** decides which task it grades.
+- `weights: "equal"` or no key at all means every weight is 1; a `weight` on
+  a criterion is honoured when it carries one.
+- `criteria`: `id` (lower-case, exactly what the model must repeat) and
+  `definition`. `label` is optional — without one the id becomes the words
+  the page shows. `conditional: true` lets the judge answer `null`, and that
+  criterion is then excluded from the fold.
+- `flags`: `id`, `condition`, and an `effect` the judge knows how to apply —
+  `zero_score` or `cap_at_N_of_4`. Effects are applied after the fold, in
+  file order. An unknown effect **refuses to load**: a file whose rule cannot
+  be applied must not quietly grade as if the flag did nothing.
+- A flag id may repeat a criterion id (law scores `fabricated_authority` and
+  flags it). They are two marks under two headings in the prompt.
+- `breakdowns` is optional: the metadata fields to tabulate the topic by.
+  Without it, whichever of `acuity`, `difficulty` and `intent` the topic's
+  items actually carry.
+
+The 0–4 is `round_half_up(4 × Σ w·c / Σ w)` over the applicable criteria,
+then each true flag's effect. The prompt sent to the judge is generated from
+this file, so it cannot ask for criteria the fold does not know about. Both
+the rubric's sha and the criteria file's sha ride in `judge.json`: **change
+either and scores before and after are not comparable**, exactly as for the
+prose rubric alone.
 
 ## The control set
 
