@@ -690,3 +690,61 @@ def test_a_button_that_is_working_says_so_and_cannot_be_pressed_twice(live, page
     assert btn.is_disabled() is False
     page.unroute("**/api/exam/build")
     assert page.errors == []
+
+
+def test_typing_survives_the_poll(live, page):
+    """Phase 8g D1/D3: the board refreshes every five seconds. A person part
+    way through typing their name must not lose it, or the caret, or the
+    field — and the name must still be there on the next page they open."""
+    base = live["base"]
+    page.goto(base + "/#tab=loop")
+    page.wait_for_selector("table.jd[data-loop-table] tbody tr")
+    name = page.locator("[data-panel], .card").first.get_by_label("your name").first
+    name.click()
+    name.type("Omar")
+    page.wait_for_timeout(6500)                    # two polls land here
+    assert page.evaluate("document.activeElement && document.activeElement.dataset.keep"
+                         ) is not None             # still in the field
+    name.type(" Affifi")
+    assert name.input_value() == "Omar Affifi"
+    # and it is the same name on the topic page, and after a reload
+    page.goto(base + "/#topic=law")
+    page.wait_for_selector("[data-topic-page='law']")
+    assert page.get_by_label("your name").first.input_value() == "Omar Affifi"
+    page.reload()
+    page.wait_for_selector("[data-topic-page='law']")
+    assert page.get_by_label("your name").first.input_value() == "Omar Affifi"
+    assert page.errors == []
+
+
+def test_the_loop_board_does_not_rebuild_itself_when_nothing_moved(live, page):
+    """The same fix as the tab bar's: a poll that changes nothing must not
+    hand the person a new DOM. A reference taken to a row survives."""
+    base = live["base"]
+    page.goto(base + "/#tab=loop")
+    page.wait_for_selector("table.jd[data-loop-table] tbody tr")
+    row = page.locator("tr[data-loop-row='law']")
+    page.evaluate("document.querySelector(\"tr[data-loop-row='law']\").dataset.marked = 'yes'")
+    page.wait_for_timeout(6500)
+    assert row.get_attribute("data-marked") == "yes"     # the same node, two polls later
+    assert page.errors == []
+
+
+def test_the_queue_row_counts_the_judge_batch_up(live, page):
+    """Phase 8g D2: "judging 40/130", not "judging 130 answers"."""
+    from service import db
+    base = live["base"]
+    sid = db.add("fx/good-750m", "auto", "judged", "omar", "", tasks=["exam_law"])
+    rid = db.judge_run_create("fx/good-750m", "b_live", 130, "stub/overlap-v1", "{}")
+    db.batch_add("b_live", "judge", rid, 130, "anthropic", "claude-x")
+    db.batch_progress("b_live", "40/130 done")
+    page.goto(base + "/#tab=queue")
+    page.wait_for_selector(f"table.jd tbody tr:has-text('#{sid}'), table tbody tr")
+    page.wait_for_selector("[data-judge-progress]", timeout=20000)
+    cell = page.locator("[data-judge-progress]").first
+    assert cell.text_content().strip() == "judging 40/130"
+    # and the topic page says it too, where the person is waiting
+    page.goto(base + "/#topic=law")
+    page.wait_for_selector("[data-judging]", timeout=20000)
+    assert "judging 40/130" in page.locator("[data-judging]").text_content()
+    assert page.errors == []

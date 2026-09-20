@@ -300,3 +300,49 @@ def test_the_missing_rubric_is_named_not_guessed(svc, tmp_path, monkeypatch):
         jd.rubric_for("exam_history")
     assert "history.md" in str(e.value) and "exam.md" in str(e.value)
     assert str(empty) in str(e.value)
+
+
+# ---------------------------------------------------------------------------
+# what a person waiting on a judged run is told
+# ---------------------------------------------------------------------------
+
+def test_a_batch_in_flight_reports_how_far_it_is(svc, monkeypatch):
+    """"judging 40/130", not "judging 130 answers". Every provider reports
+    counts while the batch runs; the poller records what it was told."""
+    from service import config, db, llm
+    client, _, _ = svc
+    monkeypatch.setattr(config, "JUDGE_MODEL", "stub")
+    sid = client.post("/api/submissions", json={"hf_id": "fx/good-750m", "suite": "judged",
+                                                "tasks": [LAW]}).json()["id"]
+    rid = db.judge_run_create("fx/good-750m", "b_1", 130, "stub/overlap-v1", "{}")
+    db.batch_add("b_1", "judge", rid, 130, "anthropic", "claude-x")
+    # what the provider says while it runs, in the shape every backend returns
+    assert llm._counted({"processing": 90, "succeeded": 40, "total": 130}) == "40/130 done"
+    assert llm._counted({"succeeded": 38, "errored": 2, "total": 130}) == "40/130 done, 2 failed"
+    assert llm._counted({}, "in_progress") == "in_progress"
+    db.batch_progress("b_1", llm._counted({"succeeded": 40, "total": 130}))
+    row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
+    assert row["judge"]["progress"] == "40/130 done" and row["judge"]["n_items"] == 130
+
+
+def test_the_poller_records_what_the_provider_said(tmp_path, monkeypatch):
+    """The poller asks for status anyway; recording the answer is the whole
+    feature. It must not write on every tick when nothing moved."""
+    from service import config, db, llm, llm_poller
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "s.sqlite3")
+    monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)
+    monkeypatch.setattr(config, "LLM_PROVIDER", "fake")
+    monkeypatch.setattr(config, "LLM_MODEL", "fake-1")
+    monkeypatch.setattr(llm.FakeBatches, "polls_to_done", 3)
+    llm.reset()
+    db.init()
+    backend = llm.client()
+    bid = backend.submit([llm.Request(custom_id=f"x{i}", system="", user="hi", max_tokens=8)
+                          for i in range(4)])
+    db.batch_add(bid, "proposal", 1, 4, backend.name, backend.model)
+    llm_poller.tick()
+    row = next(b for b in db.batches_list(10) if b["batch_id"] == bid)
+    assert row["progress"] == "1/4 done"          # a third of the way, recorded
+    llm_poller.tick()
+    row = next(b for b in db.batches_list(10) if b["batch_id"] == bid)
+    assert row["progress"] == "3/4 done"

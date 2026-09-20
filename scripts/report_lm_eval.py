@@ -1150,76 +1150,84 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                               round(bpb["value"] * math.log(2), 6), None,
                               r["n_shot"].get(task), r["n_samples"].get(task)])
 
-    # Two rows with identical scores AND item counts on the RANKED tasks are
-    # one run submitted twice (HANDOFF §11: two such sat at #1 and #2 for
-    # weeks, and still did after the first attempt at this). The ranked tasks
-    # are the test because that is what the rank is computed from: a
-    # resubmission that also finished the perplexity tasks its failed first
-    # attempt did not is the same run, and comparing "every task this row
-    # happens to have" made those two look different — which is exactly the
-    # pair on the board. Both rows stay — deleting someone's submission is not
-    # the page's call — but only one is ranked, and the other says which it
-    # duplicates. The KEEPER is the more complete run: same scores, more
-    # tasks finished. Three tasks minimum: two models genuinely tying on one
-    # task is not a duplicate.
+    # THE SAME RUN, SUBMITTED TWICE. The test is the ranked tasks, because
+    # that is what a rank is computed from, and it is "the same answers", not
+    # "the same floats": the live pair that sat at #1 and #2 for weeks is
+    # bit-identical on six of seven required tasks and differs on the seventh
+    # by ONE item in 10,042 — a re-run of the same weights, not a second
+    # model. Two different models agreeing within one item on every ranked
+    # task, mmlu's 14,042 included, does not happen.
+    #
+    # Both rows stay on the board — deleting someone's submission is not the
+    # page's call — but only one is ranked, and the other says which it
+    # duplicates. The keeper is the more complete run: same answers, more
+    # tasks finished.
     DUP_MIN_TASKS = 3
     dup_tasks = required or acc_tasks
-    by_print: dict[tuple, list[dict]] = {}
-    for row in model_rows:
-        mid = row["id"]
-        if any(mid not in cells.get(t, {}) for t in dup_tasks):
-            continue          # a row missing a ranked task is not ranked at all
-        fingerprint = tuple(sorted(
-            (t, round(cells[t][mid]["v"], 9), cells[t][mid].get("n")) for t in dup_tasks))
-        if len(fingerprint) >= DUP_MIN_TASKS:
-            by_print.setdefault(fingerprint, []).append(row)
-    n_cells = {r["id"]: sum(1 for t in cells if r["id"] in cells[t]) for r in model_rows}
-    for group in by_print.values():
-        if len(group) < 2:
-            continue
-        # most tasks finished first; then the earlier run, then the id, so the
-        # answer is the same on every rebuild
-        group.sort(key=lambda r: (-n_cells[r["id"]], str(r.get("date") or ""), r["id"]))
-        first = group[0]
-        for dup in group[1:]:
-            dup["duplicateOf"] = first["id"]
-            dup["duplicateOfName"] = first["name"]
 
-    # Two rows that LOOK identical on the board but are not: every ranked
-    # score equal to the four decimals the page prints, and something still
-    # different underneath. That pair is not merged — identical is the test,
-    # and a near-identical pair may be two honest runs — but the page says so
-    # and names the field, because "why are these two both here?" is a
-    # question the board should answer rather than leave to a diff.
-    ranked_rows = [r for r in model_rows
-                   if all(r["id"] in cells.get(t, {}) for t in dup_tasks)]
-    shown = {r["id"]: tuple(round(cells[t][r["id"]]["v"], 4) for t in dup_tasks)
-             for r in ranked_rows}
-    by_shown: dict[tuple, list[dict]] = {}
-    for r in ranked_rows:
-        by_shown.setdefault(shown[r["id"]], []).append(r)
-    for group in by_shown.values():
-        if len(group) < 2:
-            continue
-        group.sort(key=lambda r: (-n_cells[r["id"]], str(r.get("date") or ""), r["id"]))
-        keep = group[0]
-        for other in group[1:]:
-            if other.get("duplicateOf") or keep.get("duplicateOf"):
-                continue                     # already merged: exactly identical
-            why = None
-            for t in dup_tasks:
-                a, b = cells[t][keep["id"]], cells[t][other["id"]]
-                if a.get("n") != b.get("n"):
-                    why = (f"{t}: {a.get('n')} items against {b.get('n')}")
-                    break
-                if round(a["v"], 9) != round(b["v"], 9):
-                    why = (f"{t}: {a['v']:.9f} against {b['v']:.9f}")
-                    break
-            if not why:
+    def same_run(a: str, b: str) -> str | None:
+        """'' when the rows are bit-identical, a sentence when they agree to
+        within one item, None when they are two different runs."""
+        worst = ""
+        for t in dup_tasks:
+            ca, cb = cells[t][a], cells[t][b]
+            if ca.get("n") != cb.get("n"):
+                return None                      # a different number of questions
+            d = abs(ca["v"] - cb["v"])
+            if d == 0:
                 continue
-            other["nearDuplicateOf"] = keep["id"]
-            other["nearDuplicateOfName"] = keep["name"]
-            other["nearDuplicateWhy"] = why
+            n = ca.get("n") or 0
+            if not n or d > 1.0 / n + 1e-12:     # more than one item apart
+                return None
+            worst = (f"{t} differs by one item in {n}"
+                     if not worst else f"{worst}, and {t} by one in {n}")
+        return worst
+
+    ranked_rows = [r for r in model_rows
+                   if len(dup_tasks) >= DUP_MIN_TASKS
+                   and all(r["id"] in cells.get(t, {}) for t in dup_tasks)]
+    n_cells = {r["id"]: sum(1 for t in cells if r["id"] in cells[t]) for r in model_rows}
+    # most tasks finished first; then the earlier run, then the id, so the
+    # keeper is the same on every rebuild
+    ranked_rows.sort(key=lambda r: (-n_cells[r["id"]], str(r.get("date") or ""), r["id"]))
+    for i, keep in enumerate(ranked_rows):
+        if keep.get("duplicateOf"):
+            continue
+        for other in ranked_rows[i + 1:]:
+            if other.get("duplicateOf"):
+                continue
+            why = same_run(keep["id"], other["id"])
+            if why is None:
+                continue
+            other["duplicateOf"] = keep["id"]
+            other["duplicateOfName"] = keep["name"]
+            other["duplicateWhy"] = why or "every score and item count is identical"
+
+    # Two rows that are NOT the same run and still print the same numbers:
+    # every ranked score within a tenth of a point. Not merged — that is a
+    # claim about identity and these are two runs — but named on the row and
+    # in a warning, because "why are these both here?" is a question the
+    # board should answer rather than leave to a diff.
+    NEAR = 1e-3
+    for i, keep in enumerate(ranked_rows):
+        for other in ranked_rows[i + 1:]:
+            if other.get("duplicateOf") or keep.get("duplicateOf") \
+                    or other.get("nearDuplicateOf"):
+                continue
+            gaps, counts = [], []
+            for t in dup_tasks:
+                ca, cb = cells[t][keep["id"]], cells[t][other["id"]]
+                if ca.get("n") != cb.get("n"):
+                    # a different number of questions: not the same run, and
+                    # the most useful thing to say about the pair
+                    counts.append(f"{t}: {ca.get('n')} items against {cb.get('n')}")
+                    continue
+                gaps.append((abs(ca["v"] - cb["v"]),
+                             f"{t}: {ca['v']:.6f} against {cb['v']:.6f}"))
+            if gaps and max(g[0] for g in gaps) <= NEAR:
+                other["nearDuplicateOf"] = keep["id"]
+                other["nearDuplicateOfName"] = keep["name"]
+                other["nearDuplicateWhy"] = counts[0] if counts else max(gaps)[1]
 
     # provenance warnings — they gate every claim below them
     warnings: list[str] = []
@@ -1289,9 +1297,11 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         warnings.append(
             f"{len(dups)} row{'s' if len(dups) > 1 else ''} "
             f"({', '.join(m['name'] for m in dups[:4])}{', …' if len(dups) > 4 else ''}) "
-            f"score identically to another row on every task, item counts included — the same "
-            f"run submitted twice. Both are shown; the later one is not ranked and says which "
-            f"row it duplicates. Nothing has been deleted.")
+            f"give the same answers as another row on every ranked task — the same run "
+            f"submitted twice ("
+            + "; ".join(f"{m['name']}: {m['duplicateWhy']}" for m in dups[:2])
+            + "). Both are shown; the less complete one is not ranked and says which row it "
+              "duplicates. Nothing has been deleted.")
     near = [m for m in model_rows if m.get("nearDuplicateOf")]
     if near:
         warnings.append(
@@ -2043,8 +2053,9 @@ function modelSentence(m) {
 // duplicates is the whole point — "duplicate" alone would send someone hunting
 const dupBadge = m => m.duplicateOf
   ? el('span', { class: 'badge', 'data-duplicate': m.duplicateOf,
-      title: `every task score and item count is identical to ${m.duplicateOfName}`
-        + ' — the same run submitted twice. Shown, not ranked; nothing deleted.',
+      title: `the same answers as ${m.duplicateOfName} on every ranked task — `
+        + `${m.duplicateWhy || 'identical'}. The same run submitted twice: shown, not `
+        + 'ranked, nothing deleted.',
       text: `duplicate of ${m.duplicateOfName}` })
   // not merged, and the page says why rather than leaving two rows that look
   // the same sitting next to each other with no explanation
@@ -5273,10 +5284,10 @@ function vQueue() {
     el('td', { class: 'small', text: r.progress || '' },
       // the GPU half finishing is not the job finishing: the judge batch is
       // still out, and the row says how far it is
-      r.judge ? el('div', { class: 'se', 'data-judge-progress': r.judge.status || '',
+      r.judge ? el('div', { class: 'se', 'data-judge-progress': judgeCount(r.judge),
         title: `judge batch ${r.judge.batch_id}`,
         text: r.judge.status === 'done' ? `judged ${r.judge.n_items} answers`
-          : `judging ${r.judge.progress || r.judge.n_items + ' answers'}` }) : '',
+          : `judging ${judgeCount(r.judge)}` }) : '',
       r.error ? el('div', { class: 'down', text: r.error }) : ''),
     el('td', { class: 'num', text: r.gpu_seconds ? Math.round(r.gpu_seconds / 60) + ' min' : '—' }),
     el('td', {},
@@ -5393,10 +5404,28 @@ async function rvPost(path, body) {
   await loadReview(); render();
 }
 
+// The name every decision is recorded under. It is remembered for this
+// browser and restored at boot, not per tab: typing it on the Loop board and
+// finding it gone on the topic page is the same person, one name.
+function rememberedName() {
+  if (state.rvName) return state.rvName;
+  try { state.rvName = localStorage.getItem('bench-name') || ''; } catch (e) { /* private mode */ }
+  return state.rvName;
+}
+
+let _nameKey = 0;
 function rvNameInput() {
-  return el('input', { type: 'text', placeholder: 'your name (recorded)', value: state.rvName,
-    'aria-label': 'your name', oninput: e => { state.rvName = e.target.value;
-      try { localStorage.setItem('bench-name', state.rvName); } catch (err) { /* private mode */ } } });
+  // data-keep: render() puts focus and caret back on this node after a poll
+  // rebuilds the view, so a 5-second refresh cannot eat what is being typed
+  const key = 'name-' + (++_nameKey);
+  return el('input', { type: 'text', placeholder: 'your name (recorded)',
+    value: rememberedName(), 'aria-label': 'your name', 'data-keep': key,
+    oninput: e => { state.rvName = e.target.value;
+      try { localStorage.setItem('bench-name', state.rvName); } catch (err) { /* private mode */ }
+      // every other copy of the field on this page follows along
+      for (const o of document.querySelectorAll('input[data-keep^="name-"]'))
+        if (o !== e.target) o.value = state.rvName;
+    } });
 }
 
 function rvFindings(p) {
@@ -5683,7 +5712,7 @@ function rvDataset(d) {
 
 function vReview() {
   if (!state.rv.loaded && netReady()) { loadReview(); }
-  try { if (!state.rvName) state.rvName = localStorage.getItem('bench-name') || ''; } catch (e) { /* */ }
+  rememberedName();
   const llm = state.rv.llm || {};
   const llmOk = !!llm.configured && (llm.usage_today || 0) < (llm.daily_cap || 0);
   const llmCard = el('div', { class: 'card' },
@@ -5776,6 +5805,15 @@ function modelAnswers(m, cats) {
   return wrap;
 }
 
+// "judging 40/130", not "judging 130 answers": the provider reports how many
+// of the batch are back, the poller records it, and this is where a person
+// waiting on a judged run finds out whether to wait or come back later.
+function judgeCount(j) {
+  const m = /^(\d+)\s*\/\s*(\d+)/.exec(j.progress || '');
+  if (m) return `${m[1]}/${m[2]}` + (/failed/.test(j.progress) ? ' · some failed' : '');
+  return `${j.n_items} answers`;
+}
+
 // ---------------------------------------------------------------------------
 // The Loop tab: one row per topic, and for each the single next step. Nothing
 // here computes a gate — the server says whether a topic may be sat or
@@ -5784,15 +5822,21 @@ function modelAnswers(m, cats) {
 // ---------------------------------------------------------------------------
 
 let _loopInFlight = false;
+let _loopSig = '';
 async function loadLoop() {
   if (_loopInFlight) return;      // a 5 s poll must not stack requests
   _loopInFlight = true;
   try {
     const j = await api('api/loop');
+    // re-render only when the board actually moved: rebuilding the view every
+    // five seconds detaches whatever the person is reaching for
+    const sig = JSON.stringify([j.topics, j.judged_blocked, j.tasks_built]);
+    const changed = sig !== _loopSig || !state.loop.loaded || state.loop.failed;
+    _loopSig = sig;
     Object.assign(state.loop, { rows: j.topics, blocked: j.judged_blocked,
                                 built: j.tasks_built || [], floor: j.floor, loaded: true,
                                 failed: '' });
-    if ((state.tab === 'loop' || state.topic) && !state.model) render();
+    if (changed && (state.tab === 'loop' || state.topic) && !state.model) render();
   } catch (e) {
     // netFail already put the banner up and set the backoff; the board itself
     // must also stop saying "Loading…" forever, which is what it did
@@ -5975,6 +6019,7 @@ function vLoop() {
 
 function vTopic() {
   if (!state.loop.loaded && netReady()) loadLoop();
+  if (!state.queue.length && netReady()) loadQueue();
   loopReadRestore();
   const r = loopRowOf(state.topic);
   const back = el('p', { class: 'small' },
@@ -5998,8 +6043,23 @@ function vTopic() {
       `${r.bank.report} report-half questions — under the ${r.bank.floor} this topic needs `
       + 'before anything may be proposed from it. Import or write more on the Exam tab.' }) : '',
     el('div', { class: 'frm' }, loopBtn(r), rvNameInput()),
+    judgingLine(r),
     state.loop.msg ? el('p', { class: 'small', 'data-loop-msg': '1', text: state.loop.msg }) : '');
   return [headCard, loopSitPanel(r), loopAnswersPanel(r), loopOutputPanel(r)];
+}
+
+// a judged run of this topic that is still out: the queue row's own progress,
+// on the page where the person is waiting for it
+function judgingLine(r) {
+  const mine = (state.queue || []).filter(q => q.suite === 'judged' && q.judge
+    && q.judge.status !== 'done'
+    && (() => { let t = []; try { t = JSON.parse(q.tasks || '[]'); } catch (e) { /* older row */ }
+                return !t.length || t.includes(r.task); })());
+  if (!mine.length) return '';
+  return el('p', { class: 'small', 'data-judging': '1' },
+    mine.map(q => el('span', {}, `${q.hf_id}: judging ${judgeCount(q.judge)} `,
+      el('a', { href: '#tab=queue', text: 'in the queue',
+        onclick: e => { e.preventDefault(); navigate({ tab: 'queue', topic: null }); } }), ' ')));
 }
 
 function loopSitPanel(r) {
@@ -6042,7 +6102,7 @@ function loopSitPanel(r) {
     el('div', { class: 'frm' },
       el('input', { type: 'text', 'aria-label': 'model id', value: s.model,
         placeholder: 'org/model, or local/<name>', style: 'flex:2;min-width:240px',
-        oninput: e => { s.model = e.target.value; } }),
+        'data-keep': 'sit-model', oninput: e => { s.model = e.target.value; } }),
       el('select', { 'aria-label': 'kind', onchange: e => { s.kind = e.target.value; } },
         ['auto', 'base', 'instruct'].map(v => el('option', { value: v,
           selected: s.kind === v ? '' : null, text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
@@ -6310,7 +6370,7 @@ function exCandidate(c) {
 
 function vExam() {
   if (!state.ex.loaded && netReady()) loadExam();
-  try { if (!state.rvName) state.rvName = localStorage.getItem('bench-name') || ''; } catch (e) { /* */ }
+  rememberedName();
   const st = state.ex.status || {};
   const sum = st.summary || {};
   const topics = Object.keys(sum);
@@ -6417,7 +6477,8 @@ function exImport() {
       s.source = s.source || f.name.replace(/\.json$/, '');
       s.preview = null; s.msg = `${f.name} — ${(f.size / 1024).toFixed(0)} KB`; render(); } });
   const srcIn = el('input', { type: 'text', placeholder: 'source label (optional)',
-    value: s.source, 'aria-label': 'source', oninput: e => { s.source = e.target.value; } });
+    value: s.source, 'aria-label': 'source', 'data-keep': 'import-source',
+    oninput: e => { s.source = e.target.value; } });
   const nameIn = rvNameInput();
   const go = async (path) => {
     if (!s.file || !s.topic) { s.msg = 'a file and a topic, please'; return render(); }
@@ -6584,7 +6645,7 @@ function exRubricUpload(st) {
           st.content = await f.text(); st.preview = null;
           st.msg = `${f.name} — ${(f.size / 1024).toFixed(1)} KB`; render(); } }),
       el('input', { type: 'text', placeholder: 'note (why)', 'aria-label': 'note',
-        oninput: e => { st.note = e.target.value; } }),
+        'data-keep': 'rubric-note', oninput: e => { st.note = e.target.value; } }),
       rvNameInput(),
       el('button', { text: 'Check it', onclick: () => send('api/exam/rubrics/preview') }),
       p && p.ok ? el('button', { 'data-commit': 'rubric', text: 'Replace the file',
@@ -6676,10 +6737,25 @@ function render() {
   renderTabs();
   const view = document.getElementById('view');
   view.classList.remove('dimmed');
-  if (state.model) { view.replaceChildren(...vModel()); return; }
-  if (state.topic) { view.replaceChildren(...vTopic()); return; }
-  const fn = TABS.find(([id]) => id === state.tab)[2];
-  view.replaceChildren(...fn(ms));
+  // a poll rebuilds the view every few seconds. Whatever the person is typing
+  // in — and where their caret is — comes back afterwards, or the field is
+  // unusable on a live page: this is the same bug as the tab bar's, one layer
+  // down, and the cure is the same one (never lose what the DOM was holding).
+  const live = document.activeElement;
+  const keep = live && live.dataset && live.dataset.keep && view.contains(live)
+    ? { key: live.dataset.keep, value: live.value,
+        start: live.selectionStart, end: live.selectionEnd } : null;
+  if (state.model) view.replaceChildren(...vModel());
+  else if (state.topic) view.replaceChildren(...vTopic());
+  else view.replaceChildren(...TABS.find(([id]) => id === state.tab)[2](ms));
+  if (keep) {
+    const again = view.querySelector(`[data-keep="${keep.key}"]`);
+    if (again) {
+      again.value = keep.value;
+      again.focus();
+      try { again.setSelectionRange(keep.start, keep.end); } catch (e) { /* not a text field */ }
+    }
+  }
 }
 
 // The tab bar is the one thing on the page that must survive a render. A
@@ -6722,8 +6798,13 @@ function renderWarnings() {
     box.replaceChildren(...full);
     return;
   }
+  // what kind, not just how many: after a judged run most of them are about
+  // the judge, and "5 checks" says nothing about whether to open it
+  const judged = ws.filter(w => /judge|judged|rubric|criteria|canary|calibrat/i.test(w)).length;
   box.replaceChildren(el('details', { class: 'warnfold', 'data-warnings': 'collapsed' },
-    el('summary', { text: `${ws.length} check${ws.length > 1 ? 's' : ''} on the leaderboard` }),
+    el('summary', { 'data-warn-summary': String(ws.length),
+      text: `${ws.length} check${ws.length > 1 ? 's' : ''} on the leaderboard`
+        + (judged ? ` · ${judged} about the judged suite` : '') }),
     ...full));
 }
 

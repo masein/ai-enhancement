@@ -122,7 +122,14 @@ def test_the_board_checks_are_full_on_the_board_and_folded_elsewhere(live):
     pg.get_by_role("tab", name="Exam", exact=True).click()
     pg.wait_for_selector("[data-warnings='collapsed']", timeout=20000)
     fold = pg.locator("[data-warnings='collapsed']")
-    assert "check" in fold.locator("summary").text_content()
+    said = fold.locator("summary").text_content()
+    assert "check" in said
+    # phase 8g D4: what kind, not just how many — after a judged run most of
+    # them are about the judge, and a bare count says nothing about opening it
+    judged = pg.evaluate(
+        "DATA.warnings.filter(w => /judge|judged|rubric|criteria|canary|calibrat/i.test(w)).length")
+    if judged:
+        assert f"{judged} about the judged suite" in said
     # folded, never dismissed: they open
     assert not fold.locator(".warn").first.is_visible()
     fold.locator("summary").click()

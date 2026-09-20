@@ -147,6 +147,22 @@ class Backend:
         return f"{self.name}/{self.model}"
 
 
+def _counted(counts: dict, fallback: str = "") -> str:
+    """"40/130 done" from a provider's request counts, whatever it calls them.
+    A batch in flight that can only say "in_progress" tells the person nothing
+    about whether to wait or go and have lunch."""
+    if not isinstance(counts, dict) or not counts:
+        return fallback
+    done = sum(int(counts.get(k) or 0) for k in ("succeeded", "completed", "errored",
+                                                 "failed", "canceled", "cancelled", "expired"))
+    total = int(counts.get("total") or 0) or sum(int(v or 0) for v in counts.values()
+                                                 if isinstance(v, (int, float)))
+    if not total:
+        return fallback
+    bad = sum(int(counts.get(k) or 0) for k in ("errored", "failed", "expired"))
+    return f"{done}/{total} done" + (f", {bad} failed" if bad else "")
+
+
 def _http(method: str, url: str, headers: dict, body: bytes | None = None,
           timeout: float = 60.0) -> tuple[int, bytes]:
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
@@ -191,9 +207,12 @@ class AnthropicBatches(Backend):
         _, raw = _http("GET", f"{self.BASE}/messages/batches/{batch_id}", self._h())
         b = json.loads(raw)
         st = b.get("processing_status")
+        counts = b.get("request_counts") or {}
         if st == "ended":
-            return "done", json.dumps(b.get("request_counts") or {})
-        return "pending", st or ""
+            return "done", _counted(counts, json.dumps(counts))
+        # the counts are there while it runs too, and they are what a person
+        # waiting on a judge batch actually wants to know
+        return "pending", _counted(counts, st or "")
 
     def fetch(self, batch_id: str) -> dict[str, Result]:
         _, raw = _http("GET", f"{self.BASE}/messages/batches/{batch_id}", self._h())
@@ -263,11 +282,12 @@ class OpenAIBatches(Backend):
         _, raw = _http("GET", f"{self.BASE}/batches/{batch_id}", self._h())
         b = json.loads(raw)
         st = b.get("status")
+        counts = b.get("request_counts") or {}
         if st == "completed":
-            return "done", json.dumps(b.get("request_counts") or {})
+            return "done", _counted(counts, json.dumps(counts))
         if st in ("failed", "expired", "cancelled"):
             return "failed", st
-        return "pending", st or ""
+        return "pending", _counted(counts, st or "")
 
     def fetch(self, batch_id: str) -> dict[str, Result]:
         _, raw = _http("GET", f"{self.BASE}/batches/{batch_id}", self._h())
@@ -531,7 +551,12 @@ class FakeBatches(Backend):
         b = self._load(batch_id)
         b["polls"] += 1
         (self.dir / f"{batch_id}.json").write_text(json.dumps(b))
-        return ("done", "") if b["polls"] >= self.polls_to_done else ("pending", "in_progress")
+        n = len(b["requests"])
+        if b["polls"] >= self.polls_to_done:
+            return "done", _counted({"succeeded": n, "total": n})
+        # the fake one counts too, so the page's progress line is exercised
+        done = min(n, round(n * b["polls"] / max(1, self.polls_to_done)))
+        return "pending", _counted({"succeeded": done, "total": n}, "in_progress")
 
     def fetch(self, batch_id: str) -> dict[str, Result]:
         b = self._load(batch_id)

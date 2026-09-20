@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 import pytest
 
@@ -230,8 +231,9 @@ def test_an_identical_row_is_shown_named_and_not_ranked(tree, tmp_path):
     assert dup["duplicateOf"] == keep["id"] and dup["duplicateOfName"] == keep["name"]
     assert not keep.get("duplicateOf")
     assert dup["avg"] == keep["avg"]                      # shown, not deleted
-    assert any("score identically to another row" in w for w in p["warnings"])
+    assert any("give the same answers as another row" in w for w in p["warnings"])
     assert any("Nothing has been deleted" in w for w in p["warnings"])
+    assert dup["duplicateWhy"] == "every score and item count is identical"
     # a model that merely shares ONE task score is not a duplicate
     assert not any(m.get("duplicateOf") for m in p["models"]
                    if m["id"] not in (a["id"], b["id"]))
@@ -295,7 +297,7 @@ def test_a_resubmission_that_finished_more_tasks_is_the_one_that_ranks(tree, tmp
     assert a["duplicateOf"] == b["id"] and a["duplicateOfName"] == b["name"]
     assert not b.get("duplicateOf")                 # the complete run keeps it
     assert a["avg"] == b["avg"]                     # shown, not deleted
-    assert any("score identically to another row" in w for w in p["warnings"])
+    assert any("give the same answers as another row" in w for w in p["warnings"])
 
 
 def test_two_rows_that_differ_on_a_ranked_task_are_not_a_duplicate(tree, tmp_path):
@@ -366,3 +368,66 @@ def test_an_exactly_identical_row_is_merged_not_merely_flagged(tree, tmp_path):
     dup = rows["fx/good-750m-same"] if rows["fx/good-750m-same"].get("duplicateOf") \
         else rows["fx/good-750m"]
     assert dup["duplicateOf"] and not dup.get("nearDuplicateOf")   # merged, not merely noted
+
+
+def test_the_pair_from_the_live_board_is_one_run(tmp_path):
+    """The two rows that sat at #1 and #2 for weeks, as they are on the
+    server: `local/qwen35-delta-moe-7d560104-step945` and its resubmission.
+    Six of the seven ranked tasks are bit-identical and hellaswag differs by
+    ONE item in 10,042 — the same weights evaluated twice, not two models.
+    The resubmission also finished both perplexity tasks the first attempt
+    died on, which is why it is the one that keeps the rank."""
+    import tarfile
+    src = Path(__file__).resolve().parent / "fixtures" / "qwen35-pair.tgz"
+    out = tmp_path / "full"
+    out.mkdir()
+    with tarfile.open(src) as tf:
+        tf.extractall(out, filter="data")                         # our own fixture
+    p = report.build_payload(report.merge_runs(report.load_results(out)), "t", source="")
+    rows = {m["id"]: m for m in p["models"]}
+    first = rows["local/qwen35-delta-moe-7d560104-step945"]
+    again = rows["local/qwen35-delta-moe-7d560104-step945-v2"]
+    # what the board used to show: two ranked rows, one of them a ghost
+    assert first["avg"] is not None and again["avg"] is not None
+    assert first["avg"] != again["avg"]            # they are not equal numbers
+    # and what it shows now: one run, named
+    assert first["duplicateOf"] == again["id"]
+    assert first["duplicateOfName"] == again["name"]
+    assert first["duplicateWhy"] == "hellaswag differs by one item in 10042"
+    assert not again.get("duplicateOf")            # the complete run keeps the rank
+    assert any("give the same answers as another row" in w for w in p["warnings"])
+    # the rank goes to one of them, and the count reflects that
+    ranked = [m for m in p["models"] if m["avg"] is not None and not m.get("duplicateOf")]
+    assert [m["id"] for m in ranked] == [again["id"]]
+    # the perplexity tasks only the resubmission has are not part of the test
+    assert "ppl_code" in p["pplTasks"] and "ppl_code" not in p["required"]
+    assert "ppl_code" not in p["cells"] or first["id"] not in p["cells"]["ppl_code"]
+
+
+def test_two_models_that_are_not_the_same_run_stay_two_rows(tree, tmp_path):
+    """The rule is 'the same answers', and a model that answers differently
+    keeps its row however close the totals land."""
+    import shutil
+    out = tmp_path / "results" / "full"
+    shutil.copytree(tree["out_dir"], out)
+    src, twin = out / "fx__good-750m", out / "fx__good-750m-b"
+    shutil.copytree(src, twin)
+    for f in twin.rglob("results*.json"):
+        blob = json.loads(f.read_text())
+        blob["config"]["model_args"] = blob["config"]["model_args"].replace(
+            "fx/good-750m", "fx/good-750m-b")
+        if "piqa" in blob.get("results", {}):
+            # two items in a hundred-item task: two different sets of answers
+            n = (blob.get("n-samples", {}).get("piqa") or {}).get("effective") or 100
+            for k in ("acc,none", "acc_norm,none"):
+                if k in blob["results"]["piqa"]:
+                    blob["results"]["piqa"][k] += 2 / n
+        f.write_text(json.dumps(blob))
+    p = report.build_payload(report.merge_runs(report.load_results(out)), "t", source="")
+    rows = {m["id"]: m for m in p["models"]}
+    assert not rows["fx/good-750m-b"].get("duplicateOf")
+    assert not rows["fx/good-750m"].get("duplicateOf")
+    assert rows["fx/good-750m-b"]["avg"] != rows["fx/good-750m"]["avg"]
+    # two items apart on a small task is not "the same answers"; both rank
+    ranked = {m["id"] for m in p["models"] if m["avg"] is not None and not m.get("duplicateOf")}
+    assert {"fx/good-750m", "fx/good-750m-b"} <= ranked
