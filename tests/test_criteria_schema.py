@@ -304,3 +304,86 @@ def test_no_report_half_question_of_any_bank_leaves_it(five, tmp_path, monkeypat
         for r in report:
             assert r["prompt"] not in sent and r["prompt"][:60] not in sent
             assert r["qid"] not in sent
+
+
+# ---------------------------------------------------------------------------
+# the wrapped file, through both doors
+# ---------------------------------------------------------------------------
+
+PHYSICS = REPO / "eval_tasks" / "fr" / "physics_engineering_v1.json"
+PHYS_TOPIC = "physics & engineering"
+
+
+def test_the_real_wrapped_file_imports_from_the_page(tmp_path, monkeypatch):
+    """It did not: the page had an array-only check in front of the unwrapping,
+    so the one wrapped file of the five was refused with "the file must hold a
+    JSON array of question objects" while the other four went in."""
+    from conftest import make_service
+    client, appmod, _ = make_service(tmp_path, monkeypatch)
+    try:
+        from service import config
+        text = PHYSICS.read_text(encoding="utf-8")
+        assert isinstance(json.loads(text), dict)          # the shape that was refused
+        body = {"topic": PHYS_TOPIC, "approver": "Dr. Hossein",
+                "source": "physics_engineering_v1", "text": text}
+        pre = client.post("/api/exam/import/preview", json=body)
+        assert pre.status_code == 200, pre.text
+        assert pre.json()["imported"] == 100
+        # the preview says where it found them
+        assert pre.json()["wrapper"] == "questions"
+        assert len(pre.json()["items"]) == 100
+        got = client.post("/api/exam/import", json=body)
+        assert got.status_code == 200, got.text
+        assert got.json()["imported"] == 100 and got.json()["wrapper"] == "questions"
+        mine = [r for r in eb.load_bank(config.EXAM_DIR)[PHYS_TOPIC]
+                if r.get("source") == "physics_engineering_v1"]
+        assert len(mine) == 100
+        # the committed file stays as the author sent it, so re-importing the
+        # same file is a no-op: same prompts, same qids, nothing written
+        again = client.post("/api/exam/import", json=body)
+        assert (again.json()["imported"], again.json()["updated"],
+                again.json()["skipped"]) == (0, 0, 100)
+        assert len([r for r in eb.load_bank(config.EXAM_DIR)[PHYS_TOPIC]
+                    if r.get("source") == "physics_engineering_v1"]) == 100
+        # and the array the page sends when it has already parsed the file
+        parsed = client.post("/api/exam/import/preview",
+                             json={**body, "text": "", "items": json.loads(text)})
+        assert parsed.status_code == 200 and parsed.json()["skipped"] == 100
+    finally:
+        client.__exit__(None, None, None)
+
+
+def test_the_cli_and_the_page_read_the_wrapped_file_identically(tmp_path, monkeypatch):
+    """Two doors, one reading. The records must match field for field."""
+    from conftest import make_service
+    client, _, _ = make_service(tmp_path, monkeypatch)
+    try:
+        from service import config
+        text = PHYSICS.read_text(encoding="utf-8")
+        client.post("/api/exam/import", json={"topic": PHYS_TOPIC, "approver": "Dr. Hossein",
+                                              "source": "physics_engineering_v1", "text": text})
+        from_page = [r for r in eb.load_bank(config.EXAM_DIR)[PHYS_TOPIC]
+                     if r.get("source") == "physics_engineering_v1"]
+        cli_root = tmp_path / "cli-exam"
+        eb.import_bank(cli_root, PHYSICS, PHYS_TOPIC, "Dr. Hossein", "physics_engineering_v1")
+        from_cli = eb.load_bank(cli_root)[PHYS_TOPIC]
+        assert len(from_page) == len(from_cli) == 100
+        drop = lambda rows: [{k: v for k, v in r.items() if k != "accepted_at"}     # noqa: E731
+                             for r in sorted(rows, key=lambda x: x["qid"])]
+        assert drop(from_page) == drop(from_cli)
+    finally:
+        client.__exit__(None, None, None)
+
+
+def test_a_file_that_wraps_nothing_usable_is_still_refused(tmp_path, monkeypatch):
+    from conftest import make_service
+    client, _, _ = make_service(tmp_path, monkeypatch)
+    try:
+        body = {"topic": "economics", "approver": "x"}
+        for text in ('{"a": [], "b": []}', '{"questions": {"not": "a list"}}', '"a string"'):
+            r = client.post("/api/exam/import/preview", json={**body, "text": text})
+            assert r.status_code == 422, text
+            assert "array of question objects" in r.json()["detail"]
+            assert "one list in it" in r.json()["detail"]
+    finally:
+        client.__exit__(None, None, None)

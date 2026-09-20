@@ -448,9 +448,9 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
     assert "not comparable" in up.locator("[data-sha-warning]").text_content()
     assert up.locator("[data-problems]").count() == 0
     up.locator("button[data-commit='rubric']").click()
-    page.wait_for_function(
-        "document.querySelector('[data-rubric-msg]')"
-        "&& document.querySelector('[data-rubric-msg]').textContent.includes('written to')")
+    page.wait_for_selector("[data-action-ok='exrubric']", timeout=30000)
+    said = page.locator("[data-action-ok='exrubric']").text_content()
+    assert "Written to" in said and "re-run suite=judged" in said
     # written outside the checkout, read by the judge, and on the record
     written = root / "rubrics" / "medicine_health.md"
     assert written.read_text(encoding="utf-8") == signed
@@ -748,3 +748,97 @@ def test_the_queue_row_counts_the_judge_batch_up(live, page):
     page.wait_for_selector("[data-judging]", timeout=20000)
     assert "judging 40/130" in page.locator("[data-judging]").text_content()
     assert page.errors == []
+
+
+PHYSICS_FILE = REPO / "eval_tasks" / "fr" / "physics_engineering_v1.json"
+
+
+def test_a_refusal_replaces_the_last_success_rather_than_sitting_under_it(live, page):
+    """After computer science imported, the physics attempt showed the CS
+    success line with "refused" beneath it, which reads as a partial import.
+    One result line per panel."""
+    base = live["base"]
+    page.goto(base + "/#tab=exam")
+    page.wait_for_selector("[data-panel='import']")
+    panel = page.locator("[data-panel='import']")
+    panel.get_by_label("your name").first.fill("Omar")
+    # a good import first
+    upload(page, "questions file", "computer_science_v1.json", "application/json",
+           (REPO / "eval_tasks" / "fr" / "computer_science_v1.json").read_text(encoding="utf-8"))
+    panel.get_by_label("topic").select_option("computer science")
+    panel.get_by_role("button", name="Preview").click()
+    page.wait_for_selector("[data-action-ok='eximport']", timeout=30000)
+    panel.locator("button[data-commit='import']").click()
+    page.wait_for_function(
+        "() => (document.querySelector(\"[data-action-ok='eximport']\") || {}).textContent"
+        "?.startsWith('Imported')", timeout=30000)
+    assert "Imported 100" in panel.locator("[data-action-ok='eximport']").text_content()
+    # then one the server refuses: the success must be gone, not above it
+    upload(page, "questions file", "broken.json", "application/json", '{"a": [], "b": []}')
+    # the file's onchange is async (it reads the file), so wait for the answer
+    # to the LAST file to go rather than racing it
+    page.wait_for_selector("[data-action-ok='eximport']", state="detached", timeout=20000)
+    panel.get_by_role("button", name="Preview").click()
+    page.wait_for_selector("[data-action-error='eximport']", timeout=30000)
+    assert page.locator("[data-action-ok='eximport']").count() == 0
+    assert panel.locator("[data-action-error], [data-action-ok]").count() == 1
+    said = panel.locator("[data-action-error='eximport']").text_content()
+    assert "Refused." in said and "array of question objects" in said
+    assert "Imported 100" not in panel.text_content()
+    # the 422 we asked for is the only thing the console should have to say
+    assert all("422" in e for e in page.errors), page.errors
+
+
+def test_the_page_imports_the_wrapped_file_the_author_sent(live, page):
+    """The physics file, as delivered, through the panel that refused it."""
+    import exam_build as eb
+    base, root = live["base"], live["root"]
+    page.goto(base + "/#tab=exam")
+    page.wait_for_selector("[data-panel='import']")
+    panel = page.locator("[data-panel='import']")
+    panel.get_by_label("your name").first.fill("Omar")
+    upload(page, "questions file", "physics_engineering_v1.json", "application/json",
+           PHYSICS_FILE.read_text(encoding="utf-8"))
+    panel.get_by_label("topic").select_option("physics & engineering")
+    panel.get_by_label("source").fill("physics_engineering_v1")
+    panel.get_by_role("button", name="Preview").click()
+    page.wait_for_selector("[data-action-ok='eximport']", timeout=30000)
+    said = panel.locator("[data-action-ok='eximport']").text_content()
+    assert "Read 100 questions" in said and 'from "questions" in the file' in said
+    panel.locator("button[data-commit='import']").click()
+    page.wait_for_function(
+        "() => (document.querySelector(\"[data-action-ok='eximport']\") || {}).textContent"
+        "?.startsWith('Imported')", timeout=30000)
+    mine = [r for r in eb.load_bank(root / "exam")["physics & engineering"]
+            if r.get("source") == "physics_engineering_v1"]
+    assert len(mine) == 100
+    assert page.errors == []
+
+
+def test_the_rubrics_table_says_whether_a_topic_has_questions(live, page):
+    """A rubric and a criteria file ship in the repo, so every topic looked
+    equipped whether or not anyone had written it a question — and someone
+    reasonably asked whether the banks had already been imported."""
+    import exam_build as eb
+    base, root = live["base"], live["root"]
+    # a topic with the files and no questions: exactly the case that misled
+    bank = eb.bank_dir(root / "exam") / "geography_world_facts.jsonl"
+    kept = bank.read_bytes()
+    bank.unlink()
+    try:
+        page.goto(base + "/#tab=exam")
+        page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
+        panel = page.locator("[data-panel='rubrics']")
+        med = panel.locator("tr[data-rubric-row='medicine & health']")
+        assert med.locator("[data-bank]").first.get_attribute("data-bank") != "0"
+        assert "report" in med.text_content() and "diagnose" in med.text_content()
+        empty = panel.locator("tr[data-rubric-row='geography & world facts'] [data-bank='0']")
+        assert empty.count() == 1
+        assert empty.text_content() == "no questions yet"
+        # and an unversioned heading is not printed as an error
+        assert "v?" not in panel.text_content()
+        assert panel.locator("[data-no-version]").count() >= 1
+        assert "no version marker" in panel.text_content()
+        assert page.errors == []
+    finally:
+        bank.write_bytes(kept)

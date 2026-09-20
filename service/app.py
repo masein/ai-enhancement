@@ -693,25 +693,37 @@ class ImportIn(BaseModel):
     topic: str
     approver: str
     source: str = ""
-    items: list | None = None          # parsed array, as the file holds it
+    # the file as it is: an array, or an object holding one — physics &
+    # engineering arrived as {"questions": [...]}, and a file is not refused
+    # over its wrapping
+    items: list | dict | None = None
     text: str = ""                     # or the file's text, parsed here
 
 
-def _import_items(body: ImportIn) -> list:
+_NOT_A_BANK = ("the file must hold a JSON array of question objects, or an object with one "
+               "list in it (\"questions\", \"items\", …)")
+
+
+def _import_items(body: ImportIn):
+    """The file as it arrived — array or object — checked here only for being
+    readable at all. exam_build.plan_import does the unwrapping and reports
+    which key it came out of, so the page and `exam_build.py import` read a
+    delivered file exactly the same way. The page used to have its own
+    array-only check in front of that, which is how the one wrapped file of
+    the five was refused."""
     raw = body.text or ""
-    if body.items is not None:
-        if not isinstance(body.items, list):
-            raise HTTPException(422, "the file must hold a JSON array of question objects")
-        return body.items
-    if len(raw.encode("utf-8")) > IMPORT_MAX_BYTES:
-        raise HTTPException(413, f"the file is larger than {IMPORT_MAX_BYTES // 1024 // 1024} MB")
-    try:
-        items = json.loads(raw)
-    except (ValueError, TypeError) as e:
-        raise HTTPException(422, f"not valid JSON: {e}") from None
-    if not isinstance(items, list):
-        raise HTTPException(422, "the file must hold a JSON array of question objects")
-    return items
+    data = body.items if body.items is not None else None
+    if data is None:
+        if len(raw.encode("utf-8")) > IMPORT_MAX_BYTES:
+            raise HTTPException(413,
+                                f"the file is larger than {IMPORT_MAX_BYTES // 1024 // 1024} MB")
+        try:
+            data = json.loads(raw)
+        except (ValueError, TypeError) as e:
+            raise HTTPException(422, f"not valid JSON: {e}") from None
+    if not isinstance(exam_build.unwrap_items(data)[0], list):
+        raise HTTPException(422, _NOT_A_BANK)
+    return data
 
 
 def _import_preview(plan: dict) -> dict:
@@ -806,7 +818,15 @@ def _rubric_store() -> tuple[Path, bool]:
 @app.get("/api/exam/rubrics")
 def exam_rubrics():
     store, in_repo = _rubric_store()
+    # the bank beside the instrument: a rubric and a criteria file ship in the
+    # repo, so every topic looks equipped here whether or not anyone has
+    # written it a single question. Those are different facts and the table
+    # has to show both.
+    banks = exam_build.summary(config.EXAM_DIR)
     return {"store": str(store), "in_repo": in_repo,
+            "banks": {t: {k: (banks.get(t) or {}).get(k, 0)
+                          for k in ("accepted", "report", "diagnose", "pending")}
+                      for t in exam_build.TOPICS},
             "note": ("uploads land here and the judge reads them before the repo's own copies"
                      if not in_repo else "uploads replace the repo's own copies in this checkout"),
             "topics": [_rubric_row(t) for t in exam_build.TOPICS],

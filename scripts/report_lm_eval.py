@@ -6481,29 +6481,22 @@ function exImport() {
   const fileIn = el('input', { type: 'file', accept: '.json,application/json',
     'aria-label': 'questions file', onchange: async e => {
       const f = e.target.files[0]; if (!f) return;
-      s.file = await f.text(); s.name = f.name;
+      s.file = await f.text(); s.name = `${f.name} — ${(f.size / 1024).toFixed(0)} KB`;
       s.source = s.source || f.name.replace(/\.json$/, '');
-      s.preview = null; s.msg = `${f.name} — ${(f.size / 1024).toFixed(0)} KB`; render(); } });
+      // a new file is a new attempt: the last answer does not apply to it
+      s.preview = null; actState('eximport').ok = actState('eximport').err = '';
+      render(); } });
   const srcIn = el('input', { type: 'text', placeholder: 'source label (optional)',
     value: s.source, 'aria-label': 'source', 'data-keep': 'import-source',
     oninput: e => { s.source = e.target.value; } });
   const nameIn = rvNameInput();
-  const go = async (path) => {
-    if (!s.file || !s.topic) { s.msg = 'a file and a topic, please'; return render(); }
-    if (!state.rvName.trim()) { s.msg = 'your name is recorded on every question'; return render(); }
-    s.busy = true; render();
-    const r = await fetch(path, { method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
-      body: JSON.stringify({ topic: s.topic, approver: state.rvName, source: s.source,
-                             text: s.file }) }).catch(() => null);
-    const j = r ? await r.json().catch(() => ({})) : {};
-    s.busy = false;
-    if (!r || !r.ok) { s.msg = 'refused: ' + (j.detail || (r ? r.status : 'unreachable')); }
-    else if (path.endsWith('preview')) { s.preview = j; s.msg = ''; }
-    else { s.preview = null; s.file = ''; s.msg = `imported ${j.imported}, skipped ${j.skipped} `
-             + `already in the bank — report ${j.report} / diagnose ${j.diagnose}`;
-           state.ex.loaded = false; loadExam(); }
-    render();
+  // both buttons answer in the same place, so a new attempt cannot leave the
+  // last one's success sitting above its refusal — that read as a partial
+  // import when a wrapped file was rejected after a good one
+  const ready = () => {
+    if (!s.file || !s.topic) throw new Error('a file and a topic, please');
+    if (!state.rvName.trim()) throw new Error('your name is recorded on every question');
+    return { topic: s.topic, approver: state.rvName, source: s.source, text: s.file };
   };
   const p = s.preview;
   return el('div', { class: 'card', 'data-panel': 'import' },
@@ -6513,13 +6506,24 @@ function exImport() {
       + 'every question, the way a curator\'s name is on one they accept. Preview first: '
       + 'nothing is written until you commit.' }),
     el('div', { class: 'frm' }, fileIn, topicSel, srcIn, nameIn,
-      el('button', { text: s.busy ? 'working…' : 'Preview', disabled: s.busy ? '' : null,
-                     onclick: () => go('api/exam/import/preview') }),
+      actButton('eximport', 'Preview', async () => {
+        s.preview = null;                       // never a stale table under a new answer
+        const j = await post('api/exam/import/preview', ready());
+        s.preview = j;
+        return `Read ${j.imported + (j.updated || 0) + j.skipped + j.invalid} questions`
+          + (j.wrapper ? ` from "${j.wrapper}" in the file` : ' from the file')
+          + `: ${j.imported} new`
+          + (j.updated ? `, ${j.updated} whose metadata this revises` : '')
+          + (j.skipped ? `, ${j.skipped} already in the bank unchanged` : '')
+          + (j.invalid ? `, ${j.invalid} unusable` : '')
+          + '. Nothing is written yet.';
+      }),
       p ? actButton('eximport', `Import ${p.imported + (p.updated || 0)} questions`,
             async () => {
-              const j = await post('api/exam/import', {
-                topic: s.topic, approver: state.rvName, source: s.source, text: s.file });
-              s.preview = null; s.file = ''; s.msg = '';
+              const body = ready();
+              s.preview = null;
+              const j = await post('api/exam/import', body);
+              s.file = ''; s.name = '';
               state.ex.loaded = false; loadExam();
               return `Imported ${j.imported}`
                 + (j.updated ? `, revised ${j.updated} already in the bank` : '')
@@ -6528,8 +6532,10 @@ function exImport() {
                 + 'rebuild the harness tasks to sit them.';
             }, { 'data-commit': 'import',
                  disabled: (p.imported || p.updated) ? null : '' }) : ''),
+    // the file that is loaded, which is not a result and does not replace one
+    s.name ? el('p', { class: 'small se', 'data-import-file': '1',
+                       text: `file: ${s.name}` }) : '',
     actNote('eximport'),
-    s.msg ? el('p', { class: 'small', 'data-import-msg': '1', text: s.msg }) : '',
     p ? exImportPreview(p) : '');
 }
 
@@ -6574,6 +6580,16 @@ function exImportPreview(p) {
 // that is recorded in every judge.json, so the page says what that costs.
 // ---------------------------------------------------------------------------
 
+// what a topic's bank holds, beside the files that would grade it
+function bankCell(b) {
+  if (!b || !b.accepted) return el('span', { class: 'warn', 'data-bank': '0',
+    text: 'no questions yet' });
+  return el('span', { 'data-bank': String(b.accepted) },
+    `${b.accepted} — `,
+    el('span', { class: 'se', text: `${b.report} report / ${b.diagnose} diagnose` }),
+    b.pending ? el('span', { class: 'se', text: ` · ${b.pending} awaiting curation` }) : '');
+}
+
 function exRubrics() {
   const st = state.exrub || (state.exrub = { rows: null, open: '', kind: 'rubric',
                                              content: '', name: '', preview: null, msg: '' });
@@ -6588,15 +6604,24 @@ function exRubrics() {
     st.store ? el('p', { class: 'small', text: `Uploads are written to ${st.store}. ${st.note || ''}` }) : '',
     st.rows == null ? el('p', { class: 'small', text: 'Loading…' })
       : el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
-        el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { text: 'rubric' }),
+        el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { text: 'bank' }),
+          el('th', { text: 'rubric' }),
           el('th', { text: 'criteria' }), el('th', { text: 'files' }))),
         el('tbody', {}, rows.map(r => r.error
           ? el('tr', { 'data-rubric-row': r.topic, 'data-rubric-error': '1' },
               el('td', {}, r.topic),
-              el('td', { class: 'warn', colspan: '3' }, r.error))
+              el('td', { class: 'warn', colspan: '4' }, r.error))
           : el('tr', { 'data-rubric-row': r.topic },
           el('td', {}, r.topic),
-          el('td', {}, `${r.name}.md v${r.version} `,
+          // having a rubric is not having questions: three topics shipped
+          // with both files and an empty bank, and looked ready
+          el('td', { class: 'small' }, bankCell((st.banks || {})[r.topic])),
+          el('td', {}, `${r.name}.md `,
+            r.version === '?'
+              ? el('span', { class: 'se', 'data-no-version': '1',
+                  title: 'the author\'s own heading carries no version; the sha is the identity',
+                  text: 'no version marker ' })
+              : `v${r.version} `,
             r.fallback ? el('span', { class: 'se', 'data-fallback': '1',
               title: 'this topic has no rubric of its own; exam.md grades it',
               text: '(fallback) ' }) : '',
@@ -6626,19 +6651,12 @@ function exRubrics() {
 }
 
 function exRubricUpload(st) {
-  const send = async (path) => {
-    if (!st.content) { st.msg = 'choose a file first'; return render(); }
-    if (!state.rvName.trim()) { st.msg = 'your name is recorded with the change'; return render(); }
-    const r = await fetch(path, { method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
-      body: JSON.stringify({ name: st.name, kind: st.kind, content: st.content,
-                             approver: state.rvName, note: st.note || '' }) }).catch(() => null);
-    const j = r ? await r.json().catch(() => ({})) : {};
-    if (!r || !r.ok) { st.msg = 'refused: ' + (j.detail || (r ? r.status : 'unreachable')); }
-    else if (path.endsWith('preview')) { st.preview = j; st.msg = ''; }
-    else { st.msg = `written to ${j.written} — re-run suite=judged for this topic`;
-           st.preview = null; st.content = ''; st.rows = null; loadRubrics(); }
-    render();
+  const slot = 'exrubric';
+  const body = () => {
+    if (!st.content) throw new Error('choose a file first');
+    if (!state.rvName.trim()) throw new Error('your name is recorded with the change');
+    return { name: st.name, kind: st.kind, content: st.content,
+             approver: state.rvName, note: st.note || '' };
   };
   const p = st.preview;
   return el('div', { style: 'margin-top:10px', 'data-upload': st.name },
@@ -6651,14 +6669,33 @@ function exRubricUpload(st) {
         'aria-label': 'new file', onchange: async e => {
           const f = e.target.files[0]; if (!f) return;
           st.content = await f.text(); st.preview = null;
-          st.msg = `${f.name} — ${(f.size / 1024).toFixed(1)} KB`; render(); } }),
+          st.file = `${f.name} — ${(f.size / 1024).toFixed(1)} KB`;
+          actState(slot).ok = actState(slot).err = '';   // a new file, a new answer
+          render(); } }),
       el('input', { type: 'text', placeholder: 'note (why)', 'aria-label': 'note',
         'data-keep': 'rubric-note', oninput: e => { st.note = e.target.value; } }),
       rvNameInput(),
-      el('button', { text: 'Check it', onclick: () => send('api/exam/rubrics/preview') }),
-      p && p.ok ? el('button', { 'data-commit': 'rubric', text: 'Replace the file',
-                                 onclick: () => send('api/exam/rubrics') }) : ''),
-    st.msg ? el('p', { class: 'small', 'data-rubric-msg': '1', text: st.msg }) : '',
+      actButton(slot, 'Check it', async () => {
+        st.preview = null;
+        const j = await post('api/exam/rubrics/preview', body());
+        st.preview = j;
+        return j.ok
+          ? (j.changed ? 'Valid, and different from the file in use — read the diff below '
+                       + 'before replacing it.'
+                       : 'Valid, and identical to the file in use. Nothing to replace.')
+          : `${j.problems.length} problem${j.problems.length > 1 ? 's' : ''} — `
+            + 'the file cannot be saved until they are fixed. Listed below.';
+      }),
+      p && p.ok ? actButton(slot, 'Replace the file', async () => {
+        const send = body();
+        st.preview = null;
+        const j = await post('api/exam/rubrics', send);
+        st.content = ''; st.file = ''; st.rows = null; loadRubrics();
+        return `Written to ${j.written}. Its sha is recorded in every judge.json from now `
+          + 'on — re-run suite=judged for this topic.';
+      }, { 'data-commit': 'rubric' }) : ''),
+    st.file ? el('p', { class: 'small se', 'data-rubric-file': '1', text: `file: ${st.file}` }) : '',
+    actNote(slot),
     p ? el('div', {},
       p.problems.length ? el('div', { class: 'warn', 'data-problems': String(p.problems.length) },
         el('b', { text: `${p.problems.length} problem${p.problems.length > 1 ? 's' : ''}: ` }),
@@ -6674,7 +6711,8 @@ async function loadRubrics() {
   const st = state.exrub;
   try {
     const j = await api('api/exam/rubrics');
-    Object.assign(st, { rows: j.topics, store: j.store, note: j.note, changes: j.changes });
+    Object.assign(st, { rows: j.topics, store: j.store, note: j.note, changes: j.changes,
+                        banks: j.banks || {} });
     if (state.tab === 'exam' && !state.model) render();
   } catch (e) { /* netFail said so */ }
 }
