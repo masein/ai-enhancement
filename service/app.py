@@ -11,9 +11,12 @@ face the open internet.
 
 from __future__ import annotations
 
+import difflib
+import hashlib
 import html
 import json
 import math
+import os
 import re
 import sys
 import time
@@ -612,6 +615,218 @@ def exam_reject(cid: str, a: CandidateReject, x_token: str = Header(default=""))
         raise HTTPException(409, str(e)) from None
     db.curation_add(cid, rec["topic"], "", "rejected", who, False, rec.get("reason", ""))
     return {"cid": cid, "status": "rejected"}
+
+
+# ---------------------------------------------------------------------------
+# a person delivers a bank, and the rubric that grades it, from the page.
+# Two steps every time: a preview that writes nothing, then a commit. The
+# commit runs the same code as the CLI, so a bank imported here and one
+# imported from a shell are the same records.
+# ---------------------------------------------------------------------------
+
+IMPORT_MAX_BYTES = 2 * 1024 * 1024
+
+
+class ImportIn(BaseModel):
+    topic: str
+    approver: str
+    source: str = ""
+    items: list | None = None          # parsed array, as the file holds it
+    text: str = ""                     # or the file's text, parsed here
+
+
+def _import_items(body: ImportIn) -> list:
+    raw = body.text or ""
+    if body.items is not None:
+        if not isinstance(body.items, list):
+            raise HTTPException(422, "the file must hold a JSON array of question objects")
+        return body.items
+    if len(raw.encode("utf-8")) > IMPORT_MAX_BYTES:
+        raise HTTPException(413, f"the file is larger than {IMPORT_MAX_BYTES // 1024 // 1024} MB")
+    try:
+        items = json.loads(raw)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(422, f"not valid JSON: {e}") from None
+    if not isinstance(items, list):
+        raise HTTPException(422, "the file must hold a JSON array of question objects")
+    return items
+
+
+def _import_preview(plan: dict) -> dict:
+    """What the page may show of what would land. A report-half question is
+    withheld here exactly as public_bank withholds it: its author wrote it,
+    and the page still does not echo it back."""
+    shown = []
+    for rec in plan["records"]:
+        half = exam_build.half_of(rec["qid"])
+        row = {"qid": rec["qid"], "half": half, "meta": rec["meta"],
+               "reference": rec["reference"]}
+        if half == "diagnose":
+            row["prompt"] = rec["prompt"]
+        else:
+            row["prompt"] = None
+            row["withheld"] = "report half — never shown, never exported"
+        shown.append(row)
+    return {k: v for k, v in plan.items() if k != "records"} | {"items": shown}
+
+
+@app.post("/api/exam/import/preview")
+def exam_import_preview(body: ImportIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    who = _name(body.approver, "importing a bank")
+    try:
+        plan = exam_build.plan_import(config.EXAM_DIR, _import_items(body), body.topic.strip(),
+                                      who, (body.source or "import").strip())
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return _import_preview(plan)
+
+
+@app.post("/api/exam/import")
+def exam_import(body: ImportIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    who = _name(body.approver, "importing a bank")
+    items = _import_items(body)
+    try:
+        out = exam_build.import_bank(config.EXAM_DIR, items, body.topic.strip(), who,
+                                     (body.source or "import").strip())
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    # one curation row for the import, the way an accept writes one per question
+    db.curation_add(f"import:{out['source']}", out["topic"], "", "imported", who,
+                    False, f"{out['imported']} imported, {out['skipped']} already in the bank")
+    return out
+
+
+def _rubric_row(topic: str) -> dict:
+    import judge as _judge
+    task = exam_build.topic_task(topic)
+    r = _judge.rubric_for(task)
+    name = _judge.rubric_name(task)
+    md = _judge.rubric_path(name)
+    spec = _judge.rubric_path(name, ".criteria.json")
+    return {"topic": topic, "task": task, "name": name, "own": name != "exam",
+            "sha256": r.sha256, "version": r.version, "status": r.status,
+            "path": str(md) if md else "", "scoring": "criteria" if r.criteria else "single",
+            "criteria_path": str(spec) if spec else "",
+            "criteria_sha256": r.criteria_sha256,
+            "criteria_version": (r.criteria or {}).get("version"),
+            "criteria_status": (r.criteria or {}).get("status", ""),
+            "criteria_count": len(_judge.criteria_ids(r.criteria)) if r.criteria else 0}
+
+
+def _rubric_store() -> tuple[Path, bool]:
+    """Where an uploaded rubric goes, and whether it is the repo's own copy.
+    In the container /app is the image, not the checkout, so the writable
+    place is under BENCH_ROOT — and judge.rubric_dirs() looks there first."""
+    import judge as _judge
+    repo_dir = _judge.RUBRIC_DIR
+    if os.access(repo_dir, os.W_OK):
+        return repo_dir, True
+    return Path(config.BENCH_ROOT) / "rubrics", False
+
+
+@app.get("/api/exam/rubrics")
+def exam_rubrics():
+    store, in_repo = _rubric_store()
+    return {"store": str(store), "in_repo": in_repo,
+            "note": ("uploads land here and the judge reads them before the repo's own copies"
+                     if not in_repo else "uploads replace the repo's own copies in this checkout"),
+            "topics": [_rubric_row(t) for t in exam_build.TOPICS],
+            "changes": db.rubric_changes(20)}
+
+
+@app.get("/api/exam/rubrics/{name}")
+def exam_rubric_file(name: str, kind: str = "rubric"):
+    import judge as _judge
+    if not re.fullmatch(r"[a-z0-9_]+", name):
+        raise HTTPException(404, "no such rubric")
+    p = _judge.rubric_path(name, ".md" if kind == "rubric" else ".criteria.json")
+    if not p:
+        raise HTTPException(404, f"no {kind} file for {name}")
+    return PlainTextResponse(p.read_text(encoding="utf-8"),
+                             media_type="text/markdown" if kind == "rubric"
+                             else "application/json")
+
+
+class RubricIn(BaseModel):
+    name: str
+    kind: str = "rubric"               # rubric | criteria
+    content: str
+    approver: str
+    note: str = ""
+
+
+def _rubric_check(body: RubricIn) -> dict:
+    """Everything the commit would do, and every reason it should not."""
+    import judge as _judge
+    if not re.fullmatch(r"[a-z0-9_]+", body.name or ""):
+        raise HTTPException(422, "a rubric name is lower-case letters, digits and underscores, "
+                                 "and matches the topic's slug")
+    if body.kind not in ("rubric", "criteria"):
+        raise HTTPException(422, "kind must be rubric or criteria")
+    if len(body.content.encode("utf-8")) > IMPORT_MAX_BYTES:
+        raise HTTPException(413, "that file is too large")
+    problems: list[str] = []
+    suffix = ".md" if body.kind == "rubric" else ".criteria.json"
+    if body.kind == "criteria":
+        try:
+            spec = json.loads(body.content)
+        except (ValueError, TypeError) as e:
+            problems.append(f"not valid JSON: {e}")
+        else:
+            problems.extend(_judge.validate_criteria(spec))
+    else:
+        if "# Rubric" not in body.content:
+            problems.append("a rubric starts with a '# Rubric — <topic> (version N)' heading; "
+                            "the version is recorded in every judge.json")
+        for anchor in range(5):
+            if f"**{anchor}**" not in body.content:
+                problems.append(f"no anchor for {anchor} — the 0-4 scale needs all five")
+    current = _judge.rubric_path(body.name, suffix)
+    was = current.read_text(encoding="utf-8") if current else ""
+    new_sha = hashlib.sha256(body.content.encode("utf-8")).hexdigest()
+    store, in_repo = _rubric_store()
+    return {
+        "name": body.name, "kind": body.kind, "problems": problems,
+        "ok": not problems,
+        "path": str(store / f"{body.name}{suffix}"), "in_repo": in_repo,
+        "sha256": new_sha,
+        "was_sha256": hashlib.sha256(was.encode("utf-8")).hexdigest() if was else "",
+        "existed": bool(current), "was_path": str(current) if current else "",
+        "changed": new_sha != (hashlib.sha256(was.encode("utf-8")).hexdigest() if was else ""),
+        "diff": list(difflib.unified_diff(
+            was.splitlines(), body.content.splitlines(),
+            fromfile=str(current) if current else "(none)", tofile="uploaded", lineterm=""))[:400],
+        "warning": ("Committing changes this file's sha256, which is recorded in every "
+                    "judge.json. Scores judged before and after it are from different "
+                    "instruments and are not comparable; re-run suite=judged for this topic."),
+    }
+
+
+@app.post("/api/exam/rubrics/preview")
+def exam_rubric_preview(body: RubricIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    _name(body.approver, "changing a rubric")
+    return _rubric_check(body)
+
+
+@app.post("/api/exam/rubrics")
+def exam_rubric_commit(body: RubricIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    who = _name(body.approver, "changing a rubric")
+    check = _rubric_check(body)
+    if not check["ok"]:
+        raise HTTPException(422, "; ".join(check["problems"]))
+    suffix = ".md" if body.kind == "rubric" else ".criteria.json"
+    store, _ = _rubric_store()
+    store.mkdir(parents=True, exist_ok=True)
+    dest = store / f"{body.name}{suffix}"
+    dest.write_text(body.content, encoding="utf-8")
+    db.rubric_change_add(body.name, body.kind, str(dest), check["sha256"],
+                         check["was_sha256"], who, body.note.strip()[:300])
+    _cache.update(key=None, payload=None, at=0.0)     # the page shows the sha
+    return {**check, "written": str(dest), "approver": who}
 
 
 @app.post("/api/exam/build")

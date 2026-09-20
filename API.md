@@ -288,6 +288,32 @@ those rows carry `qid`, `topic`, `half` and `withheld`, never the question.
 `POST /api/exam/build` — write the harness tasks from the bank plus the MMLU
 control set (no GPU).
 
+`POST /api/exam/import/preview` and `POST /api/exam/import` —
+`{"topic", "approver", "source", "items"` **or** `"text"}`: a bank written by
+a person, the same parser and the same records as `scripts/exam_build.py
+import`. The preview writes nothing and answers with the counts (`imported`,
+`skipped` duplicates by qid, `invalid` with the offending indices), the
+`report`/`diagnose` split, the per-acuity and per-intent counts, and the
+items — **report-half prompts withheld**, qid and metadata only, in the
+response body as well as on the page. The commit is idempotent and records
+the decision in `curation`. A name is required. 2 MB cap; anything that is
+not a JSON array of objects is refused with 422.
+
+`GET /api/exam/rubrics` — for every topic: the rubric and criteria file the
+judge would use right now (the topic's own or the `exam.md` fallback), their
+version, sha256, DRAFT status and criterion count, plus `store` — where an
+upload would land — and the recent changes.
+`GET /api/exam/rubrics/{name}?kind=rubric|criteria` — the file itself.
+`POST /api/exam/rubrics/preview` and `POST /api/exam/rubrics`
+`{"name", "kind", "content", "approver", "note"}` — the preview validates a
+criteria file the way `judge.py` does (ids unique and lower-case, weights
+positive, a known fold method, `critical_safety_failure` defined,
+conditional criteria with `applies_when`) or a prose rubric (heading with a
+version, five anchors), diffs it against the file in use and says in words
+that a new sha makes earlier judged runs on that topic non-comparable. The
+commit writes the file and records who, when and both shas in
+`rubric_changes`. It never touches git.
+
 ### Judged free response
 
 `GET /api/judge/justifications?model=&topic=&limit=` — what the judge wrote

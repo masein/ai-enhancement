@@ -340,6 +340,17 @@ series — never merged with API-judged scores.
 Nothing judged is ranked until `scripts/judge_calibrate.py` has a human
 sample with Cohen's κ ≥ 0.60 on file; see DIAGNOSE.md.
 
+The rubric and criteria file that grade each topic can be replaced from the
+Exam tab (preview, then commit, under a name that is recorded in the
+`rubric_changes` table). They are written to `eval_tasks/fr/rubrics/` in the
+checkout when the service can write there, and to `$BENCH_ROOT/rubrics/`
+when it cannot — in the container `/app` is the image, not the bind mount,
+so on the box the uploads land beside the bank. The judge reads
+`$BENCH_ROOT/rubrics/` first and the repo second, and the page says which
+directory is live. Changing either file changes its sha256, which every
+`judge.json` records: scores from before and after are not comparable, so
+re-run `suite=judged` for that topic.
+
 ```bash
 # once: the four skill suites' items into the bank, under 'other'
 sudo docker compose exec -T bench python3 scripts/exam_build.py migrate --root /home/masein/benchmarks/exam
@@ -347,6 +358,10 @@ sudo docker compose exec -T bench python3 scripts/exam_build.py migrate --root /
 sudo docker compose exec -T bench python3 scripts/exam_build.py draft --root /home/masein/benchmarks/exam --per-topic 8
 sudo docker compose exec -T bench python3 scripts/exam_build.py build results/full --root /home/masein/benchmarks/exam
 #   (the Exam tab's "Rebuild the harness tasks" button does the last step too)
+# a bank someone wrote by hand — or the Exam tab's "Import a bank" panel,
+# which runs this same code path, previews it first and records the name
+sudo docker compose exec -T bench python3 scripts/exam_build.py import eval_tasks/fr/hossein_medicine_v1.json \
+    --root /home/masein/benchmarks/exam --topic 'medicine & health' --approver 'Dr. Hossein'
 # then per model:
 python clients/bench_client.py --base http://<ip>:8899 submit <model> --suite judged --submitter you
 ```

@@ -461,47 +461,74 @@ def metadata_reference(item: dict) -> str:
     return " ".join(bits)
 
 
-def import_bank(root: Path, path: Path, topic: str, approver: str,
+def plan_import(root: Path, items, topic: str, approver: str,
                 source: str = "import") -> dict:
-    """A human-written bank, straight into the bank. These questions were
-    written and curated by their author, which is what the Exam tab's accept
-    step exists to establish — so the author is the approver, on the record.
-    Idempotent: a qid already in the bank is skipped. Returns the counts and
-    the split, which is what the caller prints."""
+    """Every record an import WOULD write, and the counts — without writing
+    anything. The page previews with this and commits with import_bank, so
+    what a person is shown is what lands, record for record."""
     approver = (approver or "").strip()
     if not approver:
         raise ValueError("importing a bank needs a name — the record of who stands behind it")
     if topic not in TOPICS:
         raise ValueError(f"{topic!r} is not an exam topic: {', '.join(TOPICS)}")
-    items = json.loads(Path(path).read_text(encoding="utf-8"))
     if not isinstance(items, list):
-        raise ValueError(f"{path} is not a JSON array of question objects")
+        raise ValueError("not a JSON array of question objects")
     have = bank_qids(root)
-    out = {"topic": topic, "source": source, "imported": 0, "skipped": 0, "invalid": 0,
-           "report": 0, "diagnose": 0, "acuity": collections.Counter()}
-    for it in items:
+    out = {"topic": topic, "source": source, "records": [], "imported": 0, "skipped": 0,
+           "invalid": 0, "report": 0, "diagnose": 0, "duplicates": [], "invalid_items": [],
+           "acuity": collections.Counter(), "intent": collections.Counter()}
+    for i, it in enumerate(items):
         prompt = str((it or {}).get("prompt") or "").strip() if isinstance(it, dict) else ""
         if len(prompt) < 15:
             out["invalid"] += 1
+            if len(out["invalid_items"]) < 20:
+                out["invalid_items"].append(
+                    {"index": i, "why": "no prompt, or shorter than 15 characters",
+                     "id": (it or {}).get("id") if isinstance(it, dict) else None})
             continue
         q = qid_of(prompt)
         if q in have:
             out["skipped"] += 1
+            if len(out["duplicates"]) < 50:
+                out["duplicates"].append(q)
             continue
         meta = {k: v for k, v in it.items() if k not in ("prompt", "reference", "notes")}
         line = metadata_reference(it)
         own = str(it.get("reference") or "").strip()
-        reference = (f"{own} {line}".strip() if own else line)
-        append_bank(root, {"qid": q, "topic": topic, "prompt": prompt, "reference": reference,
-                           "notes": str(it.get("notes") or "").strip(), "meta": meta,
-                           "source": source, "accepted_by": approver,
-                           "accepted_at": time.time(), "edited": False})
+        out["records"].append({
+            "qid": q, "topic": topic, "prompt": prompt,
+            "reference": (f"{own} {line}".strip() if own else line),
+            "notes": str(it.get("notes") or "").strip(), "meta": meta, "source": source,
+            "accepted_by": approver, "edited": False})
         have.add(q)
         out["imported"] += 1
         out[half_of(q)] += 1
         if meta.get("acuity"):
             out["acuity"][str(meta["acuity"])] += 1
+        if meta.get("intent"):
+            out["intent"][str(meta["intent"])] += 1
     out["acuity"] = dict(sorted(out["acuity"].items()))
+    out["intent"] = dict(sorted(out["intent"].items()))
+    return out
+
+
+def import_bank(root: Path, path_or_items, topic: str, approver: str,
+                source: str = "import") -> dict:
+    """A human-written bank, straight into the bank. These questions were
+    written and curated by their author, which is what the Exam tab's accept
+    step exists to establish — so the author is the approver, on the record.
+    Idempotent: a qid already in the bank is skipped. Takes a path or the
+    parsed array, so the CLI and the page write identical records."""
+    if isinstance(path_or_items, (str, Path)):
+        items = json.loads(Path(path_or_items).read_text(encoding="utf-8"))
+        if not isinstance(items, list):
+            raise ValueError(f"{path_or_items} is not a JSON array of question objects")
+    else:
+        items = path_or_items
+    out = plan_import(root, items, topic, approver, source)
+    for rec in out.pop("records"):
+        append_bank(root, {**rec, "accepted_at": time.time()})
+    out.pop("invalid_items", None)
     return out
 
 

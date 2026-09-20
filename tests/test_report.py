@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 
+import pytest
+
 import make_fixture
 import report_lm_eval as report
 
@@ -239,3 +241,18 @@ def test_a_single_shared_task_score_is_not_a_duplicate(tree):
     p = report.build_payload(report.merge_runs(report.load_results(tree["out_dir"])),
                              "t", source="")
     assert not any(m.get("duplicateOf") for m in p["models"])
+
+
+def test_the_pages_javascript_parses(tmp_path):
+    """The page is ~4k lines of JS inside a Python string: one unbalanced
+    paren renders a blank page, and only a browser test would catch it. node
+    is on the CI runner; where it is not, the browser tests still do."""
+    import shutil
+    import subprocess
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available; the dashboard tests cover this in a browser")
+    js = tmp_path / "page.js"
+    js.write_text(report.JS, encoding="utf-8")
+    r = subprocess.run([node, "--check", str(js)], capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr

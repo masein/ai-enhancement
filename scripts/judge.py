@@ -142,6 +142,23 @@ class Rubric(NamedTuple):
     criteria_sha256: str = ""
 
 
+def rubric_dirs() -> list[Path]:
+    """Where a rubric may live, in order. $BENCH_ROOT/rubrics comes first so
+    a rubric uploaded through the page beats the one baked into the image —
+    inside the container /app IS the image, and the checkout is not there.
+    The repo's own directory is the fallback and the default content."""
+    from service import config
+    return [Path(config.BENCH_ROOT) / "rubrics", RUBRIC_DIR]
+
+
+def rubric_path(name: str, suffix: str = ".md") -> Path | None:
+    for d in rubric_dirs():
+        p = d / f"{name}{suffix}"
+        if p.is_file():
+            return p
+    return None
+
+
 def rubric_name(task: str) -> str:
     """Which rubric grades this task: the topic's own when one exists
     (rubrics/<slug>.md, the slug exam_build built the task name from), else
@@ -150,25 +167,80 @@ def rubric_name(task: str) -> str:
     if task == CONTROL_TASK:
         return "factual_accuracy"
     slug = _exam.task_slug(task)
-    return slug if (RUBRIC_DIR / f"{slug}.md").exists() else "exam"
+    return slug if rubric_path(slug) else "exam"
 
 
 def rubric_for(task: str) -> Rubric:
     name = rubric_name(task)
-    text = (RUBRIC_DIR / f"{name}.md").read_text(encoding="utf-8")
+    text = (rubric_path(name) or RUBRIC_DIR / f"{name}.md").read_text(encoding="utf-8")
     # "(version 1)" and "(version 1, DRAFT — awaiting sign-off)" both parse:
     # the status rides in the same brackets and must not hide the version
     m = re.search(r"\(version (\d+)", text)
     head = text.split("\n", 1)[0]
     spec = spec_sha = None
-    p = RUBRIC_DIR / f"{name}.criteria.json"
-    if p.exists():
+    p = rubric_path(name, ".criteria.json")
+    if p:
         raw = p.read_bytes()
         spec = json.loads(raw.decode("utf-8"))
         spec_sha = hashlib.sha256(raw).hexdigest()
     return Rubric(text, hashlib.sha256(text.encode("utf-8")).hexdigest(),
                   (m.group(1) if m else "?"), "draft" if "DRAFT" in head else "",
                   spec, spec_sha or "")
+
+
+FOLD_METHODS = ("weighted_mean_x4_round_half_up",)
+
+
+def validate_criteria(spec) -> list[str]:
+    """Everything wrong with a criteria file, in words, or an empty list. The
+    fold reads this file and the prompt is generated from it, so a file that
+    is wrong here grades wrongly everywhere — it is checked before it can be
+    saved, not when a batch of grades comes back strange."""
+    bad: list[str] = []
+    if not isinstance(spec, dict):
+        return ["the file is not a JSON object"]
+    fold = spec.get("fold")
+    if not isinstance(fold, dict):
+        bad.append("no 'fold' object: the 0-4 is computed from it")
+    elif fold.get("method") not in FOLD_METHODS:
+        bad.append(f"fold.method {fold.get('method')!r} is not one this judge knows "
+                   f"({', '.join(FOLD_METHODS)})")
+    csf = spec.get("critical_safety_failure")
+    if not isinstance(csf, dict) or not str(csf.get("definition") or "").strip():
+        bad.append("critical_safety_failure needs a definition — it is decided before the "
+                   "criteria and sets the score to 0")
+    crits = spec.get("criteria")
+    if not isinstance(crits, list) or not crits:
+        return bad + ["'criteria' must be a non-empty list"]
+    seen = set()
+    for i, c in enumerate(crits):
+        where = f"criterion {i + 1}"
+        if not isinstance(c, dict):
+            bad.append(f"{where} is not an object")
+            continue
+        cid = str(c.get("id") or "").strip()
+        where = f"criterion {cid or i + 1}"
+        if not cid:
+            bad.append(f"{where} has no id")
+        elif not re.fullmatch(r"[a-z][a-z0-9_]*", cid):
+            bad.append(f"{where}: an id is lower-case letters, digits and underscores — the "
+                       f"model must repeat it exactly")
+        elif cid in seen:
+            bad.append(f"{where}: duplicate id")
+        seen.add(cid)
+        if not str(c.get("label") or "").strip():
+            bad.append(f"{where} has no label — the page shows it")
+        if not str(c.get("definition") or "").strip():
+            bad.append(f"{where} has no definition — the prompt is built from it")
+        try:
+            if float(c.get("weight", 1)) <= 0:
+                bad.append(f"{where}: weight must be greater than 0")
+        except (TypeError, ValueError):
+            bad.append(f"{where}: weight is not a number")
+        if c.get("conditional") and not str(c.get("applies_when") or "").strip():
+            bad.append(f"{where} is conditional and needs applies_when — the judge is told "
+                       f"when to return null for it")
+    return bad
 
 
 def criteria_ids(spec: dict) -> list[str]:

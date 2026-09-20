@@ -5451,7 +5451,7 @@ function vExam() {
   const table = el('div', { class: 'card' }, el('h2', { text: 'By topic' }),
     el('p', { class: 'sub', text: `Target ${st.target_per_topic || 60} accepted questions per topic. `
       + 'Under 30 in the report half the published score is noise and the page greys it.' }),
-    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-topics-table': '1' },
       el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { class: 'num', text: 'accepted' }),
         el('th', { class: 'num', text: 'report half' }), el('th', { class: 'num', text: 'diagnose half' }),
         el('th', { class: 'num', text: 'awaiting curation' }), el('th', { text: 'toward target' }))),
@@ -5480,7 +5480,201 @@ function vExam() {
       : el('p', { class: 'small', text: 'Nothing waiting' + (state.ex.topic ? ' in this topic.' : '.') }),
     cands && cands.length > 40
       ? el('p', { class: 'small', text: `${cands.length - 40} more after these.` }) : '');
-  return [head, table, cur];
+  return [head, exImport(), exRubrics(), table, cur];
+}
+
+// ---------------------------------------------------------------------------
+// A person delivers a bank from here: a file, a topic, their name. Two steps,
+// always — a preview that writes nothing, then a commit. The preview shows a
+// diagnose-half question in full and a report-half one as its qid and
+// metadata: he wrote them, and the page still does not echo them back.
+// ---------------------------------------------------------------------------
+
+function exImport() {
+  const s = state.eximp || (state.eximp = { topic: '', source: '', file: '', name: '',
+                                            preview: null, msg: '', busy: false });
+  const topicSel = el('select', { 'aria-label': 'topic', onchange: e => {
+    s.topic = e.target.value; s.preview = null; render(); } },
+    el('option', { value: '', text: 'topic…' }),
+    // the topic list is categories.yaml's, the same spine the bank uses
+    ...Object.values((DATA.judged || {}).topics || {}).map(t =>
+      el('option', { value: t, text: t, selected: s.topic === t ? '' : null })));
+  const fileIn = el('input', { type: 'file', accept: '.json,application/json',
+    'aria-label': 'questions file', onchange: async e => {
+      const f = e.target.files[0]; if (!f) return;
+      s.file = await f.text(); s.name = f.name;
+      s.source = s.source || f.name.replace(/\.json$/, '');
+      s.preview = null; s.msg = `${f.name} — ${(f.size / 1024).toFixed(0)} KB`; render(); } });
+  const srcIn = el('input', { type: 'text', placeholder: 'source label (optional)',
+    value: s.source, 'aria-label': 'source', oninput: e => { s.source = e.target.value; } });
+  const nameIn = rvNameInput();
+  const go = async (path) => {
+    if (!s.file || !s.topic) { s.msg = 'a file and a topic, please'; return render(); }
+    if (!state.rvName.trim()) { s.msg = 'your name is recorded on every question'; return render(); }
+    s.busy = true; render();
+    const r = await fetch(path, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+      body: JSON.stringify({ topic: s.topic, approver: state.rvName, source: s.source,
+                             text: s.file }) }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    s.busy = false;
+    if (!r || !r.ok) { s.msg = 'refused: ' + (j.detail || (r ? r.status : 'unreachable')); }
+    else if (path.endsWith('preview')) { s.preview = j; s.msg = ''; }
+    else { s.preview = null; s.file = ''; s.msg = `imported ${j.imported}, skipped ${j.skipped} `
+             + `already in the bank — report ${j.report} / diagnose ${j.diagnose}`;
+           state.ex.loaded = false; loadExam(); }
+    render();
+  };
+  const p = s.preview;
+  return el('div', { class: 'card', 'data-panel': 'import' },
+    el('h2', { text: 'Import a bank' }),
+    el('p', { class: 'sub', text: 'A JSON array of questions written by a person — the same '
+      + 'file and the same records as scripts/exam_build.py import. Your name is recorded on '
+      + 'every question, the way a curator\'s name is on one they accept. Preview first: '
+      + 'nothing is written until you commit.' }),
+    el('div', { class: 'frm' }, fileIn, topicSel, srcIn, nameIn,
+      el('button', { text: s.busy ? 'working…' : 'Preview', disabled: s.busy ? '' : null,
+                     onclick: () => go('api/exam/import/preview') }),
+      p ? el('button', { 'data-commit': 'import', text: `Import ${p.imported} questions`,
+                         disabled: p.imported ? null : '',
+                         onclick: () => go('api/exam/import') }) : ''),
+    s.msg ? el('p', { class: 'small', 'data-import-msg': '1', text: s.msg }) : '',
+    p ? exImportPreview(p) : '');
+}
+
+function exImportPreview(p) {
+  const rows = (p.items || []).slice(0, 12);
+  return el('div', {},
+    el('div', { class: 'kvs', 'data-preview': 'counts' },
+      el('span', {}, el('b', { text: 'would import ' }), String(p.imported)),
+      el('span', {}, el('b', { text: 'already in the bank ' }), String(p.skipped)),
+      el('span', {}, el('b', { text: 'unusable ' }), String(p.invalid)),
+      el('span', {}, el('b', { text: 'split ' }), `report ${p.report} / diagnose ${p.diagnose}`)),
+    Object.keys(p.acuity || {}).length ? el('p', { class: 'small', text: 'acuity — '
+      + Object.entries(p.acuity).map(([k, v]) => `${k} ${v}`).join(', ') }) : '',
+    Object.keys(p.intent || {}).length ? el('p', { class: 'small', text: 'intent — '
+      + Object.entries(p.intent).map(([k, v]) => `${k} ${v}`).join(', ') }) : '',
+    p.invalid ? el('p', { class: 'warn' }, el('b', { text: 'Unusable: ' }),
+      (p.invalid_items || []).map(x => `#${x.index + 1}${x.id != null ? ` (id ${x.id})` : ''}`)
+        .join(', ') + ' — no prompt, or shorter than 15 characters. They are skipped.') : '',
+    el('p', { class: 'small', text: `${p.report} of these land in the report half and are not `
+      + 'shown below, here or anywhere else — that is the split, and it applies to a bank you '
+      + 'wrote yourself.' }),
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'half' }), el('th', { text: 'question' }),
+        el('th', { text: 'reference (its metadata)' }))),
+      el('tbody', {}, rows.map(it => el('tr', { 'data-half': it.half },
+        el('td', {}, el('span', { class: 'badge' + (it.half === 'report' ? '' : ' instruct'),
+                                  text: it.half })),
+        el('td', {}, it.prompt || el('span', { class: 'se',
+          text: `withheld · ${it.qid.slice(0, 12)}` })),
+        el('td', { class: 'se', text: it.reference })))))),
+    (p.items || []).length > 12 ? el('p', { class: 'small',
+      text: `${p.items.length - 12} more not shown.` }) : '');
+}
+
+// ---------------------------------------------------------------------------
+// The rubric and the criteria file that grade each topic: what the judge
+// would use right now, and how to replace them. Committing changes a sha
+// that is recorded in every judge.json, so the page says what that costs.
+// ---------------------------------------------------------------------------
+
+function exRubrics() {
+  const st = state.exrub || (state.exrub = { rows: null, open: '', kind: 'rubric',
+                                             content: '', name: '', preview: null, msg: '' });
+  if (st.rows == null && netReady()) loadRubrics();
+  const rows = st.rows || [];
+  return el('div', { class: 'card', 'data-panel': 'rubrics' },
+    el('h2', { text: 'Rubrics and criteria' }),
+    el('p', { class: 'sub', text: 'What the judge grades each topic with right now. A topic '
+      + 'without a rubric of its own uses rubrics/exam.md. A criteria file turns the 0–4 into '
+      + 'a fold of per-criterion scores. Changing either file changes its sha256, which is '
+      + 'recorded in every judge.json: scores from before and after are not comparable.' }),
+    st.store ? el('p', { class: 'small', text: `Uploads are written to ${st.store}. ${st.note || ''}` }) : '',
+    st.rows == null ? el('p', { class: 'small', text: 'Loading…' })
+      : el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+        el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { text: 'rubric' }),
+          el('th', { text: 'criteria' }), el('th', { text: 'files' }))),
+        el('tbody', {}, rows.map(r => el('tr', { 'data-rubric-row': r.topic },
+          el('td', {}, r.topic),
+          el('td', {}, `${r.name}.md v${r.version} `,
+            el('span', { class: 'se', text: r.sha256.slice(0, 10) }),
+            r.status === 'draft' ? el('span', { class: 'badge taint', text: 'DRAFT' }) : ''),
+          el('td', {}, r.scoring === 'criteria'
+            ? el('span', {}, `${r.criteria_count} criteria `,
+                el('span', { class: 'se', text: r.criteria_sha256.slice(0, 10) }),
+                r.criteria_status === 'draft'
+                  ? el('span', { class: 'badge taint', text: 'DRAFT' }) : '')
+            : el('span', { class: 'se', text: 'single score' })),
+          el('td', {},
+            el('a', { href: `api/exam/rubrics/${r.name}`, text: 'rubric', download: `${r.name}.md` }),
+            ' · ',
+            r.scoring === 'criteria'
+              ? el('a', { href: `api/exam/rubrics/${r.name}?kind=criteria`, text: 'criteria',
+                          download: `${r.name}.criteria.json` })
+              : el('span', { class: 'se', text: '—' }),
+            ' · ',
+            el('a', { href: '#', text: 'replace', onclick: e => { e.preventDefault();
+              st.open = st.open === r.name ? '' : r.name; st.name = r.name;
+              st.preview = null; st.content = ''; render(); } }))))))),
+    st.open ? exRubricUpload(st) : '',
+    (st.changes || []).length ? el('p', { class: 'small', text: 'last change: '
+      + st.changes.map(c => `${c.name}.${c.kind === 'criteria' ? 'criteria.json' : 'md'} by `
+        + `${c.approver} ${rel(c.changed_at)} ago`).slice(0, 3).join(' · ') }) : '');
+}
+
+function exRubricUpload(st) {
+  const send = async (path) => {
+    if (!st.content) { st.msg = 'choose a file first'; return render(); }
+    if (!state.rvName.trim()) { st.msg = 'your name is recorded with the change'; return render(); }
+    const r = await fetch(path, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+      body: JSON.stringify({ name: st.name, kind: st.kind, content: st.content,
+                             approver: state.rvName, note: st.note || '' }) }).catch(() => null);
+    const j = r ? await r.json().catch(() => ({})) : {};
+    if (!r || !r.ok) { st.msg = 'refused: ' + (j.detail || (r ? r.status : 'unreachable')); }
+    else if (path.endsWith('preview')) { st.preview = j; st.msg = ''; }
+    else { st.msg = `written to ${j.written} — re-run suite=judged for this topic`;
+           st.preview = null; st.content = ''; st.rows = null; loadRubrics(); }
+    render();
+  };
+  const p = st.preview;
+  return el('div', { style: 'margin-top:10px', 'data-upload': st.name },
+    el('div', { class: 'frm' },
+      el('select', { 'aria-label': 'which file', onchange: e => {
+        st.kind = e.target.value; st.preview = null; render(); } },
+        el('option', { value: 'rubric', text: `${st.name}.md (prose)` }),
+        el('option', { value: 'criteria', text: `${st.name}.criteria.json` })),
+      el('input', { type: 'file', accept: '.md,.json,text/markdown,application/json',
+        'aria-label': 'new file', onchange: async e => {
+          const f = e.target.files[0]; if (!f) return;
+          st.content = await f.text(); st.preview = null;
+          st.msg = `${f.name} — ${(f.size / 1024).toFixed(1)} KB`; render(); } }),
+      el('input', { type: 'text', placeholder: 'note (why)', 'aria-label': 'note',
+        oninput: e => { st.note = e.target.value; } }),
+      rvNameInput(),
+      el('button', { text: 'Check it', onclick: () => send('api/exam/rubrics/preview') }),
+      p && p.ok ? el('button', { 'data-commit': 'rubric', text: 'Replace the file',
+                                 onclick: () => send('api/exam/rubrics') }) : ''),
+    st.msg ? el('p', { class: 'small', 'data-rubric-msg': '1', text: st.msg }) : '',
+    p ? el('div', {},
+      p.problems.length ? el('div', { class: 'warn', 'data-problems': String(p.problems.length) },
+        el('b', { text: `${p.problems.length} problem${p.problems.length > 1 ? 's' : ''}: ` }),
+        p.problems.join('; ')) : el('p', { class: 'note', text: 'Valid.' }),
+      p.ok && p.changed ? el('p', { class: 'warn', 'data-sha-warning': '1' },
+        el('b', { text: 'This changes the file\'s sha256. ' }), p.warning) : '',
+      p.ok && !p.changed ? el('p', { class: 'small', text: 'Identical to the file in use.' }) : '',
+      el('pre', { class: 'mono', style: 'max-height:260px;overflow:auto;font-size:11.5px',
+                  text: (p.diff || []).join('\n') || '(no difference)' })) : '');
+}
+
+async function loadRubrics() {
+  const st = state.exrub;
+  try {
+    const j = await api('api/exam/rubrics');
+    Object.assign(st, { rows: j.topics, store: j.store, note: j.note, changes: j.changes });
+    if (state.tab === 'exam' && !state.model) render();
+  } catch (e) { /* netFail said so */ }
 }
 
 function download(name, mime, text) {
@@ -5534,16 +5728,29 @@ function render() {
   const ms = visible();
   document.getElementById('countNote').textContent =
     `${ms.length} of ${DATA.models.length} models shown`;
-  const tabs = document.getElementById('tabs');
-  tabs.replaceChildren(...TABS.map(([id, label]) =>
-    el('button', { role: 'tab',
-      'aria-selected': String(!state.model && state.tab === id),
-      onclick: () => navigate({ tab: id, model: null }), text: label })));
+  renderTabs();
   const view = document.getElementById('view');
   view.classList.remove('dimmed');
   if (state.model) { view.replaceChildren(...vModel()); return; }
   const fn = TABS.find(([id]) => id === state.tab)[2];
   view.replaceChildren(...fn(ms));
+}
+
+// The tab bar is the one thing on the page that must survive a render. A
+// poll, a finished fetch and a click all call render(); replacing the buttons
+// each time hands whoever is mid-click a node that is no longer in the
+// document, and the click goes nowhere. Build them once, then only move the
+// selection.
+function renderTabs() {
+  const tabs = document.getElementById('tabs');
+  if (tabs.children.length !== TABS.length) {
+    tabs.replaceChildren(...TABS.map(([id, label]) =>
+      el('button', { role: 'tab', onclick: () => navigate({ tab: id, model: null }),
+                     text: label })));
+  }
+  const sel = state.model ? '' : state.tab;
+  [...tabs.children].forEach((b, i) =>
+    b.setAttribute('aria-selected', String(TABS[i][0] === sel)));
 }
 
 // The board-level checks belong to the board. They are findings, not
@@ -5552,13 +5759,20 @@ function render() {
 // page, so there they collapse to one line that opens.
 const WARN_TABS = ['overview', 'leaderboard'];
 
+let _warnSig = null;
 function renderWarnings() {
   const box = document.getElementById('warnings');
   if (!box || !DATA) return;
   const ws = DATA.warnings || [];
+  const mode = (!state.model && WARN_TABS.includes(state.tab)) ? 'full' : 'fold';
+  // rebuilding this on every poll would snap shut a fold someone just opened,
+  // and hand Playwright (and a mouse) a node that vanishes mid-click
+  const sig = mode + '' + ws.join('');
+  if (sig === _warnSig) return;
+  _warnSig = sig;
   if (!ws.length) { box.replaceChildren(); return; }
   const full = ws.map(w => el('div', { class: 'warn' }, el('b', { text: 'Check: ' }), w));
-  if (!state.model && WARN_TABS.includes(state.tab)) {
+  if (mode === 'full') {
     box.replaceChildren(...full);
     return;
   }

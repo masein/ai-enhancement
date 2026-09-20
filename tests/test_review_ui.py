@@ -45,6 +45,11 @@ def live(tmp_path_factory):
     worker.start = lambda: None
     llm.reset()
     appmod._cache.update(key=None, payload=None, at=0.0)
+    # an upload from the page must not land in the developer's checkout: the
+    # service prefers the repo's rubrics directory when it can write there,
+    # and on this machine it can
+    rubric_store = appmod._rubric_store
+    appmod._rubric_store = lambda: (root / "rubrics", False)
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
@@ -66,6 +71,7 @@ def live(tmp_path_factory):
     th.join(5)
     llm_poller.stop()
     worker.start = worker_start
+    appmod._rubric_store = rubric_store
     for k, v in saved.items():
         setattr(config, k, v)
     llm.reset()
@@ -153,11 +159,11 @@ def test_exam_curation_in_the_browser(live, page):
     page.wait_for_selector(".rv[data-candidate]", timeout=15000)
     text = page.locator("#view").text_content()
     assert "fake/fake-exam" in text and "awaiting curation 4" in text
-    rows = page.locator("table.jd tbody tr")
+    rows = page.locator("table.jd[data-topics-table] tbody tr")
     assert rows.count() == 15                                      # one per topic in categories.yaml
     assert "other" in text and "economics" in text
     # filter to one topic by clicking it
-    page.locator("table.jd tbody tr a", has_text=re.compile(r"^law$")).click()
+    page.locator("table.jd[data-topics-table] tbody tr a", has_text=re.compile(r"^law$")).click()
     page.wait_for_selector(".card h2:has-text('Awaiting curation — law')")
     # the list is dropped with the filter and re-fetched, so wait for it to
     # land rather than counting whatever is on screen this frame
@@ -331,4 +337,122 @@ def test_review_flow_in_the_browser(live, page):
             page.wait_for_selector(".card h2:has-text('Judged free response')")
             page.screenshot(path=SCREENS / f"model-exam-first-{scheme}-{width}.png", full_page=True)
             assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
+    assert page.errors == []
+
+
+REPO = Path(__file__).resolve().parents[1]
+MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v1.json"
+
+
+def upload(pg, label, name, mime, text):
+    pg.get_by_label(label).set_input_files(
+        {"name": name, "mimeType": mime, "buffer": text.encode("utf-8")})
+
+
+def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
+    """Dr. Hossein has no shell on the box: he delivers his file from the Exam
+    tab, sees what would land before anything is written, and the half that
+    becomes the published score is never printed back to him."""
+    import exam_build as eb
+    base, root = live["base"], live["root"]
+    topic, raw = "medicine & health", MEDICINE.read_text(encoding="utf-8")
+    items = json.loads(raw)
+    page.goto(base + "/#tab=exam")
+    page.wait_for_selector("[data-panel='import']")
+    panel = page.locator("[data-panel='import']")
+    upload(page, "questions file", "hossein_medicine_v1.json", "application/json", raw)
+    panel.get_by_label("topic").select_option(topic)
+    panel.get_by_label("source").fill("hossein_v1")
+    panel.get_by_label("your name").first.fill("Dr. Hossein")
+    before = len(eb.load_bank(root / "exam").get(topic, []))
+    panel.get_by_role("button", name="Preview").click()
+    page.wait_for_selector("[data-preview='counts']")
+    counts = panel.locator("[data-preview='counts']").text_content()
+    assert "would import 50" in counts and "unusable 0" in counts
+    # a preview writes nothing: that is the whole point of two steps
+    assert len(eb.load_bank(root / "exam").get(topic, [])) == before
+    # the report half is on the table as a qid, and its text is nowhere on the
+    # page — not in a row, not in a title, not in a data attribute
+    assert panel.locator("tr[data-half='report'] .se:has-text('withheld')").count() > 0
+    assert panel.locator("tr[data-half='diagnose']").count() > 0
+    html = page.content()
+    withheld = [it["prompt"] for it in items
+                if eb.half_of(eb.qid_of(it["prompt"])) == "report"]
+    assert withheld and not any(q[:60] in html for q in withheld)
+    # commit, and the bank on disk holds his records under his name
+    panel.locator("button[data-commit='import']").click()
+    page.wait_for_selector("[data-import-msg]")
+    assert "imported 50" in panel.locator("[data-import-msg]").text_content()
+    bank = eb.load_bank(root / "exam")[topic]
+    mine = [r for r in bank if r.get("source") == "hossein_v1"]
+    assert len(mine) == 50
+    assert all(r["accepted_by"] == "Dr. Hossein" and not r["edited"] for r in mine)
+    assert {eb.half_of(r["qid"]) for r in mine} == {"report", "diagnose"}
+    assert page.errors == []
+
+
+def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page):
+    """The file that grades a topic, changed by the person who wrote it: a bad
+    criteria file cannot be committed at all, and a good one is committed only
+    after the page has said the sha it is recorded under changes."""
+    import judge as jd
+    base, root = live["base"], live["root"]
+    page.goto(base + "/#tab=exam")
+    page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
+    panel = page.locator("[data-panel='rubrics']")
+    row = panel.locator("tr[data-rubric-row='medicine & health']")
+    assert "medicine_health.md v1" in row.text_content()
+    assert "16 criteria" in row.text_content()
+    assert row.locator(".badge.taint", has_text="DRAFT").count() == 2   # both files are drafts
+    # a topic without a rubric of its own says which one grades it instead
+    assert "exam.md" in panel.locator("tr[data-rubric-row='history']").text_content()
+    # a criteria file the judge would refuse never gets a commit button
+    row.get_by_role("link", name="replace").click()
+    page.wait_for_selector("[data-upload='medicine_health']")
+    up = page.locator("[data-upload='medicine_health']")
+    up.get_by_label("which file").select_option("criteria")
+    spec = json.loads(jd.rubric_path("medicine_health", ".criteria.json").read_text("utf-8"))
+    spec.pop("critical_safety_failure")
+    spec["fold"] = {"method": "vibes"}
+    upload(page, "new file", "medicine_health.criteria.json", "application/json",
+           json.dumps(spec))
+    up.get_by_label("your name").first.fill("Dr. Hossein")
+    up.get_by_role("button", name="Check it").click()
+    page.wait_for_selector("[data-problems]")
+    problems = up.locator("[data-problems]").text_content()
+    assert "not one this judge knows" in problems
+    assert "critical_safety_failure needs a definition" in problems
+    assert up.locator("button[data-commit='rubric']").count() == 0
+    # the prose rubric, signed off: valid, changed, and the page says the cost
+    up.get_by_label("which file").select_option("rubric")
+    text = jd.rubric_path("medicine_health").read_text(encoding="utf-8")
+    signed = text.replace(", DRAFT — awaiting Dr. Hossein's sign-off", "")
+    assert signed != text
+    upload(page, "new file", "medicine_health.md", "text/markdown", signed)
+    up.get_by_label("note").fill("signed off in the meeting")
+    up.get_by_role("button", name="Check it").click()
+    page.wait_for_selector("[data-sha-warning]")
+    assert "not comparable" in up.locator("[data-sha-warning]").text_content()
+    assert up.locator("[data-problems]").count() == 0
+    up.locator("button[data-commit='rubric']").click()
+    page.wait_for_function(
+        "document.querySelector('[data-rubric-msg]')"
+        "&& document.querySelector('[data-rubric-msg]').textContent.includes('written to')")
+    # written outside the checkout, read by the judge, and on the record
+    written = root / "rubrics" / "medicine_health.md"
+    assert written.read_text(encoding="utf-8") == signed
+    assert jd.rubric_for("exam_medicine_health").status == ""
+    assert (REPO / "eval_tasks" / "fr" / "rubrics" / "medicine_health.md"
+            ).read_text(encoding="utf-8") == text
+    from service import db
+    change = db.rubric_changes(1)[0]
+    assert change["approver"] == "Dr. Hossein" and change["kind"] == "rubric"
+    assert change["note"] == "signed off in the meeting"
+    # and the table it came from now shows the new sha, with the rubric's own
+    # DRAFT gone and the criteria file's still there
+    sha = jd.rubric_for("exam_medicine_health").sha256[:10]
+    page.wait_for_function(
+        "sha => document.querySelector(\"tr[data-rubric-row='medicine & health']\")"
+        ".textContent.includes(sha)", arg=sha)
+    assert row.locator(".badge.taint", has_text="DRAFT").count() == 1
     assert page.errors == []

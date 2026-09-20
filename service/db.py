@@ -114,6 +114,20 @@ CREATE TABLE IF NOT EXISTS exam_curation (
   reason      TEXT DEFAULT '',
   decided_at  REAL NOT NULL
 );
+-- the one place the service writes to the repo's own tree: a rubric or a
+-- criteria file uploaded from the Exam tab. Who, when, what it replaced.
+CREATE TABLE IF NOT EXISTS rubric_changes (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT NOT NULL,                    -- the rubric slug, e.g. medicine_health
+  kind        TEXT NOT NULL,                    -- rubric|criteria
+  path        TEXT NOT NULL,                    -- where it was written
+  sha256      TEXT NOT NULL,                    -- of the new file
+  was_sha256  TEXT DEFAULT '',                  -- of the one it replaced, if any
+  approver    TEXT NOT NULL,
+  note        TEXT DEFAULT '',
+  changed_at  REAL NOT NULL
+);
+
 -- a judged run in flight: the plan the results are assembled against, so
 -- the poller can finish it in another process
 CREATE TABLE IF NOT EXISTS judge_runs (
@@ -567,6 +581,27 @@ def curation_list(limit: int = 500) -> list[dict]:
         rows = c.execute(f"SELECT {','.join(_CUR_COLS)} FROM exam_curation "
                          "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
     return [dict(zip(_CUR_COLS, r)) for r in rows]
+
+
+_RUB_COLS = ["id", "name", "kind", "path", "sha256", "was_sha256", "approver", "note",
+             "changed_at"]
+
+
+def rubric_change_add(name: str, kind: str, path: str, sha256: str, was_sha256: str,
+                      approver: str, note: str = "") -> int:
+    with closing(_conn()) as c:
+        cur = c.execute("INSERT INTO rubric_changes (name, kind, path, sha256, was_sha256, "
+                        "approver, note, changed_at) VALUES (?,?,?,?,?,?,?,?)",
+                        (name, kind, path, sha256, was_sha256, approver, note, time.time()))
+        c.commit()
+        return int(cur.lastrowid)
+
+
+def rubric_changes(limit: int = 100) -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute(f"SELECT {','.join(_RUB_COLS)} FROM rubric_changes "
+                         "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+    return [dict(zip(_RUB_COLS, r)) for r in rows]
 
 
 # ---------------------------------------------------------------------------
