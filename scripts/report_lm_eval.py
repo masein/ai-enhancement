@@ -3026,12 +3026,18 @@ function vJudged(m) {
           return el('tr', { class: n ? null : 'dim', 'data-criterion': id },
             el('td', {}, labels[id] || id,
               cond ? el('span', { class: 'se', text: ` · conditional, ${n} of ${v.n}` }) : ''),
-            el('td', { class: 'num', text: m == null ? '—' : num(m, 2) }),
+            // exactly 0 is a finding, and weakest-first puts it at the top:
+            // "0" beside "0.65" read as an empty cell, so this column keeps
+            // its decimals rather than trimming them away
+            el('td', { class: 'num', text: m == null ? '—' : (+m).toFixed(2) }),
             el('td', { class: 'num se', text: String(n) }),
             // zero-anchored, one hue: the mean beside it is the encoding
             el('td', {}, el('div', { class: 'dxbar', style: 'width:180px;height:8px' },
-              m == null ? '' : el('span', { style: `width:${(100 * m).toFixed(1)}%;`
-                + 'background:var(--s1)' }))));
+              m == null ? '' : el('span', { 'data-bar': (+m).toFixed(2),
+                // a hairline at zero: an empty track and a missing value look
+                // the same, and one of them is a result
+                style: `width:${Math.max(0.8, 100 * m).toFixed(1)}%;`
+                  + 'background:var(--s1)' }))));
         })))));
       const flags = v.flags || {};
       const fids = Object.keys(flags);
@@ -5798,8 +5804,11 @@ function modelAnswers(m, cats) {
   const rep = j.report_half || {};
   wrap.append(el('p', { class: 'note', 'data-report-half': '1' },
     el('b', { text: 'The report half. ' }),
-    `${rep.n ?? 0} questions, mean ${num(rep.mean, 2)} / 4. That is the published score, and `
-    + 'this line is all of it you will see here.'));
+    `${rep.n ?? 0} questions, mean ${num(rep.mean, 2)} / 4`
+    + (Object.entries(rep.flags || {}).filter(([, n]) => n).length
+       ? ' · ' + Object.entries(rep.flags).filter(([, n]) => n)
+           .map(([fid, n]) => `${n} ${fid.replace(/_/g, ' ')}`).join(', ') : '')
+    + '. That is the published score, and this line is all of it you will see here.'));
   const rows = ansVisible(j);
   wrap.append(ansFilters(j));
   wrap.append(el('p', { class: 'small', 'data-answer-count': String(rows.length),
@@ -6043,7 +6052,8 @@ function vTopic() {
     el('div', { class: 'kvs' },
       el('span', {}, el('b', { text: 'bank ' }), r.bank.accepted
         ? `${r.bank.accepted} (${r.bank.report} report / ${r.bank.diagnose} diagnose)` : 'empty'),
-      el('span', {}, el('b', { text: 'rubric ' }), `${r.rubric.name}.md v${r.rubric.version}`
+      el('span', {}, el('b', { text: 'rubric ' }),
+        `${r.rubric.name}.md ${rubricVersion(r.rubric.version)}`
         + (r.rubric.status === 'draft' ? ' · DRAFT' : '')
         + (r.rubric.scoring === 'criteria' ? ` · ${r.rubric.criteria_count} criteria` : '')),
       el('span', {}, el('b', { text: 'next ' }), st.label)),
@@ -6260,10 +6270,17 @@ function loopAnswersPanel(r) {
   card.append(el('p', { class: 'note', 'data-report-half': '1' },
     el('b', { text: 'The report half. ' }),
     `${rep.n ?? 0} questions, mean ${num(rep.mean, 2)} / 4`
+    // the flags OF THIS HALF: the whole-bank count under this heading would
+    // be a claim about the published score that is not true of it
     + (Object.entries(rep.flags || {}).filter(([, n]) => n).length
        ? ' · ' + Object.entries(rep.flags).filter(([, n]) => n)
            .map(([fid, n]) => `${n} ${fid.replace(/_/g, ' ')}`).join(', ') : '')
-    + '. That is the published score, and this line is all of it you will see here.'));
+    + '. That is the published score, and this line is all of it you will see '
+    + 'here.'
+    + (Object.entries(rep.flags_whole_bank || {}).some(([fid, n]) => n > (rep.flags || {})[fid])
+       ? ' Across both halves: ' + Object.entries(rep.flags_whole_bank)
+           .filter(([, n]) => n).map(([fid, n]) => `${n} ${fid.replace(/_/g, ' ')}`).join(', ')
+           + '.' : '')));
   const rows = ansVisible(j);
   card.append(ansFilters(j));
   card.append(el('p', { class: 'small', 'data-answer-count': String(rows.length),
@@ -6470,8 +6487,9 @@ function vExam() {
 // ---------------------------------------------------------------------------
 
 function exImport() {
-  const s = state.eximp || (state.eximp = { topic: '', source: '', file: '', name: '',
-                                            preview: null, msg: '', busy: false });
+  const s = state.eximp || (state.eximp = { topic: '', source: '', author: '', file: '',
+                                            name: '', fileName: '', preview: null, msg: '',
+                                            busy: false });
   const topicSel = el('select', { 'aria-label': 'topic', onchange: e => {
     s.topic = e.target.value; s.preview = null; render(); } },
     el('option', { value: '', text: 'topic…' }),
@@ -6482,30 +6500,43 @@ function exImport() {
     'aria-label': 'questions file', onchange: async e => {
       const f = e.target.files[0]; if (!f) return;
       s.file = await f.text(); s.name = `${f.name} — ${(f.size / 1024).toFixed(0)} KB`;
+      s.fileName = f.name;
+      // the file's own name, never the topic's: "economics" in the source
+      // column of the economics bank says nothing about where it came from
       s.source = s.source || f.name.replace(/\.json$/, '');
       // a new file is a new attempt: the last answer does not apply to it
       s.preview = null; actState('eximport').ok = actState('eximport').err = '';
       render(); } });
-  const srcIn = el('input', { type: 'text', placeholder: 'source label (optional)',
+  const srcIn = el('input', { type: 'text', placeholder: 'source (the file, e.g. law_v2)',
     value: s.source, 'aria-label': 'source', 'data-keep': 'import-source',
     oninput: e => { s.source = e.target.value; } });
+  // WHO WROTE THEM, which is not usually who is sitting here: the record has
+  // to carry the author, or "these are Dr. Hossein's questions" lives only in
+  // somebody's memory of the afternoon
+  const authorIn = el('input', { type: 'text', placeholder: 'written by (the author)',
+    value: s.author, 'aria-label': 'written by', 'data-keep': 'import-author',
+    oninput: e => { s.author = e.target.value; } });
   const nameIn = rvNameInput();
   // both buttons answer in the same place, so a new attempt cannot leave the
   // last one's success sitting above its refusal — that read as a partial
   // import when a wrapped file was rejected after a good one
   const ready = () => {
     if (!s.file || !s.topic) throw new Error('a file and a topic, please');
-    if (!state.rvName.trim()) throw new Error('your name is recorded on every question');
-    return { topic: s.topic, approver: state.rvName, source: s.source, text: s.file };
+    if (!s.author.trim()) throw new Error('who wrote these questions? that name goes on '
+      + 'every one of them');
+    if (!state.rvName.trim()) throw new Error('your own name is recorded with the import');
+    return { topic: s.topic, approver: s.author, imported_by: state.rvName,
+             source: s.source, filename: s.fileName, text: s.file };
   };
   const p = s.preview;
   return el('div', { class: 'card', 'data-panel': 'import' },
     el('h2', { text: 'Import a bank' }),
-    el('p', { class: 'sub', text: 'A JSON array of questions written by a person — the same '
-      + 'file and the same records as scripts/exam_build.py import. Your name is recorded on '
-      + 'every question, the way a curator\'s name is on one they accept. Preview first: '
+    el('p', { class: 'sub', text: 'A JSON array of questions written by a person — or an '
+      + 'object holding one — read exactly as scripts/exam_build.py import reads it. The '
+      + 'author\'s name goes on every question and the source says which file they came '
+      + 'from; your own name is recorded as the person who imported them. Preview first: '
       + 'nothing is written until you commit.' }),
-    el('div', { class: 'frm' }, fileIn, topicSel, srcIn, nameIn,
+    el('div', { class: 'frm' }, fileIn, topicSel, authorIn, srcIn, nameIn,
       actButton('eximport', 'Preview', async () => {
         s.preview = null;                       // never a stale table under a new answer
         const j = await post('api/exam/import/preview', ready());
@@ -6542,6 +6573,11 @@ function exImport() {
 function exImportPreview(p) {
   const rows = (p.items || []).slice(0, 12);
   return el('div', {},
+    el('div', { class: 'kvs', 'data-preview': 'provenance' },
+      el('span', {}, el('b', { text: 'written by ' }), p.approver || '—'),
+      el('span', {}, el('b', { text: 'source ' }), p.source || '—'),
+      p.wrapper ? el('span', {}, el('b', { text: 'read from ' }), `"${p.wrapper}" in the file`) : '',
+      el('span', {}, el('b', { text: 'imported by ' }), state.rvName || '—')),
     el('div', { class: 'kvs', 'data-preview': 'counts' },
       el('span', {}, el('b', { text: 'would import ' }), String(p.imported)),
       // a question already in the bank whose metadata this file revises: the
@@ -6579,6 +6615,10 @@ function exImportPreview(p) {
 // would use right now, and how to replace them. Committing changes a sha
 // that is recorded in every judge.json, so the page says what that costs.
 // ---------------------------------------------------------------------------
+
+// A rubric heading need not carry "(version N)" — the author's own do not,
+// and the sha is the identity. "v?" read like an error.
+const rubricVersion = v => (!v || v === '?') ? 'no version' : 'v' + v;
 
 // what a topic's bank holds, beside the files that would grade it
 function bankCell(b) {
@@ -6620,7 +6660,7 @@ function exRubrics() {
             r.version === '?'
               ? el('span', { class: 'se', 'data-no-version': '1',
                   title: 'the author\'s own heading carries no version; the sha is the identity',
-                  text: 'no version marker ' })
+                  text: rubricVersion(r.version) + ' ' })
               : `v${r.version} `,
             r.fallback ? el('span', { class: 'se', 'data-fallback': '1',
               title: 'this topic has no rubric of its own; exam.md grades it',

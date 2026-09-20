@@ -372,8 +372,9 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     panel = page.locator("[data-panel='import']")
     upload(page, "questions file", "medicine_v2.json", "application/json", raw)
     panel.get_by_label("topic").select_option(topic)
+    panel.get_by_label("written by").fill("Dr. Hossein")
     panel.get_by_label("source").fill("medicine_v1")
-    panel.get_by_label("your name").first.fill("Dr. Hossein")
+    panel.get_by_label("your name").first.fill("Omar")
     before = len(eb.load_bank(root / "exam").get(topic, []))
     panel.get_by_role("button", name="Preview").click()
     page.wait_for_selector("[data-preview='counts']")
@@ -762,6 +763,7 @@ def test_a_refusal_replaces_the_last_success_rather_than_sitting_under_it(live, 
     page.wait_for_selector("[data-panel='import']")
     panel = page.locator("[data-panel='import']")
     panel.get_by_label("your name").first.fill("Omar")
+    panel.get_by_label("written by").fill("Dr. Hossein")
     # a good import first
     upload(page, "questions file", "computer_science_v1.json", "application/json",
            (REPO / "eval_tasks" / "fr" / "computer_science_v1.json").read_text(encoding="utf-8"))
@@ -797,6 +799,7 @@ def test_the_page_imports_the_wrapped_file_the_author_sent(live, page):
     page.wait_for_selector("[data-panel='import']")
     panel = page.locator("[data-panel='import']")
     panel.get_by_label("your name").first.fill("Omar")
+    panel.get_by_label("written by").fill("Dr. Hossein")
     upload(page, "questions file", "physics_engineering_v1.json", "application/json",
            PHYSICS_FILE.read_text(encoding="utf-8"))
     panel.get_by_label("topic").select_option("physics & engineering")
@@ -838,7 +841,7 @@ def test_the_rubrics_table_says_whether_a_topic_has_questions(live, page):
         # and an unversioned heading is not printed as an error
         assert "v?" not in panel.text_content()
         assert panel.locator("[data-no-version]").count() >= 1
-        assert "no version marker" in panel.text_content()
+        assert "no version" in panel.text_content()
         assert page.errors == []
     finally:
         bank.write_bytes(kept)

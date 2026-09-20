@@ -69,9 +69,26 @@ python3 scripts/exam_build.py --root $BENCH_ROOT/exam import \
     --topic "medicine & health" --approver "Dr. Hossein" --source medicine_v2
 ```
 
-The file is a JSON array of objects with at least a `prompt`. `--approver` is
-required and is recorded on every item, the same way a curator's name is;
-`--source` tags where they came from. The command is idempotent on `qid`, so
+The file is a JSON array of objects with at least a `prompt` — or an object
+holding one, such as `{"questions": [...]}`. `--approver` is **who wrote the
+questions**, recorded on every item the way a curator's name is;
+`--imported-by` is whoever ran the import, when that is somebody else.
+`--source` tags which file they came from and defaults to the file's own
+name; it is never the topic ("economics" in the source column of the
+economics bank says nothing about where those questions came from, and the
+import refuses it).
+
+A bank already written cannot be corrected by re-importing it — a matching
+qid is skipped, which is exactly what the qid is for — so there is a command
+for that:
+
+```bash
+python3 scripts/exam_build.py --root $BENCH_ROOT/exam set-source     --topic economics --source economics_v1 --approver "Dr. Hossein"
+```
+
+It rewrites `source` and `accepted_by` in place and touches nothing else: the
+qid is the question's identity *and* its half, so moving one would re-roll
+the split and quietly change what every judged score of that topic is about. The command is idempotent on `qid`, so
 re-running it after the author sends more items adds only the new ones, and
 prints what it imported, what it skipped and the report/diagnose split.
 

@@ -100,8 +100,23 @@ def _finish_judge(row: dict, results: dict[str, llm.Result]) -> None:
     run = db.judge_run_get(row["ref_id"])
     if not run:
         return
-    _judge.finish_run(run, results, config.OUT_DIR)
+    path = _judge.finish_run(run, results, config.OUT_DIR)
     db.judge_run_update(run["id"], status="done", finished_at=time.time())
+    # the count stops where it landed, not where the last poll happened to
+    # see it, and the submission stops saying the batch is out
+    db.batch_progress(row["batch_id"], f"{run['n_items']}/{run['n_items']} done")
+    sub = db.submission_of_batch(row["batch_id"])
+    if not sub:
+        return
+    try:
+        topics = len([t for t in json.loads(Path(path).read_text(encoding="utf-8")).get("tasks")
+                      or {} if t != _judge.CONTROL_TASK])
+    except (OSError, ValueError, TypeError):
+        topics = 0
+    when = time.strftime("%H:%M", time.localtime())
+    db.update(sub["id"], progress=(
+        f"judged: {topics} topic{'s' if topics != 1 else ''}, judge.json written {when}"
+        if topics else f"judged, judge.json written {when}"))
 
 
 def _mark_failed(r: dict, why: str) -> None:
@@ -138,6 +153,8 @@ def tick() -> int:
         except llm.LLMError as e:
             print(f"[llm] status {r['batch_id']}: {e}")
             continue
+        if state == "done" and detail and detail != r.get("progress"):
+            db.batch_progress(r["batch_id"], detail)     # the count that actually landed
         if state == "pending":
             # the provider was asked anyway; recording what it said is what
             # lets a queue row say "judging 40/80" instead of only "pending"

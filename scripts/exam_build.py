@@ -507,8 +507,25 @@ def unwrap_items(data):
     return data, ""
 
 
+def source_for(source: str, topic: str, filename: str = "") -> str:
+    """The label that says where these questions came from. Never the topic —
+    "economics" in the source column of the economics bank is a tautology,
+    and two of the five banks ended up with exactly that because the page
+    fell back to whatever was nearest. The file's own stem is the answer when
+    nobody typed one."""
+    text = (source or "").strip()
+    slug = _categories.topic_slug(topic) if topic in TOPICS else ""
+    if text and text.lower() not in {topic.lower(), slug.lower()}:
+        return text
+    stem = re.sub(r"\.json$", "", (filename or "").strip(), flags=re.I).strip()
+    if stem and stem.lower() not in {topic.lower(), slug.lower()}:
+        return stem
+    return "import"
+
+
 def plan_import(root: Path, items, topic: str, approver: str,
-                source: str = "import") -> dict:
+                source: str = "import", filename: str = "",
+                imported_by: str = "") -> dict:
     """Every record an import WOULD write, and the counts — without writing
     anything. The page previews with this and commits with import_bank, so
     what a person is shown is what lands, record for record."""
@@ -520,11 +537,16 @@ def plan_import(root: Path, items, topic: str, approver: str,
     items, wrapper = unwrap_items(items)
     if not isinstance(items, list):
         raise ValueError("not a JSON array of question objects")
+    source = source_for(source, topic, filename)
     # the whole bank by qid, not just the set: an author who revises the
     # metadata of a question already in the bank is revising it, not
     # re-importing it — the prompt is the identity, the rest is hers to change
     have = {r["qid"]: (t, r) for t, rows in load_bank(root).items() for r in rows}
-    out = {"topic": topic, "source": source, "wrapper": wrapper, "records": [], "updates": [],
+    out = {"topic": topic, "source": source, "wrapper": wrapper,
+           # what will be recorded, so the preview can show it before the
+           # commit writes it on a hundred questions
+           "approver": approver, "imported_by": imported_by,
+           "records": [], "updates": [],
            "imported": 0, "updated": 0, "skipped": 0,
            "invalid": 0, "report": 0, "diagnose": 0, "duplicates": [], "invalid_items": [],
            "acuity": collections.Counter(), "intent": collections.Counter()}
@@ -572,7 +594,12 @@ def plan_import(root: Path, items, topic: str, approver: str,
             "qid": q, "topic": topic, "prompt": prompt,
             "reference": reference,
             "notes": str(it.get("notes") or "").strip(), "meta": meta, "source": source,
-            "accepted_by": approver, "edited": False})
+            # who wrote the questions, and — when it was not the same person —
+            # who put them in. "these are Dr. Hossein's questions" has to be
+            # in the record, not in whoever remembers the afternoon
+            "accepted_by": approver, "edited": False,
+            **({"imported_by": imported_by} if imported_by
+               and imported_by != approver else {})})
         have[q] = (topic, out["records"][-1])
         out["imported"] += 1
         out[half_of(q)] += 1
@@ -586,7 +613,7 @@ def plan_import(root: Path, items, topic: str, approver: str,
 
 
 def import_bank(root: Path, path_or_items, topic: str, approver: str,
-                source: str = "import") -> dict:
+                source: str = "import", imported_by: str = "") -> dict:
     """A human-written bank, straight into the bank. These questions were
     written and curated by their author, which is what the Exam tab's accept
     step exists to establish — so the author is the approver, on the record.
@@ -601,13 +628,63 @@ def import_bank(root: Path, path_or_items, topic: str, approver: str,
                              f"nor an object holding one")
     else:
         items = path_or_items
-    out = plan_import(root, items, topic, approver, source)
+    name = Path(path_or_items).name if isinstance(path_or_items, (str, Path)) else ""
+    out = plan_import(root, items, topic, approver, source, filename=name,
+                      imported_by=imported_by)
+    return write_import(root, out)
+
+
+def write_import(root: Path, plan: dict) -> dict:
+    """Write what a plan says, and report what it wrote. Split out so the page
+    commits the very plan it previewed rather than planning a second time."""
+    out = dict(plan)
     for rec in out.pop("records"):
         append_bank(root, {**rec, "accepted_at": time.time()})
     for rec in out.pop("updates"):
         update_bank(root, {**rec, "accepted_at": time.time()})
     out.pop("invalid_items", None)
     return out
+
+
+def set_provenance(root: Path, topic: str, source: str = "", approver: str = "",
+                   only_source: str = "") -> dict:
+    """Correct who wrote a bank's questions and where they came from, in
+    place. Re-importing the same file cannot do it — a matching qid is
+    skipped, which is the whole point of the qid — so the two banks that
+    recorded their own topic as their source, and the five that recorded
+    whoever clicked import as their author, need this.
+
+    `only_source` limits it to rows that currently carry that source."""
+    if topic not in TOPICS:
+        raise ValueError(f"{topic!r} is not an exam topic: {', '.join(TOPICS)}")
+    if source and source.strip().lower() in {topic.lower(),
+                                             _categories.topic_slug(topic).lower()}:
+        raise ValueError(f"{source!r} is the topic's own name, which says nothing about where "
+                         f"the questions came from")
+    p = bank_dir(root) / f"{_categories.topic_slug(topic)}.jsonl"
+    rows = _read(p)
+    # the qid is the question's identity AND its half: sha256 of the prompt,
+    # split by dx.split_of. Recomputing one here would re-roll the split, and
+    # every judged score of this topic would be a number about a different
+    # set of questions. Two fields change; nothing else is touched.
+    qids_before = [r["qid"] for r in rows]
+    changed = 0
+    for r in rows:
+        if only_source and r.get("source") != only_source:
+            continue
+        before = (r.get("source"), r.get("accepted_by"))
+        if source:
+            r["source"] = source.strip()
+        if approver:
+            r["accepted_by"] = approver.strip()
+        changed += (r.get("source"), r.get("accepted_by")) != before
+    if [r["qid"] for r in rows] != qids_before:              # cannot happen; proves it did not
+        raise RuntimeError("set_provenance changed a qid — refusing to write; the split and "
+                           "every judged score of this topic hang on it")
+    if changed:
+        _write(p, rows)
+    return {"topic": topic, "rows": len(rows), "changed": changed,
+            "source": source or None, "approver": approver or None}
 
 
 def migrate_seeds(root: Path, seed_dir: Path = SEED_DIR, approver: str = "migration") -> int:
@@ -800,7 +877,16 @@ def main() -> int:
     i.add_argument("path", type=Path, help="JSON array of objects with at least a prompt")
     i.add_argument("--topic", required=True, help="the exam topic these belong to")
     i.add_argument("--approver", required=True, help="who stands behind them — recorded per item")
-    i.add_argument("--source", default="import", help="provenance tag kept on every item")
+    i.add_argument("--source", default="", help="provenance tag kept on every item; "
+                                                "defaults to the file's own name, never the topic")
+    i.add_argument("--imported-by", default="", help="who ran the import, when that is not "
+                                                     "the person who wrote the questions")
+    sp = sub.add_parser("set-source", help="correct a bank's provenance in place — a re-import "
+                                           "cannot, because a matching qid is skipped")
+    sp.add_argument("--topic", required=True)
+    sp.add_argument("--source", default="", help="the new provenance tag")
+    sp.add_argument("--approver", default="", help="who wrote these questions")
+    sp.add_argument("--only-source", default="", help="limit to rows carrying this source now")
     sub.add_parser("summary", help="per topic: accepted, halves, pending")
     b = sub.add_parser("build", help="write the harness tasks from the bank + the MMLU control set")
     b.add_argument("results", type=Path, help="results/full (source of the control set)")
@@ -812,7 +898,8 @@ def main() -> int:
         return 0
     if a.cmd == "import":
         try:
-            r = import_bank(root, a.path, a.topic, a.approver, a.source)
+            r = import_bank(root, a.path, a.topic, a.approver, a.source,
+                            imported_by=a.imported_by)
         except (ValueError, OSError, json.JSONDecodeError) as e:
             print(e, file=sys.stderr)
             return 2
@@ -823,8 +910,22 @@ def main() -> int:
               + f" — report {r['report']} / diagnose {r['diagnose']}")
         if r["acuity"]:
             print("acuity: " + ", ".join(f"{k} {v}" for k, v in r["acuity"].items()))
+        print(f"source recorded: {r['source']} · written by {a.approver}")
         print(f"they are in the bank ({bank_dir(root)}); rebuild the tasks with "
               f"exam_build.py build <results> --root {root}")
+        return 0
+    if a.cmd == "set-source":
+        if not a.source and not a.approver:
+            print("nothing to set: give --source, --approver or both", file=sys.stderr)
+            return 2
+        try:
+            r = set_provenance(root, a.topic, a.source, a.approver, a.only_source)
+        except (ValueError, OSError) as e:
+            print(e, file=sys.stderr)
+            return 2
+        print(f"{r['topic']}: {r['changed']} of {r['rows']} rows updated"
+              + (f" · source {r['source']}" if r["source"] else "")
+              + (f" · written by {r['approver']}" if r["approver"] else ""))
         return 0
     if a.cmd == "summary":
         for t, s in summary(root).items():

@@ -289,9 +289,14 @@ those rows carry `qid`, `topic`, `half` and `withheld`, never the question.
 control set (no GPU).
 
 `POST /api/exam/import/preview` and `POST /api/exam/import` —
-`{"topic", "approver", "source", "items"` **or** `"text"}`: a bank written by
-a person, the same parser and the same records as `scripts/exam_build.py
-import`. The preview writes nothing and answers with the counts (`imported`,
+`{"topic", "approver", "imported_by", "source", "filename", "items"` **or**
+`"text"}`: a bank written by a person, the same parser and the same records as
+`scripts/exam_build.py import` — including the unwrapping, so an object
+holding one list (`{"questions": [...]}`) is read, not refused. `approver` is
+who WROTE the questions and goes on every record; `imported_by` is whoever
+ran the import; `source` says which file they came from, defaults to
+`filename`'s stem and is never the topic's own name. The preview shows all
+three before anything is written. The preview writes nothing and answers with the counts (`imported`,
 `updated` — questions already in the bank whose metadata the file revises —
 `skipped` duplicates by qid, `invalid` with the offending indices), the
 `report`/`diagnose` split, the per-acuity and per-intent counts, and the

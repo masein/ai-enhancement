@@ -1038,11 +1038,20 @@ def _criteria_blocks(items: list[dict], spec: dict) -> dict:
                 if it["criteria"].get(cid) is not None]
         means[cid], counts[cid] = (_mean(vals), len(vals)) if vals else (None, 0)
     flags = {}
+    n_rep = sum(1 for it in items if it.get("half") == "report")
+    n_dia = sum(1 for it in items if it.get("half") == "diagnose")
     for f in spec.get("flags") or []:
         fid = f["id"]
         fired = [it for it in graded if (it.get("flags") or {}).get(fid)]
+        rep = sum(1 for it in fired if it.get("half") == "report")
+        dia = sum(1 for it in fired if it.get("half") == "diagnose")
         flags[fid] = {
             "n": len(fired), "share": round(len(fired) / len(items), 4) if items else 0,
+            # …and per half, because the published score is the report half and
+            # a page that prints the whole-bank count under a report-half
+            # heading is saying something untrue about the published number
+            "n_report": rep, "share_report": round(rep / n_rep, 4) if n_rep else 0,
+            "n_diagnose": dia, "share_diagnose": round(dia / n_dia, 4) if n_dia else 0,
             "label": label_of(f), "effect": effect_of(f),
             "effect_words": effect_words(effect_of(f)),
             # the count covers both halves; only diagnose-half qids are named,

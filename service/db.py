@@ -63,7 +63,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   arch        TEXT,                              -- JSON: architecture/hidden/layers/heads/ctx/vocab
   allow_remote_code INTEGER NOT NULL DEFAULT 0,  -- submitter opted in to executing the upload's code
   load_missing TEXT DEFAULT '',                  -- JSON: checkpoint keys transformers had to invent
-  tasks       TEXT DEFAULT '[]'                  -- JSON: narrow a suite to these tasks (one exam topic)
+  tasks       TEXT DEFAULT '[]',                 -- JSON: narrow a suite to these tasks (one exam topic)
+  judge_batch TEXT DEFAULT ''                    -- the judge batch THIS run submitted (not the model's newest)
 );
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
 -- find-the-gap: an LLM proposes a skill spec from diagnose-half failures, a
@@ -163,7 +164,7 @@ CREATE TABLE IF NOT EXISTS llm_batches (
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
          "finished_at", "gpu_seconds", "arch", "allow_remote_code", "load_missing",
-         "tasks"]
+         "tasks", "judge_batch"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -187,7 +188,8 @@ def init() -> None:
                      "ALTER TABLE truns ADD COLUMN parent TEXT DEFAULT ''",
                      "ALTER TABLE proposals ADD COLUMN judge_run TEXT DEFAULT '{}'",
                      "ALTER TABLE submissions ADD COLUMN tasks TEXT DEFAULT '[]'",
-                     "ALTER TABLE llm_batches ADD COLUMN progress TEXT DEFAULT ''"):
+                     "ALTER TABLE llm_batches ADD COLUMN progress TEXT DEFAULT ''",
+                     "ALTER TABLE submissions ADD COLUMN judge_batch TEXT DEFAULT ''"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:
@@ -487,6 +489,16 @@ def batch_finish(batch_id: str, status: str, error: str) -> None:
         c.execute("UPDATE llm_batches SET status=?, error=?, finished_at=? WHERE batch_id=?",
                   (status, error, time.time(), batch_id))
         c.commit()
+
+
+def submission_of_batch(batch_id: str) -> dict | None:
+    """Which submission asked for this judge batch. Recorded when the run
+    submits it, because "the model's most recent judge run" is a different
+    thing the moment two runs of one model are in flight."""
+    with closing(_conn()) as c:
+        row = c.execute(f"SELECT {','.join(_COLS)} FROM submissions WHERE judge_batch=? "
+                        "ORDER BY id DESC LIMIT 1", (batch_id,)).fetchone()
+    return dict(zip(_COLS, row)) if row else None
 
 
 def batch_progress(batch_id: str, progress: str) -> None:

@@ -655,3 +655,50 @@ def test_a_model_page_has_a_sub_nav_and_its_sections(surface):
         anchor = nav.locator("a[data-nav]", has_text=a).first.get_attribute("data-nav")
         assert pg.locator(f"#sec-{anchor}").count() == 1
     assert surface.errors == []
+
+
+@pytest.fixture(scope="module")
+def zero_criterion(tmp_path_factory) -> Path:
+    """A board where one criterion scored exactly 0 on every answer it
+    applied to — physics's "Uncertainty and calibration", 5 of 100."""
+    import judge as jd
+    import make_fixture
+    root = tmp_path_factory.mktemp("zero-crit")
+    tree = make_fixture.build(root)
+    d = tree["models"]["fx/good-750m"]["dir"]
+    j = json.loads((d / "judge.json").read_text(encoding="utf-8"))
+    task = "exam_medicine_health"
+    spec = jd.rubric_for(task).criteria
+    zero = jd.criteria_ids(spec)[0]
+    t = j["tasks"][task]
+    for it in t["items"]:
+        if it.get("criteria"):
+            it["criteria"][zero] = 0.0
+    t["criteria_mean"][zero] = 0.0
+    (d / "judge.json").write_text(json.dumps(j), encoding="utf-8")
+    return make_fixture.frozen_report(root, root / "report.html")
+
+
+def test_a_criterion_that_scored_zero_says_zero(browser, zero_criterion):
+    """It rendered as an empty cell — and weakest-first put that empty row at
+    the top of the table, so the worst finding looked like a missing one."""
+    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+    s = Surface(ctx.new_page(), zero_criterion.as_uri())
+    try:
+        pg = s.open(model_link("fx/good-750m"))
+        table = pg.locator("table.jd[data-criteria-table='medicine & health']")
+        first = table.locator("tr[data-criterion]").first
+        mean = first.locator("td").nth(1)
+        assert mean.inner_text().strip() == "0.00"        # not "", not "0"
+        assert first.locator("td").nth(2).inner_text().strip() != "0"   # it was scored
+        # the bar for zero is a hairline, not an empty track
+        bar = first.locator("[data-bar]")
+        assert bar.count() == 1 and bar.get_attribute("data-bar") == "0.00"
+        assert bar.evaluate("e => e.getBoundingClientRect().width") > 0
+        # and every other row still prints two decimals
+        others = table.locator("tr[data-criterion] td.num:nth-child(2)")
+        for i in range(min(4, others.count())):
+            assert re.fullmatch(r"\d\.\d\d", others.nth(i).inner_text().strip())
+        assert s.errors == []
+    finally:
+        ctx.close()

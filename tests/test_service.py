@@ -120,10 +120,18 @@ def test_submission_lifecycle_without_a_worker(svc):
                                           "submitter": "tester", "note": "smoke"})
     assert r.status_code == 200 and r.json()["status"] == "queued"
     sid = r.json()["id"]
-    # the same model again joins the existing run instead of queueing twice
-    again = c.post("/api/submissions", json={"hf_id": "EleutherAI/pythia-31m"}).json()
+    # the same model asking for the same work joins it instead of queueing twice
+    again = c.post("/api/submissions", json={"hf_id": "EleutherAI/pythia-31m",
+                                             "suite": "quick"}).json()
     assert again["id"] == sid and "joining" in again["note"]
-    rows = c.get("/api/submissions").json()
+    # a different suite is different work, and gets its own row: joining them
+    # gave one row two jobs, and a judged queue could not then say which
+    # batch belonged to which run
+    other = c.post("/api/submissions", json={"hf_id": "EleutherAI/pythia-31m",
+                                             "suite": "full"}).json()
+    assert other["id"] != sid
+    assert c.post(f"/api/submissions/{other['id']}/cancel").json()["status"] == "canceled"
+    rows = [r for r in c.get("/api/submissions").json() if r["status"] != "canceled"]
     assert len(rows) == 1 and rows[0]["submitter"] == "tester"
     assert rows[0]["status"] == "queued" and rows[0]["suite"] == "quick"
     assert c.get("/healthz").json()["queue"] == 1

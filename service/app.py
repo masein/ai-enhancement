@@ -258,7 +258,16 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
             raise HTTPException(403, f"remote code is not available: {blocked}. "
                                      f"See SERVICE.md § custom model code.")
     for row in db.recent(200):
-        if row["hf_id"] == hf_id and row["status"] in ACTIVE:
+        if row["hf_id"] != hf_id or row["status"] not in ACTIVE:
+            continue
+        # …and asking for the same work. A judged run of one topic is not the
+        # run of all fifteen: joining them gave one row two jobs, and the
+        # queue could not then say which batch belonged to which.
+        try:
+            same = sorted(json.loads(row.get("tasks") or "[]")) == sorted(chosen)
+        except ValueError:
+            same = not chosen
+        if row["suite"] == s.suite and same:
             return {"id": row["id"], "status": row["status"],
                     "note": "already in the queue — joining the existing run"}
     sid = db.add(hf_id, s.kind, s.suite, s.submitter.strip()[:80], s.note.strip()[:200],
@@ -274,13 +283,23 @@ def submissions(limit: int = 100):
     rows = db.recent(min(limit, 500))
     judged = [r for r in rows if r["suite"] == "judged"]
     if judged:
-        runs = db.judge_runs(100)
-        batches = {b["batch_id"]: b for b in db.batches_list(200) if b["kind"] == "judge"}
-        newest: dict[str, dict] = {}
-        for run in runs:                       # judge_runs comes back newest first
-            newest.setdefault(run["model"], run)
+        runs = {run["batch_id"]: run for run in db.judge_runs(200)}
+        batches = {b["batch_id"]: b for b in db.batches_list(500) if b["kind"] == "judge"}
+        # by the batch THIS submission recorded. Matching on the model gave
+        # every judged row of a model the newest run's batch, so a finished
+        # 130-answer run showed the 680 of the one still going.
+        by_model: dict[str, list[dict]] = {}
+        for run in db.judge_runs(200):
+            by_model.setdefault(run["model"], []).append(run)
         for r in judged:
-            run = newest.get(r["hf_id"])
+            bid = r.get("judge_batch") or ""
+            run = runs.get(bid)
+            if not run:
+                # a row from before the batch was recorded on it: the newest
+                # run of that model that started after the row did
+                started = r.get("started_at") or r.get("created_at") or 0
+                run = next((x for x in by_model.get(r["hf_id"], [])
+                            if (x.get("created_at") or 0) >= started), None)
             if not run:
                 continue
             b = batches.get(run["batch_id"]) or {}
@@ -691,7 +710,9 @@ IMPORT_MAX_BYTES = 2 * 1024 * 1024
 
 class ImportIn(BaseModel):
     topic: str
-    approver: str
+    approver: str                      # who WROTE the questions; it goes on every record
+    imported_by: str = ""              # who put them in, when that is someone else
+    filename: str = ""                 # the file's own name: the source falls back to its stem
     source: str = ""
     # the file as it is: an array, or an object holding one — physics &
     # engineering arrived as {"questions": [...]}, and a file is not refused
@@ -754,7 +775,8 @@ def exam_import_preview(body: ImportIn, x_token: str = Header(default="")):
     who = _name(body.approver, "importing a bank")
     try:
         plan = exam_build.plan_import(config.EXAM_DIR, _import_items(body), body.topic.strip(),
-                                      who, (body.source or "import").strip())
+                                      who, (body.source or "").strip(),
+                                      filename=body.filename, imported_by=body.imported_by.strip())
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
     return _import_preview(plan)
@@ -765,14 +787,18 @@ def exam_import(body: ImportIn, x_token: str = Header(default="")):
     _check_token(x_token)
     who = _name(body.approver, "importing a bank")
     items = _import_items(body)
+    by = body.imported_by.strip()
     try:
-        out = exam_build.import_bank(config.EXAM_DIR, items, body.topic.strip(), who,
-                                     (body.source or "import").strip())
+        plan = exam_build.plan_import(config.EXAM_DIR, items, body.topic.strip(), who,
+                                      (body.source or "").strip(), filename=body.filename,
+                                      imported_by=by)
+        out = exam_build.write_import(config.EXAM_DIR, plan)
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
     # one curation row for the import, the way an accept writes one per question
-    db.curation_add(f"import:{out['source']}", out["topic"], "", "imported", who,
-                    False, f"{out['imported']} imported, {out['skipped']} already in the bank")
+    db.curation_add(f"import:{out['source']}", out["topic"], "", "imported", by or who,
+                    False, f"{out['imported']} imported, {out['updated']} revised, "
+                           f"{out['skipped']} already in the bank; written by {who}")
     return out
 
 
@@ -1160,9 +1186,14 @@ def answers(model: str, topic: str, limit: int = 200):
         "flags": [{"id": f["id"], "label": _judge.label_of(f),
                    "effect_words": _judge.effect_words(_judge.effect_of(f))}
                   for f in spec.get("flags") or []],
-        # the published half, as a number and never as rows
+        # the published half, as a number and never as rows. Its flag counts
+        # are the REPORT half's: the whole-bank figure under this heading
+        # says something untrue about the published score
         "report_half": {"n": t.get("n_report"), "mean": t.get("score_report"),
-                        "flags": {fid: f.get("n") for fid, f in (t.get("flags") or {}).items()},
+                        "flags": {fid: f.get("n_report", 0)
+                                  for fid, f in (t.get("flags") or {}).items()},
+                        "flags_whole_bank": {fid: f.get("n", 0)
+                                             for fid, f in (t.get("flags") or {}).items()},
                         "note": "report-half questions and answers are never listed — the "
                                 "published score is this line"},
         "items": rows[:max(1, min(limit, 500))], "n_diagnose": len(rows),
