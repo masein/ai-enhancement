@@ -98,8 +98,11 @@ docs/
   design-diagnose-and-generate.md     the original design (phases 0–2 there = T…6 here)
   prompts/phases-4-5.md               brief that built T, 3b, 4, 5, 6 — superseded where phase-7 disagrees
   prompts/phase-7-exam-driven-loop.md brief that turned the loop around — implemented
-  prompts/phase-8-local-backend.md    brief for the local vLLM backend + demo — NOT implemented
+  prompts/phase-8-local-backend.md    the local vLLM backend + the narrated demo — implemented
+  prompts/phase-8b-hossein-medicine.md Dr. Hossein's medicine bank + per-criterion grading — implemented
+  hossein-evaluation-criteria.md      his 15 criteria and the critical-failure rule, as delivered
 DIAGNOSE.md              how to read a diagnosis; the finding→action table; the log to keep
+DEMO.md                  the whole loop in one command against the local model — and what it does not prove
 SERVICE.md               how to run the service; Docker; troubleshooting
 ```
 
@@ -289,8 +292,12 @@ deselected gpu/network/dashboard), non-browser suite ~34 s:**
 them. First server session is: pull, `up -d --build`, run `diagnose.py`, then
 the rollout in §9.
 
-**Not implemented:** phase 8 (§10). **Not built and not planned:** thinking-trace
-export (was in an early plan; dropped).
+**Since merged (phase 8 and 8b):** the `local` provider — vLLM behind the batch
+interface, everything it produces stamped provisional — the narrated
+`scripts/demo_loop.py` and `DEMO.md`, Dr. Hossein's imported medicine bank with
+a rubric per topic, and per-criterion grading with the 0–4 folded in code (§8,
+§10). **Not built and not planned:** thinking-trace export (was in an early
+plan; dropped).
 
 **Never exercised against anything real:** the Anthropic and OpenAI batch
 clients and the judge. They have only run against the `fake` backend and stubs.
@@ -304,13 +311,42 @@ test. Budget a day for things not to work the first time.
 | Who | Role in the loop |
 |---|---|
 | **Omar Affifi** | Owns the platform and the decisions in §5. Runs Claude Code against the briefs in `docs/prompts/`. |
-| **Dr. Hossein** | Owns the exam's substance: signs off the topic list, **writes the rubrics** (what a 0 and a 4 look like, per topic), curates the drafted questions. Rubrics are the critical path. |
+| **Dr. Hossein** | Owns the exam's substance: signs off the topic list, **writes the rubrics** (what a 0 and a 4 look like, per topic), curates the drafted questions. Rubrics are the critical path. **First delivery is in** — see below. |
 | **Roohi** | Trains. Consumes generated datasets via `--gap-dataset`, resubmits checkpoints. **Open: his fine-tuning cycle time, and whether prose-document JSONL drops into his training mix as-is.** Also owns the `transformers` minimum-version answer. |
 
 A rubric is the marking scheme: anchored 0–4 descriptions, a stated priority
 (e.g. reasoning chain over right answer), length named explicitly (judges reward
 length). Example: `eval_tasks/fr/rubrics/reasoning.md`. Its hash goes into every
 `judge.json`; change the rubric and scores before/after are not comparable.
+
+**Dr. Hossein's first delivery (phase 8b) is in the repo and in the loop:**
+
+| What | Where |
+|---|---|
+| 50 consumer health questions with metadata, as delivered | `eval_tasks/fr/hossein_medicine_v1.json` |
+| his 15 criteria and the critical-failure rule, as delivered | `docs/hossein-evaluation-criteria.md` |
+| the 0–4 rubric derived from them — **DRAFT** | `eval_tasks/fr/rubrics/medicine_health.md` |
+| the same criteria, machine-readable: ids, weights, the conditional one, the fold | `eval_tasks/fr/rubrics/medicine_health.criteria.json` |
+
+They import into the `medicine & health` bank with him as the approver
+(`exam_build.py import`, AUTHORING.md), the judge grades that topic criterion
+by criterion and folds the 0–4 in code, and the page shows the per-criterion
+row, the critical-failure count and the by-acuity table.
+
+**Two things are open with him, and both are blockers for calling any medicine
+score a result:**
+
+1. **At least 10 more questions.** The 50 split 29 report / 21 diagnose, and
+   30 report-half questions is the floor below which a topic cannot be
+   proposed from. The demo prints the shortfall every run.
+2. **Rubric and criteria sign-off.** Both files say DRAFT; until he removes
+   the word, every judged score for the topic is stamped draft on the page
+   beside the provisional stamp. Removing it changes their hashes, which is
+   correct — scores from before and after are then not comparable.
+
+Not yet done and worth planning with him: per-criterion calibration. The
+export writes a column per criterion and the flag, and the import reports the
+agreement, but κ — the gate — is still on the folded score alone.
 
 ---
 
@@ -336,11 +372,15 @@ length). Example: `eval_tasks/fr/rubrics/reasoning.md`. Its hash goes into every
 
 ---
 
-## 10. Phase 8 — specced, NOT implemented
+## 10. Phase 8 — implemented and merged
 
-Brief: `docs/prompts/phase-8-local-backend.md`. Motivation: no cloud API keys
-yet, and the loop has never run against anything real. There is a local model
-on the deploy box:
+Briefs: `docs/prompts/phase-8-local-backend.md` (P0–P3) and
+`docs/prompts/phase-8b-hossein-medicine.md` (P4a–P4c). Read **DEMO.md** first:
+it has the `.env` block, the one command, and what a green run does not prove.
+What landed: the `local` provider (`service/llm.py::LocalOpenAI`), the
+provisional stamp on every artefact a local identity makes,
+`scripts/demo_loop.py`, `exam_build.py import` with a rubric per topic, and
+per-criterion grading folded to a 0–4 in code. What is still true of the box:
 
 - vLLM OpenAI-compatible server at `http://localhost:8000/v1`, **loopback only**
   (tunnel with `ssh -L 8000:localhost:8000`)
@@ -351,7 +391,7 @@ on the deploy box:
 - **Shared card:** vLLM holds 13.3 GB; with Qwen in Ollama the card sits at
   ~94%. Long-context requests can push it over.
 
-The brief, in four parts:
+What the briefs asked for, and what it became:
 
 - **P0** cleanup: `rm -rf logs/_testenv logs/_repo_snapshot.tgz` (leftovers
   from a test run; gitignored) and add `.claude/` to `.gitignore`.
@@ -375,7 +415,14 @@ The brief, in four parts:
   Anthropic or OpenAI batch clients.** A green demo is not a green production
   path.
 
-Hand it to Claude Code with: `Read @docs/prompts/phase-8-local-backend.md and do P0, then P1.`
+- **P4a–P4c** (phase 8b) Dr. Hossein's medicine bank: `exam_build.py import`
+  with metadata as the reference, a rubric per topic with a DRAFT stamp,
+  per-criterion grading whose 0–4 is folded in code, and the docs above.
+
+All of it is merged. What has NOT happened yet: a full `--sit here` run on the
+box against vLLM with a real model on the card, and Dr. Hossein's sign-off plus
+the ≥10 further questions (§8). Until both, every medicine score carries two
+stamps and counts for nothing.
 
 ---
 
@@ -408,9 +455,11 @@ Hand it to Claude Code with: `Read @docs/prompts/phase-8-local-backend.md and do
 |---|---|
 | `HANDOFF.md` | this |
 | `DIAGNOSE.md` | operator guide: routine, reading order, finding→action table, the log to keep |
+| `DEMO.md` | the loop end to end in one command against the local model, and — plainly — what a green run does not prove |
 | `SERVICE.md`, `API.md`, `FRIENDS.md`, `BENCHMARK-RUN.md` | running the service; the API; the submitter guide; the manual CLI path |
 | `docs/design-diagnose-and-generate.md` | the original design and its argument for the split |
-| `docs/prompts/*.md` | the three implementation briefs, in order; phase-8 is open |
+| `docs/prompts/*.md` | the implementation briefs, in order; all merged as of phase 8b |
+| `docs/hossein-evaluation-criteria.md` | Dr. Hossein's 15 criteria and the critical-failure rule, as delivered — the source `rubrics/medicine_health*.` derive from |
 | `llm-api-budget.xlsx` (with Omar) | per-cycle cost model; prices verified 2026-09-18; Steps and Glossary sheets define every term |
 | `eval_pipeline_fasttrack.html` (with Omar) | the team deck: loop, the one rule, rollout, curation math, costs, provider rule |
 

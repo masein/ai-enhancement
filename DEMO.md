@@ -87,6 +87,33 @@ Useful flags: `--dry-run` prints the plan and calls nothing; `--keep` leaves
 the tree; `--count` sets how many documents; `--no-auto-accept` stops after
 drafting so you can curate on the Exam tab; `--sit stub` skips the GPU.
 
+### The medicine run — a human-written bank
+
+Dr. Hossein's 50 consumer health questions, with his 15-criterion framework
+behind the grading:
+
+```bash
+python3 scripts/demo_loop.py --topic "medicine & health" \
+    --import eval_tasks/fr/hossein_medicine_v1.json --approver "Dr. Hossein" \
+    --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
+```
+
+`--import` replaces steps 2 and 3 with one import step: his name is the
+approver on every item, the metadata is the reference (acuity first), and the
+step prints the report/diagnose split, the per-acuity counts and the
+shortfall against the 30-question floor as a concrete ask back to him. The
+run needs **no exam writer** configured — nobody is drafting anything.
+
+Use an **instruct** model for this topic. A base model answers a triage
+question with word salad and scores 0 on everything, which teaches nothing;
+the demo's preflight says so when the model id does not look instruction
+tuned.
+
+Step 6 then shows what per-criterion grading looks like: each criterion's
+mean weakest first, the critical-failure count with the acuities it fell on,
+the by-acuity table, and one graded diagnosis-half answer in full — its
+criteria, its flag and the fold that turned them into a 0–4.
+
 ### The safety property, shown rather than claimed
 
 Step 7 reads the request bodies the backend actually wrote to disk and checks
@@ -138,6 +165,16 @@ In detail, a green demo says nothing about:
   4B model's grades are not evidence about a model's ability.
 - Question quality. `--auto-accept` accepts whatever was drafted; a real bank
   is read question by question by a person whose name is recorded.
+- **The medicine rubric and its criteria file are drafts**, pending Dr.
+  Hossein's sign-off. They grade, and they are marked DRAFT on the page and
+  in every `judge.json` until he signs them off by removing the word — which
+  changes their sha, so scores from before and after do not compare.
+- **The 0–4 for a criteria topic is a deterministic fold of the 15 criteria**
+  (the rule is in `rubrics/medicine_health.criteria.json`), not a number the
+  judge chose. Per-criterion agreement with a human has **not** been measured
+  yet: `judge_calibrate.py` exports the columns for it and reports the
+  differences, but nothing gates on them, and κ is still computed on the
+  folded score alone.
 
 So: a green demo is not a green production path.
 

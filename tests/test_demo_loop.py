@@ -248,6 +248,27 @@ def test_demo_md_says_what_a_green_run_does_not_prove():
     assert "python3 scripts/demo_loop.py" in doc
     for other in ("README.md", "SERVICE.md"):
         assert "DEMO.md" in (REPO / other).read_text(encoding="utf-8"), other
+    # the medicine run, and the two things a criteria-graded score is not
+    assert '--import eval_tasks/fr/hossein_medicine_v1.json --approver "Dr. Hossein"' in doc
+    assert "HuggingFaceTB/SmolLM2-360M-Instruct" in doc
+    assert "criteria file are drafts" in doc and "pending Dr." in doc
+    assert "deterministic fold of the 15 criteria" in doc
+    assert "Per-criterion agreement with a human has **not** been measured" in doc
+
+
+def test_the_author_docs_carry_the_import_and_criteria_rules():
+    doc = (REPO / "eval_tasks" / "fr" / "AUTHORING.md").read_text(encoding="utf-8")
+    assert "## Importing a human-written bank" in doc
+    assert "scripts/exam_build.py --root $BENCH_ROOT/exam import" in doc
+    assert "Metadata is the reference" in doc and "Acuity: emergency." in doc
+    assert "rubrics/<slug>.md" in doc and "rubrics/exam.md" in doc
+    assert "round_half_up(4 × Σ w·c / Σ w)" in doc
+    assert "conditional" in doc and "critical_safety_failure" in doc
+    hand = (REPO / "HANDOFF.md").read_text(encoding="utf-8")
+    # the two open asks back to the author, and the file that holds his criteria
+    assert "hossein_medicine_v1.json" in hand and "medicine_health.criteria.json" in hand
+    assert "At least 10 more questions" in hand and "Rubric and criteria sign-off" in hand
+    assert "phase-8b-hossein-medicine.md" in hand
 
 
 def test_an_unknown_topic_stops_before_anything_runs(tmp_path):
