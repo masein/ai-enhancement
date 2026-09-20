@@ -1149,6 +1149,28 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                               round(bpb["value"] * math.log(2), 6), None,
                               r["n_shot"].get(task), r["n_samples"].get(task)])
 
+    # Two rows identical on every task, item counts included, are one run
+    # submitted twice (HANDOFF §11: two such sat at #1 and #2 for weeks). Both
+    # stay on the board — deleting someone's submission is not the page's call
+    # — but only one is ranked, and the other says which it duplicates. Three
+    # tasks minimum: two models genuinely tying on one task is not a duplicate.
+    DUP_MIN_TASKS = 3
+    by_print: dict[tuple, list[dict]] = {}
+    for row in model_rows:
+        fingerprint = tuple(sorted(
+            (t, round(cells[t][row["id"]]["v"], 9), cells[t][row["id"]].get("n"))
+            for t in acc_tasks if row["id"] in cells.get(t, {})))
+        if len(fingerprint) >= DUP_MIN_TASKS:
+            by_print.setdefault(fingerprint, []).append(row)
+    for group in by_print.values():
+        if len(group) < 2:
+            continue
+        group.sort(key=lambda r: (str(r.get("date") or ""), r["id"]))
+        first = group[0]
+        for dup in group[1:]:
+            dup["duplicateOf"] = first["id"]
+            dup["duplicateOfName"] = first["name"]
+
     # provenance warnings — they gate every claim below them
     warnings: list[str] = []
     shots_seen: dict[str, set] = {}
@@ -1212,6 +1234,14 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             f"{', …' if len(tainted_rows) > 4 else ''}) trained on data derived from "
             f"benchmark diagnostics. The affected task is shown per model, badged, and "
             f"excluded from that model's official average — it is not a ranking claim.")
+    dups = [m for m in model_rows if m.get("duplicateOf")]
+    if dups:
+        warnings.append(
+            f"{len(dups)} row{'s' if len(dups) > 1 else ''} "
+            f"({', '.join(m['name'] for m in dups[:4])}{', …' if len(dups) > 4 else ''}) "
+            f"score identically to another row on every task, item counts included — the same "
+            f"run submitted twice. Both are shown; the later one is not ranked and says which "
+            f"row it duplicates. Nothing has been deleted.")
     n_prelim = sum(1 for m in model_rows if not m["official"])
     if n_prelim and required:
         warnings.append(
@@ -1628,6 +1658,12 @@ th .dir { font-size:9px; }
   padding:10px 14px; margin:0 0 14px; font-size:13.5px; font-weight:600;
   color:var(--text-primary); background:color-mix(in srgb, var(--warning) 10%, transparent); }
 .pagebanner a { font-weight:500; }
+/* the board's checks, folded where they are not about the work in front of
+   you. Folded, never dismissed: they are findings */
+.warnfold { margin:8px 0; }
+.warnfold > summary { cursor:pointer; font-size:12.5px; color:var(--text-secondary);
+  padding:4px 0; }
+.warnfold[open] > summary { color:var(--text-primary); }
 .lb td.model { white-space:nowrap; }
 .lb td.model .mname { display:inline-block; max-width:22ch; overflow:hidden;
   text-overflow:ellipsis; vertical-align:bottom; }
@@ -1865,7 +1901,7 @@ let _rankMap = null, _rankKey = '';
 function rankOf(m) {
   const key = state.avgMode + ':' + DATA.models.length;
   if (_rankKey !== key) {
-    const ranked = DATA.models.filter(x => officialAvg(x) != null)
+    const ranked = DATA.models.filter(x => officialAvg(x) != null && !x.duplicateOf)
                               .sort((a, b) => officialAvg(b) - officialAvg(a));
     _rankMap = new Map(ranked.map((x, i) => [x.id, { n: i + 1, of: ranked.length }]));
     _rankKey = key;
@@ -1887,9 +1923,12 @@ function modelSentence(m) {
   const r = rankOf(m), a = officialAvg(m);
   const tn = (m.tainted || []).map(tName).join(' and ');
   if (r && a != null) {
+    // the date belongs beside the rank, not two sentences later: a rank
+    // without one is a claim about now, and this run may be months old
     out.push(`It averages ${pct(a)} `
       + `${state.avgMode === 'raw' ? 'raw' : 'above chance'} over the ${m.nreq} `
-      + `required tasks, ranking ${ord(r.n)} of ${r.of} ranked models here.`);
+      + `required tasks, ranking ${ord(r.n)} of ${r.of} ranked models here`
+      + (m.date ? ` — evaluated ${String(m.date).slice(0, 10)}.` : '.'));
     // the multiple-choice average can be intact while an exam topic is not
     if (tn) out.push(`Its training consumed a dataset derived from ${tn} diagnostics, so that `
       + 'score is shown and never ranked.');
@@ -1928,6 +1967,13 @@ function modelSentence(m) {
   if (m.date) out.push(`Last evaluated ${String(m.date).slice(0, 10)}.`);
   return out.join(' ');
 }
+// the same run submitted twice: both rows stay, one rank. Naming the row it
+// duplicates is the whole point — "duplicate" alone would send someone hunting
+const dupBadge = m => !m.duplicateOf ? null
+  : el('span', { class: 'badge', 'data-duplicate': m.duplicateOf,
+      title: `every task score and item count is identical to ${m.duplicateOfName}`
+        + ' — the same run submitted twice. Shown, not ranked; nothing deleted.',
+      text: `duplicate of ${m.duplicateOfName}` });
 const prelimBadge = m => m.official ? null
   : el('span', { class: 'badge prelim',
       title: `preliminary — ${m.nhave}/${m.nreq} required tasks`
@@ -2875,7 +2921,8 @@ function vJudged(m) {
       card.append(el('div', { class: 'dxh', 'data-criteria': frName(t),
         text: `${frName(t)} — by criterion (0–1), weakest first · ${v.n} answers, `
           + `${v.unparseable || 0} unreadable` }));
-      card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+      card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd',
+        'data-criteria-table': frName(t) },
         el('thead', {}, el('tr', {}, el('th', { text: 'criterion' }),
           el('th', { class: 'num', text: 'mean' }), el('th', { class: 'num', text: 'answers' }),
           el('th', { text: '0 → 1' }))),
@@ -2892,7 +2939,8 @@ function vJudged(m) {
                 + 'background:var(--s1)' }))));
         })))));
       const csf = v.critical_safety_failures || { n: 0, share: 0 };
-      card.append(el('p', { class: csf.n ? 'warn' : 'note', 'data-csf': String(csf.n) },
+      card.append(el('p', { class: csf.n ? 'warn' : 'note', 'data-csf': String(csf.n),
+        'data-csf-topic': frName(t) },
         el('b', { text: csf.n ? 'Critical safety failures. ' : 'No critical safety failure. ' }),
         csf.n
           ? `${csf.n} of ${v.n} answers (${pct(csf.share, 0)}) could plausibly have caused harm`
@@ -2904,7 +2952,8 @@ function vJudged(m) {
             + 'before the criteria are scored, and it sets the score to 0 when it is true.'));
       if (v.by_acuity) {
         card.append(el('div', { class: 'dxh', text: 'By acuity — the axis this bank was written around' }));
-        card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+        card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd',
+          'data-acuity-table': frName(t) },
           el('thead', {}, el('tr', {}, el('th', { text: 'acuity' }),
             el('th', { class: 'num', text: 'answers' }), el('th', { class: 'num', text: 'mean' }),
             el('th', { class: 'num', text: 'critical failures' }))),
@@ -3042,8 +3091,11 @@ function vModel() {
       ckBadge(m) || el('span', { class: 'badge' + (m.kind === 'instruct' ? ' instruct' : ''),
         text: m.kind }),
       prelimBadge(m) || '', taintBadge(m) || '',
-      r ? el('span', { class: 'rankbadge', title: `${r.n} of ${r.of} ranked models`,
-        text: `#${r.n}` }) : ''),
+      // the badge carries its date too: #7 from August is not #7 today
+      r ? el('span', { class: 'rankbadge', 'data-rank': String(r.n),
+        title: `${r.n} of ${r.of} ranked models`
+          + (m.date ? `, from the evaluation of ${String(m.date).slice(0, 10)}` : ''),
+        text: `#${r.n}` + (m.date ? ` · evaluated ${String(m.date).slice(0, 10)}` : '') }) : ''),
     el('p', { class: 'sub mono', text: m.id }),
     el('p', { class: 'small', style: 'margin-top:8px', text: modelSentence(m) }),
     el('div', { class: 'tiles', style: 'margin-top:14px' },
@@ -3603,7 +3655,7 @@ function vLeaderboard(ms) {
         ckBadge(m) || (m.kind === 'instruct'
           ? el('span', { class: 'badge instruct', text: 'instruct' })
           : el('span', { class: 'badge', text: 'base' })),
-        prelimBadge(m) || '', taintBadge(m) || '');
+        prelimBadge(m) || '', taintBadge(m) || '', dupBadge(m) || '');
       if (c.key === 'params') {
         const a = m.archinfo || {};
         // a sparse model loads every expert but routes each token through a few:
@@ -4438,11 +4490,11 @@ async function loadTraining(force = false) {
   if (!LIVE || state.trFetching) return;
   state.trFetching = true;
   try {
-    state.trRuns = await (await fetch('api/truns')).json();
+    state.trRuns = await api('api/truns');
     await Promise.all(state.trSel.map(async id => {
       const row = state.trRuns.find(r => r.id === id);
       if (force || !state.trSeries[id] || (row && row.status === 'running'))
-        state.trSeries[id] = await (await fetch(`api/truns/${id}`)).json();
+        state.trSeries[id] = await api(`api/truns/${id}`);
     }));
     if (state.tab === 'training') (state.trRedraw || render)();
   } catch (e) { /* next poll retries */ }
@@ -4468,7 +4520,7 @@ function toggleRun(id) {
 const METRIC_ORDER = ['loss', 'lr', 'grad_norm', 'tokens_per_s', 'gpu_mem_gb', 'gpu_util'];
 
 function vTraining() {
-  if (!state.trRuns.length && LIVE) loadTraining();
+  if (!state.trRuns.length && LIVE && netReady()) loadTraining();
   const frag = [];
   // ---- left: the runs list --------------------------------------------------
   // two lines per run: name + status on top, the numbers underneath. The old
@@ -4936,9 +4988,7 @@ function vQueue() {
 async function loadReview() {
   try {
     const [llm, props, ds] = await Promise.all([
-      fetch('api/llm').then(r => r.json()),
-      fetch('api/proposals').then(r => r.json()),
-      fetch('api/datasets').then(r => r.json())]);
+      api('api/llm'), api('api/proposals'), api('api/datasets')]);
     const changed = !state.rv.loaded || JSON.stringify([llm, props, ds])
       !== JSON.stringify([state.rv.llm, state.rv.proposals, state.rv.datasets]);
     Object.assign(state.rv, { llm, proposals: props, datasets: ds, loaded: true });
@@ -5244,7 +5294,7 @@ function rvDataset(d) {
 }
 
 function vReview() {
-  if (!state.rv.loaded) { loadReview(); }
+  if (!state.rv.loaded && netReady()) { loadReview(); }
   try { if (!state.rvName) state.rvName = localStorage.getItem('bench-name') || ''; } catch (e) { /* */ }
   const llm = state.rv.llm || {};
   const llmOk = !!llm.configured && (llm.usage_today || 0) < (llm.daily_cap || 0);
@@ -5306,8 +5356,7 @@ async function loadExam() {
   try {
     const q = state.ex.topic ? '?topic=' + encodeURIComponent(state.ex.topic) : '';
     const [status, cands] = await Promise.all([
-      fetch('api/exam').then(r => r.json()),
-      fetch('api/exam/candidates' + q).then(r => r.json())]);
+      api('api/exam'), api('api/exam/candidates' + q)]);
     const changed = !state.ex.loaded || JSON.stringify([status.summary, cands])
       !== JSON.stringify([(state.ex.status || {}).summary, state.ex.candidates]);
     Object.assign(state.ex, { status, candidates: cands, loaded: true });
@@ -5356,7 +5405,7 @@ function exCandidate(c) {
 }
 
 function vExam() {
-  if (!state.ex.loaded) loadExam();
+  if (!state.ex.loaded && netReady()) loadExam();
   try { if (!state.rvName) state.rvName = localStorage.getItem('bench-name') || ''; } catch (e) { /* */ }
   const st = state.ex.status || {};
   const sum = st.summary || {};
@@ -5378,8 +5427,21 @@ function vExam() {
       el('span', {}, el('b', { text: 'awaiting curation ' }), String(pending)),
       el('span', {}, el('b', { text: 'tasks built ' }), String((st.tasks_built || []).length))),
     !st.configured && st.reason ? el('p', { class: 'warn', text: st.reason }) : '',
-    el('p', { class: 'small' }, 'Draft more: ', el('code', { style: 'overflow-wrap:anywhere',
-      text: st.draft_command || 'scripts/exam_build.py draft' }),
+    // an empty bank is not a page bug, but the page is where someone finds
+    // out about it, so it says which of the three ways in they want
+    total ? '' : el('p', { class: 'warn', 'data-bank': 'empty' },
+      el('b', { text: 'No questions yet. ' }),
+      'Nothing has been migrated, imported or drafted into this bank. Run ',
+      el('code', { text: 'exam_build.py migrate' }), ' for the 40 seed items, ',
+      el('code', { text: 'import' }), ' for a human-written bank, or ',
+      el('code', { text: 'draft' }), ' for LLM candidates — the commands are below.'),
+    el('p', { class: 'small' }, 'A person\'s bank, imported whole: ',
+      el('code', { style: 'overflow-wrap:anywhere',
+                   text: st.import_command || 'scripts/exam_build.py import' }),
+      '. The approver is recorded on every question, exactly as accepting one here is.'),
+    el('p', { class: 'small' }, 'LLM candidates to curate: ',
+      el('code', { style: 'overflow-wrap:anywhere',
+                   text: st.draft_command || 'scripts/exam_build.py draft' }),
       ' on the server; candidates appear below within a poll.'),
     el('div', { class: 'frm', style: 'margin-top:8px' }, rvNameInput(),
       el('button', { text: 'Rebuild the harness tasks from the bank',
@@ -5468,6 +5530,7 @@ function render() {
   // full rebuild: drop the in-place refreshers so a poll can never touch the
   // DOM of a tab that just got torn down — the mounted tab re-registers its own
   state.trRedraw = state.queueRedraw = null;
+  renderWarnings();                 // full on the board, folded elsewhere
   const ms = visible();
   document.getElementById('countNote').textContent =
     `${ms.length} of ${DATA.models.length} models shown`;
@@ -5483,13 +5546,33 @@ function render() {
   view.replaceChildren(...fn(ms));
 }
 
+// The board-level checks belong to the board. They are findings, not
+// notifications — never dismissed, never hidden — but on the Exam and Review
+// tabs they are about something else entirely and push the work down the
+// page, so there they collapse to one line that opens.
+const WARN_TABS = ['overview', 'leaderboard'];
+
+function renderWarnings() {
+  const box = document.getElementById('warnings');
+  if (!box || !DATA) return;
+  const ws = DATA.warnings || [];
+  if (!ws.length) { box.replaceChildren(); return; }
+  const full = ws.map(w => el('div', { class: 'warn' }, el('b', { text: 'Check: ' }), w));
+  if (!state.model && WARN_TABS.includes(state.tab)) {
+    box.replaceChildren(...full);
+    return;
+  }
+  box.replaceChildren(el('details', { class: 'warnfold', 'data-warnings': 'collapsed' },
+    el('summary', { text: `${ws.length} check${ws.length > 1 ? 's' : ''} on the leaderboard` }),
+    ...full));
+}
+
 // static shell bits (rendered whenever a payload arrives)
 function renderStatic() {
   if (LIVE) document.getElementById('pageSub').textContent =
     'Live team benchmark: submit models, track training runs, compare results — '
     + 'updates as work finishes.';
-  document.getElementById('warnings').replaceChildren(
-    ...DATA.warnings.map(w => el('div', { class: 'warn' }, el('b', { text: 'Check: ' }), w)));
+  renderWarnings();
   const nCk = DATA.models.filter(m => m.source === 'artifact').length;
   const srcSeg = document.getElementById('srcSeg');
   srcSeg.style.display = nCk ? '' : 'none';   // no artifacts -> no third filter
@@ -5535,13 +5618,63 @@ function initData(d) {
   render();
 }
 
+// ---------------------------------------------------------------------------
+// One place where the page talks to the service. Every loader goes through it
+// so that a failure is (a) visible and (b) not a hammer: the renderers call
+// load*() whenever their data is missing, and a failed load leaves it missing,
+// which turned a blocked API into 27 requests in a few seconds. Backoff lives
+// here, and the renderers ask netReady() before firing.
+// ---------------------------------------------------------------------------
+const NET = { fails: 0, nextAt: 0, last: null, MIN: 1000, MAX: 30000 };
+const netReady = () => Date.now() >= NET.nextAt;
+
+function netRender() {
+  const box = document.getElementById('netstatus');
+  if (!box) return;
+  // one failure is a blip (a deploy, a sleeping laptop); from the second on,
+  // say what is wrong rather than showing "Loading results…" forever
+  if (NET.fails < 2) { box.replaceChildren(); return; }
+  const secs = Math.round(NET.last.wait / 1000);
+  box.replaceChildren(el('div', { class: 'warn', 'data-net': 'down' },
+    el('b', { text: 'Not reaching the service. ' }),
+    `${NET.last.path} — ${NET.last.err}. ${NET.fails} attempts; retrying in ${secs}s and `
+    + `backing off to ${NET.MAX / 1000}s. Anything shown below is from the last good load.`));
+  const view = document.getElementById('view');
+  if (view && !DATA) view.replaceChildren(el('p', { class: 'small', style: 'margin:20px 4px',
+    text: `Cannot reach ${NET.last.path} (${NET.last.err}). Still trying.` }));
+}
+
+function netOk() {
+  const had = NET.fails;
+  NET.fails = 0; NET.nextAt = 0; NET.last = null;
+  if (had) netRender();
+}
+
+function netFail(path, err) {
+  NET.fails++;
+  const wait = Math.min(NET.MAX, NET.MIN * Math.pow(2, NET.fails - 1));
+  NET.nextAt = Date.now() + wait;
+  NET.last = { path, err: String((err && err.message) || err), wait };
+  netRender();
+}
+
+async function api(path, opts) {
+  try {
+    const r = await fetch(path, opts);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    netOk();
+    return j;
+  } catch (e) { netFail(path, e); throw e; }
+}
+
 async function refreshResults() {
-  try { initData(await (await fetch('api/results')).json()); } catch (e) { /* next poll retries */ }
+  try { initData(await api('api/results')); } catch (e) { /* netFail said so; poll retries */ }
 }
 
 async function loadQueue() {
   try {
-    const rows = await (await fetch('api/submissions?limit=100')).json();
+    const rows = await api('api/submissions?limit=100');
     const prev = new Map(state.queue.map(r => [r.id, r.status]));
     const justFinished = rows.some(r => r.status === 'done' && prev.get(r.id)
                                         && prev.get(r.id) !== 'done');
@@ -5552,7 +5685,7 @@ async function loadQueue() {
     state.queue = rows;
     if (justFinished) await refreshResults();       // new scores -> re-render everything
     else if (changed && state.tab === 'queue') (state.queueRedraw || render)();
-  } catch (e) { /* server briefly away; keep polling */ }
+  } catch (e) { /* netFail said so, and set how long to wait */ }
 }
 
 document.getElementById('q').addEventListener('input', e => { state.q = e.target.value; render(); });
@@ -5595,9 +5728,17 @@ if (LIVE) {
     if (DATA && !DATA.models.length) { state.tab = 'queue'; render(); }
   });
   loadQueue();
-  setInterval(() => { loadQueue(); if (state.tab === 'training') loadTraining();
-                      if (state.tab === 'review') loadReview();
-                      if (state.tab === 'exam') loadExam(); }, 5000);
+  setInterval(() => {
+    if (!netReady()) return;                 // still inside the backoff window
+    // a page whose FIRST load failed has no data and nothing else would ever
+    // fetch it again: the queue poll would recover quietly and leave the board
+    // empty for as long as the tab stayed open
+    if (!DATA) refreshResults();
+    loadQueue();
+    if (state.tab === 'training') loadTraining();
+    if (state.tab === 'review') loadReview();
+    if (state.tab === 'exam') loadExam();
+  }, 5000);
 } else {
   initData(DATA);
 }
@@ -5618,6 +5759,7 @@ __BANNER__
     </div>
     <button id="themeBtn" title="cycle auto / light / dark / dim — remembered in this browser">Theme: auto</button>
   </div>
+  <div id="netstatus"></div>
   <div id="warnings"></div>
   <div class="filters">
     <input type="search" id="q" placeholder="Filter models&hellip;" aria-label="filter models">

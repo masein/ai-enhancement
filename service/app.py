@@ -564,6 +564,11 @@ def exam_status():
             "summary": exam_build.summary(config.EXAM_DIR),
             "draft_command": f"python3 scripts/exam_build.py draft --root {config.EXAM_DIR} "
                              f"--per-topic 8",
+            # the other way a bank arrives: written by a person, imported whole.
+            # Both paths are shown on the tab, because only one of them was.
+            "import_command": f"python3 scripts/exam_build.py --root {config.EXAM_DIR} import "
+                              f"<questions.json> --topic \"<topic>\" --approver \"<name>\"",
+            "migrate_command": f"python3 scripts/exam_build.py --root {config.EXAM_DIR} migrate",
             "note": "the published per-topic score comes from the report half; only the "
                     "diagnose half is ever shown here or placed in a request"}
 

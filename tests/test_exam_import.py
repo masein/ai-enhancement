@@ -183,7 +183,7 @@ def test_judge_json_records_which_rubric_graded_each_task(tree, tmp_path, monkey
     assert rub[other]["name"] == "exam" and "status" not in rub[other]
     # the file says a draft rubric graded it, and which topic's
     assert out["judge"]["rubric_status"] == "draft"
-    assert out["judge"]["rubrics_draft"] == [TASK]
+    assert TASK in out["judge"]["rubrics_draft"]      # and any other draft topic
 
 
 def test_a_bank_with_no_draft_rubric_carries_no_draft_stamp(tmp_path):

@@ -263,10 +263,14 @@ def test_judged_section_and_the_control_sentence(surface, tree):
     assert m and int(m.group(2)) / int(m.group(1)) >= 0.5
     assert "By topic (0–4), weakest first — report half" in text
     assert "Score against answer length" in text and "economics" in text
-    # topics, score-vs-length, the control — plus per-criterion and by-acuity
-    # for the one topic that is graded criterion by criterion
-    assert card.locator("table.jd").count() == 5
-    assert card.locator("[data-criteria='medicine & health']").count() == 1
+    # topics, score-vs-length, the control — plus one per-criterion table for
+    # every topic graded criterion by criterion, and a by-acuity table for
+    # every one of those whose bank carries an acuity
+    crit = card.locator("table.jd[data-criteria-table]").count()
+    acuity = card.locator("table.jd[data-acuity-table]").count()
+    assert crit >= 1 and acuity >= 1
+    assert card.locator("table.jd").count() == 3 + crit + acuity
+    assert card.locator("table.jd[data-criteria-table='medicine & health']").count() == 1
     surface.open(model_link("fx/chance-160m"))
     card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
     assert "Didn't know it either way" in card.text_content()
@@ -401,24 +405,25 @@ def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browse
         card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
         head = card.locator("[data-criteria='medicine & health']")
         assert head.count() == 1 and "by criterion (0–1), weakest first" in head.text_content()
-        # every criterion in the file has a row, weakest first, zero-anchored
-        rows = card.locator("tr[data-criterion]")
+        # every criterion in THIS topic's file has a row, weakest first
+        table = card.locator("table.jd[data-criteria-table='medicine & health']")
+        rows = table.locator("tr[data-criterion]")
         assert rows.count() == 16
         means = [float(rows.nth(i).locator("td").nth(1).inner_text())
                  for i in range(rows.count())
                  if rows.nth(i).locator("td").nth(1).inner_text() != "—"]
         assert means == sorted(means)
-        cond = card.locator("tr[data-criterion='medication_safety']")
+        cond = table.locator("tr[data-criterion='medication_safety']")
         assert "conditional" in cond.text_content()
         # the critical failure is stated in words, not only coloured
-        csf = card.locator("[data-csf]")
+        csf = card.locator("[data-csf-topic='medicine & health']")
         assert csf.count() == 1
         text = csf.text_content()
         assert text.startswith("Critical safety failures.")
         assert "could plausibly have caused harm" in text
         assert "Each is a 0 whatever else the answer got right" in text
         # and the acuity table says which kind of question it happened on
-        acuity = card.locator("tr[data-acuity]")
+        acuity = card.locator("table.jd[data-acuity-table='medicine & health'] tr[data-acuity]")
         assert acuity.count() >= 3
         assert any("see above" in acuity.nth(i).text_content() for i in range(acuity.count()))
         SCREENS.mkdir(exist_ok=True)
@@ -475,13 +480,14 @@ def test_the_demo_page_says_what_it_is_and_shows_the_criteria(browser, demo_repo
         assert "Draft rubric." in text                    # …but the rubric is still a draft
         assert "medicine & health is graded against a rubric its author has not signed off" in text
         # the criteria row, the failures in words, the acuity table
+        med = card.locator("table.jd[data-criteria-table='medicine & health']")
         assert card.locator("[data-criteria='medicine & health']").count() == 1
-        assert card.locator("tr[data-criterion]").count() == 16
-        assert card.locator("tr[data-criterion='medication_safety']").text_content().count(
-            "conditional") == 1
-        assert card.locator("[data-csf]").count() == 1
+        assert med.locator("tr[data-criterion]").count() == 16
+        assert "conditional" in med.locator("tr[data-criterion='medication_safety']").text_content()
+        assert card.locator("[data-csf-topic='medicine & health']").count() == 1
         assert "critical safety failure" in text.lower()
-        assert card.locator("tr[data-acuity]").count() == 5
+        assert card.locator("table.jd[data-acuity-table='medicine & health'] tr[data-acuity]"
+                            ).count() == 5
         # the folded score is shown, greyed and not counted: 29 report-half
         # questions is under the floor, and nothing is calibrated
         assert "Preliminary." in text and "never ranked, never averaged" in text

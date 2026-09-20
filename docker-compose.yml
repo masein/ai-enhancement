@@ -33,7 +33,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      TZ: ${TZ:-Asia/Qatar}
+      TZ: ${TZ:-Asia/Dubai}          # display timezone for the page's timestamps
       BENCH_ROOT: ${BENCH_ROOT}
       HF_HOME: ${HF_HOME}
       TITLE: ${TITLE:-Team model benchmark}

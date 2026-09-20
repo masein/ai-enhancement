@@ -220,7 +220,10 @@ def test_calibration_round_trip(tree, tmp_path):
     n = jc.export(out_dir, csv_path, [], 30, seed=7)
     assert n == 30
     rows = list(csv.DictReader(open(csv_path, newline="", encoding="utf-8")))
-    assert list(rows[0]) == jc.FIELDS and "judge_score" not in rows[0]        # hidden
+    # a topic graded criterion by criterion adds a column per criterion after
+    # the shared ones; the judge's own numbers are never written either way
+    assert list(rows[0])[:len(jc.FIELDS)] == jc.FIELDS
+    assert not any(k.startswith("judge") for k in rows[0])
     assert all(r["human_score"] == "" and r["rubric"].startswith("# Rubric") for r in rows)
     assert len({r["id"] for r in rows}) == 30
     assert len({r["category"] for r in rows}) >= 4                              # stratified
@@ -231,7 +234,7 @@ def test_calibration_round_trip(tree, tmp_path):
         r["human_score"] = str(judged[r["id"]])
     rows[3]["human_score"] = ""                                                # left blank: skipped
     with open(csv_path, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=jc.FIELDS)
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]))   # whatever the export wrote
         w.writeheader()
         w.writerows(rows)
     cal = jc.import_csv(out_dir, csv_path)
@@ -242,7 +245,7 @@ def test_calibration_round_trip(tree, tmp_path):
     for r in rows:
         r["human_score"] = str((int(judged[r["id"]]) + 2) % 5)
     with open(csv_path, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=jc.FIELDS)
+        w = csv.DictWriter(fh, fieldnames=list(rows[0]))   # whatever the export wrote
         w.writeheader()
         w.writerows(rows)
     cal = jc.import_csv(out_dir, csv_path)

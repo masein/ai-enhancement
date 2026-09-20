@@ -498,9 +498,11 @@ def judge_step(a, ctx) -> str:
         print(f"   {task:<24}{(f'{rep:.2f}/4' if rep is not None else '—'):>8}"
               f"{(f'{dia:.2f}/4' if dia is not None else '—'):>10}{v['n']:>7}")
     c = j.get("canary") or {}
+    drift = (f"{c.get('mad_vs_previous')} from the previous run (limit {c.get('threshold')})"
+             if c.get("mad_vs_previous") is not None else
+             "first run for this judge — no previous canary to compare")
     say("", f"canary: {c.get('graded')} of {c.get('n')} re-graded · "
-            f"MAD {c.get('mad_vs_human')} from the human marks · "
-            f"{c.get('mad_vs_previous')} from the previous run (limit {c.get('threshold')})"
+            f"MAD {c.get('mad_vs_human')} from the human marks · {drift}"
             + (" · MOVED" if c.get("drifted") else ""))
     jj = j["judge"]
     if jj.get("provisional"):
@@ -616,10 +618,12 @@ def propose(a, ctx) -> str:
     print()
     kv("weakest topic", topic)
     items, counts = prop.justifications_for(ctx["model_dir"], task)
+    shown = items[:3]
     say(f"{counts['diagnose_weak']} of {counts['diagnose_items']} diagnosis-half answers fell "
         f"short; {len(items)} go into the request.",
-        "What the judge wrote about them — the evidence, in a person's vocabulary:")
-    for it in items[:3]:
+        "What the judge wrote about them — the evidence, in a person's vocabulary"
+        + (f" ({len(shown)} of {len(items)} shown):" if len(shown) < len(items) else ":"))
+    for it in shown:
         quote(f"scored {it['score']}/4 — {it['justification']}")
     say("", "The live service would REFUSE this proposal here: the judged suite is "
             "provisional or",
@@ -781,6 +785,14 @@ def summary(a, ctx) -> None:
         kv("dataset", prop.dataset_dir(ctx["did"]))
         kv("provenance", prop.dataset_dir(ctx["did"]) / "provenance.json")
     kv("database", config.DB_PATH)
+    if a.import_path:
+        # the next step after a demo of an imported bank is to put that bank
+        # in the LIVE exam, which is one paste rather than a reconstruction
+        say("", "This bank is in the demo's exam, not the live one. To put it in the live exam:",
+            f"  python3 scripts/exam_build.py --root {ctx['bench_root']}/exam import \\",
+            f"      {a.import_path} --topic {ctx['topics'][0]!r} \\",
+            f"      --approver {a.approver!r} --source {a.source!r}",
+            "  then rebuild the tasks (Exam tab, or exam_build.py build results/full).")
     say("", "What would happen next, in a real cycle:",
         f"  1. fine-tune the model on that dataset "
         f"(examples/train_and_benchmark.py --gap-dataset {ctx.get('did', '<id>')}),",

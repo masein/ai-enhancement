@@ -199,3 +199,43 @@ def test_build_report_embeds_the_payload(tree):
     data = json.loads(blob.replace("<\\/", "</"))
     assert {m["id"] for m in data["models"]} == set(tree["models"])
     assert "</script>" not in blob            # the one sequence that could end the tag early
+
+
+# ---------------------------------------------------------------------------
+# phase 8c P5b: the same run submitted twice
+# ---------------------------------------------------------------------------
+
+def test_an_identical_row_is_shown_named_and_not_ranked(tree, tmp_path):
+    """HANDOFF §11: two byte-identical rows sat at #1 and #2 for weeks. Both
+    stay on the board — deleting a submission is not the page's call — but
+    only one is ranked, and the other says which it duplicates."""
+    import shutil
+    out = tmp_path / "results" / "full"
+    shutil.copytree(tree["out_dir"], out)
+    src = out / "fx__good-750m"
+    twin = out / "fx__good-750m-v2"
+    shutil.copytree(src, twin)
+    for f in twin.rglob("results*.json"):
+        blob = json.loads(f.read_text())
+        blob["config"]["model_args"] = blob["config"]["model_args"].replace(
+            "fx/good-750m", "fx/good-750m-v2")
+        f.write_text(json.dumps(blob))
+    p = report.build_payload(report.merge_runs(report.load_results(out)), "t", source="")
+    rows = {m["id"]: m for m in p["models"]}
+    a, b = rows["fx/good-750m"], rows["fx/good-750m-v2"]
+    # the earlier one keeps the rank; the other names it and carries no claim
+    dup, keep = (b, a) if b.get("duplicateOf") else (a, b)
+    assert dup["duplicateOf"] == keep["id"] and dup["duplicateOfName"] == keep["name"]
+    assert not keep.get("duplicateOf")
+    assert dup["avg"] == keep["avg"]                      # shown, not deleted
+    assert any("score identically to another row" in w for w in p["warnings"])
+    assert any("Nothing has been deleted" in w for w in p["warnings"])
+    # a model that merely shares ONE task score is not a duplicate
+    assert not any(m.get("duplicateOf") for m in p["models"]
+                   if m["id"] not in (a["id"], b["id"]))
+
+
+def test_a_single_shared_task_score_is_not_a_duplicate(tree):
+    p = report.build_payload(report.merge_runs(report.load_results(tree["out_dir"])),
+                             "t", source="")
+    assert not any(m.get("duplicateOf") for m in p["models"])

@@ -67,6 +67,10 @@ def test_the_loop_produced_a_score_a_spec_and_a_document(demo):
     out, root = demo
     assert "the report half is the score" in out and "/4" in out
     assert "canary: 30 of 30 re-graded" in out
+    # nothing to compare against on a first run, and it says that rather than
+    # printing "None from the previous run"
+    assert "first run for this judge — no previous canary to compare" in out
+    assert "None from the previous run" not in out
     assert "The spec that came back" in out
     assert "One document in full — prose, not a question-and-answer pair:" in out
     j = json.loads((root / "results" / "full" / "EleutherAI__pythia-160m" / "judge.json").read_text())
@@ -202,6 +206,11 @@ def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
     assert re.search(r"acuity\s+emergency 3,", out)
     assert "a real run needs 30 before this topic" in out
     assert "the ask back to the author is at least" in out.lower()
+    # the evidence shown is a sample, and says so rather than looking like all of it
+    assert re.search(r"in a person's vocabulary \(3 of \d+ shown\):", out)
+    # the next step after a demo of an imported bank is one paste
+    assert "This bank is in the demo's exam, not the live one." in out
+    assert "exam_build.py --root" in out and "--approver 'Dr. Hossein'" in out
     # the two stamps, one from the judge and one from the rubric
     assert "CAVEAT draft rubric: medicine & health is graded against medicine_health.md" in out
     assert "does not look instruction-tuned" in out          # the default model is a base model
