@@ -331,6 +331,8 @@ length). Example: `eval_tasks/fr/rubrics/reasoning.md`. Its hash goes into every
 |---|---|
 | 100 consumer health questions with metadata, as delivered | `eval_tasks/fr/medicine_v2.json` |
 | 100 law questions with metadata, his own difficulty levels and `jurisdiction_required` | `eval_tasks/fr/law_v2.json` |
+| 100 questions each for computer science, economics and physics & engineering | `eval_tasks/fr/computer_science_v1.json`, `economics_v1.json`, `physics_engineering_v1.json` |
+| their criteria files and **his own prose rubrics** — not drafts, he wrote the 0–4 anchors | `eval_tasks/fr/rubrics/{computer_science,economics,physics_engineering}.{md,criteria.json}` |
 | his criteria files, **verbatim** — the platform's schema is his | `eval_tasks/fr/rubrics/medicine_health.criteria.json`, `law.criteria.json` |
 | his scoring notes for each, as delivered | `docs/medicine-criteria-v2.md`, `docs/law-criteria-v2.md` |
 | the 0–4 rubrics derived from them — **DRAFT**, anchors not yet reviewed | `eval_tasks/fr/rubrics/medicine_health.md`, `law.md` |
@@ -340,8 +342,17 @@ import`, AUTHORING.md, or the Exam tab's import panel), the judge grades
 those topics criterion by criterion and folds the 0–4 in code, and the page
 shows the per-criterion row, one line per flag in words, and one breakdown
 table per metadata field the topic carries. A criteria file names its own
-flags and their effects (`zero_score`, `cap_at_N_of_4`); nothing about
-medicine or law is special-cased in the code.
+flags and their effects (`zero_score`, `cap_at_N_of_4`, `score=N`); nothing
+about any topic is special-cased in the code.
+
+**His files go in as he writes them.** Three deliveries have arrived in three
+shapes — flags as a list, as `critical_flag`, as `critical_error_flag`; the
+criterion slug in `id` or in `name`; effects spelled `zero_score` or
+`score=0` — and the loader reads all of them into one internal shape
+(`judge.normalise_criteria`). The decision (2026-09-20) is that we extend the
+loader, never ask him to rewrite a file. `docs/CRITERIA-SCHEMA.md` is the
+table of every variant and what it maps onto; `tests/test_criteria_schema.py`
+asserts every delivered file still normalises.
 
 **The question floor is cleared.** Both topics are at 100 questions, about 50
 report-half each, over the 30 a topic needs before anything may be proposed

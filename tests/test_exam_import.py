@@ -185,9 +185,9 @@ def test_a_report_half_import_is_as_withheld_as_any_other_question(bank):
 def test_the_rubric_follows_the_topic_and_falls_back(tmp_path):
     assert eb.task_slug(TASK) == "medicine_health" == eb.topic_task(TOPIC)[len("exam_"):]
     assert jd.rubric_name(TASK) == "medicine_health"
-    assert jd.rubric_name("exam_economics") == "exam"          # no rubric of its own
+    assert jd.rubric_name("exam_history") == "exam"            # no rubric of its own
     assert jd.rubric_name(eb.CONTROL_TASK) == "factual_accuracy"
-    med, exam = jd.rubric_for(TASK), jd.rubric_for("exam_economics")
+    med, exam = jd.rubric_for(TASK), jd.rubric_for("exam_history")
     assert "consumer health question" in med.text and med.sha256 != exam.sha256
     assert med.version == "2" and med.status == "draft"        # until its author signs it off
     assert exam.status == ""
@@ -211,8 +211,9 @@ def test_judge_json_records_which_rubric_graded_each_task(tree, tmp_path, monkey
     rub = out["judge"]["rubrics"]
     assert rub[TASK]["sha256"] == jd.rubric_for(TASK).sha256
     assert rub[TASK]["name"] == "medicine_health" and rub[TASK]["status"] == "draft"
-    other = next(t for t in rub if t.startswith("exam_") and t != TASK)
-    assert rub[other]["sha256"] == jd.rubric_for("exam_economics").sha256
+    other = "exam_history"                       # no rubric of its own: the shared one
+    assert other in rub
+    assert rub[other]["sha256"] == jd.rubric_for("exam_history").sha256
     assert rub[other]["name"] == "exam" and "status" not in rub[other]
     # the file says a draft rubric graded it, and which topic's
     assert out["judge"]["rubric_status"] == "draft"

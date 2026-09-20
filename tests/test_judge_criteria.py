@@ -52,7 +52,7 @@ def test_both_delivered_files_load_and_say_what_they_grade():
     # `topic` is informational — the FILE NAME decides which task it grades
     assert isinstance(SPEC["topic"], str) and isinstance(LAW["topic"], str)
     assert jd.rubric_name(TASK) == "medicine_health" and jd.rubric_name(LAW_TASK) == "law"
-    assert jd.rubric_for("exam_economics").criteria is None    # no file, no criteria path
+    assert jd.rubric_for("exam_history").criteria is None      # no file, no criteria path
     for r in (jd.rubric_for(TASK), jd.rubric_for(LAW_TASK)):
         assert len(r.criteria_sha256) == 64
         assert r.status == "draft"          # the prose anchors are not signed off yet
@@ -129,7 +129,7 @@ def test_the_criteria_prompt_carries_every_criterion_and_every_flag():
     assert "take an aspirin" in text and "Chest pain since when?" in text
     assert "Acuity: emergency" in text
     assert jd.prompt_for(TASK) is jd.PROMPT_CRITERIA
-    assert jd.prompt_for("exam_economics") is jd.PROMPT
+    assert jd.prompt_for("exam_history") is jd.PROMPT      # no criteria file of its own
 
 
 def test_a_conditional_criterion_is_told_when_to_return_null():
@@ -345,7 +345,7 @@ def test_a_law_task_is_tabulated_by_its_own_fields_and_both_flags(tmp_path):
 
 def test_a_task_without_criteria_gains_nothing(tree):
     j = json.loads((tree["models"]["fx/good-750m"]["dir"] / "judge.json").read_text())
-    econ, med = j["tasks"]["exam_economics"], j["tasks"][TASK]
+    econ, med = j["tasks"]["exam_history"], j["tasks"][TASK]
     for key in ("criteria_mean", "criteria_n", "criteria_labels", "flags", "breakdowns",
                 "unparseable"):
         assert key not in econ, key
@@ -388,7 +388,7 @@ def test_the_gap_finder_carries_labels_and_numbers_and_nothing_else(tree):
     assert all(set(c) == {"id", "label", "mean", "n"} for c in ev["weakest_criteria"])
     assert ev["breakdowns"]["acuity"]
     assert all(set(v) == {"n", "mean"} for v in ev["breakdowns"]["acuity"].values())
-    assert prop.criteria_evidence(d, "exam_economics") == {}
+    assert prop.criteria_evidence(d, "exam_history") == {}
     items, counts = prop.justifications_for(d, TASK)
     req = prop.proposal_request(1, "m", TASK, TOPIC, items, counts,
                                 jd.rubric_for(TASK).text, ev)

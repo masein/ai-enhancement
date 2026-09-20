@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "What happens to the equilibrium price and quantity of a normal good if demand increases while supply is unchanged? Explain the adjustment mechanism.",
+    "intent": "explain demand-shift equilibrium adjustment",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A student can spend an evening either earning $30 at work or studying for an exam. What is the opportunity cost of studying for the evening?",
+    "intent": "identify opportunity cost",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A 10% increase in the price of a product causes quantity demanded to fall by 20%. Calculate the price elasticity of demand and classify demand as elastic, inelastic, or unit elastic.",
+    "intent": "calculate and interpret price elasticity",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "Why can a firm rationally produce an additional unit even when that unit raises total cost? Use marginal revenue and marginal cost in your explanation.",
+    "intent": "explain marginal decision rule",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "What is the difference between consumer surplus and producer surplus, and how are both represented in a standard supply-and-demand diagram?",
+    "intent": "distinguish surplus concepts",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A binding price ceiling is imposed below the market-clearing price. What shortage or surplus does the model predict, and why?",
+    "intent": "analyze price ceiling",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "Suppose a $4 per-unit tax is imposed on sellers. Explain why the price paid by buyers and the net price received by sellers need not differ by exactly $4 relative to their original prices.",
+    "intent": "explain tax incidence",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A household buys less of a good when its income rises, holding prices constant. What type of good is this, and what does that imply about its income elasticity?",
+    "intent": "identify inferior good from income response",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "Why is a Giffen good an exception to the usual downward-sloping demand relationship? Distinguish the income and substitution effects.",
+    "intent": "explain Giffen-good mechanism",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A factory emits pollution that harms nearby residents, but the firm considers only its private production costs. What market failure results, and how could a per-unit corrective tax affect the outcome?",
+    "intent": "analyze negative externality and corrective policy",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "Why can a privately provided public good be underprovided even when many people value it? Explain the free-rider problem.",
+    "intent": "explain public-good underprovision",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "Compare a common-pool resource with a public good using excludability and rivalry. Give one example of each and explain the associated collective-action problem.",
+    "intent": "distinguish public goods and common-pool resources",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "If demand is much less elastic than supply, which side of a market tends to bear more of a per-unit tax? Explain without relying on whether the tax is legally imposed on buyers or sellers.",
+    "intent": "reason about tax incidence and elasticities",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A subsidy increases the quantity traded but creates a wedge between the buyer's willingness to pay and the seller's cost. Under what conditions can the subsidy create deadweight loss?",
+    "intent": "analyze subsidy welfare effects",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "welfare-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A market has demand Qd = 100 - 2P and supply Qs = 20 + 2P. Find the competitive equilibrium price and quantity.",
+    "intent": "solve linear market equilibrium",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "Explain why a binding price floor above equilibrium can create unsold inventory even if sellers would like to sell more at the mandated price.",
+    "intent": "explain price-floor surplus",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A product's price falls by 5% and total consumer spending on the product rises by 2%. What does this imply about the approximate price elasticity of demand?",
+    "intent": "infer elasticity from expenditure response",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A consumer chooses a bundle where the marginal utility per dollar is higher for coffee than for tea. Assuming both goods can be adjusted and the consumer is optimizing, what adjustment should occur?",
+    "intent": "apply marginal utility per dollar condition",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "Why can a market equilibrium be efficient in a competitive model but not when production generates an unpriced external cost? State the key assumption that changes.",
+    "intent": "distinguish competitive efficiency with and without externalities",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A city considers congestion pricing for a road. Explain the efficiency argument for the policy and one important distributional concern it could create.",
+    "intent": "analyze efficiency-equity trade-off",
+    "domain": "microeconomics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "In perfect competition, why does a price-taking firm choose output where price equals marginal cost when it is producing?",
+    "intent": "explain competitive firm output rule",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A competitive firm's price is below average total cost but above average variable cost in the short run. Should it shut down? Explain.",
+    "intent": "apply shutdown condition",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "Distinguish accounting profit from economic profit using the opportunity cost of owner-supplied capital and labor.",
+    "intent": "distinguish profit concepts",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "How can a firm earn zero economic profit while its owners still receive income?",
+    "intent": "explain zero economic profit",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A monopolist faces a downward-sloping demand curve. Why does marginal revenue lie below price over the relevant range?",
+    "intent": "explain monopoly marginal revenue",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A monopolist has inverse demand P = 100 - Q and constant marginal cost of 20. Find the profit-maximizing quantity and price.",
+    "intent": "solve monopoly output and price",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "Compare a single-price monopolist with a competitive industry in terms of output, price, and deadweight loss, holding demand and marginal cost fixed.",
+    "intent": "compare monopoly and competition",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "Why can first-degree price discrimination eliminate the conventional monopoly deadweight loss under idealized assumptions?",
+    "intent": "explain welfare effect of first-degree price discrimination",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "welfare-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A natural monopoly has large fixed costs and falling average cost over the relevant demand range. Why might competition for the entire market be difficult to sustain?",
+    "intent": "explain natural monopoly",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "Two firms simultaneously choose High or Low prices. If each prefers to undercut the other's High price, explain how a Nash equilibrium can differ from the jointly preferred outcome.",
+    "intent": "identify strategic-interaction outcome",
+    "domain": "game theory",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "game-theory",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "In a prisoner's dilemma, why can individually rational choices produce an outcome that both players would prefer to avoid?",
+    "intent": "explain prisoner's dilemma",
+    "domain": "game theory",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "How can repeated interaction make cooperation more sustainable than in a one-shot prisoner's dilemma? State the importance of future payoffs and credible responses.",
+    "intent": "analyze repeated-game cooperation",
+    "domain": "game theory",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "game-theory",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "What is tacit coordination, and why can firms coordinate without an explicit written agreement?",
+    "intent": "explain tacit coordination",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "Why should a firm generally ignore sunk costs when making a current production decision?",
+    "intent": "apply sunk-cost principle",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "Distinguish economies of scale from economies of scope and give a business example illustrating each.",
+    "intent": "distinguish scale and scope economies",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Two firms consider a merger. Explain why lower unit costs after the merger do not by themselves establish that the merger improves overall welfare.",
+    "intent": "analyze merger trade-offs",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A platform becomes more valuable to each user as more users join it. Explain how network effects can create increasing returns to adoption and barriers to entry.",
+    "intent": "analyze network effects",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "How can switching costs affect competition even when several firms offer similar products?",
+    "intent": "explain switching-cost effects",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "An industry has substantial economies of scale, but firms differ in productivity. Explain how scale economies and firm heterogeneity can affect market concentration without implying that concentration is automatically inefficient.",
+    "intent": "analyze concentration with scale and heterogeneity",
+    "domain": "industrial organization",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "advanced-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A duopoly's firms repeatedly interact, demand is uncertain, and each can observe only noisy signals of the other's price. Explain why distinguishing genuine cheating from demand shocks can complicate tacit coordination.",
+    "intent": "analyze repeated-game coordination under imperfect monitoring",
+    "domain": "game theory",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "advanced-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "Using the expenditure approach, what are the main components of GDP, and why are imports subtracted?",
+    "intent": "explain expenditure GDP accounting",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "Why are intermediate goods excluded from GDP when calculating the value of final production?",
+    "intent": "explain intermediate-good exclusion",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A country's nominal GDP rises 8% while its real GDP rises 3%. What broad information does this provide about the change in the overall price level?",
+    "intent": "distinguish nominal and real GDP",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "What is the difference between the GDP deflator and CPI in terms of the basket of goods and whose prices are represented?",
+    "intent": "distinguish price indexes",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "Why can GDP per capita rise while some households experience little or no improvement in living standards?",
+    "intent": "interpret GDP per capita limitation",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "What is inflation, and why is a fall in the inflation rate different from deflation?",
+    "intent": "distinguish inflation and disinflation/deflation",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A worker is unemployed but actively searching for a job after leaving a previous job voluntarily. Is this necessarily structural unemployment? Explain the distinction among frictional, structural, and cyclical unemployment.",
+    "intent": "classify unemployment types",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "Why can the unemployment rate fall without a comparable increase in employment if people leave the labor force?",
+    "intent": "explain labor-force participation effect",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "What does the natural rate of unemployment represent, and why is it not necessarily zero?",
+    "intent": "explain natural unemployment",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "What does a short-run Phillips curve describe, and why might the relationship differ in the long run?",
+    "intent": "explain Phillips-curve horizons",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "An economy is operating below potential output. Explain how a fall in aggregate demand can contribute to an output gap and cyclical unemployment.",
+    "intent": "explain recession mechanism",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "What is the difference between potential output and actual output, and how is the output gap interpreted?",
+    "intent": "distinguish potential and actual output",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "Why can higher labor productivity raise sustainable living standards without requiring a proportional increase in hours worked?",
+    "intent": "connect productivity and living standards",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A recession occurs while inflation remains elevated. Explain how a negative demand shock and a negative supply shock would produce different combinations of output and prices.",
+    "intent": "distinguish demand and supply shocks",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Suppose nominal GDP is 1,200 and real GDP at base-year prices is 1,000. Calculate the GDP deflator and interpret the result.",
+    "intent": "calculate GDP deflator",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "Why can a country's measured GDP increase after an environmental cleanup even if the underlying environmental quality had previously deteriorated?",
+    "intent": "identify GDP measurement limitation",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "How can expectations about future inflation affect current wage-setting and price-setting behavior?",
+    "intent": "explain inflation-expectations mechanism",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "An economy experiences a temporary productivity boom. Explain why the short-run effects on inflation, output, and employment may differ from the effects of a permanent productivity increase.",
+    "intent": "compare temporary and permanent productivity shocks",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "advanced-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A country has rapid GDP growth but also rising inequality, worsening air pollution, and falling leisure time. Explain why GDP growth alone is an incomplete measure of changes in welfare.",
+    "intent": "evaluate limits of GDP as welfare measure",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "An economy faces a supply shock that raises production costs while inflation expectations are well anchored. Compare the likely short-run policy trade-offs with the case where inflation expectations become unanchored.",
+    "intent": "analyze supply shock with expectations",
+    "domain": "macroeconomics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "advanced-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "What are the core functions of a central bank, and why can price stability and financial stability both matter?",
+    "intent": "explain central bank functions",
+    "domain": "monetary economics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "If a central bank raises its policy interest rate, describe two channels through which aggregate demand might decline.",
+    "intent": "explain monetary transmission",
+    "domain": "monetary economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "Why do monetary-policy decisions affect the economy with lags rather than immediately?",
+    "intent": "explain monetary-policy lags",
+    "domain": "monetary economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "If the nominal interest rate is 8% and expected inflation is 5%, what is the approximate expected real interest rate?",
+    "intent": "calculate real interest rate",
+    "domain": "monetary economics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Explain the Fisher relationship between nominal interest rates, real interest rates, and expected inflation.",
+    "intent": "explain Fisher relationship",
+    "domain": "monetary economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "What is quantitative easing intended to accomplish when short-term policy rates are already very low?",
+    "intent": "explain quantitative easing",
+    "domain": "monetary economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "How can credible central-bank communication influence inflation without changing the policy rate immediately?",
+    "intent": "analyze expectations channel",
+    "domain": "monetary economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "Explain how an automatic stabilizer differs from discretionary fiscal stimulus, using taxes or unemployment benefits as examples.",
+    "intent": "distinguish fiscal policy types",
+    "domain": "fiscal economics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "What determines the size of a fiscal multiplier in a simple Keynesian framework, and why can the multiplier differ across economic conditions?",
+    "intent": "analyze fiscal multiplier determinants",
+    "domain": "fiscal economics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "advanced-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "How can expansionary fiscal policy crowd out private investment, and under what circumstances might crowding out be weaker?",
+    "intent": "analyze crowding-out mechanism",
+    "domain": "fiscal economics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "What does it mean for government debt to be sustainable? Why is the debt-to-GDP ratio alone insufficient to assess sustainability?",
+    "intent": "explain debt sustainability",
+    "domain": "fiscal economics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "If a government has fixed-rate nominal debt and an unexpected burst of inflation occurs, what happens to the real burden of that existing debt, all else equal?",
+    "intent": "analyze real debt burden",
+    "domain": "fiscal economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "Country A can produce either 10 units of wheat or 5 units of cloth per worker; Country B can produce 6 wheat or 6 cloth. Which country has comparative advantage in wheat, and why?",
+    "intent": "calculate comparative advantage",
+    "domain": "international economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "Why can trade benefit both countries even when one country has an absolute advantage in producing every traded good?",
+    "intent": "explain comparative advantage",
+    "domain": "international economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A tariff raises the domestic price of an imported good. Identify the effects on domestic consumers, domestic producers, government revenue, and deadweight loss in the standard small-country model.",
+    "intent": "analyze tariff incidence and welfare",
+    "domain": "international economics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "Why does a currency depreciation tend to make exports cheaper to foreign buyers and imports more expensive to domestic buyers, holding other factors constant?",
+    "intent": "explain exchange-rate transmission",
+    "domain": "international economics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "How can a currency depreciation be inflationary, and why might the size of the effect differ across countries?",
+    "intent": "analyze exchange-rate pass-through",
+    "domain": "international economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "What does a current-account deficit mean, and why does it not automatically imply that a country is economically unhealthy?",
+    "intent": "interpret current-account deficit",
+    "domain": "international economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A country imposes a tariff to protect a domestic industry. Explain the short-run distributional gains and losses and one possible long-run efficiency concern.",
+    "intent": "evaluate tariff trade-offs",
+    "domain": "international economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A central bank raises interest rates while the government simultaneously increases spending. Explain why the net effect on output, inflation, and the exchange rate may depend on relative policy strength and transmission channels.",
+    "intent": "analyze interacting monetary and fiscal policy",
+    "domain": "macro-policy",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "advanced-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "Why can a binding minimum wage affect employment differently in a competitive labor market and in a monopsonistic labor market?",
+    "intent": "compare minimum-wage effects under different labor-market structures",
+    "domain": "labor economics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "What is human capital, and how can education or training increase a worker's productivity?",
+    "intent": "explain human capital",
+    "domain": "labor economics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "How can education function as a signal of worker ability even if the education itself does not directly increase productivity?",
+    "intent": "explain signaling model",
+    "domain": "information economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "What is moral hazard? Give an insurance example and explain how contract design can reduce the problem.",
+    "intent": "explain moral hazard and mitigation",
+    "domain": "information economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "What is adverse selection, and why can it cause a market for used goods to shrink or fail?",
+    "intent": "explain adverse selection",
+    "domain": "information economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A study finds that people who attend a job-training program earn more than nonparticipants. Give two reasons why this difference may not identify the causal effect of training.",
+    "intent": "identify confounding and selection problems",
+    "domain": "econometrics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal-inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "Suppose education and earnings are positively correlated. Explain how omitted ability could bias a regression coefficient on education if ability raises both education and earnings.",
+    "intent": "explain omitted-variable bias",
+    "domain": "econometrics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal-inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "An instrumental variable is correlated with education but affects earnings only through education. Which two core conditions make it a valid instrument, and why is the exclusion restriction especially important?",
+    "intent": "explain IV relevance and exclusion",
+    "domain": "econometrics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal-inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A randomized experiment estimates that a program increases earnings by $1,000 with a 95% confidence interval of [$200, $1,800]. How should this estimate and interval be interpreted?",
+    "intent": "interpret randomized estimate and confidence interval",
+    "domain": "econometrics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "empirical-interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "Why does random assignment help identify a causal effect, and what problems can remain even after randomization?",
+    "intent": "explain randomized causal identification and limitations",
+    "domain": "econometrics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal-inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A researcher observes that unusually high-performing firms tend to have lower performance the following year. Explain how regression to the mean could contribute to this pattern.",
+    "intent": "explain regression to the mean",
+    "domain": "econometrics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "empirical-interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A policy raises average income but imposes costs primarily on a low-income group. Explain how a policy can improve aggregate efficiency while worsening an equity objective.",
+    "intent": "analyze efficiency-equity trade-off",
+    "domain": "welfare economics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "welfare-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "What does Pareto efficiency mean, and why does a Pareto-efficient allocation not necessarily satisfy a society's preferred distribution of income?",
+    "intent": "distinguish efficiency and equity",
+    "domain": "welfare economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A government subsidy increases production of a good with a positive externality. Explain why the subsidy can improve welfare, and identify a reason it could be set too high.",
+    "intent": "analyze subsidy for positive externality",
+    "domain": "welfare economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A regression estimates that a tax credit is associated with a 4% increase in employment, but the policy was adopted first in regions already experiencing faster growth. What identification problem should concern you most, and why?",
+    "intent": "identify confounding from policy selection",
+    "domain": "econometrics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal-inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A study reports a statistically significant estimate that a policy reduces unemployment by 0.2 percentage points. List two questions you would ask before concluding that the effect is economically important.",
+    "intent": "distinguish statistical and economic significance",
+    "domain": "econometrics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "empirical-interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A policy has uncertain effects: it may increase employment through lower labor costs but reduce employment through weaker aggregate demand. Explain how you would structure an empirical strategy to distinguish these mechanisms.",
+    "intent": "design mechanism-discriminating empirical strategy",
+    "domain": "econometrics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal-inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A government must choose between a policy that produces a larger total surplus and one that produces a smaller total surplus but substantially benefits a disadvantaged group. Explain the economic dimensions that a welfare analysis should make explicit rather than declaring one policy automatically superior.",
+    "intent": "frame welfare analysis with distributional weights and efficiency",
+    "domain": "welfare economics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "policy-analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "An observational study finds that regions with more hospitals have higher mortality. Give a plausible confounder and explain why the finding cannot by itself show that hospitals cause higher mortality.",
+    "intent": "distinguish correlation from causation with confounding",
+    "domain": "econometrics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal-inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "An economist estimates a policy effect using a regression model, but the treatment variable is strongly correlated with unobserved local economic shocks. Explain why the coefficient may be biased, what assumption would be needed for a causal interpretation, and one design that could improve identification.",
+    "intent": "integrate omitted-variable bias, assumptions, and causal design",
+    "domain": "econometrics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "advanced-causal-analysis",
+    "jurisdiction_required": false
+  }
+]

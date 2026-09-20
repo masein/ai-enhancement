@@ -395,3 +395,31 @@ def test_a_blocked_identity_stops_at_preflight(tmp_path):
     # a run that stopped early keeps its tree, whatever --keep says: its logs
     # and half-written artefacts are the whole reason to look
     assert "the run stopped early" in r.stdout and (root / "demo").exists()
+
+
+def test_the_demo_doc_carries_every_delivered_bank():
+    """Five topics now; each is one command, and all five clear the floor."""
+    doc = (REPO / "DEMO.md").read_text(encoding="utf-8")
+    for stem in ("medicine_v2", "law_v2", "computer_science_v1", "economics_v1",
+                 "physics_engineering_v1"):
+        assert f"--import eval_tasks/fr/{stem}.json" in doc, stem
+        assert f"--source {stem}" in doc, stem
+    assert "clear the 30-question floor" in doc
+    # and what differs between them is the author's file, not our code
+    assert "routine` on every item" in doc and "difficulty and domain" in doc
+
+
+def test_the_schema_doc_is_the_table_of_what_arrives():
+    doc = (REPO / "docs" / "CRITERIA-SCHEMA.md").read_text(encoding="utf-8")
+    assert "Internal" in doc.split("\n")[2] or "*Internal" in doc
+    for variant in ("critical_flag", "critical_error_flag", "evaluation_principles",
+                    "not_critical", "do_not_classify_as_critical", "score=0", "cap=1"):
+        assert variant in doc, variant
+    assert "normalise_criteria" in doc
+    assert "refuses to load" in doc
+    # the promise this document makes about who changes what
+    assert "we do not ask the author to change how" in doc
+    assert "the loader learns it" in doc
+    hand = (REPO / "HANDOFF.md").read_text(encoding="utf-8")
+    assert "CRITERIA-SCHEMA.md" in hand
+    assert "we extend the\nloader, never ask him to rewrite a file" in hand

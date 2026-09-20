@@ -1,0 +1,180 @@
+{
+  "criteria": [
+    {
+      "id": 1,
+      "name": "relevance",
+      "definition": "Directly addresses the stated physics or engineering task and its constraints.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": 2,
+      "name": "physical_accuracy",
+      "definition": "Uses physically correct principles, relationships, and interpretations.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": 3,
+      "name": "engineering_accuracy",
+      "definition": "Uses technically sound engineering reasoning and design practice where applicable.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": 4,
+      "name": "reasoning",
+      "definition": "Shows a coherent chain from the problem to the conclusion rather than unsupported assertions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": 5,
+      "name": "conceptual_precision",
+      "definition": "Distinguishes closely related concepts and describes mechanisms accurately.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": 6,
+      "name": "model_selection",
+      "definition": "Chooses an appropriate governing model, equation set, or engineering abstraction when the question requires it.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": 7,
+      "name": "mathematical_correctness",
+      "definition": "Performs algebra, derivations, and mathematical transformations correctly when applicable.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": 8,
+      "name": "dimensional_correctness",
+      "definition": "Maintains consistent physical dimensions and units in quantitative work.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": 9,
+      "name": "assumptions",
+      "definition": "Identifies and appropriately uses important modeling assumptions and their limits.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": 10,
+      "name": "conservation_and_constraints",
+      "definition": "Respects relevant conservation laws, boundary conditions, physical constraints, and feasibility limits.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": 11,
+      "name": "quantitative_correctness",
+      "definition": "Produces numerically correct results and appropriate numerical interpretation when quantitative work is required.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": 12,
+      "name": "limiting_case_and_sanity_checks",
+      "definition": "Checks limiting behavior, signs, magnitudes, efficiencies, or other physical plausibility conditions when relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": 13,
+      "name": "engineering_tradeoffs",
+      "definition": "Recognizes competing objectives and constraints instead of assuming one universally optimal engineering choice.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": 14,
+      "name": "system_analysis",
+      "definition": "Integrates interacting components, mechanisms, stages, or domains when the problem requires system-level reasoning.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": 15,
+      "name": "experimental_interpretation",
+      "definition": "Correctly interprets observations, plots, measurements, trends, and model-versus-data discrepancies when applicable.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": 16,
+      "name": "uncertainty_and_calibration",
+      "definition": "Handles measurement uncertainty, calibration, repeatability, and error sources appropriately when applicable.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": 17,
+      "name": "completeness",
+      "definition": "Covers the material needed to answer the question without omitting a central required element.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": 18,
+      "name": "consistency",
+      "definition": "Maintains internally consistent definitions, signs, assumptions, equations, and conclusions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": 19,
+      "name": "clarity",
+      "definition": "Communicates the reasoning and result clearly enough to be checked and used.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": 20,
+      "name": "actionability",
+      "definition": "Provides a usable conclusion, diagnostic step, calculation, or design implication when the question calls for one.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_flag": {
+    "id": "critical_physics_engineering_error",
+    "condition": "A materially false central physical or engineering claim, calculation, conservation law, governing equation, or design conclusion fundamentally misleads the user.",
+    "effect": "score=0",
+    "examples": [
+      "violating a fundamental conservation law",
+      "using a governing equation in a fundamentally invalid way when that is central to the answer",
+      "reversing a fundamental physical relationship",
+      "major numerical or calculation error that changes the substantive conclusion",
+      "claiming an impossible physical result is possible",
+      "calculating efficiency greater than 100% without identifying an energy source or definition issue",
+      "fundamentally incorrect circuit behavior",
+      "fundamentally incorrect stability or control conclusion",
+      "proposing an engineering design that clearly violates a stated physical constraint",
+      "ignoring a critical load, pressure, temperature, or safety constraint where it determines feasibility"
+    ],
+    "not_critical": [
+      "minor arithmetic errors that do not change the conclusion",
+      "minor unit mistakes that are immediately obvious and do not affect the reasoning",
+      "reasonable approximations",
+      "alternative valid physical models where assumptions are clearly stated",
+      "different engineering designs that satisfy the requirements",
+      "minor omissions",
+      "notation differences"
+    ]
+  },
+  "evaluation_principles": [
+    "Correct physics over formula dumping: an answer that applies the wrong physical model should not receive a high score merely for writing many equations.",
+    "Reasoning over memorization: reward understanding of mechanisms, assumptions, and consequences.",
+    "Multiple valid engineering solutions: do not require one predetermined design when multiple approaches satisfy the stated constraints.",
+    "Evaluate feasibility, correctness, assumptions, trade-offs, safety, efficiency, and robustness.",
+    "Approximation is allowed when assumptions are appropriate, accuracy is sufficient, and the substantive conclusion is unchanged.",
+    "Units matter: dimensional consistency is an important part of quantitative correctness.",
+    "Limiting cases matter when appropriate.",
+    "Safety matters for hazardous engineering systems, but should not be required when irrelevant."
+  ]
+}

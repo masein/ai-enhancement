@@ -225,14 +225,15 @@ def test_law_is_tabulated_by_jurisdiction_and_medicine_is_not(tmp_path):
                   "id": i, "category": "law", "answer_words": 10, "score": 2, "graded": True,
                   "criteria": {c: 0.5 for c in jd.criteria_ids(spec)},
                   "flags": {f: False for f in jd.flag_ids(spec)},
-                  "meta": {"acuity": "routine", "difficulty": 2,
+                  "meta": {"acuity": "routine" if i % 2 else "urgent",
+                           "difficulty": 1 + i % 3,
                            "jurisdiction_required": i % 2 == 0}}
                  for i in range(4)]
     blocks = jd._criteria_blocks(law_items, spec)
     assert "jurisdiction_required" in blocks["breakdowns"]
     assert list(blocks["breakdowns"]["jurisdiction_required"]) == ["True", "False"]
     assert blocks["breakdowns"]["jurisdiction_required"]["True"]["n"] == 2
-    # the order a person reads: acuity, difficulty, then the flag, then intent
+    # the order a person reads them in, for the fields that split this bank
     assert list(blocks["breakdowns"]) == ["acuity", "difficulty", "jurisdiction_required"]
     # medicine's items carry no such field, so no such table
     med_spec = jd.rubric_for("exam_medicine_health").criteria
@@ -240,4 +241,7 @@ def test_law_is_tabulated_by_jurisdiction_and_medicine_is_not(tmp_path):
                   "flags": {f: False for f in jd.flag_ids(med_spec)},
                   "meta": {"acuity": "mild", "difficulty": 1}}]
     med = jd._criteria_blocks(med_items, med_spec)
-    assert "jurisdiction_required" not in med["breakdowns"]
+    # one item carries one value of everything, so nothing splits it: no
+    # tables at all, and the constant fields are named instead
+    assert "breakdowns" not in med
+    assert set(med["breakdowns_constant"]) == {"acuity", "difficulty"}

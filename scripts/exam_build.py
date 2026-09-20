@@ -492,6 +492,21 @@ def metadata_reference(item: dict) -> str:
     return " ".join(bits)
 
 
+def unwrap_items(data):
+    """(items, wrapper): a delivered file is a bare array, or an object with
+    one list in it — `{"questions": [...]}` is what physics & engineering
+    arrived as. Any single-list object is accepted and the key is reported,
+    because the page should say what it found rather than refuse a file over
+    its wrapping."""
+    if isinstance(data, list):
+        return data, ""
+    if isinstance(data, dict):
+        lists = [(k, v) for k, v in data.items() if isinstance(v, list)]
+        if len(lists) == 1:
+            return lists[0][1], lists[0][0]
+    return data, ""
+
+
 def plan_import(root: Path, items, topic: str, approver: str,
                 source: str = "import") -> dict:
     """Every record an import WOULD write, and the counts — without writing
@@ -502,13 +517,14 @@ def plan_import(root: Path, items, topic: str, approver: str,
         raise ValueError("importing a bank needs a name — the record of who stands behind it")
     if topic not in TOPICS:
         raise ValueError(f"{topic!r} is not an exam topic: {', '.join(TOPICS)}")
+    items, wrapper = unwrap_items(items)
     if not isinstance(items, list):
         raise ValueError("not a JSON array of question objects")
     # the whole bank by qid, not just the set: an author who revises the
     # metadata of a question already in the bank is revising it, not
     # re-importing it — the prompt is the identity, the rest is hers to change
     have = {r["qid"]: (t, r) for t, rows in load_bank(root).items() for r in rows}
-    out = {"topic": topic, "source": source, "records": [], "updates": [],
+    out = {"topic": topic, "source": source, "wrapper": wrapper, "records": [], "updates": [],
            "imported": 0, "updated": 0, "skipped": 0,
            "invalid": 0, "report": 0, "diagnose": 0, "duplicates": [], "invalid_items": [],
            "acuity": collections.Counter(), "intent": collections.Counter()}
@@ -577,9 +593,12 @@ def import_bank(root: Path, path_or_items, topic: str, approver: str,
     Idempotent: a qid already in the bank is skipped. Takes a path or the
     parsed array, so the CLI and the page write identical records."""
     if isinstance(path_or_items, (str, Path)):
+        # handed on whole: plan_import unwraps it and records which key it
+        # came out of, so the page can say what it found
         items = json.loads(Path(path_or_items).read_text(encoding="utf-8"))
-        if not isinstance(items, list):
-            raise ValueError(f"{path_or_items} is not a JSON array of question objects")
+        if not isinstance(unwrap_items(items)[0], list):
+            raise ValueError(f"{path_or_items} is not a JSON array of question objects, "
+                             f"nor an object holding one")
     else:
         items = path_or_items
     out = plan_import(root, items, topic, approver, source)

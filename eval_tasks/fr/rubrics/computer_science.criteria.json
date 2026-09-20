@@ -1,0 +1,160 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Whether the answer directly addresses the question's stated task, constraints, and intent.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "technical_accuracy",
+      "name": "Technical Accuracy",
+      "definition": "Whether factual, conceptual, algorithmic, system, security, and implementation claims are technically correct.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "reasoning",
+      "name": "Reasoning",
+      "definition": "Whether the answer provides sound reasoning that connects premises, mechanisms, and conclusions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Whether closely related concepts are distinguished accurately and terminology is used precisely.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "algorithmic_correctness",
+      "name": "Algorithmic Correctness",
+      "definition": "Whether proposed or analyzed algorithms are correct for the stated problem and assumptions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "complexity_analysis",
+      "name": "Complexity Analysis",
+      "definition": "Whether time, space, amortized, asymptotic, or resource-complexity claims are correctly analyzed when relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "system_model_selection",
+      "name": "System Model Selection",
+      "definition": "Whether the answer selects and applies an appropriate system, concurrency, networking, database, or distributed-systems model.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions",
+      "name": "Assumptions",
+      "definition": "Whether material assumptions, constraints, workload characteristics, and failure models are identified and used correctly.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "Whether calculations, numerical estimates, equations, and quantitative conclusions are correct when required.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "implementation_correctness",
+      "name": "Implementation Correctness",
+      "definition": "Whether implementation-level details, execution behavior, synchronization, APIs, or code-related reasoning are correct when relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "architecture_and_tradeoffs",
+      "name": "Architecture And Tradeoffs",
+      "definition": "Whether design choices satisfy requirements and constraints and accurately explain meaningful trade-offs.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "failure_mode_analysis",
+      "name": "Failure Mode Analysis",
+      "definition": "Whether relevant failure modes, edge cases, partial failures, and recovery behavior are correctly identified.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "security_and_safety",
+      "name": "Security And Safety",
+      "definition": "Whether security threats, mechanisms, mitigations, and limitations are handled correctly when security is relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "performance_analysis",
+      "name": "Performance Analysis",
+      "definition": "Whether bottlenecks, latency, throughput, resource utilization, caching, scaling, and performance mechanisms are analyzed correctly when relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "causal_debugging",
+      "name": "Causal Debugging",
+      "definition": "Whether the answer distinguishes symptoms, hypotheses, evidence, root causes, and remediation rather than merely naming plausible causes.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "empirical_interpretation",
+      "name": "Empirical Interpretation",
+      "definition": "Whether measurements, benchmark results, logs, traces, and observed behavior are interpreted cautiously and causally when relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Whether the answer covers the material aspects needed to answer the question without important omissions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Whether the answer's claims are internally consistent and do not contradict its own assumptions or conclusions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Whether the answer is understandable, well organized, and unambiguous without relying on unnecessary jargon.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "actionability",
+      "name": "Actionability",
+      "definition": "Whether recommendations or debugging/design steps are sufficiently concrete to be useful when the question calls for them.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_flag": {
+    "id": "critical_technical_error",
+    "condition": "The answer contains a materially false central technical claim, algorithm, calculation, security mechanism, or system explanation that fundamentally misleads the user.",
+    "effect": "score=0",
+    "examples": [
+      "claiming an algorithm has a fundamentally incorrect complexity when that is central to the question",
+      "reversing the behavior of a core networking or protocol mechanism",
+      "proposing an algorithm that cannot satisfy a central stated requirement",
+      "fundamentally misunderstanding transaction isolation in a way that changes the conclusion",
+      "claiming a concurrency mechanism prevents a race when it does not",
+      "giving a fundamentally incorrect security defense",
+      "making a major quantitative calculation error that changes the substantive result",
+      "claiming a distributed system guarantees a property it fundamentally cannot guarantee under the stated assumptions",
+      "describing a core ML mechanism in the fundamentally wrong direction"
+    ]
+  }
+}

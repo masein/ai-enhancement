@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A dynamic array doubles its capacity whenever it becomes full. Explain why appending n elements has O(n) total time even though an individual resize can take O(n).",
+    "intent": "Explain amortized cost of dynamic-array growth and distinguish worst-case operation cost from total cost.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "You need to process a stream of integers and repeatedly answer whether a value has appeared before. Compare a hash table and a balanced binary search tree, including expected/worst-case lookup complexity and ordering capabilities.",
+    "intent": "Compare data structures using complexity and functional trade-offs.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A breadth-first search starts at vertex s in an unweighted graph. Explain why the first time BFS reaches a vertex v, the discovered path from s to v has minimum number of edges.",
+    "intent": "Reason about the correctness invariant behind BFS shortest paths in unweighted graphs.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A graph has nonnegative edge weights, but some edges have weight zero. Explain whether Dijkstra's algorithm remains correct and why, focusing on the property that makes its greedy choice safe.",
+    "intent": "Reason about Dijkstra's correctness under boundary conditions.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "Give a small graph with a negative-weight edge for which ordinary Dijkstra's algorithm can return an incorrect shortest-path distance, and explain the execution that causes the error.",
+    "intent": "Construct and trace a counterexample to an algorithm's applicability assumptions.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "execution_trace",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A directed dependency graph is acyclic. You run topological sorting and obtain an ordering. Explain exactly what property of every directed edge must hold in that ordering, and how a cycle would prevent such an ordering.",
+    "intent": "Explain the correctness condition and failure mode of topological sorting.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "For an undirected connected weighted graph, compare Kruskal's and Prim's algorithms. Explain why both can produce a minimum spanning tree while making different local choices.",
+    "intent": "Compare two greedy algorithms and explain their correctness at a conceptual level.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A recursive algorithm satisfies T(n)=2T(n/2)+n log n. Determine its asymptotic time complexity and briefly justify the result using a recurrence method.",
+    "intent": "Analyze a divide-and-conquer recurrence.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "complexity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A dynamic-programming solution stores an answer for every pair (i,j), where 1<=i,j<=n, and each state is computed in O(n) time. What are its time and space complexities, and what change would reduce the space if only the previous row is needed?",
+    "intent": "Combine state-counting, transition cost, and space optimization reasoning.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "complexity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "An algorithm takes O(n log n) time on random inputs but O(n^2) on a particular structured family. Explain how its Big-O and Big-Theta descriptions can both be stated without contradiction when the input family or case is specified.",
+    "intent": "Distinguish asymptotic upper bounds from tight bounds under different input assumptions.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A problem can be solved by enumerating all subsets in O(2^n), while another algorithm solves it in polynomial time only for a restricted input structure. Explain why asymptotic classification depends on the general problem definition and input assumptions.",
+    "intent": "Reason about complexity classification and the role of input restrictions.",
+    "domain": "Theory of Computation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "complexity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A binary search tree receives keys in strictly increasing order. Explain what shape it can degenerate into, the resulting search complexity, and how a self-balancing tree avoids the problem.",
+    "intent": "Reason about input-dependent tree shape and balancing.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "You have a linked list and need to delete a node when you are given only a pointer to that node, not its predecessor. Under what conditions can this be done in O(1), and what limitation makes the usual technique impossible for the final node?",
+    "intent": "Trace pointer-based list operations and identify an edge case.",
+    "domain": "Algorithms and Data Structures",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "execution_trace",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "Consider a decision problem that asks whether a proposed solution can be verified in polynomial time. Explain the relationship between verification and NP, and why being in NP does not imply that a polynomial-time algorithm is known.",
+    "intent": "Explain the verifier-based characterization of NP and avoid conflating verification with efficient solving.",
+    "domain": "Theory of Computation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "Explain why a reduction from problem A to problem B can be used to transfer hardness: if A is known to be difficult and A reduces to B, what would a fast algorithm for B imply about A?",
+    "intent": "Reason about polynomial-time reductions and their role in complexity theory.",
+    "domain": "Theory of Computation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A deterministic finite automaton recognizes a language by processing one input symbol at a time with a finite set of states. Explain why it cannot recognize arbitrary balanced-parentheses strings, and what additional memory model a pushdown automaton provides.",
+    "intent": "Distinguish regular languages from context-free languages using computational memory requirements.",
+    "domain": "Theory of Computation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "Compare a process and a thread in terms of address-space isolation, resource sharing, and the typical cost of context switching. Why is 'threads are always faster' an unsafe generalization?",
+    "intent": "Compare process/thread models and qualify performance claims.",
+    "domain": "Operating Systems and Computer Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A program's CPU utilization is low while it spends most of its time waiting for disk I/O. Explain why adding CPU cores is unlikely to solve the main performance problem.",
+    "intent": "Identify an I/O-bound workload and distinguish CPU capacity from the actual bottleneck.",
+    "domain": "Operating Systems and Computer Systems",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A system has four threads, each holding one mutex and waiting for another mutex held by the next thread in a cycle. Identify the deadlock conditions present and describe two different ways an operating system or application could prevent or break the deadlock.",
+    "intent": "Diagnose deadlock and compare prevention/recovery strategies.",
+    "domain": "Operating Systems and Computer Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A process repeatedly accesses a working set of pages that fits in physical memory, then starts scanning a much larger region. Page faults suddenly rise and CPU utilization falls. Explain the likely mechanism and why adding more CPU may not help.",
+    "intent": "Diagnose paging pressure and connect page faults to performance.",
+    "domain": "Operating Systems and Computer Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "Explain how a TLB can make virtual-memory address translation faster, and describe what happens when the required translation is not in the TLB but the page itself is already in RAM.",
+    "intent": "Trace virtual-address translation through the TLB and page table.",
+    "domain": "Operating Systems and Computer Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "execution_trace",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A mutex protects a shared data structure, while a condition variable is used for a consumer to wait until work is available. Explain why the condition variable does not itself provide mutual exclusion and why the wait must be associated with a predicate protected by the mutex.",
+    "intent": "Explain synchronization semantics and correct condition-variable usage.",
+    "domain": "Operating Systems and Computer Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A semaphore is initialized to 3 and used to limit access to a resource pool. Explain what happens when four threads attempt to acquire it before any thread releases it, and why a semaphore is not interchangeable with a mutex.",
+    "intent": "Distinguish counting semaphores from mutual-exclusion locks.",
+    "domain": "Operating Systems and Computer Systems",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "Compare preemptive round-robin scheduling with a shortest-job-oriented policy. Discuss responsiveness, throughput, starvation risk, and why no policy is universally optimal.",
+    "intent": "Analyze CPU scheduling trade-offs rather than memorize definitions.",
+    "domain": "Operating Systems and Computer Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A program allocates many short-lived objects and shows increasing memory usage even though references should eventually become unreachable. What evidence would distinguish a garbage-collection delay from a true memory leak or retained references?",
+    "intent": "Use observable evidence to distinguish memory-management failure modes.",
+    "domain": "Operating Systems and Computer Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "Explain why a system call can be more expensive than an ordinary function call, and why operating systems still need system calls rather than allowing applications unrestricted direct hardware access.",
+    "intent": "Connect privilege boundaries, protection, and call overhead.",
+    "domain": "Operating Systems and Computer Systems",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A file-system workload performs many small random writes. Explain why write latency may be dominated by I/O behavior rather than CPU time, and discuss how buffering or batching can change the performance profile.",
+    "intent": "Reason about file I/O bottlenecks and mitigation trade-offs.",
+    "domain": "Operating Systems and Computer Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A five-stage CPU pipeline has a branch every few instructions, and mispredicted branches require several cycles to recover. Explain how branch prediction affects throughput and why a faster clock alone may not improve performance as expected.",
+    "intent": "Reason about pipeline hazards and branch-prediction effects.",
+    "domain": "Computer Architecture",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A loop repeatedly processes a contiguous array, then a second version accesses the same data through scattered locations. Explain the cache-locality difference and why the second version can have much lower performance even with identical asymptotic complexity.",
+    "intent": "Connect memory locality to cache behavior and performance.",
+    "domain": "Computer Architecture",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A workload's CPU execution units are mostly idle while memory requests wait for DRAM. Explain the distinction between latency and bandwidth and identify which one is likely limiting a single dependent access chain versus a highly parallel streaming workload.",
+    "intent": "Distinguish memory latency from bandwidth under different access patterns.",
+    "domain": "Computer Architecture",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A program's serial portion is 40% of total runtime. Using Amdahl's law, what is the maximum theoretical speedup from making the remaining 60% infinitely fast, and what does this imply about optimization priorities?",
+    "intent": "Apply Amdahl's law quantitatively and interpret its engineering implication.",
+    "domain": "Computer Architecture",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "Explain why SIMD can accelerate applying the same arithmetic operation to many independent data elements, and give an example of a dependency pattern that limits SIMD benefit.",
+    "intent": "Reason about data parallelism and dependency constraints.",
+    "domain": "Computer Architecture",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A GPU kernel has thousands of threads but performs irregular pointer chasing with little data reuse. Explain why simply increasing the number of GPU threads may fail to improve performance.",
+    "intent": "Analyze GPU parallelism in relation to memory latency, locality, and workload structure.",
+    "domain": "Computer Architecture",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A benchmark improves from 10 seconds to 8 seconds after an optimization, but hardware counters show that cache misses increased substantially. Give plausible reasons the runtime could still improve and explain what additional measurements would help establish causality.",
+    "intent": "Interpret conflicting performance indicators and propose evidence-based follow-up measurements.",
+    "domain": "Computer Architecture",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "empirical_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A CPU-bound service is moved to a machine with twice the memory bandwidth but similar CPU performance, and latency barely changes. Explain why this result is consistent with the workload being CPU-bound.",
+    "intent": "Interpret hardware-scaling results relative to the actual bottleneck.",
+    "domain": "Software / System Performance",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "empirical_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A client can resolve a hostname on one network but receives DNS failures on another, while direct connections to the server's IP address work. What layers and configuration would you investigate first, and why?",
+    "intent": "Diagnose a DNS-specific failure while separating name resolution from IP connectivity.",
+    "domain": "Software / System Performance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "Explain the main purpose of TCP's connection establishment and why a server can observe connection attempts before an application has accepted the connection.",
+    "intent": "Reason about TCP connection state and the boundary between transport and application behavior.",
+    "domain": "Networking",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "An API has low average latency but very high tail latency. Packet loss is observed between the client and server. Explain how retransmissions and congestion control can create tail-latency spikes.",
+    "intent": "Connect packet loss with transport-level recovery and latency distributions.",
+    "domain": "Networking",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "Compare TCP and UDP for a real-time voice application. Explain why an application might prefer UDP despite TCP's reliability features, and what responsibilities then move into the application.",
+    "intent": "Compare transport protocols using application requirements and trade-offs.",
+    "domain": "Networking",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A web service works directly but fails intermittently when placed behind a reverse proxy. Some requests receive connection resets while others succeed. What evidence would you collect to determine whether the proxy, upstream service, timeout configuration, or network path is responsible?",
+    "intent": "Design a layered debugging approach for intermittent network failures.",
+    "domain": "Networking",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "Explain how HTTPS uses TLS to protect an HTTP connection, including what authentication provides and what symmetric encryption is used for after the secure session is established.",
+    "intent": "Explain the roles of authentication and symmetric encryption in TLS without conflating them.",
+    "domain": "Networking",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A user downloads a large file from a CDN. Explain how caching can reduce latency and origin load, and identify a case where a cached response could be incorrect or stale unless cache-control rules are used appropriately.",
+    "intent": "Reason about HTTP caching, CDNs, and freshness semantics.",
+    "domain": "Networking",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A private service is reachable from the internet through a NAT gateway. Explain what NAT changes about addressing and why it does not by itself provide a complete application-layer security boundary.",
+    "intent": "Distinguish address translation from security controls.",
+    "domain": "Networking",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A link has 100 Mbps bandwidth and a round-trip time of 100 ms. Explain why a single small request can still experience about 100 ms of network round-trip delay despite the high bandwidth, and distinguish bandwidth from latency.",
+    "intent": "Apply basic networking performance concepts and distinguish throughput from delay.",
+    "domain": "Networking",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "Several backend servers sit behind a load balancer. One backend becomes overloaded while the others remain underused. Give multiple plausible explanations involving load-balancing policy, connection reuse, request cost, or session affinity, and describe evidence that would distinguish them.",
+    "intent": "Analyze a load-distribution anomaly with competing hypotheses and evidence.",
+    "domain": "Networking",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A table stores customers and orders. Explain why a foreign key from orders.customer_id to customers.id enforces a different kind of constraint than a primary key, and give an example of an invalid row it can prevent.",
+    "intent": "Distinguish key constraints and referential integrity.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A query filters a large table by an equality condition on a frequently used column. Explain why a B-tree index can reduce work, and identify a situation in which the optimizer might reasonably choose not to use that index.",
+    "intent": "Reason about index usefulness and query-planner trade-offs.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "Two tables are joined on indexed keys, but the query is still slow. What database-level evidence would you inspect to determine whether the problem is cardinality estimation, an unsuitable join strategy, missing filtering, or I/O pressure?",
+    "intent": "Use query plans and runtime evidence to diagnose database performance.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "Explain why normalization can reduce update anomalies, and why a production system might deliberately denormalize part of a schema despite the resulting redundancy.",
+    "intent": "Analyze normalization and denormalization as workload-dependent trade-offs.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A transaction reads a row twice and gets different committed values because another transaction committed an update between the reads. Identify the isolation phenomenon and explain what stronger isolation or locking behavior would prevent it.",
+    "intent": "Reason about transaction isolation and non-repeatable reads.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "execution_trace",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "Explain how MVCC can allow readers and writers to proceed with less blocking than a simple shared/exclusive locking model, and identify what MVCC does not eliminate, such as all forms of write conflict.",
+    "intent": "Explain MVCC mechanics and its limits.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "Two transactions each hold a lock needed by the other and both wait indefinitely. Explain how a database can detect this deadlock and name at least two strategies for resolving it.",
+    "intent": "Diagnose database lock deadlock and explain recovery approaches.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A service performs a payment and then retries the same request after a timeout. The first request may have committed even though the client did not receive the response. Explain how an idempotency key can prevent duplicate business effects.",
+    "intent": "Reason about retries, ambiguous outcomes, and idempotent transaction design.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A database is replicated asynchronously. A client writes a record and immediately reads from a replica that does not yet have the update. Explain why this can occur and what architectural choices could provide read-after-write behavior.",
+    "intent": "Explain replication lag and consistency choices.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A table is partitioned by customer_id, but one customer accounts for 40% of all rows. Explain how this skew can create a hot partition and what alternative partitioning or routing strategies could mitigate it.",
+    "intent": "Analyze data-skew effects on partitioning and scalability.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A team claims that choosing a NoSQL database automatically solves scalability and consistency problems. Explain why the claim is too broad and how workload, access patterns, and consistency requirements should drive database selection.",
+    "intent": "Evaluate an oversimplified database-selection claim using workload and consistency constraints.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A distributed transaction updates two services backed by separate databases. One update commits and the other fails after a network partition. Explain why a local database transaction cannot guarantee atomicity across both services and compare plausible coordination or compensation strategies.",
+    "intent": "Reason about distributed transaction atomicity and failure handling.",
+    "domain": "Databases",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A message consumer processes a message successfully but crashes before acknowledging it. Explain why an at-least-once queue may deliver the message again and how the consumer should be designed to tolerate duplicates.",
+    "intent": "Explain at-least-once delivery and idempotent consumption.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A service retries a request whenever it times out. Explain how retries can amplify load during an outage, and describe mechanisms such as exponential backoff, jitter, and retry budgets that can reduce the amplification.",
+    "intent": "Analyze retry storms and defensive distributed-system behavior.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "In a replicated service, a leader becomes unreachable but may still be running. Explain why a leader-election mechanism needs a failure detector or timeout policy and why temporary network partitions make failure detection inherently uncertain.",
+    "intent": "Reason about leader election and imperfect failure detection.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "Explain the central role of a replicated log in Raft and why a newly elected leader must have sufficiently up-to-date log information before safely committing entries.",
+    "intent": "Explain a core Raft safety mechanism and its rationale.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A system requires a majority quorum for writes and reads. Explain why quorum overlap can help ensure that a read intersects a successful write, and state an assumption under which this does not by itself guarantee linearizability.",
+    "intent": "Reason about quorum intersection and distinguish it from stronger consistency guarantees.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "Two services each wait for the other to release a distributed lock. There is no single node that can observe the entire wait cycle. Explain why distributed deadlock detection is harder than local deadlock detection and what design changes can avoid this class of problem.",
+    "intent": "Analyze distributed locking and deadlock complexity.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A system uses wall-clock timestamps to order events across machines. Explain why clock skew can make this ordering unreliable and how logical clocks provide a different notion of event ordering.",
+    "intent": "Distinguish physical-clock time from logical event ordering.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A client times out after sending a request, retries it, and receives two successful responses because the original request also completed. Design an API strategy that prevents duplicate side effects while preserving useful retry behavior.",
+    "intent": "Design an idempotent API under ambiguous network outcomes.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "Explain why 'exactly once delivery' is often an end-to-end application property rather than a simple property of a message transport, especially when a consumer can crash after performing a side effect.",
+    "intent": "Distinguish transport delivery semantics from end-to-end effect semantics.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A distributed cache returns stale data after a write to the primary database. Explain several ways the stale result could arise and how invalidation, versioning, or read routing can change the consistency behavior.",
+    "intent": "Analyze cache consistency and mitigation trade-offs.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A service is healthy on each individual machine, but users see intermittent failures because requests are routed to replicas with different configuration versions. Explain why local health checks can miss this failure and what deployment or routing mechanisms could reduce it.",
+    "intent": "Reason about distributed configuration skew and observability limits.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A distributed system must remain available during a network partition, but different clients may temporarily observe different values. Explain the trade-off being made and why the word 'consistency' needs a precise definition before evaluating the design.",
+    "intent": "Reason about partition tolerance, availability, and precise consistency semantics.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A module exposes ten unrelated responsibilities and every small change requires modifying many callers. Explain how low cohesion and high coupling can create this maintenance problem, and describe a refactoring direction.",
+    "intent": "Apply modularity concepts to an engineering scenario.",
+    "domain": "Software Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "Explain dependency injection without tying the explanation to a specific framework, and describe how it can improve testing and reduce direct coupling between components.",
+    "intent": "Explain an architectural technique and its engineering consequences.",
+    "domain": "Software Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A team adds an abstraction layer before it knows whether multiple implementations are actually needed. Discuss when abstraction improves maintainability and when it can add unnecessary complexity.",
+    "intent": "Evaluate abstraction as a trade-off rather than a universally good practice.",
+    "domain": "Software Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A regression appears after a refactor. Unit tests pass, but an end-to-end test fails only in production-like conditions. Explain what this suggests about test scope and how you would isolate the missing behavior.",
+    "intent": "Reason about test levels and debugging strategy.",
+    "domain": "Software Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A codebase has many mocks and unit tests pass, but integration failures are frequent. Explain how excessive mocking can create false confidence and when an integration test is more informative than a unit test.",
+    "intent": "Analyze test isolation and the limits of mocks.",
+    "domain": "Software Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A public API changes a response field from a string to an object. Explain why this can be a breaking change even if the endpoint and URL remain identical, and give compatibility strategies.",
+    "intent": "Reason about API contracts and backward compatibility.",
+    "domain": "Software Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A team uses semantic versioning. Explain the intended relationship between breaking API changes and major versions, and why version numbers alone cannot make an incompatible change safe for existing clients.",
+    "intent": "Explain semantic versioning while recognizing its limits as a compatibility mechanism.",
+    "domain": "Software Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A production service becomes slower after a feature release. Logs show no obvious errors. Describe a profiling and observability workflow that distinguishes CPU, allocation/GC, database, network, and lock-contention regressions.",
+    "intent": "Design a causal performance-debugging workflow using evidence rather than symptoms.",
+    "domain": "Software Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A CI pipeline runs unit tests on every commit and a smaller set of end-to-end tests after deployment. Explain the trade-off between fast feedback and broad behavioral coverage, and when the arrangement should be changed.",
+    "intent": "Evaluate CI/CD test strategy and feedback-loop trade-offs.",
+    "domain": "Software / System Performance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A team wants to refactor a large legacy component but cannot tolerate a long freeze on feature work. Explain how incremental refactoring can reduce risk and what role characterization tests can play.",
+    "intent": "Design a safe incremental refactoring approach under delivery constraints.",
+    "domain": "Software Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A code review repeatedly blocks changes over formatting and naming while missing a concurrency bug that later reaches production. Explain how review practices, automated checks, and reviewer focus can be adjusted.",
+    "intent": "Analyze code-review process failures and propose process improvements.",
+    "domain": "Software Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A service has extensive logs but operators still cannot determine which user request caused a downstream failure across several services. Explain how correlation IDs, structured logs, metrics, and traces complement one another.",
+    "intent": "Reason about observability across distributed request paths.",
+    "domain": "Software Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "Compare static and dynamic typing in terms of when type errors are detected and what information is available at compile time versus runtime. Explain why static typing does not mean a program can have no runtime type-related failures.",
+    "intent": "Distinguish typing-time guarantees from complete runtime behavior.",
+    "domain": "Programming Languages and Compilers",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A closure refers to a variable from an enclosing lexical scope after the enclosing function has returned. Explain how lexical scoping and closure environments make this possible.",
+    "intent": "Reason about lexical scope and captured environments.",
+    "domain": "Programming Languages and Compilers",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "Explain the role of an abstract syntax tree in a compiler or interpreter and why it is more useful for many semantic analyses than operating directly on the original source text.",
+    "intent": "Explain parsing output and its role in language processing.",
+    "domain": "Programming Languages and Compilers",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A language implementation first compiles source into bytecode and then executes hot bytecode paths with a JIT compiler. Explain why this can outperform simple interpretation and what runtime information a JIT can exploit.",
+    "intent": "Explain JIT compilation and runtime optimization.",
+    "domain": "Programming Languages and Compilers",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A garbage-collected runtime pauses intermittently as the heap grows. Explain why allocation rate, object lifetime distribution, and collector strategy can affect pause behavior, and what measurements would help diagnose the issue.",
+    "intent": "Connect garbage collection behavior with workload characteristics and empirical diagnosis.",
+    "domain": "Programming Languages and Compilers",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "empirical_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A generic function is instantiated for multiple types, while another language implementation uses type erasure. Compare the runtime and compile-time trade-offs that can arise from these two implementation strategies.",
+    "intent": "Reason about generic implementation strategies without depending on one language.",
+    "domain": "Programming Languages and Compilers",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "Explain the difference between authentication and authorization using an API example, and describe a failure that can occur when a system verifies identity but fails to enforce resource-level authorization.",
+    "intent": "Distinguish identity verification from access control and identify an authorization failure mode.",
+    "domain": "Security",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A web application builds a SQL query by concatenating untrusted input. Explain the mechanism of SQL injection and why parameterized queries prevent the core injection problem.",
+    "intent": "Explain a common injection mechanism and its primary defensive control.",
+    "domain": "Security",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "Explain why passwords should normally be stored using a password-hashing function with a unique salt rather than reversible encryption, and what an attacker gains from precomputed tables when salts are absent.",
+    "intent": "Reason about password storage, salts, and offline attack resistance.",
+    "domain": "Security",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A site stores an authentication token in a cookie. Explain how Secure, HttpOnly, and SameSite attributes address different threats, and why none of them alone guarantees complete session security.",
+    "intent": "Analyze cookie security controls and their distinct threat models.",
+    "domain": "Security",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A web application displays user-controlled text as HTML. Explain how XSS can arise, how output encoding reduces the risk, and why input validation alone is not a universal defense.",
+    "intent": "Explain XSS mechanism and layered defensive design.",
+    "domain": "Security",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A server accepts a user-supplied URL and fetches it from an internal network. Explain the SSRF risk, why network location is a security boundary in this scenario, and what layered controls could reduce the exposure.",
+    "intent": "Analyze SSRF as a server-side trust-boundary failure and propose layered defenses.",
+    "domain": "Security",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A build pipeline downloads a third-party package and executes its build scripts with broad repository credentials. Explain the supply-chain risks and propose controls that reduce the blast radius if a dependency or build step is compromised.",
+    "intent": "Analyze dependency and build-pipeline supply-chain risk with defense in depth.",
+    "domain": "Security",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A service uses one highly privileged credential for database access, object storage, and deployment. Explain why this violates least-privilege principles and how credential separation and secret rotation reduce risk.",
+    "intent": "Apply least privilege and secrets-management principles to system design.",
+    "domain": "Security",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A classifier has 99% accuracy on a dataset where only 1% of examples are positive. Explain why accuracy alone may be misleading and how precision, recall, and a confusion matrix provide more useful information.",
+    "intent": "Interpret classification metrics under severe class imbalance.",
+    "domain": "AI and Machine Learning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A model scores 98% on a random train/test split but only 72% after deployment. Investigation shows that near-duplicate records from the same users appeared in both training and test sets. Explain the leakage mechanism and how the evaluation should be redesigned.",
+    "intent": "Diagnose data leakage and design a more valid evaluation split.",
+    "domain": "AI and Machine Learning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A neural network's training loss decreases while validation loss starts increasing. Explain what this pattern suggests, how regularization or early stopping can help, and why adding more model capacity may worsen the problem.",
+    "intent": "Reason about overfitting and mitigation mechanisms.",
+    "domain": "AI and Machine Learning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "empirical_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A production classifier's ROC-AUC remains stable, but the probability outputs become poorly calibrated after the input population changes. Explain why ranking quality and calibration can diverge under distribution shift, and what evaluation or recalibration steps you would consider.",
+    "intent": "Distinguish ranking metrics from probability calibration under distribution shift.",
+    "domain": "AI and Machine Learning",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "empirical_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A transformer language model predicts the next token using attention over previous tokens. Explain how self-attention differs from recurrence, why attention can model relationships between distant tokens, and what computational cost becomes important as sequence length grows.",
+    "intent": "Explain transformer self-attention, its advantage over recurrence, and its scaling cost.",
+    "domain": "AI and Machine Learning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  }
+]

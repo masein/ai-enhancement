@@ -129,7 +129,8 @@ def test_the_request_carries_the_rubric_and_no_answers(gap):
                                               "requested_by": "t"}).json()["id"]
     body = next(q["system"] + "\n" + q["user"] for q in llm.client().recorded()
                 if q["custom_id"] == f"proposal:{pid}")
-    assert "# Rubric — exam topics" in body and "Topic: economics" in body
+    # the topic's own rubric when it has one — economics does now
+    assert "# Economics Evaluation Rubric" in body and "Topic: economics" in body
     assert "scored 0 of 4" in body or "scored 1 of 4" in body or "scored 2 of 4" in body
     # the model's own answers are not in the request: the judge's reading of
     # them is what the proposal is built from

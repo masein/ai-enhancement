@@ -118,10 +118,40 @@ Both banks clear it — about 50 report-half questions each — so the step says
 so rather than asking for more. The run needs **no exam writer** configured
 — nobody is drafting anything.
 
-Step 6 differs by topic, because the criteria file does: medicine's table is
-by acuity, law's by difficulty as well, and the flag lines say what each flag
-did to the score. Neither is special-cased in the code; both come from the
-file the author wrote.
+And the three topics delivered in the same round — computer science,
+economics, physics & engineering — each with the author's own prose rubric
+and his own 0–4 anchors:
+
+```bash
+python3 scripts/demo_loop.py --topic "computer science" \
+    --import eval_tasks/fr/computer_science_v1.json --approver "Dr. Hossein" \
+    --source computer_science_v1 \
+    --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
+```
+
+```bash
+python3 scripts/demo_loop.py --topic economics \
+    --import eval_tasks/fr/economics_v1.json --approver "Dr. Hossein" \
+    --source economics_v1 \
+    --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
+```
+
+```bash
+python3 scripts/demo_loop.py --topic "physics & engineering" \
+    --import eval_tasks/fr/physics_engineering_v1.json --approver "Dr. Hossein" \
+    --source physics_engineering_v1 \
+    --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
+```
+
+All five banks are 100 questions and clear the 30-question floor.
+
+Step 6 differs by topic, because the criteria file does: medicine's tables are
+by acuity, difficulty and intent, law's add jurisdiction, and the three
+technical topics are read by difficulty and domain — their acuity is
+`routine` on every item, which the page says in a sentence instead of drawing
+a table with one row. The flag lines say what each flag did to the score.
+None of it is special-cased in the code; it all comes from what the author
+wrote and what his questions carry.
 
 Use an **instruct** model for this topic. A base model answers a triage
 question with word salad and scores 0 on everything, which teaches nothing;

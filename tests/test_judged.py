@@ -103,18 +103,21 @@ def test_task_yamls_point_at_absolute_items_files(tree):
 
 
 def test_rubrics_have_anchors_and_a_length_clause():
-    for task in ("exam_economics", "exam_law", "exam_medicine_health", fr_build.CONTROL_TASK):
+    """Five anchors and something about length, however the author writes
+    them: ours use "- **3** —", his own use a "### 3" heading. The sha is the
+    identity; a version in the heading is a convenience he need not carry."""
+    for task in ("exam_economics", "exam_law", "exam_medicine_health", "exam_history",
+                 fr_build.CONTROL_TASK):
         r = jd.rubric_for(task)
-        # a rubric carries a version; the author's topics are on their second
-        assert re.fullmatch(r"[0-9]+", r.version) and re.fullmatch(r"[0-9a-f]{64}", r.sha256)
+        assert re.fullmatch(r"[0-9]+|\?", r.version) and re.fullmatch(r"[0-9a-f]{64}", r.sha256)
         for s in range(5):
-            assert re.search(rf"^- \*\*{s}\*\*", r.text, re.M), (task, s)
-        assert "Length" in r.text
+            assert re.search(rf"^(?:- \*\*{s}\*\*|#+ {s}\b)", r.text, re.M), (task, s)
+        assert re.search(r"length", r.text, re.I), task
     # a topic with no rubric of its own shares the exam one; the control keeps
     # the factual one; a topic with its own is graded by its own
-    assert jd.rubric_for("exam_economics")[1] == jd.rubric_for("exam_history")[1]
-    assert jd.rubric_for(fr_build.CONTROL_TASK)[1] != jd.rubric_for("exam_economics")[1]
-    assert jd.rubric_for("exam_medicine_health")[1] != jd.rubric_for("exam_economics")[1]
+    assert jd.rubric_for("exam_geography_world_facts")[1] == jd.rubric_for("exam_history")[1]
+    assert jd.rubric_for(fr_build.CONTROL_TASK)[1] != jd.rubric_for("exam_history")[1]
+    assert jd.rubric_for("exam_medicine_health")[1] != jd.rubric_for("exam_history")[1]
     assert (REPO / "eval_tasks" / "fr" / "rubrics" / "exam.md").exists()
 
 
@@ -142,8 +145,8 @@ def test_judge_json_shape_and_hashes(tree):
         assert re.fullmatch(r"[0-9a-f]{64}", jj["prompt_sha256"]) and jj["prompt_sha256"] == jd.prompt_sha()
         assert jj["stub"] is True and jj["id"] == "stub/overlap-v1"
         assert set(jj["rubrics"]) == set(tree["judged"]["manifest"]["tasks"])
-        assert all(r["version"].isdigit() and len(r["sha256"]) == 64
-                   for r in jj["rubrics"].values())
+        assert all((r["version"].isdigit() or r["version"] == "?")
+                   and len(r["sha256"]) == 64 for r in jj["rubrics"].values())
         assert j["split_salt"] == dx.SPLIT_SALT and j["correct_at"] == 3
         for t, v in j["tasks"].items():
             assert sum(v["dist"].values()) == v["n"] == len(v["items"])
@@ -226,7 +229,9 @@ def test_calibration_round_trip(tree, tmp_path):
     # the shared ones; the judge's own numbers are never written either way
     assert list(rows[0])[:len(jc.FIELDS)] == jc.FIELDS
     assert not any(k.startswith("judge") for k in rows[0])
-    assert all(r["human_score"] == "" and r["rubric"].startswith("# Rubric") for r in rows)
+    # every row carries the rubric its answer was graded against, whatever
+    # the author called the file's heading
+    assert all(r["human_score"] == "" and r["rubric"].lstrip().startswith("#") for r in rows)
     assert len({r["id"] for r in rows}) == 30
     assert len({r["category"] for r in rows}) >= 4                              # stratified
     judged = {r["id"]: r["judge_score"] for r in jc._judged_rows(out_dir, set())}

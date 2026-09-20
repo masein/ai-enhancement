@@ -144,6 +144,8 @@ def test_the_whole_loop(tmp_path, monkeypatch):
         rep = [it["score"] for it in raw["tasks"][TASK]["items"] if it["half"] == "report"]
         assert cmp["after"]["report"]["n"] == len(rep)
         assert cmp["after"]["report"]["v"] == pytest.approx(sum(rep) / len(rep), abs=1e-3)
-        assert jd.rubric_for(TASK)[2] == "1"
+        # the rubric that graded it, by sha; economics is on the author's own
+        # file now, whose heading carries no version number
+        assert jd.rubric_for(TASK)[1] == jd.rubric_for(TASK).sha256
     finally:
         client.__exit__(None, None, None)

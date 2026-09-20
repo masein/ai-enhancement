@@ -280,7 +280,8 @@ def _trim_judge(j: dict | None) -> dict | None:
                                # the breakdown by whichever metadata fields the
                                # topic carries. No per-item lists.
                                "criteria_mean", "criteria_n", "criteria_labels",
-                               "criteria_conditional", "flags", "breakdowns", "unparseable")
+                               "criteria_conditional", "flags", "breakdowns",
+                               "breakdowns_constant", "unparseable")
                               if t.get(k) is not None}
     return out
 
@@ -3051,9 +3052,16 @@ function vJudged(m) {
             : `None of the ${v.n} answers was flagged. When it is true it `
               + `${f.effect_words || 'changes the score'}, whatever the criteria said.`));
       });
-      // one table per metadata field the topic carries: acuity for a medical
-      // bank, difficulty for a legal one, and no special case for either
-      const order = ['acuity', 'difficulty', 'intent'];
+      // one table per metadata field that actually splits this topic —
+      // acuity for a medical bank, difficulty and domain for a technical one.
+      // A field every item shares is a sentence, not a table.
+      const constant = v.breakdowns_constant || {};
+      if (Object.keys(constant).length) card.append(el('p', { class: 'small',
+        'data-constant-fields': Object.keys(constant).join(','),
+        text: Object.entries(constant)
+          .map(([f, val]) => `${f} is ${val} on every item`).join('; ')
+          + ' — no table for that.' }));
+      const order = ['acuity', 'difficulty', 'jurisdiction_required', 'intent'];
       const fields = Object.keys(v.breakdowns || {}).sort(
         (a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
       fields.forEach(field => {

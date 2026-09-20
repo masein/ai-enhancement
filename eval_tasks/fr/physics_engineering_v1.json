@@ -1,0 +1,1004 @@
+{
+  "questions": [
+    {
+      "id": 1,
+      "prompt": "A 2.0 kg block on a horizontal surface is pulled by a 10 N horizontal force. If kinetic friction is 3 N, what is its acceleration? State the free-body forces used.",
+      "intent": "quantitative",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 2,
+      "prompt": "A car travels at 20 m/s and brakes uniformly to rest in 5 s. Find its acceleration and stopping distance, and explain the sign convention.",
+      "intent": "quantitative",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 3,
+      "prompt": "Explain why a passenger leans outward relative to a car when the car turns sharply, using Newton's laws and the role of the seat or door force.",
+      "intent": "conceptual",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 4,
+      "prompt": "A 5 kg mass is lifted vertically by a constant 80 N upward force through 3 m. Determine the net work on the mass and its change in kinetic energy, taking g = 9.8 m/s².",
+      "intent": "quantitative",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 5,
+      "prompt": "Two carts of masses 2 kg and 3 kg collide and stick together. Their initial velocities are +4 m/s and -1 m/s. Find their common velocity and explain why kinetic energy is not conserved.",
+      "intent": "quantitative",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 6,
+      "prompt": "A 0.50 kg ball moves in a horizontal circle of radius 2 m at 6 m/s. Calculate the required centripetal force and identify what physical interaction supplies it in a tethered-ball example.",
+      "intent": "quantitative",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 7,
+      "prompt": "A uniform solid disk rolls without slipping down an incline from rest through a vertical drop h. Derive its final center-of-mass speed using energy conservation and explain why the result differs from that of a sliding block.",
+      "intent": "derivation",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "derivation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 8,
+      "prompt": "A skater pulls her arms inward while spinning. Explain quantitatively how angular speed changes if external torque is negligible, and distinguish angular momentum conservation from kinetic-energy conservation.",
+      "intent": "conceptual",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 9,
+      "prompt": "A pendulum has a 1.0 m length. Derive its small-angle period and state the approximation that makes the simple harmonic model valid. Estimate the period for g = 9.8 m/s².",
+      "intent": "derivation",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "derivation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 10,
+      "prompt": "A 1200 kg satellite is in a circular orbit around Earth at radius r from Earth's center. Derive its orbital speed and explain why the satellite's acceleration points toward Earth even though its speed is constant.",
+      "intent": "derivation",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "derivation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 11,
+      "prompt": "A force F = (3x²) N acts along x from x = 0 to 2 m. Calculate the work and compare it with what a constant-force approximation using the endpoint force would predict.",
+      "intent": "quantitative",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 12,
+      "prompt": "A ladder leans against a frictionless wall with its base on a rough floor. Draw or describe the free-body diagram and derive the relation among wall force, floor normal force, friction, ladder weight, and the angle for static equilibrium.",
+      "intent": "scenario",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "system_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 13,
+      "prompt": "A projectile is launched at speed v at angle theta with negligible air resistance. Derive the range and identify the angle that maximizes it for a fixed launch and landing height.",
+      "intent": "derivation",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "derivation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 14,
+      "prompt": "A rotating shaft experiences torque that varies with angular speed because of a resisting load. Explain how to determine steady operating speed from the applied and resisting torque curves, and what happens if their slopes imply an unstable intersection.",
+      "intent": "design",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "system_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 15,
+      "prompt": "A two-stage cart-and-flywheel system receives an impulse and then transfers energy through a clutch. Explain which quantities are conserved during the collision-like coupling and which are not, and formulate an energy/momentum model for the final speed.",
+      "intent": "scenario",
+      "domain": "Classical Mechanics",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "system_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 16,
+      "prompt": "Distinguish temperature, heat, and internal energy for a hot metal block placed in contact with a cooler block. Identify which are state variables and which describe energy transfer.",
+      "intent": "conceptual",
+      "domain": "Thermodynamics & Heat Transfer",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 17,
+      "prompt": "An ideal gas occupies 2.0 L at 300 K and 1 atm. At constant temperature it expands to 4.0 L. Find the final pressure and describe the work done by the gas qualitatively.",
+      "intent": "quantitative",
+      "domain": "Thermodynamics & Heat Transfer",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 18,
+      "prompt": "For a closed system, 500 J of heat enters while the system does 200 J of work on its surroundings. Using the convention that work done by the system is positive, find the change in internal energy.",
+      "intent": "quantitative",
+      "domain": "Thermodynamics & Heat Transfer",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 19,
+      "prompt": "Explain why a reversible adiabatic expansion of an ideal gas can lower its temperature even though no heat leaves the gas.",
+      "intent": "conceptual",
+      "domain": "Thermodynamics & Heat Transfer",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 20,
+      "prompt": "A Carnot engine operates between 600 K and 300 K. Find its maximum possible efficiency and explain why no real heat engine operating between the same reservoirs can exceed it.",
+      "intent": "quantitative",
+      "domain": "Thermodynamics & Heat Transfer",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 21,
+      "prompt": "Two identical ideal-gas samples undergo free expansion into vacuum versus reversible isothermal expansion to the same final volume. Compare their work, heat transfer, entropy change, and final temperature.",
+      "intent": "comparison",
+      "domain": "Thermodynamics & Heat Transfer",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "comparison",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 22,
+      "prompt": "A refrigerator removes 2.0 kJ of heat from a cold compartment while consuming 0.50 kJ of work. Calculate its coefficient of performance and explain why COP is not an efficiency.",
+      "intent": "quantitative",
+      "domain": "Thermodynamics & Heat Transfer",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 23,
+      "prompt": "A metal rod is heated uniformly by 100 K. Given its linear expansion coefficient, derive the change in length and identify conditions under which the simple linear relation fails.",
+      "intent": "derivation",
+      "domain": "Thermodynamics & Heat Transfer",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "derivation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 24,
+      "prompt": "A wall has two layers in series with different thermal conductivities. Derive the steady heat-transfer rate using thermal resistances and explain how a thin low-conductivity layer can dominate the total resistance.",
+      "intent": "engineering_tradeoff",
+      "domain": "Thermodynamics & Heat Transfer",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "engineering_tradeoff",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 25,
+      "prompt": "An insulated piston-cylinder contains an ideal gas and is compressed rapidly. Explain why the process may deviate from the quasi-static adiabatic model and identify what measurements would distinguish heat leakage from non-equilibrium effects.",
+      "intent": "experimental_interpretation",
+      "domain": "Thermodynamics & Heat Transfer",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "experimental_interpretation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 26,
+      "prompt": "Two point charges exert an electric force on each other. State how the force changes if their separation doubles and one charge triples, and explain the vector direction.",
+      "intent": "conceptual",
+      "domain": "Electromagnetism & Circuits",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 27,
+      "prompt": "A 12 V source is connected to a 6 ohm resistor. Find the current and power dissipated, and verify the result using P = I²R.",
+      "intent": "quantitative",
+      "domain": "Electromagnetism & Circuits",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 28,
+      "prompt": "A 10 microfarad capacitor is charged to 20 V. Calculate its stored energy and explain where that energy resides physically.",
+      "intent": "quantitative",
+      "domain": "Electromagnetism & Circuits",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 29,
+      "prompt": "Use Kirchhoff's voltage and current laws to set up equations for a two-loop circuit with a shared resistor. Explain the sign convention rather than simply quoting the final currents.",
+      "intent": "derivation",
+      "domain": "Electromagnetism & Circuits",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "derivation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 30,
+      "prompt": "A charged particle enters a uniform magnetic field perpendicular to its velocity. Derive the radius of its circular path and explain why the magnetic field changes direction of velocity but not kinetic energy.",
+      "intent": "derivation",
+      "domain": "Electromagnetism & Circuits",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "derivation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 31,
+      "prompt": "A conducting loop enters a region of increasing magnetic field. Determine the induced-current direction using Faraday's and Lenz's laws, and explain the physical meaning of the minus sign.",
+      "intent": "conceptual",
+      "domain": "Electromagnetism & Circuits",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 32,
+      "prompt": "An RL circuit is connected to a DC source. Derive the current as a function of time and identify the time constant. Explain the limiting behavior at t = 0 and t much greater than the time constant.",
+      "intent": "derivation",
+      "domain": "Electromagnetism & Circuits",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "limiting_case_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 33,
+      "prompt": "An AC load has resistance and inductive reactance. Explain how impedance determines current phase and real power, and why apparent power can exceed real power.",
+      "intent": "conceptual",
+      "domain": "Electromagnetism & Circuits",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "system_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 34,
+      "prompt": "A transformer steps 240 V RMS down to 24 V RMS with an ideal turns ratio. If the secondary supplies 5 A, estimate the primary current and explain the ideal power balance.",
+      "intent": "quantitative",
+      "domain": "Electromagnetism & Circuits",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 35,
+      "prompt": "Explain at a conceptual level how Maxwell's equations connect changing electric and magnetic fields to electromagnetic waves, and why a propagating wave can carry energy through empty space.",
+      "intent": "conceptual",
+      "domain": "Electromagnetism & Circuits",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 36,
+      "prompt": "A wave has frequency 5 Hz and wavelength 2 m. Find its propagation speed and explain which quantities change if the source frequency doubles while the medium's wave speed stays fixed.",
+      "intent": "quantitative",
+      "domain": "Waves & Optics",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 37,
+      "prompt": "Two coherent waves arrive with equal amplitude and phase difference pi. What is the result of their superposition at that point, and what does this imply about destructive interference?",
+      "intent": "conceptual",
+      "domain": "Waves & Optics",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 38,
+      "prompt": "A string fixed at both ends has length 1.2 m and wave speed 120 m/s. Find its first three resonant frequencies and explain the standing-wave boundary condition.",
+      "intent": "quantitative",
+      "domain": "Waves & Optics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 39,
+      "prompt": "A sound source moves toward a stationary observer. Explain qualitatively and quantitatively why the observed frequency increases, and identify which relative-speed assumptions enter the Doppler formula.",
+      "intent": "quantitative",
+      "domain": "Waves & Optics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 40,
+      "prompt": "A converging thin lens forms an image from a real object. Use the lens equation and magnification relation to determine how image position and size change when object distance moves from far away toward the focal length.",
+      "intent": "comparison",
+      "domain": "Waves & Optics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "comparison",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 41,
+      "prompt": "Explain why a narrow slit produces a wider diffraction pattern than a wide slit, and connect the observation to Fourier or spatial-frequency reasoning.",
+      "intent": "conceptual",
+      "domain": "Waves & Optics",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 42,
+      "prompt": "An optical instrument combines two lenses with different focal lengths. Design the spacing for a simple afocal telescope and discuss the trade-off between magnification, field of view, and alignment sensitivity.",
+      "intent": "design",
+      "domain": "Waves & Optics",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "engineering_tradeoff",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 43,
+      "prompt": "A spacecraft travels at 0.8c relative to Earth. Explain time dilation and calculate the relationship between elapsed proper time on the spacecraft and Earth-frame time for a specified interval.",
+      "intent": "quantitative",
+      "domain": "Modern Physics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 44,
+      "prompt": "A particle's speed approaches the speed of light. Explain why classical kinetic energy becomes inadequate and state the relativistic energy-momentum relationship.",
+      "intent": "conceptual",
+      "domain": "Modern Physics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 45,
+      "prompt": "A metal surface has a work function of 2.0 eV and is illuminated with 5.0 eV photons. Find the maximum photoelectron kinetic energy and explain what happens if the light intensity increases without changing frequency.",
+      "intent": "quantitative",
+      "domain": "Modern Physics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 46,
+      "prompt": "Calculate the de Broglie wavelength of an electron with known momentum, and explain why increasing momentum makes its wavelength shorter.",
+      "intent": "quantitative",
+      "domain": "Modern Physics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 47,
+      "prompt": "Explain the uncertainty principle using position and momentum, and distinguish it from ordinary measurement error or poor experimental precision.",
+      "intent": "conceptual",
+      "domain": "Modern Physics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 48,
+      "prompt": "An atom emits a photon when an electron transitions from a higher to a lower energy level. Given two energy levels, calculate the photon frequency and wavelength and identify the sign of the atomic energy change.",
+      "intent": "quantitative",
+      "domain": "Modern Physics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 49,
+      "prompt": "A radioactive isotope has a half-life of 8 days. If a sample initially contains N0 atoms, derive the remaining amount after 24 days and explain the probabilistic meaning of the half-life.",
+      "intent": "derivation",
+      "domain": "Modern Physics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "derivation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 50,
+      "prompt": "A nuclear reaction has a small mass defect. Explain how to estimate the released energy using mass-energy equivalence and discuss why nuclear binding energy is a useful interpretation.",
+      "intent": "conceptual",
+      "domain": "Modern Physics",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 51,
+      "prompt": "Water at rest has density 1000 kg/m³. Calculate the gauge pressure 5 m below the surface and explain why pressure increases with depth.",
+      "intent": "quantitative",
+      "domain": "Fluid Mechanics",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 52,
+      "prompt": "A floating object displaces 0.020 m³ of water. Determine its weight from Archimedes' principle and state the assumption about static equilibrium.",
+      "intent": "quantitative",
+      "domain": "Fluid Mechanics",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 53,
+      "prompt": "Water flows steadily through a pipe whose diameter decreases from 4 cm to 2 cm. For incompressible flow, determine how the average speed changes and explain the continuity equation.",
+      "intent": "quantitative",
+      "domain": "Fluid Mechanics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 54,
+      "prompt": "Apply Bernoulli's equation between two points in a horizontal pipe and explain why higher ideal-flow speed corresponds to lower static pressure, including the assumptions required.",
+      "intent": "conceptual",
+      "domain": "Fluid Mechanics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 55,
+      "prompt": "A pipe system has a measured pressure drop that is much larger than an inviscid Bernoulli calculation predicts. Diagnose plausible causes and explain how Reynolds number and friction losses affect the model.",
+      "intent": "failure_analysis",
+      "domain": "Fluid Mechanics",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "failure_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 56,
+      "prompt": "Estimate the Reynolds number for water flowing through a pipe using given density, viscosity, diameter, and speed. Interpret whether laminar or turbulent modeling is more appropriate and discuss transition uncertainty.",
+      "intent": "estimation",
+      "domain": "Fluid Mechanics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "estimation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 57,
+      "prompt": "A pump raises water to a higher elevation while maintaining a target flow rate. Formulate the minimum hydraulic power and explain how pump efficiency changes the required input power.",
+      "intent": "engineering_tradeoff",
+      "domain": "Fluid Mechanics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "engineering_tradeoff",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 58,
+      "prompt": "A boundary layer separates from a curved surface. Explain the physical mechanism involving adverse pressure gradient and near-wall momentum, and discuss one design method to delay separation.",
+      "intent": "failure_analysis",
+      "domain": "Fluid Mechanics",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "failure_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 59,
+      "prompt": "A simply supported beam carries a point load at its center. Draw the shear-force and bending-moment behavior and identify where maximum bending moment occurs.",
+      "intent": "scenario",
+      "domain": "Mechanical Engineering",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "system_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 60,
+      "prompt": "A steel specimen has Young's modulus 200 GPa and cross-sectional area 100 mm². Under a tensile load of 10 kN, calculate stress and elastic strain.",
+      "intent": "quantitative",
+      "domain": "Mechanical Engineering",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 61,
+      "prompt": "A circular shaft transmits torque. Derive the relationship between torque, shear stress, radius, and polar moment of inertia, and explain where the maximum shear stress occurs.",
+      "intent": "derivation",
+      "domain": "Mechanical Engineering",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "derivation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 62,
+      "prompt": "Two candidate materials have similar yield strength, but one is much lighter and less ductile. Discuss which material may be preferable for a lightweight rotating component and what additional failure modes must be checked.",
+      "intent": "engineering_tradeoff",
+      "domain": "Mechanical Engineering",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "engineering_tradeoff",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 63,
+      "prompt": "A column becomes unstable under compression before its material reaches yield. Explain Euler buckling, the role of slenderness and boundary conditions, and why increasing length can sharply reduce critical load.",
+      "intent": "conceptual",
+      "domain": "Mechanical Engineering",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 64,
+      "prompt": "A rotating machine shows a vibration peak that grows strongly with rotational speed. Propose a diagnostic sequence to distinguish imbalance, misalignment, looseness, and resonance using frequency and phase observations.",
+      "intent": "failure_analysis",
+      "domain": "Mechanical Engineering",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "failure_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 65,
+      "prompt": "A metal shaft fails after millions of cycles at a stress below its yield strength. Explain fatigue initiation and growth and why static yield strength alone is insufficient for fatigue design.",
+      "intent": "failure_analysis",
+      "domain": "Mechanical Engineering",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "failure_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 66,
+      "prompt": "A heat engine receives 100 kJ per cycle and produces 30 kJ of net work. Calculate its efficiency and identify what additional information is needed to evaluate its real-world performance beyond this number.",
+      "intent": "quantitative",
+      "domain": "Mechanical Engineering",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 67,
+      "prompt": "A mechanical linkage must be light, stiff, and inexpensive. Explain how geometry, material selection, manufacturing constraints, and safety factor create competing objectives rather than a single optimum.",
+      "intent": "design",
+      "domain": "Mechanical Engineering",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "engineering_tradeoff",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 68,
+      "prompt": "A machine element is modeled with linear elasticity, but measured deformation becomes nonlinear at high load. Explain possible physical causes and how to determine whether the issue is material nonlinearity, geometric nonlinearity, or measurement error.",
+      "intent": "experimental_interpretation",
+      "domain": "Mechanical Engineering",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "experimental_interpretation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 69,
+      "prompt": "A DC motor draws 5 A from a 24 V supply while delivering 90 W mechanical output. Calculate input power and efficiency, and identify where the remaining power may go.",
+      "intent": "quantitative",
+      "domain": "Electrical / Electronics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 70,
+      "prompt": "An RC low-pass filter is driven by a sinusoid. Explain how its output amplitude and phase change as frequency increases, and identify the cutoff-frequency relationship.",
+      "intent": "conceptual",
+      "domain": "Electrical / Electronics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 71,
+      "prompt": "A sensor outputs 0–3.3 V and an ADC has 12-bit resolution over that range. Calculate the ideal voltage resolution per code and explain why effective resolution can be worse in a noisy system.",
+      "intent": "quantitative",
+      "domain": "Electrical / Electronics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 72,
+      "prompt": "A sampled signal contains frequency components above half the sampling rate. Explain aliasing, why an anti-alias filter is used, and how increasing sampling rate changes the design constraint.",
+      "intent": "conceptual",
+      "domain": "Electrical / Electronics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 73,
+      "prompt": "An op-amp is configured as an inverting amplifier. Derive its ideal gain and explain the assumptions behind virtual ground and negligible input current.",
+      "intent": "derivation",
+      "domain": "Electrical / Electronics",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "derivation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 74,
+      "prompt": "A transistor-based power stage overheats despite delivering the required load power. Diagnose how conduction loss, switching loss, heat-sinking, duty cycle, and operating frequency can contribute.",
+      "intent": "failure_analysis",
+      "domain": "Electrical / Electronics",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "failure_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 75,
+      "prompt": "A microcontroller sensor reading is unstable only when a motor turns on. Propose a systematic debugging plan involving grounding, supply impedance, decoupling, electromagnetic coupling, shielding, and sampling.",
+      "intent": "debugging",
+      "domain": "Electrical / Electronics",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "debugging",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 76,
+      "prompt": "A digital input is left electrically floating. Explain why its logic state can become unpredictable and give two robust hardware approaches for defining a default state.",
+      "intent": "conceptual",
+      "domain": "Electrical / Electronics",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 77,
+      "prompt": "A transformer is rated for a fixed apparent power. Explain why increasing secondary voltage at the same rated power changes current, and identify the main practical losses that prevent ideal behavior.",
+      "intent": "conceptual",
+      "domain": "Electrical / Electronics",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "system_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 78,
+      "prompt": "An embedded system must sample a sensor every 1 ms while performing variable-length computation. Explain how timing jitter, worst-case execution time, buffering, and real-time scheduling affect whether the requirement is actually met.",
+      "intent": "system_analysis",
+      "domain": "Electrical / Electronics",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "system_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 79,
+      "prompt": "Compare open-loop and closed-loop control using a room-temperature heater example. Explain how feedback changes sensitivity to disturbances and modeling errors.",
+      "intent": "comparison",
+      "domain": "Control Systems",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "comparison",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 80,
+      "prompt": "For a PID controller, explain the physical role of proportional, integral, and derivative terms and give one typical drawback associated with increasing each term excessively.",
+      "intent": "conceptual",
+      "domain": "Control Systems",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 81,
+      "prompt": "A temperature controller reaches the target but has persistent steady-state error under constant load. Which PID term addresses this most directly, and what new risk can it introduce?",
+      "intent": "diagnosis",
+      "domain": "Control Systems",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "failure_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 82,
+      "prompt": "A closed-loop system has a large overshoot and long settling time after a step input. Propose a tuning strategy and explain how bandwidth, damping, and robustness are related.",
+      "intent": "design",
+      "domain": "Control Systems",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "engineering_tradeoff",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 83,
+      "prompt": "Explain how poles of a continuous-time transfer function relate to stability and transient response, and use simple pole locations to distinguish stable, unstable, and marginal cases.",
+      "intent": "conceptual",
+      "domain": "Control Systems",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 84,
+      "prompt": "A feedback loop becomes oscillatory after its gain is increased. Explain how phase lag and loop gain can reduce stability margin, and describe what frequency-response evidence you would inspect.",
+      "intent": "failure_analysis",
+      "domain": "Control Systems",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "failure_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 85,
+      "prompt": "A robotic actuator must respond quickly but cannot tolerate overshoot. Explain why simply increasing proportional gain may not solve the problem and formulate a trade-off involving damping, derivative action, actuator limits, and noise.",
+      "intent": "engineering_tradeoff",
+      "domain": "Control Systems",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "engineering_tradeoff",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 86,
+      "prompt": "A simply supported structural beam carries a known distributed load. Explain how support reactions, shear force, and bending moment are related and how the maximum moment location can be found.",
+      "intent": "scenario",
+      "domain": "Structural / Civil Engineering",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "system_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 87,
+      "prompt": "A foundation transfers a building load to soil. Explain why average bearing pressure is not enough by itself and identify settlement, eccentricity, and soil variability as design considerations.",
+      "intent": "design",
+      "domain": "Structural / Civil Engineering",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "engineering_tradeoff",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 88,
+      "prompt": "A steel column has a calculated critical buckling load of 500 kN and an applied design load of 100 kN. Calculate the simple load-to-critical-load ratio and explain why a real design still requires a safety factor and model validation.",
+      "intent": "quantitative",
+      "domain": "Structural / Civil Engineering",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 89,
+      "prompt": "A water-distribution line must maintain pressure at a remote elevation while limiting pipe diameter and pumping power. Explain the hydraulic trade-offs and the role of friction losses.",
+      "intent": "engineering_tradeoff",
+      "domain": "Structural / Civil Engineering",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "engineering_tradeoff",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 90,
+      "prompt": "A structure develops unexpected cracking near a connection. Propose a failure-investigation sequence that considers load paths, stress concentration, material properties, fatigue, fabrication defects, and environmental effects.",
+      "intent": "failure_analysis",
+      "domain": "Structural / Civil Engineering",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "failure_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 91,
+      "prompt": "Compare crystalline and amorphous solids in terms of atomic order and typical effects on mechanical or thermal behavior.",
+      "intent": "comparison",
+      "domain": "Materials Science",
+      "acuity": "routine",
+      "difficulty": 1,
+      "style": "comparison",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 92,
+      "prompt": "Interpret a tensile stress-strain curve to identify elastic behavior, yield, plastic deformation, ultimate strength, and fracture, and distinguish ductile from brittle failure.",
+      "intent": "experimental_interpretation",
+      "domain": "Materials Science",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "experimental_interpretation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 93,
+      "prompt": "A component operates in a humid, salty environment. Explain the electrochemical basis of corrosion and compare at least two strategies for reducing corrosion risk.",
+      "intent": "failure_analysis",
+      "domain": "Materials Science",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "failure_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 94,
+      "prompt": "A polymer is considered for a load-bearing component that experiences elevated temperature. Explain how viscoelasticity and temperature affect stiffness and why a room-temperature strength value may be misleading.",
+      "intent": "engineering_tradeoff",
+      "domain": "Materials Science",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "engineering_tradeoff",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 95,
+      "prompt": "A composite is designed to be stiff along one direction but lightweight overall. Explain how fiber orientation, matrix properties, and load transfer produce anisotropic behavior and affect failure modes.",
+      "intent": "design",
+      "domain": "Materials Science",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "system_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 96,
+      "prompt": "An aircraft wing generates lift through a pressure distribution and changes in momentum of the surrounding air. Explain how lift, drag, angle of attack, and stall are related without treating lift as simply 'air hitting the wing.'",
+      "intent": "conceptual",
+      "domain": "Aerospace / Energy / Process Engineering",
+      "acuity": "routine",
+      "difficulty": 3,
+      "style": "conceptual",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 97,
+      "prompt": "A rocket expels propellant at exhaust speed ve. Explain the Tsiolkovsky rocket equation and why staging can increase achievable delta-v, while identifying the assumptions of the ideal equation.",
+      "intent": "derivation",
+      "domain": "Aerospace / Energy / Process Engineering",
+      "acuity": "routine",
+      "difficulty": 4,
+      "style": "derivation",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 98,
+      "prompt": "A solar installation receives 1000 W/m² of irradiance and has 20% conversion efficiency over an active area of 10 m². Estimate ideal electrical output and list important real-world losses that reduce delivered power.",
+      "intent": "quantitative",
+      "domain": "Aerospace / Energy / Process Engineering",
+      "acuity": "routine",
+      "difficulty": 2,
+      "style": "quantitative",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 99,
+      "prompt": "A process plant mixes two streams and must satisfy both mass and energy balances. Explain how to formulate the balances, identify when reaction or phase change terms matter, and describe how an inconsistent measured flow rate can be detected.",
+      "intent": "system_analysis",
+      "domain": "Aerospace / Energy / Process Engineering",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "system_analysis",
+      "jurisdiction_required": false
+    },
+    {
+      "id": 100,
+      "prompt": "A battery system must provide high peak power but also long energy capacity for a mobile platform. Analyze the trade-offs among energy density, power density, thermal management, degradation, mass, safety, and cost, and explain how the design objective changes if peak power is rare rather than continuous.",
+      "intent": "engineering_tradeoff",
+      "domain": "Aerospace / Energy / Process Engineering",
+      "acuity": "routine",
+      "difficulty": 5,
+      "style": "engineering_tradeoff",
+      "jurisdiction_required": false
+    }
+  ]
+}

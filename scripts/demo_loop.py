@@ -546,6 +546,10 @@ def _criteria_report(task: str, v: dict, jj: dict) -> None:
         for fid, f in flags.items():
             print(f"   {(f.get('label') or fid):<28}{f['n']:>3} of {v['n']} answers"
                   f" — each {f.get('effect_words', 'changes the score')}")
+    const = v.get("breakdowns_constant") or {}
+    if const:
+        say("", "; ".join(f"{f} is {val} on every item" for f, val in const.items())
+            + " — no table for that.")
     for field, cells in (v.get("breakdowns") or {}).items():
         print()
         head = f"{field:<28}{'mean':>7}{'answers':>9}"

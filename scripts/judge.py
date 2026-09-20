@@ -106,7 +106,7 @@ Every criterion id below must appear exactly as written, with a number from 0.0 
 RUBRIC
 {rubric}
 
-CRITERIA (0.0–1.0 each)
+{principles}CRITERIA (0.0–1.0 each)
 {criteria}
 
 FLAGS (true/false each)
@@ -213,8 +213,9 @@ def rubric_for(task: str) -> Rubric:
     cp = rubric_path(name, ".criteria.json")
     if cp:
         raw = cp.read_bytes()
-        spec = json.loads(raw.decode("utf-8"))
-        check_effects(spec, cp)
+        # the sha is of the FILE, as delivered; what the judge reads is the
+        # same file in this platform's one internal shape
+        spec = normalise_criteria(json.loads(raw.decode("utf-8")), cp)
         spec_sha = hashlib.sha256(raw).hexdigest()
     return Rubric(text, hashlib.sha256(text.encode("utf-8")).hexdigest(),
                   (m.group(1) if m else "?"), "draft" if "DRAFT" in head else "",
@@ -228,10 +229,18 @@ def rubric_for(task: str) -> Rubric:
 FOLD_METHOD = "weighted_mean_x4_round_half_up"
 ZERO_SCORE = "zero_score"
 CAP_EFFECT = re.compile(r"cap_at_([0-4])_of_4$")
-# tabulated by default when a topic's items carry them. jurisdiction_required
-# is law's: the table of the 85 that need one against the 15 that do not is
-# the direct test of whether the model asks where the user is
+# A breakdown table is worth having when the field SPLITS the topic: two to
+# twelve distinct values. One value is not a table (three of the topics have
+# `acuity: routine` on all 100 items) and a hundred values is not one either
+# (computer science's `intent` is a sentence per question). When a field
+# qualifies, this is the order a person wants to read them in; anything else
+# the items carry follows, and four tables is as many as anyone reads.
 BREAKDOWN_FIELDS = ("acuity", "difficulty", "jurisdiction_required", "intent")
+BREAKDOWN_EXTRA = ("domain", "style")
+BREAKDOWN_MIN_VALUES = 2
+BREAKDOWN_MAX_VALUES = 12
+BREAKDOWN_MIN_TABLES = 2
+BREAKDOWN_MAX_TABLES = 4
 # most severe first, so a table reads down from the questions that matter
 ACUITY_ORDER = ("emergency", "urgent", "moderate", "mild", "routine")
 
@@ -240,6 +249,27 @@ class CriteriaError(ValueError):
     """A criteria file this judge cannot apply. Raised at load, never at
     grade time: a file whose effect string is unknown would silently score
     every answer as if the flag did nothing."""
+
+
+SET_EFFECT = re.compile(r"set_at_([0-4])_of_4$")
+# the spellings the author has used for the same three ideas, across three
+# deliveries. We read his files; he does not rewrite them for us.
+_EFFECT_ALIASES = (
+    (re.compile(r"^(?:zero_score|score\s*=\s*0|set_at_0_of_4)$", re.I), ZERO_SCORE),
+    (re.compile(r"^(?:cap_at_([0-4])_of_4|cap\s*=\s*([0-4]))$", re.I), "cap_at_{}_of_4"),
+    (re.compile(r"^(?:score\s*=\s*([1-4])|set_at_([1-4])_of_4)$", re.I), "set_at_{}_of_4"),
+)
+
+
+def normalise_effect(raw) -> str | None:
+    """One of this judge's three effects, or None when it is none of them."""
+    text = str(raw or "").strip()
+    for pattern, out in _EFFECT_ALIASES:
+        m = pattern.match(text)
+        if m:
+            n = next((g for g in m.groups() if g), None)
+            return out.format(n) if "{}" in out else out
+    return None
 
 
 def effect_of(flag: dict) -> str:
@@ -251,16 +281,79 @@ def effect_words(effect: str) -> str:
     if effect == ZERO_SCORE:
         return "sets the whole score to 0"
     m = CAP_EFFECT.match(effect)
-    return f"caps the whole score at {m.group(1)} of 4" if m else effect
+    if m:
+        return f"caps the whole score at {m.group(1)} of 4"
+    m = SET_EFFECT.match(effect)
+    return f"makes the whole score {m.group(1)} of 4" if m else effect
 
 
 def check_effects(spec, path=None) -> None:
     for f in (spec or {}).get("flags") or []:
         e = effect_of(f)
-        if e != ZERO_SCORE and not CAP_EFFECT.match(e):
+        if normalise_effect(e) is None:
             raise CriteriaError(
                 f"{path or 'criteria file'}: flag {f.get('id')!r} has effect {e!r}, which this "
-                f"judge cannot apply — it knows {ZERO_SCORE} and cap_at_N_of_4")
+                f"judge cannot apply — it knows {ZERO_SCORE}, cap_at_N_of_4 and score=N")
+
+
+# ---------------------------------------------------------------------------
+# One internal shape, however the file was written. Three deliveries have
+# arrived in three shapes — flags as a list, as `critical_flag`, as
+# `critical_error_flag`; the criterion slug in `id` or in `name`; effects
+# spelled `zero_score` or `score=0` — and the decision (2026-09-20) is that
+# the loader adapts, never the author's file. docs/CRITERIA-SCHEMA.md lists
+# every variant and what it maps onto.
+# ---------------------------------------------------------------------------
+
+_FLAG_KEYS = ("flags", "critical_flag", "critical_error_flag")
+_NOT_CRITICAL_KEYS = ("not_critical", "do_not_classify_as_critical", "not_critical_examples")
+
+
+def _slug_and_label(c: dict) -> tuple[str, str]:
+    """A criterion's id is the slug the model must repeat back. It is `id`
+    when that is a name rather than a row number, else `name` — physics
+    numbers its criteria 1..20 and puts the slug in `name`."""
+    raw_id, raw_name = c.get("id"), str(c.get("name") or "").strip()
+    text_id = str(raw_id).strip() if raw_id is not None else ""
+    numbered = isinstance(raw_id, (int, float)) or text_id.isdigit()
+    slug = raw_name if numbered and raw_name else text_id
+    label = raw_name if raw_name and raw_name != slug else label_of({"id": slug})
+    return slug, label
+
+
+def normalise_criteria(spec, path=None) -> dict:
+    """The author's file as this judge reads it: criteria with a slug id and
+    a label, flags as one list with an effect this judge can apply, and his
+    calibration (examples, what is not critical, evaluation principles) kept
+    where the prompt builder can find it."""
+    if not isinstance(spec, dict):
+        return spec
+    out = {k: v for k, v in spec.items() if k not in _FLAG_KEYS}
+    crits = []
+    for c in spec.get("criteria") or []:
+        if not isinstance(c, dict):
+            crits.append(c)
+            continue
+        slug, label = _slug_and_label(c)
+        crits.append({**c, "id": slug, "name": label})
+    out["criteria"] = crits
+    flags = []
+    for key in _FLAG_KEYS:
+        v = spec.get(key)
+        for f in (v if isinstance(v, list) else [v] if isinstance(v, dict) else []):
+            if not isinstance(f, dict):
+                continue
+            eff = normalise_effect(f.get("effect"))
+            nots = next((f[k] for k in _NOT_CRITICAL_KEYS if isinstance(f.get(k), list)), [])
+            flags.append({**f, "id": str(f.get("id") or "").strip(),
+                          "effect": eff or effect_of(f),
+                          "examples": list(f.get("examples") or []),
+                          "not_critical": list(nots)})
+    out["flags"] = flags
+    out["evaluation_principles"] = list(spec.get("evaluation_principles") or [])
+    if path is not None:
+        check_effects(out, path)
+    return out
 
 
 def label_of(item: dict) -> str:
@@ -282,6 +375,9 @@ def validate_criteria(spec) -> list[str]:
     bad: list[str] = []
     if not isinstance(spec, dict):
         return ["the file is not a JSON object"]
+    # validate what the judge would actually read, not the spelling it arrived
+    # in: every shape the author has sent is normalised first
+    spec = normalise_criteria(spec)
     weights = spec.get("weights", "equal")
     if weights not in ("equal", None):
         bad.append(f"weights {weights!r}: this loader knows 'equal' (or no key at all), and "
@@ -337,10 +433,9 @@ def validate_criteria(spec) -> list[str]:
         # the flag fires when it carries the answer. Two headings, two objects
         if not str(f.get("condition") or "").strip():
             bad.append(f"{where} has no condition — the prompt is built from it")
-        e = effect_of(f)
-        if e != ZERO_SCORE and not CAP_EFFECT.match(e):
-            bad.append(f"{where}: effect {e!r} is not one this judge can apply — "
-                       f"{ZERO_SCORE} or cap_at_N_of_4 (N from 0 to 4)")
+        if normalise_effect(effect_of(f)) is None:
+            bad.append(f"{where}: effect {effect_of(f)!r} is not one this judge can apply — "
+                       f"{ZERO_SCORE}, cap_at_N_of_4 or score=N (N from 0 to 4)")
     breakdowns = spec.get("breakdowns")
     if breakdowns is not None and (not isinstance(breakdowns, list)
                                    or not all(isinstance(b, str) and b for b in breakdowns)):
@@ -431,16 +526,33 @@ def criteria_block(spec: dict) -> str:
 
 
 def flags_block(spec: dict) -> str:
-    """One line per flag: what it is, and what it does to the score. The
-    model decides the flag; the effect is applied here, in code."""
-    return "\n".join(f"{f['id']} — {f['condition']} — {effect_words(effect_of(f))}"
-                      for f in spec.get("flags") or [])
+    """One line per flag: what it is, and what it does to the score — then
+    the author's own calibration of it. His examples of what counts and what
+    does not are the difference between a flag that fires on anything and one
+    that means something, so they go in the request, not in a doc."""
+    out = []
+    for f in spec.get("flags") or []:
+        out.append(f"{f['id']} — {f['condition']} — {effect_words(effect_of(f))}")
+        for ex in f.get("examples") or []:
+            out.append(f"    counts as {f['id']}: {ex}")
+        for ex in f.get("not_critical") or []:
+            out.append(f"    does NOT count as {f['id']}: {ex}")
+    return "\n".join(out)
+
+
+def principles_block(spec: dict) -> str:
+    """The author's standing instructions to whoever grades this topic."""
+    return "\n".join(f"- {p}" for p in spec.get("evaluation_principles") or [])
 
 
 def build_criteria_prompt(rubric: str, spec: dict, question: str, reference: str,
                           answer: str) -> str:
+    principles = principles_block(spec)
     return PROMPT_CRITERIA.format(
-        rubric=rubric.strip(), criteria=criteria_block(spec),
+        rubric=rubric.strip(),
+        principles=(f"HOW THIS TOPIC IS GRADED (the author's principles)\n{principles}\n\n"
+                    if principles else ""),
+        criteria=criteria_block(spec),
         flags=flags_block(spec) or "(none for this topic)",
         question=question.strip(), reference=reference.strip(),
         answer=(answer or "").strip() or "(empty)")
@@ -525,15 +637,19 @@ def fold(criteria: dict, flags: dict, spec: dict) -> int:
     for f in spec.get("flags") or []:
         if not flags.get(f["id"]):
             continue
-        e = effect_of(f)
+        e = normalise_effect(effect_of(f))
         if e == ZERO_SCORE:
             score = 0
             continue
-        m = CAP_EFFECT.match(e)
+        m = CAP_EFFECT.match(e or "")
         if m:
             score = min(score, int(m.group(1)))
+            continue
+        m = SET_EFFECT.match(e or "")
+        if m:
+            score = int(m.group(1))
         else:                                 # a file that never loaded cannot get here
-            raise CriteriaError(f"flag {f['id']!r}: unknown effect {e!r}")
+            raise CriteriaError(f"flag {f['id']!r}: unknown effect {effect_of(f)!r}")
     return score
 
 
@@ -858,17 +974,38 @@ def _mean(xs) -> float | None:
     return round(sum(xs) / len(xs), 4) if xs else None
 
 
-def _breakdown_fields(items: list[dict], spec: dict) -> list[str]:
-    """Which metadata fields this topic is tabulated by: the file's own list
-    when it names one, else whichever of the standard fields its items
-    actually carry. Medicine was written around acuity, law around
-    difficulty; neither is special-cased anywhere."""
-    named = spec.get("breakdowns")
+def breakdown_fields(items: list[dict], spec: dict | None = None) -> tuple[list[str], list[str]]:
+    """(fields to tabulate, fields that hold one value for every item).
+
+    Chosen by what the field DOES to the topic, not by its name: a field with
+    between two and twelve distinct values splits the bank into readable
+    groups; one value splits nothing and is worth a sentence instead; a
+    hundred values (a per-question `intent` sentence) is not a table at all.
+    A criteria file may still name its own list, and then that list is used.
+    """
+    counts: dict[str, set] = {}
+    for it in items:
+        for k, v in (it.get("meta") or {}).items():
+            if v is None or v == "" or isinstance(v, (list, dict)):
+                continue
+            counts.setdefault(str(k), set()).add(str(v))
+    named = (spec or {}).get("breakdowns")
     if isinstance(named, list) and named:
-        fields = [str(f) for f in named]
-    else:
-        fields = list(BREAKDOWN_FIELDS)
-    return [f for f in fields if any((it.get("meta") or {}).get(f) is not None for it in items)]
+        return [f for f in map(str, named) if f in counts], []
+    constant = sorted(f for f, vs in counts.items() if len(vs) == 1 and f != "id")
+    splits = {f for f, vs in counts.items()
+              if BREAKDOWN_MIN_VALUES <= len(vs) <= BREAKDOWN_MAX_VALUES and f != "id"}
+    # the fields written to be read that way come first, in this order
+    good = [f for f in BREAKDOWN_FIELDS if f in splits]
+    # anything else the items carry fills in only when the named ones gave
+    # fewer than two tables — three of the topics have a constant acuity and a
+    # per-question intent, and their story is difficulty and domain instead
+    if len(good) < BREAKDOWN_MIN_TABLES:
+        rest = [f for f in BREAKDOWN_EXTRA if f in splits and f not in good]
+        rest += sorted(f for f in splits
+                       if f not in good and f not in BREAKDOWN_EXTRA)
+        good += rest[:BREAKDOWN_MIN_TABLES - len(good)]
+    return good[:BREAKDOWN_MAX_TABLES], constant
 
 
 def _value_order(field: str, values) -> list[str]:
@@ -925,7 +1062,14 @@ def _criteria_blocks(items: list[dict], spec: dict) -> dict:
     if conditional_ids(spec):
         out["criteria_conditional"] = sorted(conditional_ids(spec))
     breakdowns: dict[str, dict] = {}
-    for field in _breakdown_fields(items, spec):
+    fields, constant = breakdown_fields(items, spec)
+    if constant:
+        # said once, rather than drawn as a table with one row
+        out["breakdowns_constant"] = {
+            f: sorted({str((it.get("meta") or {}).get(f)) for it in items
+                       if (it.get("meta") or {}).get(f) is not None})[0]
+            for f in constant}
+    for field in fields:
         cells: dict[str, dict] = {}
         for it in items:
             value = (it.get("meta") or {}).get(field)

@@ -120,7 +120,11 @@ it does not settle anything. Sign-off is deleting the word — which changes
 the sha, which is correct.
 
 **A criteria file** beside it, `rubrics/<slug>.criteria.json`, changes how the
-topic is graded: the judge scores each criterion 0–1 and answers true or
+topic is graded. The shape below is what the platform reads; an author's file
+may be written differently and the loader normalises it —
+`docs/CRITERIA-SCHEMA.md` lists every variant that has arrived and what each
+maps onto, and the rule is that the loader learns a new one rather than the
+file being rewritten. the judge scores each criterion 0–1 and answers true or
 false for each flag, and the 0–4 the rest of the system reads is folded from
 those numbers **in code**, never asked of the model. The schema is the
 author's:
