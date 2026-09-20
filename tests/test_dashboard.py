@@ -21,7 +21,7 @@ import pytest
 pytestmark = pytest.mark.dashboard
 
 # the tabs the FROZEN page has (the live one adds Training and Submit & Queue)
-FROZEN_TABS = ["Overview", "Leaderboard", "Tasks", "Perplexity & Loss", "Evals"]
+FROZEN_TABS = ["Overview", "Models", "Leaderboard", "Tasks", "Perplexity & Loss", "Evals"]
 SCREENS = Path(__file__).resolve().parent / "_screens"
 
 
@@ -540,4 +540,84 @@ def test_screenshots_for_the_pr(surface):
             pg.locator(".card", has=pg.locator("h2", has_text="What the training taught")) \
               .screenshot(path=SCREENS / f"taught-the-test-{scheme}-{width}.png")
     assert len(list(SCREENS.glob("*.png"))) >= 16
+    assert surface.errors == []
+
+
+def test_the_models_tab_lists_every_model_and_filters_it(surface):
+    """Phase 8e P6b: thirty-three models and no list was the complaint. The
+    two filter rows that floated above the tabs live here now, where what
+    they filter is on screen under them."""
+    pg = surface.open("#tab=models")
+    table = pg.locator("table.jd[data-models-table]")
+    rows = table.locator("tbody tr[data-model-row]")
+    n = rows.count()
+    assert n == pg.evaluate("DATA.models.length") and n > 3
+    assert pg.locator("[data-model-count]").first.get_attribute("data-model-count") == str(n)
+    # the old floating filters are gone from the shell
+    assert pg.locator("#kindSeg").count() == 0 and pg.locator("#srcSeg").count() == 0
+    # every filter narrows this list, and says so by the count
+    pg.locator("[data-filter='kind:instruct']").click()
+    pg.wait_for_function("n => document.querySelectorAll('tr[data-model-row]').length < n", arg=n)
+    instruct = pg.locator("tbody tr[data-model-row]").count()
+    assert 0 < instruct < n
+    assert all("instruct" in pg.locator("tbody tr[data-model-row]").nth(i).text_content()
+               for i in range(instruct))
+    pg.locator("[data-filter='kind:all']").click()
+    pg.wait_for_function("n => document.querySelectorAll('tr[data-model-row]').length === n", arg=n)
+    # a judged-run filter, because 'which of these sat the exam' is a question
+    pg.locator("input[data-filter='judged']").check()
+    pg.wait_for_function("n => document.querySelectorAll('tr[data-model-row]').length <= n", arg=n)
+    judged = pg.locator("tbody tr[data-model-row]").count()
+    assert judged >= 1
+    pg.locator("input[data-filter='judged']").uncheck()
+    # search
+    pg.get_by_label("filter models").fill("good")
+    pg.wait_for_function("() => document.querySelectorAll('tr[data-model-row]').length >= 1")
+    assert all("good" in pg.locator("tbody tr[data-model-row]").nth(i).text_content()
+               for i in range(pg.locator("tbody tr[data-model-row]").count()))
+    pg.get_by_label("filter models").fill("")
+    # sort on a column, both ways
+    pg.locator("th[data-sort='params']").click()
+    first = pg.locator("tbody tr[data-model-row]").first.get_attribute("data-model-row")
+    pg.locator("th[data-sort='params']").click()
+    assert pg.locator("tbody tr[data-model-row]").first.get_attribute("data-model-row") != first
+    SCREENS.mkdir(exist_ok=True)
+    pg.screenshot(path=SCREENS / "models-tab.png", full_page=True)
+    assert surface.errors == []
+
+
+def test_compare_ticks_feed_the_leaderboards_radar(surface):
+    pg = surface.open("#tab=models")
+    boxes = pg.locator("tbody tr[data-model-row] input[type=checkbox]")
+    # untick everything the default picked, then choose two of our own
+    for i in range(boxes.count()):
+        if boxes.nth(i).is_checked():
+            boxes.nth(i).uncheck()
+    rows = pg.locator("tbody tr[data-model-row]")
+    want = [rows.nth(0).get_attribute("data-model-row"), rows.nth(1).get_attribute("data-model-row")]
+    boxes.nth(0).check()
+    boxes.nth(1).check()
+    surface.tab("Leaderboard")
+    legend = pg.locator(".card", has=pg.locator("h2", has_text="Compare")).first
+    text = legend.text_content() if legend.count() else pg.locator("#view").text_content()
+    for mid in want:
+        name = next(m for m in DATA_MODELS(pg) if m["id"] == mid)["name"]
+        assert name in text
+    assert surface.errors == []
+
+
+def DATA_MODELS(pg):
+    return pg.evaluate("DATA.models.map(m => ({id: m.id, name: m.name}))")
+
+
+def test_a_model_page_has_a_sub_nav_and_its_sections(surface):
+    pg = surface.open(model_link("fx/good-750m"))
+    nav = pg.locator("[data-model-nav]")
+    assert nav.count() == 1
+    labels = [nav.locator("a[data-nav]").nth(i).text_content()
+              for i in range(nav.locator("a[data-nav]").count())]
+    assert "Judged" in labels and "Provenance" in labels
+    for a in labels:
+        anchor = nav.locator("a[data-nav]", has_text=a).first.get_attribute("data-nav")
+        assert pg.locator(f"#sec-{anchor}").count() == 1
     assert surface.errors == []

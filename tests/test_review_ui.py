@@ -455,9 +455,11 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
     # and the table it came from now shows the new sha, with the rubric's own
     # DRAFT gone and the criteria file's still there
     sha = jd.rubric_for("exam_medicine_health").sha256[:10]
+    # the table is dropped and re-fetched after a commit, so for a tick there
+    # is no row at all — waiting on its text must tolerate that, not throw
     page.wait_for_function(
-        "sha => document.querySelector(\"tr[data-rubric-row='medicine & health']\")"
-        ".textContent.includes(sha)", arg=sha)
+        "sha => { const r = document.querySelector(\"tr[data-rubric-row='medicine & health']\");"
+        "  return !!r && r.textContent.includes(sha); }", arg=sha)
     assert row.locator(".badge.taint", has_text="DRAFT").count() == 0
     assert page.errors == []
 

@@ -1804,6 +1804,8 @@ const state = {
   ans: { model: '', rows: null, loading: false, topic: '', open: {},
          acuity: 'all', flag: 'all', score: 'all', sort: 'score' },          // Answers panel
   loopRead: {},                        // topics whose answers this browser has opened
+  mdl: { family: 'all', judgedOnly: false, taintedOnly: false,
+         sort: { key: 'avg', dir: -1 } },                                  // Models tab
   rvName: '',                          // the name approvals are recorded under (remembered)
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
@@ -3051,6 +3053,23 @@ function vTaint(m) {
       + 'of an exam topic or a benchmark. The report half was never touched by that data, so '
       + 'it is the honest test: if the training taught the skill, both halves move together; '
       + 'if it taught the test, only the half the generator\'s spec came from moves.' }));
+  // the trail backwards: which run, which dataset, which proposal. Every step
+  // of the loop that produced this model is one click from here
+  const tt = m.taintTrail;
+  if (tt) card.append(el('p', { class: 'small', 'data-taint-trail': '1' },
+    'From ', el('a', { href: '#tab=training', text: `training run #${tt.run_id}`,
+      onclick: e => { e.preventDefault(); state.trSel = [tt.run_id];
+        navigate({ tab: 'training', model: null, topic: null }); } }),
+    ', which trained on ',
+    tt.datasets.map((d, i) => el('span', {}, i ? ', ' : '',
+      el('a', { href: `api/datasets/${d}`, target: '_blank', rel: 'noopener',
+        text: `dataset #${d}` }))),
+    tt.proposals.length ? el('span', {}, ' from ',
+      tt.proposals.map((pid, i) => el('span', {}, i ? ', ' : '',
+        el('a', { href: '#tab=review', text: `proposal #${pid}`,
+          onclick: e => { e.preventDefault(); state.rv.loaded = false;
+            navigate({ tab: 'review', model: null, topic: null }); } })))) : '',
+    '.'));
   for (const [t, c] of Object.entries(tc)) {
     const rubric = c.scale === 'rubric';
     card.append(el('div', { class: 'dxh', text: rubric ? `${tName(t)} — the exam`
@@ -3208,7 +3227,59 @@ function vModel() {
   // The exam leads: it is the instrument the loop steers by. The
   // multiple-choice results and the per-item diagnosis follow as the free
   // second opinion — same GPU, no API call, and a different kind of evidence.
-  return [back, head, vJudged(m), vTaint(m), results, vDiagnose(m), provCard].filter(Boolean);
+  const judged = vJudged(m), taint = vTaint(m), diag = vDiagnose(m);
+  const sections = [['judged', 'Judged', judged], ['results', 'Results', results],
+                    ['diagnose', 'Diagnose', diag], ['taint', 'Training data', taint],
+                    ['provenance', 'Provenance', provCard],
+                    ['runs', 'Runs', LIVE ? vModelRuns(m) : null]];
+  for (const [id, , node] of sections) if (node) node.id = 'sec-' + id;
+  return [back, head, modelNav(sections), ...sections.map(([, , n]) => n),
+          ].filter(Boolean);
+}
+
+// The model page is long, and since the judged section arrived the
+// interesting part is halfway down it. A sub-nav that sticks is the cheapest
+// fix: anchors, not routes, so Back still leaves the page the way it came.
+function modelNav(sections) {
+  return el('div', { class: 'card modelnav', 'data-model-nav': '1',
+    style: 'position:sticky;top:0;z-index:5;padding:8px 14px' },
+    el('div', { class: 'frm', style: 'gap:14px' },
+      sections.filter(([, , node]) => node).map(([id, label]) =>
+        el('a', { href: '#sec-' + id, class: 'small', 'data-nav': id, text: label,
+          onclick: e => { e.preventDefault();
+            const t = document.getElementById('sec-' + id);
+            if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }))));
+}
+
+// Every submission of this model, newest first: which suite, what came of it,
+// and the log. "Why is this preliminary?" is answered here rather than in
+// someone's memory of the queue.
+function vModelRuns(m) {
+  const rows = (state.queue || []).filter(r => r.hf_id === m.id);
+  if (!state.queue.length && netReady()) loadQueue();
+  const card = el('div', { class: 'card' }, el('h2', { text: 'Runs of this model' }),
+    el('p', { class: 'sub', text: 'Every time this model was submitted, and what came of '
+      + 'it — the answer to "why is this one preliminary".' }));
+  if (!rows.length) {
+    card.append(note('No submission of this model is in the queue\u2019s recent history. It '
+      + 'may have been evaluated before this service kept one, or by hand.'));
+    return card;
+  }
+  card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-runs-table': '1' },
+    el('thead', {}, el('tr', {}, el('th', { text: '#' }), el('th', { text: 'submitted' }),
+      el('th', { text: 'suite' }), el('th', { text: 'status' }), el('th', { text: 'what happened' }),
+      el('th', { text: '' }))),
+    el('tbody', {}, rows.map(r => el('tr', { 'data-run': String(r.id) },
+      el('td', { class: 'num se', text: '#' + r.id }),
+      el('td', { class: 'small se', text: r.created_at ? rel(r.created_at) + ' ago' : '—' }),
+      el('td', { class: 'small' }, r.suite,
+        (() => { let t = []; try { t = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
+          return t.length ? el('div', { class: 'se', text: t.map(frName).join(', ') }) : ''; })()),
+      el('td', {}, el('span', { class: stClass(r.status), text: r.status })),
+      el('td', { class: 'small se', text: r.error || r.progress || '' }),
+      el('td', {}, el('a', { href: `api/runs/${r.id}/log`, target: '_blank', rel: 'noopener',
+        class: 'small', text: 'log' }))))))));
+  return card;
 }
 
 function vOverview(ms) {
@@ -3610,6 +3681,135 @@ function aboutBenchmarks(tasks) {
       text: (state.lbAbout ? '▾' : '▸')
           + ` About these benchmarks (${tasks.length})` }),
     state.lbAbout ? body : '');
+}
+
+// ---------------------------------------------------------------------------
+// The Models tab. Thirty-three models, nineteen of them checkpoints, and until
+// now the only ways to one were the Overview top five, a leaderboard row, or
+// knowing its hash. The two filter rows that used to float above the tabs live
+// here, where their scope is visible: they filter THIS list.
+// ---------------------------------------------------------------------------
+
+const MCOLS = [
+  { key: 'name', label: 'model' },
+  { key: 'kind', label: 'kind' },
+  { key: 'family', label: 'family' },
+  { key: 'params', label: 'params', num: true, defDir: -1 },
+  { key: 'avg', label: 'official average', num: true, defDir: -1 },
+  { key: 'judged', label: 'judged topics', num: true, defDir: -1 },
+  { key: 'date', label: 'last evaluated', defDir: -1 },
+];
+
+function mdlValue(m, key) {
+  if (key === 'avg') return officialAvg(m);
+  if (key === 'judged') return m.judge ? Object.keys(m.judge.tasks || {}).length : 0;
+  if (key === 'params') return m.params || 0;
+  return m[key];
+}
+
+function mdlVisible() {
+  const f = state.mdl;
+  const q = (state.q || '').toLowerCase();
+  let ms = DATA.models.filter(m =>
+    (state.src === 'all' || m.source === state.src) &&
+    (state.kind === 'all' || m.kind === state.kind) &&
+    (f.family === 'all' || m.family === f.family) &&
+    (!f.judgedOnly || (m.judge && Object.keys(m.judge.tasks || {}).length)) &&
+    (!f.taintedOnly || (m.tainted || []).length) &&
+    (!q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
+        || (m.family || '').includes(q)));
+  const c = MCOLS.find(x => x.key === f.sort.key) || MCOLS[0];
+  return ms.sort((a, b) => {
+    const va = mdlValue(a, c.key), vb = mdlValue(b, c.key);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1; if (vb == null) return -1;
+    return f.sort.dir * (c.num ? va - vb : natCmp(va, vb));
+  });
+}
+
+function vModels() {
+  const f = state.mdl;
+  const families = [...new Set(DATA.models.map(m => m.family).filter(Boolean))].sort();
+  const ms = mdlVisible();
+  const seg = (label, cur, opts, on) => el('div', { class: 'seg', role: 'group',
+    'aria-label': label }, opts.map(([v, t, n]) =>
+    el('button', { 'aria-pressed': String(cur === v), 'data-filter': `${label}:${v}`,
+      text: n == null ? t : `${t} (${n})`, onclick: () => { on(v); render(); } })));
+  const nCk = DATA.models.filter(m => m.source === 'artifact').length;
+  const head = el('div', { class: 'card' },
+    el('h2', { text: 'Models' }),
+    el('p', { class: 'sub', text: 'Every model on this board, with what is known about it. '
+      + 'The filters are this table\'s — they narrow the list below and nothing else. Tick '
+      + `compare on up to ${CMP_MAX} to draw them on the Leaderboard's radar.` }),
+    el('div', { class: 'toolbar' },
+      el('input', { type: 'search', id: 'mq', value: state.q, style: 'flex:1;min-width:180px',
+        placeholder: 'name, id or family…', 'aria-label': 'filter models',
+        oninput: e => { state.q = e.target.value; render(); } }),
+      seg('kind', state.kind, [['all', 'All', DATA.models.length],
+        ['base', 'Base', DATA.models.filter(m => m.kind === 'base').length],
+        ['instruct', 'Instruct', DATA.models.filter(m => m.kind === 'instruct').length]],
+        v => { state.kind = v; }),
+      nCk ? seg('source', state.src, [['all', 'All'], ['hub', 'Models'],
+        ['artifact', 'Checkpoints', nCk]], v => { state.src = v; }) : '',
+      mkSel('family filter', [['all', 'family: any'], ...families.map(x => [x, x])],
+        f.family, v => { f.family = v; render(); }),
+      el('label', { class: 'small' },
+        el('input', { type: 'checkbox', 'data-filter': 'judged',
+          checked: f.judgedOnly ? '' : null,
+          onchange: e => { f.judgedOnly = e.target.checked; render(); } }), ' has a judged run'),
+      el('label', { class: 'small' },
+        el('input', { type: 'checkbox', 'data-filter': 'tainted',
+          checked: f.taintedOnly ? '' : null,
+          onchange: e => { f.taintedOnly = e.target.checked; render(); } }), ' tainted'),
+      el('span', { class: 'count-note', 'data-model-count': String(ms.length),
+        text: `${ms.length} of ${DATA.models.length} models` })));
+  const th = c => el('th', { class: c.num ? 'num' : null,
+    style: c.key ? 'cursor:pointer' : null, 'data-sort': c.key || '',
+    onclick: c.key ? () => {
+      f.sort = f.sort.key === c.key ? { key: c.key, dir: -f.sort.dir }
+                                    : { key: c.key, dir: c.defDir || 1 };
+      render();
+    } : null },
+    c.label + (f.sort.key === c.key ? (f.sort.dir > 0 ? ' ▲' : ' ▼') : ''));
+  const table = el('div', { class: 'card' },
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-models-table': '1' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'compare' }), MCOLS.map(th),
+        el('th', { text: 'flags' }))),
+      el('tbody', {}, ms.map(m => {
+        const topics = m.judge ? Object.keys(m.judge.tasks || {})
+          .filter(t => t !== (DATA.judged || {}).control) : [];
+        const on = cmpEffective(DATA.models).includes(m.id);
+        return el('tr', { 'data-model-row': m.id },
+          el('td', {}, el('input', { type: 'checkbox', 'aria-label': 'compare ' + m.name,
+            checked: on ? '' : null,
+            onchange: () => { cmpToggle(m.id, DATA.models); render(); } })),
+          el('td', {}, el('a', { href: '#model=' + encodeURIComponent(m.id), text: m.name,
+            onclick: e => { e.preventDefault(); navigate({ model: m.id, topic: null }); } }),
+            el('div', { class: 'se mono', text: m.id })),
+          el('td', {}, el('span', { class: 'badge' + (m.kind === 'instruct' ? ' instruct' : ''),
+            text: m.kind }), m.source === 'artifact' ? el('span', { class: 'badge',
+              text: 'ckpt' }) : ''),
+          el('td', { class: 'small', text: m.family || '—' }),
+          el('td', { class: 'num se', text: P(m.params) }),
+          el('td', { class: 'num' }, officialAvg(m) != null ? pct(officialAvg(m), 1)
+            : el('span', { class: 'se', title: (m.kindReason || '') + ' ' +
+                ((m.judgeState || {}).reasons || []).join('; '),
+                text: `preliminary ${m.nhave ?? 0}/${m.nreq ?? 0}` })),
+          el('td', { class: 'num' }, topics.length
+            ? el('span', { title: topics.map(t => `${frName(t)} ${num(pubScore(m.judge.tasks[t]), 2)}`)
+                  .join(' · ') },
+                String(topics.length),
+                (m.judgeState && m.judgeState.ok) ? '' : el('span', { class: 'badge taint',
+                  title: ((m.judgeState || {}).reasons || []).join('; '), text: 'not ranked' }))
+            : el('span', { class: 'se', text: '—' })),
+          el('td', { class: 'small se', text: m.date ? String(m.date).slice(0, 10) : '—' }),
+          el('td', {}, (m.tainted || []).length ? el('span', { class: 'badge taint',
+            title: 'trained on data derived from ' + m.tainted.map(frName).join(', '),
+            text: 'tainted' }) : '',
+            m.provisional ? el('span', { class: 'badge taint', text: 'provisional' }) : ''));
+      })))));
+  if (!ms.length) table.append(note('No model matches these filters.'));
+  return [head, table];
 }
 
 function vLeaderboard(ms) {
@@ -6270,6 +6470,7 @@ const TABS = [
   ['overview', 'Overview', vOverview],
   // the loop is what this server is for, so it sits where the eye lands
   ...(LIVE ? [['loop', 'Loop', vLoop]] : []),
+  ['models', 'Models', vModels],
   ...(LIVE ? [['training', 'Training', vTraining],
               ['exam', 'Exam', vExam],
               ['review', 'Review', vReview],
@@ -6285,8 +6486,6 @@ function render() {
   state.trRedraw = state.queueRedraw = null;
   renderWarnings();                 // full on the board, folded elsewhere
   const ms = visible();
-  document.getElementById('countNote').textContent =
-    `${ms.length} of ${DATA.models.length} models shown`;
   renderTabs();
   const view = document.getElementById('view');
   view.classList.remove('dimmed');
@@ -6347,25 +6546,8 @@ function renderStatic() {
     'Live team benchmark: submit models, track training runs, compare results — '
     + 'updates as work finishes.';
   renderWarnings();
-  const nCk = DATA.models.filter(m => m.source === 'artifact').length;
-  const srcSeg = document.getElementById('srcSeg');
-  srcSeg.style.display = nCk ? '' : 'none';   // no artifacts -> no third filter
-  // every filter says how many it holds, not just the one that happened to have
-  // a count. A filter that might return nothing should say so before it is clicked.
-  const setCount = (seg, attr, val, label, n) => {
-    const b = seg.querySelector(`[${attr}="${val}"]`);
-    if (b) b.textContent = `${label} (${n})`;
-  };
-  const kindSeg = document.getElementById('kindSeg');
-  setCount(kindSeg, 'data-kind', 'all', 'All', DATA.models.length);
-  setCount(kindSeg, 'data-kind', 'base', 'Base',
-           DATA.models.filter(m => m.kind === 'base').length);
-  setCount(kindSeg, 'data-kind', 'instruct', 'Instruct',
-           DATA.models.filter(m => m.kind === 'instruct').length);
-  setCount(srcSeg, 'data-src', 'all', 'All', DATA.models.length);
-  setCount(srcSeg, 'data-src', 'hub', 'Models',
-           DATA.models.filter(m => m.source === 'hub').length);
-  setCount(srcSeg, 'data-src', 'artifact', 'Checkpoints', nCk);
+  // the model filters moved into the Models tab, where what they filter is on
+  // screen beneath them; each one carries its own count there
   document.getElementById('metaChips').replaceChildren(
     el('span', { class: 'chip', text: `generated ${DATA.generated}` }),
     LIVE ? el('span', { class: 'chip', text: 'live — updates as runs finish' }) : '',
@@ -6462,21 +6644,6 @@ async function loadQueue() {
   } catch (e) { /* netFail said so, and set how long to wait */ }
 }
 
-document.getElementById('q').addEventListener('input', e => { state.q = e.target.value; render(); });
-document.getElementById('kindSeg').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  state.kind = b.getAttribute('data-kind');
-  for (const x of e.currentTarget.querySelectorAll('button'))
-    x.setAttribute('aria-pressed', String(x === b));
-  render();
-});
-document.getElementById('srcSeg').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  state.src = b.getAttribute('data-src');
-  for (const x of e.currentTarget.querySelectorAll('button'))
-    x.setAttribute('aria-pressed', String(x === b));
-  render();
-});
 const THEMES = ['auto', 'light', 'dark', 'dim'];
 function applyTheme(t) {
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
@@ -6535,20 +6702,6 @@ __BANNER__
   </div>
   <div id="netstatus"></div>
   <div id="warnings"></div>
-  <div class="filters">
-    <input type="search" id="q" placeholder="Filter models&hellip;" aria-label="filter models">
-    <div class="seg" role="group" aria-label="model kind" id="kindSeg">
-      <button data-kind="all" aria-pressed="true">All</button>
-      <button data-kind="base" aria-pressed="false">Base</button>
-      <button data-kind="instruct" aria-pressed="false">Instruct</button>
-    </div>
-    <div class="seg" role="group" aria-label="model source" id="srcSeg" style="display:none">
-      <button data-src="all" aria-pressed="true">All</button>
-      <button data-src="hub" aria-pressed="false">Models</button>
-      <button data-src="artifact" aria-pressed="false">Checkpoints</button>
-    </div>
-    <span class="count-note" id="countNote"></span>
-  </div>
   <div class="tabs" role="tablist" id="tabs"></div>
   <div id="view"></div>
   <footer>Every score carries its standard error; differences are z-tested before

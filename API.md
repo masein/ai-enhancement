@@ -327,6 +327,11 @@ why}`. `propose` carries the same gate object `POST /api/proposals` enforces.
 Nothing here is a second implementation of a rule: when the button is
 disabled, `why` is the sentence the API itself would refuse with.
 
+`models[].taintTrail` in `/api/results` is the audit trail behind a tainted
+model: `{run_id, datasets, proposals}` — the training run that consumed the
+data, the datasets it consumed and the proposals those came from, so "what
+taught this model?" is three links rather than three queries.
+
 `GET /api/answers?model=&topic=` — one model's **diagnosis-half** answers on
 one topic: the question, what the model wrote, the folded score, the
 per-criterion numbers, which flags fired and what the judge wrote. The report

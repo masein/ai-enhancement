@@ -130,6 +130,25 @@ def taint_for(model_ids) -> dict[str, list[str]]:
     return {k: sorted(v) for k, v in out.items()}
 
 
+def trail_for(model_ids) -> dict[str, dict]:
+    """tainted model id -> the audit trail behind it: the training run that
+    consumed the data, the datasets it consumed, and the proposals those came
+    from. One click each, because "what taught this model?" should not be a
+    database query."""
+    links = db.taint_links()
+    props = {d["id"]: d["proposal_id"] for d in db.dataset_list(500)}
+    out: dict[str, dict] = {}
+    for mid in model_ids:
+        for link in links:
+            pre = link["hf_prefix"]
+            if mid in link["checkpoints"] or (pre and (mid == pre or mid.startswith(pre))):
+                ds = list(link["datasets"])
+                out[mid] = {"run_id": link["run_id"], "datasets": ds,
+                            "proposals": sorted({props[d] for d in ds if d in props})}
+                break
+    return out
+
+
 def parents_for(model_ids) -> dict[str, str]:
     """tainted model id -> the model its training run started from (the run's
     `parent`, else its config's base_model). The first run that claims a
@@ -160,6 +179,11 @@ def results_payload() -> dict:
                                        calibration=_calibration(),
                                        judge_identity=_judge_identity())
         payload["live"] = True
+        # the loop's audit trail, per tainted model: run, datasets, proposals
+        trails = trail_for([m["id"] for m in payload["models"]])
+        for m in payload["models"]:
+            if trails.get(m["id"]):
+                m["taintTrail"] = trails[m["id"]]
         # one link, only when a demo has actually run. The live payload is
         # built from OUT_DIR alone and reads nothing under demo/ — this is a
         # timestamp, not a number from that tree.
