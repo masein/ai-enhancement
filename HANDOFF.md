@@ -491,6 +491,14 @@ stamps and counts for nothing.
 - `~/benchmarks` is **not** a git repo; `~/benchmarks/aienh` is. `docker compose`
   from `~/benchmarks` finds no compose file.
 - `docker compose exec` with a heredoc needs `-T`.
+- **The image carries only what the Dockerfile copies, and the demo does not
+  prove it.** `eval_tasks/fr/` was excluded by `.dockerignore`, so the
+  container had no harness task template: both demos passed (they run from
+  the bind-mounted checkout) and the first person to press "Rebuild the
+  harness tasks" got a 500. `service/startup.py` now lists every repo file a
+  request can reach, the app refuses to start without one, the image build
+  runs the same check, and `tests/test_image_contents.py` walks the COPY list
+  through `.dockerignore` without building anything.
 - `scripts/diagnose.py` does not exist inside the container at `/app/scripts/`
   — run it on the host with `sudo`, from `~/benchmarks`.
 - The live dashboard and the static report are the **same page and the same

@@ -27,7 +27,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from . import config, db, llm, llm_poller, worker
+from . import config, db, llm, llm_poller, startup, worker
 from . import proposals as prop
 
 # the report module is the single source of truth for parsing and for the page
@@ -45,6 +45,10 @@ _HF_ID_RE = re.compile(r"^[\w.\-]{1,96}/[\w.\-]{1,96}$")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # a file this build does not carry fails at `up`, where the operator is
+    # looking — not on the first click that needs it, which is how an image
+    # without eval_tasks/fr/ shipped and got as far as a person pressing a button
+    startup.check_repo_files()
     db.init()
     llm.startup_check()          # a set-but-broken LLM config fails here, not at a click
     worker.start()
@@ -908,7 +912,15 @@ def exam_build_tasks(x_token: str = Header(default="")):
     a curator does this after a round of accepting so suite=judged runs the
     new questions."""
     _check_token(x_token)
-    m = exam_build.build(config.OUT_DIR, config.EXAM_DIR)
+    try:
+        m = exam_build.build(config.OUT_DIR, config.EXAM_DIR)
+    except FileNotFoundError as e:
+        # a file this build does not carry: say which one, in the answer the
+        # button shows, rather than a bare 500 with the reason in the log
+        raise HTTPException(500, f"the tasks could not be built: {e}. A file this build "
+                                 f"needs is missing — see SERVICE.md § Docker.") from None
+    except (ValueError, OSError) as e:
+        raise HTTPException(500, f"the tasks could not be built: {e}") from None
     return {"tasks": {t: {k: v[k] for k in ("items", "report", "diagnose")}
                       for t, v in m["tasks"].items()},
             "tasks_dir": str(exam_build.tasks_dir(config.EXAM_DIR))}

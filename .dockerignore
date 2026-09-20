@@ -4,9 +4,17 @@
 .env.example
 *.md
 !FRIENDS.md
+# the judge reads the prose rubrics at run time; they are data, not prose for
+# people, and the image without them grades nothing
+!eval_tasks/fr/rubrics/*.md
 results/
 eval_tasks/*
 !eval_tasks/mmlu_perm
+# everything exam_build.py and judge.py read from the repo at run time: the
+# harness task template, the per-topic rubrics and criteria files, the canary
+# scripts, the delivered banks and the migrated skill suites. Leaving these
+# out is invisible until the first click — which is how it shipped
+!eval_tasks/fr
 logs/
 artifacts/
 service.sqlite3*

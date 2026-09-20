@@ -38,7 +38,20 @@ COPY clients/ clients/
 # the permutation control's task yaml + utils.py: a suite=control run passes
 # this directory to lm_eval --include_path (.dockerignore carries the exception)
 COPY eval_tasks/mmlu_perm/ eval_tasks/mmlu_perm/
+# the free-response side the service reads at run time: the task template
+# exam_build.build() writes each exam task from, the per-topic rubrics and
+# criteria files the judge grades against, the canary scripts, the delivered
+# banks and the skill-suite seeds. service/app.py refuses to start without
+# them, so a missing one fails at `up` rather than on someone's first click
+COPY eval_tasks/fr/ eval_tasks/fr/
 COPY FRIENDS.md ./
+
+# the same check the service runs at startup, at BUILD time: an image missing
+# a file the service reads is a broken image, and this is where that is cheap
+# to find out
+RUN python -c "import sys; sys.path.insert(0, '/app'); \
+from service.startup import missing_repo_files; m = missing_repo_files(); \
+print('image files OK') if not m else sys.exit('image is missing: ' + ', '.join(m))"
 
 ENV PYTHONPATH=/app \
     PYTHONUNBUFFERED=1

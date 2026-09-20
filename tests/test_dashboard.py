@@ -602,23 +602,41 @@ def test_the_models_tab_lists_every_model_and_filters_it(surface):
     assert surface.errors == []
 
 
-def test_compare_ticks_feed_the_leaderboards_radar(surface):
+def test_the_leaderboards_compare_ticks_are_the_only_ones(surface):
+    """The radar belongs to the Leaderboard. Its ticks pick up to five models,
+    say how many slots are used, redraw the radar, and drop the oldest when a
+    sixth arrives. The Models tab has no tick at all: two tables sharing one
+    selection is what broke this."""
     pg = surface.open("#tab=models")
-    boxes = pg.locator("tbody tr[data-model-row] input[type=checkbox]")
-    # untick everything the default picked, then choose two of our own
-    for i in range(boxes.count()):
-        if boxes.nth(i).is_checked():
-            boxes.nth(i).uncheck()
-    rows = pg.locator("tbody tr[data-model-row]")
-    want = [rows.nth(0).get_attribute("data-model-row"), rows.nth(1).get_attribute("data-model-row")]
-    boxes.nth(0).check()
-    boxes.nth(1).check()
+    assert pg.locator("table.jd[data-models-table] input[type=checkbox][aria-label^='compare']"
+                      ).count() == 0
     surface.tab("Leaderboard")
-    legend = pg.locator(".card", has=pg.locator("h2", has_text="Compare")).first
-    text = legend.text_content() if legend.count() else pg.locator("#view").text_content()
-    for mid in want:
-        name = next(m for m in DATA_MODELS(pg) if m["id"] == mid)["name"]
-        assert name in text
+    boxes = pg.locator("table.lb tbody input[type=checkbox]")
+    assert boxes.count() > 5
+    radar = pg.locator(".card", has=pg.locator("h2", has_text="Capability profile"))
+    assert radar.count() == 1 and radar.locator("svg").count() == 1
+    assert "comparing 5 of 5 slots" in radar.text_content()   # the default profile
+    drawn = radar.locator("svg").inner_html()
+    assert len(drawn) > 200
+    # untick one: the count follows and the radar is redrawn without it
+    first_on = next(i for i in range(boxes.count()) if boxes.nth(i).is_checked())
+    boxes.nth(first_on).uncheck()
+    assert "comparing 4 of 5 slots" in radar.text_content()
+    assert radar.locator("svg").inner_html() != drawn
+    # tick one that was not in the set: back to five, and it is on the radar
+    off = next(i for i in range(boxes.count()) if not boxes.nth(i).is_checked())
+    mid = pg.locator("table.lb tbody tr").nth(off).locator("td.model").first.get_attribute(
+        "data-model")
+    boxes.nth(off).check()
+    assert "comparing 5 of 5 slots" in radar.text_content()
+    assert "full, the next tick replaces the oldest" in radar.text_content()
+    assert mid.split("/")[-1] in radar.text_content()          # it is on the radar now
+    # a sixth lands and the oldest leaves — the newest click always wins
+    spare = next(i for i in range(boxes.count()) if not boxes.nth(i).is_checked())
+    boxes.nth(spare).check()
+    assert "comparing 5 of 5 slots" in radar.text_content()
+    assert "dropped" in radar.text_content()
+    assert sum(1 for i in range(boxes.count()) if boxes.nth(i).is_checked()) == 5
     assert surface.errors == []
 
 

@@ -317,3 +317,52 @@ def test_two_rows_that_differ_on_a_ranked_task_are_not_a_duplicate(tree, tmp_pat
     rows = {m["id"]: m for m in p["models"]}
     assert not rows["fx/good-750m"].get("duplicateOf")
     assert not rows["fx/good-750m-v3"].get("duplicateOf")
+
+
+def test_two_rows_that_only_look_identical_say_why_they_are_not_merged(tree, tmp_path):
+    """Identical is the test for a duplicate, and a pair that agrees to the
+    four decimals the board prints but differs underneath is not one. The
+    page says so and names the field, because two rows that look the same
+    sitting at #1 and #2 with no explanation is what started this."""
+    import shutil
+    out = tmp_path / "results" / "full"
+    shutil.copytree(tree["out_dir"], out)
+    src, twin = out / "fx__good-750m", out / "fx__good-750m-near"
+    shutil.copytree(src, twin)
+    for f in twin.rglob("results*.json"):
+        blob = json.loads(f.read_text())
+        blob["config"]["model_args"] = blob["config"]["model_args"].replace(
+            "fx/good-750m", "fx/good-750m-near")
+        # one item fewer on one ranked task: same score to four decimals,
+        # a different run
+        if "piqa" in blob.get("n-samples", {}):
+            blob["n-samples"]["piqa"]["effective"] -= 1
+        f.write_text(json.dumps(blob))
+    p = report.build_payload(report.merge_runs(report.load_results(out)), "t", source="")
+    rows = {m["id"]: m for m in p["models"]}
+    near = rows["fx/good-750m-near"]
+    assert not near.get("duplicateOf") and not rows["fx/good-750m"].get("duplicateOf")
+    assert near["nearDuplicateOf"] == "fx/good-750m"
+    assert "piqa" in near["nearDuplicateWhy"] and "items against" in near["nearDuplicateWhy"]
+    assert any("print the same score as another row" in w for w in p["warnings"])
+    assert any("are NOT the same run" in w for w in p["warnings"])
+    # both still rank: not being a duplicate means being a row
+    assert near["avg"] is not None and rows["fx/good-750m"]["avg"] is not None
+
+
+def test_an_exactly_identical_row_is_merged_not_merely_flagged(tree, tmp_path):
+    import shutil
+    out = tmp_path / "results" / "full"
+    shutil.copytree(tree["out_dir"], out)
+    src, twin = out / "fx__good-750m", out / "fx__good-750m-same"
+    shutil.copytree(src, twin)
+    for f in twin.rglob("results*.json"):
+        blob = json.loads(f.read_text())
+        blob["config"]["model_args"] = blob["config"]["model_args"].replace(
+            "fx/good-750m", "fx/good-750m-same")
+        f.write_text(json.dumps(blob))
+    p = report.build_payload(report.merge_runs(report.load_results(out)), "t", source="")
+    rows = {m["id"]: m for m in p["models"]}
+    dup = rows["fx/good-750m-same"] if rows["fx/good-750m-same"].get("duplicateOf") \
+        else rows["fx/good-750m"]
+    assert dup["duplicateOf"] and not dup.get("nearDuplicateOf")   # merged, not merely noted

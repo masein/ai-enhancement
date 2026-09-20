@@ -190,7 +190,9 @@ def test_exam_curation_in_the_browser(live, page):
     assert page.locator(".rv[data-candidate]").count() == 0
     # rebuild the harness tasks from the bank, from the page
     page.get_by_role("button", name="Rebuild the harness tasks from the bank").click()
-    page.wait_for_function("document.querySelector('#view').textContent.includes('tasks rebuilt')")
+    page.wait_for_selector("[data-action-ok='exbuild']", timeout=30000)
+    built = page.locator("[data-action-ok='exbuild']").text_content()
+    assert built.startswith("Built") and "law (" in built
     assert (root / "exam" / "tasks" / "exam_law.yaml").exists()
     # screenshots: the Exam tab, light and dark, desktop and phone
     SCREENS.mkdir(exist_ok=True)
@@ -389,8 +391,9 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     assert withheld and not any(q[:60] in html for q in withheld)
     # commit, and the bank on disk holds his records under his name
     panel.locator("button[data-commit='import']").click()
-    page.wait_for_selector("[data-import-msg]")
-    assert "imported 100" in panel.locator("[data-import-msg]").text_content()
+    page.wait_for_selector("[data-action-ok='eximport']", timeout=30000)
+    said = page.locator("[data-action-ok='eximport']").text_content()
+    assert "Imported 100" in said and "report" in said and "diagnose" in said
     bank = eb.load_bank(root / "exam")[topic]
     mine = [r for r in bank if r.get("source") == "medicine_v1"]
     assert len(mine) == 100
@@ -634,4 +637,56 @@ def test_a_topic_on_the_shared_rubric_says_so_on_both_boards(live, page):
     row = page.locator("tr[data-rubric-row='history']")
     assert "exam.md" in row.text_content() and "(fallback)" in row.text_content()
     assert page.locator("[data-rubric-error]").count() == 0
+    assert page.errors == []
+
+
+def test_a_button_that_calls_the_api_says_what_happened(live, page):
+    """The rebuild button answered "refused: 500" in small grey text under
+    itself, which the person read as "nothing happens" — and behind it was a
+    file missing from the image. Every button that calls the API now says it
+    is working, says what happened, and on a refusal says what the SERVER
+    said."""
+    base = live["base"]
+    page.goto(base + "/#tab=exam")
+    page.wait_for_selector("[data-action='exbuild']")
+    btn = page.locator("[data-action='exbuild']")
+    # the refusal: the server's own sentence, in the error style, not a status
+    page.route("**/api/exam/build", lambda route: route.fulfill(
+        status=500, content_type="application/json",
+        body='{"detail":"the tasks could not be built: no such file: _fr_template_yaml"}'))
+    btn.click()
+    page.wait_for_selector("[data-action-error='exbuild']")
+    err = page.locator("[data-action-error='exbuild']")
+    assert "Refused." in err.text_content()
+    assert "_fr_template_yaml" in err.text_content()
+    assert "warn" in (err.get_attribute("class") or "")     # the 8c error style
+    assert "500" not in err.text_content()                  # the message, not the code
+    # and the success: what was built, where, in a line a person can read
+    page.unroute("**/api/exam/build")
+    btn.click()
+    page.wait_for_selector("[data-action-ok='exbuild']", timeout=30000)
+    ok = page.locator("[data-action-ok='exbuild']").text_content()
+    assert "Built" in ok and "task" in ok
+    assert "exam_" not in ok                     # topic names, not task ids
+    assert "medicine & health (" in ok or "law (" in ok
+    assert page.locator("[data-action-error='exbuild']").count() == 0
+    # the 500 we injected is the only thing the console should have to say
+    assert all("500" in e for e in page.errors), page.errors
+
+
+def test_a_button_that_is_working_says_so_and_cannot_be_pressed_twice(live, page):
+    base = live["base"]
+    page.goto(base + "/#tab=exam")
+    page.wait_for_selector("[data-action='exbuild']")
+    # hold the request open: the button must say it is working meanwhile
+    page.route("**/api/exam/build", lambda route: page.wait_for_timeout(1500) or route.fulfill(
+        status=200, content_type="application/json", body='{"tasks":{},"tasks_dir":"/x"}'))
+    btn = page.locator("[data-action='exbuild']")
+    btn.click()
+    assert btn.inner_text().strip() == "working…"
+    assert btn.is_disabled()
+    assert page.locator("[data-action-busy='exbuild']").count() == 1
+    page.wait_for_selector("[data-action-ok='exbuild']", timeout=30000)
+    assert btn.is_disabled() is False
+    page.unroute("**/api/exam/build")
     assert page.errors == []

@@ -1185,6 +1185,42 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             dup["duplicateOf"] = first["id"]
             dup["duplicateOfName"] = first["name"]
 
+    # Two rows that LOOK identical on the board but are not: every ranked
+    # score equal to the four decimals the page prints, and something still
+    # different underneath. That pair is not merged — identical is the test,
+    # and a near-identical pair may be two honest runs — but the page says so
+    # and names the field, because "why are these two both here?" is a
+    # question the board should answer rather than leave to a diff.
+    ranked_rows = [r for r in model_rows
+                   if all(r["id"] in cells.get(t, {}) for t in dup_tasks)]
+    shown = {r["id"]: tuple(round(cells[t][r["id"]]["v"], 4) for t in dup_tasks)
+             for r in ranked_rows}
+    by_shown: dict[tuple, list[dict]] = {}
+    for r in ranked_rows:
+        by_shown.setdefault(shown[r["id"]], []).append(r)
+    for group in by_shown.values():
+        if len(group) < 2:
+            continue
+        group.sort(key=lambda r: (-n_cells[r["id"]], str(r.get("date") or ""), r["id"]))
+        keep = group[0]
+        for other in group[1:]:
+            if other.get("duplicateOf") or keep.get("duplicateOf"):
+                continue                     # already merged: exactly identical
+            why = None
+            for t in dup_tasks:
+                a, b = cells[t][keep["id"]], cells[t][other["id"]]
+                if a.get("n") != b.get("n"):
+                    why = (f"{t}: {a.get('n')} items against {b.get('n')}")
+                    break
+                if round(a["v"], 9) != round(b["v"], 9):
+                    why = (f"{t}: {a['v']:.9f} against {b['v']:.9f}")
+                    break
+            if not why:
+                continue
+            other["nearDuplicateOf"] = keep["id"]
+            other["nearDuplicateOfName"] = keep["name"]
+            other["nearDuplicateWhy"] = why
+
     # provenance warnings — they gate every claim below them
     warnings: list[str] = []
     shots_seen: dict[str, set] = {}
@@ -1256,6 +1292,16 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             f"score identically to another row on every task, item counts included — the same "
             f"run submitted twice. Both are shown; the later one is not ranked and says which "
             f"row it duplicates. Nothing has been deleted.")
+    near = [m for m in model_rows if m.get("nearDuplicateOf")]
+    if near:
+        warnings.append(
+            f"{len(near)} row{'s' if len(near) > 1 else ''} print the same score as another "
+            f"row on every ranked task and are NOT the same run: "
+            + "; ".join(f"{m['name']} vs {m['nearDuplicateOfName']} differ on "
+                        f"{m['nearDuplicateWhy']}" for m in near[:3])
+            + (", …" if len(near) > 3 else "")
+            + ". Both are ranked, because identical is the test for a duplicate and these "
+              "are not identical — but two runs this close are worth a look.")
     n_prelim = sum(1 for m in model_rows if not m["official"])
     if n_prelim and required:
         warnings.append(
@@ -1817,8 +1863,8 @@ const state = {
   ans: { model: '', rows: null, loading: false, topic: '', open: {},
          acuity: 'all', flag: 'all', score: 'all', sort: 'score' },          // Answers panel
   loopRead: {},                        // topics whose answers this browser has opened
-  mdl: { family: 'all', judgedOnly: false, taintedOnly: false,
-         sort: { key: 'avg', dir: -1 } },                                  // Models tab
+  mdl: { q: '', kind: 'all', src: 'all', family: 'all', judgedOnly: false,
+         taintedOnly: false, sort: { key: 'avg', dir: -1 } },              // Models tab
   rvName: '',                          // the name approvals are recorded under (remembered)
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
@@ -1995,11 +2041,19 @@ function modelSentence(m) {
 }
 // the same run submitted twice: both rows stay, one rank. Naming the row it
 // duplicates is the whole point — "duplicate" alone would send someone hunting
-const dupBadge = m => !m.duplicateOf ? null
-  : el('span', { class: 'badge', 'data-duplicate': m.duplicateOf,
+const dupBadge = m => m.duplicateOf
+  ? el('span', { class: 'badge', 'data-duplicate': m.duplicateOf,
       title: `every task score and item count is identical to ${m.duplicateOfName}`
         + ' — the same run submitted twice. Shown, not ranked; nothing deleted.',
-      text: `duplicate of ${m.duplicateOfName}` });
+      text: `duplicate of ${m.duplicateOfName}` })
+  // not merged, and the page says why rather than leaving two rows that look
+  // the same sitting next to each other with no explanation
+  : m.nearDuplicateOf
+  ? el('span', { class: 'badge', 'data-near-duplicate': m.nearDuplicateOf,
+      title: `prints the same score as ${m.nearDuplicateOfName} on every ranked task, but is `
+        + `not the same run: ${m.nearDuplicateWhy}. Both are ranked.`,
+      text: `same scores as ${m.nearDuplicateOfName}` })
+  : null;
 const prelimBadge = m => m.official ? null
   : el('span', { class: 'badge prelim',
       title: `preliminary — ${m.nhave}/${m.nreq} required tasks`
@@ -3452,6 +3506,54 @@ const tile = (label, value, notetext) => el('div', { class: 'tile' },
   notetext ? el('div', { class: 'note', text: notetext }) : null);
 const note = t => el('p', { class: 'note', text: t });
 
+// ---------------------------------------------------------------------------
+// A button that calls the API answers in three ways, always: it says it is
+// working while the request is out, it says what happened when it lands, and
+// when it is refused it says what the SERVER said. The rebuild button used to
+// answer "refused: 500" in small grey text under itself, which a person read
+// as "nothing happens" — and it was a missing file in the image.
+// ---------------------------------------------------------------------------
+
+const ACT = {};
+const actState = slot => ACT[slot] || (ACT[slot] = { busy: false, ok: '', err: '' });
+
+async function post(path, body) {
+  const r = await fetch(path, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+    body: JSON.stringify(body || {}) }).catch(() => null);
+  if (!r) throw new Error('the server is unreachable — it may be restarting');
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail
+    : (j.detail ? JSON.stringify(j.detail) : `the server answered HTTP ${r.status}`));
+  return j;
+}
+
+// run() returns the sentence to show on success, or throws with the server's
+// own words. Both are rendered by actNote(slot) wherever it is placed.
+function actButton(slot, label, run, attrs = {}) {
+  const a = actState(slot);
+  return el('button', Object.assign({}, attrs, {
+    'data-action': slot,
+    disabled: a.busy ? '' : (attrs.disabled === undefined ? null : attrs.disabled),
+    text: a.busy ? 'working…' : label,
+    onclick: async () => {
+      a.busy = true; a.ok = ''; a.err = ''; render();
+      try { a.ok = (await run()) || 'done.'; }
+      catch (e) { a.err = String((e && e.message) || e); }
+      finally { a.busy = false; render(); }
+    } }));
+}
+
+function actNote(slot) {
+  const a = actState(slot);
+  if (a.busy) return el('p', { class: 'small', 'data-action-busy': slot,
+    text: 'Working — the request is out.' });
+  if (a.err) return el('p', { class: 'warn', 'data-action-error': slot },
+    el('b', { text: 'Refused. ' }), a.err);
+  if (a.ok) return el('p', { class: 'note', 'data-action-ok': slot, text: a.ok });
+  return '';
+}
+
 function lbMini(rows) {
   const tb = el('tbody', {}, rows.map((m, i) => el('tr', {},
     el('td', { text: String(i + 1) }),
@@ -3724,10 +3826,10 @@ function mdlValue(m, key) {
 
 function mdlVisible() {
   const f = state.mdl;
-  const q = (state.q || '').toLowerCase();
+  const q = (f.q || '').toLowerCase();
   let ms = DATA.models.filter(m =>
-    (state.src === 'all' || m.source === state.src) &&
-    (state.kind === 'all' || m.kind === state.kind) &&
+    (f.src === 'all' || m.source === f.src) &&
+    (f.kind === 'all' || m.kind === f.kind) &&
     (f.family === 'all' || m.family === f.family) &&
     (!f.judgedOnly || (m.judge && Object.keys(m.judge.tasks || {}).length)) &&
     (!f.taintedOnly || (m.tainted || []).length) &&
@@ -3754,18 +3856,18 @@ function vModels() {
   const head = el('div', { class: 'card' },
     el('h2', { text: 'Models' }),
     el('p', { class: 'sub', text: 'Every model on this board, with what is known about it. '
-      + 'The filters are this table\'s — they narrow the list below and nothing else. Tick '
-      + `compare on up to ${CMP_MAX} to draw them on the Leaderboard's radar.` }),
+      + 'The filters are this table\'s — they narrow the list below and nothing else. The '
+      + 'radar and its compare ticks belong to the Leaderboard, where they are.' }),
     el('div', { class: 'toolbar' },
-      el('input', { type: 'search', id: 'mq', value: state.q, style: 'flex:1;min-width:180px',
+      el('input', { type: 'search', id: 'mq', value: f.q, style: 'flex:1;min-width:180px',
         placeholder: 'name, id or family…', 'aria-label': 'filter models',
-        oninput: e => { state.q = e.target.value; render(); } }),
-      seg('kind', state.kind, [['all', 'All', DATA.models.length],
+        oninput: e => { f.q = e.target.value; render(); } }),
+      seg('kind', f.kind, [['all', 'All', DATA.models.length],
         ['base', 'Base', DATA.models.filter(m => m.kind === 'base').length],
         ['instruct', 'Instruct', DATA.models.filter(m => m.kind === 'instruct').length]],
-        v => { state.kind = v; }),
-      nCk ? seg('source', state.src, [['all', 'All'], ['hub', 'Models'],
-        ['artifact', 'Checkpoints', nCk]], v => { state.src = v; }) : '',
+        v => { f.kind = v; }),
+      nCk ? seg('source', f.src, [['all', 'All'], ['hub', 'Models'],
+        ['artifact', 'Checkpoints', nCk]], v => { f.src = v; }) : '',
       mkSel('family filter', [['all', 'family: any'], ...families.map(x => [x, x])],
         f.family, v => { f.family = v; render(); }),
       el('label', { class: 'small' },
@@ -3788,16 +3890,13 @@ function vModels() {
     c.label + (f.sort.key === c.key ? (f.sort.dir > 0 ? ' ▲' : ' ▼') : ''));
   const table = el('div', { class: 'card' },
     el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-models-table': '1' },
-      el('thead', {}, el('tr', {}, el('th', { text: 'compare' }), MCOLS.map(th),
-        el('th', { text: 'flags' }))),
+      el('thead', {}, el('tr', {}, MCOLS.map(th), el('th', { text: 'flags' }))),
       el('tbody', {}, ms.map(m => {
         const topics = m.judge ? Object.keys(m.judge.tasks || {})
           .filter(t => t !== (DATA.judged || {}).control) : [];
-        const on = cmpEffective(DATA.models).includes(m.id);
+        // no compare tick here: the radar is the Leaderboard's, and two tables
+        // sharing one selection is what broke the Leaderboard's own ticks
         return el('tr', { 'data-model-row': m.id },
-          el('td', {}, el('input', { type: 'checkbox', 'aria-label': 'compare ' + m.name,
-            checked: on ? '' : null,
-            onchange: () => { cmpToggle(m.id, DATA.models); render(); } })),
           el('td', {}, el('a', { href: '#model=' + encodeURIComponent(m.id), text: m.name,
             onclick: e => { e.preventDefault(); navigate({ model: m.id, topic: null }); } }),
             el('div', { class: 'se mono', text: m.id })),
@@ -5755,27 +5854,29 @@ function loopStep(r) {
 
 function loopBtn(r) {
   const st = loopStep(r);
-  const b = el('button', { 'data-step': st.step, disabled: st.ok ? null : '',
-    title: st.ok ? '' : st.why, text: st.label,
-    onclick: () => st.step === 'propose' ? loopPropose(r) : loopGo(r, st.step) });
-  return el('div', {}, b, st.ok ? '' : el('div', { class: 'propwhy', 'data-why': st.step,
-    title: st.why, text: st.short || st.why || '' }));
+  const slot = 'loop:' + r.slug;
+  const b = st.step === 'propose'
+    ? actButton(slot, st.label, () => loopPropose(r),
+        { 'data-step': st.step, disabled: st.ok ? null : '', title: st.ok ? '' : st.why })
+    : el('button', { 'data-step': st.step, disabled: st.ok ? null : '',
+        title: st.ok ? '' : st.why, text: st.label,
+        onclick: () => loopGo(r, st.step) });
+  return el('div', {}, b,
+    st.ok ? '' : el('div', { class: 'propwhy', 'data-why': st.step,
+      title: st.why, text: st.short || st.why || '' }),
+    st.step === 'propose' ? actNote(slot) : '');
 }
 
 async function loopPropose(r) {
   const last = r.last_judged || {};
-  if (!last.model) { state.loop.msg = 'no judged run to propose from'; return render(); }
-  if (!state.rvName.trim()) { state.loop.msg = 'your name is recorded on a proposal'; return render(); }
-  const res = await fetch('api/proposals', { method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
-    body: JSON.stringify({ model: last.model, topic: r.topic, requested_by: state.rvName })
-  }).catch(() => null);
-  const j = res ? await res.json().catch(() => ({})) : {};
-  state.loop.msg = res && res.ok
-    ? `proposal #${j.id} submitted for ${last.model} · ${r.topic} — it lands in Review when the batch completes`
-    : 'refused: ' + (j.detail || (res ? res.status : 'server unreachable'));
+  if (!last.model) throw new Error('no judged run on this topic to propose from');
+  if (!state.rvName.trim()) throw new Error('your name is recorded on a proposal — type it first');
+  const j = await post('api/proposals',
+    { model: last.model, topic: r.topic, requested_by: state.rvName });
   state.loop.loaded = false; state.rv.loaded = false;
-  loadLoop(); render();
+  loadLoop();
+  return `Proposal #${j.id} submitted for ${last.model} on ${r.topic}. `
+    + 'It lands on the Review tab when the batch completes.';
 }
 
 function judgedBadges(last) {
@@ -6247,9 +6348,16 @@ function vExam() {
                    text: st.draft_command || 'scripts/exam_build.py draft' }),
       ' on the server; candidates appear below within a poll.'),
     el('div', { class: 'frm', style: 'margin-top:8px' }, rvNameInput(),
-      el('button', { text: 'Rebuild the harness tasks from the bank',
-        title: 'writes $EXAM_DIR/tasks from the accepted questions + the MMLU control set; no GPU',
-        onclick: () => exPost('api/exam/build') })),
+      actButton('exbuild', 'Rebuild the harness tasks from the bank', async () => {
+        const j = await post('api/exam/build');
+        const ts = Object.entries(j.tasks || {});
+        state.ex.loaded = false; loadExam();
+        return `Built ${ts.length} task${ts.length === 1 ? '' : 's'}: `
+          + ts.map(([t, v]) => `${frName(t)} (${v.items})`).join(', ')
+          + `. They are in ${j.tasks_dir}; a suite=judged run uses them now.`;
+      }, { title: 'writes $EXAM_DIR/tasks from the accepted questions + the MMLU control '
+                  + 'set; no GPU' })),
+    actNote('exbuild'),
     state.ex.msg ? el('p', { class: 'small', text: state.ex.msg }) : '');
   const table = el('div', { class: 'card' }, el('h2', { text: 'By topic' }),
     el('p', { class: 'sub', text: `Target ${st.target_per_topic || 60} accepted questions per topic. `
@@ -6338,9 +6446,20 @@ function exImport() {
     el('div', { class: 'frm' }, fileIn, topicSel, srcIn, nameIn,
       el('button', { text: s.busy ? 'working…' : 'Preview', disabled: s.busy ? '' : null,
                      onclick: () => go('api/exam/import/preview') }),
-      p ? el('button', { 'data-commit': 'import', text: `Import ${p.imported} questions`,
-                         disabled: p.imported ? null : '',
-                         onclick: () => go('api/exam/import') }) : ''),
+      p ? actButton('eximport', `Import ${p.imported + (p.updated || 0)} questions`,
+            async () => {
+              const j = await post('api/exam/import', {
+                topic: s.topic, approver: state.rvName, source: s.source, text: s.file });
+              s.preview = null; s.file = ''; s.msg = '';
+              state.ex.loaded = false; loadExam();
+              return `Imported ${j.imported}`
+                + (j.updated ? `, revised ${j.updated} already in the bank` : '')
+                + (j.skipped ? `, skipped ${j.skipped} unchanged` : '')
+                + ` — report ${j.report} / diagnose ${j.diagnose}. They are in the bank; `
+                + 'rebuild the harness tasks to sit them.';
+            }, { 'data-commit': 'import',
+                 disabled: (p.imported || p.updated) ? null : '' }) : ''),
+    actNote('eximport'),
     s.msg ? el('p', { class: 'small', 'data-import-msg': '1', text: s.msg }) : '',
     p ? exImportPreview(p) : '');
 }

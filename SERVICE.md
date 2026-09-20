@@ -437,6 +437,14 @@ needs (`need_gb` on the queue row); it starts the moment memory frees, and gives
 up after `GPU_WAIT_MAX_S` with a resubmit-later message.
 **Everything fails with the same error** — read one `log` link; a
 `ModuleNotFoundError` means the venv changed under the service.
+**`this build cannot serve requests: …`** and the container exits at `up` —
+the image is missing a file the service reads at run time (the harness task
+template, a rubric, the canary). The message names the paths. It means the
+Dockerfile's COPY list or `.dockerignore` dropped them; rebuild with
+`docker compose up -d --build` after fixing, and note that
+`tests/test_image_contents.py` checks this without building. The check runs
+at startup on purpose: a missing file used to surface as a 500 on whichever
+button needed it first.
 
 ## Backup
 
