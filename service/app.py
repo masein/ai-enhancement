@@ -699,7 +699,7 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
     }
     pid = db.proposal_create(p.model, task, p.topic, p.requested_by.strip()[:80], evidence)
     req = prop.proposal_request(pid, p.model, task, p.topic, justifications, counts,
-                                _judge_rubric(task))
+                                _judge_rubric(task), prop.criteria_evidence(model_dir, task))
     try:
         bid = backend.submit([req])
     except llm.LLMError as e:

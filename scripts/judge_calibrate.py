@@ -28,7 +28,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from judge import rubric_for  # noqa: E402
+from judge import criteria_ids, rubric_for  # noqa: E402
 
 KAPPA_MIN = 0.60
 CALIBRATION_FILE = "judge_calibration.json"
@@ -71,7 +71,11 @@ def _judged_rows(results: Path, models: set[str]) -> list[dict]:
                              "task": task, "category": it.get("category") or task[3:],
                              "prompt": a["prompt"], "reference": a["reference"],
                              "answer": a["answer"], "answer_words": it["answer_words"],
-                             "judge_score": it["score"]})
+                             "judge_score": it["score"],
+                             # a criteria task: what the judge said per criterion, so a
+                             # person can mark the same things it did
+                             "judge_criteria": it.get("criteria") or {},
+                             "judge_csf": it.get("critical_safety_failure")})
     return rows
 
 
@@ -107,15 +111,33 @@ def sample(rows: list[dict], n: int, seed: int) -> list[dict]:
     return out
 
 
+def criteria_columns(rows: list[dict]) -> list[str]:
+    """The per-criterion columns a grader fills in, for whichever criteria
+    tasks are in this sample. A task with no criteria file adds none."""
+    out: list[str] = []
+    for task in sorted({r["task"] for r in rows}):
+        spec = rubric_for(task).criteria
+        if not spec:
+            continue
+        for cid in criteria_ids(spec):
+            if f"human_{cid}" not in out:
+                out.append(f"human_{cid}")
+    return (["human_critical_safety_failure"] + out) if out else []
+
+
 def export(results: Path, out: Path, models: list[str], n: int, seed: int) -> int:
     rows = _judged_rows(results, {m.replace("/", "__") for m in models})
     picked = sample(rows, n, seed)
+    extra = criteria_columns(picked)
     with open(out, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=FIELDS)
+        w = csv.DictWriter(fh, fieldnames=FIELDS + extra)
         w.writeheader()
         for r in picked:
+            # the judge's own numbers are never written: the grader marks the
+            # same things it did, without seeing what it said
             w.writerow({**{k: r[k] for k in FIELDS if k in r},
-                        "rubric": rubric_for(r["task"])[0], "human_score": ""})
+                        "rubric": rubric_for(r["task"])[0], "human_score": "",
+                        **{k: "" for k in extra}})
     return len(picked)
 
 
@@ -124,6 +146,8 @@ def import_csv(results: Path, csv_path: Path) -> dict:
         human = {r["id"]: r for r in csv.DictReader(fh)}
     judged = {r["id"]: r for r in _judged_rows(results, set())}
     pairs: dict[str, list[tuple[int, int]]] = collections.defaultdict(list)
+    crit_pairs: dict[str, list[tuple[float, float]]] = collections.defaultdict(list)
+    csf_pairs: list[tuple[int, int]] = []
     skipped = 0
     for rid, r in human.items():
         hs = (r.get("human_score") or "").strip()
@@ -132,6 +156,25 @@ def import_csv(results: Path, csv_path: Path) -> dict:
             skipped += 1
             continue
         pairs[j["category"]].append((j["judge_score"], int(hs)))
+        # per criterion, where the grader filled any in: agreement on the
+        # parts, reported beside the agreement on the whole
+        for k, v in r.items():
+            if not k.startswith("human_") or k == "human_score" or not (v or "").strip():
+                continue
+            cid = k[len("human_"):]
+            if cid == "critical_safety_failure":
+                jv = j.get("judge_csf")
+                if isinstance(jv, bool):
+                    csf_pairs.append((int(jv), int(str(v).strip().lower()
+                                                 in ("1", "true", "yes", "y"))))
+                continue
+            jv = (j.get("judge_criteria") or {}).get(cid)
+            try:
+                hv = float(v)
+            except ValueError:
+                continue
+            if jv is not None:
+                crit_pairs[cid].append((float(jv), max(0.0, min(1.0, hv))))
     per_cat = {c: {"n": len(v), "kappa": cohen_kappa([x for x, _ in v], [y for _, y in v]),
                    "agreement": round(sum(1 for x, y in v if x == y) / len(v), 4)}
                for c, v in sorted(pairs.items())}
@@ -143,9 +186,21 @@ def import_csv(results: Path, csv_path: Path) -> dict:
         if jf.exists():
             judge_meta = json.loads(jf.read_text(encoding="utf-8")).get("judge", {})
             break
+    # κ is on the FOLDED score — that is still the gate. Per-criterion
+    # agreement is reported, not gating: nobody has marked enough criteria by
+    # hand yet to make a threshold out of it.
+    per_criterion = {cid: {"n": len(v),
+                           "mean_abs_diff": round(sum(abs(a - b) for a, b in v) / len(v), 4)}
+                     for cid, v in sorted(crit_pairs.items()) if v}
     out = {"kappa": overall, "n": len(allp), "kappa_min": KAPPA_MIN,
            "calibrated": overall is not None and overall >= KAPPA_MIN,
            "per_category": per_cat, "rows_skipped": skipped,
+           **({"per_criterion": per_criterion} if per_criterion else {}),
+           **({"critical_safety_failure": {
+               "n": len(csf_pairs),
+               "kappa": cohen_kappa([a for a, _ in csf_pairs], [b for _, b in csf_pairs]),
+               "agreement": round(sum(1 for a, b in csf_pairs if a == b) / len(csf_pairs), 4)}}
+              if csf_pairs else {}),
            "csv_sha256": hashlib.sha256(csv_path.read_bytes()).hexdigest(),
            "judge": {k: judge_meta.get(k) for k in ("id", "provider", "model", "weights_sha256",
                                                     "prompt_sha256", "rubrics", "stub")},
@@ -181,6 +236,14 @@ def main() -> int:
           f"({out['rows_skipped']} skipped)")
     for c, v in out["per_category"].items():
         print(f"  {c:26} kappa {v['kappa']!s:>7}  agreement {v['agreement']:.0%}  n={v['n']}")
+    if out.get("per_criterion"):
+        print("per criterion (mean absolute difference, 0-1 scale) — reported, not a gate:")
+        for cid, v in out["per_criterion"].items():
+            print(f"  {cid:26} {v['mean_abs_diff']:.3f}  n={v['n']}")
+    if out.get("critical_safety_failure"):
+        c = out["critical_safety_failure"]
+        print(f"  {'critical safety failure':26} kappa {c['kappa']!s:>7}  "
+              f"agreement {c['agreement']:.0%}  n={c['n']}")
     print("calibrated — judged scores may enter the judged average" if out["calibrated"]
           else f"PRELIMINARY — below {KAPPA_MIN}: shown, never ranked, never averaged")
     print(f"wrote {a.results / CALIBRATION_FILE}")

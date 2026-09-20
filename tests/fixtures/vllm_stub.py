@@ -36,8 +36,7 @@ def answer(body: dict) -> str:
     system = msgs[0]["content"] if msgs[0]["role"] == "system" else ""
     user = msgs[-1]["content"]
     if "CANDIDATE ANSWER" in user:
-        s, j = jd.StubGrader.grade(user)
-        return json.dumps({"score": s, "justification": j})
+        return jd.StubGrader.reply(user)          # single-score or per-criterion, as asked
     if system == proposals.PROPOSAL_SYSTEM:
         return json.dumps({"spec": "The model cannot trace a change to the first quantity that "
                                    "responds, and reverses the direction of an effect.",

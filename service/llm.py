@@ -379,10 +379,9 @@ def default_responder(req: Request) -> str:
     if req.custom_id.startswith(("judge:", "canary:")):
         try:
             from judge import StubGrader              # scripts/, on sys.path in the service
-            s, j = StubGrader.grade(req.user)
+            return StubGrader.reply(req.user)         # single-score or per-criterion, as asked
         except Exception:                             # noqa: BLE001 — a fixed grade beats a crash
-            s, j = 2, "fake grade"
-        return json.dumps({"score": s, "justification": j})
+            return json.dumps({"score": 2, "justification": "fake grade"})
     if req.custom_id.startswith("exam:"):
         topic = req.meta.get("topic", "the topic")
         n = int(req.meta.get("count", 4))

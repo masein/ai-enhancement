@@ -210,6 +210,19 @@ def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
             .read_text().splitlines() if x.strip()]
     assert len(bank) == 50 and all(b["accepted_by"] == "Dr. Hossein" for b in bank)
     assert all(b["source"] == "hossein_medicine_v1" for b in bank)   # the file's stem
+    # the judge graded it criterion by criterion, and the demo shows what that is
+    assert "is graded criterion by criterion, and the 0-4 above is a fold of them" in out
+    assert re.search(r"medicine_health\.criteria\.json \([0-9a-f]{12}, draft\)", out)
+    assert re.search(r"Triage / urgency\s+[01]\.\d\d\s+\d+", out)
+    assert re.search(r"critical safety failures: \d+ of 50 answers", out)
+    assert re.search(r"emergency\s+\d\.\d\d\s+3\s+\d", out)          # the by-acuity table
+    assert "One graded answer in full — the diagnosis half, so it may be shown:" in out
+    assert "folded from" in out and "medication_safety" in out
+    # and the spec request carried the weakest criteria, as labels and numbers
+    assert "three weakest criteria and the per-acuity means — labels and numbers only" in out
+    t = j["tasks"]["exam_medicine_health"]
+    assert t["criteria_mean"] and t["by_acuity"] and t["unparseable"] == 0
+    assert all(it.get("fold") for it in t["items"])
 
 
 def test_the_import_flags_are_checked_before_anything_runs(tmp_path):

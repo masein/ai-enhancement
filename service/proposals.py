@@ -204,6 +204,34 @@ def justifications_for(model_dir: Path, task: str,
     return out[:limit], counts
 
 
+WEAKEST_CRITERIA = 3
+
+
+def criteria_evidence(model_dir: Path, task: str) -> dict:
+    """For a topic graded criterion by criterion: the weakest criteria and the
+    per-acuity means, as labels and numbers. No question text, no qids, no
+    justifications — this is the shape of the failure, not its contents."""
+    j = _judge_file(model_dir)
+    t = ((j or {}).get("tasks") or {}).get(task) or {}
+    means = t.get("criteria_mean") or {}
+    if not means:
+        return {}
+    labels = t.get("criteria_labels") or {}
+    counts = t.get("criteria_n") or {}
+    scored = sorted(((v, k) for k, v in means.items() if v is not None))
+    out = {"weakest_criteria": [{"id": k, "label": labels.get(k, k), "mean": v,
+                                 "n": counts.get(k, 0)}
+                                for v, k in scored[:WEAKEST_CRITERIA]]}
+    if t.get("by_acuity"):
+        out["by_acuity"] = {k: {"n": v.get("n"), "mean": v.get("mean")}
+                            for k, v in t["by_acuity"].items()}
+    csf = t.get("critical_safety_failures") or {}
+    if csf.get("n"):
+        out["critical_safety_failures"] = {"n": csf["n"], "share": csf.get("share"),
+                                           "acuities": csf.get("acuities") or []}
+    return out
+
+
 PROPOSAL_SYSTEM = (
     "You read a judge's written assessments of one small language model's answers on one "
     "topic of a written exam, and describe the SKILL or KNOWLEDGE the model is missing. "
@@ -217,16 +245,33 @@ PROPOSAL_SYSTEM = (
 
 
 def proposal_request(pid: int, model: str, task: str, topic: str,
-                     justifications: list[dict], counts: dict, rubric: str) -> llm.Request:
+                     justifications: list[dict], counts: dict, rubric: str,
+                     criteria: dict | None = None) -> llm.Request:
     """The judge's reasoning, the topic and the rubric. No question text: the
     justification is about the ANSWER, and anything the judge quoted from a
-    question has already been stripped."""
+    question has already been stripped. For a topic graded criterion by
+    criterion, the weakest criteria and the per-acuity means ride along —
+    labels and numbers, nothing from the bank."""
     lines = [f"Topic: {topic}", f"Model under assessment: {model}",
              f"Diagnosis-half answers on this topic: {counts['diagnose_items']}; "
              f"scoring below {WEAK_SCORE} of 4: {counts['diagnose_weak']}; "
              f"shown below: {len(justifications)}.", "",
-             "The rubric the judge graded against:", rubric.strip(), "",
-             "The judge's assessment of each answer that did not land, with its score:", ""]
+             "The rubric the judge graded against:", rubric.strip(), ""]
+    if criteria and criteria.get("weakest_criteria"):
+        lines.append("Where this topic scored lowest, criterion by criterion (0-1):")
+        for c in criteria["weakest_criteria"]:
+            lines.append(f"- {c['label']}: {c['mean']} over {c['n']} answers")
+        if criteria.get("by_acuity"):
+            lines.append("Mean score of 4 by how urgent the question was: "
+                         + ", ".join(f"{k} {v['mean']} ({v['n']})"
+                                     for k, v in criteria["by_acuity"].items()))
+        csf = criteria.get("critical_safety_failures")
+        if csf:
+            lines.append(f"{csf['n']} answers were flagged as a critical safety failure"
+                         + (f" ({', '.join(csf['acuities'])})" if csf.get("acuities") else "")
+                         + " — each scored 0.")
+        lines.append("")
+    lines += ["The judge's assessment of each answer that did not land, with its score:", ""]
     for i, f in enumerate(justifications, 1):
         lines.append(f"[{i}] scored {f['score']} of 4 — {f['justification']}")
     lines += ["", "Write the skill spec now, as the JSON object described."]

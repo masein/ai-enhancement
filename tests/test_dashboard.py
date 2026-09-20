@@ -11,6 +11,7 @@ light and dark at desktop and phone width.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from urllib.parse import quote
@@ -262,7 +263,10 @@ def test_judged_section_and_the_control_sentence(surface, tree):
     assert m and int(m.group(2)) / int(m.group(1)) >= 0.5
     assert "By topic (0–4), weakest first — report half" in text
     assert "Score against answer length" in text and "economics" in text
-    assert card.locator("table.jd").count() == 3
+    # topics, score-vs-length, the control — plus per-criterion and by-acuity
+    # for the one topic that is graded criterion by criterion
+    assert card.locator("table.jd").count() == 5
+    assert card.locator("[data-criteria='medicine & health']").count() == 1
     surface.open(model_link("fx/chance-160m"))
     card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
     assert "Didn't know it either way" in card.text_content()
@@ -327,12 +331,21 @@ def local_judged(tmp_path_factory) -> Path:
     tree = make_fixture.build(root)
     d = tree["models"]["fx/good-750m"]["dir"]
     reqs, plan = jd.plan_requests(d, "gemma")
+    results = jd.stub_results(reqs)
+    # plant one critical safety failure on a criteria-graded item, so the page
+    # has both wordings to show: the fixture's own answers trip none
+    med = [m for m in plan["tasks"]["exam_medicine_health"] if m["half"] == "diagnose"]
+    spec = jd.rubric_for("exam_medicine_health").criteria
+    results[med[0]["cid"]] = type(results[med[0]["cid"]])(text=json.dumps({
+        "critical_safety_failure": True,
+        "criteria": {cid: 1.0 for cid in jd.criteria_ids(spec)},
+        "justification": "told an emergency to wait until morning"}))
     plan["provisional"] = {"provisional": True,
                            "provisional_reason": "graded by a local model — not a pinned benchmark",
                            "base_url": "http://localhost:8000/v1", "served_model": "chat",
                            "weights": "google/gemma-4-E4B-it"}
     ident = {"provider": "local", "model": "chat", "id": "local/chat", "family": "chat"}
-    jd.write_judge(d, jd.assemble(plan, jd.stub_results(reqs), ident, "local_0123456789ab",
+    jd.write_judge(d, jd.assemble(plan, results, ident, "local_0123456789ab",
                                   tree["out_dir"], 0.5, False, record=False))
     return make_fixture.frozen_report(root, root / "report.html")
 
@@ -375,6 +388,41 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
                    for c in row.locator("td").all())
         assert "were graded by a local model — not a pinned benchmark" in \
             pg.locator("#warnings").text_content()
+        assert s.errors == []
+    finally:
+        ctx.close()
+
+
+def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browser, local_judged):
+    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+    s = Surface(ctx.new_page(), local_judged.as_uri())
+    try:
+        pg = s.open(model_link("fx/good-750m"))
+        card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
+        head = card.locator("[data-criteria='medicine & health']")
+        assert head.count() == 1 and "by criterion (0–1), weakest first" in head.text_content()
+        # every criterion in the file has a row, weakest first, zero-anchored
+        rows = card.locator("tr[data-criterion]")
+        assert rows.count() == 16
+        means = [float(rows.nth(i).locator("td").nth(1).inner_text())
+                 for i in range(rows.count())
+                 if rows.nth(i).locator("td").nth(1).inner_text() != "—"]
+        assert means == sorted(means)
+        cond = card.locator("tr[data-criterion='medication_safety']")
+        assert "conditional" in cond.text_content()
+        # the critical failure is stated in words, not only coloured
+        csf = card.locator("[data-csf]")
+        assert csf.count() == 1
+        text = csf.text_content()
+        assert text.startswith("Critical safety failures.")
+        assert "could plausibly have caused harm" in text
+        assert "Each is a 0 whatever else the answer got right" in text
+        # and the acuity table says which kind of question it happened on
+        acuity = card.locator("tr[data-acuity]")
+        assert acuity.count() >= 3
+        assert any("see above" in acuity.nth(i).text_content() for i in range(acuity.count()))
+        SCREENS.mkdir(exist_ok=True)
+        card.screenshot(path=SCREENS / "criteria-medicine.png")
         assert s.errors == []
     finally:
         ctx.close()

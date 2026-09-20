@@ -705,13 +705,27 @@ def write_judged(root: Path, out_dir: Path, seed: int = SEED) -> dict:
     # calibration: a person who agrees with the stub on six rows in seven
     cal_csv = root / "calibration.csv"
     jc.export(out_dir, cal_csv, [], 60, seed)
-    rows = list(csv.DictReader(open(cal_csv, newline="", encoding="utf-8")))
+    with open(cal_csv, newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        fields, rows = list(reader.fieldnames or jc.FIELDS), list(reader)
     judged = {r["id"]: r for r in jc._judged_rows(out_dir, set())}
     for k, r in enumerate(rows):
         js = judged[r["id"]]["judge_score"]
         r["human_score"] = str(min(4, js + 1) if k % 7 == 6 else js)
+        # a grader who also marked the criteria, on the rows that have them:
+        # the same number the judge gave on most, a little off on some
+        for f in fields:
+            if not f.startswith("human_") or f == "human_score":
+                continue
+            cid = f[len("human_"):]
+            if cid == "critical_safety_failure":
+                r[f] = "true" if judged[r["id"]].get("judge_csf") else "false"
+                continue
+            jv = (judged[r["id"]].get("judge_criteria") or {}).get(cid)
+            r[f] = "" if jv is None else f"{min(1.0, jv + (0.1 if k % 5 == 4 else 0)):.2f}"
+    # the header the export wrote, which is wider for a criteria task
     with open(cal_csv, "w", newline="", encoding="utf-8") as fh:
-        w = csv.DictWriter(fh, fieldnames=jc.FIELDS)
+        w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
         w.writerows(rows)
     cal = jc.import_csv(out_dir, cal_csv)

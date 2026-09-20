@@ -496,7 +496,51 @@ def judge_step(a, ctx) -> str:
             "These scores are shown greyed on the page, never ranked, never in any average.")
     for why in j.get("preliminary_reasons") or []:
         say(f"preliminary: {why}")
+    for task, v in sorted(j["tasks"].items()):
+        if v.get("criteria_mean"):
+            _criteria_report(task, v, jj)
     return ""
+
+
+def _criteria_report(task: str, v: dict, jj: dict) -> None:
+    """What a topic graded criterion by criterion looks like: where it was
+    weak, how often it was dangerous, on which acuities, and one graded
+    answer in full so a person can see what a grade actually is."""
+    labels = v.get("criteria_labels") or {}
+    counts = v.get("criteria_n") or {}
+    rub = (jj.get("rubrics") or {}).get(task) or {}
+    print()
+    say(f"{task} is graded criterion by criterion, and the 0-4 above is a fold of them:",
+        f"  {rub.get('name')}.criteria.json ({rub.get('criteria_sha256', '')[:12]}, "
+        f"{rub.get('criteria_status') or 'signed off'}) · "
+        f"{v.get('unparseable', 0)} of {v['n']} replies unreadable")
+    print()
+    print(f"   {'criterion':<28}{'mean':>7}{'answers':>9}   weakest first")
+    for cid, m in sorted(v["criteria_mean"].items(), key=lambda kv_: (kv_[1] is None, kv_[1])):
+        print(f"   {(labels.get(cid) or cid):<28}{('—' if m is None else f'{m:.2f}'):>7}"
+              f"{counts.get(cid, 0):>9}")
+    csf = v.get("critical_safety_failures") or {}
+    say("", f"critical safety failures: {csf.get('n', 0)} of {v['n']} answers"
+            + (f" ({', '.join(csf.get('acuities') or [])})" if csf.get("acuities") else "")
+            + " — each folds to 0 whatever else was right.")
+    if v.get("by_acuity"):
+        print()
+        print(f"   {'acuity':<28}{'mean':>7}{'answers':>9}{'critical':>10}")
+        for acuity, b in v["by_acuity"].items():
+            print(f"   {acuity:<28}{b['mean']:>7.2f}{b['n']:>9}"
+                  f"{b['critical_safety_failures']:>10}")
+    graded = [it for it in v.get("items") or []
+              if it.get("half") == "diagnose" and it.get("criteria")]
+    if graded:
+        it = min(graded, key=lambda x: x["score"])
+        print()
+        say("One graded answer in full — the diagnosis half, so it may be shown:",
+            f"  score {it['score']}/4, folded from {it['fold']['applicable']} applicable "
+            f"criteria"
+            + (", CRITICAL SAFETY FAILURE" if it.get("critical_safety_failure") else ""))
+        quote(", ".join(f"{cid} {'null' if val is None else val}"
+                        for cid, val in sorted(it["criteria"].items())))
+        quote(it.get("justification") or "(no justification)")
 
 
 # ---------------------------------------------------------------------------
@@ -572,8 +616,14 @@ def propose(a, ctx) -> str:
     db.init()
     pid = db.proposal_create(a.model, task, topic, APPROVER,
                              {"n_shown": len(items), **counts, "demo": True})
+    crit = prop.criteria_evidence(ctx["model_dir"], task)
+    if crit.get("weakest_criteria"):
+        say("", "This topic is graded criterion by criterion, so the request also carries the",
+            "three weakest criteria and the per-acuity means — labels and numbers only:")
+        for c in crit["weakest_criteria"]:
+            say(f"  {c['label']}: {c['mean']} over {c['n']} answers")
     req = prop.proposal_request(pid, a.model, task, topic, items, counts,
-                                jd.rubric_for(task)[0])
+                                jd.rubric_for(task)[0], crit)
     bid = backend.submit([req])
     db.batch_add(bid, "proposal", pid, 1, backend.name, backend.model)
     db.proposal_update(pid, batch_id=bid, prompt_sha=llm.prompt_sha(req.system, req.user),
