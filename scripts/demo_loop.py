@@ -404,6 +404,20 @@ def _stub_answers(a, ctx) -> None:
                          "target": ref})
         (d / "samples_demo.jsonl").write_text(
             "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+        # the harness writes one of these beside its samples, and the report
+        # is built from them — without it the demo's own page has no run to
+        # show, which is how this went unnoticed until someone looked
+        (d / "results_demo.json").write_text(json.dumps({
+            "results": {task: {"alias": task, "bypass,none": 999}},
+            "group_subtasks": {task: []}, "versions": {task: 1.0}, "n-shot": {task: 0},
+            "configs": {task: {"task": task, "output_type": "generate_until",
+                               "metric_list": [{"metric": "bypass"}]}},
+            "higher_is_better": {task: {"bypass": True}},
+            "n-samples": {task: {"original": len(rows), "effective": len(rows)}},
+            "config": {"model": "hf", "model_args": f"pretrained={a.model}", "batch_size": "1",
+                       "device": "demo-stub", "limit": None, "random_seed": 1234},
+            "git_hash": "demo", "date": time.time(), "chat_template": None,
+            "total_evaluation_time_seconds": "0.0"}), encoding="utf-8")
     (config.OUT_DIR / safe / "model_meta.json").write_text(json.dumps(
         {"model": a.model, "kind": "demo-stub", "params": None}), encoding="utf-8")
 
@@ -729,9 +743,37 @@ def generate(a, ctx) -> str:
 # 9 · summary
 # ---------------------------------------------------------------------------
 
+def write_report(a, ctx) -> Path | None:
+    """The demo's own dashboard, of the demo's own tree. Without it "shown
+    greyed on the page" is a claim about a code path nobody can open: the
+    live board reads results/full and this ran under demo/, which is the
+    isolation working and the demo invisible. Two pages, two trees."""
+    import report_lm_eval as report
+    from service import config
+    runs = report.load_results(config.OUT_DIR) if config.OUT_DIR.is_dir() else []
+    if not runs:
+        return None
+    when = time.strftime("%Y-%m-%d %H:%M", time.localtime())
+    title = f"DEMO RUN — {when} — not the leaderboard"
+    out = report.build_report(
+        runs, ctx["root"] / "report.html", title,
+        judge_identity=jd.identity(),
+        banner=(f"DEMO RUN — {when} — every number here is provisional and stamped "
+                f"{APPROVER}; nothing on this page is on the leaderboard."),
+        banner_link=("/", "the live dashboard"))
+    return out
+
+
 def summary(a, ctx) -> None:
     from service import config, proposals as prop
     hr("Summary — every path this run wrote")
+    report_path = write_report(a, ctx)
+    if report_path:
+        kv("THE DEMO'S PAGE", report_path)
+        say("  the service serves it at /demo — e.g. http://<this box>:8899/demo — with a",
+            "  banner saying what it is. The live board at / is untouched and lists no",
+            "  model from this run.")
+        print()
     kv("exam bank", eb.bank_dir(config.EXAM_DIR))
     kv("harness tasks", eb.tasks_dir(config.EXAM_DIR))
     kv("answers + judge.json", ctx.get("model_dir", "—"))
@@ -747,6 +789,9 @@ def summary(a, ctx) -> None:
         "     the skill; the diagnose half alone is the test being taught.",
         "", "What this run did not exercise: the Anthropic and OpenAI batch clients. They",
         "stay untested until there are keys — a green demo is not a green production path.")
+    if report_path and not a.keep:
+        say("", f"The tree below is about to be removed; {report_path.name} stays, so the page",
+            "outlives the run it describes.")
 
 
 # ---------------------------------------------------------------------------
@@ -846,8 +891,15 @@ def main() -> int:
             print(f"\n   left {root} in place"
                   + ("" if ok else " — the run stopped early, so its logs are still there"))
         else:
-            shutil.rmtree(root, ignore_errors=True)
-            print(f"\n   removed {root} (--keep leaves it in place)")
+            # everything except the report: the numbers were a demo and go,
+            # the page that says they were a demo stays
+            kept = root / "report.html"
+            for child in root.iterdir():
+                if child == kept:
+                    continue
+                shutil.rmtree(child, ignore_errors=True) if child.is_dir() else child.unlink()
+            print(f"\n   removed {root}/* (--keep leaves it all)"
+                  + (f", kept {kept.name}" if kept.exists() else ""))
 
 
 if __name__ == "__main__":

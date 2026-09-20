@@ -68,6 +68,24 @@ _cache: dict = {"key": None, "payload": None, "at": 0.0}
 _WATCH = ("results*.json", "diagnose.json", "model_meta.json", "judge.json",
           "judge_calibration.json")
 
+# The demo's own report, which the demo script writes and GET /demo serves.
+# It is NOT under OUT_DIR — the whole point is that the demo's tree is not the
+# live tree — so its mtime joins the cache key by hand. HANDOFF §13: both
+# cache bugs so far were a file that changed without the key noticing.
+DEMO_REPORT = "report.html"
+
+
+def demo_report_path() -> Path:
+    return config.BENCH_ROOT / "demo" / DEMO_REPORT
+
+
+def demo_report_stamp() -> float:
+    p = demo_report_path()
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return 0.0
+
 
 def _judge_identity() -> dict:
     import judge as _judge
@@ -89,10 +107,10 @@ def _tree_key() -> tuple:
     # the taint join reads the database, so its state is part of the key too:
     # a training run registering a dataset changes what the board should show
     if not config.OUT_DIR.is_dir():
-        return (0, 0.0, db.taint_stamp())
+        return (0, 0.0, db.taint_stamp(), demo_report_stamp())
     files = [f for pat in _WATCH for f in config.OUT_DIR.rglob(pat)]
     return (len(files), max((f.stat().st_mtime for f in files), default=0.0),
-            db.taint_stamp())
+            db.taint_stamp(), demo_report_stamp())
 
 
 def taint_for(model_ids) -> dict[str, list[str]]:
@@ -139,6 +157,11 @@ def results_payload() -> dict:
                                        calibration=_calibration(),
                                        judge_identity=_judge_identity())
         payload["live"] = True
+        # one link, only when a demo has actually run. The live payload is
+        # built from OUT_DIR alone and reads nothing under demo/ — this is a
+        # timestamp, not a number from that tree.
+        stamp = demo_report_stamp()
+        payload["demo"] = {"at": stamp, "href": "/demo"} if stamp else None
         _cache.update(key=key, payload=payload)
     _cache["at"] = now
     return _cache["payload"]
@@ -897,6 +920,7 @@ def healthz():
 
 _PAGE = (report.TEMPLATE
          .replace("__TITLE__", report.html.escape(config.TITLE))
+         .replace("__BANNER__", "")          # the live board is the real one
          .replace("__CSS__", report.CSS)
          .replace("__DATA__", "null")
          .replace("__JS__SLOT__", report.JS))
@@ -905,6 +929,31 @@ _PAGE = (report.TEMPLATE
 @app.get("/", response_class=HTMLResponse)
 def index():
     return _PAGE
+
+
+_NO_DEMO = """<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>No demo run yet</title></head><body style="font:15px/1.6 system-ui;margin:40px auto;
+max-width:46em;padding:0 16px"><h1>No demo run yet</h1>
+<p>A demo run writes its own page here — its own exam bank, its own results tree, its own
+numbers, none of them on the leaderboard. Run one on the box:</p>
+<pre style="background:#f4f4f5;padding:12px;border-radius:6px;overflow:auto">cd $BENCH_ROOT &amp;&amp; python3 aienh/scripts/demo_loop.py \\
+    --topic "medicine &amp; health" \\
+    --import aienh/eval_tasks/fr/hossein_medicine_v1.json \\
+    --approver "Dr. Hossein" --model HuggingFaceTB/SmolLM2-360M-Instruct</pre>
+<p>It prints this URL when it finishes. See <code>DEMO.md</code> for the rest, including
+what a green run does not prove.</p>
+<p><a href="/">← the live dashboard</a></p></body></html>"""
+
+
+@app.get("/demo", response_class=HTMLResponse)
+def demo_report():
+    """The demo's own dashboard, of the demo's own tree. Deliberately a
+    second page rather than a switch on the live one: two trees, two pages,
+    one link each way, and no chance of a demo number being read as a result."""
+    p = demo_report_path()
+    if not p.is_file():
+        return HTMLResponse(_NO_DEMO, status_code=404)
+    return HTMLResponse(p.read_text(encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------------

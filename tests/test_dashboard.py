@@ -428,6 +428,77 @@ def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browse
         ctx.close()
 
 
+@pytest.fixture(scope="module")
+def demo_report(tmp_path_factory) -> Path:
+    """A real demo run's own page, built by the demo itself — the medicine
+    bank, so the judged section has criteria to show."""
+    import os
+    import subprocess
+    import sys
+    root = tmp_path_factory.mktemp("demo-bench")
+    env = {**os.environ, "BENCH_ROOT": str(root),
+           "LLM_PROVIDER": "fake", "LLM_MODEL": "fake-1",
+           "JUDGE_PROVIDER": "fake", "JUDGE_MODEL": "fake-judge-20250101",
+           "EXAM_PROVIDER": "", "EXAM_MODEL": ""}
+    for k in ("LLM_API_KEY", "EXAM_API_KEY", "JUDGE_API_KEY"):
+        env.pop(k, None)
+    repo = Path(__file__).resolve().parents[1]
+    r = subprocess.run(
+        [sys.executable, str(repo / "scripts" / "demo_loop.py"), "--topic", "medicine & health",
+         "--import", str(repo / "eval_tasks" / "fr" / "hossein_medicine_v1.json"),
+         "--approver", "Dr. Hossein", "--sit", "stub", "--count", "4", "--keep"],
+        capture_output=True, text=True, timeout=300, env=env, cwd=repo)
+    assert r.returncode == 0, r.stdout + r.stderr
+    page = root / "demo" / "report.html"
+    assert page.is_file()
+    return page
+
+
+def test_the_demo_page_says_what_it_is_and_shows_the_criteria(browser, demo_report):
+    """P5a: the first time a person can open what the demo produced. The
+    judged section has to hold up on the page, not only in judge.json."""
+    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+    s = Surface(ctx.new_page(), demo_report.as_uri())
+    try:
+        pg = s.open()
+        banner = pg.locator(".pagebanner")
+        assert banner.count() == 1
+        assert "DEMO RUN" in banner.text_content()
+        assert "nothing on this page is on the leaderboard" in banner.text_content()
+        assert banner.locator("a").get_attribute("href") == "/"      # back to the real board
+        pg.goto(demo_report.as_uri() + model_link("EleutherAI/pythia-160m"))
+        pg.wait_for_selector("#view > *")
+        card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
+        text = card.text_content()
+        # the two stamps, in words
+        assert "Provisional." not in text                 # the fake judge is not local…
+        assert "Draft rubric." in text                    # …but the rubric is still a draft
+        assert "medicine & health is graded against a rubric its author has not signed off" in text
+        # the criteria row, the failures in words, the acuity table
+        assert card.locator("[data-criteria='medicine & health']").count() == 1
+        assert card.locator("tr[data-criterion]").count() == 16
+        assert card.locator("tr[data-criterion='medication_safety']").text_content().count(
+            "conditional") == 1
+        assert card.locator("[data-csf]").count() == 1
+        assert "critical safety failure" in text.lower()
+        assert card.locator("tr[data-acuity]").count() == 5
+        # the folded score is shown, greyed and not counted: 29 report-half
+        # questions is under the floor, and nothing is calibrated
+        assert "Preliminary." in text and "never ranked, never averaged" in text
+        row = card.locator("tr[data-topic='medicine & health']")
+        assert row.count() == 1 and "dim" in (row.get_attribute("class") or "")
+        assert "· under 30" in row.text_content()
+        SCREENS.mkdir(exist_ok=True)
+        card.screenshot(path=SCREENS / "demo-judged-medicine.png")
+        pg.goto(demo_report.as_uri())
+        pg.wait_for_selector("#view > *")
+        pg.screenshot(path=SCREENS / "demo-report-top.png", clip={"x": 0, "y": 0,
+                                                                  "width": 1240, "height": 420})
+        assert s.errors == []
+    finally:
+        ctx.close()
+
+
 def test_screenshots_for_the_pr(surface):
     """Not an assertion beyond 'it rendered': the pictures a reviewer wants."""
     SCREENS.mkdir(exist_ok=True)

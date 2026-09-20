@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 import demo_loop
+from conftest import fresh
 
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "scripts" / "demo_loop.py"
@@ -100,11 +101,15 @@ def test_nothing_lands_outside_the_demo_root(demo):
     assert sorted(p.name for p in (root / "exam").iterdir()) == ["bank", "candidates", "tasks"]
 
 
-def test_the_tree_is_removed_unless_kept(tmp_path):
+def test_the_tree_is_removed_unless_kept_but_the_page_stays(tmp_path):
     root = tmp_path / "bench"
     r = run(root)
     assert r.returncode == 0, r.stdout + r.stderr
-    assert "removed" in r.stdout and not (root / "demo").exists()
+    assert "removed" in r.stdout
+    # the numbers were a demo and go; the page that says they were a demo stays
+    assert sorted(p.name for p in (root / "demo").iterdir()) == ["report.html"]
+    assert "DEMO RUN" in (root / "demo" / "report.html").read_text(encoding="utf-8")
+    assert "the page outlives the run it describes" in r.stdout.replace("\n   ", " ")
 
 
 def test_dry_run_calls_nothing_and_writes_nothing(tmp_path):
@@ -235,6 +240,81 @@ def test_the_import_flags_are_checked_before_anything_runs(tmp_path):
             "--topic", "medicine & health")
     assert r.returncode == 2 and "no such file" in r.stdout
     assert not (root / "demo").exists()
+
+
+def test_the_run_ends_with_its_own_page(demo):
+    """The demo writes the demo's own dashboard. Without it, "shown greyed on
+    the page" is true of a code path nobody can open: the live board reads
+    results/full and this ran under demo/."""
+    out, root = demo
+    page = root / "report.html"
+    assert page.is_file() and "THE DEMO'S PAGE" in out and "serves it at /demo" in out
+    html = page.read_text(encoding="utf-8")
+    assert "DEMO RUN" in html and "nothing on this page is on the leaderboard" in html
+    assert 'class="pagebanner"' in html and ">the live dashboard</a>" in html
+    assert "<title>DEMO RUN" in html
+    # it is the report of the DEMO tree: the model that sat this exam is on it
+    assert "EleutherAI__pythia-160m" in html or "pythia-160m" in html
+    assert "exam_economics" in html
+
+
+def test_the_service_serves_the_demo_page_apart_from_the_board(tmp_path, monkeypatch):
+    from conftest import make_service
+    from service import config
+    client, appmod, _ = make_service(tmp_path, monkeypatch)
+    try:
+        # nothing has run yet: a page that says so, and how to run one
+        r = client.get("/demo")
+        assert r.status_code == 404
+        assert "No demo run yet" in r.text and "demo_loop.py" in r.text
+        assert "DEMO RUN" not in client.get("/").text        # the board is the board
+        fresh(appmod)
+        assert client.get("/api/results").json()["demo"] is None
+        # a run leaves a page behind, and the board grows one link to it
+        page = config.BENCH_ROOT / "demo" / "report.html"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        page.write_text("<html><body>DEMO RUN — a page</body></html>", encoding="utf-8")
+        assert "DEMO RUN — a page" in client.get("/demo").text
+        fresh(appmod)
+        demo = client.get("/api/results").json()["demo"]
+        assert demo["href"] == "/demo" and demo["at"] > 0
+        # ...without a restart: the file is part of the payload's cache key
+        assert appmod.demo_report_stamp() > 0
+        assert appmod.demo_report_stamp() in appmod._tree_key()
+    finally:
+        client.__exit__(None, None, None)
+
+
+def test_the_live_payload_never_opens_the_demo_tree(tmp_path, monkeypatch):
+    """Two trees, two pages. The live board must not read a demo number even
+    by accident, so watch every path it opens while it builds."""
+    import builtins
+    from conftest import make_service
+    from service import config
+    client, appmod, _ = make_service(tmp_path, monkeypatch)
+    try:
+        demo = config.BENCH_ROOT / "demo"
+        (demo / "results" / "full" / "fx__demo-model").mkdir(parents=True)
+        (demo / "results" / "full" / "fx__demo-model" / "results_x.json").write_text(
+            json.dumps({"results": {"mmlu": {"acc,none": 0.99}}, "config": {
+                "model_args": "pretrained=fx/demo-model"}}), encoding="utf-8")
+        (demo / "report.html").write_text("DEMO RUN", encoding="utf-8")
+        opened: list[str] = []
+        real = builtins.open
+
+        def watched(file, *a, **kw):
+            opened.append(str(file))
+            return real(file, *a, **kw)
+        monkeypatch.setattr(builtins, "open", watched)
+        monkeypatch.setattr(Path, "read_text", lambda self, *a, **kw: (
+            opened.append(str(self)) or real(self, encoding=kw.get("encoding")).read()))
+        fresh(appmod)
+        payload = client.get("/api/results").json()
+        assert not [p for p in opened if "/demo/" in p], \
+            [p for p in opened if "/demo/" in p][:3]
+        assert not any(m["id"] == "fx/demo-model" for m in payload["models"])
+    finally:
+        client.__exit__(None, None, None)
 
 
 def test_demo_md_says_what_a_green_run_does_not_prove():

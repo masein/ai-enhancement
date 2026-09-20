@@ -1622,6 +1622,12 @@ th .dir { font-size:9px; }
 .warn { border-left:2px solid var(--warning); padding:6px 0 6px 12px; margin:10px 0;
   color:var(--text-secondary); font-size:13px; }
 .warn b, .note b { color:var(--text-primary); }
+/* a band the page cannot lose: a demo report must say what it is wherever
+   it is opened, so it is markup at the top of the document, not a toast */
+.pagebanner { border:1px solid var(--warning); border-left-width:4px; border-radius:6px;
+  padding:10px 14px; margin:0 0 14px; font-size:13.5px; font-weight:600;
+  color:var(--text-primary); background:color-mix(in srgb, var(--warning) 10%, transparent); }
+.pagebanner a { font-weight:500; }
 .lb td.model { white-space:nowrap; }
 .lb td.model .mname { display:inline-block; max-width:22ch; overflow:hidden;
   text-overflow:ellipsis; vertical-align:bottom; }
@@ -5508,6 +5514,12 @@ function renderStatic() {
     LIVE ? el('span', { class: 'chip', text: 'live — updates as runs finish' }) : '',
     LIVE ? el('a', { class: 'chip', href: 'guide', target: '_blank', rel: 'noopener',
                      style: 'text-decoration:none', text: '📖 guide for new users' }) : '',
+    // a demo has its own page, of its own tree; this is the only thread
+    // between them, and it appears only once a run has left one behind
+    LIVE && DATA.demo ? el('a', { class: 'chip', href: DATA.demo.href, 'data-demo': 'link',
+                                  style: 'text-decoration:none',
+                                  title: 'a demo run\'s own page — provisional, not the board',
+                                  text: `demo run from ${absT(DATA.demo.at).split(',')[0]}` }) : '',
     DATA.meta.hashes.length ? el('span', { class: 'chip' }, 'harness ',
       el('span', { class: 'mono', text: DATA.meta.hashes.join(', ') })) : '',
     DATA.meta.transformers ? el('span', { class: 'chip', text: `transformers ${DATA.meta.transformers}` }) : '',
@@ -5596,6 +5608,7 @@ TEMPLATE = """<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>__TITLE__</title><style>__CSS__</style></head>
 <body class="viz-root"><div id="tip" role="status"></div><div class="wrap">
+__BANNER__
   <div class="topbar">
     <div>
       <h1>__TITLE__</h1>
@@ -5631,18 +5644,33 @@ TEMPLATE = """<!doctype html>
 </body></html>"""
 
 
+def banner_html(text: str, link: str = "", link_text: str = "") -> str:
+    """A band across the top of a report that cannot be dismissed. It exists
+    for the demo: a page of numbers that look like a leaderboard, and are not
+    one, must say so wherever it is opened and however far it is scrolled
+    from — so it is in the markup, not in a toast."""
+    if not text:
+        return ""
+    tail = (f' <a href="{html.escape(link)}">{html.escape(link_text or link)}</a>'
+            if link else "")
+    return f'  <div class="pagebanner" role="note">{html.escape(text)}{tail}</div>'
+
+
 def build_report(runs: list[dict], out_path: Path, title: str,
                  calibration: dict | None = None, taint: dict | None = None,
-                 parents: dict | None = None, judge_identity: dict | None = None) -> Path:
+                 parents: dict | None = None, judge_identity: dict | None = None,
+                 banner: str = "", banner_link: tuple[str, str] = ("", "")) -> Path:
     if not runs:
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text("<h1>No lm-eval results found.</h1>", encoding="utf-8")
+        out_path.write_text(f"<h1>No lm-eval results found.</h1><p>{html.escape(banner)}</p>",
+                            encoding="utf-8")
         return out_path
     payload = build_payload(merge_runs(runs), title, source="", calibration=calibration,
                             taint=taint, parents=parents, judge_identity=judge_identity)
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     page = (TEMPLATE
             .replace("__TITLE__", html.escape(title))
+            .replace("__BANNER__", banner_html(banner, *banner_link))
             .replace("__CSS__", CSS)
             .replace("__DATA__", blob)
             .replace("__JS__SLOT__", JS))
