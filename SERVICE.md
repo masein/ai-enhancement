@@ -96,17 +96,21 @@ re-queued automatically and per-task resume repeats only the interrupted task.
 | `EVAL_USER` | benchjob | unprivileged account those jobs run as; required when the above is on |
 | `REMOTE_CODE_SHAS` | *(unset)* | if set, an allowlist: only these .py hashes may run |
 | `CONTROL_TASKS_DIR` | the repo's `eval_tasks/mmlu_perm` | where a `suite=control` run finds the permutation control's task yaml |
-| `LLM_PROVIDER` | *(unset — off)* | `anthropic` / `openai` / `fake`: the model behind skill-spec proposals and data generation (batch API only) |
+| `LLM_PROVIDER` | *(unset — off)* | `anthropic` / `openai` / `local` / `fake`: the model behind skill-spec proposals and data generation (batch API only; `local` is vLLM on this box — see *The local model*) |
 | `LLM_MODEL` | *(unset)* | the generator model id, pinned; recorded in every dataset's provenance |
 | `LLM_API_KEY` | *(unset)* | in `.env` only — see *The LLM key* below |
 | `LLM_MAX_ITEMS_PER_BATCH` / `LLM_DAILY_ITEM_CAP` | 200 / 2000 | spend guard, in batch requests (one per proposal, one per ten generated items); the Review tab shows today's use |
 | `DATASET_QUOTA_GB` | 20 | total generated-dataset storage under `$BENCH_ROOT/datasets` |
 | `EXAM_PROVIDER` / `EXAM_MODEL` / `EXAM_API_KEY` | *(unset — off)* | the exam writer behind `scripts/exam_build.py draft`. A different identity from the generator and the judge, on purpose |
 | `EXAM_DIR` | `$BENCH_ROOT/exam` | `candidates/` awaiting curation, `bank/` accepted questions (split by qid), `tasks/` what the harness runs |
-| `JUDGE_PROVIDER` / `JUDGE_MODEL` / `JUDGE_API_KEY` | *(unset — off)* | the judge: an API call, batch mode. A **dated** model id, never an alias; a **different provider** from the exam writer and the generator; `stub` for a dry run. The page states the reason when any rule fails |
+| `JUDGE_PROVIDER` / `JUDGE_MODEL` / `JUDGE_API_KEY` | *(unset — off)* | the judge: an API call, batch mode. A **dated** model id, never an alias; a **different provider** from the exam writer and the generator; `stub` for a dry run. The page states the reason when any rule fails. `local` is the one exception to the dated id: it runs, **provisional** |
 | `JUDGE_CANARY_MAX_DRIFT` | 0.5 | thirty fixed scripts are re-graded every run; if their grades move more than this from the previous run the run is preliminary |
 | `ALLOW_SINGLE_PROVIDER_LOOP` | 0 | the documented override for a one-provider trial; every judged score is then stamped "single-provider loop" |
 | `JUDGED_TASKS_DIR` | `$EXAM_DIR/tasks` | where `scripts/exam_build.py build` put the exam tasks |
+| `LOCAL_BASE_URL` | `http://localhost:8000/v1` | the `local` provider's OpenAI-compatible server (vLLM). Loopback only on the deploy box |
+| `LOCAL_CONCURRENCY` | 2 | `local` requests in flight at once — the card is shared |
+| `LOCAL_MAX_TOKENS` | 1024 | a cap on every `local` reply, whatever the caller asked for, for the same reason |
+| `LOCAL_TIMEOUT_S` | 180 | per `local` request; a timeout is retried like a 5xx |
 
 ## The LLM key
 
@@ -134,6 +138,73 @@ Everything the LLM produces goes through the contamination gate
 (`service/contamination.py`) before it can be stored, and every dataset
 carries a full provenance record. Who approved a spec is recorded as a
 typed name, the same way submissions record a submitter — there is no login.
+
+## The local model (vLLM)
+
+There are no cloud keys yet; there is a vLLM server on the deploy box. The
+`local` provider lets any of the three roles — generator, exam writer, judge —
+run against it, so the loop can be driven end to end today.
+
+- **Endpoint.** `http://localhost:8000/v1`, **loopback only**. Served model id
+  `chat` (weights `google/gemma-4-E4B-it`); `curl -s localhost:8000/v1/models`
+  lists what is served. From another machine, tunnel it first:
+
+  ```bash
+  ssh -L 8000:localhost:8000 <box>
+  ```
+
+- **Not from inside the container.** In the service container `localhost` is
+  the container, not the box, so the dockerized service cannot reach a
+  loopback-only vLLM at the default URL. The client says so when it cannot
+  connect. Drive the loop from the host (`scripts/exam_build.py draft`,
+  `scripts/judge.py --wait`, or the manual no-Docker service) — or, as a
+  deliberate choice, expose vLLM to the docker bridge and point
+  `LOCAL_BASE_URL` there; that gives up "loopback only".
+- **No key.** vLLM ignores one unless it was launched with `--api-key`; if it
+  was, the role's `*_API_KEY` is sent. A missing key is fine for `local` and
+  still fatal for `anthropic` and `openai`. A missing model id is fatal for all.
+- **No batch API.** vLLM has no `/v1/batches`, so the client keeps the batch
+  *interface* and fulfils it itself: `submit()` writes the batch under
+  `$BENCH_ROOT/llm_batches/local/<id>/` and returns at once; a worker thread
+  runs the requests, `LOCAL_CONCURRENCY` at a time, appending each result to
+  `results.jsonl` as it lands. A restart resumes from that file instead of
+  re-running. The work happens in whichever process is polling the batch —
+  the service's poller, or `exam_build.py fetch` / `judge.py --wait` on the
+  command line.
+- **One bad request never fails the batch.** A 5xx, a timeout, a refused
+  connection or anything that reads like CUDA OOM is retried after 2, 8 and
+  30 s, then recorded as that request's error. A 4xx is recorded at once — a
+  malformed request or an unknown model id does not fix itself. The batch is
+  `failed` only when every request failed.
+- **Checked at start.** The first use asks `/v1/models` and refuses a model id
+  the server does not serve, by name: *vLLM is up but serves `['chat']`, not
+  `'gemma'`*. If nothing answers, the poller waits and tries again next tick
+  rather than failing pending batches — vLLM takes a while to load after a
+  reboot.
+
+**Everything a local identity produces is provisional, and there is no flag
+to turn that off.** A local server's model id is whatever someone typed at
+launch: not dated, and changeable with no version to check. A 4B model is
+also not a judge anyone publishes scores from. So:
+
+- `judge.json` from a local judge records `"provisional": true`, the reason
+  (*graded by a local model — not a pinned benchmark*), the base URL, the
+  served id and the weights. The reason joins the preliminary reasons, so the
+  page shows those scores **greyed, labelled, never ranked and in no
+  average**. No calibration lifts it, and nothing a local judge wrote can pick
+  a topic to train. The same-family rule uses the *weights'* family (`gemma`),
+  not the served id's; the canary still shows whether the weights behind
+  `chat` changed between runs.
+- Exam candidates a local writer drafted, a spec a local proposer wrote and a
+  dataset a local generator made all carry the same stamp. Dataset
+  provenance lists which roles were local under `local_models`.
+- All three roles on `local` is a provider clash and still needs
+  `ALLOW_SINGLE_PROVIDER_LOOP=1`. Someone has to type it, and the
+  single-provider caveat stays on the page beside the provisional one.
+
+A green run against the local model exercises the callers, the split, the
+airlock, the gate and the dashboard. It does **not** exercise the Anthropic or
+OpenAI batch clients, which stay untested until real keys exist.
 
 ## Custom model code (`trust_remote_code`)
 

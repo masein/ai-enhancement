@@ -249,7 +249,11 @@ def _trim_judge(j: dict | None) -> dict | None:
     out = {"judge": {k: jj.get(k) for k in
                      ("id", "provider", "model", "family", "stub", "weights_sha256",
                       "prompt_sha256", "prompt_version", "rubrics", "greedy", "batch_id",
-                      "single_provider_loop")},
+                      "single_provider_loop",
+                      # a local judge (service/llm.py::local_mark): what it was
+                      # and why nothing it graded counts
+                      "provisional", "provisional_reason", "base_url", "served_model",
+                      "weights")},
            "skipped": j.get("skipped"), "correct_at": j.get("correct_at"),
            "canary": ({k: v for k, v in (j.get("canary") or {}).items()
                        if k in ("n", "graded", "mad_vs_human", "mad_vs_previous", "threshold",
@@ -297,9 +301,22 @@ def judged_state(trimmed: dict | None, cal: dict | None, current_id: str | None)
     elif cal.get("judge_id") and jid and cal["judge_id"] != jid:
         reasons.append(f"the calibration on file is for {cal['judge_id']}, not {jid}")
     reasons.extend(trimmed.get("preliminaryReasons") or [])
+    prov = provisional_reason(trimmed)
+    if prov and prov not in reasons:
+        reasons.append(prov)
     if trimmed.get("skipped"):
         reasons.append(trimmed["skipped"])
     return {"ok": not reasons, "reasons": reasons, "current": current}
+
+
+def provisional_reason(trimmed: dict | None) -> str | None:
+    """Why a local judge's scores never count, or None for any other judge.
+    Not a flag anyone sets: scripts/judge.py stamps every file a local judge
+    writes, and there is no way to write one without it."""
+    j = (trimmed or {}).get("judge") or {}
+    if not j.get("provisional"):
+        return None
+    return j.get("provisional_reason") or "graded by a local model — not a pinned benchmark"
 
 
 # A model that wrote nothing on a topic has not revealed a gap in it.
@@ -348,8 +365,8 @@ def judged_avg(trimmed: dict | None, tainted: list[str] | None = None) -> float 
     """Mean published (report-half) score over the exam topics this model sat,
     on the 0–4 scale. None when fewer than three topics were judged. A topic
     whose diagnostics trained this model is left out: its score is shown, it
-    is not a ranking claim."""
-    if not trimmed or trimmed.get("skipped"):
+    is not a ranking claim. A local judge's scores are in no average at all."""
+    if not trimmed or trimmed.get("skipped") or provisional_reason(trimmed):
         return None
     skip = set(tainted or ())
     vals = [published_score(trimmed["tasks"][t]) for t in EXAM_TASKS
@@ -1222,6 +1239,13 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             f"({', '.join(drifted[:4])}): the same thirty scripts were graded differently from "
             f"the previous run. Those judged scores are preliminary — a vendor may have changed "
             f"the model behind the id.")
+    local_judged = [m["name"] for m in model_rows if provisional_reason(m.get("judge"))]
+    if local_judged:
+        warnings.append(
+            f"Judged scores for {len(local_judged)} model{'s' if len(local_judged) > 1 else ''} "
+            f"({', '.join(local_judged[:4])}{', …' if len(local_judged) > 4 else ''}) were "
+            f"graded by a local model — not a pinned benchmark. They are provisional: shown "
+            f"greyed on the model page, never ranked, never in any average.")
     if any((m.get("judge") or {}).get("judge", {}).get("single_provider_loop") for m in model_rows):
         warnings.append(
             "Single-provider loop: the judge shares a provider with the exam writer or the "
@@ -1529,6 +1553,8 @@ th .dir { font-size:9px; }
 .jd td, .jd th { padding:4px 8px 4px 0; border-bottom:1px solid var(--border); text-align:left; }
 .jd th { font-size:11px; font-weight:600; color:var(--muted); }
 .jd td.num, .jd th.num { text-align:right; font-variant-numeric:tabular-nums; }
+.jd tr.dim td { color:var(--muted); }
+.jd tr.dim .jbar { opacity:.4; }
 .lb th.judged { color:var(--text-secondary); font-style:italic; }
 /* the one button that can spend money and make training data: never colour alone */
 .propose { font:inherit; font-size:11.5px; padding:2px 9px; border-radius:6px;
@@ -2667,6 +2693,8 @@ const frName = t => t === DATA.judged.control ? 'MMLU control (open-ended)'
 // the published topic score is the REPORT half; older files carry only a mean
 const pubScore = v => v.score_report != null ? v.score_report : (v.n_report == null ? v.mean : null);
 
+const upFirst = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+
 function jBar(dist, n) {
   const bar = el('div', { class: 'jbar' });
   for (let s = 0; s <= 4; s++) {
@@ -2700,12 +2728,18 @@ function vJudged(m) {
   const cal = J.calibration;
   const st = m.judgeState || { ok: false, reasons: ['not judged'], current: false };
   const ok = st.ok;
+  // a local judge: never ranked, never averaged, and greyed so it cannot be
+  // read as a number that counts. The canary below still says whether the
+  // weights behind the served id changed between runs.
+  const prov = !!(m.judge && m.judge.judge && m.judge.judge.provisional);
   const card = el('div', { class: 'card' },
     el('h2', { text: 'Judged free response — the exam' }),
     el('p', { class: 'sub', text: 'Open questions per topic, answered in writing, graded 0–4 '
-      + 'against a written rubric by an API judge pinned to a dated model id — single answers, '
-      + 'never pairwise. Length is in the rubric and reported below; a thirty-script canary is '
-      + 're-graded every run so a vendor changing the model behind the id would show.' }));
+      + (prov ? 'against a written rubric by a local model whose id cannot be pinned — '
+              : 'against a written rubric by an API judge pinned to a dated model id — ')
+      + 'single answers, never pairwise. Length is in the rubric and reported below; a '
+      + 'thirty-script canary is re-graded every run so a change to the model behind the id '
+      + 'would show.' }));
   card.append(el('p', { class: ok ? 'note' : 'warn' },
     el('b', { text: ok ? 'Counts. ' : 'Preliminary. ' }),
     cal ? `Cohen's κ ${cal.kappa} against a human grader over ${cal.n} answers `
@@ -2722,6 +2756,13 @@ function vJudged(m) {
     + 'cell stays empty rather than flattering.')); return card; }
   if (j.judge.stub) card.append(el('p', { class: 'warn', text: 'Graded by the STUB grader — a '
     + 'word-overlap stand-in for plumbing tests. Not a judgement of anything.' }));
+  if (prov) card.append(el('p', { class: 'warn', 'data-provisional': 'judge' },
+    el('b', { text: 'Provisional. ' }),
+    `${upFirst(j.judge.provisional_reason || 'graded by a local model — not a pinned benchmark')}: `
+    + `${j.judge.served_model || j.judge.model} at ${j.judge.base_url || 'a local server'}`
+    + (j.judge.weights ? ` (weights ${j.judge.weights})` : '')
+    + '. A local server\'s model id is whatever was typed at launch, so these scores are shown '
+    + 'greyed, never ranked and never in any average.'));
   if (j.judge.single_provider_loop) card.append(el('p', { class: 'warn', text: 'Single-provider '
     + 'loop: the judge shares a provider with the exam writer or the generator. Every score here '
     + 'carries that caveat — a judge scores its own family higher.' }));
@@ -2737,7 +2778,8 @@ function vJudged(m) {
   const cats = J.exam.filter(t => j.tasks[t] && pubScore(j.tasks[t]) != null)
     .sort((a, b) => pubScore(j.tasks[a]) - pubScore(j.tasks[b]));
   if (cats.length) {
-    card.append(el('div', { class: 'dxh', text: 'By topic (0–4), weakest first — report half' }));
+    card.append(el('div', { class: 'dxh', text: 'By topic (0–4), weakest first — report half'
+      + (prov ? ' · provisional, not ranked' : '') }));
     card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
       el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { class: 'num', text: 'score' }),
         el('th', { class: 'num', text: 'κ' }), el('th', { class: 'num', text: 'items (report half)' }),
@@ -2748,7 +2790,7 @@ function vJudged(m) {
         const nr = v.n_report != null ? v.n_report : v.n;
         const g = v.propose;
         const tainted = (m.tainted || []).includes(t);
-        return el('tr', { class: nr < CAT_MIN_N ? 'dim' : null, 'data-topic': frName(t) },
+        return el('tr', { class: prov || nr < CAT_MIN_N ? 'dim' : null, 'data-topic': frName(t) },
           el('td', {}, frName(t), tainted ? el('span', { class: 'badge taint',
             title: 'this model trained on data derived from this topic\'s diagnosis half — the '
               + 'score is shown and is not a ranking claim',
@@ -5012,6 +5054,9 @@ function rvProposal(p, llmOk) {
     card.append(el('p', { class: 'small', text: 'Waiting for the LLM batch to complete '
       + `(batch ${p.batch_id}). Batches take minutes to hours; this page polls.` }));
   if (p.error) card.append(el('p', { class: 'warn', text: p.error }));
+  if (ev.provisional) card.append(el('p', { class: 'warn', 'data-provisional': 'proposal' },
+    el('b', { text: 'Provisional. ' }), `${upFirst(ev.provisional_reason)}: ${ev.served_model} at `
+    + `${ev.base_url}` + (ev.weights ? ` (weights ${ev.weights})` : '') + '.'));
   if (p.spec_text) {
     card.append(el('div', { class: 'dxh', text: 'Proposed skill spec (the LLM\'s words)' }));
     card.append(el('p', { class: 'spec', text: p.spec_text }));
@@ -5090,8 +5135,13 @@ function rvDataset(d) {
       el('span', { class: stClass(d.status === 'ready' ? 'done' : d.status === 'pending'
         ? 'running' : 'failed'), text: d.status }),
       pv.items ? ` · ${pv.items.kept} kept of ${pv.items.generated} generated` : '',
+      pv.provisional ? ' · provisional' : '',
       d.download ? [' · ', el('a', { href: d.download.replace(/^\//, ''), text: 'items.jsonl' })] : ''));
   if (d.error) det.append(el('p', { class: 'warn', text: d.error }));
+  if (pv.provisional) det.append(el('p', { class: 'warn', 'data-provisional': 'dataset' },
+    el('b', { text: 'Provisional. ' }), upFirst(pv.provisional_reason) + ': '
+    + Object.entries(pv.local_models || {}).map(([role, s]) => `${role} ${s.served_model} at `
+      + `${s.base_url}` + (s.weights ? ` (weights ${s.weights})` : '')).join('; ') + '.'));
   if (g.items_in != null)
     det.append(el('p', { class: 'small', text: `Contamination gate: ${g.dropped_benchmark} of `
       + `${g.items_in} items shared a ${g.ngram}-gram with something we evaluate on `
@@ -5208,7 +5258,8 @@ function exCandidate(c) {
   const name = rvNameInput();
   return el('div', { class: 'rv', 'data-candidate': c.cid },
     el('div', { class: 'mhead' }, el('h3', { text: c.topic }),
-      el('span', { class: 'small', text: `drafted by ${c.drafted_by || '—'} · batch ${(c.batch_id || '').slice(0, 14)}` })),
+      el('span', { class: 'small', text: `drafted by ${c.drafted_by || '—'} · batch ${(c.batch_id || '').slice(0, 14)}`
+        + (c.provisional ? ` · provisional: ${c.provisional_reason}` : '') })),
     c.notes ? el('p', { class: 'small', text: 'drafter\'s note: ' + c.notes }) : '',
     el('div', { class: 'dxh', text: 'Question' }), prompt,
     el('div', { class: 'dxh', text: 'Reference (what a full-marks answer must contain)' }), ref,

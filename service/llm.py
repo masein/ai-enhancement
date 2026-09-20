@@ -1,4 +1,4 @@
-"""One LLM client, batch API only, three backends: anthropic, openai, fake.
+"""One LLM client, batch API only, four backends: anthropic, openai, local, fake.
 
 Batch only is the owner's call and the right one for this job: nothing here is
 latency-sensitive — a proposal is read by a person hours later, a dataset is
@@ -6,6 +6,12 @@ consumed by a training run days later — and batch pricing is about half of
 interactive. It also shapes the code well: every request is a row with a
 custom_id, every batch id is persisted before anything else happens, and a
 restart resumes polling rather than re-submitting (service/llm_poller.py).
+
+`local` is a vLLM server on the deploy box. It has no batch API, so it keeps
+the batch INTERFACE and fulfils it with ordinary chat completions on a worker
+thread (LocalOpenAI). Its model id is whatever someone typed at launch — not
+dated, changeable with no version to check — so everything a local identity
+produces is stamped provisional (local_mark), with no flag to turn it off.
 
 The key comes from LLM_API_KEY, which reaches the container through
 docker-compose ${LLM_API_KEY} interpolation from .env — never a literal in
@@ -21,9 +27,14 @@ responder function so a test can plant whatever text it needs to see refused.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
+import http.client
 import json
+import os
+import queue
 import re
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -35,7 +46,18 @@ from . import config
 
 
 class LLMError(RuntimeError):
-    pass
+    """`status` is the HTTP status when there was one — None for a timeout, a
+    refused connection, or anything that never reached a response. Callers
+    that retry branch on it; everything else reads only the message."""
+
+    def __init__(self, message: str = "", status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
+
+class LocalUnreachable(LLMError):
+    """Nothing answered at LOCAL_BASE_URL. Transient on a box where vLLM
+    restarts: the poller tries again next tick instead of failing the batch."""
 
 
 @dataclass
@@ -47,6 +69,10 @@ class Request:
     # recorded by the fake backend, never sent anywhere: what the tests need to
     # prove about a request (the doc hashes behind a proposal, the item count)
     meta: dict = field(default_factory=dict)
+    # the caller parses the reply as JSON: openai and local put
+    # response_format=json_object on the wire, anthropic has no such field and
+    # relies on the prompt. extract_json stays the fallback either way
+    json: bool = False
 
 
 @dataclass
@@ -86,6 +112,18 @@ def extract_json(text: str):
     return None
 
 
+def extract_array(text: str) -> list | None:
+    """The JSON array in a reply. JSON mode (response_format=json_object) may
+    only produce an object, so a model asked for an array under it answers
+    {"documents": [...]}: an object whose ONE list value is the array reads as
+    that array. A bare object is still not an array."""
+    obj = extract_json(text)
+    if isinstance(obj, dict):
+        lists = [v for v in obj.values() if isinstance(v, list)]
+        obj = lists[0] if len(lists) == 1 else None
+    return obj if isinstance(obj, list) else None
+
+
 # ---------------------------------------------------------------------------
 # backends
 # ---------------------------------------------------------------------------
@@ -116,9 +154,14 @@ def _http(method: str, url: str, headers: dict, body: bytes | None = None,
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.status, r.read()
     except urllib.error.HTTPError as e:
-        raise LLMError(f"{method} {url}: HTTP {e.code}: {e.read()[:400].decode(errors='replace')}") from None
+        raise LLMError(f"{method} {url}: HTTP {e.code}: {e.read()[:400].decode(errors='replace')}",
+                       status=e.code) from None
     except urllib.error.URLError as e:
         raise LLMError(f"{method} {url}: {e.reason}") from None
+    except TimeoutError:
+        raise LLMError(f"{method} {url}: no response within {timeout:g}s") from None
+    except (OSError, http.client.HTTPException) as e:   # a dropped connection mid-read
+        raise LLMError(f"{method} {url}: {e!r}") from None
 
 
 class AnthropicBatches(Backend):
@@ -188,13 +231,21 @@ class OpenAIBatches(Backend):
             h["content-type"] = ctype
         return h
 
+    @staticmethod
+    def body(model: str, r: Request) -> dict:
+        """One request's body. JSON mode only when the caller asked for it:
+        OpenAI rejects a JSON-mode request whose prompt does not mention JSON."""
+        b = {"model": model, "max_tokens": r.max_tokens}
+        if r.json:
+            b["response_format"] = {"type": "json_object"}
+        b["messages"] = [{"role": "system", "content": r.system},
+                         {"role": "user", "content": r.user}]
+        return b
+
     def submit(self, requests: list[Request]) -> str:
         lines = [json.dumps({
             "custom_id": r.custom_id, "method": "POST", "url": "/v1/chat/completions",
-            "body": {"model": self.model, "max_tokens": r.max_tokens,
-                     "response_format": {"type": "json_object"},
-                     "messages": [{"role": "system", "content": r.system},
-                                  {"role": "user", "content": r.user}]}}) for r in requests]
+            "body": self.body(self.model, r)}) for r in requests]
         boundary = "----bench" + uuid.uuid4().hex
         payload = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"purpose\"\r\n\r\n"
                    f"batch\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; "
@@ -463,7 +514,8 @@ class FakeBatches(Backend):
     def submit(self, requests: list[Request]) -> str:
         bid = "fake_" + uuid.uuid4().hex[:12]
         rows = [{"batch_id": bid, "custom_id": r.custom_id, "system": r.system,
-                 "user": r.user, "max_tokens": r.max_tokens, "meta": r.meta} for r in requests]
+                 "user": r.user, "max_tokens": r.max_tokens, "json": r.json,
+                 "meta": r.meta} for r in requests]
         with open(self.log, "a", encoding="utf-8") as fh:
             for row in rows:
                 fh.write(json.dumps(row) + "\n")
@@ -487,7 +539,7 @@ class FakeBatches(Backend):
         out = {}
         for row in b["requests"]:
             req = Request(row["custom_id"], row["system"], row["user"], row["max_tokens"],
-                          row.get("meta") or {})
+                          row.get("meta") or {}, bool(row.get("json")))
             try:
                 out[req.custom_id] = Result(text=type(self).responder(req))
             except Exception as e:                       # noqa: BLE001 — a planted failure
@@ -496,10 +548,279 @@ class FakeBatches(Backend):
 
 
 # ---------------------------------------------------------------------------
+# local: a vLLM server behind the batch interface
+# ---------------------------------------------------------------------------
+
+LOCAL_REASON = "{} by a local model — not a pinned benchmark"
+# base url -> {served id: weights id}, filled when a client is constructed, so
+# a provenance record can name the weights without another network call
+_SERVED: dict[str, dict[str, str]] = {}
+_OOM = re.compile(r"out of memory|\boom\b", re.I)
+_BATCH_ID = re.compile(r"local_[0-9a-f]{12}")
+
+
+def local_mark(provider: str, model: str, verb: str, base_url: str | None = None) -> dict:
+    """{} for every provider but `local`. For `local`, the mark every artefact
+    it produced carries — always, with no flag to turn it off. A local
+    server's model id is whatever someone typed at launch: not a dated id,
+    changeable with no version to check, and a 4B model is not an instrument
+    anyone publishes from. `verb` says what it did: graded, drafted,
+    proposed, generated."""
+    if provider != "local":
+        return {}
+    base = (base_url or config.LOCAL_BASE_URL).rstrip("/")
+    out = {"provisional": True, "provisional_reason": LOCAL_REASON.format(verb),
+           "base_url": base, "served_model": model}
+    weights = _SERVED.get(base, {}).get(model)
+    if weights:
+        out["weights"] = weights
+    return out
+
+
+def provisional(backend: Backend, verb: str) -> dict:
+    """local_mark for the backend that did the work."""
+    return local_mark(backend.name, backend.model, verb, getattr(backend, "base", None))
+
+
+class LocalOpenAI(Backend):
+    """A local OpenAI-compatible server (vLLM) presented as a batch backend.
+
+    vLLM has no /v1/batches, so this is not OpenAIBatches with another base
+    URL — that would 404 on the first submit. submit() writes the batch under
+    BENCH_ROOT/llm_batches/local/<id>/ and returns at once; a worker thread
+    fulfils it with ordinary chat completions, at most LOCAL_CONCURRENCY at a
+    time because the card is shared, and appends each result to disk as it
+    lands. status() and fetch() read the disk, so the callers and the poller
+    drive it exactly as they drive a real batch — and a restart resumes where
+    the last process stopped instead of re-running what was done.
+
+    One request failing never fails the batch. A 5xx, a timeout, a refused
+    connection or anything that reads like CUDA OOM is retried after 2, 8 and
+    30 seconds, then recorded as that request's error; transient pressure on
+    a shared card is expected. A 4xx is recorded at once — a malformed request
+    or an unknown model id does not fix itself in 30 seconds.
+
+        requests.jsonl   the batch, written whole before submit() returns
+        results.jsonl    one line per finished request, appended as it lands
+        worker.lock      flock'd by the live worker; the kernel frees it when
+                         the process dies, which is how a restart knows to resume
+    """
+    name = "local"
+    BACKOFF = (2, 8, 30)          # seconds before each retry; the tests set zeros
+
+    def __init__(self, model: str, key: str, root: Path, base_url: str | None = None,
+                 concurrency: int | None = None, max_tokens: int | None = None,
+                 timeout: float | None = None):
+        self.model, self.key = model, key
+        self.base = (base_url or config.LOCAL_BASE_URL).rstrip("/")
+        self.concurrency = max(1, int(concurrency or config.LOCAL_CONCURRENCY))
+        self.max_tokens = int(max_tokens or config.LOCAL_MAX_TOKENS)
+        self.timeout = float(timeout or config.LOCAL_TIMEOUT_S)
+        self.dir = Path(root) / "llm_batches" / "local"
+        self.served_models = self._check_served()
+
+    def _h(self) -> dict:
+        h = {"content-type": "application/json"}
+        if self.key:              # vLLM ignores it unless launched with --api-key
+            h["authorization"] = f"Bearer {self.key}"
+        return h
+
+    def _check_served(self) -> list[str]:
+        """GET /models once, at construction: "vLLM is up but serves ['chat'],
+        not 'gemma'" now beats a 404 on the first click."""
+        try:
+            _, raw = _http("GET", f"{self.base}/models", self._h(), timeout=10)
+        except LLMError as e:
+            if e.status is not None:
+                raise LLMError(f"the local model server at {self.base} refused GET /models: {e}",
+                               status=e.status) from None
+            inside = (" This process is in a container, where localhost is the container "
+                      "itself, not the box." if Path("/.dockerenv").exists() else "")
+            raise LocalUnreachable(
+                f"nothing is answering at {self.base} ({e}).{inside} The vLLM server listens on "
+                f"the deploy box's loopback only; from another machine, tunnel it first: "
+                f"ssh -L 8000:localhost:8000 <box>") from None
+        try:
+            data = json.loads(raw).get("data") or []
+        except (ValueError, AttributeError):
+            raise LLMError(f"{self.base}/models did not return an OpenAI-style model list") from None
+        served = {str(m["id"]): str(m.get("root") or "") for m in data
+                  if isinstance(m, dict) and m.get("id")}
+        if self.model not in served:
+            raise LLMError(f"vLLM is up at {self.base} but serves {sorted(served)}, not "
+                           f"{self.model!r} — set the model id to one of those")
+        _SERVED[self.base] = {k: v for k, v in served.items() if v}
+        return sorted(served)
+
+    # -- the batch on disk ---------------------------------------------------
+
+    def _bdir(self, batch_id: str) -> Path:
+        d = self.dir / batch_id
+        if not _BATCH_ID.fullmatch(batch_id) or not (d / "requests.jsonl").exists():
+            raise LLMError(f"unknown local batch {batch_id}")
+        return d
+
+    @staticmethod
+    def _requests(d: Path) -> list[dict]:
+        return [json.loads(x) for x in (d / "requests.jsonl").read_text(encoding="utf-8").splitlines()
+                if x.strip()]
+
+    @staticmethod
+    def _results(d: Path) -> dict[str, dict]:
+        p = d / "results.jsonl"
+        out: dict[str, dict] = {}
+        if not p.exists():
+            return out
+        for line in p.read_text(encoding="utf-8").splitlines():
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue          # a line cut short by a crash: that request runs again
+            out[row["custom_id"]] = row
+        return out
+
+    def submit(self, requests: list[Request]) -> str:
+        bid = "local_" + uuid.uuid4().hex[:12]
+        d = self.dir / bid
+        d.mkdir(parents=True)
+        (d / "batch.json").write_text(json.dumps({
+            "id": bid, "model": self.model, "base_url": self.base, "n": len(requests),
+            "concurrency": self.concurrency, "max_tokens_cap": self.max_tokens,
+            "submitted_at": time.time()}), encoding="utf-8")
+        # whole or not at all: a batch id the caller persists must never point
+        # at half a batch
+        tmp = d / "requests.jsonl.tmp"
+        tmp.write_text("".join(json.dumps({"custom_id": r.custom_id, "system": r.system,
+                                           "user": r.user, "max_tokens": r.max_tokens,
+                                           "json": r.json}) + "\n" for r in requests),
+                       encoding="utf-8")
+        tmp.replace(d / "requests.jsonl")
+        self._ensure_worker(bid)
+        return bid
+
+    def status(self, batch_id: str) -> tuple[str, str]:
+        d = self._bdir(batch_id)
+        ids = [r["custom_id"] for r in self._requests(d)]
+        res = self._results(d)
+        got = [res[c] for c in ids if c in res]
+        failed = [r for r in got if r.get("error")]
+        cut = sum(1 for r in got if r.get("finish_reason") == "length")
+        detail = (f"{len(got)}/{len(ids)} done" + (f", {len(failed)} failed" if failed else "")
+                  + (f", {cut} cut off at LOCAL_MAX_TOKENS={self.max_tokens}" if cut else ""))
+        if len(got) < len(ids):
+            self._ensure_worker(batch_id)   # after a restart: resume, never re-run
+            return "pending", detail
+        if ids and len(failed) == len(ids):
+            return "failed", failed[0]["error"]
+        return "done", detail
+
+    def fetch(self, batch_id: str) -> dict[str, Result]:
+        d = self._bdir(batch_id)
+        ids = [r["custom_id"] for r in self._requests(d)]
+        res = self._results(d)
+        if any(c not in res for c in ids):
+            self._ensure_worker(batch_id)
+            raise LLMError(f"local batch {batch_id} is not finished: "
+                           f"{sum(c in res for c in ids)}/{len(ids)} done")
+        return {c: Result(text=res[c].get("text") or "", error=res[c].get("error") or "")
+                for c in ids}
+
+    # -- the worker ----------------------------------------------------------
+
+    def _ensure_worker(self, batch_id: str) -> bool:
+        """Start a worker unless one already holds this batch, in this process
+        or another. False when one does."""
+        fd = os.open(self.dir / batch_id / "worker.lock", os.O_CREAT | os.O_RDWR, 0o644)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            os.close(fd)
+            return False
+        threading.Thread(target=self._work, args=(batch_id, fd), name=f"llm-{batch_id}",
+                         daemon=True).start()
+        return True
+
+    def _work(self, batch_id: str, fd: int) -> None:
+        try:
+            d = self.dir / batch_id
+            done = self._results(d)
+            out = d / "results.jsonl"
+            if out.exists() and not out.read_bytes().endswith(b"\n"):
+                with open(out, "a", encoding="utf-8") as fh:   # a crash cut the last line
+                    fh.write("\n")                             # short; never glue onto it
+            todo: queue.SimpleQueue = queue.SimpleQueue()
+            n = 0
+            for row in self._requests(d):
+                if row["custom_id"] not in done:
+                    todo.put(row)
+                    n += 1
+            write = threading.Lock()
+
+            def drain() -> None:
+                while True:
+                    try:
+                        row = todo.get_nowait()
+                    except queue.Empty:
+                        return
+                    rec = self._complete(row)
+                    with write, open(out, "a", encoding="utf-8") as fh:
+                        fh.write(json.dumps(rec) + "\n")
+
+            pool = [threading.Thread(target=drain, name=f"llm-{batch_id}-{i}", daemon=True)
+                    for i in range(min(self.concurrency, n))]
+            for t in pool:
+                t.start()
+            for t in pool:
+                t.join()
+        finally:
+            os.close(fd)          # releases the flock
+
+    @staticmethod
+    def _transient(e: LLMError) -> bool:
+        return e.status is None or e.status >= 500 or bool(_OOM.search(str(e)))
+
+    def _complete(self, row: dict) -> dict:
+        """One request, synchronously, retried while the failure looks
+        transient. Always returns a record — text or error, never a raise."""
+        body = {"model": self.model, "max_tokens": min(int(row["max_tokens"]), self.max_tokens),
+                "messages": ([{"role": "system", "content": row["system"]}] if row["system"] else [])
+                + [{"role": "user", "content": row["user"]}]}
+        if row.get("json"):
+            body["response_format"] = {"type": "json_object"}
+        payload = json.dumps(body).encode()
+        rec = {"custom_id": row["custom_id"], "text": "", "error": "", "attempts": 0}
+        for wait in (*self.BACKOFF, None):
+            rec["attempts"] += 1
+            try:
+                _, raw = _http("POST", f"{self.base}/chat/completions", self._h(), payload,
+                               self.timeout)
+            except LLMError as e:
+                if wait is None or not self._transient(e):
+                    rec["error"] = str(e)[:400]
+                    return rec
+                time.sleep(wait)
+                continue
+            try:
+                choice = json.loads(raw)["choices"][0]
+                rec["text"] = choice["message"].get("content") or ""
+                rec["finish_reason"] = choice.get("finish_reason")
+            except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+                rec["error"] = f"unreadable reply from {self.base}: {raw[:200]!r}"
+            return rec
+
+
+# ---------------------------------------------------------------------------
 # configuration
 # ---------------------------------------------------------------------------
 
-PROVIDERS = ("anthropic", "openai", "fake")
+PROVIDERS = ("anthropic", "openai", "local", "fake")
+# providers that need no API key: the test double, and a server on the box's
+# loopback that ignores one. Both still need a model id except the fake.
+KEYLESS = ("fake", "local")
+
+
+def needs_key(provider: str) -> bool:
+    return provider not in KEYLESS
 
 
 # Three identities share this client: the generator (LLM_*), the exam writer
@@ -525,9 +846,12 @@ def blocked(role: str = "llm") -> str:
         return f"no LLM is configured for {what} on this server ({pv} is unset) — it is off"
     if p not in PROVIDERS:
         return f"{pv}={p!r} is not one of {', '.join(PROVIDERS)}"
+    if p == "local" and not m:
+        return (f"{mv} is unset — name the model the local server serves "
+                f"(GET {config.LOCAL_BASE_URL}/models lists them)")
     if p != "fake" and not m:
         return f"{mv} is unset — the model must be pinned and recorded"
-    if p != "fake" and not k:
+    if needs_key(p) and not k:
         return f"{kv} is unset — put it in .env, never in docker-compose.yml"
     return ""
 
@@ -547,6 +871,8 @@ def backend_for(provider: str, model: str, key: str, root: Path | None = None) -
         return AnthropicBatches(model, key)
     if provider == "openai":
         return OpenAIBatches(model, key)
+    if provider == "local":
+        return LocalOpenAI(model, key, root or config.BENCH_ROOT)
     if provider == "fake":
         return FakeBatches(model, root or config.BENCH_ROOT)
     raise LLMError(f"unknown provider {provider!r}")
@@ -556,8 +882,11 @@ _clients: dict[str, tuple[tuple, Backend]] = {}
 
 
 def client(role: str = "llm") -> Backend:
+    """The backend for one identity, built once per process. For `local`,
+    building it asks the server what it serves, so this can raise
+    LocalUnreachable (try later) or LLMError (the configuration is wrong)."""
     p, m, k = identity(role)
-    key = (p, m, bool(k), str(config.BENCH_ROOT))
+    key = (p, m, bool(k), str(config.BENCH_ROOT), config.LOCAL_BASE_URL if p == "local" else "")
     hit = _clients.get(role)
     if hit is None or hit[0] != key:
         why = blocked(role)

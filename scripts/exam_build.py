@@ -62,6 +62,8 @@ TARGET_PER_TOPIC = 60
 CANDIDATES_PER_REQUEST = 4
 MIGRATED_TOPIC = _categories.OTHER      # the four skill suites are not topics; they live here
 SKILL_SUITES = ["instruction_following", "factual_accuracy", "reasoning", "cultural"]
+# what service/llm.py::local_mark stamps on anything a local model drafted
+PROVISIONAL_KEYS = ("provisional", "provisional_reason", "base_url", "served_model", "weights")
 
 
 def topic_task(topic: str) -> str:
@@ -216,7 +218,7 @@ def draft_requests(root: Path, topic: str, n: int, per_request: int = CANDIDATES
                    "No accepted questions in this topic yet.\n\n")
                 + f"Write {m} new questions. Set {k + 1}: make them differ in form from any other set.")
         reqs.append(llm.Request(custom_id=f"exam:{_categories.topic_slug(topic)}:{k}",
-                                system=DRAFT_SYSTEM, user=user, max_tokens=3000,
+                                system=DRAFT_SYSTEM, user=user, max_tokens=3000, json=True,
                                 meta={"kind": "exam", "topic": topic, "count": m,
                                       "start": offset + start,
                                       "example_qids": [qid_of(e) for e in examples]}))
@@ -225,8 +227,8 @@ def draft_requests(root: Path, topic: str, n: int, per_request: int = CANDIDATES
 
 def parse_candidates(text: str) -> list[dict]:
     from service import llm
-    arr = llm.extract_json(text)
-    if not isinstance(arr, list):
+    arr = llm.extract_array(text)
+    if arr is None:
         return []
     out = []
     for o in arr:
@@ -277,8 +279,10 @@ def draft(root: Path, backend, topics: list[str] | None = None, per_topic: int =
 
 
 def fetch(root: Path, backend, batch_id: str) -> dict:
+    from service import llm
     root = Path(root)
     results = backend.fetch(batch_id)
+    stamp = llm.provisional(backend, "drafted")       # nothing unless the writer was local
     existing = bank_qids(root) | {c["qid"] for c in load_candidates(root)}
     written: dict[str, int] = collections.Counter()
     by_topic: dict[str, list[dict]] = collections.defaultdict(list)
@@ -296,7 +300,7 @@ def fetch(root: Path, backend, batch_id: str) -> dict:
             existing.add(q)
             by_topic[topic].append({"cid": "c_" + uuid.uuid4().hex[:12], "qid": q, "topic": topic,
                                     **c, "batch_id": batch_id, "drafted_by": backend.id,
-                                    "drafted_at": time.time(), "status": "candidate"})
+                                    "drafted_at": time.time(), "status": "candidate", **stamp})
     for topic, rows in by_topic.items():
         cur = load_candidates(root, topic)
         _save_candidates(root, topic, cur + rows)
@@ -341,7 +345,9 @@ def accept(root: Path, cid: str, approver: str, prompt: str | None = None,
            "notes": (notes if notes is not None else c.get("notes", "")).strip(),
            "source": "llm-draft", "drafted_by": c.get("drafted_by", ""),
            "batch_id": c.get("batch_id", ""), "cid": cid,
-           "accepted_by": approver, "accepted_at": time.time(), "edited": edited}
+           "accepted_by": approver, "accepted_at": time.time(), "edited": edited,
+           # a local writer's mark stays on the record; a person still read it
+           **{k: c[k] for k in PROVISIONAL_KEYS if k in c}}
     if rec["qid"] in bank_qids(root):
         raise ValueError("an identical question is already in the bank")
     append_bank(root, rec)
@@ -525,7 +531,11 @@ def _backend():
     if why:
         print(why, file=sys.stderr)
         raise SystemExit(2)
-    return llm.client("exam"), config
+    try:
+        return llm.client("exam"), config
+    except llm.LLMError as e:          # a local server that is down, or serves another id
+        print(e, file=sys.stderr)
+        raise SystemExit(2) from None
 
 
 def main() -> int:
@@ -563,12 +573,24 @@ def main() -> int:
         return 0
     backend, _ = _backend()
     if a.cmd == "fetch":
+        # wait rather than fail on an unfinished batch: a local batch only
+        # makes progress while some process is polling it, and this is one
+        state, detail = backend.status(a.batch_id)
+        while state == "pending":
+            print(f"batch {a.batch_id}: {detail}", file=sys.stderr)
+            time.sleep(5 if backend.name == "local" else 30)
+            state, detail = backend.status(a.batch_id)
+        if state == "failed":
+            print(f"batch {a.batch_id} failed: {detail}", file=sys.stderr)
+            return 1
         r = fetch(root, backend, a.batch_id)
     else:
         r = draft(root, backend, a.topic or None, a.per_topic, wait=not a.no_wait)
         if r.get("pending"):
-            print(f"batch {r['batch_id']} submitted ({r['n_requests']} requests); when it completes: "
-                  f"exam_build.py fetch --root {root} {r['batch_id']}")
+            print(f"batch {r['batch_id']} submitted ({r['n_requests']} requests); "
+                  + ("a local batch runs only while a process polls it, so collect it now: "
+                     if backend.name == "local" else "when it completes: ")
+                  + f"exam_build.py fetch --root {root} {r['batch_id']}")
             return 0
     print(f"batch {r['batch_id']}: candidates written per topic — "
           + ", ".join(f"{t}: {n}" for t, n in sorted(r["written"].items())))

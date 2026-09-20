@@ -232,7 +232,7 @@ def proposal_request(pid: int, model: str, task: str, topic: str,
     lines += ["", "Write the skill spec now, as the JSON object described."]
     return llm.Request(
         custom_id=f"proposal:{pid}", system=PROPOSAL_SYSTEM, user="\n".join(lines),
-        max_tokens=1024,
+        max_tokens=1024, json=True,
         meta={"kind": "proposal", "proposal_id": pid, "model": model, "task": task,
               "topic": topic, "qids": [f["qid"] for f in justifications]})
 
@@ -297,15 +297,15 @@ def generation_requests(did: int, spec_text: str, category: str, count: int,
                 f"Style seed {seed}-{k}: make this set differ in scenario, register and "
                 f"phrasing from any other set you might write for the same specification.")
         reqs.append(llm.Request(
-            custom_id=f"gen:{did}:{k}", system=GEN_SYSTEM, user=user, max_tokens=8192,
+            custom_id=f"gen:{did}:{k}", system=GEN_SYSTEM, user=user, max_tokens=8192, json=True,
             meta={"kind": "generation", "dataset_id": did, "count": n, "start": start,
                   "format": fmt}))
     return reqs
 
 
 def parse_items(text: str, fmt: str) -> list[dict]:
-    arr = llm.extract_json(text)
-    if not isinstance(arr, list):
+    arr = llm.extract_array(text)
+    if arr is None:
         return []
     out = []
     for o in arr:
@@ -383,8 +383,41 @@ def identities(generator_id: str) -> dict:
             "single_provider_loop": _judge.single_provider_loop()}
 
 
+LOCAL_ROLES = (("generator", "generated"), ("exam writer", "drafted"), ("judge", "graded"))
+
+
+def local_marks(generator_id: str, prop: dict) -> dict:
+    """{role: what the local server served} for every identity behind this
+    dataset that was a local model — the generator that wrote it, the exam
+    writer whose questions it was steered by, the judge whose words picked
+    the topic. {} when none was."""
+    from . import llm
+    ex = llm.identity("exam")
+    ids = {"generator": generator_id, "exam writer": f"{ex[0]}/{ex[1]}" if ex[0] else "",
+           "judge": judge_run_of(prop)["judge_id"]}
+    out = {}
+    for role, verb in LOCAL_ROLES:
+        provider, _, model = ids[role].partition("/")
+        mark = llm.local_mark(provider, model, verb)
+        if mark:
+            out[role] = {k: mark[k] for k in ("base_url", "served_model", "weights") if k in mark}
+    return out
+
+
 def provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash: str,
                gate: dict, sha: str, n_generated: int, n_kept: int) -> dict:
+    out = _provenance(prop, ds, backend_id, batch_id, prompt_hash, gate, sha, n_generated, n_kept)
+    local = local_marks(backend_id, prop)
+    if local:                     # always, when any of them was local — there is no flag
+        out["provisional"] = True
+        out["provisional_reason"] = (f"a local model was the {' and the '.join(local)} — "
+                                     f"not a pinned benchmark")
+        out["local_models"] = local
+    return out
+
+
+def _provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash: str,
+                gate: dict, sha: str, n_generated: int, n_kept: int) -> dict:
     return {
         "dataset_id": ds["id"],
         "source_model": prop["model"],

@@ -63,6 +63,13 @@ services:
       JUDGE_API_KEY: ${JUDGE_API_KEY:-}
       JUDGE_CANARY_MAX_DRIFT: ${JUDGE_CANARY_MAX_DRIFT:-0.5}
       ALLOW_SINGLE_PROVIDER_LOOP: ${ALLOW_SINGLE_PROVIDER_LOOP:-0}
+      # the `local` provider (vLLM). NOTE: inside this container localhost is
+      # the container, so a vLLM listening on the box's loopback is NOT
+      # reachable at the default URL — SERVICE.md § The local model
+      LOCAL_BASE_URL: ${LOCAL_BASE_URL:-http://localhost:8000/v1}
+      LOCAL_CONCURRENCY: ${LOCAL_CONCURRENCY:-2}
+      LOCAL_MAX_TOKENS: ${LOCAL_MAX_TOKENS:-1024}
+      LOCAL_TIMEOUT_S: ${LOCAL_TIMEOUT_S:-180}
     volumes:
       - ${BENCH_ROOT}:${BENCH_ROOT}
       - ${HF_HOME}:${HF_HOME}

@@ -317,6 +317,62 @@ def test_what_the_training_taught(surface, tree):
     assert surface.errors == []
 
 
+@pytest.fixture(scope="module")
+def local_judged(tmp_path_factory) -> Path:
+    """The fixture board with one model's exam graded by a local judge — the
+    judge.json scripts/judge.py writes for JUDGE_PROVIDER=local."""
+    import judge as jd
+    import make_fixture
+    root = tmp_path_factory.mktemp("local-judge")
+    tree = make_fixture.build(root)
+    d = tree["models"]["fx/good-750m"]["dir"]
+    reqs, plan = jd.plan_requests(d, "gemma")
+    plan["provisional"] = {"provisional": True,
+                           "provisional_reason": "graded by a local model — not a pinned benchmark",
+                           "base_url": "http://localhost:8000/v1", "served_model": "chat",
+                           "weights": "google/gemma-4-E4B-it"}
+    ident = {"provider": "local", "model": "chat", "id": "local/chat", "family": "chat"}
+    jd.write_judge(d, jd.assemble(plan, jd.stub_results(reqs), ident, "local_0123456789ab",
+                                  tree["out_dir"], 0.5, False, record=False))
+    return make_fixture.frozen_report(root, root / "report.html")
+
+
+def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged):
+    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+    s = Surface(ctx.new_page(), local_judged.as_uri())
+    try:
+        pg = s.open(model_link("fx/good-750m"))
+        card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
+        banner = card.locator("[data-provisional='judge']")
+        assert banner.count() == 1
+        text = banner.text_content()
+        assert text.startswith("Provisional. Graded by a local model — not a pinned benchmark")
+        assert "whose id cannot be pinned" in card.locator("p.sub").text_content()
+        assert "chat at http://localhost:8000/v1 (weights google/gemma-4-E4B-it)" in text
+        assert "Preliminary." in card.text_content() and "Judged average" not in card.text_content()
+        # greyed: every topic row, in the muted colour rather than the text colour
+        rows = card.locator("table.jd").first.locator("tbody tr")
+        assert rows.count() > 0
+        assert all("dim" in (rows.nth(i).get_attribute("class") or "") for i in range(rows.count()))
+        style = "e => getComputedStyle(e).color"
+        assert rows.first.locator("td").nth(1).evaluate(style) != card.locator("h2").evaluate(style)
+        SCREENS.mkdir(exist_ok=True)
+        for scheme in ("light", "dark"):
+            pg.emulate_media(color_scheme=scheme)
+            card.screenshot(path=SCREENS / f"local-judge-provisional-{scheme}.png")
+        # never ranked: its judged cells on the board are blank, with the reason on hover
+        s.open("#tab=leaderboard")
+        row = pg.locator("table.lb tbody tr", has_text="good-750m").first
+        assert "/4" not in row.text_content()
+        assert any("graded by a local model" in (c.get_attribute("title") or "")
+                   for c in row.locator("td").all())
+        assert "were graded by a local model — not a pinned benchmark" in \
+            pg.locator("#warnings").text_content()
+        assert s.errors == []
+    finally:
+        ctx.close()
+
+
 def test_screenshots_for_the_pr(surface):
     """Not an assertion beyond 'it rendered': the pictures a reviewer wants."""
     SCREENS.mkdir(exist_ok=True)

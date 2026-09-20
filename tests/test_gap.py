@@ -542,7 +542,8 @@ def test_backends_shape_the_provider_requests_without_the_network(monkeypatch):
             return 200, b'{"id": "batch_1"}'
         raise AssertionError(url)
     monkeypatch.setattr(llm, "_http", fake_http)
-    req = llm.Request("proposal:1", "sys", "user text", 100, {"doc_hashes": ["x"]})
+    # a proposal request, which parses JSON and so asks for it (proposal_request)
+    req = llm.Request("proposal:1", "sys", "user text", 100, {"doc_hashes": ["x"]}, json=True)
     a = llm.AnthropicBatches("claude-x", "key-a")
     assert a.submit([req]) == "msgbatch_1"
     body = json.loads(sent[-1][3])

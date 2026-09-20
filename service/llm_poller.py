@@ -40,6 +40,7 @@ def _finish_proposal(row: dict, results: dict[str, llm.Result], backend: llm.Bac
     prop = db.proposal_get(pid)
     ev = json.loads(prop["evidence"] or "{}")
     ev.update({"share_explained": parsed["share_explained"], "patterns": parsed["patterns"]})
+    ev.update(llm.provisional(backend, "proposed"))      # nothing unless the proposer was local
     db.proposal_update(pid, status="proposed", spec_text=parsed["spec"],
                        evidence=json.dumps(ev), proposer=backend.id)
 
@@ -121,6 +122,11 @@ def tick() -> int:
     for r in rows:
         try:
             backend = llm.client("judge" if r["kind"] == "judge" else "llm")
+        except llm.LocalUnreachable as e:
+            # vLLM restarting (or still loading after a reboot) is not a reason
+            # to throw away batches whose finished results are on disk
+            print(f"[llm] {r['batch_id']}: {e} — trying again next tick")
+            continue
         except llm.LLMError as e:
             db.batch_finish(r["batch_id"], "failed", f"LLM unavailable: {e}")
             _mark_failed(r, f"LLM unavailable: {e}")

@@ -645,7 +645,10 @@ def _require_llm() -> llm.Backend:
     why = llm.blocked()
     if why:
         raise HTTPException(503, why)
-    return llm.client()
+    try:
+        return llm.client()
+    except llm.LLMError as e:      # a local server that is down, or serves another model
+        raise HTTPException(503, str(e)) from None
 
 
 @app.post("/api/proposals")

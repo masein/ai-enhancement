@@ -22,6 +22,12 @@ The judging contract, unchanged in substance from the local judge:
   pinned     JUDGE_MODEL must be a DATED model id, not a floating alias.
              Provider, model, prompt sha, rubric sha and batch id ride in
              every judge.json and in every dataset's provenance
+  local      JUDGE_PROVIDER=local (a vLLM server on the box) cannot be pinned
+             at all — its id is whatever was typed at launch. It is not
+             refused; it runs PROVISIONAL: judge.json says so with the base
+             URL, the served id and the weights, the reason joins the
+             preliminary reasons, and the page greys it, never ranks it and
+             leaves it out of every average. No flag turns that off
   canary     a fixed set of thirty answer scripts with known human marks
              (eval_tasks/fr/canary.jsonl) is re-graded at the start of every
              run. judge.json records the canary's mean absolute deviation
@@ -146,6 +152,14 @@ def identity() -> dict:
             "family": family(model) if model else ""}
 
 
+def judge_family(ident: dict, stamp: dict | None = None) -> str:
+    """The family the same-family rule compares against. A local judge's is
+    its weights' when the server names them: the served id ('chat') is
+    whatever someone typed at launch and says nothing about the family."""
+    weights = (stamp or {}).get("weights")
+    return family(weights) if weights else ident["family"]
+
+
 def provider_clash() -> str:
     """The exam writer's or generator's provider, when it equals the judge's."""
     from service import config
@@ -178,11 +192,13 @@ def blocked() -> str:
         return "JUDGE_PROVIDER is unset — the judge is an API call and needs one"
     if p not in llm.PROVIDERS:
         return f"JUDGE_PROVIDER={p!r} is not one of {', '.join(llm.PROVIDERS)}"
-    if p != "fake" and not DATED.search(config.JUDGE_MODEL):
+    # a local server's id cannot be pinned, so for `local` this refusal
+    # becomes a stamp instead (assemble): it runs, and nothing it writes counts
+    if p not in ("fake", "local") and not DATED.search(config.JUDGE_MODEL):
         return (f"JUDGE_MODEL={config.JUDGE_MODEL!r} is a floating alias, not a dated model id — "
                 f"pin it (e.g. claude-sonnet-4-5-20250929, gpt-4.1-2025-04-14) or a vendor "
                 f"update silently re-bases every score")
-    if p != "fake" and not config.JUDGE_API_KEY:
+    if llm.needs_key(p) and not config.JUDGE_API_KEY:
         return "JUDGE_API_KEY is unset — put it in .env, never in docker-compose.yml"
     clash = provider_clash()
     if clash and not config.ALLOW_SINGLE_PROVIDER_LOOP:
@@ -308,7 +324,7 @@ def plan_requests(model_dir: Path, judge_family: str) -> tuple[list, dict]:
     rub_exam = rubric_for("exam_x")[0]
     for c in load_canary():
         cid = f"canary:{c['id']}"
-        reqs.append(llm.Request(custom_id=cid, system="", max_tokens=200,
+        reqs.append(llm.Request(custom_id=cid, system="", max_tokens=200, json=True,
                                 user=build_prompt(rub_exam, c["prompt"], c["reference"], c["answer"]),
                                 meta={"kind": "canary", "id": c["id"], "human_score": c["human_score"]}))
         plan["canary"].append({"cid": cid, "id": c["id"], "human_score": c["human_score"]})
@@ -328,7 +344,7 @@ def plan_requests(model_dir: Path, judge_family: str) -> tuple[list, dict]:
             ans = _answer(rec)
             qid = doc.get("qid")
             cid = f"judge:{safe}:{task}:{i}"
-            reqs.append(llm.Request(custom_id=cid, system="", max_tokens=300,
+            reqs.append(llm.Request(custom_id=cid, system="", max_tokens=300, json=True,
                                     user=build_prompt(rubric, doc.get("prompt", ""),
                                                       doc.get("reference", ""), ans),
                                     meta={"kind": "judge", "task": task, "qid": qid}))
@@ -401,6 +417,7 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
              threshold: float, caveat: bool, record: bool = True) -> dict:
     """judge.json from a plan and the provider's results. Deterministic for a
     deterministic grader (sorted keys, no timestamps in the body)."""
+    from service import llm
     tasks_present = list(plan["tasks"])
     head = {"judge": {"id": ident["id"], "provider": ident["provider"], "model": ident["model"],
                       "family": ident["family"], "batch_id": batch_id,
@@ -409,6 +426,12 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
                       "rubrics": {t: {"sha256": rubric_for(t)[1], "version": rubric_for(t)[2]}
                                   for t in tasks_present}},
             "model": plan["model"], "split_salt": dx.SPLIT_SALT, "correct_at": CORRECT_AT}
+    # a local judge: the stamp recorded at submit time (with what the server
+    # said it serves), or at the least the mark itself — never nothing
+    stamp = plan.get("provisional") or llm.local_mark(ident["provider"], ident["model"], "graded")
+    if stamp:
+        head["judge"].update(stamp)
+        head["judge"]["family"] = judge_family(ident, stamp)
     if plan.get("skipped"):
         return {**head, "skipped": plan["skipped"], "tasks": {}}
     # the canary first: has the judge moved since last time?
@@ -420,7 +443,9 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
     canary = canary_stats(cscores, load_canary(), prev, threshold) if plan["canary"] else None
     if canary and record:
         record_canary(results_root, ident["id"], plan["model"], canary)
-    reasons = []
+    # provisional is a preliminary reason like any other: the page greys it,
+    # never ranks it and keeps it out of every average by the same mechanism
+    reasons = [stamp["provisional_reason"]] if stamp else []
     if canary and canary["drifted"]:
         reasons.append(f"the judge moved: canary grades differ from the previous run by "
                        f"{canary['mad_vs_previous']} points on average (limit {threshold})")
@@ -514,14 +539,17 @@ def start_run(model_dir: Path, results_root: Path) -> dict:
     why = blocked()
     if why:
         raise RuntimeError(why)
-    reqs, plan = plan_requests(model_dir, ident["family"])
+    backend = llm.client("judge")
+    stamp = llm.provisional(backend, "graded")
+    reqs, plan = plan_requests(model_dir, judge_family(ident, stamp))
+    if stamp:
+        plan["provisional"] = stamp
     if plan.get("skipped"):
         write_judge(model_dir, assemble(plan, {}, ident, "", results_root,
                                         config.JUDGE_CANARY_MAX_DRIFT, single_provider_loop()))
         return {"mode": "batch", "written": True, "skipped": plan["skipped"]}
     if not reqs:
         return {"mode": "batch", "written": False}
-    backend = llm.client("judge")
     bid = backend.submit(reqs)
     rid = db.judge_run_create(plan["model"], bid, len(reqs), ident["id"], json.dumps(plan))
     db.batch_add(bid, "judge", rid, len(reqs), backend.name, backend.model)
@@ -569,18 +597,27 @@ def main() -> int:
     n = 0
     ident = {"provider": "stub", "model": "overlap-v1", "id": "stub/overlap-v1",
              "family": "stub"} if a.stub else identity()
+    backend, stamp = None, {}
+    if not a.stub:
+        try:
+            backend = llm.client("judge")
+        except llm.LLMError as e:          # a local server that is down, or serves another id
+            print(e, file=sys.stderr)
+            return 2
+        stamp = llm.provisional(backend, "graded")
     for d in sorted(p for p in a.results.iterdir() if p.is_dir()):
         if want and d.name not in want:
             continue
         if a.stub:
             out = run_stub(d, a.results, record=True)
         else:
-            reqs, plan = plan_requests(d, ident["family"])
+            reqs, plan = plan_requests(d, judge_family(ident, stamp))
+            if stamp:
+                plan["provisional"] = stamp
             if not plan["tasks"] and not plan.get("skipped"):
                 continue
             results, bid = {}, ""
             if reqs:
-                backend = llm.client("judge")
                 bid = backend.submit(reqs)
                 while True:
                     state, detail = backend.status(bid)
@@ -608,7 +645,8 @@ def main() -> int:
                       f"{c.get('mad_vs_previous')} vs previous · {' '.join(bits)}")
     if not a.quiet:
         print(f"\nwrote judge.json for {n} model(s) · judge {ident['id']}"
-              + (" · STUB — not a judgement" if a.stub else ""))
+              + (" · STUB — not a judgement" if a.stub else "")
+              + (f" · PROVISIONAL — {stamp['provisional_reason']}" if stamp else ""))
     return 0
 
 

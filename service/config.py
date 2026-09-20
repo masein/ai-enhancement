@@ -122,7 +122,7 @@ CONTROL_TASKS_DIR = Path(os.environ.get(
 # evaluation subprocess (runner._child_env), and visible to anyone with docker
 # access on the box — SERVICE.md says so in those words.
 # ---------------------------------------------------------------------------
-LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "").strip().lower()   # anthropic | openai | fake
+LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "").strip().lower()   # anthropic | openai | local | fake
 LLM_MODEL = os.environ.get("LLM_MODEL", "").strip()                 # pinned; in every provenance
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 # spend guard: 'items' are batch requests (one per proposal, one per ten
@@ -130,6 +130,18 @@ LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 LLM_MAX_ITEMS_PER_BATCH = int(os.environ.get("LLM_MAX_ITEMS_PER_BATCH", "200"))
 LLM_DAILY_ITEM_CAP = int(os.environ.get("LLM_DAILY_ITEM_CAP", "2000"))
 LLM_POLL_S = float(os.environ.get("LLM_POLL_S", "60"))
+
+# The `local` provider (any of the three roles): vLLM's OpenAI-compatible
+# server on the deploy box, loopback only. It has no batch API, so the client
+# runs the batch itself, a few requests at a time — the card is shared (vLLM
+# holds ~13 GB of 32, and a long request from either side can push it over),
+# which is also why replies are capped. No key: vLLM ignores one unless it was
+# launched with --api-key, in which case the role's *_API_KEY is sent. Every
+# artefact a local identity produces is stamped provisional (llm.local_mark).
+LOCAL_BASE_URL = os.environ.get("LOCAL_BASE_URL", "http://localhost:8000/v1").strip().rstrip("/")
+LOCAL_CONCURRENCY = int(os.environ.get("LOCAL_CONCURRENCY", "2"))
+LOCAL_MAX_TOKENS = int(os.environ.get("LOCAL_MAX_TOKENS", "1024"))
+LOCAL_TIMEOUT_S = float(os.environ.get("LOCAL_TIMEOUT_S", "180"))
 
 # The exam writer (scripts/exam_build.py draft): a SEPARATE identity from the
 # generator and the judge, because a loop whose questions, grades and training
@@ -160,7 +172,9 @@ DATASET_QUOTA_GB = float(os.environ.get("DATASET_QUOTA_GB", "20"))
 # identity: JUDGE_PROVIDER must differ from the exam writer's and the
 # generator's, or a loop whose questions, grades and data come from one family
 # grades itself. JUDGE_MODEL must be a DATED model id, never a floating alias
-# — a vendor update behind an alias would silently re-base every score. A
+# — a vendor update behind an alias would silently re-base every score. The
+# one exception is JUDGE_PROVIDER=local, whose id cannot be pinned at all: it
+# runs, and every score it writes is stamped provisional and never ranked. A
 # thirty-script canary is re-graded every run; movement past
 # JUDGE_CANARY_MAX_DRIFT marks the run preliminary. "stub" is the stand-in.
 JUDGE_PROVIDER = os.environ.get("JUDGE_PROVIDER", "").strip().lower()
