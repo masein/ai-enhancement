@@ -557,3 +557,34 @@ def test_sitting_one_topic_from_its_page(live, page):
     assert opt.count() == 1 and opt.is_disabled()
     assert "unavailable" in opt.text_content()
     assert page.errors == []
+
+
+def test_the_tabs_are_named_once_and_ordered_by_how_often_they_are_opened(live, page):
+    """Phase 8e P6c: one name per tab, the hash equal to it, the old hashes
+    still landing, and the loop's tabs where the eye lands."""
+    base = live["base"]
+    page.goto(base + "/")
+    page.wait_for_selector("#tabs button")
+    labels = page.locator("#tabs button").all_text_contents()
+    assert labels[:4] == ["Overview", "Loop", "Models", "Leaderboard"]
+    assert "Evals" not in labels and "Provenance" in labels
+    # the hash is the label, and the page said so in SERVICE.md
+    for label, want in (("Loop", "loop"), ("Models", "models"),
+                        ("Submit & Queue", "queue"), ("Provenance", "provenance")):
+        page.get_by_role("tab", name=label, exact=True).click()
+        page.wait_for_selector("#view > *")
+        assert page.evaluate("location.hash") == f"#tab={want}", label
+    # the hashes people already pasted somewhere
+    for old, label in (("runs", "Provenance"), ("submit", "Submit & Queue"),
+                       ("evals", "Provenance")):
+        page.goto(f"{base}/#tab={old}")
+        page.wait_for_selector("#view > *")
+        assert page.locator("#tabs button[aria-selected='true']").inner_text() == label, old
+    # the header says what it is, and the theme button says what it does
+    page.goto(base + "/")
+    page.wait_for_selector("[data-stamp]")
+    assert "live · refreshed" in page.locator("[data-stamp]").text_content()
+    assert page.locator("#themeBtn").text_content().startswith("Theme")
+    assert ":" not in page.locator("#themeBtn").text_content()
+    assert "theme:" in page.locator("#themeBtn").get_attribute("title")
+    assert page.errors == []

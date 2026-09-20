@@ -131,6 +131,12 @@ def test_the_board_checks_are_full_on_the_board_and_folded_elsewhere(live):
     pg.wait_for_selector("table.lb", timeout=20000)
     assert pg.locator("[data-warnings='collapsed']").count() == 0
     assert pg.locator("#warnings .warn").count() >= 1
+    # and exactly once per page: the Provenance tab used to print the same
+    # findings again under its own "Warnings" heading
+    pg.get_by_role("tab", name="Provenance", exact=True).click()
+    pg.wait_for_selector("#view .card")
+    assert pg.locator("#view .warn").count() == 0
+    assert pg.locator("#view h2", has_text="Warnings").count() == 0
     assert s.errors == []
 
 

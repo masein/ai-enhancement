@@ -3374,7 +3374,9 @@ function routeFromHash() {
   if (tp && LIVE && topicOfSlug(tp[1])) { state.topic = tp[1]; state.tab = 'loop'; return; }
   state.topic = null;
   const t = /^tab=(.+)$/.exec(h);
-  if (t && TABS.some(([id]) => id === t[1])) state.tab = t[1];
+  if (!t) return;
+  const want = TAB_ALIASES[t[1]] || t[1];
+  if (TABS.some(([id]) => id === want)) state.tab = want;
 }
 
 // slug ↔ topic, from the same map the payload carries (exam_law ↔ law)
@@ -3962,7 +3964,9 @@ function vLeaderboard(ms) {
         cc.se && !c.lower ? el('span', { class: 'se', text: ` ±${(100 * cc.se).toFixed(1)}` }) : '');
     }))));
   const nOff = ms.filter(m => m.official).length;
-  return [radarCard(ms) || '', el('div', { class: 'card' },
+  // the table first: it is what the tab is named after and what most visits
+  // want. The radar follows, drawn from whatever the compare ticks hold
+  return [el('div', { class: 'card' },
     el('h2', { text: 'Leaderboard' }),
     el('p', { class: 'sub', text: 'Click a column to sort. Accuracy cells are score ± stderr; '
       + 'perplexity columns are lower-is-better, excluded from Avg, and carry no standard '
@@ -3992,6 +3996,7 @@ function vLeaderboard(ms) {
     lbViewCtrl(ms),
     state.lbView === 'cats' ? lbCategoryTable(ms)
       : el('div', { class: 'lb-wrap' }, el('table', { class: 'lb' }, thead, tbody))),
+    radarCard(ms) || '',
     aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
 }
 
@@ -4242,9 +4247,8 @@ function tableTwin(id, ms, tasks, lower) {
 
 function vRuns(ms) {
   const frag = [];
-  if (DATA.warnings.length)
-    frag.push(el('div', { class: 'card' }, el('h2', { text: 'Warnings' }),
-      DATA.warnings.map(w => el('div', { class: 'warn', text: w }))));
+  // the board checks are already above every tab, in full on the board tabs
+  // and folded elsewhere. A second copy here was the same finding twice.
   // provenance was rendered in results-directory scan order — effectively random,
   // and worst exactly when it matters most (a burst of checkpoint evals). Sortable
   // now, defaulting to last run first: the eval you just finished is row one.
@@ -6466,20 +6470,31 @@ function exportCsv() {
 function exportJson() { download('benchmark.json', 'application/json', JSON.stringify(DATA, null, 1)); }
 
 // ---------- shell ----------
+// Tab order is how often each is opened, and every id is the label's own
+// slug — a tab called Evals whose hash said `runs` and whose heading said
+// "Run provenance" was three names for one thing.
 const TABS = [
   ['overview', 'Overview', vOverview],
   // the loop is what this server is for, so it sits where the eye lands
   ...(LIVE ? [['loop', 'Loop', vLoop]] : []),
   ['models', 'Models', vModels],
-  ...(LIVE ? [['training', 'Training', vTraining],
+  ['leaderboard', 'Leaderboard', vLeaderboard],
+  ...(LIVE ? [['queue', 'Submit & Queue', vQueue],
               ['exam', 'Exam', vExam],
               ['review', 'Review', vReview],
-              ['queue', 'Submit & Queue', vQueue]] : []),
-  ['leaderboard', 'Leaderboard', vLeaderboard],
+              ['training', 'Training', vTraining]] : []),
   ['tasks', 'Tasks', vTasks],
   ['perplexity', 'Perplexity & Loss', vPpl],
-  ['runs', 'Evals', vRuns],
+  ['provenance', 'Provenance', vRuns],
 ];
+
+// Old hashes keep working: a link someone pasted into a message last month
+// should still land, and silently landing on Overview instead is the worst
+// of the three possible behaviours.
+const TAB_ALIASES = {
+  runs: 'provenance', evals: 'provenance', submit: 'queue', 'submit-queue': 'queue',
+  models_tab: 'models', ppl: 'perplexity', 'perplexity-loss': 'perplexity',
+};
 function render() {
   // full rebuild: drop the in-place refreshers so a poll can never touch the
   // DOM of a tab that just got torn down — the mounted tab re-registers its own
@@ -6549,8 +6564,8 @@ function renderStatic() {
   // the model filters moved into the Models tab, where what they filter is on
   // screen beneath them; each one carries its own count there
   document.getElementById('metaChips').replaceChildren(
-    el('span', { class: 'chip', text: `generated ${DATA.generated}` }),
-    LIVE ? el('span', { class: 'chip', text: 'live — updates as runs finish' }) : '',
+    el('span', { class: 'chip', 'data-stamp': '1',
+      text: LIVE ? `live · refreshed ${DATA.generated}` : `generated ${DATA.generated}` }),
     LIVE ? el('a', { class: 'chip', href: 'guide', target: '_blank', rel: 'noopener',
                      style: 'text-decoration:none', text: '📖 guide for new users' }) : '',
     // a demo has its own page, of its own tree; this is the only thread
@@ -6648,14 +6663,19 @@ const THEMES = ['auto', 'light', 'dark', 'dim'];
 function applyTheme(t) {
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', t);
-  document.getElementById('themeBtn').textContent = 'Theme: ' + t;
+  document.getElementById('themeBtn').textContent = 'Theme \u25be';
+  document.getElementById('themeBtn').title =
+    `theme: ${t} — click to cycle auto / light / dark / dim, remembered in this browser`;
   try { localStorage.setItem('bench-theme', t); } catch (e) { /* private mode etc. */ }
 }
 let themeIdx = 0;
 try {   // remembered per browser — the dashboard is a page people leave open
   const saved = localStorage.getItem('bench-theme');
-  if (THEMES.includes(saved)) { themeIdx = THEMES.indexOf(saved); applyTheme(saved); }
+  if (THEMES.includes(saved)) themeIdx = THEMES.indexOf(saved);
 } catch (e) { /* storage unavailable: stay on auto */ }
+// always applied, even on 'auto': the button's title names the current theme,
+// and a button whose tooltip is only right after the first click is a lie
+applyTheme(THEMES[themeIdx]);
 document.getElementById('themeBtn').addEventListener('click', () => {
   themeIdx = (themeIdx + 1) % THEMES.length;
   applyTheme(THEMES[themeIdx]);
@@ -6698,14 +6718,14 @@ __BANNER__
       file — data embedded, charts drawn locally, nothing fetched.</p>
       <div class="meta-chips" id="metaChips"></div>
     </div>
-    <button id="themeBtn" title="cycle auto / light / dark / dim — remembered in this browser">Theme: auto</button>
+    <button id="themeBtn" title="cycle auto / light / dark / dim — remembered in this browser">Theme &#9662;</button>
   </div>
   <div id="netstatus"></div>
   <div id="warnings"></div>
   <div class="tabs" role="tablist" id="tabs"></div>
   <div id="view"></div>
   <footer>Every score carries its standard error; differences are z-tested before
-  they are called wins; provenance is in the Runs tab. Scores are only comparable to
+  they are called wins; provenance is in the Provenance tab. Scores are only comparable to
   published numbers when n-shot, prompt template and metric all match.</footer>
 </div>
 <script id="data" type="application/json">__DATA__</script>

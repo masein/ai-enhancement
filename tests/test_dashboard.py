@@ -21,7 +21,8 @@ import pytest
 pytestmark = pytest.mark.dashboard
 
 # the tabs the FROZEN page has (the live one adds Training and Submit & Queue)
-FROZEN_TABS = ["Overview", "Models", "Leaderboard", "Tasks", "Perplexity & Loss", "Evals"]
+FROZEN_TABS = ["Overview", "Models", "Leaderboard", "Tasks", "Perplexity & Loss",
+                "Provenance"]
 SCREENS = Path(__file__).resolve().parent / "_screens"
 
 
@@ -78,8 +79,23 @@ def test_every_tab_renders_with_zero_console_errors(surface):
         surface.tab(label)
         assert surface.selected_tab() == label
         assert pg.locator("#view > *").count() > 0, label
+        # every tab's hash is its own label's slug — one name per tab
         assert pg.evaluate("location.hash") == "#tab=" + {
-            "Perplexity & Loss": "perplexity", "Evals": "runs"}.get(label, label.lower())
+            "Perplexity & Loss": "perplexity"}.get(label, label.lower())
+    assert surface.errors == []
+
+
+def test_old_hashes_still_land_where_they_used_to(surface):
+    """A link someone pasted in a message last month must not silently drop
+    the reader on Overview."""
+    pg = surface.page
+    for old_hash, label in (("runs", "Provenance"), ("evals", "Provenance"),
+                            ("ppl", "Perplexity & Loss")):
+        surface.open("#tab=" + old_hash)
+        assert surface.selected_tab() == label, old_hash
+    # and a hash that means nothing leaves you where you were, not blank
+    surface.open("#tab=nonsense")
+    assert pg.locator("#view > *").count() > 0
     assert surface.errors == []
 
 

@@ -375,6 +375,31 @@ the leaderboard costs nothing (per-task resume sees the results and finishes in
 seconds), and a `quick` run (hellaswag + arc_easy + perplexity slices) later
 upgrades to `full` by running only the missing tasks.
 
+## The page's addresses
+
+Every view is in the URL, so a link to one is a link someone else can open.
+The hash is the tab's own label, lower-cased:
+
+| Hash | What |
+|---|---|
+| `#tab=overview` | the board's summary |
+| `#tab=loop` | the loop, one row per topic |
+| `#topic=<slug>` | one topic's page: bank, rubric, sit, answers, propose (`#topic=law`) |
+| `#tab=models` | every model, with the filters that narrow it |
+| `#tab=leaderboard` | the table, then the radar of whatever compare holds |
+| `#tab=queue` | Submit & Queue |
+| `#tab=exam` | the bank, the import panel, the rubric and criteria files |
+| `#tab=review` | proposals awaiting a person, and the datasets |
+| `#tab=training` | training runs and their curves |
+| `#tab=tasks`, `#tab=perplexity` | per-task panels |
+| `#tab=provenance` | how every number was produced |
+| `#model=<id>` | one model's page (`#model=fx%2Fgood-750m`) |
+
+Older hashes still resolve: `#tab=runs` and `#tab=evals` land on Provenance,
+`#tab=submit` on Submit & Queue, `#tab=ppl` on Perplexity & Loss. A hash the
+page does not know leaves you where you were rather than silently on
+Overview.
+
 ## API (everything the page does, scriptable)
 
 ```bash
