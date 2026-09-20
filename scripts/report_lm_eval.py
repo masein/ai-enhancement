@@ -1716,6 +1716,10 @@ th .dir { font-size:9px; }
 .msec-h .count-note { font-weight:400; }
 .diffrow td { background:var(--accent-soft); }
 td.cfgv { white-space:pre-wrap; overflow-wrap:anywhere; max-width:440px; }
+/* an answer is long; two lines is enough to recognise it, and the rest is one
+   click away. -webkit-line-clamp is the only cross-browser way to do this */
+.clamp2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+          overflow:hidden; }
 .radar-grid { display:grid; grid-template-columns:minmax(300px,540px) minmax(0,1fr);
   gap:16px; align-items:start; margin-top:6px; }
 @media (max-width:900px){ .radar-grid { grid-template-columns:1fr; } }
@@ -1794,6 +1798,12 @@ const state = {
   rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '',
         topic: '', just: {}, justOpen: '' },                               // Review tab
   ex: { status: null, candidates: [], loaded: false, msg: '', topic: '' },   // Exam tab
+  topic: null,                         // open topic page, by slug (hash-routed)
+  loop: { rows: null, blocked: '', msg: '', loaded: false },                 // Loop tab
+  loopSit: { model: '', kind: 'auto', tasks: null, msg: '', busy: false },   // sit-the-exam form
+  ans: { model: '', rows: null, loading: false, topic: '', open: {},
+         acuity: 'all', flag: 'all', score: 'all', sort: 'score' },          // Answers panel
+  loopRead: {},                        // topics whose answers this browser has opened
   rvName: '',                          // the name approvals are recorded under (remembered)
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
@@ -2987,6 +2997,10 @@ function vJudged(m) {
                 text: String((b.flags || {})[fid] || 0) }))))))));
       });
     }
+    // the answers themselves, for whichever topic is picked — the same panel
+    // the topic page shows, because "see the answers" is the step between a
+    // score and knowing what to do about it
+    if (LIVE) card.append(modelAnswers(m, cats));
   }
   // the control
   const ctl = j.tasks[J.control];
@@ -3275,15 +3289,31 @@ function vOverview(ms) {
 // you came from is the single most reported annoyance in apps shaped like this.
 // ---------------------------------------------------------------------------
 const hashFor = () => state.model ? 'model=' + encodeURIComponent(state.model)
+                                  : state.topic ? 'topic=' + encodeURIComponent(state.topic)
                                   : 'tab=' + state.tab;
 
 function routeFromHash() {
   const h = decodeURIComponent(location.hash.replace(/^#/, ''));
   const m = /^model=(.+)$/.exec(h);
-  if (m && DATA.models.some(x => x.id === m[1])) { state.model = m[1]; return; }
+  if (m && DATA.models.some(x => x.id === m[1])) { state.model = m[1]; state.topic = null; return; }
   state.model = null;
+  // a topic page is the loop for one topic — deep-linkable, because it is the
+  // page a person is sent to when someone says "look at law"
+  const tp = /^topic=(.+)$/.exec(h);
+  if (tp && LIVE && topicOfSlug(tp[1])) { state.topic = tp[1]; state.tab = 'loop'; return; }
+  state.topic = null;
   const t = /^tab=(.+)$/.exec(h);
   if (t && TABS.some(([id]) => id === t[1])) state.tab = t[1];
+}
+
+// slug ↔ topic, from the same map the payload carries (exam_law ↔ law)
+function topicOfSlug(slug) {
+  const task = 'exam_' + slug;
+  return ((DATA.judged || {}).topics || {})[task] || null;
+}
+function slugOfTopic(topic) {
+  const e = Object.entries(((DATA.judged || {}).topics) || {}).find(([, v]) => v === topic);
+  return e ? e[0].replace(/^exam_/, '') : '';
 }
 
 // every navigation goes through here, so history and state cannot disagree
@@ -4867,16 +4897,26 @@ const stClass = s => s === 'done' ? 'st st-done' : s === 'failed' ? 'st st-faile
                    : ACTIVE_STATUS.has(s) ? 'st st-active' : 'st st-muted';
 
 function vQueue() {
+  // the judged suite's availability (and its reason when it has none) comes
+  // from the same endpoint the Loop tab reads
+  if (!state.loop.loaded && netReady()) loadLoop();
   const f = {
     hf_id: el('input', { type: 'text', style: 'flex:2;min-width:260px',
       placeholder: 'org/model on the Hub, or local/<name> for an uploaded artifact' }),
     kind: el('select', {}, ['auto', 'base', 'instruct'].map(v =>
       el('option', { value: v, text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
+    // judged is offered even when it cannot run: an option that is simply
+    // absent tells a person nothing, and 'why is there no judged suite?' was
+    // the first question asked of this page
     suite: el('select', {},
       el('option', { value: 'full', text: 'full — all tasks, comparable' }),
       el('option', { value: 'quick', text: 'quick — hellaswag + arc_easy + ppl, minutes' }),
       el('option', { value: 'control', text: 'control — mmlu_perm only: MMLU with the '
-        + 'options rotated (the position-bias experiment), ~a fifth of a full MMLU' })),
+        + 'options rotated (the position-bias experiment), ~a fifth of a full MMLU' }),
+      el('option', { value: 'judged', disabled: state.loop.blocked ? '' : null,
+        title: state.loop.blocked || '',
+        text: 'judged — the written exam, graded by the judge'
+          + (state.loop.blocked ? ' (unavailable)' : '') })),
     submitter: el('input', { type: 'text', placeholder: 'your name', style: 'width:130px' }),
     note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px' }),
   };
@@ -4907,10 +4947,20 @@ function vQueue() {
               return `\n${a.arch || ''} · hidden ${a.hidden ?? '—'} · layers ${a.layers ?? '—'} · vocab ${a.vocab ?? '—'}`; }
         catch { return ''; } })() : '') }, r.hf_id,
       el('span', { class: 'badge' + (r.kind === 'instruct' ? ' instruct' : ''), text: r.kind })),
-    el('td', { text: r.suite }),
+    el('td', { class: 'small' }, r.suite,
+      // a judged row says what it sat: one topic is now the usual unit
+      (() => { let t = []; try { t = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
+        return t.length ? el('div', { class: 'se', 'data-row-tasks': '1',
+          text: t.map(frName).join(', ') }) : ''; })()),
     el('td', { text: r.submitter || '—' }),
     el('td', {}, el('span', { class: stClass(r.status), text: r.status })),
     el('td', { class: 'small', text: r.progress || '' },
+      // the GPU half finishing is not the job finishing: the judge batch is
+      // still out, and the row says how far it is
+      r.judge ? el('div', { class: 'se', 'data-judge-progress': r.judge.status || '',
+        title: `judge batch ${r.judge.batch_id}`,
+        text: r.judge.status === 'done' ? `judged ${r.judge.n_items} answers`
+          : `judging ${r.judge.progress || r.judge.n_items + ' answers'}` }) : '',
       r.error ? el('div', { class: 'down', text: r.error }) : ''),
     el('td', { class: 'num', text: r.gpu_seconds ? Math.round(r.gpu_seconds / 60) + ' min' : '—' }),
     el('td', {},
@@ -5368,6 +5418,491 @@ function vReview() {
       closed.map(p => rvProposal(p, llmOk))) : ''];
 }
 
+// The judged card's answers section on a model page: pick one of this model's
+// judged topics and read the diagnosis-half answers. Everything below the
+// picker is the topic page's own panel, unchanged — one implementation of the
+// rule that the report half is never a row.
+function modelAnswers(m, cats) {
+  const a = state.ans;
+  const topics = cats.map(t => frName(t));
+  if (!topics.length) return '';
+  const topic = topics.includes(a.topic) ? a.topic : topics[0];
+  const wrap = el('div', { 'data-panel': 'model-answers' },
+    el('div', { class: 'dxh', text: 'The answers, topic by topic' }),
+    el('div', { class: 'frm' },
+      mkSel('answers topic', topics.map(t => [t, t]), topic,
+        v => { state.ans.topic = v; state.ans.rows = null; render(); }),
+      el('a', { class: 'small', href: '#topic=' + slugOfTopic(topic),
+        text: 'this topic\u2019s page in the loop',
+        onclick: e => { e.preventDefault(); navigate({ topic: slugOfTopic(topic), model: null }); } })));
+  if (netReady() && !a.loading && (!a.rows || a.model !== m.id || a.topic !== topic))
+    loadAnswers(m.id, topic);
+  const j = a.rows;
+  if (!j || a.model !== m.id || a.topic !== topic) {
+    wrap.append(el('p', { class: 'small', text: 'Loading…' }));
+    return wrap;
+  }
+  const rep = j.report_half || {};
+  wrap.append(el('p', { class: 'note', 'data-report-half': '1' },
+    el('b', { text: 'The report half. ' }),
+    `${rep.n ?? 0} questions, mean ${num(rep.mean, 2)} / 4. That is the published score, and `
+    + 'this line is all of it you will see here.'));
+  const rows = ansVisible(j);
+  wrap.append(ansFilters(j));
+  wrap.append(el('p', { class: 'small', 'data-answer-count': String(rows.length),
+    text: `${rows.length} of ${j.n_diagnose} diagnosis-half answers` }));
+  wrap.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-answers-table': '1' },
+    el('thead', {}, el('tr', {}, el('th', { text: 'acuity' }),
+      el('th', { text: 'question and answer' }), el('th', { class: 'num', text: 'score' }),
+      el('th', { text: `criteria (${(j.criteria || []).length})` }),
+      el('th', { text: 'what the judge wrote' }))),
+    el('tbody', {}, rows.map(it => ansRow(it, j))))));
+  return wrap;
+}
+
+// ---------------------------------------------------------------------------
+// The Loop tab: one row per topic, and for each the single next step. Nothing
+// here computes a gate — the server says whether a topic may be sat or
+// proposed from, in the same words the API refuses with, and this table shows
+// that answer. The person should never have to know which tab is next.
+// ---------------------------------------------------------------------------
+
+async function loadLoop() {
+  try {
+    const j = await api('api/loop');
+    Object.assign(state.loop, { rows: j.topics, blocked: j.judged_blocked,
+                                built: j.tasks_built || [], floor: j.floor, loaded: true });
+    if ((state.tab === 'loop' || state.topic) && !state.model) render();
+  } catch (e) { /* netFail said so */ }
+}
+
+function loopRowOf(slug) {
+  return (state.loop.rows || []).find(r => r.slug === slug) || null;
+}
+
+// where a step goes. The button is the same object on the board and on the
+// topic page; only 'read' and 'sit' behave differently depending on which of
+// the two you are already looking at.
+function loopGo(r, step) {
+  if (step === 'import') return navigate({ tab: 'exam', topic: null, model: null });
+  if (step === 'review' || step === 'generate')
+    { state.rv.topic = r.topic; state.rv.loaded = false; return navigate({ tab: 'review', topic: null, model: null }); }
+  if (step === 'read') markRead(r.topic);
+  return navigate({ topic: r.slug, model: null });
+}
+
+let _readRestored = false;
+function loopReadRestore() {
+  if (_readRestored) return;
+  _readRestored = true;
+  try { state.loopRead = JSON.parse(localStorage.getItem('bench-loop-read') || '{}') || {}; }
+  catch (e) { /* private mode, or someone else's JSON */ }
+}
+
+function markRead(topic) {
+  state.loopRead[topic] = true;
+  try { localStorage.setItem('bench-loop-read', JSON.stringify(state.loopRead)); } catch (e) { /* private mode */ }
+}
+
+// 'Read the results' becomes 'Propose' once this browser has opened the
+// answers for the topic: the step after reading is only honest after reading.
+function loopStep(r) {
+  if (r.next.step === 'read' && state.loopRead[r.topic] && r.propose)
+    return { step: 'propose', label: 'Propose', ok: r.propose.ok,
+             why: r.propose.why || '', short: r.propose.short || '' };
+  return { ...r.next, short: r.next.why };
+}
+
+function loopBtn(r) {
+  const st = loopStep(r);
+  const b = el('button', { 'data-step': st.step, disabled: st.ok ? null : '',
+    title: st.ok ? '' : st.why, text: st.label,
+    onclick: () => st.step === 'propose' ? loopPropose(r) : loopGo(r, st.step) });
+  return el('div', {}, b, st.ok ? '' : el('div', { class: 'propwhy', 'data-why': st.step,
+    title: st.why, text: st.short || st.why || '' }));
+}
+
+async function loopPropose(r) {
+  const last = r.last_judged || {};
+  if (!last.model) { state.loop.msg = 'no judged run to propose from'; return render(); }
+  if (!state.rvName.trim()) { state.loop.msg = 'your name is recorded on a proposal'; return render(); }
+  const res = await fetch('api/proposals', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+    body: JSON.stringify({ model: last.model, topic: r.topic, requested_by: state.rvName })
+  }).catch(() => null);
+  const j = res ? await res.json().catch(() => ({})) : {};
+  state.loop.msg = res && res.ok
+    ? `proposal #${j.id} submitted for ${last.model} · ${r.topic} — it lands in Review when the batch completes`
+    : 'refused: ' + (j.detail || (res ? res.status : 'server unreachable'));
+  state.loop.loaded = false; state.rv.loaded = false;
+  loadLoop(); render();
+}
+
+function judgedBadges(last) {
+  if (!last) return [];
+  const out = [];
+  if (last.provisional) out.push(el('span', { class: 'badge taint', title: last.provisional_reason,
+    text: 'provisional' }));
+  if (last.draft_rubric) out.push(el('span', { class: 'badge taint', text: 'draft rubric' }));
+  if (last.single_provider_loop) out.push(el('span', { class: 'badge taint',
+    title: 'the same provider wrote, sat or graded more than one step of this loop',
+    text: 'single provider' }));
+  if (last.tainted) out.push(el('span', { class: 'badge taint',
+    title: 'this model trained on data derived from this topic', text: 'trained on it' }));
+  return out;
+}
+
+function vLoop() {
+  if (!state.loop.loaded && netReady()) loadLoop();
+  loopReadRestore();
+  const rows = state.loop.rows || [];
+  const head = el('div', { class: 'card' },
+    el('h2', { text: 'The loop, by topic' }),
+    el('p', { class: 'sub', text: 'Write the exam, sit it, read what the judge made of the '
+      + 'answers, propose the skill that is missing, approve it, generate data, hand it to '
+      + 'training. One row per topic, and the one thing to do next. Every refusal below is '
+      + 'the API\'s own, in its words — this table asks, it does not decide.' }),
+    state.loop.blocked ? el('p', { class: 'warn', 'data-loop-blocked': '1' },
+      el('b', { text: 'No topic can be sat right now. ' }), state.loop.blocked) : '',
+    state.loop.msg ? el('p', { class: 'small', 'data-loop-msg': '1', text: state.loop.msg }) : '',
+    el('div', { class: 'frm' }, rvNameInput(),
+      el('span', { class: 'small', text: 'recorded on anything you start from here' })),
+    el('p', { class: 'small' }, 'New here? ',
+      el('a', { href: 'guide#the-loop', target: '_blank', rel: 'noopener',
+                text: 'what the loop is and whose job each step is' }), '.'));
+  if (!state.loop.loaded)
+    return [head, el('div', { class: 'card' }, el('p', { class: 'small', text: 'Loading…' }))];
+  const table = el('div', { class: 'card' },
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-loop-table': '1' },
+      el('thead', {}, el('tr', {},
+        el('th', { text: 'topic' }), el('th', { text: 'bank (report / diagnose)' }),
+        el('th', { text: 'rubric' }), el('th', { text: 'last judged' }),
+        el('th', { text: 'open proposal' }), el('th', { text: 'datasets' }),
+        el('th', { text: 'next step' }))),
+      el('tbody', {}, rows.map(r => {
+        const last = r.last_judged;
+        return el('tr', { 'data-loop-row': r.slug },
+          el('td', {}, el('a', { href: '#topic=' + r.slug, text: r.topic,
+            onclick: e => { e.preventDefault(); navigate({ topic: r.slug, model: null }); } })),
+          el('td', { class: 'small' }, r.bank.accepted
+            ? `${r.bank.accepted} — ${r.bank.report} report / ${r.bank.diagnose} diagnose`
+            : 'empty',
+            r.bank.accepted && r.bank.under_floor
+              ? el('div', { class: 'se', 'data-under-floor': '1',
+                  text: `under ${r.bank.floor} report-half questions` }) : '',
+            r.bank.awaiting ? el('div', { class: 'se', text: `${r.bank.awaiting} awaiting curation` }) : ''),
+          el('td', { class: 'small' },
+            el('a', { href: '#tab=exam', title: 'the rubric and criteria panel on the Exam tab',
+              text: `${r.rubric.name}.md`,
+              onclick: e => { e.preventDefault(); navigate({ tab: 'exam', topic: null }); } }),
+            r.rubric.own ? '' : el('span', { class: 'se', text: ' (shared)' }),
+            r.rubric.status === 'draft' ? el('span', { class: 'badge taint', text: 'DRAFT' }) : '',
+            el('div', { class: 'se', text: r.rubric.scoring === 'criteria'
+              ? `${r.rubric.criteria_count} criteria` : 'single score' })),
+          el('td', { class: 'small' }, last
+            ? el('span', {}, el('a', { href: '#model=' + encodeURIComponent(last.model),
+                text: last.model, onclick: e => { e.preventDefault();
+                  navigate({ model: last.model, topic: null }); } }),
+                ` · ${num(last.score_report, 2)} / 4 `,
+                el('span', { class: 'se', text: `(${last.n_report ?? 0} report-half)` }),
+                ...judgedBadges(last))
+            : el('span', { class: 'se', text: 'not judged yet' })),
+          el('td', { class: 'small' }, r.proposal
+            ? el('a', { href: '#tab=review', text: `#${r.proposal.id} ${r.proposal.status}`,
+                onclick: e => { e.preventDefault(); state.rv.topic = r.topic;
+                  navigate({ tab: 'review', topic: null }); } })
+            : el('span', { class: 'se', text: '—' })),
+          el('td', { class: 'small' }, r.datasets.length
+            ? r.datasets.map(d => el('div', { class: 'se', text: `#${d.id} ${d.status}` }))
+            : el('span', { class: 'se', text: '—' })),
+          el('td', {}, loopBtn(r)));
+      })))));
+  return [head, table];
+}
+
+// ---------------------------------------------------------------------------
+// One topic, in loop order: where it stands, sit it, read the answers, propose,
+// and what came out. The panels are the steps; the Review tab keeps its job as
+// the cross-topic queue for whoever approves.
+// ---------------------------------------------------------------------------
+
+function vTopic() {
+  if (!state.loop.loaded && netReady()) loadLoop();
+  loopReadRestore();
+  const r = loopRowOf(state.topic);
+  const back = el('p', { class: 'small' },
+    el('a', { href: '#tab=loop', text: '← every topic',
+      onclick: e => { e.preventDefault(); navigate({ topic: null, tab: 'loop' }); } }));
+  if (!r) return [el('div', { class: 'card' }, back,
+    el('h2', { text: state.topic }), el('p', { class: 'small',
+      text: state.loop.loaded ? 'No such topic.' : 'Loading…' }))];
+  const last = r.last_judged;
+  const st = loopStep(r);
+  const headCard = el('div', { class: 'card', 'data-topic-page': r.slug }, back,
+    el('h2', { text: r.topic }),
+    el('div', { class: 'kvs' },
+      el('span', {}, el('b', { text: 'bank ' }), r.bank.accepted
+        ? `${r.bank.accepted} (${r.bank.report} report / ${r.bank.diagnose} diagnose)` : 'empty'),
+      el('span', {}, el('b', { text: 'rubric ' }), `${r.rubric.name}.md v${r.rubric.version}`
+        + (r.rubric.status === 'draft' ? ' · DRAFT' : '')
+        + (r.rubric.scoring === 'criteria' ? ` · ${r.rubric.criteria_count} criteria` : '')),
+      el('span', {}, el('b', { text: 'next ' }), st.label)),
+    r.bank.under_floor && r.bank.accepted ? el('p', { class: 'warn', text:
+      `${r.bank.report} report-half questions — under the ${r.bank.floor} this topic needs `
+      + 'before anything may be proposed from it. Import or write more on the Exam tab.' }) : '',
+    el('div', { class: 'frm' }, loopBtn(r), rvNameInput()),
+    state.loop.msg ? el('p', { class: 'small', 'data-loop-msg': '1', text: state.loop.msg }) : '');
+  return [headCard, loopSitPanel(r), loopAnswersPanel(r), loopOutputPanel(r)];
+}
+
+function loopSitPanel(r) {
+  const s = state.loopSit;
+  if (s.tasks == null) s.tasks = [r.task];
+  const built = state.loop.built || [];
+  const pick = el('div', { class: 'frm', style: 'flex-wrap:wrap' }, built.map(task => {
+    const id = 'sit-' + task;
+    const box = el('input', { type: 'checkbox', id, 'data-sit-task': task,
+      checked: s.tasks.includes(task) ? '' : null,
+      onchange: e => { s.tasks = e.target.checked ? [...s.tasks, task]
+                                                  : s.tasks.filter(t => t !== task); } });
+    return el('label', { class: 'small', for: id, style: 'margin-right:10px' }, box,
+      ' ' + frName(task));
+  }));
+  const go = async () => {
+    const body = { hf_id: s.model.trim(), kind: s.kind, suite: 'judged',
+                   submitter: state.rvName, tasks: s.tasks };
+    if (!body.hf_id) { s.msg = 'a model id first — org/name, or local/<name>'; return render(); }
+    if (!body.tasks.length) { s.msg = 'pick at least one topic'; return render(); }
+    s.busy = true; render();
+    const res = await fetch('api/submissions', { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+      body: JSON.stringify(body) }).catch(() => null);
+    const j = res ? await res.json().catch(() => ({})) : {};
+    s.busy = false;
+    s.msg = res && res.ok
+      ? `#${j.id} queued — ${(j.tasks || []).map(frName).join(', ')}. The queue shows it, and `
+        + 'the judge batch after it.'
+      : 'refused: ' + (j.detail || (res ? res.status : 'server unreachable'));
+    render();
+  };
+  return el('div', { class: 'card', 'data-panel': 'sit' },
+    el('h2', { text: 'Sit the exam' }),
+    el('p', { class: 'sub', text: 'One model, this topic — the same judged suite, narrowed to '
+      + 'the tasks you tick. The answers are graded by the pinned judge when the run finishes; '
+      + 'nothing here touches the report half except the judge.' }),
+    state.loop.blocked ? el('p', { class: 'warn', 'data-sit-blocked': '1',
+      text: state.loop.blocked }) : '',
+    el('div', { class: 'frm' },
+      el('input', { type: 'text', 'aria-label': 'model id', value: s.model,
+        placeholder: 'org/model, or local/<name>', style: 'flex:2;min-width:240px',
+        oninput: e => { s.model = e.target.value; } }),
+      el('select', { 'aria-label': 'kind', onchange: e => { s.kind = e.target.value; } },
+        ['auto', 'base', 'instruct'].map(v => el('option', { value: v,
+          selected: s.kind === v ? '' : null, text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
+      rvNameInput(),
+      el('button', { 'data-sit': '1', disabled: (state.loop.blocked || s.busy) ? '' : null,
+        text: s.busy ? 'queueing…' : 'Queue this run', onclick: go })),
+    el('p', { class: 'small', text: 'topics in this run:' }), pick,
+    s.msg ? el('p', { class: 'small', 'data-sit-msg': '1', text: s.msg }) : '',
+    el('p', { class: 'small' }, 'The queue is on ',
+      el('a', { href: '#tab=queue', text: 'Submit & Queue',
+        onclick: e => { e.preventDefault(); navigate({ tab: 'queue', topic: null }); } }),
+      ' — a judged row says which topics it sat and how far the judge batch is.'));
+}
+
+
+// ---------------------------------------------------------------------------
+// The answers, for the diagnosis half only. The report half is one aggregate
+// line above the table and nothing else: no row, no qid, no answer text — an
+// answer quotes its question often enough that showing one shows the other.
+// The endpoint enforces the same rule; this is the second lock on the door.
+// ---------------------------------------------------------------------------
+
+async function loadAnswers(model, topic) {
+  const a = state.ans;
+  a.loading = true; a.model = model; a.topic = topic;
+  try {
+    const j = await api(`api/answers?model=${encodeURIComponent(model)}`
+                        + `&topic=${encodeURIComponent(topic)}`);
+    Object.assign(a, { rows: j, loading: false });
+  } catch (e) { Object.assign(a, { rows: null, loading: false }); }
+  if (state.topic || state.model) render();
+}
+
+function ansJudgedModels(task) {
+  return DATA.models.filter(m => m.judge && (m.judge.tasks || {})[task])
+    .map(m => m.id).sort(natCmp);
+}
+
+function ansFilters(j) {
+  const a = state.ans;
+  const acuities = [...new Set(j.items.map(it => (it.meta || {}).acuity).filter(Boolean))];
+  const sel = (label, cur, opts, on) => mkSel(label, opts, cur, on);
+  return el('div', { class: 'toolbar' },
+    acuities.length ? sel('acuity filter', a.acuity,
+      [['all', 'acuity: all'], ...acuities.map(v => [v, v])],
+      v => { a.acuity = v; render(); }) : '',
+    j.flags.length ? sel('flag filter', a.flag,
+      [['all', 'flags: any'], ['none', 'no flag raised'],
+       ...j.flags.map(f => [f.id, 'flagged: ' + f.label])],
+      v => { a.flag = v; render(); }) : '',
+    sel('score filter', a.score,
+      [['all', 'score: any'], ['weak', 'scored under 2'], ['0', '0'], ['1', '1'], ['2', '2'],
+       ['3', '3'], ['4', '4'], ['ungraded', 'the judge\'s reply was unreadable']],
+      v => { a.score = v; render(); }),
+    sel('sort', a.sort, [['score', 'weakest first'], ['best', 'best first'],
+                         ['difficulty', 'by difficulty']],
+      v => { a.sort = v; render(); }));
+}
+
+function ansVisible(j) {
+  const a = state.ans;
+  let rows = j.items.filter(it => {
+    if (a.acuity !== 'all' && (it.meta || {}).acuity !== a.acuity) return false;
+    if (a.flag === 'none' && Object.values(it.flags || {}).some(Boolean)) return false;
+    if (a.flag !== 'all' && a.flag !== 'none' && !(it.flags || {})[a.flag]) return false;
+    if (a.score === 'ungraded') return !it.graded;
+    if (a.score === 'weak') return it.graded && it.score < 2;
+    if (a.score !== 'all') return it.graded && String(it.score) === a.score;
+    return true;
+  });
+  if (a.sort === 'best') rows = rows.slice().sort((x, y) => (y.score ?? -1) - (x.score ?? -1));
+  else if (a.sort === 'difficulty') rows = rows.slice().sort((x, y) =>
+    ((x.meta || {}).difficulty ?? 99) - ((y.meta || {}).difficulty ?? 99));
+  return rows;
+}
+
+// the per-criterion strip: bars, because fifteen numbers in a row is a wall.
+// Each bar carries its criterion and value as a title, for the mouse and for
+// anything reading the DOM.
+function ansStrip(it, criteria) {
+  return el('div', { class: 'frm', style: 'gap:2px;flex-wrap:nowrap;align-items:flex-end' },
+    criteria.map(c => {
+      const v = (it.criteria || {})[c.id];
+      return el('span', { class: 'dxbar', 'data-criterion': c.id,
+        title: `${c.label}: ${v == null ? 'not applicable' : num(v, 2)}`,
+        style: 'width:8px;height:22px;display:inline-flex;align-items:flex-end' },
+        v == null ? '' : el('span', { style: `height:${Math.max(8, 100 * v).toFixed(0)}%;`
+          + 'width:100%;display:block;background:var(--s1);border-radius:1px' }));
+    }));
+}
+
+function ansRow(it, j) {
+  const meta = it.meta || {};
+  const flags = (j.flags || []).filter(f => (it.flags || {})[f.id]);
+  const open = state.ans.open[it.qid];
+  return el('tr', { 'data-answer': it.qid, 'data-half': 'diagnose' },
+    el('td', { class: 'small', style: 'white-space:nowrap' }, meta.acuity || '—',
+      meta.difficulty != null ? el('div', { class: 'se', text: 'difficulty ' + meta.difficulty }) : ''),
+    el('td', { style: 'min-width:340px' },
+      el('div', { class: 'small', text: it.prompt || '(question not on disk)' }),
+      el('div', { class: open ? '' : 'clamp2', style: 'margin-top:4px',
+                  'data-answer-text': '1' },
+        el('span', { class: 'se', text: it.answer || '(the model wrote nothing)' })),
+      el('a', { href: '#', class: 'small', text: open ? 'less' : 'more',
+        onclick: e => { e.preventDefault();
+          state.ans.open[it.qid] = !open; render(); } })),
+    el('td', { class: 'num' }, it.graded ? `${it.score} / 4`
+      : el('span', { class: 'se', text: 'unreadable' }),
+      flags.length ? el('div', {}, flags.map(f => el('span', { class: 'badge taint',
+        title: f.effect_words, 'data-flag': f.id, text: f.label }))) : ''),
+    el('td', {}, ansStrip(it, j.criteria || [])),
+    el('td', { class: 'small se', text: it.justification || '—' }));
+}
+
+function loopAnswersPanel(r) {
+  const a = state.ans;
+  const models = ansJudgedModels(r.task);
+  const card = el('div', { class: 'card', 'data-panel': 'answers' },
+    el('h2', { text: 'The answers' }),
+    el('p', { class: 'sub', text: 'What the model actually wrote on this topic\'s DIAGNOSIS '
+      + 'half, and what the judge made of each answer. The report half is the published '
+      + 'score: it appears below as one line and never as a row — not its questions, not '
+      + 'its answers, not its qids.' }));
+  if (!models.length) {
+    card.append(note('No model has been judged on this topic yet. Sit the exam above.'));
+    return card;
+  }
+  const want = a.model && models.includes(a.model) ? a.model
+             : (r.last_judged || {}).model && models.includes((r.last_judged || {}).model)
+               ? r.last_judged.model : models[0];
+  if (netReady() && (!a.rows || a.model !== want || a.topic !== r.topic) && !a.loading) {
+    loadAnswers(want, r.topic);
+    markRead(r.topic);
+  }
+  card.append(el('div', { class: 'frm' },
+    mkSel('model', models.map(m => [m, m]), want,
+      v => { state.ans.model = v; state.ans.rows = null; render(); }),
+    el('a', { class: 'small', href: '#model=' + encodeURIComponent(want),
+      text: 'this model\'s page',
+      onclick: e => { e.preventDefault(); navigate({ model: want, topic: null }); } })));
+  const j = a.rows;
+  if (!j || a.topic !== r.topic) {
+    card.append(el('p', { class: 'small', text: 'Loading…' }));
+    return card;
+  }
+  const rep = j.report_half || {};
+  card.append(el('p', { class: 'note', 'data-report-half': '1' },
+    el('b', { text: 'The report half. ' }),
+    `${rep.n ?? 0} questions, mean ${num(rep.mean, 2)} / 4`
+    + (Object.entries(rep.flags || {}).filter(([, n]) => n).length
+       ? ' · ' + Object.entries(rep.flags).filter(([, n]) => n)
+           .map(([fid, n]) => `${n} ${fid.replace(/_/g, ' ')}`).join(', ') : '')
+    + '. That is the published score, and this line is all of it you will see here.'));
+  const rows = ansVisible(j);
+  card.append(ansFilters(j));
+  card.append(el('p', { class: 'small', 'data-answer-count': String(rows.length),
+    text: `${rows.length} of ${j.n_diagnose} diagnosis-half answers` }));
+  card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-answers-table': '1' },
+    el('thead', {}, el('tr', {}, el('th', { text: 'acuity' }),
+      el('th', { text: 'question and answer' }), el('th', { class: 'num', text: 'score' }),
+      el('th', { text: `criteria (${(j.criteria || []).length})` }),
+      el('th', { text: 'what the judge wrote' }))),
+    el('tbody', {}, rows.map(it => ansRow(it, j))))));
+  if (!rows.length) card.append(note('No answer matches these filters.'));
+  return card;
+}
+
+// What came out of the loop for this topic: the proposal being reviewed, and
+// the dataset a person hands to training.
+function loopOutputPanel(r) {
+  const card = el('div', { class: 'card', 'data-panel': 'output' },
+    el('h2', { text: 'Propose, approve, generate' }),
+    el('p', { class: 'sub', text: 'A proposal reads the judge\'s written assessments of the '
+      + 'answers above — never the questions — and says what skill is missing. A person '
+      + 'approves that sentence on the Review tab, and only the approved text reaches a '
+      + 'generator.' }));
+  if (r.proposal) {
+    card.append(el('p', { class: 'small', 'data-proposal': String(r.proposal.id) },
+      `Proposal #${r.proposal.id} for ${r.proposal.model} is ${r.proposal.status}`
+      + (r.proposal.requested_by ? `, requested by ${r.proposal.requested_by}` : ''), '. ',
+      el('a', { href: '#tab=review', text: 'Review it',
+        onclick: e => { e.preventDefault(); state.rv.topic = r.topic;
+          navigate({ tab: 'review', topic: null }); } })));
+  } else {
+    card.append(el('p', { class: 'small' }, 'No open proposal. ', loopBtn(r)));
+  }
+  const ready = (r.datasets || []).filter(d => d.status === 'ready');
+  if (ready.length) {
+    card.append(el('div', { class: 'dxh', text: 'Datasets from this topic' }));
+    card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-datasets-table': '1' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'dataset' }), el('th', { class: 'num', text: 'documents' }),
+        el('th', { text: 'hand to training' }))),
+      el('tbody', {}, ready.map(d => el('tr', { 'data-dataset': String(d.id) },
+        el('td', {}, el('a', { href: `api/datasets/${d.id}`, target: '_blank', rel: 'noopener',
+          text: `#${d.id}` }),
+          el('div', { class: 'se', text: `${d.kept ?? d.count} kept of ${d.count}` })),
+        el('td', { class: 'num', text: String(d.kept ?? d.count) }),
+        el('td', {}, el('code', { class: 'mono', text: `--gap-dataset ${d.id}` }),
+          el('div', { class: 'se', text: 'the training run that consumes it registers it, and '
+            + 'its checkpoints carry the taint badge on this topic' }))))))));
+  } else if (r.datasets.length) {
+    card.append(note('A dataset for this topic is being generated — it appears here when the '
+      + 'batch completes and the contamination gate has run.'));
+  }
+  return card;
+}
+
 // ---------- Exam: write the instrument ----------
 // An LLM drafts candidate questions per topic (scripts/exam_build.py draft); a
 // person accepts, edits or rejects each one here, under a name; accepted
@@ -5733,6 +6268,8 @@ function exportJson() { download('benchmark.json', 'application/json', JSON.stri
 // ---------- shell ----------
 const TABS = [
   ['overview', 'Overview', vOverview],
+  // the loop is what this server is for, so it sits where the eye lands
+  ...(LIVE ? [['loop', 'Loop', vLoop]] : []),
   ...(LIVE ? [['training', 'Training', vTraining],
               ['exam', 'Exam', vExam],
               ['review', 'Review', vReview],
@@ -5754,6 +6291,7 @@ function render() {
   const view = document.getElementById('view');
   view.classList.remove('dimmed');
   if (state.model) { view.replaceChildren(...vModel()); return; }
+  if (state.topic) { view.replaceChildren(...vTopic()); return; }
   const fn = TABS.find(([id]) => id === state.tab)[2];
   view.replaceChildren(...fn(ms));
 }

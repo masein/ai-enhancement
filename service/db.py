@@ -62,7 +62,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   gpu_seconds REAL DEFAULT 0,
   arch        TEXT,                              -- JSON: architecture/hidden/layers/heads/ctx/vocab
   allow_remote_code INTEGER NOT NULL DEFAULT 0,  -- submitter opted in to executing the upload's code
-  load_missing TEXT DEFAULT ''                   -- JSON: checkpoint keys transformers had to invent
+  load_missing TEXT DEFAULT '',                  -- JSON: checkpoint keys transformers had to invent
+  tasks       TEXT DEFAULT '[]'                  -- JSON: narrow a suite to these tasks (one exam topic)
 );
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
 -- find-the-gap: an LLM proposes a skill spec from diagnose-half failures, a
@@ -154,13 +155,15 @@ CREATE TABLE IF NOT EXISTS llm_batches (
   status      TEXT NOT NULL DEFAULT 'submitted',  -- submitted|done|failed
   error       TEXT DEFAULT '',
   created_at  REAL NOT NULL,
-  finished_at REAL
+  finished_at REAL,
+  progress    TEXT DEFAULT ''                       -- what the provider last said: "40/80 done"
 );
 """
 
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
-         "finished_at", "gpu_seconds", "arch", "allow_remote_code", "load_missing"]
+         "finished_at", "gpu_seconds", "arch", "allow_remote_code", "load_missing",
+         "tasks"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -182,7 +185,9 @@ def init() -> None:
                      "ALTER TABLE submissions ADD COLUMN load_missing TEXT DEFAULT ''",
                      "ALTER TABLE truns ADD COLUMN datasets TEXT DEFAULT '[]'",
                      "ALTER TABLE truns ADD COLUMN parent TEXT DEFAULT ''",
-                     "ALTER TABLE proposals ADD COLUMN judge_run TEXT DEFAULT '{}'"):
+                     "ALTER TABLE proposals ADD COLUMN judge_run TEXT DEFAULT '{}'",
+                     "ALTER TABLE submissions ADD COLUMN tasks TEXT DEFAULT '[]'",
+                     "ALTER TABLE llm_batches ADD COLUMN progress TEXT DEFAULT ''"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:
@@ -196,12 +201,13 @@ def init() -> None:
 
 
 def add(hf_id: str, kind: str, suite: str, submitter: str, note: str,
-        allow_remote_code: bool = False) -> int:
+        allow_remote_code: bool = False, tasks: list[str] | None = None) -> int:
     with closing(_conn()) as c:
         cur = c.execute(
             "INSERT INTO submissions (hf_id, kind, suite, submitter, note, created_at, "
-            "allow_remote_code) VALUES (?,?,?,?,?,?,?)",
-            (hf_id, kind, suite, submitter, note, time.time(), int(allow_remote_code)))
+            "allow_remote_code, tasks) VALUES (?,?,?,?,?,?,?,?)",
+            (hf_id, kind, suite, submitter, note, time.time(), int(allow_remote_code),
+             json.dumps(sorted(tasks or []))))
         c.commit()
         return int(cur.lastrowid)
 
@@ -384,7 +390,7 @@ _PROP_COLS = ["id", "model", "task", "category", "status", "spec_text", "edited_
 _DS_COLS = ["id", "proposal_id", "status", "fmt", "count", "requester", "batch_id",
             "provenance", "error", "created_at", "finished_at"]
 _BATCH_COLS = ["batch_id", "kind", "ref_id", "n_items", "provider", "model", "status",
-               "error", "created_at", "finished_at"]
+               "error", "created_at", "finished_at", "progress"]
 
 
 def proposal_create(model: str, task: str, category: str, requested_by: str,
@@ -480,6 +486,15 @@ def batch_finish(batch_id: str, status: str, error: str) -> None:
     with closing(_conn()) as c:
         c.execute("UPDATE llm_batches SET status=?, error=?, finished_at=? WHERE batch_id=?",
                   (status, error, time.time(), batch_id))
+        c.commit()
+
+
+def batch_progress(batch_id: str, progress: str) -> None:
+    """What the provider says about a batch in flight ("40/80 done"). The
+    poller asks anyway; recording the answer is what lets the queue row say
+    how far along a judge batch is instead of only that it is pending."""
+    with closing(_conn()) as c:
+        c.execute("UPDATE llm_batches SET progress=? WHERE batch_id=?", (progress[:200], batch_id))
         c.commit()
 
 

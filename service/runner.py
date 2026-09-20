@@ -338,6 +338,12 @@ def run_submission(sub: dict) -> None:
                        f"needs ~{meta['need_gb']:g} GB")
 
     tasks = config.tasks_for_suite(sub["suite"])
+    # a judged run narrowed to one topic: the same suite, fewer tasks. The
+    # judge below grades only these, so a person can sit one topic in minutes
+    # instead of the whole exam
+    only = [t for t in json.loads(sub.get("tasks") or "[]") if t in tasks]
+    if only:
+        tasks = only
     safe = sub["hf_id"].replace("/", "__")
     log_path = config.LOGS_DIR / f"service_{sid}_{safe}.log"
     config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -516,7 +522,7 @@ def run_submission(sub: dict) -> None:
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
             import judge as _judge
             try:
-                jr = _judge.start_run(config.OUT_DIR / safe, config.OUT_DIR)
+                jr = _judge.start_run(config.OUT_DIR / safe, config.OUT_DIR, only=only)
                 if jr.get("skipped"):
                     judge_note = f" · {jr['skipped']}"
                 elif jr.get("batch_id"):
@@ -536,8 +542,10 @@ def run_submission(sub: dict) -> None:
             db.update(sid, status="failed", finished_at=time.time(),
                       progress=f"failed on: {', '.join(failed_tasks)}")
         else:
+            what = (f"all {len(tasks)} tasks" if not only
+                    else f"{', '.join(t.replace('exam_', '') for t in tasks)}")
             db.update(sid, status="done", finished_at=time.time(),
-                      progress=f"all {len(tasks)} tasks done{judge_note}", error="")
+                      progress=f"{what} done{judge_note}", error="")
     finally:
         release_lock()
         if remote_code:

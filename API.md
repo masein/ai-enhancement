@@ -315,6 +315,34 @@ that a new sha makes earlier judged runs on that topic non-comparable. The
 commit writes the file and records who, when and both shas in
 `rubric_changes`. It never touches git.
 
+### The loop
+
+`GET /api/loop` — one row per topic in `categories.yaml`: the bank (accepted,
+report/diagnose split, whether it is under the 30-question floor), which
+rubric and criteria file grade it, the most recently written `judge.json`
+that covers it (model, folded report-half score, and the provisional /
+draft-rubric / single-provider / trained-on-it stamps), any open proposal,
+any datasets, and **`next`** — the one step to take, as `{step, label, ok,
+why}`. `propose` carries the same gate object `POST /api/proposals` enforces.
+Nothing here is a second implementation of a rule: when the button is
+disabled, `why` is the sentence the API itself would refuse with.
+
+`GET /api/answers?model=&topic=` — one model's **diagnosis-half** answers on
+one topic: the question, what the model wrote, the folded score, the
+per-criterion numbers, which flags fired and what the judge wrote. The report
+half appears as `report_half` — a count, a mean and per-flag counts — and
+nowhere else: no rows, no qids, no answers. An answer quotes its question
+often enough that showing one shows the other.
+
+`POST /api/submissions` takes `tasks: ["exam_law"]` beside `suite: "judged"`
+to narrow a run to some of the built exam tasks; the worker runs only those
+and the judge grades only those answers. An empty list still means the whole
+exam. A narrowed run keeps the topics it did not re-grade in `judge.json`
+only when the judge id, the prompt and that topic's rubric record are
+unchanged — otherwise they are dropped and named in `judge.replaced`, because
+one file must not mix two instruments. A judged row in `GET /api/submissions`
+carries its `tasks` and a `judge` block with the batch and its progress.
+
 ### Judged free response
 
 `GET /api/judge/justifications?model=&topic=&limit=` — what the judge wrote

@@ -125,6 +125,35 @@ python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --dry-r
 python examples/train_and_benchmark.py --bench http://100.74.89.105:8899 --steps 200 --checkpoint-every 100
 ```
 
+## The loop
+
+Most of this guide is about benchmarking a model. The **Loop** tab is the
+other job: improving one. It runs on one topic at a time, and every step has
+an owner.
+
+| Step | What happens | Whose job |
+|---|---|---|
+| **Import a bank** | Questions written by a person arrive whole, under their name — Exam tab, import panel. An LLM can draft candidates instead, but nothing reaches the bank unread. | whoever owns the subject |
+| **Sit the exam** | One model answers that topic's questions. The judge grades every answer against the topic's rubric and criteria file, and folds a 0–4 in code. | anyone with a model |
+| **Read the results** | The answers panel: what the model wrote, the score, which flags fired, each criterion as a bar, and what the judge wrote about it. Diagnosis half only. | whoever wants to know why |
+| **Propose** | An LLM reads the judge's *written assessments* — never the questions — and says what skill is missing. | anyone, once the gate is clear |
+| **Review the spec** | A person approves, edits or rejects that sentence. This is the airlock: only approved text reaches a generator. | the reviewer |
+| **Generate** | A generator that has seen only the spec writes prose documents. A 13-gram gate drops anything that overlaps an exam question or a benchmark item. | the reviewer |
+| **Hand to training** | The dataset id and the `--gap-dataset` line. A run that consumes it registers it, and its checkpoints carry a taint badge on that topic. | whoever trains |
+
+Two rules hold at every step. **The report half of each topic is never
+shown** — not on a page, not in an export, not in any request except the
+judge's; it is the published score, and it stays unseen so it stays
+meaningful. And **a number that cannot be trusted is not ranked**: an
+uncalibrated judge, a judge that has moved, a topic with fewer than 30
+report-half questions, or a model that trained on the topic's diagnostics
+all leave the score visible and out of every average, with the reason in
+words beside it.
+
+The single button on each Loop row is the next step for that topic. When it
+is disabled, the sentence under it is the server's own refusal — the same
+words the API would answer with.
+
 ## 5 · Reading the dashboard
 
 **Overview** — best model, how many differences are statistically real.

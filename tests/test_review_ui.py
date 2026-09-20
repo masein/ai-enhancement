@@ -460,3 +460,98 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
         ".textContent.includes(sha)", arg=sha)
     assert row.locator(".badge.taint", has_text="DRAFT").count() == 0
     assert page.errors == []
+
+
+def test_the_loop_tab_is_one_row_per_topic_with_the_next_step(live, page):
+    """Phase 8e P6a: the loop, as a board. Every row says where the topic
+    stands and the one thing to do next — and a refusal says why in words."""
+    base = live["base"]
+    page.goto(base + "/#tab=loop")
+    page.wait_for_selector("table.jd[data-loop-table] tbody tr")
+    rows = page.locator("table.jd[data-loop-table] tbody tr")
+    assert rows.count() == 15                              # every topic in categories.yaml
+    med = page.locator("tr[data-loop-row='medicine_health']")
+    assert "medicine_health.md" in med.text_content()
+    assert "15 criteria" in med.text_content()
+    assert "/ 4" in med.text_content()                     # the last judged score
+    # a rubric its author has not signed off is stamped on the row that uses it
+    law = page.locator("tr[data-loop-row='law']")
+    assert "law.md" in law.text_content() and "DRAFT" in law.text_content()
+    assert "draft rubric" in law.text_content()            # and on its judged run
+    # no judge is configured in this fixture, so a topic nobody has sat says
+    # so on the button rather than offering it
+    assert page.locator("[data-loop-blocked]").count() == 1
+    sit = page.locator("button[data-step='sit']").first
+    if sit.count():
+        assert sit.is_disabled()
+    # the step for a judged topic is to read what the judge made of it
+    btn = med.locator("button[data-step]")
+    assert btn.get_attribute("data-step") == "read"
+    btn.click()
+    page.wait_for_selector("[data-topic-page='medicine_health']")
+    assert "#topic=medicine_health" in page.url
+    SCREENS.mkdir(exist_ok=True)
+    page.goto(base + "/#tab=loop")
+    page.wait_for_selector("table.jd[data-loop-table] tbody tr")
+    page.screenshot(path=SCREENS / "loop-board.png", full_page=True)
+    page.goto(base + "/#topic=medicine_health")
+    page.wait_for_selector("[data-panel='answers'] table.jd[data-answers-table]")
+    page.screenshot(path=SCREENS / "loop-topic.png", full_page=True)
+    assert page.errors == []
+
+
+def test_the_topic_page_shows_the_answers_and_never_the_report_half(live, page):
+    """The panel a person reads before proposing anything: the diagnosis half
+    in full, the report half as one line and not one row."""
+    import exam_build as eb
+    base, root = live["base"], live["root"]
+    page.goto(base + "/#topic=medicine_health")            # deep link, cold
+    page.wait_for_selector("[data-panel='answers'] table.jd[data-answers-table]")
+    rows = page.locator("table.jd[data-answers-table] tbody tr")
+    assert rows.count() > 0
+    assert rows.count() == page.locator("tr[data-half='diagnose']").count()
+    # the published half is a sentence, and the only sentence
+    line = page.locator("[data-report-half]").first.text_content()
+    assert "The report half." in line and "published score" in line
+    # and no report-half question is anywhere in the document
+    bank = eb.load_bank(root / "exam")["medicine & health"]
+    report = [b for b in bank if eb.half_of(b["qid"]) == "report"]
+    assert report
+    html = page.content()
+    for b in report:
+        assert b["prompt"][:60] not in html and b["qid"] not in html
+    # a diagnose-half row carries the question, the answer, the score and the
+    # judge's words — and a bar per criterion
+    first = rows.first
+    assert first.locator("[data-answer-text]").count() == 1
+    assert first.locator("[data-criterion]").count() == 15
+    assert "/ 4" in first.text_content() or "unreadable" in first.text_content()
+    # filters narrow it without a reload
+    before = int(page.locator("[data-answer-count]").first.get_attribute("data-answer-count"))
+    page.get_by_label("score filter").select_option("weak")
+    page.wait_for_function(
+        "n => +document.querySelector('[data-answer-count]').dataset.answerCount <= n",
+        arg=before)
+    assert page.errors == []
+
+
+def test_sitting_one_topic_from_its_page(live, page):
+    """The Sit panel queues a judged run narrowed to the topics ticked — and
+    says why it cannot when the judge is not configured."""
+    base = live["base"]
+    page.goto(base + "/#topic=law")
+    page.wait_for_selector("[data-panel='sit']")
+    panel = page.locator("[data-panel='sit']")
+    # this topic is pre-ticked, the others are there to add
+    assert panel.locator("input[data-sit-task='exam_law']").is_checked()
+    assert panel.locator("input[data-sit-task='exam_economics']").is_checked() is False
+    # no judge configured in the fixture: the button says so instead of failing later
+    assert panel.locator("[data-sit-blocked]").count() == 1
+    assert panel.locator("button[data-sit]").is_disabled()
+    # the queue's suite drop-down offers judged all the same, disabled with the reason
+    page.goto(base + "/#tab=queue")
+    page.wait_for_selector("select")
+    opt = page.locator("option[value='judged']")
+    assert opt.count() == 1 and opt.is_disabled()
+    assert "unavailable" in opt.text_content()
+    assert page.errors == []

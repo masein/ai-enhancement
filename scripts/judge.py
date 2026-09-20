@@ -740,13 +740,18 @@ def load_canary() -> list[dict]:
 # a run: plan the requests, then assemble the file from the results
 # ---------------------------------------------------------------------------
 
-def plan_requests(model_dir: Path, judge_family: str) -> tuple[list, dict]:
+def plan_requests(model_dir: Path, judge_family: str,
+                  only: list[str] | None = None) -> tuple[list, dict]:
     """Every grading request for one model — the canary first, then every
     answer — plus the plan the results are assembled against later (the
-    poller may be in another process by then)."""
+    poller may be in another process by then). `only` narrows it to the tasks
+    a run asked for: a person sitting one topic should not pay to re-grade
+    fourteen others whose answers are already on disk."""
     from service import llm
     model_id = model_dir.name.replace("__", "/", 1)
     tasks_present = [t for t in ALL_TASKS if any(model_dir.glob(f"{t}_*shot"))]
+    if only:
+        tasks_present = [t for t in tasks_present if t in set(only)]
     plan = {"model": model_id, "model_dir": str(model_dir), "tasks": {}, "canary": [],
             "skipped": None}
     if not tasks_present:
@@ -1067,6 +1072,53 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
     return {**head, "canary": canary, "preliminary_reasons": reasons, "tasks": tasks}
 
 
+def merge_judged(model_dir: Path, out: dict, dest: Path | None = None) -> dict:
+    """A run narrowed to one topic must not wipe the others' scores out of
+    judge.json — but it must not pretend they were graded by this run's
+    instrument either. A previous task is carried over only when the judge id,
+    the prompt and that task's rubric record are all identical to this run's;
+    anything else is named in `judge.replaced` and dropped, because a file
+    that mixes two instruments under one heading is worse than a gap."""
+    prev_path = (dest or model_dir) / "judge.json"
+    if not prev_path.exists() or out.get("skipped"):
+        return out
+    try:
+        prev = json.loads(prev_path.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return out
+    if prev.get("skipped") or not isinstance(prev.get("tasks"), dict):
+        return out
+    pj, nj = prev.get("judge") or {}, out.get("judge") or {}
+    same_judge = (pj.get("id") == nj.get("id")
+                  and pj.get("prompt_sha256") == nj.get("prompt_sha256")
+                  and bool(pj.get("provisional")) == bool(nj.get("provisional")))
+    kept, dropped = {}, []
+    for task, t in prev["tasks"].items():
+        if task in out.get("tasks", {}):
+            continue
+        prev_rub = (pj.get("rubrics") or {}).get(task)
+        if same_judge and prev_rub == _rubric_record(task):
+            kept[task] = t
+        else:
+            dropped.append(task)
+    if not kept and not dropped:
+        return out
+    merged = {**out, "tasks": {**kept, **out.get("tasks", {})}}
+    judge = dict(nj)
+    judge["rubrics"] = {**{t: (pj.get("rubrics") or {}).get(t) for t in kept},
+                        **(nj.get("rubrics") or {})}
+    draft = sorted(t for t, r in judge["rubrics"].items() if (r or {}).get("status") == "draft")
+    if draft:
+        judge["rubric_status"] = "draft"
+        judge["rubrics_draft"] = draft
+    if dropped:
+        judge["replaced"] = sorted(dropped)
+        judge["replaced_why"] = ("graded earlier by a different judge, prompt or rubric — "
+                                 "re-run suite=judged for these topics")
+    merged["judge"] = judge
+    return merged
+
+
 def write_judge(model_dir: Path, out: dict, dest: Path | None = None) -> Path:
     d = dest or model_dir
     d.mkdir(parents=True, exist_ok=True)
@@ -1076,34 +1128,36 @@ def write_judge(model_dir: Path, out: dict, dest: Path | None = None) -> Path:
 
 
 def run_stub(model_dir: Path, results_root: Path | None = None, record: bool = False,
-             threshold: float = 0.5) -> dict | None:
+             threshold: float = 0.5, only: list[str] | None = None) -> dict | None:
     """Grade with the stub, in process. The fixture and the tests."""
     ident = {"provider": "stub", "model": "overlap-v1", "id": "stub/overlap-v1", "family": "stub"}
-    reqs, plan = plan_requests(model_dir, "stub")
+    reqs, plan = plan_requests(model_dir, "stub", only=only)
     if not plan["tasks"] and not plan.get("skipped"):
         return None
     return assemble(plan, stub_results(reqs), ident, "stub", results_root or model_dir.parent,
                     threshold, caveat=False, record=record)
 
 
-def start_run(model_dir: Path, results_root: Path) -> dict:
+def start_run(model_dir: Path, results_root: Path, only: list[str] | None = None) -> dict:
     """The service's entry point, called inside the GPU lock: plan, submit
     the batch (seconds), return. The poller finishes it. With JUDGE_MODEL=stub
-    the file is written here and now."""
+    the file is written here and now. `only` narrows the run to the tasks the
+    submission asked for."""
     from service import config, db, llm
     ident = identity()
     if config.JUDGE_MODEL == "stub":
-        out = run_stub(model_dir, results_root, record=True, threshold=config.JUDGE_CANARY_MAX_DRIFT)
+        out = run_stub(model_dir, results_root, record=True,
+                       threshold=config.JUDGE_CANARY_MAX_DRIFT, only=only)
         if out is None:
             return {"mode": "stub", "written": False}
-        write_judge(model_dir, out)
+        write_judge(model_dir, merge_judged(model_dir, out))
         return {"mode": "stub", "written": True, "skipped": out.get("skipped")}
     why = blocked()
     if why:
         raise RuntimeError(why)
     backend = llm.client("judge")
     stamp = llm.provisional(backend, "graded")
-    reqs, plan = plan_requests(model_dir, judge_family(ident, stamp))
+    reqs, plan = plan_requests(model_dir, judge_family(ident, stamp), only=only)
     if stamp:
         plan["provisional"] = stamp
     if plan.get("skipped"):
@@ -1125,7 +1179,8 @@ def finish_run(run: dict, results: dict, results_root: Path) -> Path:
     ident = identity()
     out = assemble(plan, results, ident, run["batch_id"], results_root,
                    config.JUDGE_CANARY_MAX_DRIFT, single_provider_loop())
-    return write_judge(Path(plan["model_dir"]), out)
+    model_dir = Path(plan["model_dir"])
+    return write_judge(model_dir, merge_judged(model_dir, out))
 
 
 def main() -> int:

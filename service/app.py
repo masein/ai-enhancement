@@ -181,6 +181,10 @@ class SubmissionIn(BaseModel):
     submitter: str = ""
     note: str = ""
     allow_remote_code: bool = False    # execute the upload's own modeling code
+    # narrow a judged run to these built exam tasks. Empty means the whole
+    # suite, which is what it has always meant — one topic at a time is the
+    # loop's unit of work, and a person should not have to sit fifteen.
+    tasks: list[str] = []
 
 
 ACTIVE = ("queued", "preflight", "waiting_gpu", "waiting_lock", "running")
@@ -199,10 +203,20 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     if s.suite not in ("quick", "full", "control", "judged"):
         raise HTTPException(422, "suite must be quick, full, control (mmlu_perm only) or "
                                  "judged (free response + judge)")
+    chosen: list[str] = []
     if s.suite == "judged":
         why = config.judged_blocked()
         if why:
             raise HTTPException(503, why)
+        built = config.judged_tasks()
+        chosen = [t.strip() for t in s.tasks if t.strip()]
+        unknown = [t for t in chosen if t not in built]
+        if unknown:
+            raise HTTPException(422, f"not built exam tasks: {', '.join(unknown)} — built "
+                                     f"tasks are {', '.join(built)}")
+    elif s.tasks:
+        raise HTTPException(422, "tasks narrows a judged run only; the other suites are "
+                                 "fixed lists")
     if s.allow_remote_code:
         # the flag is only meaningful for uploads, and only when the operator has
         # configured the server to run other people's code at all. Checked here
@@ -220,13 +234,33 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
             return {"id": row["id"], "status": row["status"],
                     "note": "already in the queue — joining the existing run"}
     sid = db.add(hf_id, s.kind, s.suite, s.submitter.strip()[:80], s.note.strip()[:200],
-                 allow_remote_code=s.allow_remote_code)
-    return {"id": sid, "status": "queued"}
+                 allow_remote_code=s.allow_remote_code, tasks=chosen)
+    return {"id": sid, "status": "queued", "tasks": sorted(chosen)}
 
 
 @app.get("/api/submissions")
 def submissions(limit: int = 100):
-    return db.recent(min(limit, 500))
+    """The queue. A judged row carries the judge batch with it: the answers
+    are on disk long before the grades are, and 'done' on the GPU half is not
+    done — the row should say which topics it sat and how far the judge is."""
+    rows = db.recent(min(limit, 500))
+    judged = [r for r in rows if r["suite"] == "judged"]
+    if judged:
+        runs = db.judge_runs(100)
+        batches = {b["batch_id"]: b for b in db.batches_list(200) if b["kind"] == "judge"}
+        newest: dict[str, dict] = {}
+        for run in runs:                       # judge_runs comes back newest first
+            newest.setdefault(run["model"], run)
+        for r in judged:
+            run = newest.get(r["hf_id"])
+            if not run:
+                continue
+            b = batches.get(run["batch_id"]) or {}
+            r["judge"] = {"batch_id": run["batch_id"], "n_items": run["n_items"],
+                          "status": b.get("status") or run.get("status"),
+                          "progress": b.get("progress") or "",
+                          "judge_id": run.get("judge_id")}
+    return rows
 
 
 @app.post("/api/submissions/{sid}/cancel")
@@ -854,6 +888,188 @@ def judge_justifications(model: str, topic: str, limit: int = 8):
             "note": "diagnosis half only; any exam question text the judge quoted is removed"}
 
 
+# ---------------------------------------------------------------------------
+# The loop, as one board. Every number here already exists somewhere else —
+# the bank, the rubric files, judge.json, the proposals table, the datasets
+# table. What this endpoint adds is the ORDER: for one topic, what has been
+# done and what the single next step is. The gates are not re-implemented
+# here; they are the same objects the API enforces on submit and on propose.
+# ---------------------------------------------------------------------------
+
+STEPS = {
+    "import": "Import a bank",
+    "sit": "Sit the exam",
+    "read": "Read the results",
+    "propose": "Propose",
+    "review": "Review the spec",
+    "generate": "Generate",
+    "hand": "Hand to training",
+}
+
+
+def _judged_at(model: str) -> float | None:
+    """When this model's judge.json was written. The file itself carries no
+    timestamp on purpose (it must hash the same for the same inputs), so the
+    filesystem is the clock."""
+    p = config.OUT_DIR / model.replace("/", "__") / "judge.json"
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return None
+
+
+def _last_judged(payload: dict, task: str) -> dict | None:
+    """The most recently written judge.json that contains this topic, as the
+    board's 'where does this topic stand' line."""
+    best = None
+    for m in payload.get("models") or []:
+        t = ((m.get("judge") or {}).get("tasks") or {}).get(task)
+        if not t:
+            continue
+        at = _judged_at(m["id"]) or 0
+        if best and at <= best["at"]:
+            continue
+        j = m.get("judge") or {}
+        jm = j.get("judge") or {}
+        best = {
+            "model": m["id"], "at": at,
+            "score_report": t.get("score_report"), "n_report": t.get("n_report"),
+            "score_diagnose": t.get("score_diagnose"), "n_diagnose": t.get("n_diagnose"),
+            "unparseable": t.get("unparseable"),
+            "flags": {fid: f.get("n") for fid, f in (t.get("flags") or {}).items()},
+            "judge_id": jm.get("id"), "provisional": bool(jm.get("provisional")),
+            "provisional_reason": jm.get("provisional_reason") or "",
+            "single_provider_loop": bool(jm.get("single_provider_loop")),
+            "draft_rubric": task in (jm.get("rubrics_draft") or []),
+            "state": m.get("judgeState"), "propose": t.get("propose"),
+            "tainted": task in (m.get("tainted") or []),
+        }
+    return best
+
+
+def _dataset_kept(d: dict) -> int | None:
+    try:
+        return ((json.loads(d.get("provenance") or "{}") or {}).get("items") or {}).get("kept")
+    except ValueError:
+        return None
+
+
+def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
+              blocked: str) -> dict:
+    task = exam_build.topic_task(topic)
+    bank = (exam_build.summary(config.EXAM_DIR) or {}).get(topic) or {}
+    rub = _rubric_row(topic)
+    last = _last_judged(payload, task)
+    mine = [p for p in props if p["category"] == topic]
+    open_p = next((p for p in mine if p["status"] in ("pending", "proposed", "approved")), None)
+    ds = [d for d in sets if d.get("proposal_id") in {p["id"] for p in mine}]
+    ready = [d for d in ds if d.get("status") == "ready"]
+    gate = (last or {}).get("propose") or {}
+    if not bank.get("accepted"):
+        step, ok, why = "import", True, ""
+    elif not last:
+        step, ok, why = "sit", not blocked, blocked
+    elif open_p and open_p["status"] == "approved":
+        step = "hand" if ready else "generate"
+        ok, why = True, ""
+    elif open_p:
+        step, ok, why = "review", True, ""
+    elif ready:
+        step, ok, why = "hand", True, ""
+    else:
+        step, ok, why = "read", True, ""
+    return {
+        "topic": topic, "task": task, "slug": exam_build.task_slug(task),
+        "bank": {"accepted": bank.get("accepted", 0), "report": bank.get("report", 0),
+                 "diagnose": bank.get("diagnose", 0), "awaiting": bank.get("pending", 0),
+                 "floor": report.PROPOSE_MIN_N,
+                 "under_floor": bank.get("report", 0) < report.PROPOSE_MIN_N},
+        "rubric": {k: rub[k] for k in ("name", "own", "version", "status", "scoring",
+                                       "sha256", "criteria_count", "criteria_sha256")},
+        "last_judged": last,
+        # the same object the propose endpoint enforces — the page never
+        # decides for itself whether a topic may be proposed from
+        "propose": {"ok": bool(gate.get("ok")), "why": gate.get("why"),
+                    "short": gate.get("short"), "caution": gate.get("caution")} if last else None,
+        "proposal": {k: open_p[k] for k in ("id", "status", "model", "category",
+                                            "created_at", "requested_by")} if open_p else None,
+        # kept/dropped live in the provenance record the gate wrote, which is
+        # the only place that count is authoritative
+        "datasets": [{"id": d["id"], "status": d.get("status"), "count": d.get("count"),
+                      "kept": _dataset_kept(d), "created_at": d.get("created_at")} for d in ds],
+        "next": {"step": step, "label": STEPS[step], "ok": ok, "why": why},
+    }
+
+
+@app.get("/api/loop")
+def loop_board():
+    """One row per topic: the bank, the rubric, where the last judged run
+    left it, and the one next step."""
+    payload = results_payload()
+    props = db.proposal_list(limit=500)
+    sets = db.dataset_list(limit=500)
+    blocked = config.judged_blocked()
+    return {"topics": [_loop_row(t, payload, props, sets, blocked)
+                       for t in exam_build.TOPICS],
+            "judged_blocked": blocked, "tasks_built": config.judged_tasks(),
+            "floor": report.PROPOSE_MIN_N,
+            "gap_dataset_flag": "--gap-dataset"}
+
+
+@app.get("/api/answers")
+def answers(model: str, topic: str, limit: int = 200):
+    """One model's DIAGNOSE-half answers on one topic, with what the judge
+    made of each. The report half is here as one aggregate line and nothing
+    else: not its questions, not its answers, not its qids. An answer quotes
+    its question often enough that showing one shows the other."""
+    if topic not in exam_build.TOPICS:
+        raise HTTPException(404, f"{topic!r} is not an exam topic")
+    task = exam_build.topic_task(topic)
+    model_dir = config.OUT_DIR / model.replace("/", "__")
+    jf = model_dir / "judge.json"
+    if not jf.exists():
+        raise HTTPException(404, f"{model} has no judged run on file — submit it with "
+                                 f"suite=judged first")
+    j = json.loads(jf.read_text(encoding="utf-8"))
+    t = (j.get("tasks") or {}).get(task)
+    if not t:
+        raise HTTPException(404, f"{model}'s judged run does not cover {topic!r}")
+    import judge as _judge
+    spec = _judge.rubric_for(task).criteria or {}
+    answers_by_hash = {}
+    for rec in _judge._records(model_dir, task):
+        answers_by_hash[rec.get("doc_hash")] = ((rec.get("doc") or {}), _judge._answer(rec))
+    rows = []
+    for it in t.get("items") or []:
+        if it.get("half") != "diagnose":
+            continue                      # the whole safety property, in one line
+        doc, ans = answers_by_hash.get(it.get("doc_hash"), ({}, ""))
+        rows.append({
+            "qid": it.get("qid"), "score": it.get("score"), "graded": it.get("graded"),
+            "meta": it.get("meta") or {}, "answer_words": it.get("answer_words"),
+            "prompt": doc.get("prompt") or "", "reference": doc.get("reference") or "",
+            "answer": ans, "criteria": it.get("criteria") or {},
+            "flags": {k: bool(v) for k, v in (it.get("flags") or {}).items()},
+            "effects_applied": (it.get("fold") or {}).get("effects_applied") or [],
+            "justification": it.get("justification") or "",
+        })
+    rows.sort(key=lambda r: (r["score"] if r["score"] is not None else 99, str(r["qid"])))
+    return {
+        "model": model, "topic": topic, "task": task,
+        "criteria": [{"id": c["id"], "label": _judge.label_of(c)}
+                     for c in spec.get("criteria") or []],
+        "flags": [{"id": f["id"], "label": _judge.label_of(f),
+                   "effect_words": _judge.effect_words(_judge.effect_of(f))}
+                  for f in spec.get("flags") or []],
+        # the published half, as a number and never as rows
+        "report_half": {"n": t.get("n_report"), "mean": t.get("score_report"),
+                        "flags": {fid: f.get("n") for fid, f in (t.get("flags") or {}).items()},
+                        "note": "report-half questions and answers are never listed — the "
+                                "published score is this line"},
+        "items": rows[:max(1, min(limit, 500))], "n_diagnose": len(rows),
+    }
+
+
 @app.get("/api/judge")
 def judge_status():
     """What the judged suite would run with: the pinned judge, its family,
@@ -1201,6 +1417,12 @@ def _md_inline(escaped: str) -> str:
     return escaped
 
 
+def _slug(heading: str) -> str:
+    """A heading's anchor, the way every markdown host makes one — so the
+    page can link to a section of the guide and land on it."""
+    return re.sub(r"[^a-z0-9]+", "-", heading.lower()).strip("-")
+
+
 def _md_to_html(text: str) -> str:
     out: list[str] = []
     para: list[str] = []
@@ -1231,9 +1453,11 @@ def _md_to_html(text: str) -> str:
         if not s:
             flush()
         elif s.startswith("## "):
-            flush(); out.append("<h2>" + _md_inline(html.escape(s[3:])) + "</h2>")
+            flush(); out.append(f"<h2 id=\"{_slug(s[3:])}\">"
+                                + _md_inline(html.escape(s[3:])) + "</h2>")
         elif s.startswith("# "):
-            flush(); out.append("<h1>" + _md_inline(html.escape(s[2:])) + "</h1>")
+            flush(); out.append(f"<h1 id=\"{_slug(s[2:])}\">"
+                                + _md_inline(html.escape(s[2:])) + "</h1>")
         elif s == "---":
             flush(); out.append("<hr>")
         elif s.startswith("- "):

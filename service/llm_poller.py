@@ -137,6 +137,10 @@ def tick() -> int:
             print(f"[llm] status {r['batch_id']}: {e}")
             continue
         if state == "pending":
+            # the provider was asked anyway; recording what it said is what
+            # lets a queue row say "judging 40/80" instead of only "pending"
+            if detail and detail != r.get("progress"):
+                db.batch_progress(r["batch_id"], detail)
             continue
         if state == "failed":
             db.batch_finish(r["batch_id"], "failed", detail)
