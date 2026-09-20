@@ -20,7 +20,7 @@ from conftest import make_service
 from service import proposals as prop
 
 REPO = Path(__file__).resolve().parents[1]
-LAW = REPO / "eval_tasks" / "fr" / "hossein_law_v2.json"
+LAW = REPO / "eval_tasks" / "fr" / "law_v2.json"
 TOPIC = "medicine & health"
 
 
@@ -188,21 +188,21 @@ def test_the_revised_law_bank_updates_metadata_in_place(tmp_path):
     for it in v1:                       # the id-range mapping v1 carried
         i = it["id"]
         it["difficulty"] = 1 if i <= 20 else 2 if i <= 45 else 3 if i <= 65 else 4 if i <= 85 else 5
-    first = eb.import_bank(root, v1, "law", "Dr. Hossein", "hossein_v1")
+    first = eb.import_bank(root, v1, "law", "Dr. Hossein", "medicine_v1")
     assert (first["imported"], first["updated"], first["skipped"]) == (100, 0, 0)
     halves = {r["qid"]: eb.half_of(r["qid"]) for r in eb.load_bank(root)["law"]}
-    second = eb.import_bank(root, LAW, "law", "Dr. Hossein", "hossein_law_v2")
+    second = eb.import_bank(root, LAW, "law", "Dr. Hossein", "law_v2")
     assert (second["imported"], second["updated"], second["skipped"]) == (0, 100, 0)
     rows = eb.load_bank(root)["law"]
     assert len(rows) == 100
-    assert {r["source"] for r in rows} == {"hossein_law_v2"}
+    assert {r["source"] for r in rows} == {"law_v2"}
     assert {r["accepted_by"] for r in rows} == {"Dr. Hossein"}
     assert {r["qid"]: eb.half_of(r["qid"]) for r in rows} == halves     # nothing moved
     assert all("jurisdiction_required" in r["meta"] for r in rows)
     assert sum(1 for r in rows if r["meta"]["jurisdiction_required"]) == 85
     assert sum(1 for r in rows if r["meta"]["difficulty"] == 2) == 33
     # and a third import of the same file changes nothing
-    again = eb.import_bank(root, LAW, "law", "Dr. Hossein", "hossein_law_v2")
+    again = eb.import_bank(root, LAW, "law", "Dr. Hossein", "law_v2")
     assert (again["imported"], again["updated"], again["skipped"]) == (0, 0, 100)
 
 

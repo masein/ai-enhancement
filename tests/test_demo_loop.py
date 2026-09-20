@@ -188,7 +188,7 @@ def test_a_model_answering_in_an_uncurable_shape_says_how_many(tmp_path, monkeyp
         srv.server_close()
 
 
-MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v2.json"
+MEDICINE = REPO / "eval_tasks" / "fr" / "medicine_v2.json"
 
 
 def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
@@ -225,7 +225,7 @@ def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
     bank = [json.loads(x) for x in (root / "demo" / "exam" / "bank" / "medicine_health.jsonl")
             .read_text().splitlines() if x.strip()]
     assert len(bank) == 100 and all(b["accepted_by"] == "Dr. Hossein" for b in bank)
-    assert all(b["source"] == "hossein_medicine_v2" for b in bank)   # the file's stem
+    assert all(b["source"] == "medicine_v2" for b in bank)   # the file's stem
     # the judge graded it criterion by criterion, and the demo shows what that is
     assert "is graded criterion by criterion, and the 0-4 above is a fold of them" in out
     # the criteria file is the author's own and carries no draft stamp; the
@@ -349,9 +349,9 @@ def test_demo_md_says_what_a_green_run_does_not_prove():
     for other in ("README.md", "SERVICE.md"):
         assert "DEMO.md" in (REPO / other).read_text(encoding="utf-8"), other
     # the medicine run, and the two things a criteria-graded score is not
-    assert '--import eval_tasks/fr/hossein_medicine_v2.json --approver "Dr. Hossein"' in doc
+    assert '--import eval_tasks/fr/medicine_v2.json --approver "Dr. Hossein"' in doc
     # and the second bank delivered in the same round, as its own run
-    assert '--import eval_tasks/fr/hossein_law_v2.json --approver "Dr. Hossein"' in doc
+    assert '--import eval_tasks/fr/law_v2.json --approver "Dr. Hossein"' in doc
     assert "HuggingFaceTB/SmolLM2-360M-Instruct" in doc
     assert "rubrics are drafts" in doc and "pending Dr." in doc
     assert "deterministic fold of that topic's\n  criteria" in doc
@@ -373,12 +373,12 @@ def test_the_author_docs_carry_the_import_and_criteria_rules():
     assert "refuses to load" in doc
     hand = (REPO / "HANDOFF.md").read_text(encoding="utf-8")
     # the two open asks back to the author, and the file that holds his criteria
-    assert "hossein_medicine_v2.json" in hand and "medicine_health.criteria.json" in hand
+    assert "medicine_v2.json" in hand and "medicine_health.criteria.json" in hand
     # the ask that is still open, and the two closed by delivery
     assert "The question floor is cleared." in hand
     assert "Rubric sign-off." in hand
-    assert "jurisdiction_required" in hand and "hossein_law_v2.json" in hand
-    assert "phase-8b-hossein-medicine.md" in hand
+    assert "jurisdiction_required" in hand and "law_v2.json" in hand
+    assert "phase-8b-medicine.md" in hand
 
 
 def test_an_unknown_topic_stops_before_anything_runs(tmp_path):

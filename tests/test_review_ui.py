@@ -349,7 +349,7 @@ def test_review_flow_in_the_browser(live, page):
 
 
 REPO = Path(__file__).resolve().parents[1]
-MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v2.json"
+MEDICINE = REPO / "eval_tasks" / "fr" / "medicine_v2.json"
 
 
 def upload(pg, label, name, mime, text):
@@ -368,9 +368,9 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     page.goto(base + "/#tab=exam")
     page.wait_for_selector("[data-panel='import']")
     panel = page.locator("[data-panel='import']")
-    upload(page, "questions file", "hossein_medicine_v2.json", "application/json", raw)
+    upload(page, "questions file", "medicine_v2.json", "application/json", raw)
     panel.get_by_label("topic").select_option(topic)
-    panel.get_by_label("source").fill("hossein_v1")
+    panel.get_by_label("source").fill("medicine_v1")
     panel.get_by_label("your name").first.fill("Dr. Hossein")
     before = len(eb.load_bank(root / "exam").get(topic, []))
     panel.get_by_role("button", name="Preview").click()
@@ -392,7 +392,7 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     page.wait_for_selector("[data-import-msg]")
     assert "imported 100" in panel.locator("[data-import-msg]").text_content()
     bank = eb.load_bank(root / "exam")[topic]
-    mine = [r for r in bank if r.get("source") == "hossein_v1"]
+    mine = [r for r in bank if r.get("source") == "medicine_v1"]
     assert len(mine) == 100
     assert all(r["accepted_by"] == "Dr. Hossein" and not r["edited"] for r in mine)
     assert {eb.half_of(r["qid"]) for r in mine} == {"report", "diagnose"}
@@ -593,4 +593,45 @@ def test_the_tabs_are_named_once_and_ordered_by_how_often_they_are_opened(live, 
     assert page.locator("#themeBtn").text_content().startswith("Theme")
     assert ":" not in page.locator("#themeBtn").text_content()
     assert "theme:" in page.locator("#themeBtn").get_attribute("title")
+    assert page.errors == []
+
+
+def test_the_loop_tab_says_what_failed_instead_of_loading_forever(live, page):
+    """The live tree's /api/loop returned 500 and the board said 'Loading…'
+    until someone opened the console. Every other tab already had the 8c
+    error line; this one now does too."""
+    base = live["base"]
+    page.route("**/api/loop", lambda route: route.fulfill(
+        status=500, content_type="application/json", body='{"detail":"boom"}'))
+    page.goto(base + "/#tab=loop")
+    page.wait_for_selector("[data-loop-failed]", timeout=20000)
+    line = page.locator("[data-loop-failed]").text_content()
+    assert "Not reaching the service." in line
+    assert "api/loop — HTTP 500" in line
+    assert "Retrying" in line and "backing off" in line
+    assert "Nothing has loaded yet." in line
+    assert "Loading…" not in page.locator("#view").text_content()
+    # and when the service comes back, the board does
+    page.unroute("**/api/loop")
+    page.wait_for_selector("table.jd[data-loop-table] tbody tr", timeout=60000)
+    assert page.locator("[data-loop-failed]").count() == 0
+    # the 500 we injected is the only thing the console should have to say
+    assert all("500" in e for e in page.errors), page.errors
+
+
+def test_a_topic_on_the_shared_rubric_says_so_on_both_boards(live, page):
+    """Thirteen topics have no rubric of their own, and the page says which
+    file grades them rather than implying each has one."""
+    base = live["base"]
+    page.goto(base + "/#tab=loop")
+    page.wait_for_selector("table.jd[data-loop-table] tbody tr")
+    hist = page.locator("tr[data-loop-row='history']")
+    assert "exam.md" in hist.text_content()
+    assert hist.locator("[data-fallback]").count() == 1
+    assert page.locator("tr[data-loop-row='law'] [data-fallback]").count() == 0
+    page.goto(base + "/#tab=exam")
+    page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
+    row = page.locator("tr[data-rubric-row='history']")
+    assert "exam.md" in row.text_content() and "(fallback)" in row.text_content()
+    assert page.locator("[data-rubric-error]").count() == 0
     assert page.errors == []

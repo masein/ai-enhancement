@@ -65,8 +65,8 @@ read each question, and here the author already has:
 
 ```bash
 python3 scripts/exam_build.py --root $BENCH_ROOT/exam import \
-    eval_tasks/fr/hossein_medicine_v2.json \
-    --topic "medicine & health" --approver "Dr. Hossein" --source hossein_v2
+    eval_tasks/fr/medicine_v2.json \
+    --topic "medicine & health" --approver "Dr. Hossein" --source medicine_v2
 ```
 
 The file is a JSON array of objects with at least a `prompt`. `--approver` is

@@ -98,15 +98,15 @@ where the user is. Each is one run:
 
 ```bash
 python3 scripts/demo_loop.py --topic "medicine & health" \
-    --import eval_tasks/fr/hossein_medicine_v2.json --approver "Dr. Hossein" \
-    --source hossein_v2 \
+    --import eval_tasks/fr/medicine_v2.json --approver "Dr. Hossein" \
+    --source medicine_v2 \
     --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
 ```
 
 ```bash
 python3 scripts/demo_loop.py --topic law \
-    --import eval_tasks/fr/hossein_law_v2.json --approver "Dr. Hossein" \
-    --source hossein_law_v2 \
+    --import eval_tasks/fr/law_v2.json --approver "Dr. Hossein" \
+    --source law_v2 \
     --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
 ```
 

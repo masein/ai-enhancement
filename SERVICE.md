@@ -363,7 +363,7 @@ sudo docker compose exec -T bench python3 scripts/exam_build.py build results/fu
 #   (the Exam tab's "Rebuild the harness tasks" button does the last step too)
 # a bank someone wrote by hand — or the Exam tab's "Import a bank" panel,
 # which runs this same code path, previews it first and records the name
-sudo docker compose exec -T bench python3 scripts/exam_build.py import eval_tasks/fr/hossein_medicine_v2.json \
+sudo docker compose exec -T bench python3 scripts/exam_build.py import eval_tasks/fr/medicine_v2.json \
     --root /home/masein/benchmarks/exam --topic 'medicine & health' --approver 'Dr. Hossein'
 # then per model:
 python clients/bench_client.py --base http://<ip>:8899 submit <model> --suite judged --submitter you

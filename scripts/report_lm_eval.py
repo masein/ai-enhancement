@@ -1150,23 +1150,36 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                               round(bpb["value"] * math.log(2), 6), None,
                               r["n_shot"].get(task), r["n_samples"].get(task)])
 
-    # Two rows identical on every task, item counts included, are one run
-    # submitted twice (HANDOFF §11: two such sat at #1 and #2 for weeks). Both
-    # stay on the board — deleting someone's submission is not the page's call
-    # — but only one is ranked, and the other says which it duplicates. Three
-    # tasks minimum: two models genuinely tying on one task is not a duplicate.
+    # Two rows with identical scores AND item counts on the RANKED tasks are
+    # one run submitted twice (HANDOFF §11: two such sat at #1 and #2 for
+    # weeks, and still did after the first attempt at this). The ranked tasks
+    # are the test because that is what the rank is computed from: a
+    # resubmission that also finished the perplexity tasks its failed first
+    # attempt did not is the same run, and comparing "every task this row
+    # happens to have" made those two look different — which is exactly the
+    # pair on the board. Both rows stay — deleting someone's submission is not
+    # the page's call — but only one is ranked, and the other says which it
+    # duplicates. The KEEPER is the more complete run: same scores, more
+    # tasks finished. Three tasks minimum: two models genuinely tying on one
+    # task is not a duplicate.
     DUP_MIN_TASKS = 3
+    dup_tasks = required or acc_tasks
     by_print: dict[tuple, list[dict]] = {}
     for row in model_rows:
+        mid = row["id"]
+        if any(mid not in cells.get(t, {}) for t in dup_tasks):
+            continue          # a row missing a ranked task is not ranked at all
         fingerprint = tuple(sorted(
-            (t, round(cells[t][row["id"]]["v"], 9), cells[t][row["id"]].get("n"))
-            for t in acc_tasks if row["id"] in cells.get(t, {})))
+            (t, round(cells[t][mid]["v"], 9), cells[t][mid].get("n")) for t in dup_tasks))
         if len(fingerprint) >= DUP_MIN_TASKS:
             by_print.setdefault(fingerprint, []).append(row)
+    n_cells = {r["id"]: sum(1 for t in cells if r["id"] in cells[t]) for r in model_rows}
     for group in by_print.values():
         if len(group) < 2:
             continue
-        group.sort(key=lambda r: (str(r.get("date") or ""), r["id"]))
+        # most tasks finished first; then the earlier run, then the id, so the
+        # answer is the same on every rebuild
+        group.sort(key=lambda r: (-n_cells[r["id"]], str(r.get("date") or ""), r["id"]))
         first = group[0]
         for dup in group[1:]:
             dup["duplicateOf"] = first["id"]
@@ -5671,13 +5684,36 @@ function modelAnswers(m, cats) {
 // that answer. The person should never have to know which tab is next.
 // ---------------------------------------------------------------------------
 
+let _loopInFlight = false;
 async function loadLoop() {
+  if (_loopInFlight) return;      // a 5 s poll must not stack requests
+  _loopInFlight = true;
   try {
     const j = await api('api/loop');
     Object.assign(state.loop, { rows: j.topics, blocked: j.judged_blocked,
-                                built: j.tasks_built || [], floor: j.floor, loaded: true });
+                                built: j.tasks_built || [], floor: j.floor, loaded: true,
+                                failed: '' });
     if ((state.tab === 'loop' || state.topic) && !state.model) render();
-  } catch (e) { /* netFail said so */ }
+  } catch (e) {
+    // netFail already put the banner up and set the backoff; the board itself
+    // must also stop saying "Loading…" forever, which is what it did
+    state.loop.failed = String((e && e.message) || e);
+    if ((state.tab === 'loop' || state.topic) && !state.model) render();
+  } finally { _loopInFlight = false; }
+}
+
+// the same words the network banner uses, inside the card that has no data:
+// what failed, what it said, and that it will try again on its own
+function loopFailure() {
+  if (!state.loop.failed) return '';
+  const secs = Math.max(1, Math.round((NET.nextAt - Date.now()) / 1000));
+  return el('p', { class: 'warn', 'data-loop-failed': '1' },
+    el('b', { text: 'Not reaching the service. ' }),
+    `api/loop — ${state.loop.failed}. `
+    + (NET.nextAt > Date.now() ? `Retrying in ${secs}s` : 'Retrying')
+    + `, backing off to ${NET.MAX / 1000}s. `
+    + (state.loop.rows ? 'The board below is from the last good load.'
+                       : 'Nothing has loaded yet.'));
 }
 
 function loopRowOf(slug) {
@@ -5769,13 +5805,15 @@ function vLoop() {
     state.loop.blocked ? el('p', { class: 'warn', 'data-loop-blocked': '1' },
       el('b', { text: 'No topic can be sat right now. ' }), state.loop.blocked) : '',
     state.loop.msg ? el('p', { class: 'small', 'data-loop-msg': '1', text: state.loop.msg }) : '',
+    loopFailure(),
     el('div', { class: 'frm' }, rvNameInput(),
       el('span', { class: 'small', text: 'recorded on anything you start from here' })),
     el('p', { class: 'small' }, 'New here? ',
       el('a', { href: 'guide#the-loop', target: '_blank', rel: 'noopener',
                 text: 'what the loop is and whose job each step is' }), '.'));
   if (!state.loop.loaded)
-    return [head, el('div', { class: 'card' }, el('p', { class: 'small', text: 'Loading…' }))];
+    return [head, el('div', { class: 'card' }, el('p', { class: 'small',
+      text: state.loop.failed ? 'No board to show yet — see above.' : 'Loading…' }))];
   const table = el('div', { class: 'card' },
     el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-loop-table': '1' },
       el('thead', {}, el('tr', {},
@@ -5785,6 +5823,9 @@ function vLoop() {
         el('th', { text: 'next step' }))),
       el('tbody', {}, rows.map(r => {
         const last = r.last_judged;
+        if (r.error) return el('tr', { 'data-loop-row': r.slug, 'data-row-error': '1' },
+          el('td', {}, r.topic),
+          el('td', { class: 'warn', colspan: '6' }, r.error));
         return el('tr', { 'data-loop-row': r.slug },
           el('td', {}, el('a', { href: '#topic=' + r.slug, text: r.topic,
             onclick: e => { e.preventDefault(); navigate({ topic: r.slug, model: null }); } })),
@@ -5799,7 +5840,8 @@ function vLoop() {
             el('a', { href: '#tab=exam', title: 'the rubric and criteria panel on the Exam tab',
               text: `${r.rubric.name}.md`,
               onclick: e => { e.preventDefault(); navigate({ tab: 'exam', topic: null }); } }),
-            r.rubric.own ? '' : el('span', { class: 'se', text: ' (shared)' }),
+            r.rubric.fallback ? el('span', { class: 'se', 'data-fallback': '1',
+              title: 'this topic has no rubric of its own', text: ' (fallback)' }) : '',
             r.rubric.status === 'draft' ? el('span', { class: 'badge taint', text: 'DRAFT' }) : '',
             el('div', { class: 'se', text: r.rubric.scoring === 'criteria'
               ? `${r.rubric.criteria_count} criteria` : 'single score' })),
@@ -6360,9 +6402,16 @@ function exRubrics() {
       : el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
         el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { text: 'rubric' }),
           el('th', { text: 'criteria' }), el('th', { text: 'files' }))),
-        el('tbody', {}, rows.map(r => el('tr', { 'data-rubric-row': r.topic },
+        el('tbody', {}, rows.map(r => r.error
+          ? el('tr', { 'data-rubric-row': r.topic, 'data-rubric-error': '1' },
+              el('td', {}, r.topic),
+              el('td', { class: 'warn', colspan: '3' }, r.error))
+          : el('tr', { 'data-rubric-row': r.topic },
           el('td', {}, r.topic),
           el('td', {}, `${r.name}.md v${r.version} `,
+            r.fallback ? el('span', { class: 'se', 'data-fallback': '1',
+              title: 'this topic has no rubric of its own; exam.md grades it',
+              text: '(fallback) ' }) : '',
             el('span', { class: 'se', text: r.sha256.slice(0, 10) }),
             r.status === 'draft' ? el('span', { class: 'badge taint', text: 'DRAFT' }) : ''),
           el('td', {}, r.scoring === 'criteria'
@@ -6703,6 +6752,10 @@ if (LIVE) {
     if (state.tab === 'training') loadTraining();
     if (state.tab === 'review') loadReview();
     if (state.tab === 'exam') loadExam();
+    // the Loop board and a topic page: without this nothing ever re-fetched
+    // /api/loop, so a board whose first load failed stayed empty for as long
+    // as the tab was open — which is exactly what happened on the live tree
+    if (state.tab === 'loop' || state.topic) loadLoop();
   }, 5000);
 } else {
   initData(DATA);

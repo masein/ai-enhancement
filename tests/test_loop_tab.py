@@ -231,3 +231,72 @@ def test_the_queue_row_carries_the_judge_batch(svc, monkeypatch):
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
     assert json.loads(row["tasks"]) == [LAW]
     assert row["judge"]["progress"] == "18/40 done" and row["judge"]["n_items"] == 40
+
+
+# ---------------------------------------------------------------------------
+# a topic with no rubric of its own, and a board that survives it
+# ---------------------------------------------------------------------------
+
+def test_a_topic_without_its_own_rubric_is_graded_by_the_shared_one(svc):
+    """Thirteen of fifteen topics have no rubric file of their own. The
+    fallback is rubrics/exam.md, as P4a specified — not rubrics/<slug>.md,
+    which does not exist, and which took both of these endpoints down on the
+    live tree the moment anyone opened them."""
+    client, _, _ = svc
+    rubrics = client.get("/api/exam/rubrics")
+    assert rubrics.status_code == 200
+    rows = {t["topic"]: t for t in rubrics.json()["topics"]}
+    hist = rows["history"]
+    assert hist["name"] == "exam" and hist["fallback"] is True and hist["own"] is False
+    assert hist["error"] == "" and hist["sha256"] and hist["path"].endswith("exam.md")
+    med = rows[TOPIC]
+    assert med["name"] == "medicine_health" and med["fallback"] is False
+    # the loop board says the same thing, for every topic
+    loop = client.get("/api/loop")
+    assert loop.status_code == 200
+    lrows = {t["topic"]: t for t in loop.json()["topics"]}
+    assert len(lrows) == len(eb.TOPICS)
+    assert lrows["history"]["rubric"]["fallback"] is True
+    assert lrows[TOPIC]["rubric"]["fallback"] is False
+    assert all(not t["error"] for t in lrows.values())
+    # and the judge reads the same file the page names
+    assert jd.rubric_for("exam_history").path == hist["path"]
+    assert jd.rubric_for("exam_history").name == "exam"
+
+
+def test_neither_board_dies_when_a_rubric_file_is_missing(svc, tmp_path, monkeypatch):
+    """One unreadable topic is a fact about that topic. Both endpoints
+    iterate every topic, and before this both returned 500 for all fifteen
+    because of one."""
+    client, _, _ = svc
+    empty = tmp_path / "no-rubrics-here"
+    empty.mkdir()
+    monkeypatch.setattr(jd, "RUBRIC_DIR", empty)       # not even exam.md
+    rubrics = client.get("/api/exam/rubrics")
+    assert rubrics.status_code == 200
+    rows = {t["topic"]: t for t in rubrics.json()["topics"]}
+    assert len(rows) == len(eb.TOPICS)
+    hist = rows["history"]
+    assert "no rubric file for exam_history" in hist["error"]
+    assert "history.md" in hist["error"] and "exam.md" in hist["error"]
+    assert hist["sha256"] == ""                        # nothing invented
+    loop = client.get("/api/loop")
+    assert loop.status_code == 200
+    lrows = {t["topic"]: t for t in loop.json()["topics"]}
+    assert len(lrows) == len(eb.TOPICS)
+    bad = lrows["history"]
+    assert "no rubric file for exam_history" in bad["error"]
+    # and the row offers no button that would fail later
+    assert bad["next"]["ok"] is False and bad["next"]["why"] == bad["error"]
+    # every topic is in the same boat here, and all fifteen rows still render
+    assert all(t["error"] for t in lrows.values())
+
+
+def test_the_missing_rubric_is_named_not_guessed(svc, tmp_path, monkeypatch):
+    empty = tmp_path / "empty-rubrics"
+    empty.mkdir()
+    monkeypatch.setattr(jd, "RUBRIC_DIR", empty)
+    with pytest.raises(jd.RubricMissing) as e:
+        jd.rubric_for("exam_history")
+    assert "history.md" in str(e.value) and "exam.md" in str(e.value)
+    assert str(empty) in str(e.value)

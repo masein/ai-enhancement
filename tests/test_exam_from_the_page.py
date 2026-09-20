@@ -17,7 +17,7 @@ import judge as jd
 from conftest import make_service
 
 REPO = Path(__file__).resolve().parents[1]
-MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v2.json"
+MEDICINE = REPO / "eval_tasks" / "fr" / "medicine_v2.json"
 TOPIC = "medicine & health"
 ITEMS = json.loads(MEDICINE.read_text(encoding="utf-8"))
 
@@ -47,7 +47,7 @@ def test_preview_writes_nothing_and_says_what_would_land(svc):
     from service import config
     before = len(eb.load_bank(config.EXAM_DIR).get(TOPIC, []))
     r = post(client, "/api/exam/import/preview", topic=TOPIC, approver="Dr. Hossein",
-             source="hossein_v1", items=ITEMS)
+             source="medicine_v1", items=ITEMS)
     assert r.status_code == 200, r.text
     p = r.json()
     assert p["imported"] == 100 and p["skipped"] == 0 and p["invalid"] == 0
@@ -80,16 +80,16 @@ def test_commit_writes_the_same_records_as_the_cli(svc, tmp_path):
     client, _ = svc
     from service import config
     r = post(client, "/api/exam/import", topic=TOPIC, approver="Dr. Hossein",
-             source="hossein_v1", items=ITEMS)
+             source="medicine_v1", items=ITEMS)
     assert r.status_code == 200, r.text
     assert r.json()["imported"] == 100
     # the fixture's bank already holds drafted questions for this topic; the
     # imported ones are the ones to compare
     from_page = [r for r in eb.load_bank(config.EXAM_DIR)[TOPIC]
-                 if r.get("source") == "hossein_v1"]
+                 if r.get("source") == "medicine_v1"]
     # the same file through the CLI's own entry point, into a fresh bank
     cli_root = tmp_path / "cli-exam"
-    eb.import_bank(cli_root, MEDICINE, TOPIC, "Dr. Hossein", "hossein_v1")
+    eb.import_bank(cli_root, MEDICINE, TOPIC, "Dr. Hossein", "medicine_v1")
     from_cli = eb.load_bank(cli_root)[TOPIC]
     assert len(from_page) == len(from_cli) == 100
     drop = lambda rows: [{k: v for k, v in r.items() if k != "accepted_at"}      # noqa: E731
@@ -263,7 +263,7 @@ def test_a_page_imported_report_half_question_never_leaves_the_bank(svc, tmp_pat
     from service import config, llm, proposals as prop
     client, _ = svc
     assert post(client, "/api/exam/import", topic=TOPIC, approver="Dr. Hossein",
-                source="hossein_v1", items=ITEMS).status_code == 200
+                source="medicine_v1", items=ITEMS).status_code == 200
     rows = eb.load_bank(config.EXAM_DIR)[TOPIC]
     report = [r for r in rows if eb.half_of(r["qid"]) == "report"]
     assert report, "the split put nothing in the report half"

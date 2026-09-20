@@ -99,14 +99,14 @@ docs/
   prompts/phases-4-5.md               brief that built T, 3b, 4, 5, 6 — superseded where phase-7 disagrees
   prompts/phase-7-exam-driven-loop.md brief that turned the loop around — implemented
   prompts/phase-8-local-backend.md    the local vLLM backend + the narrated demo — implemented
-  prompts/phase-8b-hossein-medicine.md Dr. Hossein's medicine bank + per-criterion grading — implemented
+  prompts/phase-8b-medicine.md Dr. Hossein's medicine bank + per-criterion grading — implemented
   prompts/phase-8c-dashboard-and-demo-visibility.md the demo's own page, the page as found, import from it — implemented
   prompts/phase-8d-law-topic.md       the law topic, his criteria schema, generalised flags and breakdowns — implemented
   prompts/phase-8e-loop-ux.md         next: the loop's UX
-  hossein-evaluation-criteria.md      his first 15 criteria, as delivered (superseded by the v2 notes)
-  hossein-medicine-criteria-v2.md     his medicine criteria and the critical-failure rule, as delivered
-  hossein-law-criteria.md             his law dataset and criteria suggestions, as delivered
-  hossein-law-criteria-v2.md          his 23 law criteria and two flags, as delivered
+  medicine-criteria-v1.md      his first 15 criteria, as delivered (superseded by the v2 notes)
+  medicine-criteria-v2.md     his medicine criteria and the critical-failure rule, as delivered
+  law-criteria-v1.md             his law dataset and criteria suggestions, as delivered
+  law-criteria-v2.md          his 23 law criteria and two flags, as delivered
 DIAGNOSE.md              how to read a diagnosis; the finding→action table; the log to keep
 DEMO.md                  the whole loop in one command against the local model — and what it does not prove
 SERVICE.md               how to run the service; Docker; troubleshooting
@@ -329,10 +329,10 @@ length). Example: `eval_tasks/fr/rubrics/reasoning.md`. Its hash goes into every
 
 | What | Where |
 |---|---|
-| 100 consumer health questions with metadata, as delivered | `eval_tasks/fr/hossein_medicine_v2.json` |
-| 100 law questions with metadata, his own difficulty levels and `jurisdiction_required` | `eval_tasks/fr/hossein_law_v2.json` |
+| 100 consumer health questions with metadata, as delivered | `eval_tasks/fr/medicine_v2.json` |
+| 100 law questions with metadata, his own difficulty levels and `jurisdiction_required` | `eval_tasks/fr/law_v2.json` |
 | his criteria files, **verbatim** — the platform's schema is his | `eval_tasks/fr/rubrics/medicine_health.criteria.json`, `law.criteria.json` |
-| his scoring notes for each, as delivered | `docs/hossein-medicine-criteria-v2.md`, `docs/hossein-law-criteria-v2.md` |
+| his scoring notes for each, as delivered | `docs/medicine-criteria-v2.md`, `docs/law-criteria-v2.md` |
 | the 0–4 rubrics derived from them — **DRAFT**, anchors not yet reviewed | `eval_tasks/fr/rubrics/medicine_health.md`, `law.md` |
 
 They import into their topics with him as the approver (`exam_build.py
@@ -357,7 +357,7 @@ these topics a result:**
    before and after are then not comparable. The criteria files themselves
    are his own and need no sign-off.
 2. *(closed)* The law difficulty levels and `jurisdiction_required` arrived
-   in `hossein_law_v2.json`: his own levels on every item (55 of them differ
+   in `law_v2.json`: his own levels on every item (55 of them differ
    from the id-range mapping we had assumed) and the jurisdiction flag on all
    100. The reference line says the flag in words, so the judge reads it, and
    the page tabulates law's means for the 85 against the 15.
@@ -393,7 +393,7 @@ agreement, but κ — the gate — is still on the folded score alone.
 ## 10. Phase 8 — implemented and merged
 
 Briefs: `docs/prompts/phase-8-local-backend.md` (P0–P3) and
-`docs/prompts/phase-8b-hossein-medicine.md` (P4a–P4c). Read **DEMO.md** first:
+`docs/prompts/phase-8b-medicine.md` (P4a–P4c). Read **DEMO.md** first:
 it has the `.env` block, the one command, and what a green run does not prove.
 What landed: the `local` provider (`service/llm.py::LocalOpenAI`), the
 provisional stamp on every artefact a local identity makes,
@@ -480,7 +480,7 @@ stamps and counts for nothing.
 | `SERVICE.md`, `API.md`, `FRIENDS.md`, `BENCHMARK-RUN.md` | running the service; the API; the submitter guide; the manual CLI path |
 | `docs/design-diagnose-and-generate.md` | the original design and its argument for the split |
 | `docs/prompts/*.md` | the implementation briefs, in order; all merged as of phase 8b |
-| `docs/hossein-evaluation-criteria.md` | Dr. Hossein's 15 criteria and the critical-failure rule, as delivered — the source `rubrics/medicine_health*.` derive from |
+| `docs/medicine-criteria-v1.md` | Dr. Hossein's 15 criteria and the critical-failure rule, as delivered — the source `rubrics/medicine_health*.` derive from |
 | `llm-api-budget.xlsx` (with Omar) | per-cycle cost model; prices verified 2026-09-18; Steps and Glossary sheets define every term |
 | `eval_pipeline_fasttrack.html` (with Omar) | the team deck: loop, the one rule, rollout, curation math, costs, provider rule |
 

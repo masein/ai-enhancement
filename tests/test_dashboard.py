@@ -476,7 +476,7 @@ def demo_report(tmp_path_factory) -> Path:
     repo = Path(__file__).resolve().parents[1]
     r = subprocess.run(
         [sys.executable, str(repo / "scripts" / "demo_loop.py"), "--topic", "medicine & health",
-         "--import", str(repo / "eval_tasks" / "fr" / "hossein_medicine_v2.json"),
+         "--import", str(repo / "eval_tasks" / "fr" / "medicine_v2.json"),
          "--approver", "Dr. Hossein", "--sit", "stub", "--count", "4", "--keep"],
         capture_output=True, text=True, timeout=300, env=env, cwd=repo)
     assert r.returncode == 0, r.stdout + r.stderr

@@ -17,11 +17,11 @@ Files in this commit:
 
 | File | What |
 |---|---|
-| `eval_tasks/fr/hossein_medicine_v2.json` | 100 medicine questions. Ids 1–50 are byte-identical prompts to v1 (same qids, same split); 51–100 new; every item has `difficulty` from the author. **Replaces** `hossein_medicine_v1.json` — delete v1 (git keeps it) and point `DEMO.md` and any test fixture at v2. |
-| `eval_tasks/fr/hossein_law_v1.json` | unchanged from the earlier 8d: his 100 law questions plus `difficulty` from his id-range table (1–20 → 1, 21–45 → 2, 46–65 → 3, 66–85 → 4, 86–100 → 5), pending his confirmation |
+| `eval_tasks/fr/medicine_v2.json` | 100 medicine questions. Ids 1–50 are byte-identical prompts to v1 (same qids, same split); 51–100 new; every item has `difficulty` from the author. **Replaces** `medicine_v1.json` — delete v1 (git keeps it) and point `DEMO.md` and any test fixture at v2. |
+| `eval_tasks/fr/law_v1.json` | unchanged from the earlier 8d: his 100 law questions plus `difficulty` from his id-range table (1–20 → 1, 21–45 → 2, 46–65 → 3, 66–85 → 4, 86–100 → 5), pending his confirmation |
 | `eval_tasks/fr/rubrics/medicine_health.criteria.json` | **the author's file, verbatim** — replaces P4b's draft. 15 criteria, no conditional ones (medication safety is folded into safety and accuracy), one flag |
 | `eval_tasks/fr/rubrics/law.criteria.json` | **the author's file, verbatim** — 23 criteria, no conditional ones, two flags |
-| `docs/hossein-medicine-criteria-v2.md`, `docs/hossein-law-criteria-v2.md` | his scoring notes for each, as delivered |
+| `docs/medicine-criteria-v2.md`, `docs/law-criteria-v2.md` | his scoring notes for each, as delivered |
 | `eval_tasks/fr/rubrics/medicine_health.md`, `law.md` | the prose rubrics (0–4 anchors and flag rules), aligned to his v2 ids; still DRAFT — he has not reviewed the anchors |
 
 **Read first:** `scripts/judge.py` (the P4b criteria path: loader, prompt,
@@ -117,10 +117,10 @@ recomputed in the test.
 ## 5. Import and run
 
 ```
-python scripts/exam_build.py import eval_tasks/fr/hossein_medicine_v2.json \
-    --topic "medicine & health" --approver "Dr. Hossein" --source hossein_v2 --root $BENCH_ROOT/exam
-python scripts/exam_build.py import eval_tasks/fr/hossein_law_v1.json \
-    --topic law --approver "Dr. Hossein" --source hossein_v1 --root $BENCH_ROOT/exam
+python scripts/exam_build.py import eval_tasks/fr/medicine_v2.json \
+    --topic "medicine & health" --approver "Dr. Hossein" --source medicine_v2 --root $BENCH_ROOT/exam
+python scripts/exam_build.py import eval_tasks/fr/law_v1.json \
+    --topic law --approver "Dr. Hossein" --source medicine_v1 --root $BENCH_ROOT/exam
 ```
 
 Medicine v2 on a bank that already holds v1: 50 skipped, 50 imported —

@@ -14,8 +14,8 @@ Files, all in this commit, all verbatim from him except the rubric:
 
 | File | What |
 |---|---|
-| `eval_tasks/fr/hossein_medicine_v1.json` | the 50 questions, his JSON as delivered, unchanged |
-| `docs/hossein-evaluation-criteria.md` | his 15 criteria + critical failure rule, as delivered — the source the rubric derives from |
+| `eval_tasks/fr/medicine_v1.json` | the 50 questions, his JSON as delivered, unchanged |
+| `docs/medicine-criteria-v1.md` | his 15 criteria + critical failure rule, as delivered — the source the rubric derives from |
 | `eval_tasks/fr/rubrics/medicine_health.md` | a **draft** 0–4 rubric derived from the criteria, marked DRAFT in its heading until he signs it off — the prose the judge reads |
 | `eval_tasks/fr/rubrics/medicine_health.criteria.json` | the same criteria, machine-readable: ids, labels, definitions, weights, the conditional one, and the fold rule — what P4b grades against |
 
@@ -54,8 +54,8 @@ Do P4a as its own PR, then P4b, then P4c.
 ### `exam_build.py import`
 
 ```
-python scripts/exam_build.py import eval_tasks/fr/hossein_medicine_v1.json \
-    --topic "medicine & health" --approver "Dr. Hossein" --source hossein_v1 \
+python scripts/exam_build.py import eval_tasks/fr/medicine_v1.json \
+    --topic "medicine & health" --approver "Dr. Hossein" --source medicine_v1 \
     --root $BENCH_ROOT/exam
 ```
 
@@ -299,7 +299,7 @@ calibrate export/import round-trip with criteria columns.
 
   ```
   python scripts/demo_loop.py --topic "medicine & health" \
-      --import eval_tasks/fr/hossein_medicine_v1.json --approver "Dr. Hossein" \
+      --import eval_tasks/fr/medicine_v1.json --approver "Dr. Hossein" \
       --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
   ```
   and, in the "what this does not test" section, two more lines: the

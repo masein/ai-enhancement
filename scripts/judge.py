@@ -129,6 +129,13 @@ def family(model_id: str) -> str:
     return re.split(r"[^a-z0-9]", model_id.split("/")[-1].lower())[0]
 
 
+class RubricMissing(FileNotFoundError):
+    """No rubric file for a task — not even the shared one. Raised rather
+    than guessed at: a topic graded by a file nobody can name is not graded.
+    Every page that loops over topics catches this per topic, so one missing
+    file cannot take a whole board down."""
+
+
 class Rubric(NamedTuple):
     """(text, sha256, version, status, criteria, criteria_sha256) — indexable
     as the 3-tuple it used to be. `status` is "draft" while the heading says
@@ -143,6 +150,11 @@ class Rubric(NamedTuple):
     status: str = ""
     criteria: dict | None = None
     criteria_sha256: str = ""
+    # which file was read, so a page can say so instead of implying that
+    # every topic has a rubric of its own
+    name: str = ""
+    path: str = ""
+    fallback: bool = False
 
 
 def rubric_dirs() -> list[Path]:
@@ -162,6 +174,9 @@ def rubric_path(name: str, suffix: str = ".md") -> Path | None:
     return None
 
 
+SHARED_RUBRIC = "exam"
+
+
 def rubric_name(task: str) -> str:
     """Which rubric grades this task: the topic's own when one exists
     (rubrics/<slug>.md, the slug exam_build built the task name from), else
@@ -170,26 +185,41 @@ def rubric_name(task: str) -> str:
     if task == CONTROL_TASK:
         return "factual_accuracy"
     slug = _exam.task_slug(task)
-    return slug if rubric_path(slug) else "exam"
+    return slug if rubric_path(slug) else SHARED_RUBRIC
 
 
 def rubric_for(task: str) -> Rubric:
+    """The instrument that grades this task. A topic with no file of its own
+    is graded by the SHARED rubric (rubrics/exam.md), which is what P4a
+    specified and what AUTHORING.md says — never by rubrics/<slug>.md, which
+    for thirteen of fifteen topics does not exist. The returned Rubric names
+    the file that was actually read, so a page can say "exam.md (fallback)"
+    rather than implying every topic has its own."""
     name = rubric_name(task)
-    text = (rubric_path(name) or RUBRIC_DIR / f"{name}.md").read_text(encoding="utf-8")
+    p = rubric_path(name)
+    if p is None and name != SHARED_RUBRIC:
+        name, p = SHARED_RUBRIC, rubric_path(SHARED_RUBRIC)
+    if p is None:
+        own = _exam.task_slug(task) if task != CONTROL_TASK else name
+        raise RubricMissing(
+            f"no rubric file for {task}: neither {own}.md nor the shared "
+            f"{SHARED_RUBRIC}.md is in {' or '.join(str(d) for d in rubric_dirs())}")
+    text = p.read_text(encoding="utf-8")
     # "(version 1)" and "(version 1, DRAFT — awaiting sign-off)" both parse:
     # the status rides in the same brackets and must not hide the version
     m = re.search(r"\(version (\d+)", text)
     head = text.split("\n", 1)[0]
     spec = spec_sha = None
-    p = rubric_path(name, ".criteria.json")
-    if p:
-        raw = p.read_bytes()
+    cp = rubric_path(name, ".criteria.json")
+    if cp:
+        raw = cp.read_bytes()
         spec = json.loads(raw.decode("utf-8"))
-        check_effects(spec, p)
+        check_effects(spec, cp)
         spec_sha = hashlib.sha256(raw).hexdigest()
     return Rubric(text, hashlib.sha256(text.encode("utf-8")).hexdigest(),
                   (m.group(1) if m else "?"), "draft" if "DRAFT" in head else "",
-                  spec, spec_sha or "")
+                  spec, spec_sha or "", name, str(p),
+                  name == SHARED_RUBRIC and task != CONTROL_TASK)
 
 
 # How the 0-4 is folded is the platform's rule, not the file's: the weighted

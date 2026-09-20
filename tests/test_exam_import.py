@@ -18,7 +18,7 @@ import judge as jd
 from service import llm
 
 REPO = Path(__file__).resolve().parents[1]
-MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v2.json"
+MEDICINE = REPO / "eval_tasks" / "fr" / "medicine_v2.json"
 TOPIC = "medicine & health"
 TASK = "exam_medicine_health"
 
@@ -26,7 +26,7 @@ TASK = "exam_medicine_health"
 @pytest.fixture
 def bank(tmp_path) -> tuple[Path, dict]:
     root = tmp_path / "exam"
-    r = eb.import_bank(root, MEDICINE, TOPIC, "Dr. Hossein", "hossein_v1")
+    r = eb.import_bank(root, MEDICINE, TOPIC, "Dr. Hossein", "medicine_v1")
     return root, r
 
 
@@ -42,7 +42,7 @@ def test_the_delivered_file_is_what_the_import_expects():
     assert {it["acuity"] for it in items} == {"emergency", "urgent", "moderate", "mild", "routine"}
     # v2 gave every item the author's own difficulty level
     assert all(isinstance(it.get("difficulty"), int) for it in items)
-    law = json.loads((REPO / "eval_tasks" / "fr" / "hossein_law_v2.json").read_text("utf-8"))
+    law = json.loads((REPO / "eval_tasks" / "fr" / "law_v2.json").read_text("utf-8"))
     assert len(law) == 100 and all(it.get("prompt") and it.get("difficulty") for it in law)
     assert sorted({it["difficulty"] for it in law}) == [1, 2, 3, 4, 5]
 
@@ -55,7 +55,7 @@ def test_import_round_trips_the_whole_file_and_is_idempotent(bank):
     rows = eb.load_bank(root)[TOPIC]
     assert len(rows) == 100
     one = next(x for x in rows if x["meta"]["id"] == 1)
-    assert one["source"] == "hossein_v1" and one["accepted_by"] == "Dr. Hossein"
+    assert one["source"] == "medicine_v1" and one["accepted_by"] == "Dr. Hossein"
     assert one["edited"] is False and one["notes"] == "" and one["accepted_at"] > 0
     assert one["qid"] == eb.qid_of(one["prompt"]) and one["topic"] == TOPIC
     # his metadata is kept whole, under meta
@@ -63,7 +63,7 @@ def test_import_round_trips_the_whole_file_and_is_idempotent(bank):
                            "age_group": "5-12", "sex": "male", "acuity": "moderate",
                            "domain": "respiratory_infectious", "style": "conversational",
                            "difficulty": 2}
-    again = eb.import_bank(root, MEDICINE, TOPIC, "Dr. Hossein", "hossein_v1")
+    again = eb.import_bank(root, MEDICINE, TOPIC, "Dr. Hossein", "medicine_v1")
     assert (again["imported"], again["skipped"]) == (0, 100)
     assert len(eb.load_bank(root)[TOPIC]) == 100
 
@@ -77,16 +77,16 @@ def test_a_second_delivery_adds_only_what_is_new(tmp_path):
     items = json.loads(MEDICINE.read_text(encoding="utf-8"))
     first, second = tmp_path / "v1.json", MEDICINE
     first.write_text(json.dumps(items[:50]), encoding="utf-8")
-    r1 = eb.import_bank(root, first, TOPIC, "Dr. Hossein", "hossein_v1")
+    r1 = eb.import_bank(root, first, TOPIC, "Dr. Hossein", "medicine_v1")
     assert (r1["imported"], r1["skipped"]) == (50, 0)
-    r2 = eb.import_bank(root, second, TOPIC, "Dr. Hossein", "hossein_v2")
+    r2 = eb.import_bank(root, second, TOPIC, "Dr. Hossein", "medicine_v2")
     assert (r2["imported"], r2["skipped"]) == (50, 50)
     rows = eb.load_bank(root)[TOPIC]
     assert len(rows) == 100
     # the first fifty keep the source they arrived under, and their qids and
     # halves did not move: the published score stays comparable across the
     # delivery, which is the whole point of hashing the prompt
-    kept = [x for x in rows if x["source"] == "hossein_v1"]
+    kept = [x for x in rows if x["source"] == "medicine_v1"]
     assert len(kept) == 50
     assert {x["qid"] for x in kept} == {eb.qid_of(it["prompt"]) for it in items[:50]}
 
@@ -142,7 +142,7 @@ def test_the_import_refuses_what_it_should(tmp_path):
 def test_the_cli_imports_and_says_what_it_did(tmp_path):
     r = subprocess.run([sys.executable, str(REPO / "scripts" / "exam_build.py"),
                         "--root", str(tmp_path / "exam"), "import", str(MEDICINE),
-                        "--topic", TOPIC, "--approver", "Dr. Hossein", "--source", "hossein_v1"],
+                        "--topic", TOPIC, "--approver", "Dr. Hossein", "--source", "medicine_v1"],
                        capture_output=True, text=True, timeout=120, cwd=REPO)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "imported 100, skipped 0" in r.stdout and "report" in r.stdout
@@ -241,8 +241,8 @@ def test_both_delivered_banks_keep_their_report_half_out_of_every_request(bank, 
     sent, no report-half question from either bank appears."""
     from service import config, proposals as prop
     root, _ = bank
-    law_file = REPO / "eval_tasks" / "fr" / "hossein_law_v2.json"
-    eb.import_bank(root, law_file, "law", "Dr. Hossein", "hossein_v1")
+    law_file = REPO / "eval_tasks" / "fr" / "law_v2.json"
+    eb.import_bank(root, law_file, "law", "Dr. Hossein", "medicine_v1")
     monkeypatch.setattr(config, "EXAM_DIR", root)
     monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)
     fake = llm.FakeBatches("fake-exam", tmp_path)

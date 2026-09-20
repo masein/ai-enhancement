@@ -761,15 +761,26 @@ def exam_import(body: ImportIn, x_token: str = Header(default="")):
 
 
 def _rubric_row(topic: str) -> dict:
+    """One topic's instrument, or — when its files cannot be read — a row
+    that says so. A board that shows fifteen topics must not disappear
+    because one of them has a missing or unreadable file; the endpoints that
+    render it are how a person finds out which one."""
     import judge as _judge
     task = exam_build.topic_task(topic)
-    r = _judge.rubric_for(task)
-    name = _judge.rubric_name(task)
-    md = _judge.rubric_path(name)
-    spec = _judge.rubric_path(name, ".criteria.json")
-    return {"topic": topic, "task": task, "name": name, "own": name != "exam",
+    base = {"topic": topic, "task": task, "name": "", "own": False, "fallback": False,
+            "sha256": "", "version": "", "status": "", "path": "", "scoring": "single",
+            "criteria_path": "", "criteria_sha256": "", "criteria_count": 0, "error": ""}
+    try:
+        r = _judge.rubric_for(task)
+    except (_judge.RubricMissing, OSError, ValueError) as e:
+        # ValueError covers a criteria file that is not JSON, and
+        # CriteriaError (an effect this judge cannot apply) is one
+        return {**base, "name": _judge.rubric_name(task), "error": str(e)}
+    spec = _judge.rubric_path(r.name, ".criteria.json")
+    return {**base, "name": r.name, "own": not r.fallback and r.name != "factual_accuracy",
+            "fallback": r.fallback,
             "sha256": r.sha256, "version": r.version, "status": r.status,
-            "path": str(md) if md else "", "scoring": "criteria" if r.criteria else "single",
+            "path": r.path, "scoring": "criteria" if r.criteria else "single",
             "criteria_path": str(spec) if spec else "",
             "criteria_sha256": r.criteria_sha256,
             "criteria_version": (r.criteria or {}).get("version"),
@@ -993,7 +1004,12 @@ def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
     ds = [d for d in sets if d.get("proposal_id") in {p["id"] for p in mine}]
     ready = [d for d in ds if d.get("status") == "ready"]
     gate = (last or {}).get("propose") or {}
-    if not bank.get("accepted"):
+    if rub.get("error"):
+        # a topic whose instrument cannot be read cannot be sat, judged or
+        # proposed from; the row says which file is missing rather than
+        # offering a button that would fail later
+        step, ok, why = "read", False, rub["error"]
+    elif not bank.get("accepted"):
         step, ok, why = "import", True, ""
     elif not last:
         step, ok, why = "sit", not blocked, blocked
@@ -1008,12 +1024,14 @@ def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
         step, ok, why = "read", True, ""
     return {
         "topic": topic, "task": task, "slug": exam_build.task_slug(task),
+        "error": rub.get("error", ""),
         "bank": {"accepted": bank.get("accepted", 0), "report": bank.get("report", 0),
                  "diagnose": bank.get("diagnose", 0), "awaiting": bank.get("pending", 0),
                  "floor": report.PROPOSE_MIN_N,
                  "under_floor": bank.get("report", 0) < report.PROPOSE_MIN_N},
-        "rubric": {k: rub[k] for k in ("name", "own", "version", "status", "scoring",
-                                       "sha256", "criteria_count", "criteria_sha256")},
+        "rubric": {k: rub[k] for k in ("name", "own", "fallback", "version", "status",
+                                       "scoring", "sha256", "criteria_count",
+                                       "criteria_sha256")},
         "last_judged": last,
         # the same object the propose endpoint enforces — the page never
         # decides for itself whether a topic may be proposed from
@@ -1029,6 +1047,27 @@ def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
     }
 
 
+def _loop_row_safe(topic: str, payload: dict, props: list[dict], sets: list[dict],
+                   blocked: str) -> dict:
+    """A row that cannot take the board down with it. One topic's files being
+    unreadable is a fact about that topic, and the other fourteen rows are
+    still the answer to 'what do I do next'."""
+    try:
+        return _loop_row(topic, payload, props, sets, blocked)
+    except Exception as e:                                  # noqa: BLE001
+        why = f"this topic could not be read: {e}"
+        return {"topic": topic, "task": exam_build.topic_task(topic),
+                "slug": exam_build.task_slug(exam_build.topic_task(topic)),
+                "bank": {"accepted": 0, "report": 0, "diagnose": 0, "awaiting": 0,
+                         "floor": report.PROPOSE_MIN_N, "under_floor": False},
+                "rubric": {"name": "", "own": False, "version": "", "status": "",
+                           "scoring": "single", "sha256": "", "criteria_count": 0,
+                           "criteria_sha256": ""},
+                "last_judged": None, "propose": None, "proposal": None, "datasets": [],
+                "error": why,
+                "next": {"step": "read", "label": "Read the results", "ok": False, "why": why}}
+
+
 @app.get("/api/loop")
 def loop_board():
     """One row per topic: the bank, the rubric, where the last judged run
@@ -1037,7 +1076,7 @@ def loop_board():
     props = db.proposal_list(limit=500)
     sets = db.dataset_list(limit=500)
     blocked = config.judged_blocked()
-    return {"topics": [_loop_row(t, payload, props, sets, blocked)
+    return {"topics": [_loop_row_safe(t, payload, props, sets, blocked)
                        for t in exam_build.TOPICS],
             "judged_blocked": blocked, "tasks_built": config.judged_tasks(),
             "floor": report.PROPOSE_MIN_N,
@@ -1409,7 +1448,7 @@ max-width:46em;padding:0 16px"><h1>No demo run yet</h1>
 numbers, none of them on the leaderboard. Run one on the box:</p>
 <pre style="background:#f4f4f5;padding:12px;border-radius:6px;overflow:auto">cd $BENCH_ROOT &amp;&amp; python3 aienh/scripts/demo_loop.py \\
     --topic "medicine &amp; health" \\
-    --import aienh/eval_tasks/fr/hossein_medicine_v2.json \\
+    --import aienh/eval_tasks/fr/medicine_v2.json \\
     --approver "Dr. Hossein" --model HuggingFaceTB/SmolLM2-360M-Instruct</pre>
 <p>It prints this URL when it finishes. See <code>DEMO.md</code> for the rest, including
 what a green run does not prove.</p>

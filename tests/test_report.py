@@ -256,3 +256,64 @@ def test_the_pages_javascript_parses(tmp_path):
     js.write_text(report.JS, encoding="utf-8")
     r = subprocess.run([node, "--check", str(js)], capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
+
+
+def test_a_resubmission_that_finished_more_tasks_is_the_one_that_ranks(tree, tmp_path):
+    """The pair on the live board: a run that failed on a perplexity task and
+    its resubmission, byte-identical on all seven ranked tasks. Comparing
+    'every task this row happens to have' made them look different, so both
+    sat at #1 and #2. The ranked tasks are the test, and the more complete
+    run is the one that keeps the rank."""
+    import shutil
+    out = tmp_path / "results" / "full"
+    shutil.copytree(tree["out_dir"], out)
+    src, twin = out / "fx__good-750m", out / "fx__good-750m-v2"
+    shutil.copytree(src, twin)
+    for f in twin.rglob("results*.json"):
+        blob = json.loads(f.read_text())
+        blob["config"]["model_args"] = blob["config"]["model_args"].replace(
+            "fx/good-750m", "fx/good-750m-v2")
+        f.write_text(json.dumps(blob))
+    # only the resubmission finished the perplexity task; the first attempt
+    # died on it, which is the whole difference between the two rows
+    ppl = twin / "wikitext_0shot"
+    ppl.mkdir(parents=True)
+    sample = next(iter((twin / "mmlu_5shot").rglob("results*.json")))
+    blob = json.loads(sample.read_text())
+    blob["results"] = {"wikitext": {"alias": "wikitext", "word_perplexity,none": 12.5,
+                                    "bits_per_byte,none": 0.9}}
+    blob["n-samples"] = {"wikitext": {"original": 100, "effective": 100}}
+    blob["configs"] = {"wikitext": {"num_fewshot": 0, "metric_list": [
+        {"metric": "word_perplexity", "higher_is_better": False}]}}
+    blob["higher_is_better"] = {"wikitext": {"word_perplexity": False}}
+    (ppl / "results_2026-09-20T00-00-00.json").write_text(json.dumps(blob))
+    p = report.build_payload(report.merge_runs(report.load_results(out)), "t", source="")
+    rows = {m["id"]: m for m in p["models"]}
+    a, b = rows["fx/good-750m"], rows["fx/good-750m-v2"]
+    assert "wikitext" in p["pplTasks"] and "wikitext" not in p["required"]
+    # identical on every ranked task, so: one run, one rank
+    assert a["duplicateOf"] == b["id"] and a["duplicateOfName"] == b["name"]
+    assert not b.get("duplicateOf")                 # the complete run keeps it
+    assert a["avg"] == b["avg"]                     # shown, not deleted
+    assert any("score identically to another row" in w for w in p["warnings"])
+
+
+def test_two_rows_that_differ_on_a_ranked_task_are_not_a_duplicate(tree, tmp_path):
+    import shutil
+    out = tmp_path / "results" / "full"
+    shutil.copytree(tree["out_dir"], out)
+    src, twin = out / "fx__good-750m", out / "fx__good-750m-v3"
+    shutil.copytree(src, twin)
+    for f in twin.rglob("results*.json"):
+        blob = json.loads(f.read_text())
+        blob["config"]["model_args"] = blob["config"]["model_args"].replace(
+            "fx/good-750m", "fx/good-750m-v3")
+        if "piqa" in blob.get("results", {}):       # one ranked task moves
+            for k in ("acc,none", "acc_norm,none"):
+                if k in blob["results"]["piqa"]:
+                    blob["results"]["piqa"][k] = blob["results"]["piqa"][k] - 0.05
+        f.write_text(json.dumps(blob))
+    p = report.build_payload(report.merge_runs(report.load_results(out)), "t", source="")
+    rows = {m["id"]: m for m in p["models"]}
+    assert not rows["fx/good-750m"].get("duplicateOf")
+    assert not rows["fx/good-750m-v3"].get("duplicateOf")

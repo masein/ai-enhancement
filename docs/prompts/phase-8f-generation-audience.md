@@ -67,19 +67,19 @@ Ollama loaded. The truncation counter and the demo's note stay.
 
 ## Also in this PR: the author's revised law bank
 
-Dr. Hossein returned `eval_tasks/fr/hossein_law_v2.json`: the same 100
+Dr. Hossein returned `eval_tasks/fr/law_v2.json`: the same 100
 prompts and metadata as v1, plus **his own per-question `difficulty`**
 (20 / 33 / 31 / 13 / 3 across levels 1–5; 55 items differ from the
 id-range mapping v1 carried) and **`jurisdiction_required`** on every item
 (85 true, 15 false). Prompts are byte-identical, so qids and the split do
 not move.
 
-- Delete `hossein_law_v1.json` (git keeps it); point `DEMO.md`, the
+- Delete `law_v1.json` (git keeps it); point `DEMO.md`, the
   demo's printed live-import line and any fixture at v2.
 - On a bank that already holds v1, `import` of v2 must **update the
   `meta` of the 100 existing records** (same qid) rather than skip them —
   the prompt is the identity, the metadata is the author's to revise.
-  Record `source: hossein_law_v2` and the new `accepted_at`; keep
+  Record `source: law_v2` and the new `accepted_at`; keep
   `accepted_by`. Print "100 updated, 0 imported, 0 skipped". Add the
   test. (v1 → v2 medicine was 50 skipped + 50 new because nothing on the
   existing 50 changed; this is the other case.)
