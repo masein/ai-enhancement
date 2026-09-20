@@ -330,7 +330,7 @@ length). Example: `eval_tasks/fr/rubrics/reasoning.md`. Its hash goes into every
 | What | Where |
 |---|---|
 | 100 consumer health questions with metadata, as delivered | `eval_tasks/fr/hossein_medicine_v2.json` |
-| 100 law questions with metadata and his difficulty levels | `eval_tasks/fr/hossein_law_v1.json` |
+| 100 law questions with metadata, his own difficulty levels and `jurisdiction_required` | `eval_tasks/fr/hossein_law_v2.json` |
 | his criteria files, **verbatim** — the platform's schema is his | `eval_tasks/fr/rubrics/medicine_health.criteria.json`, `law.criteria.json` |
 | his scoring notes for each, as delivered | `docs/hossein-medicine-criteria-v2.md`, `docs/hossein-law-criteria-v2.md` |
 | the 0–4 rubrics derived from them — **DRAFT**, anchors not yet reviewed | `eval_tasks/fr/rubrics/medicine_health.md`, `law.md` |
@@ -347,8 +347,8 @@ medicine or law is special-cased in the code.
 report-half each, over the 30 a topic needs before anything may be proposed
 from it. The demo says so rather than asking for more.
 
-**Three things are open with him, and the first two are blockers for calling
-any score on these topics a result:**
+**What is open with him, and the first is a blocker for calling any score on
+these topics a result:**
 
 1. **Rubric sign-off.** Both prose rubrics say DRAFT: their 0–4 anchors were
    derived from his criteria and he has not reviewed them. Until he removes
@@ -356,14 +356,11 @@ any score on these topics a result:**
    Removing it changes the rubric's hash, which is correct — scores from
    before and after are then not comparable. The criteria files themselves
    are his own and need no sign-off.
-2. **The law difficulty levels.** Every law item carries a `difficulty`
-   assigned from the id-range table in his §5 note (1–20 → 1, 21–45 → 2,
-   46–65 → 3, 66–85 → 4, 86–100 → 5). It matches that table exactly, but
-   the levels are ours to confirm with him, or for him to resend the way he
-   sent medicine's.
-3. **`jurisdiction_required` per law item.** His notes say the criteria read
-   it "where present", and it is present on no item yet. Nothing breaks
-   without it — a field the items do not carry is simply not tabulated.
+2. *(closed)* The law difficulty levels and `jurisdiction_required` arrived
+   in `hossein_law_v2.json`: his own levels on every item (55 of them differ
+   from the id-range mapping we had assumed) and the jurisdiction flag on all
+   100. The reference line says the flag in words, so the judge reads it, and
+   the page tabulates law's means for the 85 against the 15.
 
 Not yet done and worth planning with him: per-criterion calibration. The
 export writes a column per criterion and the flag, and the import reports the

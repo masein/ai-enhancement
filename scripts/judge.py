@@ -198,7 +198,10 @@ def rubric_for(task: str) -> Rubric:
 FOLD_METHOD = "weighted_mean_x4_round_half_up"
 ZERO_SCORE = "zero_score"
 CAP_EFFECT = re.compile(r"cap_at_([0-4])_of_4$")
-BREAKDOWN_FIELDS = ("acuity", "difficulty", "intent")
+# tabulated by default when a topic's items carry them. jurisdiction_required
+# is law's: the table of the 85 that need one against the 15 that do not is
+# the direct test of whether the model asks where the user is
+BREAKDOWN_FIELDS = ("acuity", "difficulty", "jurisdiction_required", "intent")
 # most severe first, so a table reads down from the questions that matter
 ACUITY_ORDER = ("emergency", "urgent", "moderate", "mild", "routine")
 
@@ -840,12 +843,15 @@ def _breakdown_fields(items: list[dict], spec: dict) -> list[str]:
 
 def _value_order(field: str, values) -> list[str]:
     """The order a person reads the table in: acuity from the questions that
-    can kill someone down to the ones that cannot, difficulty 1 to 5, and
-    anything else alphabetically."""
+    can kill someone down to the ones that cannot, difficulty 1 to 5, a
+    boolean field with the true case first, and anything else
+    alphabetically."""
     vals = sorted(values)
     if field == "acuity":
         known = [v for v in ACUITY_ORDER if v in vals]
         return known + [v for v in vals if v not in known]
+    if set(vals) <= {"True", "False"}:
+        return [v for v in ("True", "False") if v in vals]
     try:
         return sorted(vals, key=lambda v: (float(v), v))
     except (TypeError, ValueError):

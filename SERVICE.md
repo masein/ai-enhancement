@@ -109,7 +109,10 @@ re-queued automatically and per-task resume repeats only the interrupted task.
 | `JUDGED_TASKS_DIR` | `$EXAM_DIR/tasks` | where `scripts/exam_build.py build` put the exam tasks |
 | `LOCAL_BASE_URL` | `http://localhost:8000/v1` | the `local` provider's OpenAI-compatible server (vLLM). Loopback only on the deploy box |
 | `LOCAL_CONCURRENCY` | 2 | `local` requests in flight at once — the card is shared |
-| `LOCAL_MAX_TOKENS` | 1024 | a cap on every `local` reply, whatever the caller asked for, for the same reason |
+| `LOCAL_MAX_TOKENS_LLM` | 1536 | the cap on a `local` generation or proposal reply. A ~600-word training document is ~1,400 tokens and the request already asks for one, so there is no smaller request to make; two of these in flight is well inside what the shared card has left |
+| `LOCAL_MAX_TOKENS_JUDGE` | 1024 | the cap on a `local` judge reply — a 23-criterion JSON answer is about 350 tokens |
+| `LOCAL_MAX_TOKENS_EXAM` | 1024 | the cap on a `local` exam-writer reply |
+| `LOCAL_MAX_TOKENS` | *(unset)* | the fallback for any role above that has no knob of its own. A truncated reply names the knob that capped it |
 | `LOCAL_TIMEOUT_S` | 180 | per `local` request; a timeout is retried like a 5xx |
 
 ## The LLM key
@@ -181,7 +184,7 @@ run against it, so the loop can be driven end to end today.
   malformed request or an unknown model id does not fix itself. The batch is
   `failed` only when every request failed.
 - **One item per request.** Asked for several, a small model answers in
-  shapes nothing can use: two documents at once overrun `LOCAL_MAX_TOKENS`
+  shapes nothing can use: two documents at once overrun `LOCAL_MAX_TOKENS_LLM`
   and the JSON is cut off, and four exam questions come back as one question,
   or as a list of question texts with no reference answers. So a `local`
   generator is asked for one document and a `local` exam writer for one

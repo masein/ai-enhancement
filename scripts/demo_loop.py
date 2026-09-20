@@ -655,7 +655,8 @@ def propose(a, ctx) -> str:
         for c in crit["weakest_criteria"]:
             say(f"  {c['label']}: {c['mean']} over {c['n']} answers")
     req = prop.proposal_request(pid, a.model, task, topic, items, counts,
-                                jd.rubric_for(task)[0], crit)
+                                jd.rubric_for(task)[0], crit,
+                                audience=prop.audience_for(topic, task))
     bid = backend.submit([req])
     db.batch_add(bid, "proposal", pid, 1, backend.name, backend.model)
     db.proposal_update(pid, batch_id=bid, prompt_sha=llm.prompt_sha(req.system, req.user),
@@ -709,18 +710,25 @@ def generate(a, ctx) -> str:
     say(f"{a.count} documents, {per} per request, from the approved spec and nothing else:",
         "no exam question, no benchmark item, no hash, no model name, no score.")
     did = db.dataset_create(ctx["pid"], "doc", a.count, APPROVER, {})
-    reqs = prop.generation_requests(did, spec, row["category"], a.count, "doc", seed=did)
+    audience = prop.audience_for(row["category"], row["task"])
+    if audience:
+        say("", "and who asks these questions, as labels from the bank's own metadata —",
+            "so the documents are written for that reader and not for a professional:")
+        quote(audience)
+    reqs = prop.generation_requests(did, spec, row["category"], a.count, "doc", seed=did,
+                                    audience=audience)
     sha = llm.prompt_sha(*[q.system + "\n" + q.user for q in reqs])
     bid = backend.submit(reqs)
     db.batch_add(bid, "generation", did, len(reqs), backend.name, backend.model)
-    db.dataset_update(did, batch_id=bid, provenance=json.dumps({"prompt_sha256": sha}))
+    db.dataset_update(did, batch_id=bid,
+                      provenance=json.dumps({"prompt_sha256": sha, "audience": audience}))
     kv("batch", f"{bid}  ({len(reqs)} requests)")
     if poll(backend, bid, "generating") != "done":
         return die(f"the generation batch did not complete: {bid}")
     cut = backend.status(bid)[1]
     if "cut off" in cut:
         say(f"NOTE {cut} — a truncated reply is a lost document; lower the count per request",
-            "or raise LOCAL_MAX_TOKENS if this is more than the odd one.")
+            "or raise the cap it names if this is more than the odd one.")
     hits = leaked(sent_bodies(backend, bid), bank_questions(config.EXAM_DIR)[0])
     say(f"SAFETY CHECK — exam question text in the generation request: "
         f"{'FAILED' if hits else 'none, as expected'}.")

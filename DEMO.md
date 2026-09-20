@@ -92,7 +92,9 @@ drafting so you can curate on the Exam tab; `--sit stub` skips the GPU.
 Dr. Hossein's own questions, graded against his own criteria files. Medicine
 is 100 questions and 15 criteria with one flag; law is 100 questions and 23
 criteria with two flags, one of which caps the score rather than zeroing it.
-Each is one run:
+Law's items also carry `jurisdiction_required`, which the reference line says
+in words and the page tabulates — the direct test of whether the model asks
+where the user is. Each is one run:
 
 ```bash
 python3 scripts/demo_loop.py --topic "medicine & health" \
@@ -103,8 +105,8 @@ python3 scripts/demo_loop.py --topic "medicine & health" \
 
 ```bash
 python3 scripts/demo_loop.py --topic law \
-    --import eval_tasks/fr/hossein_law_v1.json --approver "Dr. Hossein" \
-    --source hossein_v1 \
+    --import eval_tasks/fr/hossein_law_v2.json --approver "Dr. Hossein" \
+    --source hossein_law_v2 \
     --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
 ```
 

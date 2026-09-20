@@ -140,7 +140,26 @@ LLM_POLL_S = float(os.environ.get("LLM_POLL_S", "60"))
 # artefact a local identity produces is stamped provisional (llm.local_mark).
 LOCAL_BASE_URL = os.environ.get("LOCAL_BASE_URL", "http://localhost:8000/v1").strip().rstrip("/")
 LOCAL_CONCURRENCY = int(os.environ.get("LOCAL_CONCURRENCY", "2"))
-LOCAL_MAX_TOKENS = int(os.environ.get("LOCAL_MAX_TOKENS", "1024"))
+# One cap for every role was one cap too few: a 600-word training document is
+# ~1,400 tokens and the request already asks for one document, so there is no
+# smaller request to make — while a judge's reply to a 23-criterion file is
+# ~350 and an exam draft is shorter still. Per role, with LOCAL_MAX_TOKENS as
+# the fallback for any role that has none. On the shared card, 1536 across two
+# concurrent generation requests is well inside what is left with vLLM and
+# Ollama both loaded.
+LOCAL_MAX_TOKENS = int(os.environ.get("LOCAL_MAX_TOKENS", "0") or 0)
+LOCAL_MAX_TOKENS_LLM = int(os.environ.get("LOCAL_MAX_TOKENS_LLM", "0") or 0)
+LOCAL_MAX_TOKENS_JUDGE = int(os.environ.get("LOCAL_MAX_TOKENS_JUDGE", "0") or 0)
+LOCAL_MAX_TOKENS_EXAM = int(os.environ.get("LOCAL_MAX_TOKENS_EXAM", "0") or 0)
+LOCAL_MAX_TOKENS_DEFAULTS = {"llm": 1536, "judge": 1024, "exam": 1024}
+
+
+def local_max_tokens(role: str = "llm") -> int:
+    """The reply cap for one role: its own knob, else LOCAL_MAX_TOKENS, else
+    the default for that role."""
+    own = {"llm": LOCAL_MAX_TOKENS_LLM, "judge": LOCAL_MAX_TOKENS_JUDGE,
+           "exam": LOCAL_MAX_TOKENS_EXAM}.get(role, 0)
+    return own or LOCAL_MAX_TOKENS or LOCAL_MAX_TOKENS_DEFAULTS.get(role, 1024)
 LOCAL_TIMEOUT_S = float(os.environ.get("LOCAL_TIMEOUT_S", "180"))
 
 # The exam writer (scripts/exam_build.py draft): a SEPARATE identity from the

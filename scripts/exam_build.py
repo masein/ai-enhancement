@@ -151,6 +151,21 @@ def append_bank(root: Path, rec: dict) -> None:
     _write(p, rows)
 
 
+def update_bank(root: Path, rec: dict) -> bool:
+    """Replace a bank row in place, by qid. The author revising her own
+    metadata — a difficulty level, a jurisdiction flag — is not a new
+    question: the prompt is the identity, so the qid and the half it decided
+    do not move."""
+    p = bank_dir(root) / f"{_categories.topic_slug(rec['topic'])}.jsonl"
+    rows = _read(p)
+    for i, r in enumerate(rows):
+        if r["qid"] == rec["qid"]:
+            rows[i] = rec
+            _write(p, rows)
+            return True
+    return False
+
+
 def load_candidates(root: Path, topic: str | None = None, status: str | None = None) -> list[dict]:
     topics = [topic] if topic else TOPICS
     out = []
@@ -431,9 +446,14 @@ def reject(root: Path, cid: str, approver: str, reason: str = "") -> dict:
 # the order metadata is written in, so the same item always hashes the same
 # way. Subject carries sex and age group in brackets; only present fields
 # appear at all.
-META_ORDER = ("acuity", "intent", "domain", "difficulty", "subject", "style")
+META_ORDER = ("acuity", "intent", "domain", "difficulty", "jurisdiction_required",
+              "subject", "style")
 META_LABEL = {"acuity": "Acuity", "intent": "Intent", "domain": "Domain",
-              "difficulty": "Difficulty", "subject": "Subject", "style": "Style"}
+              "difficulty": "Difficulty", "jurisdiction_required": "Jurisdiction required",
+              "subject": "Subject", "style": "Style"}
+# fields whose value is a fact about the question rather than a word: the
+# reference line says them the way a person would
+META_BOOL = {"jurisdiction_required"}
 
 
 def metadata_reference(item: dict) -> str:
@@ -446,11 +466,17 @@ def metadata_reference(item: dict) -> str:
 
     Difficulty is the author's own level for the item (1 easiest), and the
     judge reads it the same way it reads acuity: as ground truth about the
-    question, not as an instruction about how hard to mark.
+    question, not as an instruction about how hard to mark. A boolean field
+    is said in words — "Jurisdiction required: yes." — because the criterion
+    that reads it is written about the question, not about a JSON value.
     """
     bits = []
     for field in META_ORDER:
-        value = str(item.get(field) or "").strip()
+        raw = item.get(field)
+        if field in META_BOOL and isinstance(raw, bool):
+            bits.append(f"{META_LABEL[field]}: {'yes' if raw else 'no'}.")
+            continue
+        value = str(raw or "").strip()
         if field == "subject":
             who = [str(item.get(k) or "").strip() for k in ("sex", "age_group")]
             who = [w for w in who if w]
@@ -478,8 +504,12 @@ def plan_import(root: Path, items, topic: str, approver: str,
         raise ValueError(f"{topic!r} is not an exam topic: {', '.join(TOPICS)}")
     if not isinstance(items, list):
         raise ValueError("not a JSON array of question objects")
-    have = bank_qids(root)
-    out = {"topic": topic, "source": source, "records": [], "imported": 0, "skipped": 0,
+    # the whole bank by qid, not just the set: an author who revises the
+    # metadata of a question already in the bank is revising it, not
+    # re-importing it — the prompt is the identity, the rest is hers to change
+    have = {r["qid"]: (t, r) for t, rows in load_bank(root).items() for r in rows}
+    out = {"topic": topic, "source": source, "records": [], "updates": [],
+           "imported": 0, "updated": 0, "skipped": 0,
            "invalid": 0, "report": 0, "diagnose": 0, "duplicates": [], "invalid_items": [],
            "acuity": collections.Counter(), "intent": collections.Counter()}
     for i, it in enumerate(items):
@@ -492,20 +522,42 @@ def plan_import(root: Path, items, topic: str, approver: str,
                      "id": (it or {}).get("id") if isinstance(it, dict) else None})
             continue
         q = qid_of(prompt)
-        if q in have:
-            out["skipped"] += 1
-            if len(out["duplicates"]) < 50:
-                out["duplicates"].append(q)
-            continue
         meta = {k: v for k, v in it.items() if k not in ("prompt", "reference", "notes")}
         line = metadata_reference(it)
         own = str(it.get("reference") or "").strip()
+        reference = f"{own} {line}".strip() if own else line
+        if q in have:
+            where, old = have[q]
+            if where != topic:
+                # one question belongs to one topic; importing it under
+                # another would give it two halves of two banks
+                out["skipped"] += 1
+                if len(out["duplicates"]) < 50:
+                    out["duplicates"].append(q)
+                continue
+            if (old.get("meta") or {}) == meta and (old.get("reference") or "") == reference:
+                out["skipped"] += 1
+                if len(out["duplicates"]) < 50:
+                    out["duplicates"].append(q)
+                continue
+            # the author revised this question's metadata: keep whose it is
+            # and which half it fell in, take the rest from the new file
+            out["updates"].append({**old, "meta": meta, "reference": reference,
+                                   "notes": str(it.get("notes") or "").strip() or old.get("notes", ""),
+                                   "source": source})
+            out["updated"] += 1
+            out[half_of(q)] += 1
+            if meta.get("acuity"):
+                out["acuity"][str(meta["acuity"])] += 1
+            if meta.get("intent"):
+                out["intent"][str(meta["intent"])] += 1
+            continue
         out["records"].append({
             "qid": q, "topic": topic, "prompt": prompt,
-            "reference": (f"{own} {line}".strip() if own else line),
+            "reference": reference,
             "notes": str(it.get("notes") or "").strip(), "meta": meta, "source": source,
             "accepted_by": approver, "edited": False})
-        have.add(q)
+        have[q] = (topic, out["records"][-1])
         out["imported"] += 1
         out[half_of(q)] += 1
         if meta.get("acuity"):
@@ -533,6 +585,8 @@ def import_bank(root: Path, path_or_items, topic: str, approver: str,
     out = plan_import(root, items, topic, approver, source)
     for rec in out.pop("records"):
         append_bank(root, {**rec, "accepted_at": time.time()})
+    for rec in out.pop("updates"):
+        update_bank(root, {**rec, "accepted_at": time.time()})
     out.pop("invalid_items", None)
     return out
 
@@ -743,8 +797,10 @@ def main() -> int:
         except (ValueError, OSError, json.JSONDecodeError) as e:
             print(e, file=sys.stderr)
             return 2
-        print(f"{r['topic']}: imported {r['imported']}, skipped {r['skipped']} already in the "
-              f"bank" + (f", {r['invalid']} without a usable prompt" if r["invalid"] else "")
+        print(f"{r['topic']}: imported {r['imported']}, "
+              + (f"updated {r['updated']} already in the bank, " if r["updated"] else "")
+              + f"skipped {r['skipped']} already in the bank"
+              + (f", {r['invalid']} without a usable prompt" if r["invalid"] else "")
               + f" — report {r['report']} / diagnose {r['diagnose']}")
         if r["acuity"]:
             print("acuity: " + ", ".join(f"{k} {v}" for k, v in r["acuity"].items()))

@@ -351,7 +351,7 @@ def test_demo_md_says_what_a_green_run_does_not_prove():
     # the medicine run, and the two things a criteria-graded score is not
     assert '--import eval_tasks/fr/hossein_medicine_v2.json --approver "Dr. Hossein"' in doc
     # and the second bank delivered in the same round, as its own run
-    assert '--import eval_tasks/fr/hossein_law_v1.json --approver "Dr. Hossein"' in doc
+    assert '--import eval_tasks/fr/hossein_law_v2.json --approver "Dr. Hossein"' in doc
     assert "HuggingFaceTB/SmolLM2-360M-Instruct" in doc
     assert "rubrics are drafts" in doc and "pending Dr." in doc
     assert "deterministic fold of that topic's\n  criteria" in doc
@@ -374,10 +374,10 @@ def test_the_author_docs_carry_the_import_and_criteria_rules():
     hand = (REPO / "HANDOFF.md").read_text(encoding="utf-8")
     # the two open asks back to the author, and the file that holds his criteria
     assert "hossein_medicine_v2.json" in hand and "medicine_health.criteria.json" in hand
-    # the asks that are still open, and the one that was closed by delivery
+    # the ask that is still open, and the two closed by delivery
     assert "The question floor is cleared." in hand
-    assert "Rubric sign-off." in hand and "The law difficulty levels." in hand
-    assert "jurisdiction_required" in hand
+    assert "Rubric sign-off." in hand
+    assert "jurisdiction_required" in hand and "hossein_law_v2.json" in hand
     assert "phase-8b-hossein-medicine.md" in hand
 
 

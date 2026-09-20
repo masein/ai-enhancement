@@ -243,6 +243,12 @@ def test_the_review_tab_starts_from_a_topic(live, page):
     assert page.errors == []
 
 
+# propose → approve → generate → gate → ready is four batch round trips and
+# two poll intervals; on a loaded CI runner that is ordinary, not a flake, so
+# the waits below are generous on purpose rather than tight and re-run.
+E2E_MS = 90000
+
+
 def test_review_flow_in_the_browser(live, page):
     base = live["base"]
     # the LLM card says what is configured and what today has cost
@@ -258,7 +264,7 @@ def test_review_flow_in_the_browser(live, page):
     page.wait_for_selector(".card h2:has-text('Review')")
     assert "proposal #" in page.locator("#view").text_content()
     card = page.locator(".rv[data-proposal]").first
-    card.locator("textarea").wait_for(timeout=20000)          # the poller and the 5 s poll
+    card.locator("textarea").wait_for(timeout=E2E_MS)         # the poller and the 5 s poll
     text = card.text_content()
     assert "introductory economics" in text
     assert "judge assessments the LLM saw" in text and "question text removed" in text
@@ -273,14 +279,14 @@ def test_review_flow_in_the_browser(live, page):
     ta.fill(ta.input_value() + " Emphasise direction of effect.")
     card.get_by_label("your name").fill("Omar")
     card.get_by_role("button", name="Approve this spec").click()
-    page.wait_for_selector(".rv[data-proposal] :text('Approved as edited')", timeout=10000)
+    page.wait_for_selector(".rv[data-proposal] :text('Approved as edited')", timeout=E2E_MS)
     card = page.locator(".rv[data-proposal]").first
     assert "approved by Omar" in card.text_content()
     # generate
     card.get_by_label("item count").fill("20")
     card.get_by_label("your name").fill("Omar")
     card.get_by_role("button", name="Generate data").click()
-    page.wait_for_selector(".rv[data-dataset]:has-text('ready')", timeout=20000)
+    page.wait_for_selector(".rv[data-dataset]:has-text('ready')", timeout=E2E_MS)
     ds = page.locator(".rv[data-dataset]").first
     ds.locator("summary").click()
     dtext = ds.text_content()

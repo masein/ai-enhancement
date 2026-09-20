@@ -292,6 +292,7 @@ control set (no GPU).
 `{"topic", "approver", "source", "items"` **or** `"text"}`: a bank written by
 a person, the same parser and the same records as `scripts/exam_build.py
 import`. The preview writes nothing and answers with the counts (`imported`,
+`updated` — questions already in the bank whose metadata the file revises —
 `skipped` duplicates by qid, `invalid` with the offending indices), the
 `report`/`diagnose` split, the per-acuity and per-intent counts, and the
 items — **report-half prompts withheld**, qid and metadata only, in the

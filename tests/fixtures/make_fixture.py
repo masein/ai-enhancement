@@ -648,27 +648,27 @@ IMPORT_TOPIC_LAW = "law"
 IMPORTED_LAW = [
     {"id": 1, "prompt": "What is the difference between a civil case and a criminal case?",
      "intent": "legal_information", "domain": "general_law", "acuity": "routine",
-     "style": "conversational", "difficulty": 1},
+     "style": "conversational", "difficulty": 1, "jurisdiction_required": False},
     {"id": 2, "prompt": "I was served with a court claim eleven days ago and the form says I "
                         "have fourteen days. What happens if I miss it?",
      "intent": "procedural_guidance", "domain": "civil_procedure", "acuity": "urgent",
-     "style": "conversational", "difficulty": 5},
+     "style": "conversational", "difficulty": 5, "jurisdiction_required": True},
     {"id": 3, "prompt": "My landlord says he can raise the rent whenever he likes. Is that "
                         "right?",
      "intent": "legal_information", "domain": "housing_law", "acuity": "moderate",
-     "style": "conversational", "difficulty": 2},
+     "style": "conversational", "difficulty": 2, "jurisdiction_required": True},
     {"id": 4, "prompt": "The police want to interview me as a witness tomorrow morning. Do I "
                         "have to answer everything they ask?",
      "intent": "rights_and_obligations", "domain": "criminal_procedure", "acuity": "urgent",
-     "style": "conversational", "difficulty": 4},
+     "style": "conversational", "difficulty": 4, "jurisdiction_required": True},
     {"id": 5, "prompt": "My employer changed my contracted hours without telling me. What are "
                         "my options?",
      "intent": "situation_assessment", "domain": "employment_law", "acuity": "moderate",
-     "style": "context_rich", "difficulty": 3},
+     "style": "context_rich", "difficulty": 3, "jurisdiction_required": True},
     {"id": 6, "prompt": "Do I need a written agreement for a small loan between friends, or is "
                         "a message enough?",
      "intent": "legal_information", "domain": "contract_law", "acuity": "mild",
-     "style": "conversational", "difficulty": 2},
+     "style": "conversational", "difficulty": 2, "jurisdiction_required": False},
 ]
 
 

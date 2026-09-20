@@ -713,19 +713,23 @@ def _import_items(body: ImportIn) -> list:
 def _import_preview(plan: dict) -> dict:
     """What the page may show of what would land. A report-half question is
     withheld here exactly as public_bank withholds it: its author wrote it,
-    and the page still does not echo it back."""
+    and the page still does not echo it back. Both lists the plan carries —
+    the new records and the revisions of ones already in the bank — go
+    through the same withholding; neither raw list is in the response."""
     shown = []
-    for rec in plan["records"]:
+    for rec, what in ([(r, "new") for r in plan["records"]]
+                      + [(r, "updated") for r in plan["updates"]]):
         half = exam_build.half_of(rec["qid"])
         row = {"qid": rec["qid"], "half": half, "meta": rec["meta"],
-               "reference": rec["reference"]}
+               "reference": rec["reference"], "change": what}
         if half == "diagnose":
             row["prompt"] = rec["prompt"]
         else:
             row["prompt"] = None
             row["withheld"] = "report half — never shown, never exported"
         shown.append(row)
-    return {k: v for k, v in plan.items() if k != "records"} | {"items": shown}
+    return ({k: v for k, v in plan.items() if k not in ("records", "updates")}
+            | {"items": shown})
 
 
 @app.post("/api/exam/import/preview")
@@ -1182,7 +1186,8 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
     }
     pid = db.proposal_create(p.model, task, p.topic, p.requested_by.strip()[:80], evidence)
     req = prop.proposal_request(pid, p.model, task, p.topic, justifications, counts,
-                                _judge_rubric(task), prop.criteria_evidence(model_dir, task))
+                                _judge_rubric(task), prop.criteria_evidence(model_dir, task),
+                                audience=prop.audience_for(p.topic, task))
     try:
         bid = backend.submit([req])
     except llm.LLMError as e:
@@ -1288,7 +1293,10 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
     _spend_check(n_items)
     spec = r["edited_text"] or r["spec_text"]
     did = db.dataset_create(pid, g.fmt, g.count, who, {})
-    reqs = prop.generation_requests(did, spec, r["category"], g.count, g.fmt, seed=did)
+    # the audience travels with the topic: a spec alone never said who asks
+    audience = prop.audience_for(r["category"], r["task"])
+    reqs = prop.generation_requests(did, spec, r["category"], g.count, g.fmt, seed=did,
+                                    audience=audience)
     sha = llm.prompt_sha(*[q.system + "\n" + q.user for q in reqs])
     try:
         bid = backend.submit(reqs)
@@ -1296,7 +1304,10 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
         db.dataset_update(did, status="failed", finished_at=time.time(), error=str(e)[:400])
         raise HTTPException(502, f"the LLM batch could not be submitted: {e}") from None
     db.batch_add(bid, "generation", did, len(reqs), backend.name, backend.model)
-    db.dataset_update(did, batch_id=bid, provenance=json.dumps({"prompt_sha256": sha}))
+    # what the generator was actually told about its reader, kept for the
+    # poller: recomputing it later would read a bank that may have moved
+    db.dataset_update(did, batch_id=bid,
+                      provenance=json.dumps({"prompt_sha256": sha, "audience": audience}))
     return {"dataset_id": did, "status": "pending", "batch_id": bid, "items": len(reqs)}
 
 

@@ -6308,7 +6308,10 @@ function exImportPreview(p) {
   return el('div', {},
     el('div', { class: 'kvs', 'data-preview': 'counts' },
       el('span', {}, el('b', { text: 'would import ' }), String(p.imported)),
-      el('span', {}, el('b', { text: 'already in the bank ' }), String(p.skipped)),
+      // a question already in the bank whose metadata this file revises: the
+      // prompt is the identity, so it keeps its qid and its half
+      p.updated ? el('span', {}, el('b', { text: 'would update ' }), String(p.updated)) : '',
+      el('span', {}, el('b', { text: 'already in the bank, unchanged ' }), String(p.skipped)),
       el('span', {}, el('b', { text: 'unusable ' }), String(p.invalid)),
       el('span', {}, el('b', { text: 'split ' }), `report ${p.report} / diagnose ${p.diagnose}`)),
     Object.keys(p.acuity || {}).length ? el('p', { class: 'small', text: 'acuity — '
@@ -6328,7 +6331,8 @@ function exImportPreview(p) {
         el('td', {}, el('span', { class: 'badge' + (it.half === 'report' ? '' : ' instruct'),
                                   text: it.half })),
         el('td', {}, it.prompt || el('span', { class: 'se',
-          text: `withheld · ${it.qid.slice(0, 12)}` })),
+          text: `withheld · ${it.qid.slice(0, 12)}` }),
+          it.change === 'updated' ? el('span', { class: 'badge', text: 'revised' }) : ''),
         el('td', { class: 'se', text: it.reference })))))),
     (p.items || []).length > 12 ? el('p', { class: 'small',
       text: `${p.items.length - 12} more not shown.` }) : '');

@@ -84,6 +84,17 @@ Acuity: emergency. Intent: symptom_assessment_triage. Domain: cardiovascular.
 Difficulty: 3. Subject: self (male, 45-59). Style: telegraphic.
 ```
 
+A boolean field is said in words — `Jurisdiction required: yes.` — because
+the criterion that reads it is written about the question, not about a JSON
+value.
+
+**Re-importing revises, it does not duplicate.** A question whose prompt is
+already in the bank keeps its qid and its half; if the file gives it
+different metadata, that record is *updated* (new `meta`, new reference, the
+new `source` and `accepted_at`, the original `accepted_by`) and the import
+prints how many it updated. Identical metadata is still skipped. The prompt
+is the identity; everything else is the author's to revise.
+
 That line IS the ground truth the rubric asks the judge to check against —
 above all the acuity. The order is fixed rather than the file's, because the
 reference is part of what the item is and the same item must always read the
@@ -136,8 +147,16 @@ author's:
 - A flag id may repeat a criterion id (law scores `fabricated_authority` and
   flags it). They are two marks under two headings in the prompt.
 - `breakdowns` is optional: the metadata fields to tabulate the topic by.
-  Without it, whichever of `acuity`, `difficulty` and `intent` the topic's
-  items actually carry.
+  Without it, whichever of `acuity`, `difficulty`, `jurisdiction_required`
+  and `intent` the topic's items actually carry.
+- `audience` is optional, and is one sentence about the **register** the
+  training documents for this topic should be written in. It replaces the
+  default ("guidance a layperson can read and act on … not clinical notes,
+  case files, legal memoranda or textbook exposition"). The audience
+  *counts* beside it are always the bank's own — styles, subjects and
+  intents as labels and percentages — and travel with both the proposal and
+  the generation request, because a generator that is told only the skill
+  writes for whoever it imagines.
 
 The 0–4 is `round_half_up(4 × Σ w·c / Σ w)` over the applicable criteria,
 then each true flag's effect. The prompt sent to the judge is generated from

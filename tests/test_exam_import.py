@@ -42,7 +42,7 @@ def test_the_delivered_file_is_what_the_import_expects():
     assert {it["acuity"] for it in items} == {"emergency", "urgent", "moderate", "mild", "routine"}
     # v2 gave every item the author's own difficulty level
     assert all(isinstance(it.get("difficulty"), int) for it in items)
-    law = json.loads((REPO / "eval_tasks" / "fr" / "hossein_law_v1.json").read_text("utf-8"))
+    law = json.loads((REPO / "eval_tasks" / "fr" / "hossein_law_v2.json").read_text("utf-8"))
     assert len(law) == 100 and all(it.get("prompt") and it.get("difficulty") for it in law)
     assert sorted({it["difficulty"] for it in law}) == [1, 2, 3, 4, 5]
 
@@ -241,7 +241,7 @@ def test_both_delivered_banks_keep_their_report_half_out_of_every_request(bank, 
     sent, no report-half question from either bank appears."""
     from service import config, proposals as prop
     root, _ = bank
-    law_file = REPO / "eval_tasks" / "fr" / "hossein_law_v1.json"
+    law_file = REPO / "eval_tasks" / "fr" / "hossein_law_v2.json"
     eb.import_bank(root, law_file, "law", "Dr. Hossein", "hossein_v1")
     monkeypatch.setattr(config, "EXAM_DIR", root)
     monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)

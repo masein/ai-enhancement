@@ -175,6 +175,64 @@ def topic_question_grams(task: str) -> set[str]:
     return question_ngrams(prompts)
 
 
+# ---------------------------------------------------------------------------
+# Who the answers are for. The generator only ever sees the approved spec, so
+# the audience had to travel with the topic or not at all — and it did not.
+# Both demo runs of 2026-09-20 show the cost: medicine produced clinical case
+# notes and law produced advisory memoranda, when the exam is members of the
+# public asking about their own symptoms and their own disputes. A model
+# fine-tuned on clinician notes learns a register it is never asked for.
+#
+# What travels is LABELS AND PERCENTAGES from the bank's own metadata — style,
+# subject, intent — over the whole topic. No prompt text, no qids, no item.
+# ---------------------------------------------------------------------------
+
+AUDIENCE_FIELDS = ("style", "subject", "intent")
+AUDIENCE_TOP = 4
+DEFAULT_REGISTER = (
+    "guidance a layperson can read and act on — what to do, what to watch for, when to "
+    "escalate — not clinical notes, case files, legal memoranda or textbook exposition. "
+    "Second person is fine.")
+DEFAULT_WHO = "members of the public asking about their own situation"
+
+
+def _share_line(counts: dict) -> str:
+    total = sum(counts.values()) or 1
+    top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:AUDIENCE_TOP]
+    return ", ".join(f"{k} {round(100 * n / total)}%" for k, n in top)
+
+
+def audience_for(topic: str, task: str | None = None, root: Path | None = None) -> str:
+    """The audience line for one topic, or '' when its bank says nothing about
+    who is asking. Built from the WHOLE bank — both halves — because this is a
+    count of labels, and a count of labels reveals no question.
+
+    The author may write the register sentence herself: an `audience` string
+    in the topic's criteria file replaces the default one.
+    """
+    import collections
+    rows = _exam.load_bank(root or config.EXAM_DIR).get(topic) or []
+    counts = {f: collections.Counter() for f in AUDIENCE_FIELDS}
+    for r in rows:
+        meta = r.get("meta") or {}
+        for f in AUDIENCE_FIELDS:
+            v = str(meta.get(f) or "").strip()
+            if v:
+                counts[f][v] += 1
+    if not counts["style"] and not counts["subject"]:
+        return ""                      # nothing said about who is asking
+    register = ""
+    try:
+        import judge as _judge
+        spec = _judge.rubric_for(task or _exam.topic_task(topic)).criteria or {}
+        register = str(spec.get("audience") or "").strip()
+    except Exception:                  # noqa: BLE001 — no criteria file, or none readable
+        register = ""
+    parts = [f"{f}s: {_share_line(counts[f])}" for f in AUDIENCE_FIELDS if counts[f]]
+    return (f"Audience: {DEFAULT_WHO} ({'; '.join(parts)}).\n"
+            f"Register for documents: {register or DEFAULT_REGISTER}")
+
+
 def justifications_for(model_dir: Path, task: str,
                        limit: int = MAX_JUSTIFICATIONS) -> tuple[list[dict], dict]:
     """The judge's written reasoning for this topic's DIAGNOSE-half answers
@@ -249,7 +307,7 @@ PROPOSAL_SYSTEM = (
 
 def proposal_request(pid: int, model: str, task: str, topic: str,
                      justifications: list[dict], counts: dict, rubric: str,
-                     criteria: dict | None = None) -> llm.Request:
+                     criteria: dict | None = None, audience: str = "") -> llm.Request:
     """The judge's reasoning, the topic and the rubric. No question text: the
     justification is about the ANSWER, and anything the judge quoted from a
     question has already been stripped. For a topic graded criterion by
@@ -259,8 +317,11 @@ def proposal_request(pid: int, model: str, task: str, topic: str,
     lines = [f"Topic: {topic}", f"Model under assessment: {model}",
              f"Diagnosis-half answers on this topic: {counts['diagnose_items']}; "
              f"scoring below {WEAK_SCORE} of 4: {counts['diagnose_weak']}; "
-             f"shown below: {len(justifications)}.", "",
-             "The rubric the judge graded against:", rubric.strip(), ""]
+             f"shown below: {len(justifications)}.", ""]
+    # who asks these questions, as labels — the spec is for answering THEM
+    if audience:
+        lines += ["Who asks the questions on this topic:", audience.strip(), ""]
+    lines += ["The rubric the judge graded against:", rubric.strip(), ""]
     if criteria and criteria.get("weakest_criteria"):
         lines.append("Where this topic scored lowest, criterion by criterion (0-1):")
         for c in criteria["weakest_criteria"]:
@@ -318,7 +379,10 @@ STYLE = {
     "doc": (f"Each object: {{\"title\": <a short descriptive title>, \"text\": <the document "
             f"body, around {DOC_TARGET_WORDS} words of continuous prose that teaches the "
             f"specification's skill; paragraphs separated by blank lines; no questions posed "
-            f"to the reader, no answer keys, no bullet lists of Q/A>}}."),
+            f"to the reader, no answer keys, no bullet lists of Q/A>}}. Write what a person "
+            f"with that question would be helped by reading — an explainer, a guide, a worked "
+            f"\"what to do if\" — in the register named above, and never shaped as a question "
+            f"followed by its answer."),
     "free": ("Each object: {\"question\": ..., \"answer\": <a short free-text answer>, "
              "\"rationale\": <one or two sentences>}. This format is for comparison only: "
              "question-shaped training data teaches the test more readily than prose does."),
@@ -339,19 +403,21 @@ def items_per_request(fmt: str, provider: str | None = None) -> int:
 
 
 def generation_requests(did: int, spec_text: str, category: str, count: int,
-                        fmt: str, seed: int) -> list[llm.Request]:
+                        fmt: str, seed: int, audience: str = "") -> list[llm.Request]:
     """One request per few items. Contains the approved spec, the topic, the
-    count, the format and a style constraint — and no benchmark item, no exam
-    question, no hash, no model name and no score, in any form."""
+    count, the format, a style constraint and the audience labels — and no
+    benchmark item, no exam question, no hash, no model name and no score, in
+    any form."""
     per = items_per_request(fmt)
     reqs = []
     for k, start in enumerate(range(0, count, per)):
         n = min(per, count - start)
         what = ("document" if fmt == "doc" else "item") + ("" if n == 1 else "s")
         user = (f"Skill specification:\n{spec_text.strip()}\n\n"
-                f"Topic: {category}\nFormat: {fmt}\nWrite {n} {what}.\n{STYLE[fmt]}\n"
-                f"Style seed {seed}-{k}: make this set differ in scenario, register and "
-                f"phrasing from any other set you might write for the same specification.")
+                + (f"{audience.strip()}\n\n" if audience else "")
+                + f"Topic: {category}\nFormat: {fmt}\nWrite {n} {what}.\n{STYLE[fmt]}\n"
+                + f"Style seed {seed}-{k}: make this set differ in scenario, register and "
+                + "phrasing from any other set you might write for the same specification.")
         reqs.append(llm.Request(
             custom_id=f"gen:{did}:{k}", system=GEN_SYSTEM, user=user, max_tokens=8192, json=True,
             meta={"kind": "generation", "dataset_id": did, "count": n, "start": start,
@@ -468,8 +534,10 @@ def local_marks(generator_id: str, prop: dict) -> dict:
 
 
 def provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash: str,
-               gate: dict, sha: str, n_generated: int, n_kept: int) -> dict:
-    out = _provenance(prop, ds, backend_id, batch_id, prompt_hash, gate, sha, n_generated, n_kept)
+               gate: dict, sha: str, n_generated: int, n_kept: int,
+               audience: str = "") -> dict:
+    out = _provenance(prop, ds, backend_id, batch_id, prompt_hash, gate, sha, n_generated,
+                      n_kept, audience=audience)
     local = local_marks(backend_id, prop)
     if local:                     # always, when any of them was local — there is no flag
         out["provisional"] = True
@@ -480,8 +548,12 @@ def provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash
 
 
 def _provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash: str,
-                gate: dict, sha: str, n_generated: int, n_kept: int) -> dict:
+                gate: dict, sha: str, n_generated: int, n_kept: int,
+                audience: str = "") -> dict:
     return {
+        # the labels the generator was given about who asks these questions,
+        # recorded beside the spec because they shaped the documents too
+        "audience": audience or audience_for(prop["category"], prop["task"]),
         "dataset_id": ds["id"],
         "source_model": prop["model"],
         "task": prop["task"],
@@ -528,8 +600,11 @@ def provenance_complete(p: dict) -> list[str]:
     walk(p, "")
     # edited_text is legitimately empty when the human approved the spec as
     # written; a clean gate legitimately has no offending n-grams to list; an
-    # identity may legitimately be unconfigured, and False is a value
+    # identity may legitimately be unconfigured, and False is a value.
+    # audience is empty for a topic whose bank says nothing about who asks —
+    # the legacy `other` items carry no style or subject at all
     return [h for h in holes if h not in ("edited_text", "gate.offending_ngrams",
+                                          "audience",
                                           "identities.exam_writer", "identities.judge",
                                           "identities.single_provider_loop")]
 

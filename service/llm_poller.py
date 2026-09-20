@@ -69,7 +69,8 @@ def _finish_generation(row: dict, results: dict[str, llm.Result], backend: llm.B
     prompt_hash = prov_stub.get("prompt_sha256", "")
     if gate["report"]["rejected"]:
         prov = proposals.provenance(prop, ds, backend.id, row["batch_id"], prompt_hash,
-                                    gate["report"], sha="", n_generated=len(items), n_kept=0)
+                                    gate["report"], sha="", n_generated=len(items), n_kept=0,
+                                    audience=prov_stub.get("audience", ""))
         db.dataset_update(did, status="rejected", finished_at=time.time(),
                           provenance=json.dumps(prov),
                           error=f"{gate['report']['share_dropped_benchmark']:.1%} of items "
@@ -83,7 +84,8 @@ def _finish_generation(row: dict, results: dict[str, llm.Result], backend: llm.B
         return
     path, sha = proposals.write_items(did, gate["kept"])
     prov = proposals.provenance(prop, ds, backend.id, row["batch_id"], prompt_hash,
-                                gate["report"], sha, len(items), len(gate["kept"]))
+                                gate["report"], sha, len(items), len(gate["kept"]),
+                                audience=prov_stub.get("audience", ""))
     holes = proposals.provenance_complete(prov)
     if holes:                      # a dataset with an unaccountable field is not ready
         db.dataset_update(did, status="failed", finished_at=time.time(),

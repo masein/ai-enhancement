@@ -609,14 +609,27 @@ class LocalOpenAI(Backend):
 
     def __init__(self, model: str, key: str, root: Path, base_url: str | None = None,
                  concurrency: int | None = None, max_tokens: int | None = None,
-                 timeout: float | None = None):
+                 timeout: float | None = None, role: str = "llm"):
         self.model, self.key = model, key
+        self.role = role
         self.base = (base_url or config.LOCAL_BASE_URL).rstrip("/")
         self.concurrency = max(1, int(concurrency or config.LOCAL_CONCURRENCY))
-        self.max_tokens = int(max_tokens or config.LOCAL_MAX_TOKENS)
+        # the cap belongs to the role: only generation needs the headroom
+        self.max_tokens = int(max_tokens or config.local_max_tokens(role))
         self.timeout = float(timeout or config.LOCAL_TIMEOUT_S)
         self.dir = Path(root) / "llm_batches" / "local"
         self.served_models = self._check_served()
+
+    @property
+    def cap_name(self) -> str:
+        """Which knob capped this reply, so a truncation names the thing to
+        raise rather than a knob that may not be the one in force."""
+        own = {"llm": config.LOCAL_MAX_TOKENS_LLM, "judge": config.LOCAL_MAX_TOKENS_JUDGE,
+               "exam": config.LOCAL_MAX_TOKENS_EXAM}.get(self.role, 0)
+        if own:
+            return f"LOCAL_MAX_TOKENS_{self.role.upper()}"
+        return "LOCAL_MAX_TOKENS" if config.LOCAL_MAX_TOKENS else \
+            f"LOCAL_MAX_TOKENS_{self.role.upper()} (default)"
 
     def _h(self) -> dict:
         h = {"content-type": "application/json"}
@@ -707,7 +720,7 @@ class LocalOpenAI(Backend):
         failed = [r for r in got if r.get("error")]
         cut = sum(1 for r in got if r.get("finish_reason") == "length")
         detail = (f"{len(got)}/{len(ids)} done" + (f", {len(failed)} failed" if failed else "")
-                  + (f", {cut} cut off at LOCAL_MAX_TOKENS={self.max_tokens}" if cut else ""))
+                  + (f", {cut} cut off at {self.cap_name}={self.max_tokens}" if cut else ""))
         if len(got) < len(ids):
             self._ensure_worker(batch_id)   # after a restart: resume, never re-run
             return "pending", detail
@@ -867,13 +880,14 @@ def startup_check() -> None:
             raise RuntimeError(f"{role.upper()} misconfigured: " + blocked(role))
 
 
-def backend_for(provider: str, model: str, key: str, root: Path | None = None) -> Backend:
+def backend_for(provider: str, model: str, key: str, root: Path | None = None,
+                role: str = "llm") -> Backend:
     if provider == "anthropic":
         return AnthropicBatches(model, key)
     if provider == "openai":
         return OpenAIBatches(model, key)
     if provider == "local":
-        return LocalOpenAI(model, key, root or config.BENCH_ROOT)
+        return LocalOpenAI(model, key, root or config.BENCH_ROOT, role=role)
     if provider == "fake":
         return FakeBatches(model, root or config.BENCH_ROOT)
     raise LLMError(f"unknown provider {provider!r}")
@@ -893,7 +907,7 @@ def client(role: str = "llm") -> Backend:
         why = blocked(role)
         if why:
             raise LLMError(why)
-        _clients[role] = (key, backend_for(p, m, k))
+        _clients[role] = (key, backend_for(p, m, k, role=role))
     return _clients[role][1]
 
 
