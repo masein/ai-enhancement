@@ -74,7 +74,7 @@ shell works as well as putting them in `.env`.
 | step | what it does | what to look for |
 |---|---|---|
 | 1 preflight | resolves the three identities, asks vLLM what it serves | every role `local/chat`, the weights, and the two caveats: single-provider loop, and provisional |
-| 2 draft | the exam writer drafts candidates per topic (`--per-topic`, default 12) | a batch id, then two candidate questions printed in full with their reference answers |
+| 2 draft | the exam writer drafts candidates per topic (`--per-topic`, default 12), one question per request on `local` | a batch id, two candidate questions printed in full with their reference answers, and how many replies could not be read |
 | 3 accept | `--auto-accept` accepts them unread as approver `demo` | it says plainly that this is **not** curation, and the report/diagnose split per topic |
 | 4 build | writes the harness task yamls from the bank | the split counts, and the paths the harness will run |
 | 5 sit | the model answers, through the normal runner, free-VRAM gate and shared lock | the submission id and the status; `--sit stub` writes answers without a model and says so |
@@ -153,6 +153,7 @@ The script stops at the first problem and says which one.
 | `the judge's provider (local) is the same as the exam writer's` | set `ALLOW_SINGLE_PROVIDER_LOOP=1` — deliberately not implicit |
 | `the evaluation did not finish` | a real run failed: the log path is printed, and `--sit stub` gets you past the GPU while you look |
 | `N cut off at LOCAL_MAX_TOKENS` | replies are being truncated — lower the items per request or raise the cap, knowing the card is shared |
+| `replies unread — N of M` | the model answered in a shape nothing can curate (commonly question texts with no reference answers). The batch is on disk under `$BENCH_ROOT/demo/llm_batches/local/<id>/results.jsonl`: read what it actually sent. A whole round of this usually means the prompt needs the shape spelled out again, not that anything is broken |
 
 ## Related
 

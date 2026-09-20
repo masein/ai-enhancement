@@ -263,7 +263,30 @@ def test_a_json_mode_object_wrapping_the_array_reads_as_the_array():
     doc = {"title": "Margins first", "text": "word " * 200}
     assert proposals.parse_items(json.dumps({"documents": [doc]}), "doc")[0]["title"] == "Margins first"
     cand = {"prompt": "Explain why a binding constraint moves the margin first.", "reference": "r"}
-    assert eb.parse_candidates(json.dumps({"questions": [cand]}))[0]["reference"] == "r"
+    assert eb.parse_candidates(json.dumps({"questions": [cand]})) == ([{**cand, "notes": ""}], "")
+
+
+def test_the_drafter_reads_every_shape_a_small_model_sends_and_names_the_rest():
+    """Gemma-4-E4B under JSON mode does not send the array it was asked for.
+    These are the replies a real run got."""
+    cand = {"prompt": "Explain why a binding constraint moves the margin first.",
+            "reference": "It binds on the margin before volumes move.", "notes": "mechanism"}
+    # the array that was asked for, and a lone object when one was asked for
+    assert eb.parse_candidates(json.dumps([cand])) == ([cand], "")
+    assert eb.parse_candidates(json.dumps(cand)) == ([cand], "")
+    # an object wrapping the array, whatever the key is called
+    two = [cand, {**cand, "prompt": cand["prompt"] + " Give a counterexample."}]
+    got, why = eb.parse_candidates(json.dumps({"exam_questions": two}))
+    assert len(got) == 2 and why == ""
+    # a wrapped list of bare STRINGS is not a question: no reference answer
+    # means nothing to grade against and nothing to curate
+    got, why = eb.parse_candidates(json.dumps({"prompts": [cand["prompt"], cand["prompt"]]}))
+    assert got == [] and "2 str item(s), none of them a question" in why
+    # neither is an object that is not one, or a reply with no JSON at all
+    got, why = eb.parse_candidates(json.dumps({"topic": "economics"}))
+    assert got == [] and "none of them a question" in why
+    assert eb.parse_candidates("I'm sorry, I cannot do that.") == ([], "the reply held no JSON "
+                                                                       "object or array")
 
 
 # ---------------------------------------------------------------------------
@@ -468,6 +491,33 @@ def test_a_pinned_loop_carries_no_stamp(tmp_path, monkeypatch):
         assert "provisional" not in prov and "local_models" not in prov
     finally:
         client.__exit__(None, None, None)
+
+
+def test_a_local_exam_writer_is_asked_for_one_question_at_a_time(vllm, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "EXAM_PROVIDER", "local")
+    assert eb.candidates_per_request() == 1 and eb.candidates_per_request("openai") == 4
+    reqs = eb.draft_requests(tmp_path / "exam", "economics", 3)
+    assert len(reqs) == 3 and all("Write 1 new question." in r.user for r in reqs)
+    b = llm.LocalOpenAI("chat", "", tmp_path)
+    r = eb.draft(tmp_path / "exam", b, ["economics"], per_topic=3, wait=True, poll_s=0.02)
+    assert r["written"] == {"economics": 3} and r["unusable"] == {}
+    assert len(vllm.bodies) == 3                      # one question per request, three rows
+
+
+def test_a_reply_nothing_can_be_curated_from_is_counted_not_silent(vllm, tmp_path, monkeypatch):
+    # the failure a real run hit: asked for questions, the model sent a list
+    # of question texts with no reference answers
+    monkeypatch.setattr(vllm_stub, "DRAFT_SHAPE", "strings")
+    b = llm.LocalOpenAI("chat", "", tmp_path)
+    r = eb.draft(tmp_path / "exam", b, ["economics"], per_topic=3, wait=True, poll_s=0.02)
+    assert r["written"] == {}
+    assert len(r["unusable"]) == 3
+    cid, why = sorted(r["unusable"].items())[0]
+    assert cid.startswith("exam:economics:") and "none of them a question" in why
+    # and it is on the record, not just in the return value
+    log = [json.loads(x) for x in
+           (eb.candidates_dir(tmp_path / "exam") / "_batches.jsonl").read_text().splitlines()]
+    assert len(log[-1]["unusable"]) == 3
 
 
 def test_a_local_exam_writer_stamps_its_candidates_and_the_bank_keeps_it(vllm, tmp_path):

@@ -202,18 +202,29 @@ def draft(a, ctx) -> str:
     from service import config
     hr("Draft the exam — an LLM writes candidate questions, per topic")
     backend = ctx["backend"]["exam"]
+    per = eb.candidates_per_request(backend.name)
     say(f"{a.per_topic} candidates per topic, through {backend.id}, "
-        f"{eb.CANDIDATES_PER_REQUEST} to a request.",
+        f"{per} to a request" + (" (a local model answers one at a time)" if per == 1 else "") + ".",
         "They land in candidates/ for a person to read. Nothing reaches the bank unread.")
     r = eb.draft(config.EXAM_DIR, backend, ctx["topics"], a.per_topic, wait=False)
     bid = r["batch_id"]
     kv("batch", f"{bid}  ({r['n_requests']} requests)")
     if poll(backend, bid, "drafting") != "done":
         return die(f"the drafting batch did not complete: {bid}")
-    written = eb.fetch(config.EXAM_DIR, backend, bid)["written"]
+    got = eb.fetch(config.EXAM_DIR, backend, bid)
+    written, bad = got["written"], got.get("unusable") or {}
     kv("candidates written", ", ".join(f"{t}: {n}" for t, n in sorted(written.items())) or "none")
+    if bad:
+        cid, why = sorted(bad.items())[0]
+        kv("replies unread", f"{len(bad)} of {r['n_requests']} — e.g. {cid}: {why}")
+        say("  a model answering in a shape a curator cannot read is not a networking "
+            "problem;",
+            f"  the replies are on disk under {config.BENCH_ROOT}/llm_batches/")
     if not written:
-        return die("no candidate questions came back — nothing to curate.")
+        return die(f"no candidate questions came back: {len(bad)} of {r['n_requests']} replies "
+                   f"could not be read.",
+                   "The batch is on disk — read results.jsonl to see what the model actually "
+                   "sent.")
     shown = 0
     for topic in ctx["topics"]:
         for c in eb.load_candidates(config.EXAM_DIR, topic, "candidate")[:1]:
@@ -357,8 +368,12 @@ def sit(a, ctx) -> str:
     row = db.get(sid)
     kv("status", f"{row['status']} in {time.time() - t0:.0f}s · {row.get('progress') or ''}")
     if row["status"] != "done":
+        # name the log only when the runner actually wrote one: a path to an
+        # empty directory sends someone looking for a file that is not there
+        log = config.LOGS_DIR / f"service_{sid}_{safe}.log"
         return die(f"the evaluation did not finish: {row.get('error') or row['status']}",
-                   f"log: {config.LOGS_DIR}")
+                   *([f"log: {log}"] if log.exists() else
+                     ["the run failed before the harness wrote a log"]))
     return ""
 
 

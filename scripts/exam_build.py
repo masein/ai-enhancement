@@ -203,11 +203,23 @@ def diagnose_half_examples(root: Path, topic: str, k: int = 3) -> list[str]:
     return [r["prompt"] for r in rows[:k]]
 
 
-def draft_requests(root: Path, topic: str, n: int, per_request: int = CANDIDATES_PER_REQUEST):
+def candidates_per_request(provider: str | None = None) -> int:
+    """How many questions one request asks for. A LOCAL model gets one: asked
+    for four, Gemma-4-E4B answers with one object, or with a list of bare
+    question strings and no reference answers — shapes nothing can curate.
+    Asked for one it answers with one question, and the batch simply gets a
+    row per question, which the on-disk resume does not care about."""
+    from service import config
+    p = config.EXAM_PROVIDER if provider is None else provider
+    return 1 if p == "local" else CANDIDATES_PER_REQUEST
+
+
+def draft_requests(root: Path, topic: str, n: int, per_request: int | None = None):
     from service import llm
     rubric = rubric_text()
     examples = diagnose_half_examples(root, topic)
     offset = len(load_bank(root).get(topic, [])) + len(load_candidates(root, topic))
+    per_request = per_request or candidates_per_request()
     reqs = []
     for k, start in enumerate(range(0, n, per_request)):
         m = min(per_request, n - start)
@@ -216,7 +228,10 @@ def draft_requests(root: Path, topic: str, n: int, per_request: int = CANDIDATES
                 + ("Accepted questions in this topic, as examples of the target (do not copy):\n"
                    + "\n".join(f"- {e}" for e in examples) + "\n\n" if examples else
                    "No accepted questions in this topic yet.\n\n")
-                + f"Write {m} new questions. Set {k + 1}: make them differ in form from any other set.")
+                + (f"Write 1 new question. Set {k + 1}: make it differ in form from any other set."
+                   if m == 1 else
+                   f"Write {m} new questions. Set {k + 1}: make them differ in form from any "
+                   f"other set."))
         reqs.append(llm.Request(custom_id=f"exam:{_categories.topic_slug(topic)}:{k}",
                                 system=DRAFT_SYSTEM, user=user, max_tokens=3000, json=True,
                                 meta={"kind": "exam", "topic": topic, "count": m,
@@ -225,11 +240,24 @@ def draft_requests(root: Path, topic: str, n: int, per_request: int = CANDIDATES
     return reqs
 
 
-def parse_candidates(text: str) -> list[dict]:
+def parse_candidates(text: str) -> tuple[list[dict], str]:
+    """(candidates, why nothing usable came back). Three shapes are a
+    question, because a small model under JSON mode sends all three: the
+    array that was asked for, a lone object when one question was asked for,
+    and an object wrapping the array ({"questions": [...]}) — JSON mode may
+    only return an object, so a model asked for an array often wraps it.
+
+    A wrapped list of bare STRINGS is not a candidate, however many it holds:
+    no reference answer means nothing to grade against and nothing for a
+    curator to read. That comes back as the reason instead, so a partial
+    failure is visible rather than silently zero."""
     from service import llm
     arr = llm.extract_array(text)
     if arr is None:
-        return []
+        obj = llm.extract_json(text)
+        arr = [obj] if isinstance(obj, dict) else None
+    if arr is None:
+        return [], "the reply held no JSON object or array"
     out = []
     for o in arr:
         if not isinstance(o, dict):
@@ -239,7 +267,11 @@ def parse_candidates(text: str) -> list[dict]:
             continue
         out.append({"prompt": p[:1200], "reference": r[:1200],
                     "notes": str(o.get("notes") or "").strip()[:400]})
-    return out
+    if out:
+        return out, ""
+    kinds = sorted({type(o).__name__ for o in arr}) or ["nothing"]
+    return [], (f"the reply held {len(arr)} {'/'.join(kinds)} item(s), none of them a question "
+                f"with both a prompt and a reference answer")
 
 
 def _batches_log(root: Path) -> Path:
@@ -253,9 +285,10 @@ def draft(root: Path, backend, topics: list[str] | None = None, per_topic: int =
     when not waiting; `fetch` finishes it."""
     root = Path(root)
     topics = topics or TOPICS
-    reqs = [r for t in topics for r in draft_requests(root, t, per_topic)]
+    per_request = candidates_per_request(backend.name)
+    reqs = [r for t in topics for r in draft_requests(root, t, per_topic, per_request)]
     if not reqs:
-        return {"batch_id": None, "written": {}}
+        return {"batch_id": None, "written": {}, "unusable": {}}
     bid = backend.submit(reqs)
     candidates_dir(root).mkdir(parents=True, exist_ok=True)
     with open(_batches_log(root), "a", encoding="utf-8") as fh:
@@ -286,14 +319,24 @@ def fetch(root: Path, backend, batch_id: str) -> dict:
     existing = bank_qids(root) | {c["qid"] for c in load_candidates(root)}
     written: dict[str, int] = collections.Counter()
     by_topic: dict[str, list[dict]] = collections.defaultdict(list)
+    # a reply nothing could be read out of, by custom_id: the caller prints
+    # how many, so a model answering in a shape we cannot curate is visible
+    # rather than arriving as "no candidates came back"
+    unusable: dict[str, str] = {}
     for cid_, res in sorted(results.items()):
-        if not cid_.startswith("exam:") or res.error:
+        if not cid_.startswith("exam:"):
+            continue
+        if res.error:
+            unusable[cid_] = res.error[:300]
             continue
         slug = cid_.split(":")[1]
         topic = next((t for t in TOPICS if _categories.topic_slug(t) == slug), None)
         if topic is None:
             continue
-        for c in parse_candidates(res.text):
+        cands, why = parse_candidates(res.text)
+        if why:
+            unusable[cid_] = why
+        for c in cands:
             q = qid_of(c["prompt"])
             if q in existing:
                 continue
@@ -308,9 +351,10 @@ def fetch(root: Path, backend, batch_id: str) -> dict:
     rows = _read(_batches_log(root))
     for r in rows:
         if r["batch_id"] == batch_id:
-            r.update(status="fetched", fetched_at=time.time(), written=dict(written))
+            r.update(status="fetched", fetched_at=time.time(), written=dict(written),
+                     unusable=unusable)
     _write(_batches_log(root), rows)
-    return {"batch_id": batch_id, "written": dict(written)}
+    return {"batch_id": batch_id, "written": dict(written), "unusable": unusable}
 
 
 # ---------------------------------------------------------------------------
@@ -593,7 +637,12 @@ def main() -> int:
                   + f"exam_build.py fetch --root {root} {r['batch_id']}")
             return 0
     print(f"batch {r['batch_id']}: candidates written per topic — "
-          + ", ".join(f"{t}: {n}" for t, n in sorted(r["written"].items())))
+          + (", ".join(f"{t}: {n}" for t, n in sorted(r["written"].items())) or "none"))
+    bad = r.get("unusable") or {}
+    if bad:
+        cid, why = sorted(bad.items())[0]
+        print(f"{len(bad)} repl{'y' if len(bad) == 1 else 'ies'} could not be read, e.g. "
+              f"{cid}: {why}", file=sys.stderr)
     print("curate them on the dashboard's Exam tab; they are not in the bank until someone "
           "accepts them")
     return 0

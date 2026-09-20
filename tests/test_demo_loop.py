@@ -138,8 +138,9 @@ def test_against_a_local_server_everything_it_made_is_stamped(tmp_path):
         assert "stamp: PROVISIONAL — proposed by a local model — not a pinned benchmark" in out
         assert "stamp: PROVISIONAL — a local model was the generator" in out
         assert "never ranked, never in any average" in out
-        # a local generator is asked for one document at a time, and the
-        # batches it ran are inside the demo tree
+        # a local model is asked for one at a time, drafting and generating
+        # alike, and the batches it ran are inside the demo tree
+        assert "1 to a request (a local model answers one at a time)" in out
         assert "4 documents, 1 per request" in out
         assert (root / "demo" / "llm_batches" / "local").is_dir()
         assert "PASSED: none of them appear" in out
@@ -149,6 +150,30 @@ def test_against_a_local_server_everything_it_made_is_stamped(tmp_path):
         prov = json.loads((root / "demo" / "datasets" / "1" / "provenance.json").read_text())
         assert prov["provisional"] is True and set(prov["local_models"]) == {
             "generator", "exam writer", "judge"}
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_a_model_answering_in_an_uncurable_shape_says_how_many(tmp_path, monkeypatch):
+    """The failure a real run hit: three replies, none of them a question,
+    and the demo said only "no candidate questions came back"."""
+    import vllm_stub
+    monkeypatch.setattr(vllm_stub, "DRAFT_SHAPE", "strings")
+    stub, srv = vllm_stub.serve()
+    try:
+        root = tmp_path / "bench"
+        r = run(root, "--keep", LLM_PROVIDER="local", LLM_MODEL="chat",
+                EXAM_PROVIDER="local", EXAM_MODEL="chat",
+                JUDGE_PROVIDER="local", JUDGE_MODEL="chat",
+                ALLOW_SINGLE_PROVIDER_LOOP="1", LOCAL_BASE_URL=stub.url)
+        assert r.returncode == 2
+        assert re.search(r"replies unread\s+8 of 8 — e\.g\. exam:economics:\d", r.stdout)
+        assert "none of them a question with both a prompt and a reference answer" in r.stdout
+        assert "no candidate questions came back: 8 of 8 replies could not be read" in r.stdout
+        assert "read results.jsonl to see what the model actually sent" in r.stdout
+        # the replies are where it says they are, and the tree is kept
+        assert list((root / "demo" / "llm_batches" / "local").glob("*/results.jsonl"))
     finally:
         srv.shutdown()
         srv.server_close()

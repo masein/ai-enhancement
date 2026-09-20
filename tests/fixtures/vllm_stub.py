@@ -22,6 +22,9 @@ import judge as jd
 from service import llm, proposals
 
 WEIGHTS = "google/gemma-4-E4B-it"
+# "auto": the shapes the real model sends. "strings": the one nothing can
+# curate — a list of question texts with no reference answers.
+DRAFT_SHAPE = "auto"
 
 
 def answer(body: dict) -> str:
@@ -48,12 +51,19 @@ def answer(body: dict) -> str:
         return json.dumps(docs[0] if n == 1 else {"documents": docs})
     if system == eb.DRAFT_SYSTEM:
         topic = re.search(r"Topic: (.+)", user).group(1)
-        n, k = map(int, re.search(r"Write (\d+) new questions\. Set (\d+)", user).groups())
-        return json.dumps({"questions": [
-            {"prompt": f"In {topic}, explain mechanism {k}-{i} and the one condition under which "
-                       f"it fails.", "reference": f"Mechanism {k}-{i} runs through the binding "
-                                                  f"constraint; it fails when the constraint is slack.",
-             "notes": "local draft"} for i in range(n)]})
+        n, k = map(int, re.search(r"Write (\d+) new questions?\. Set (\d+)", user).groups())
+        qs = [{"prompt": f"In {topic}, explain mechanism {k}-{i} and the one condition under "
+                         f"which it fails.",
+               "reference": f"Mechanism {k}-{i} runs through the binding constraint; it fails "
+                            f"when the constraint is slack.",
+               "notes": "local draft"} for i in range(n)]
+        # the shapes Gemma-4-E4B actually sends under JSON mode, which is not
+        # the array it was asked for: one question comes back as the object
+        # itself, several come back wrapped in one — and sometimes as bare
+        # strings with no reference answer, which is not a question at all
+        if DRAFT_SHAPE == "strings":
+            return json.dumps({"prompts": [q["prompt"] for q in qs]})
+        return json.dumps(qs[0] if n == 1 else {"questions": qs})
     return "echo: " + user
 
 

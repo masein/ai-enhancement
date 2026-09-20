@@ -180,6 +180,16 @@ run against it, so the loop can be driven end to end today.
   30 s, then recorded as that request's error. A 4xx is recorded at once — a
   malformed request or an unknown model id does not fix itself. The batch is
   `failed` only when every request failed.
+- **One item per request.** Asked for several, a small model answers in
+  shapes nothing can use: two documents at once overrun `LOCAL_MAX_TOKENS`
+  and the JSON is cut off, and four exam questions come back as one question,
+  or as a list of question texts with no reference answers. So a `local`
+  generator is asked for one document and a `local` exam writer for one
+  question; the batch simply gets a row each, which the on-disk resume does
+  not care about. Both parsers also read the shapes JSON mode actually
+  produces — the object itself, or the array wrapped in one — and the exam
+  drafter reports any reply it could not read, per request, rather than
+  leaving a round with no candidates and no reason.
 - **Checked at start.** The first use asks `/v1/models` and refuses a model id
   the server does not serve, by name: *vLLM is up but serves `['chat']`, not
   `'gemma'`*. If nothing answers, the poller waits and tries again next tick
