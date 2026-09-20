@@ -24,3 +24,6 @@ tests/_screens/
 
 # session notes and screenshots kept beside the repo, not in it
 Claude outputs/
+
+# per-machine Claude Code settings
+.claude/
