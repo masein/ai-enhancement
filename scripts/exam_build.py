@@ -66,8 +66,18 @@ SKILL_SUITES = ["instruction_following", "factual_accuracy", "reasoning", "cultu
 PROVISIONAL_KEYS = ("provisional", "provisional_reason", "base_url", "served_model", "weights")
 
 
+TASK_PREFIX = "exam_"
+
+
 def topic_task(topic: str) -> str:
-    return f"exam_{_categories.topic_slug(topic)}"
+    return f"{TASK_PREFIX}{_categories.topic_slug(topic)}"
+
+
+def task_slug(task: str) -> str:
+    """The slug inside a task name — exactly what topic_task built it from.
+    A per-topic rubric is named after it (rubrics/<slug>.md), so the rubric
+    file and the task it grades cannot drift apart."""
+    return task[len(TASK_PREFIX):] if task.startswith(TASK_PREFIX) else task
 
 
 def exam_tasks() -> list[str]:
@@ -414,6 +424,87 @@ def reject(root: Path, cid: str, approver: str, reason: str = "") -> dict:
     return c
 
 
+# ---------------------------------------------------------------------------
+# importing a human-written bank
+# ---------------------------------------------------------------------------
+
+# the order metadata is written in, so the same item always hashes the same
+# way. Subject carries sex and age group in brackets; only present fields
+# appear at all.
+META_ORDER = ("acuity", "intent", "domain", "subject", "style")
+META_LABEL = {"acuity": "Acuity", "intent": "Intent", "domain": "Domain",
+              "subject": "Subject", "style": "Style"}
+
+
+def metadata_reference(item: dict) -> str:
+    """The ground truth an item carries instead of a model answer: what the
+    rubric asks the judge to check the answer against — above all the acuity.
+
+        Acuity: emergency. Intent: symptom_assessment_triage.
+        Domain: cardiovascular. Subject: self (male, 45-59). Style: telegraphic.
+    """
+    bits = []
+    for field in META_ORDER:
+        value = str(item.get(field) or "").strip()
+        if field == "subject":
+            who = [str(item.get(k) or "").strip() for k in ("sex", "age_group")]
+            who = [w for w in who if w]
+            if value and who:
+                bits.append(f"Subject: {value} ({', '.join(who)}).")
+            elif value:
+                bits.append(f"Subject: {value}.")
+            elif who:
+                bits.append(f"Subject: {', '.join(who)}.")
+            continue
+        if value:
+            bits.append(f"{META_LABEL[field]}: {value}.")
+    return " ".join(bits)
+
+
+def import_bank(root: Path, path: Path, topic: str, approver: str,
+                source: str = "import") -> dict:
+    """A human-written bank, straight into the bank. These questions were
+    written and curated by their author, which is what the Exam tab's accept
+    step exists to establish — so the author is the approver, on the record.
+    Idempotent: a qid already in the bank is skipped. Returns the counts and
+    the split, which is what the caller prints."""
+    approver = (approver or "").strip()
+    if not approver:
+        raise ValueError("importing a bank needs a name — the record of who stands behind it")
+    if topic not in TOPICS:
+        raise ValueError(f"{topic!r} is not an exam topic: {', '.join(TOPICS)}")
+    items = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(items, list):
+        raise ValueError(f"{path} is not a JSON array of question objects")
+    have = bank_qids(root)
+    out = {"topic": topic, "source": source, "imported": 0, "skipped": 0, "invalid": 0,
+           "report": 0, "diagnose": 0, "acuity": collections.Counter()}
+    for it in items:
+        prompt = str((it or {}).get("prompt") or "").strip() if isinstance(it, dict) else ""
+        if len(prompt) < 15:
+            out["invalid"] += 1
+            continue
+        q = qid_of(prompt)
+        if q in have:
+            out["skipped"] += 1
+            continue
+        meta = {k: v for k, v in it.items() if k not in ("prompt", "reference", "notes")}
+        line = metadata_reference(it)
+        own = str(it.get("reference") or "").strip()
+        reference = (f"{own} {line}".strip() if own else line)
+        append_bank(root, {"qid": q, "topic": topic, "prompt": prompt, "reference": reference,
+                           "notes": str(it.get("notes") or "").strip(), "meta": meta,
+                           "source": source, "accepted_by": approver,
+                           "accepted_at": time.time(), "edited": False})
+        have.add(q)
+        out["imported"] += 1
+        out[half_of(q)] += 1
+        if meta.get("acuity"):
+            out["acuity"][str(meta["acuity"])] += 1
+    out["acuity"] = dict(sorted(out["acuity"].items()))
+    return out
+
+
 def migrate_seeds(root: Path, seed_dir: Path = SEED_DIR, approver: str = "migration") -> int:
     """The four skill suites' items, as they are, into the bank under `other`
     with their skill kept on the record. Nothing is thrown away; nothing is
@@ -462,9 +553,10 @@ def public_bank(root: Path, topic: str | None = None) -> list[dict]:
                                           "accepted_at", "edited")}
             base["half"] = h
             if h == "diagnose":
-                base.update(prompt=r["prompt"], reference=r["reference"], notes=r.get("notes", ""))
+                base.update(prompt=r["prompt"], reference=r["reference"], notes=r.get("notes", ""),
+                            meta=r.get("meta") or None)
             else:
-                base.update(prompt=None, reference=None, notes=None,
+                base.update(prompt=None, reference=None, notes=None, meta=None,
                             withheld="report half — never shown, never exported")
             out.append(base)
     return out
@@ -540,8 +632,12 @@ def build(results_root: Path, root: Path, per_category: int = CONTROL_PER_CATEGO
                 if stale.exists():
                     stale.unlink()
             continue
+        # meta rides along when the bank has it (an imported item's acuity,
+        # intent, domain): the judge reads the doc, and a per-acuity table is
+        # the first thing the author of a medical bank looks at
         items = [{"id": f"{task}-{r['qid'][:12]}", "qid": r["qid"], "topic": topic,
-                  "category": topic, "prompt": r["prompt"], "reference": r["reference"]}
+                  "category": topic, "prompt": r["prompt"], "reference": r["reference"],
+                  **({"meta": r["meta"]} if r.get("meta") else {})}
                  for r in sorted(rows, key=lambda r: r["qid"])]
         _write(p, items)
         halves = collections.Counter(half_of(r["qid"]) for r in rows)
@@ -595,6 +691,11 @@ def main() -> int:
     f = sub.add_parser("fetch", help="collect a batch submitted with --no-wait")
     f.add_argument("batch_id")
     sub.add_parser("migrate", help="the four skill suites' 40 items into the bank, under 'other'")
+    i = sub.add_parser("import", help="a human-written bank (JSON array) straight into the bank")
+    i.add_argument("path", type=Path, help="JSON array of objects with at least a prompt")
+    i.add_argument("--topic", required=True, help="the exam topic these belong to")
+    i.add_argument("--approver", required=True, help="who stands behind them — recorded per item")
+    i.add_argument("--source", default="import", help="provenance tag kept on every item")
     sub.add_parser("summary", help="per topic: accepted, halves, pending")
     b = sub.add_parser("build", help="write the harness tasks from the bank + the MMLU control set")
     b.add_argument("results", type=Path, help="results/full (source of the control set)")
@@ -603,6 +704,20 @@ def main() -> int:
     root = a.root or Path(os.environ.get("BENCH_ROOT", ".")) / "exam"
     if a.cmd == "migrate":
         print(f"migrated {migrate_seeds(root)} items into {bank_dir(root)}")
+        return 0
+    if a.cmd == "import":
+        try:
+            r = import_bank(root, a.path, a.topic, a.approver, a.source)
+        except (ValueError, OSError, json.JSONDecodeError) as e:
+            print(e, file=sys.stderr)
+            return 2
+        print(f"{r['topic']}: imported {r['imported']}, skipped {r['skipped']} already in the "
+              f"bank" + (f", {r['invalid']} without a usable prompt" if r["invalid"] else "")
+              + f" — report {r['report']} / diagnose {r['diagnose']}")
+        if r["acuity"]:
+            print("acuity: " + ", ".join(f"{k} {v}" for k, v in r["acuity"].items()))
+        print(f"they are in the bank ({bank_dir(root)}); rebuild the tasks with "
+              f"exam_build.py build <results> --root {root}")
         return 0
     if a.cmd == "summary":
         for t, s in summary(root).items():

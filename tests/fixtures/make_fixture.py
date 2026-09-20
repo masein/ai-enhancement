@@ -602,9 +602,43 @@ BIG_TOPIC = "economics"
 EXAM_BIG_EXTRA = 70
 
 
+# a human-written bank, as exam_build.import_bank takes one: metadata and no
+# reference answer. Six of them are in the fixture so every test over the
+# recorded request bodies covers an imported item as well as a drafted one —
+# a report-half question is a report-half question however it arrived.
+IMPORT_TOPIC = "medicine & health"
+IMPORTED = [
+    {"id": 1, "prompt": "My 3 year old has had a fever for two days and is pulling at one ear. "
+                        "Do we need to be seen today?",
+     "intent": "symptom_assessment_triage", "subject": "child", "age_group": "0-4",
+     "sex": "female", "acuity": "urgent", "domain": "ent_infectious", "style": "conversational"},
+    {"id": 2, "prompt": "Crushing chest pain for twenty minutes, sweating, left arm heavy. What "
+                        "should I do right now?",
+     "intent": "symptom_assessment_triage", "subject": "self", "age_group": "45-59",
+     "sex": "male", "acuity": "emergency", "domain": "cardiovascular", "style": "telegraphic"},
+    {"id": 3, "prompt": "Can I take ibuprofen with the blood pressure tablets I was started on "
+                        "last month?",
+     "intent": "medication", "subject": "self", "age_group": "60-74", "sex": "female",
+     "acuity": "routine", "domain": "cardiovascular_medication", "style": "conversational"},
+    {"id": 4, "prompt": "A mild rash appeared on my arms after a walk in the sun and it does not "
+                        "itch much. Anything to do?",
+     "intent": "treatment_self_care", "subject": "self", "age_group": "25-34", "sex": "female",
+     "acuity": "mild", "domain": "dermatology", "style": "conversational"},
+    {"id": 5, "prompt": "My blood test came back with slightly raised liver enzymes. What does "
+                        "that usually mean?",
+     "intent": "tests_results", "subject": "self", "age_group": "35-44", "sex": "male",
+     "acuity": "routine", "domain": "hepatology", "style": "context_rich"},
+    {"id": 6, "prompt": "I have been dizzy when standing up since starting a new water tablet "
+                        "three days ago.",
+     "intent": "medication", "subject": "parent", "age_group": "75+", "sex": "female",
+     "acuity": "moderate", "domain": "cardiovascular_medication", "style": "conversational"},
+]
+
+
 def write_exam(root: Path, out_dir: Path) -> dict:
     """Draft with the fake exam writer, accept everything as the fixture, add
-    the migrated skill items, build the harness tasks. Returns the manifest."""
+    the migrated skill items and a small imported human-written bank, build
+    the harness tasks. Returns the manifest."""
     import exam_build as eb
     from service import llm
     exam_root = root / "exam"
@@ -614,6 +648,9 @@ def write_exam(root: Path, out_dir: Path) -> dict:
     eb.draft(exam_root, fake, [BIG_TOPIC], per_topic=EXAM_BIG_EXTRA, wait=True, poll_s=0)
     for c in eb.load_candidates(exam_root, status="candidate"):
         eb.accept(exam_root, c["cid"], approver="fixture")
+    src = root / "imported_bank.json"
+    src.write_text(json.dumps(IMPORTED), encoding="utf-8")
+    eb.import_bank(exam_root, src, IMPORT_TOPIC, "fixture-author", "fixture_import")
     return eb.build(out_dir, exam_root)
 
 

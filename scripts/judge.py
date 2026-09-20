@@ -59,12 +59,14 @@ import re
 import sys
 import time
 from pathlib import Path
+from typing import NamedTuple
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(REPO))
 import diagnose as dx  # noqa: E402
+import exam_build as _exam  # noqa: E402
 from exam_build import ALL_TASKS, CONTROL_TASK  # noqa: E402
 
 RUBRIC_DIR = REPO / "eval_tasks" / "fr" / "rubrics"
@@ -98,14 +100,45 @@ def family(model_id: str) -> str:
     return re.split(r"[^a-z0-9]", model_id.split("/")[-1].lower())[0]
 
 
-def rubric_for(task: str) -> tuple[str, str, str]:
-    """(text, sha256, version). Every exam topic is graded with the exam
-    rubric; the control set with the factual one — it asks for a fact, and the
-    gold option is the reference."""
-    cat = "factual_accuracy" if task == CONTROL_TASK else "exam"
-    text = (RUBRIC_DIR / f"{cat}.md").read_text(encoding="utf-8")
-    m = re.search(r"\(version (\d+)\)", text)
-    return text, hashlib.sha256(text.encode("utf-8")).hexdigest(), (m.group(1) if m else "?")
+class Rubric(NamedTuple):
+    """(text, sha256, version, status) — indexable as the 3-tuple it used to
+    be. `status` is "draft" while the heading says so: a rubric its author
+    has not signed off is not a benchmark, and the page says so beside the
+    score. Signing off means deleting the word, which changes the sha, which
+    is correct — a different rubric is a different instrument."""
+    text: str
+    sha256: str
+    version: str
+    status: str = ""
+
+
+def rubric_name(task: str) -> str:
+    """Which rubric grades this task: the topic's own when one exists
+    (rubrics/<slug>.md, the slug exam_build built the task name from), else
+    the shared exam rubric. The control set asks for a fact, and its gold
+    option is the reference, so it keeps the factual one."""
+    if task == CONTROL_TASK:
+        return "factual_accuracy"
+    slug = _exam.task_slug(task)
+    return slug if (RUBRIC_DIR / f"{slug}.md").exists() else "exam"
+
+
+def rubric_for(task: str) -> Rubric:
+    text = (RUBRIC_DIR / f"{rubric_name(task)}.md").read_text(encoding="utf-8")
+    # "(version 1)" and "(version 1, DRAFT — awaiting sign-off)" both parse:
+    # the status rides in the same brackets and must not hide the version
+    m = re.search(r"\(version (\d+)", text)
+    head = text.split("\n", 1)[0]
+    return Rubric(text, hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                  (m.group(1) if m else "?"), "draft" if "DRAFT" in head else "")
+
+
+def _rubric_record(task: str) -> dict:
+    r = rubric_for(task)
+    out = {"name": rubric_name(task), "sha256": r.sha256, "version": r.version}
+    if r.status:
+        out["status"] = r.status
+    return out
 
 
 def build_prompt(rubric: str, question: str, reference: str, answer: str) -> str:
@@ -332,7 +365,7 @@ def plan_requests(model_dir: Path, judge_family: str) -> tuple[list, dict]:
     safe = model_dir.name
     plan["answer_stats"] = {}
     for task in tasks_present:
-        rubric, _, _ = rubric_for(task)
+        rubric = rubric_for(task).text
         items = []
         # what the model actually wrote, in aggregate. A model that wrote
         # nothing on a topic has not revealed a gap in that topic, and the
@@ -423,8 +456,10 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
                       "family": ident["family"], "batch_id": batch_id,
                       "prompt_sha256": prompt_sha(), "prompt_version": PROMPT_VERSION,
                       "stub": ident["provider"] == "stub", "single_provider_loop": caveat,
-                      "rubrics": {t: {"sha256": rubric_for(t)[1], "version": rubric_for(t)[2]}
-                                  for t in tasks_present}},
+                      # per task, because the rubric is now per topic: which
+                      # one graded it, its sha, its version, and whether its
+                      # author has signed it off
+                      "rubrics": {t: _rubric_record(t) for t in tasks_present}},
             "model": plan["model"], "split_salt": dx.SPLIT_SALT, "correct_at": CORRECT_AT}
     # a local judge: the stamp recorded at submit time (with what the server
     # said it serves), or at the least the mark itself — never nothing
@@ -432,6 +467,12 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
     if stamp:
         head["judge"].update(stamp)
         head["judge"]["family"] = judge_family(ident, stamp)
+    # a second stamp, independent of the judge: a rubric its author has not
+    # signed off yet. The page shows it beside the provisional one.
+    draft = sorted(t for t, r in head["judge"]["rubrics"].items() if r.get("status") == "draft")
+    if draft:
+        head["judge"]["rubric_status"] = "draft"
+        head["judge"]["rubrics_draft"] = draft
     if plan.get("skipped"):
         return {**head, "skipped": plan["skipped"], "tasks": {}}
     # the canary first: has the judge moved since last time?

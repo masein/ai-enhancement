@@ -179,6 +179,51 @@ def test_a_model_answering_in_an_uncurable_shape_says_how_many(tmp_path, monkeyp
         srv.server_close()
 
 
+MEDICINE = REPO / "eval_tasks" / "fr" / "hossein_medicine_v1.json"
+
+
+def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
+    """The medicine run: a human-written bank, its author as the approver,
+    and no exam writer configured at all — nobody is drafting anything."""
+    root = tmp_path / "bench"
+    r = run(root, "--keep", "--import", str(MEDICINE), "--approver", "Dr. Hossein",
+            "--topic", "medicine & health", EXAM_PROVIDER="", EXAM_MODEL="")
+    assert r.returncode == 0, r.stdout + r.stderr
+    out = r.stdout
+    assert "Import the exam — a human-written bank, not an LLM's drafts" in out
+    assert "Draft the exam" not in out and "NOT curation" not in out
+    assert re.search(r"imported\s+50 items", out)
+    assert re.search(r"split by qid\s+report \d+ / diagnose \d+", out)
+    assert re.search(r"acuity\s+emergency 3,", out)
+    assert "a real run needs 30 before this topic" in out
+    assert "the ask back to the author is at least" in out.lower()
+    # the two stamps, one from the judge and one from the rubric
+    assert "CAVEAT draft rubric: medicine & health is graded against medicine_health.md" in out
+    assert "does not look instruction-tuned" in out          # the default model is a base model
+    assert "PASSED: none of them appear" in out              # the split holds for an import too
+    j = json.loads((root / "demo" / "results" / "full" / "EleutherAI__pythia-160m"
+                    / "judge.json").read_text())
+    rub = j["judge"]["rubrics"]["exam_medicine_health"]
+    assert rub["name"] == "medicine_health" and rub["status"] == "draft"
+    assert j["judge"]["rubric_status"] == "draft"
+    bank = [json.loads(x) for x in (root / "demo" / "exam" / "bank" / "medicine_health.jsonl")
+            .read_text().splitlines() if x.strip()]
+    assert len(bank) == 50 and all(b["accepted_by"] == "Dr. Hossein" for b in bank)
+    assert all(b["source"] == "hossein_medicine_v1" for b in bank)   # the file's stem
+
+
+def test_the_import_flags_are_checked_before_anything_runs(tmp_path):
+    root = tmp_path / "bench"
+    r = run(root, "--import", str(MEDICINE), "--topic", "medicine & health")
+    assert r.returncode == 2 and "--import needs --approver" in r.stdout
+    r = run(root, "--import", str(MEDICINE), "--approver", "X", "--topics", "law,economics")
+    assert r.returncode == 2 and "--import takes one topic, not 2" in r.stdout
+    r = run(root, "--import", str(tmp_path / "nope.json"), "--approver", "X",
+            "--topic", "medicine & health")
+    assert r.returncode == 2 and "no such file" in r.stdout
+    assert not (root / "demo").exists()
+
+
 def test_demo_md_says_what_a_green_run_does_not_prove():
     doc = (REPO / "DEMO.md").read_text(encoding="utf-8")
     # the sentence the brief asks for, in those words — a green demo must not

@@ -10,6 +10,8 @@ instead of reading about it:
     1 preflight      vLLM reachable, what it serves, the three identities
     2 draft          an LLM writes candidate questions per topic
     3 accept         a person curates — here, --auto-accept, recorded as `demo`
+      (--import <json> replaces 2 and 3 with a human-written bank, whose
+       author is the approver on every item)
     4 build          the harness tasks, split report/diagnose by qid
     5 sit            the model answers, on the GPU, behind the shared lock
     6 judge          an LLM grades every answer 0-4 and says why
@@ -36,6 +38,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import sys
 import time
@@ -52,6 +55,8 @@ import judge as jd  # noqa: E402
 
 WIDTH = 78
 APPROVER = "demo"          # never a curator's name: nobody should mistake this for curation
+# an instruct-tuned model, by the only signal a model id gives
+INSTRUCT = re.compile(r"instruct|-it\b|chat|sft|tulu|zephyr", re.I)
 _N = 0
 
 
@@ -137,8 +142,12 @@ def preflight(a, ctx) -> str:
     kv("database", config.DB_PATH)
     kv("topics", ", ".join(ctx["topics"]))
     kv("model to sit the exam", a.model)
+    if a.import_path:
+        kv("exam bank from", f"{a.import_path}  (imported, not drafted)")
     print()
-    roles = (("exam", "exam writer"), ("judge", "judge"), ("llm", "generator"))
+    # an imported bank needs no exam writer: nobody is drafting anything
+    roles = ([("judge", "judge"), ("llm", "generator")] if a.import_path else
+             [("exam", "exam writer"), ("judge", "judge"), ("llm", "generator")])
     blocked = {}
     for role, label in roles:
         p, m, _ = llm.identity(role)
@@ -146,7 +155,8 @@ def preflight(a, ctx) -> str:
         blocked[role] = why
         kv(label, (f"{p}/{m}" if p else "(unset)") + ("" if not why else f"  ← {why}"))
     if any(blocked.values()):
-        return die("One identity is not usable, and the loop needs all three.",
+        return die(f"One identity is not usable, and the loop needs "
+                   f"{'both of these' if a.import_path else 'all three'}.",
                    *[f"{r}: {w}" for r, w in blocked.items() if w],
                    "", "For an all-local trial, put this in .env (SERVICE.md § The local model):",
                    "  LLM_PROVIDER=local    LLM_MODEL=chat",
@@ -174,6 +184,21 @@ def preflight(a, ctx) -> str:
             "nothing this judge writes is ranked or averaged. That is the point of the "
             "stamp,",
             "not a fault in the run.")
+    for topic in ctx["topics"]:
+        r = jd.rubric_for(eb.topic_task(topic))
+        if r.status == "draft":
+            say("", f"CAVEAT draft rubric: {topic} is graded against "
+                    f"{jd.rubric_name(eb.topic_task(topic))}.md, which its author has not",
+                "signed off. Its scores are a reading, not a result; sign-off is removing "
+                "DRAFT",
+                "from the heading, which changes the rubric's sha.")
+    if not INSTRUCT.search(a.model):
+        say("", f"NOTE {a.model} does not look instruction-tuned. A base model answers a "
+                f"consumer",
+            "health question with word salad and scores 0 on everything, which teaches "
+            "nothing.",
+            "For this kind of topic use an instruct model, e.g. "
+            "HuggingFaceTB/SmolLM2-360M-Instruct.")
     return ""
 
 
@@ -276,6 +301,49 @@ def accept(a, ctx) -> str:
         "in a topic before anything can be proposed from it — the most any topic has here",
         f"is {floor}, so the live service would refuse to propose. This demo goes on anyway,",
         "and says so again at that step.")
+    return ""
+
+
+# ---------------------------------------------------------------------------
+# 2+3 · import, when the bank is human-written
+# ---------------------------------------------------------------------------
+
+def import_step(a, ctx) -> str:
+    from service import config
+    import report_lm_eval as report
+    hr("Import the exam — a human-written bank, not an LLM's drafts")
+    topic = ctx["topics"][0]
+    say(f"{a.import_path}",
+        f"into the {topic!r} bank, as approver {a.approver!r} — the author of these questions.",
+        "Drafting and curation (steps 2 and 3 of a normal run) are what this replaces: these",
+        "were written and curated by the person whose name is on them.")
+    try:
+        r = eb.import_bank(config.EXAM_DIR, a.import_path, topic, a.approver, a.source)
+    except (ValueError, OSError, json.JSONDecodeError) as e:
+        return die(f"the import failed: {e}")
+    kv("imported", f"{r['imported']} items"
+       + (f", {r['skipped']} already in the bank" if r["skipped"] else "")
+       + (f", {r['invalid']} without a usable prompt" if r["invalid"] else ""))
+    kv("split by qid", f"report {r['report']} / diagnose {r['diagnose']}")
+    if r["acuity"]:
+        kv("acuity", ", ".join(f"{k} {v}" for k, v in r["acuity"].items()))
+    if not r["imported"] and not r["skipped"]:
+        return die("nothing was imported — the file held no usable questions.")
+    short = report.PROPOSE_MIN_N - r["report"]
+    if short > 0:
+        say("", f"{r['report']} report-half questions; a real run needs "
+                f"{report.PROPOSE_MIN_N} before this topic",
+            f"can be proposed from. The ask back to the author is at least {2 * short} more "
+            f"items",
+            "(the split is by qid, so about half of what arrives lands in the report half).")
+    for row in eb.load_bank(config.EXAM_DIR).get(topic, [])[:1]:
+        print()
+        say("One item as it was imported — the reference is its metadata, which is the "
+            "ground",
+            "truth the rubric asks the judge to check against, the acuity above all:")
+        quote(row["prompt"])
+        quote("")
+        quote(row["reference"])
     return ""
 
 
@@ -636,8 +704,15 @@ def summary(a, ctx) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--topics", default="economics",
+    ap.add_argument("--topics", "--topic", dest="topics", default="economics",
                     help="comma-separated, from scripts/categories.yaml (default: economics)")
+    ap.add_argument("--import", dest="import_path", type=Path, default=None,
+                    help="a human-written bank (JSON array) to import instead of drafting and "
+                         "curating — one topic, and --approver names its author")
+    ap.add_argument("--approver", default=None,
+                    help="who stands behind an imported bank; recorded on every item")
+    ap.add_argument("--source", default=None,
+                    help="provenance tag for an imported bank (default: the file's stem)")
     ap.add_argument("--model", default="EleutherAI/pythia-160m",
                     help="the model that sits the exam (default: a small one, on purpose)")
     ap.add_argument("--per-topic", type=int, default=12, help="candidate questions drafted")
@@ -664,6 +739,17 @@ def main() -> int:
     unknown = [t for t in topics if t not in known]
     if unknown:
         return die(f"not exam topics: {', '.join(unknown)}", f"known: {', '.join(known)}")
+    if a.import_path:
+        if not a.approver or not a.approver.strip():
+            return die("--import needs --approver: the name of whoever stands behind these "
+                       "questions",
+                       "is recorded on every one of them, the way a curator's name is.")
+        if len(topics) != 1:
+            return die(f"--import takes one topic, not {len(topics)}: an imported file is one "
+                       f"topic's bank.")
+        if not a.import_path.exists():
+            return die(f"no such file: {a.import_path}")
+        a.source = a.source or a.import_path.stem
     ctx = {"root": root, "topics": topics, "backend": {}, "bench_root": config.BENCH_ROOT}
     print(f"\n{'═' * WIDTH}\n  THE LOOP, END TO END — a demo run, everything it writes stamped "
           f"'{APPROVER}'\n{'═' * WIDTH}")
@@ -671,9 +757,13 @@ def main() -> int:
         configure(root, create=False)      # a plan writes nothing, not even a directory
         hr("Dry run — the plan, in order. Nothing is called.")
         for i, line in enumerate((
-                f"draft {a.per_topic} candidates per topic ({', '.join(topics)}) through the "
-                f"exam writer",
-                f"accept them unread as {APPROVER!r}" if a.auto_accept else "stop for curation",
+                (f"import {a.import_path} into {topics[0]!r} as {a.approver!r} — no drafting, "
+                 f"no curation" if a.import_path else
+                 f"draft {a.per_topic} candidates per topic ({', '.join(topics)}) through the "
+                 f"exam writer"),
+                *([] if a.import_path else
+                  [f"accept them unread as {APPROVER!r}" if a.auto_accept else
+                   "stop for curation"]),
                 "build the harness tasks from the bank, split by qid",
                 f"{a.model} sits the exam ({a.sit})",
                 "the judge grades every answer, canary first",
@@ -688,7 +778,8 @@ def main() -> int:
     t0 = time.time()
     ok = False
     try:
-        for stepfn in (preflight, draft, accept, build, sit, judge_step, propose, generate):
+        write_bank = (import_step,) if a.import_path else (draft, accept)
+        for stepfn in (preflight, *write_bank, build, sit, judge_step, propose, generate):
             why = stepfn(a, ctx)
             if why:
                 return 2

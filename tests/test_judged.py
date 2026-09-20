@@ -103,15 +103,17 @@ def test_task_yamls_point_at_absolute_items_files(tree):
 
 
 def test_rubrics_have_anchors_and_a_length_clause():
-    for task in ("exam_economics", "exam_law", fr_build.CONTROL_TASK):
-        text, sha, ver = jd.rubric_for(task)
-        assert ver == "1" and re.fullmatch(r"[0-9a-f]{64}", sha)
+    for task in ("exam_economics", "exam_law", "exam_medicine_health", fr_build.CONTROL_TASK):
+        r = jd.rubric_for(task)
+        assert r.version == "1" and re.fullmatch(r"[0-9a-f]{64}", r.sha256)
         for s in range(5):
-            assert re.search(rf"^- \*\*{s}\*\*", text, re.M), (task, s)
-        assert "Length" in text
-    # every exam topic shares one rubric; the control keeps the factual one
+            assert re.search(rf"^- \*\*{s}\*\*", r.text, re.M), (task, s)
+        assert "Length" in r.text
+    # a topic with no rubric of its own shares the exam one; the control keeps
+    # the factual one; a topic with its own is graded by its own
     assert jd.rubric_for("exam_economics")[1] == jd.rubric_for("exam_history")[1]
     assert jd.rubric_for(fr_build.CONTROL_TASK)[1] != jd.rubric_for("exam_economics")[1]
+    assert jd.rubric_for("exam_medicine_health")[1] != jd.rubric_for("exam_economics")[1]
     assert (REPO / "eval_tasks" / "fr" / "rubrics" / "exam.md").exists()
 
 

@@ -18,6 +18,7 @@ import pytest
 import diagnose as dx
 import exam_build as eb
 import judge as jd
+import make_fixture
 import report_lm_eval as report
 from conftest import fresh, make_service
 from service import llm, llm_poller
@@ -77,6 +78,13 @@ def test_the_whole_loop(tmp_path, monkeypatch):
         assert all(dx.split_of(q) == "diagnose" for q in req["meta"]["qids"])
         for b in eb.load_bank(exam_root)[TOPIC]:              # THE RULE, both halves
             assert b["prompt"] not in body
+        # and a question that was IMPORTED rather than drafted is no different:
+        # a report-half question is a report-half question however it arrived
+        imported = [b for b in eb.load_bank(exam_root)[make_fixture.IMPORT_TOPIC]
+                    if b.get("source") == "fixture_import"]
+        assert imported and any(eb.half_of(b["qid"]) == "report" for b in imported)
+        for b in imported:
+            assert b["prompt"] not in body
         assert json.loads(p["judge_run"])["judge_id"] == "stub/overlap-v1"
 
         # 7. APPROVE — the airlock: a name, and the text the generator will get
@@ -92,7 +100,7 @@ def test_the_whole_loop(tmp_path, monkeypatch):
         for q in gen:
             gbody = q["system"] + "\n" + q["user"]
             assert edited in gbody and "fx/good-750m" not in gbody
-            for b in eb.load_bank(exam_root)[TOPIC]:
+            for b in eb.load_bank(exam_root)[TOPIC] + imported:
                 assert b["prompt"] not in gbody
         assert llm_poller.tick() == 1
 

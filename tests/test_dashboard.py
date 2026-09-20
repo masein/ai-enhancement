@@ -350,6 +350,13 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
         assert "whose id cannot be pinned" in card.locator("p.sub").text_content()
         assert "chat at http://localhost:8000/v1 (weights google/gemma-4-E4B-it)" in text
         assert "Preliminary." in card.text_content() and "Judged average" not in card.text_content()
+        # the second stamp, independent of the judge: a rubric its author has
+        # not signed off. The fixture's medicine topic is graded by one.
+        draft = card.locator("[data-rubric='draft']")
+        assert draft.count() == 1
+        assert "medicine & health is graded against a rubric its author has not signed off" \
+            in draft.text_content()
+        assert "changes its sha" in draft.text_content()
         # greyed: every topic row, in the muted colour rather than the text colour
         rows = card.locator("table.jd").first.locator("tbody tr")
         assert rows.count() > 0

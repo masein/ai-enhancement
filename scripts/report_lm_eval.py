@@ -253,7 +253,9 @@ def _trim_judge(j: dict | None) -> dict | None:
                       # a local judge (service/llm.py::local_mark): what it was
                       # and why nothing it graded counts
                       "provisional", "provisional_reason", "base_url", "served_model",
-                      "weights")},
+                      "weights",
+                      # a rubric whose author has not signed it off yet
+                      "rubric_status", "rubrics_draft")},
            "skipped": j.get("skipped"), "correct_at": j.get("correct_at"),
            "canary": ({k: v for k, v in (j.get("canary") or {}).items()
                        if k in ("n", "graded", "mad_vs_human", "mad_vs_previous", "threshold",
@@ -2763,6 +2765,16 @@ function vJudged(m) {
     + (j.judge.weights ? ` (weights ${j.judge.weights})` : '')
     + '. A local server\'s model id is whatever was typed at launch, so these scores are shown '
     + 'greyed, never ranked and never in any average.'));
+  // a rubric is an instrument: one its author has not signed off yet grades,
+  // but it does not settle anything, and deleting DRAFT from its heading
+  // changes its sha — which is the point, a different rubric is a different
+  // instrument and before/after across the change do not compare
+  if (j.judge.rubric_status === 'draft') card.append(el('p', { class: 'warn',
+    'data-rubric': 'draft' }, el('b', { text: 'Draft rubric. ' }),
+    `${(j.judge.rubrics_draft || []).map(frName).join(', ') || 'a topic'} is graded against a `
+    + 'rubric its author has not signed off yet, so its scores are a reading, not a result. '
+    + 'Sign-off is recorded by removing DRAFT from the rubric\'s heading, which changes its '
+    + 'sha: scores from before and after do not compare.'));
   if (j.judge.single_provider_loop) card.append(el('p', { class: 'warn', text: 'Single-provider '
     + 'loop: the judge shares a provider with the exam writer or the generator. Every score here '
     + 'carries that caveat — a judge scores its own family higher.' }));
