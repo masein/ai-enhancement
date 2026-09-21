@@ -108,6 +108,18 @@ def _beside(source: Path, name: str) -> dict | None:
     return None
 
 
+def _beside_mtime(source: Path, name: str) -> float | None:
+    """When the file _beside read was last written, for a record that has no
+    time of its own to show."""
+    for up in (1, 2):
+        if len(source.parents) > up:
+            try:
+                return (source.parents[up] / name).stat().st_mtime
+            except OSError:
+                continue
+    return None
+
+
 def _model_meta(source: Path) -> dict | None:
     """Written by the service at preflight: architecture, param count, template."""
     return _beside(source, "model_meta.json")
@@ -286,6 +298,17 @@ def _trim_judge(j: dict | None) -> dict | None:
                                # time, not the file's last merge
                                "judged_at")
                               if t.get(k) is not None}
+    return out
+
+
+def _judged_now(row: dict, fingerprints: dict[str, str] | None) -> dict | None:
+    """The trimmed judge.json of one model with only the topics that count
+    now, and the rest as `history` (scripts/judge.py::split_by_bank)."""
+    from judge import split_by_bank
+    now, hist = split_by_bank(row.get("judge"), fingerprints, row.get("judge_mtime"))
+    out = _trim_judge(now)
+    if out is not None:
+        out["history"] = hist
     return out
 
 
@@ -686,6 +709,7 @@ def parse_run(blob: dict, source: Path) -> dict:
         "diag": _beside(source, "diagnose.json"),
         # rubric scores from scripts/judge.py, same place and pattern as the diagnosis
         "judge": _beside(source, "judge.json"),
+        "judge_mtime": _beside_mtime(source, "judge.json"),
         "tasks": tasks,
     }
 
@@ -960,6 +984,7 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
         m["archinfo"] = m.get("archinfo") or r.get("archinfo")
         m["diag"] = m.get("diag") or r.get("diag")
         m["judge"] = m.get("judge") or r.get("judge")
+        m["judge_mtime"] = m.get("judge_mtime") or r.get("judge_mtime")
     return by_model
 
 
@@ -967,11 +992,19 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                   taint: dict[str, list[str]] | None = None,
                   calibration: dict | None = None,
                   parents: dict[str, str] | None = None,
-                  judge_identity: dict | None = None) -> dict:
+                  judge_identity: dict | None = None,
+                  fingerprints: dict[str, str] | None = None) -> dict:
     """`taint`: model id -> tasks whose diagnostics its training data was
     derived from (the service computes it from the run/dataset join). A
     tainted task is treated exactly like a missing required task: shown per
-    task, excluded from the official average, the model unranked."""
+    task, excluded from the official average, the model unranked.
+
+    `fingerprints`: task -> the question set the exam holds now
+    (exam_build.current_fingerprints). A judged topic graded on any other
+    set — or before sets were fingerprinted — is left out of every number
+    here and handed to the model page as `judge.history`. None when the exam
+    directory is not known (a frozen report built from a results tree
+    alone): then nothing is filtered."""
     models = list(by_model)
     taint = taint or {}
     parents = parents or {}      # tainted model id -> the model its training run started from
@@ -1046,7 +1079,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         missing = [t for t in required if mid not in cells.get(t, {})]
         official = bool(required) and not missing and not (set(tainted_acc) & set(required))
         params = r["num_params"] or params_from_name(mid)
-        judge = _trim_judge(r.get("judge"))
+        judge = _judged_now(r, fingerprints)
         jstate = judged_state(judge, cal, current_judge) if judge else None
         diag = _trim_diag(r.get("diag"))
         compare = {}
@@ -1054,7 +1087,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             if not t.startswith("exam_"):
                 continue
             pid = parents.get(mid)
-            pjudge = _trim_judge(by_model[pid].get("judge")) if pid in by_model else None
+            pjudge = _judged_now(by_model[pid], fingerprints) if pid in by_model else None
             cmp = taint_exam_compare(t, judge, pjudge, pid) if judge and pjudge else None
             if cmp:
                 compare[t] = cmp
@@ -1366,8 +1399,10 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             f"({', '.join(hashes)}). A benchmark whose code changed is a different "
             f"benchmark — treat cross-build comparisons with suspicion.")
 
-    judged_tasks = sorted({t for r in by_model.values()
-                           for t in ((r.get("judge") or {}).get("tasks") or {})})
+    # the topics judged on the question set they hold now — a topic sat only
+    # on a retired set is history on the model page, not a column here
+    judged_tasks = sorted({t for m in model_rows
+                           for t in ((m.get("judge") or {}).get("tasks") or {})})
     judge_meta = next(((m["judge"] or {}).get("judge") for m in model_rows if m.get("judge")), None)
     if judged_tasks and cal is None:
         warn('judge_uncalibrated', 'warning', {'tab': 'loop'}, 'The judge is not calibrated against a person',
@@ -1952,6 +1987,8 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .anscard .score { font-size:var(--fs-4); font-weight:650; letter-spacing:-.02em; line-height:1.1; }
 .anscard .side .badge { margin:4px 0 0 4px; }
 .critrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+/* where a button took you: a card or row marked for a few seconds */
+.landed { outline:2px solid var(--accent); outline-offset:2px; border-radius:var(--r-1); }
 .critcells { display:flex; gap:2px; flex-wrap:wrap; min-width:0; }
 .critcell { width:14px; height:14px; border-radius:3px; flex:none; box-shadow:inset 0 0 0 1px var(--border); }
 .critcell.na { background:none; border:1px dashed var(--axis); box-sizing:border-box; }
@@ -3157,6 +3194,33 @@ function controlSentence(c) {
   return { lead, text, tot };
 }
 
+// Grades on question sets the exam no longer holds: what this model scored on
+// the retired law, and when. Shown here and nowhere else — not on the Loop
+// board, in an average, a Leaderboard column or a proposal — because a number
+// on other questions is not a Law score, however its task was named.
+function vEarlier(m) {
+  const h = ((m.judge || {}).history || []).filter(e => e && e.task);
+  if (!h.length) return null;
+  const day = t => t ? new Date(t * 1000).toISOString().slice(0, 10) : 'date not recorded';
+  return el('div', { class: 'card', 'data-earlier': String(h.length) },
+    el('h2', { text: 'Earlier exams (retired question sets)' }),
+    el('p', { class: 'sub', text: 'Judged on questions the exam no longer holds, or before the '
+      + 'exam recorded which questions a grade was on. Kept as history: none of these counts '
+      + 'toward anything on this board.' }),
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'topic' }),
+        el('th', { class: 'num', text: 'score (report half)' }),
+        el('th', { class: 'num', text: 'items' }), el('th', { text: 'judged' }),
+        el('th', { text: 'judge' }))),
+      el('tbody', {}, h.map(e => el('tr', { class: 'dim', 'data-earlier-task': e.task },
+        el('td', { text: e.topic || e.task }),
+        el('td', { class: 'num', text: e.score_report != null ? `${num(e.score_report, 2)} / 4`
+          : e.mean != null ? `${num(e.mean, 2)} / 4 (all items)` : '—' }),
+        el('td', { class: 'num se', text: String(e.n_report != null ? e.n_report : (e.n || '—')) }),
+        el('td', { class: 'se', text: day(e.judged_at) }),
+        el('td', { class: 'se', text: (e.judge_id || '—') + (e.provisional ? ' · provisional' : '') })))))));
+}
+
 function vJudged(m) {
   const J = DATA.judged;
   if (!J || !J.tasks.length) return null;
@@ -3198,6 +3262,9 @@ function vJudged(m) {
     + 'suite=judged, or run scripts/judge.py over its fr_* answers.')); return card; }
   if (j.skipped) { card.append(note(j.skipped + '. A judge scores its own family higher; the '
     + 'cell stays empty rather than flattering.')); return card; }
+  if (!Object.keys(j.tasks || {}).length) { card.append(note('Not judged on the current exam: '
+    + 'every judged run on file was on questions the exam no longer holds (Earlier exams, below). '
+    + 'Sit the exam to score it on the current questions.')); return card; }
   if (j.judge.stub) caveat('stub grader', el('p', { class: 'warn', text: 'Graded by the STUB grader — a '
     + 'word-overlap stand-in for plumbing tests. Not a judgement of anything.' }), { 'data-caveat': 'stub' });
   if (prov) caveat('provisional', el('p', { class: 'warn', 'data-provisional': 'judge' },
@@ -3622,8 +3689,9 @@ function vModel() {
   // The exam leads: it is the instrument the loop steers by. The
   // multiple-choice results and the per-item diagnosis follow as the free
   // second opinion — same GPU, no API call, and a different kind of evidence.
-  const judged = vJudged(m), taint = vTaint(m), diag = vDiagnose(m);
-  const sections = [['judged', 'Judged', judged], ['results', 'Results', results],
+  const judged = vJudged(m), taint = vTaint(m), diag = vDiagnose(m), earlier = vEarlier(m);
+  const sections = [['judged', 'Judged', judged], ['earlier', 'Earlier exams', earlier],
+                    ['results', 'Results', results],
                     ['diagnose', 'Diagnose', diag], ['taint', 'Training data', taint],
                     ['provenance', 'Provenance', provCard],
                     ['runs', 'Runs', LIVE ? vModelRuns(m) : null]];
@@ -6618,7 +6686,8 @@ function rvProposal(p, llmOk) {
     + (p.proposer ? ` · proposed by ${p.proposer}` : '')
     + (p.approver ? ` · ${p.status} by ${p.approver}` : '')
     + (p.prompt_sha ? ` · prompt ${p.prompt_sha.slice(0, 12)}` : '') });
-  const card = el('div', { class: 'rv', 'data-proposal': p.id }, head, meta);
+  const card = el('div', { class: 'rv' + (state.rv.landed === p.id ? ' landed' : ''),
+    'data-proposal': p.id }, head, meta);
   if (p.status === 'pending')
     card.append(el('p', { class: 'small', text: 'Waiting for the LLM batch to complete '
       + `(batch ${p.batch_id}). Batches take minutes to hours; this page polls.` }));
@@ -6682,7 +6751,8 @@ function rvProposal(p, llmOk) {
         + 'because question-and-answer pairs shaped like the exam are the most direct route to '
         + 'teaching the test there is. Every document then passes the 13-gram contamination '
         + 'gate against both halves of every benchmark AND every exam question. Today: '
-        + `${usage.usage_today ?? '—'} of ${usage.daily_cap ?? '—'} batch items used.` }),
+        + `${usage.usage_today ?? '—'} ${usage.daily_cap == null ? 'batch items used (no daily limit on '
+            + (usage.provider || 'this provider') + ')' : `of ${usage.daily_cap} batch items used`}.` }),
       el('div', { class: 'frm' }, count, fmt,
         el('button', { class: 'primary', text: 'Generate data', disabled: llmOk ? null : '',
           title: llmOk ? '' : (usage.reason || 'LLM not configured'),
@@ -6739,11 +6809,24 @@ function rvDataset(d) {
   return det;
 }
 
+// the daily limit is per provider (a paid API's, or LOCAL_DAILY_ITEM_CAP):
+// null is no limit, and the judge's spend is on the judge's line
+const underCap = u => u.daily_cap == null || (u.usage_today || 0) < u.daily_cap;
+function usageLine(llm) {
+  const rows = (llm.usage || []).length ? llm.usage
+    : [{ provider: llm.provider, items: llm.usage_today, cap: llm.daily_cap, roles: ['generator'] }];
+  return el('span', { 'data-usage': '1' }, el('b', { text: 'today ' }),
+    rows.map(u => `${u.provider}${u.roles && u.roles.length ? ` (${u.roles.join(', ')})` : ''}: `
+      + (u.cap == null ? `${u.items} items, no daily limit`
+         : `${u.items} of ${u.cap} items` + (u.items >= u.cap ? ' — cap reached until tomorrow' : '')))
+      .join(' · '));
+}
+
 function vReview() {
   if (!state.rv.loaded && netReady()) { loadReview(); }
   rememberedName();
   const llm = state.rv.llm || {};
-  const llmOk = !!llm.configured && (llm.usage_today || 0) < (llm.daily_cap || 0);
+  const llmOk = !!llm.configured && underCap(llm);
   const llmCard = el('div', { class: 'card' },
     el('h2', { text: 'Review' }),
     el('p', { class: 'sub', text: 'The human in the loop. An LLM reads the judge\'s written '
@@ -6755,9 +6838,7 @@ function vReview() {
     el('div', { class: 'kvs' },
       el('span', {}, el('b', { text: 'LLM ' }), llm.configured
         ? `${llm.provider}/${llm.model || '—'}` : 'not configured'),
-      llm.configured ? el('span', {}, el('b', { text: 'today ' }),
-        `${llm.usage_today} of ${llm.daily_cap} batch items` + ((llm.usage_today || 0) >= (llm.daily_cap || 0)
-          ? ' — cap reached, generation paused until tomorrow' : '')) : '',
+      llm.configured ? usageLine(llm) : '',
       llm.datasets_quota_bytes ? el('span', {}, el('b', { text: 'dataset storage ' }),
         `${(llm.datasets_bytes / 1e6).toFixed(1)} MB of ${(llm.datasets_quota_bytes / 1e9).toFixed(0)} GB`) : ''),
     !llm.configured && llm.reason ? el('p', { class: 'warn', text: llm.reason }) : '',
@@ -6912,10 +6993,16 @@ function loopGo(r, step) {
   }
   if (step === 'review' || step === 'generate') {
     state.rv.topic = r.topic; state.rv.loaded = false;
+    // to the proposal the step is about, marked — not the top of Review,
+    // where the reader had to find it among every other proposal
+    const pid = r.proposal && r.proposal.id;
+    if (pid) { state.rv.landed = pid; state.after = { scroll: `.rv[data-proposal="${pid}"]` };
+               setTimeout(() => { if (state.rv.landed === pid) { state.rv.landed = null; render(); } },
+                          LANDED_MS); }
     return navigate({ tab: 'review', topic: null, model: null });
   }
   if (step === 'sit') {
-    state.loopSit.tasks = [r.task];
+    state.loopSit.tasks = [r.task]; state.loopSit.page = r.task;
     state.after = { scroll: '[data-panel="sit"]', focus: '[data-ms="sit"] input' };
   } else if (step === 'read') {
     state.after = { scroll: '[data-panel="answers"]' };
@@ -7181,7 +7268,9 @@ function judgingLine(r) {
 
 function loopSitPanel(r) {
   const s = state.loopSit;
-  if (s.tasks == null) s.tasks = [r.task];
+  // a topic page ticks its own topic, exactly: the ticks belong to the page
+  // they were made on, and law's must not ride along onto physics'
+  if (s.tasks == null || s.page !== r.task) { s.tasks = [r.task]; s.page = r.task; }
   const built = state.loop.built || [];
   const pick = el('div', { class: 'frm', style: 'flex-wrap:wrap' }, built.map(task => {
     const id = 'sit-' + task;
@@ -8031,6 +8120,9 @@ function render() {
   }
 }
 
+// how long a row or card a button took you to stays marked
+const LANDED_MS = 6000;
+
 // A button that scrolls to a panel usually lands before the panel's data
 // does: the page is short, the scroll stops early, and when the answers
 // arrive and the page grows the browser puts the old offset back — with 37
@@ -8442,14 +8534,16 @@ def banner_html(text: str, link: str = "", link_text: str = "") -> str:
 def build_report(runs: list[dict], out_path: Path, title: str,
                  calibration: dict | None = None, taint: dict | None = None,
                  parents: dict | None = None, judge_identity: dict | None = None,
-                 banner: str = "", banner_link: tuple[str, str] = ("", "")) -> Path:
+                 banner: str = "", banner_link: tuple[str, str] = ("", ""),
+                 fingerprints: dict | None = None) -> Path:
     if not runs:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(f"<h1>No lm-eval results found.</h1><p>{html.escape(banner)}</p>",
                             encoding="utf-8")
         return out_path
     payload = build_payload(merge_runs(runs), title, source="", calibration=calibration,
-                            taint=taint, parents=parents, judge_identity=judge_identity)
+                            taint=taint, parents=parents, judge_identity=judge_identity,
+                            fingerprints=fingerprints)
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     page = (TEMPLATE
             .replace("__TITLE__", html.escape(title))
@@ -8470,6 +8564,10 @@ def main() -> int:
     ap.add_argument("-o", "--out", type=Path, default=Path("artifacts/benchmark_report.html"))
     ap.add_argument("--title", default="Model benchmark report")
     ap.add_argument("--csv", type=Path, help="also write a flat CSV of every metric")
+    ap.add_argument("--exam-tasks", type=Path, default=None,
+                    help="the built exam (manifest.json): judged results on any other question "
+                         "set are history. Default: $BENCH_ROOT/exam/tasks, else "
+                         "<results>/../../exam/tasks")
     args = ap.parse_args()
 
     runs = load_results(args.results)
@@ -8493,7 +8591,19 @@ def main() -> int:
             cal = json.loads(cal_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             cal = None
-    out = build_report(runs, args.out, args.title, calibration=cal)
+    fps = None
+    for cand in ([args.exam_tasks] if args.exam_tasks else
+                 [Path(os.environ["BENCH_ROOT"]) / "exam" / "tasks"] * bool(os.environ.get("BENCH_ROOT"))
+                 + [args.results.resolve().parent.parent / "exam" / "tasks"]):
+        if (cand / "manifest.json").is_file():
+            import exam_build
+            fps = exam_build.current_fingerprints(cand)
+            print(f"judged results count only on the exam built in {cand}")
+            break
+    else:
+        print("no built exam found (--exam-tasks): judged results are shown whatever question "
+              "set they were graded on")
+    out = build_report(runs, args.out, args.title, calibration=cal, fingerprints=fps)
     print(f"\nwrote {out}  ({out.stat().st_size / 1024:.1f} KB)")
 
     if args.csv:

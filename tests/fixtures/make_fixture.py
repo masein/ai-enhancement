@@ -698,6 +698,64 @@ def write_exam(root: Path, out_dir: Path) -> dict:
     return eb.build(out_dir, exam_root)
 
 
+def write_answers(out_dir: Path, model_id: str, task: str, items: list[dict], rng,
+                  p_right: float) -> None:
+    """One judged model's generate_until samples and results for one exam
+    task, as lm_eval writes them."""
+    task_dir = (out_dir / safe_name(model_id) / f"{task}_0shot"
+                / _SANITIZE.sub("__", model_args(model_id)))
+    task_dir.mkdir(parents=True, exist_ok=True)
+    recs = []
+    for i, it in enumerate(items):
+        ans = _fr_answer(rng, it, p_right)
+        ctx = it["prompt"] + "\n\nAnswer:"
+        recs.append({"doc_id": i, "doc": it, "target": it["reference"],
+                     "arguments": [[ctx, {"until": ["\n\n\n"], "max_gen_toks": 256,
+                                          "do_sample": False, "temperature": 0.0}]],
+                     "resps": [[ans]], "filtered_resps": [ans],
+                     "doc_hash": _sha(json.dumps(it, sort_keys=True, ensure_ascii=False)),
+                     "prompt_hash": _sha(ctx), "target_hash": _sha(it["reference"]),
+                     "filter": "none", "metrics": ["bypass"], "bypass": 999})
+    with open(task_dir / f"samples_{task}_{TS}.jsonl", "w", encoding="utf-8") as fh:
+        for r in recs:
+            fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+    blob = {"results": {task: {"alias": task, "bypass,none": 999}},
+            "group_subtasks": {task: []},
+            "configs": {task: {"task": task, "output_type": "generate_until",
+                               "metric_list": [{"metric": "bypass"}]}},
+            "versions": {task: 1.0}, "n-shot": {task: 0},
+            "higher_is_better": {task: {"bypass": True}},
+            "n-samples": {task: {"original": len(recs), "effective": len(recs)}},
+            "config": {"model": "hf", "model_args": model_args(model_id), "batch_size": "8",
+                       "device": "cuda:0", "limit": None, "random_seed": 1234,
+                       "model_num_parameters": dict((m[0], m[3]) for m in MODELS)[model_id]},
+            "git_hash": GIT_HASH, "date": DATE + 9000, "transformers_version": TRANSFORMERS,
+            "chat_template": None, "total_evaluation_time_seconds": "40.0"}
+    (task_dir / f"results_{TS}.json").write_text(json.dumps(blob, indent=2),
+                                                 encoding="utf-8")
+
+
+def sit_again(root: Path, out_dir: Path, tasks: list[str], seed: int = SEED) -> None:
+    """The judged models sit `tasks` again on the exam as built NOW, and the
+    stub grades them: what the loop does after a topic's questions change,
+    because answers to the old questions no longer count (phase 10b)."""
+    import shutil
+
+    import exam_build as eb
+    import judge as jd
+    tasks_dir = eb.tasks_dir(root / "exam")
+    for model_id, p_right in JUDGED.items():
+        rng = _rng(seed, "fr-again", model_id)
+        mdir = out_dir / safe_name(model_id)
+        for task in tasks:
+            shutil.rmtree(mdir / f"{task}_0shot", ignore_errors=True)
+            items = [json.loads(ln) for ln in (tasks_dir / f"{task}.jsonl").read_text(
+                encoding="utf-8").splitlines() if ln.strip()]
+            write_answers(out_dir, model_id, task, items, rng, p_right)
+        out = jd.run_stub(mdir, out_dir, record=True, only=tasks)
+        jd.write_judge(mdir, jd.merge_judged(mdir, out))
+
+
 def write_judged(root: Path, out_dir: Path, seed: int = SEED) -> dict:
     """Build the exam from this tree, write generate_until samples for the
     judged models, grade them with the stub, calibrate synthetically."""
@@ -713,37 +771,7 @@ def write_judged(root: Path, out_dir: Path, seed: int = SEED) -> dict:
     for model_id, p_right in JUDGED.items():
         rng = _rng(seed, "fr", model_id)
         for task, items in items_by_task.items():
-            task_dir = (out_dir / safe_name(model_id) / f"{task}_0shot"
-                        / _SANITIZE.sub("__", model_args(model_id)))
-            task_dir.mkdir(parents=True, exist_ok=True)
-            recs = []
-            for i, it in enumerate(items):
-                ans = _fr_answer(rng, it, p_right)
-                ctx = it["prompt"] + "\n\nAnswer:"
-                recs.append({"doc_id": i, "doc": it, "target": it["reference"],
-                             "arguments": [[ctx, {"until": ["\n\n\n"], "max_gen_toks": 256,
-                                                  "do_sample": False, "temperature": 0.0}]],
-                             "resps": [[ans]], "filtered_resps": [ans],
-                             "doc_hash": _sha(json.dumps(it, sort_keys=True, ensure_ascii=False)),
-                             "prompt_hash": _sha(ctx), "target_hash": _sha(it["reference"]),
-                             "filter": "none", "metrics": ["bypass"], "bypass": 999})
-            with open(task_dir / f"samples_{task}_{TS}.jsonl", "w", encoding="utf-8") as fh:
-                for r in recs:
-                    fh.write(json.dumps(r, ensure_ascii=False) + "\n")
-            blob = {"results": {task: {"alias": task, "bypass,none": 999}},
-                    "group_subtasks": {task: []},
-                    "configs": {task: {"task": task, "output_type": "generate_until",
-                                       "metric_list": [{"metric": "bypass"}]}},
-                    "versions": {task: 1.0}, "n-shot": {task: 0},
-                    "higher_is_better": {task: {"bypass": True}},
-                    "n-samples": {task: {"original": len(recs), "effective": len(recs)}},
-                    "config": {"model": "hf", "model_args": model_args(model_id), "batch_size": "8",
-                               "device": "cuda:0", "limit": None, "random_seed": 1234,
-                               "model_num_parameters": dict((m[0], m[3]) for m in MODELS)[model_id]},
-                    "git_hash": GIT_HASH, "date": DATE + 9000, "transformers_version": TRANSFORMERS,
-                    "chat_template": None, "total_evaluation_time_seconds": "40.0"}
-            (task_dir / f"results_{TS}.json").write_text(json.dumps(blob, indent=2),
-                                                         encoding="utf-8")
+            write_answers(out_dir, model_id, task, items, rng, p_right)
         out = jd.run_stub(out_dir / safe_name(model_id), out_dir, record=True)
         jd.write_judge(out_dir / safe_name(model_id), out)
     # calibration: a person who agrees with the stub on six rows in seven

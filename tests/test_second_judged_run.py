@@ -150,7 +150,10 @@ def test_a_one_topic_run_says_which_topic_it_judged(svc, monkeypatch):
     run_judged(monkeypatch, sid)
     assert llm_poller.tick() == 1
     row = rows(client)[sid]
-    assert re.fullmatch(r"judged: Economics, judge.json written \d\d:\d\d", row["progress"]), \
+    # the fixture's answers are on disk already, to the same questions, so
+    # the run re-grades them — and says so before it says what it judged
+    assert re.fullmatch(r"answers reused from an earlier run \(same questions\) · re-graded · "
+                        r"judged: Economics, judge.json written \d\d:\d\d", row["progress"]), \
         row["progress"]
     assert row["judge"]["status"] == "done"
 

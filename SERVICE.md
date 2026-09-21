@@ -111,7 +111,8 @@ it. If it fails part-way, the record is removed and the next start tries again.
 | `LLM_PROVIDER` | *(unset — off)* | `anthropic` / `openai` / `local` / `fake`: the model behind skill-spec proposals and data generation (batch API only; `local` is vLLM on this box — see *The local model*) |
 | `LLM_MODEL` | *(unset)* | the generator model id, pinned; recorded in every dataset's provenance |
 | `LLM_API_KEY` | *(unset)* | in `.env` only — see *The LLM key* below |
-| `LLM_MAX_ITEMS_PER_BATCH` / `LLM_DAILY_ITEM_CAP` | 200 / 2000 | spend guard, in batch requests (one per proposal, one per ten generated items); the Review tab shows today's use |
+| `LLM_MAX_ITEMS_PER_BATCH` / `LLM_DAILY_ITEM_CAP` | 200 / 2000 | spend guard, in batch requests (one per proposal, one per ten generated items). The daily cap is **per provider**: Propose and Generate count only the generator's provider, and a judge batch counts against the judge's. The Review tab shows today's use per provider |
+| `LOCAL_DAILY_ITEM_CAP` | unset | the daily cap for `local`, which costs nothing per item: unset is no limit. One judged run of the 37-topic exam is ~3,870 items |
 | `DATASET_QUOTA_GB` | 20 | total generated-dataset storage under `$BENCH_ROOT/datasets` |
 | `EXAM_PROVIDER` / `EXAM_MODEL` / `EXAM_API_KEY` | *(unset — off)* | the exam writer behind `scripts/exam_build.py draft`. A different identity from the generator and the judge, on purpose |
 | `EXAM_DIR` | `$BENCH_ROOT/exam` | `candidates/` awaiting curation, `bank/` accepted questions (split by qid), `tasks/` what the harness runs |
@@ -121,7 +122,7 @@ it. If it fails part-way, the record is removed and the next start tries again.
 | `ALLOW_PRELIMINARY_OVERRIDE` | 1 | Propose from a topic whose judge is not evidence yet (a local model, not calibrated, single provider, draft rubric): the topic page shows **Propose…**, asks, and a person ticks "I understand these grades are not evidence". The proposal, its spec, the dataset's `provenance.json` and any model trained on it are marked "proposed over a provisional judge". Reasons about the data (too few questions, nothing written, collapsed output) are never overridable. `0` restores the hard gate: the button disabled, the old words |
 | `EVALBOARD_BUILD` | *(unset)* | build arg: the git sha the image is built from, shown to a page that was loaded before a deploy. Optional — the page's own hash tells an old page from a new one without it |
 | `JUDGED_TASKS_DIR` | `$EXAM_DIR/tasks` | where `scripts/exam_build.py build` put the exam tasks |
-| `LOCAL_BASE_URL` | `http://localhost:8000/v1` | the `local` provider's OpenAI-compatible server (vLLM). Loopback only on the deploy box |
+| `LOCAL_BASE_URL` | `http://localhost:8000/v1` | the `local` provider's OpenAI-compatible server (vLLM). On the deploy box, `http://gemma-vllm:8000/v1` over the shared Docker network (§ The local model) |
 | `LOCAL_CONCURRENCY` | 2 | `local` requests in flight at once — the card is shared |
 | `LOCAL_MAX_TOKENS_LLM` | 1536 | the cap on a `local` generation or proposal reply. A ~600-word training document is ~1,400 tokens and the request already asks for one, so there is no smaller request to make; two of these in flight is well inside what the shared card has left |
 | `LOCAL_MAX_TOKENS_JUDGE` | 1024 | the cap on a `local` judge reply — a 23-criterion JSON answer is about 350 tokens |
@@ -170,17 +171,51 @@ run against it, so the loop can be driven end to end today.
   ssh -L 8000:localhost:8000 <box>
   ```
 
-- **From inside the container, through the host gateway.** In the service
-  container `localhost` is the container, not the box, so compose maps the
-  box's loopback in as `host.docker.internal` (`extra_hosts:
-  host.docker.internal:host-gateway`) and defaults `LOCAL_BASE_URL` to
-  `http://host.docker.internal:8000/v1`. vLLM stays bound to 127.0.0.1 and
-  nothing new is exposed on the tailnet or the LAN. `network_mode: host`
-  would also reach it and would throw away the `${BIND}` publish line that
-  keeps the service off the LAN, so it is the gateway, not host networking.
-  On the host — the demo script, `exam_build.py draft`, `judge.py --wait` —
-  the code default `http://localhost:8000/v1` is the right one. If the URL is
-  wrong the client says so plainly instead of failing at the first click.
+- **From inside the container: a shared Docker network (the supported
+  setup).** vLLM runs in its own container, `gemma-vllm`, started separately
+  and also used by another service; it publishes `127.0.0.1:8000` on the box
+  and nothing else. That port is not reachable from the service container
+  through `host.docker.internal` — the host gateway is the bridge address,
+  and a port published on loopback does not listen there. So the service
+  container joins vLLM on a Docker network instead:
+
+  ```bash
+  sudo docker network connect aienh_default gemma-vllm
+  ```
+
+  and `.env` points the local provider at the container by name:
+
+  ```bash
+  LOCAL_BASE_URL=http://gemma-vllm:8000/v1
+  ```
+
+  `aienh_default` is the network compose creates for this project. Nothing
+  new is published on the tailnet or the LAN, and the `${BIND}` publish line
+  that keeps the service off the LAN stays as it is (`network_mode: host`
+  would throw it away).
+
+  **Re-creating `gemma-vllm` drops the connection.** `docker network connect`
+  attaches the container that exists now; a `docker rm` + `docker run`, or its
+  own compose project re-creating it, starts a new container that is on its
+  default network only. The symptom is the local provider saying nothing is
+  answering at `http://gemma-vllm:8000/v1` — judged runs refuse to start and
+  pending batches wait. Run the `network connect` line again. To check from
+  inside the service container:
+
+  ```bash
+  sudo docker compose exec -T bench python3 -c "import urllib.request as u; print(u.urlopen('http://gemma-vllm:8000/v1/models', timeout=3).read()[:200])"
+  ```
+
+  `sudo docker network inspect aienh_default` lists `gemma-vllm` among its
+  containers while the connection holds.
+
+  The compose default, `http://host.docker.internal:8000/v1` (with
+  `extra_hosts: host.docker.internal:host-gateway`), only reaches a server
+  that listens on the bridge address — not one bound to loopback, which is
+  why the box sets `LOCAL_BASE_URL` instead. On the host — the demo script,
+  `exam_build.py draft`, `judge.py --wait` — the code default
+  `http://localhost:8000/v1` is the right one. If the URL is wrong the client
+  says so plainly instead of failing at the first click.
 - **No key.** vLLM ignores one unless it was launched with `--api-key`; if it
   was, the role's `*_API_KEY` is sent. A missing key is fine for `local` and
   still fatal for `anthropic` and `openai`. A missing model id is fatal for all.

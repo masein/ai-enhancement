@@ -110,15 +110,17 @@ def _finish_judge(row: dict, results: dict[str, llm.Result]) -> None:
     sub = db.submission_of_batch(row["batch_id"])
     if not sub:
         return
-    db.update(sub["id"], progress=judged_line(run))
+    db.update(sub["id"], progress=judged_line(run, note=sub.get("reuse_note") or ""))
 
 
-def judged_line(run: dict, at: float | None = None) -> str:
-    """What a judged row says once its batch has landed."""
+def judged_line(run: dict, at: float | None = None, note: str = "") -> str:
+    """What a judged row says once its batch has landed — after, when the
+    run answered nothing new, that it re-graded answers already on disk."""
     when = time.strftime("%H:%M", time.localtime(time.time() if at is None else at))
     what = judged_what(run)
-    return (f"judged: {what}, judge.json written {when}" if what
+    line = (f"judged: {what}, judge.json written {when}" if what
             else f"judged, judge.json written {when}")
+    return f"{note} · {line}" if note else line
 
 
 # a row still telling the reader its batch is out, or the pre-#33 count of
@@ -153,7 +155,8 @@ def repair_finished_rows() -> list[int]:
         old = s.get("progress") or ""
         if s["status"] == "done":
             new = judged_line(db.judge_run_get(run["id"]) or run,
-                              run.get("finished_at") or b.get("finished_at"))
+                              run.get("finished_at") or b.get("finished_at"),
+                              note=s.get("reuse_note") or "")
             stale = _STILL_OUT.search(old) or (
                 old.startswith("judged") and old.split(_WRITTEN)[0] != new.split(_WRITTEN)[0])
             if stale:

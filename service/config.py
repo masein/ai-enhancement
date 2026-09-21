@@ -129,6 +129,23 @@ LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 # generated items); the UI shows today's use against the cap before anyone clicks
 LLM_MAX_ITEMS_PER_BATCH = int(os.environ.get("LLM_MAX_ITEMS_PER_BATCH", "200"))
 LLM_DAILY_ITEM_CAP = int(os.environ.get("LLM_DAILY_ITEM_CAP", "2000"))
+# The daily limit is per provider: it exists for the paid APIs. A `local`
+# identity costs nothing per item — one judged run of the 37-topic exam is
+# ~3,870 items, and against one shared cap it refused every Propose that day —
+# so local is unlimited unless LOCAL_DAILY_ITEM_CAP is set. Every other
+# provider keeps LLM_DAILY_ITEM_CAP, and a judge batch counts against the
+# judge's provider, never the generator's.
+_LOCAL_CAP = os.environ.get("LOCAL_DAILY_ITEM_CAP", "").strip()
+LOCAL_DAILY_ITEM_CAP = int(_LOCAL_CAP) if _LOCAL_CAP else None
+
+
+def daily_cap(provider: str) -> int | None:
+    """Items a provider may be sent per day; None is no limit."""
+    return LOCAL_DAILY_ITEM_CAP if provider == "local" else LLM_DAILY_ITEM_CAP
+
+
+def daily_cap_name(provider: str) -> str:
+    return "LOCAL_DAILY_ITEM_CAP" if provider == "local" else "LLM_DAILY_ITEM_CAP"
 LLM_POLL_S = float(os.environ.get("LLM_POLL_S", "60"))
 
 # The `local` provider (any of the three roles): vLLM's OpenAI-compatible

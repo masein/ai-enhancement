@@ -313,8 +313,91 @@ def include_args_for(task: str) -> list[str]:
     return []
 
 
-def _task_done(task_out: Path) -> bool:
+def _has_results(task_out: Path) -> bool:
     return any(task_out.glob("*/results*.json")) or any(task_out.glob("results*.json"))
+
+
+# ---------------------------------------------------------------------------
+# which questions a task's answers answer. A task's name does not say:
+# exam_law held the retired law's questions until phase 10 and the new Law's
+# after it. The exam build fingerprints each task's question set; the runner
+# writes the same value beside the answers, and answers count as done only
+# while the two agree. Tasks the build does not write (mmlu, hellaswag…) have
+# no fingerprint and resume on their name, as always.
+# ---------------------------------------------------------------------------
+
+BANK_FILE = "bank.sha256"
+ANSWERED_BY = "answered_by.json"
+
+
+def _scripts() -> None:
+    p = str(Path(__file__).resolve().parent.parent / "scripts")
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+
+def current_fingerprint(task: str) -> str | None:
+    """The question set the built task holds now, or None for a task the
+    exam build does not write."""
+    _scripts()
+    import exam_build
+    return (exam_build.current_fingerprints(config.JUDGED_TASKS_DIR) or {}).get(task)
+
+
+def answers_fingerprint(task_out: Path, task: str) -> str | None:
+    """Which question set the answers in `task_out` were given on: the file
+    the runner wrote beside them, or — for answers from before it wrote one
+    — what the answers themselves say they answered."""
+    try:
+        v = (task_out / BANK_FILE).read_text(encoding="utf-8").strip()
+        if v:
+            return v
+    except OSError:
+        pass
+    _scripts()
+    import judge
+    return judge.answered_fingerprint(task_out.parent, task)
+
+
+def _task_done(task_out: Path, task: str | None = None) -> bool:
+    if not _has_results(task_out):
+        return False
+    want = current_fingerprint(task) if task else None
+    return want is None or answers_fingerprint(task_out, task) == want
+
+
+def _answered_by(task_out: Path) -> int | None:
+    try:
+        return int(json.loads((task_out / ANSWERED_BY).read_text(encoding="utf-8"))["submission"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def _set_aside(task_out: Path, task: str) -> Path:
+    """Answers to another question set are not overwritten and not deleted:
+    they move out of the results tree, whole, beside it — results/earlier/
+    <model>/<task>_<n>shot-<fingerprint>-<time> — so nothing reads them as
+    this task's answers again and nobody loses them."""
+    fp = answers_fingerprint(task_out, task) or "unfingerprinted"
+    dest = (config.OUT_DIR.with_name("earlier") / task_out.parent.name
+            / f"{task_out.name}-{fp[:12]}-{int(time.time())}")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(task_out), str(dest))
+    return dest
+
+
+def reuse_note(reused: dict[str, int | None], tasks: list[str]) -> str:
+    """What a judged row says when it answered nothing it had answered
+    before: "answers reused from #46 (same questions) · re-graded". A reader
+    of the queue should not have to infer it from GPU —."""
+    exam = [t for t in tasks if t.startswith("exam_")]
+    got = [t for t in exam if t in reused]
+    if not got:
+        return ""
+    sids = sorted({reused[t] for t in got if reused[t]})
+    src = f"from {', '.join(f'#{s}' for s in sids)}" if sids else "from an earlier run"
+    what = "answers" if len(got) == len(exam) else f"answers for {len(got)} of {len(exam)} topics"
+    return f"{what} reused {src} (same questions) · re-graded"
 
 
 CANCELED = -15
@@ -457,6 +540,7 @@ def run_submission(sub: dict) -> None:
         gpu_seconds = 0.0
         failed_tasks: list[str] = []
         canceled = False
+        reused: dict[str, int | None] = {}
         for i, task in enumerate(tasks, 1):
             if canceled or db.cancel_requested(sid):
                 canceled = True
@@ -464,9 +548,17 @@ def run_submission(sub: dict) -> None:
             shots = config.NFEWSHOT.get(task, 0)
             task_out = config.OUT_DIR / safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
-            if _task_done(task_out):
+            if _task_done(task_out, task):
+                if current_fingerprint(task):
+                    reused[task] = _answered_by(task_out)
                 db.update(sid, status="running", progress=f"{label} — already done")
                 continue
+            if _has_results(task_out):
+                # answers on disk, to a question set the task no longer holds
+                moved = _set_aside(task_out, task)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] {task}: the answers on disk are to other questions "
+                             f"than the task holds now; kept at {moved}, answering again\n")
             db.update(sid, status="running", progress=label)
 
             # local/<name> artifacts resolve to their on-disk directory; the report
@@ -537,6 +629,13 @@ def run_submission(sub: dict) -> None:
                                    if len(missing) > 6 else ""))
                 break          # every remaining task would load the same model
 
+            if status == 0 and current_fingerprint(task):
+                # which questions these answers answer, and which row asked
+                (task_out / BANK_FILE).write_text(current_fingerprint(task) + "\n",
+                                                  encoding="utf-8")
+                (task_out / ANSWERED_BY).write_text(json.dumps(
+                    {"submission": sid, "at": time.time()}), encoding="utf-8")
+
             if status != 0:
                 tail = _tail(log_path)
                 failed_tasks.append(task)
@@ -558,6 +657,9 @@ def run_submission(sub: dict) -> None:
                       progress=f"canceled by request after {len(tasks) and i - 1} of "
                                f"{len(tasks)} tasks — nothing half-written was kept")
             return
+        note = reuse_note(reused, tasks) if sub["suite"] == "judged" else ""
+        if note:
+            db.update(sid, reuse_note=note)
         if sub["suite"] == "judged" and not failed_tasks:
             db.update(sid, status="running", progress="submitting the answers to the judge")
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -590,7 +692,8 @@ def run_submission(sub: dict) -> None:
             what = (f"all {len(tasks)} tasks" if not only
                     else f"{', '.join(t.replace('exam_', '') for t in tasks)}")
             db.update(sid, status="done", finished_at=time.time(),
-                      progress=f"{what} done{judge_note}", error="")
+                      progress=f"{what} done" + (f" · {note}" if note else "") + judge_note,
+                      error="")
     finally:
         release_lock()
         if remote_code:

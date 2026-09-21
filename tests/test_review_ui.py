@@ -129,6 +129,11 @@ def test_exam_curation_in_the_browser(live, page):
     tasks = (root / "exam" / "tasks" / "exam_law.jsonl").read_text(encoding="utf-8")
     assert accepted["qid"] in tasks or accepted["prompt"][:40] in tasks
     assert page.locator("[data-action='exbuild']").count() == 0
+    # Law holds one question more now, so the judged models' Law answers are
+    # to other questions and count as history (10b); they sit it again, as
+    # they would on the box, before anything below reads Law's results
+    import make_fixture
+    make_fixture.sit_again(root, root / "results" / "full", ["exam_law"])
     # screenshots: the Exam tab, light and dark, desktop and phone
     SCREENS.mkdir(exist_ok=True)
     eb.draft(root / "exam", llm.FakeBatches("fake-exam", root), ["Economics"], per_topic=2,
@@ -356,6 +361,11 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     assert all(r["accepted_by"] == "Dr. Hossein" and not r["edited"] for r in mine)
     assert {eb.half_of(r["qid"]) for r in mine} == {"report", "diagnose"}
     assert page.errors == []
+    # the topic holds other questions now, so the judged models' answers on
+    # it are history (10b); they sit it again, as they would on the box, and
+    # the tests after this one read a topic that was sat on what it holds
+    import make_fixture
+    make_fixture.sit_again(root, root / "results" / "full", [eb.topic_task(topic)])
 
 
 def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page):

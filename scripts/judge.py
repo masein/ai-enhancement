@@ -884,6 +884,14 @@ def _records(model_dir: Path, task: str) -> list[dict]:
     return out
 
 
+def answered_fingerprint(model_dir: Path, task: str) -> str | None:
+    """The fingerprint of the question set this model's answers on `task`
+    were given on (exam_build.fingerprint over the items it answered), or
+    None when there are no answers."""
+    keys = [_exam.item_key(r.get("doc") or {}) for r in _records(model_dir, task)]
+    return _exam.fingerprint(keys) if any(keys) else None
+
+
 def _answer(rec: dict) -> str:
     r = rec.get("filtered_resps") or rec.get("resps") or []
     while isinstance(r, list) and r:
@@ -948,7 +956,12 @@ def plan_requests(model_dir: Path, judge_family: str,
     mc = mmlu_outcomes(model_dir) if CONTROL_TASK in tasks_present else {}
     safe = model_dir.name
     plan["answer_stats"] = {}
+    # which questions these answers answer, from the answers themselves: a
+    # grade is about the question set its answers were given on, whatever
+    # the task is called now
+    plan["bank"] = {}
     for task in tasks_present:
+        plan["bank"][task] = answered_fingerprint(model_dir, task)
         rub = rubric_for(task)
         spec = rub.criteria           # a criteria file beside the rubric: grade every one
         items = []
@@ -1271,6 +1284,12 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
              "items": items}
         if spec:
             t.update(_criteria_blocks(items, spec))
+        # which questions, and under what name: a result counts only while
+        # this is the task's current fingerprint, and is history after
+        t["bank_sha256"] = (plan.get("bank") or {}).get(task)
+        t["topic"] = (_exam.TASK_TOPIC.get(task)
+                      or (CONTROL_LABEL if task == CONTROL_TASK else items[0].get("category"))
+                      or task)
         stats = (plan.get("answer_stats") or {}).get(task)
         if stats:
             t["answers"] = stats
@@ -1290,6 +1309,70 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
     return {**head, "canary": canary, "preliminary_reasons": reasons, "tasks": tasks}
 
 
+CONTROL_LABEL = "MMLU control"
+# what a history entry keeps: enough to say what the model scored on a
+# question set nobody sits any more, and when — not the items, which name
+# questions and answers the page has no business showing again
+HISTORY_KEYS = ("topic", "bank_sha256", "judged_at", "n", "mean", "n_report", "score_report",
+                "n_diagnose", "score_diagnose")
+
+
+def history_entry(task: str, t: dict, judge: dict | None = None,
+                  judged_at: float | None = None) -> dict:
+    """One judged topic, as history: its task, what it scored, on which
+    question set, when, and by which judge. A file from before topics
+    carried their own name gives it through its items' category."""
+    e = {k: t.get(k) for k in HISTORY_KEYS if t.get(k) is not None}
+    e["task"] = task
+    if not e.get("topic"):
+        items = t.get("items") or []
+        e["topic"] = (items[0].get("category") if items and task != CONTROL_TASK else None) \
+            or (CONTROL_LABEL if task == CONTROL_TASK else _exam.task_slug(task).replace("_", " "))
+    if not e.get("judged_at") and judged_at:
+        e["judged_at"] = int(judged_at)
+    jd_ = judge or {}
+    if jd_.get("id"):
+        e["judge_id"] = jd_["id"]
+    if jd_.get("provisional"):
+        e["provisional"] = True
+    return e
+
+
+def _history_key(e: dict) -> tuple:
+    return (e.get("task"), e.get("bank_sha256"), e.get("judged_at"))
+
+
+def _add_history(hist: list[dict], entries) -> list[dict]:
+    seen = {_history_key(e) for e in hist}
+    for e in entries:
+        if _history_key(e) not in seen:
+            hist.append(e)
+            seen.add(_history_key(e))
+    return sorted(hist, key=lambda e: (-(e.get("judged_at") or 0), str(e.get("task"))))
+
+
+def split_by_bank(j: dict | None, current: dict[str, str] | None,
+                  judged_at: float | None = None) -> tuple[dict | None, list[dict]]:
+    """(the file with only the topics that count now, the history). A topic
+    counts only when its `bank_sha256` is the task's current fingerprint;
+    anything else — graded on a question set the task no longer holds, or
+    before fingerprints were recorded at all — is history, shown as such
+    and nowhere else. `current` None means the current exam is unknown (a
+    report built without the exam directory): nothing is filtered."""
+    if not isinstance(j, dict):
+        return j, []
+    hist = list(j.get("history") or [])
+    if current is None or not isinstance(j.get("tasks"), dict):
+        return j, hist
+    keep, gone = {}, []
+    for task, t in j["tasks"].items():
+        if isinstance(t, dict) and t.get("bank_sha256") and t["bank_sha256"] == current.get(task):
+            keep[task] = t
+        elif isinstance(t, dict):
+            gone.append(history_entry(task, t, j.get("judge"), t.get("judged_at") or judged_at))
+    return {**j, "tasks": keep}, _add_history(hist, gone)
+
+
 def merge_judged(model_dir: Path, out: dict, dest: Path | None = None,
                  when: float | None = None) -> dict:
     """A run narrowed to one topic must not wipe the others' scores out of
@@ -1304,7 +1387,13 @@ def merge_judged(model_dir: Path, out: dict, dest: Path | None = None,
     is the time of the last merge, and a one-topic run re-stamped every topic
     in the file with it. A topic carried from a file written before this
     field existed takes that file's mtime — the last time it was written, and
-    the best that file can say."""
+    the best that file can say.
+
+    A grade on a question set the task no longer holds is neither replaced
+    nor dropped: it moves to `history` (history_entry), with its fingerprint
+    and time — and so does a topic graded before fingerprints existed, or
+    one the exam no longer has. That is what the model page lists under
+    Earlier exams, and nothing else reads it."""
     when = int(time.time() if when is None else when)
     for t in (out.get("tasks") or {}).values():
         t["judged_at"] = when
@@ -1322,18 +1411,34 @@ def merge_judged(model_dir: Path, out: dict, dest: Path | None = None,
     same_judge = (pj.get("id") == nj.get("id")
                   and pj.get("prompt_sha256") == nj.get("prompt_sha256")
                   and bool(pj.get("provisional")) == bool(nj.get("provisional")))
+    # a grade on a question set the task no longer holds is not replaced
+    # by the new one and not dropped: it is history — what this model
+    # scored on the old questions, and when
+    history = list(prev.get("history") or [])
+    earlier = []
     kept, dropped = {}, []
     for task, t in prev["tasks"].items():
+        if not isinstance(t, dict):
+            continue
+        at = t.get("judged_at") or prev_at
         if task in out.get("tasks", {}):
+            if t.get("bank_sha256") != out["tasks"][task].get("bank_sha256"):
+                earlier.append(history_entry(task, t, pj, at))
             continue
         prev_rub = (pj.get("rubrics") or {}).get(task)
-        if same_judge and prev_rub == _rubric_record(task):
-            kept[task] = {**t, "judged_at": t.get("judged_at") or prev_at}
+        if not t.get("bank_sha256") or task not in ALL_TASKS:
+            # graded before fingerprints, or a topic the exam no longer has
+            earlier.append(history_entry(task, t, pj, at))
+        elif same_judge and prev_rub == _rubric_record(task):
+            kept[task] = {**t, "judged_at": at}
         else:
             dropped.append(task)
-    if not kept and not dropped:
-        return out
+    history = _add_history(history, earlier)
     merged = {**out, "tasks": {**kept, **out.get("tasks", {})}}
+    if history:
+        merged["history"] = history
+    if not kept and not dropped:
+        return merged
     judge = dict(nj)
     judge["rubrics"] = {**{t: (pj.get("rubrics") or {}).get(t) for t in kept},
                         **(nj.get("rubrics") or {})}

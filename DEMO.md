@@ -42,10 +42,11 @@ From your laptop, tunnel it first — it is not on the tailnet:
 ssh -L 8000:localhost:8000 <box>
 ```
 
-From inside the service container, `localhost` is the container: compose maps
-the box's loopback in as `host.docker.internal` and points `LOCAL_BASE_URL`
-there. The demo script runs on the host, where the default
-`http://localhost:8000/v1` is right.
+From inside the service container, `localhost` is the container: the service
+reaches vLLM's own container over a shared Docker network, with
+`LOCAL_BASE_URL=http://gemma-vllm:8000/v1` (SERVICE.md § The local model). The
+demo script runs on the host, where the default `http://localhost:8000/v1` is
+right.
 
 ## The `.env` block
 

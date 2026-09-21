@@ -90,6 +90,107 @@ def test_the_author_may_write_the_register_sentence_herself(svc, tmp_path, monke
     assert line.startswith("Audience: ")             # the counts are still the bank's
 
 
+BANKS = REPO / "eval_tasks" / "fr" / "banks"
+RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+EXPLAINER = "set the problem up, state the assumptions, carry units and check limiting cases"
+
+
+def _registers(tmp_path, monkeypatch) -> dict[str, str]:
+    """The line for four real banks: two of the 37-topic exam, whose styles
+    are kinds of reasoning, and the two retired ones written as people asking
+    about their own situation, imported into their topics by hand."""
+    from service import config
+    out = {}
+    for name, root, src, topic in (
+            ("physics", "new", BANKS / "physics_astronomy_v1.json", "Physics & Astronomy"),
+            ("economics", "new", BANKS / "economics_v1.json", "Economics"),
+            ("medicine", "old", RETIRED / "medicine_v2.json", "Medicine & Clinical Health"),
+            ("law", "old", RETIRED / "law_v2.json", "Law")):
+        eb.import_bank(tmp_path / root, src, topic, "masein")
+        monkeypatch.setattr(config, "EXAM_DIR", tmp_path / root)
+        out[name] = prop.audience_for(topic)
+    return out
+
+
+def test_a_topic_of_worked_problems_gets_the_explainer_not_the_layperson(svc, tmp_path,
+                                                                          monkeypatch):
+    """Proposal #1 on the box, physics & engineering: the spec asked for
+    governing equations and dimensional consistency, and document 1 opened
+    "When you notice your heating or cooling system isn't performing…" —
+    the layperson register 8f wrote for medicine and law, applied to every
+    topic whose items carry a style."""
+    lines = _registers(tmp_path, monkeypatch)
+    for name in ("physics", "economics"):
+        line = lines[name]
+        assert line.startswith("Audience: people learning or practising the subject (styles: ")
+        assert EXPLAINER in line and "name the common mistake" in line
+        assert "Prose, never question-and-answer pairs" in line
+        assert "layperson" not in line and "members of the public" not in line
+    assert "styles: quantitative 15%, conceptual 14%, physical_explanation 13%" in lines["physics"]
+    for name in ("medicine", "law"):
+        line = lines[name]
+        assert line.startswith("Audience: members of the public asking about their own situation")
+        assert "guidance a layperson can read and act on" in line and EXPLAINER not in line
+    assert "styles: conversational 85%" in lines["medicine"]
+    assert "intents: legal_assessment 44%" in lines["law"]              # labels: a mix
+
+
+def test_a_sentence_per_question_is_not_a_label_and_never_travels(svc, tmp_path, monkeypatch):
+    """The 37-topic banks' `intent` is a different sentence on every item —
+    a description of that question. The top four of them would put four
+    questions, report half included, into a generator's request."""
+    lines = _registers(tmp_path, monkeypatch)
+    assert "intents:" not in lines["physics"] and "intents:" not in lines["economics"]
+    items = json.loads((BANKS / "physics_astronomy_v1.json").read_text(encoding="utf-8"))
+    for it in items:
+        assert it["intent"] not in lines["physics"]
+    assert prop.is_label_set({"quantitative": 3, "case_analysis": 2})
+    assert not prop.is_label_set({"Distinguish path length from vector displacement": 1})
+
+
+def test_the_criteria_files_audience_replaces_the_explainer_too(svc, tmp_path, monkeypatch):
+    from service import config
+    eb.import_bank(tmp_path / "exam", BANKS / "physics_astronomy_v1.json",
+                   "Physics & Astronomy", "masein")
+    monkeypatch.setattr(config, "EXAM_DIR", tmp_path / "exam")
+    spec = json.loads(jd.rubric_path("physics_astronomy", ".criteria.json")
+                      .read_text(encoding="utf-8"))
+    spec["audience"] = "an observing log a first-year student would keep."
+    (tmp_path / "rubrics").mkdir(exist_ok=True)
+    (tmp_path / "rubrics" / "physics_astronomy.md").write_text(
+        jd.rubric_for("exam_physics_astronomy").text, encoding="utf-8")
+    (tmp_path / "rubrics" / "physics_astronomy.criteria.json").write_text(
+        json.dumps(spec), encoding="utf-8")
+    monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)
+    line = prop.audience_for("Physics & Astronomy")
+    assert "an observing log a first-year student would keep" in line and EXPLAINER not in line
+    assert line.startswith("Audience: people learning or practising the subject")
+
+
+def test_the_explainer_line_reaches_both_requests_and_the_provenance(svc, tmp_path,
+                                                                    monkeypatch):
+    client, _, _ = svc
+    from service import config, db, llm
+    audience = _registers(tmp_path, monkeypatch)["physics"]
+    fake = llm.FakeBatches("fake-1", config.BENCH_ROOT)
+    bids = {fake.submit([prop.proposal_request(
+                1, "m", "exam_physics_astronomy", "Physics & Astronomy", [],
+                {"diagnose_items": 0, "diagnose_weak": 0, "scores": {}}, "rubric",
+                audience=audience)]),
+            fake.submit(prop.generation_requests(1, "a spec", "Physics & Astronomy", 2, "doc",
+                                                 7, audience=audience))}
+    sent = [r["system"] + "\n" + r["user"] for r in fake.recorded() if r["batch_id"] in bids]
+    assert len(sent) >= 2 and all(EXPLAINER in body for body in sent)
+    pid = db.proposal_create("fx/good-750m", "exam_physics_astronomy", "Physics & Astronomy",
+                             "omar", {"n": 1})
+    db.proposal_update(pid, status="approved", spec_text="a spec", approver="omar",
+                       approved_at=1.0, proposer="fake/fake-1")
+    did = db.dataset_create(pid, "doc", 2, "omar", "")
+    p = prop.provenance(db.proposal_get(pid), db.dataset_get(did), "fake/fake-1", "b1", "sha",
+                        {"rejected": False}, "s", 2, 2, audience=audience)
+    assert EXPLAINER in p["audience"]
+
+
 # ---------------------------------------------------------------------------
 # where it travels
 # ---------------------------------------------------------------------------

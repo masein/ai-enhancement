@@ -562,6 +562,35 @@ are retired: their files and judged runs stay, as history.
   finds the results under `BENCH_ROOT` when the working directory does not
   have them — inside the container that is `/app`, where the documented
   command could not have worked before.
+- **10b — results belong to the questions they were given on.** `build`
+  writes each task's `bank_sha256` (sha256 over its sorted item keys — qids,
+  or MMLU document hashes for the control) into `tasks/manifest.json`. The
+  runner writes the same value beside the answers
+  (`<task>_<n>shot/bank.sha256`, with `answered_by.json` naming the row) and
+  treats a built task as done only when the two agree; answers to another
+  question set are moved, whole, to `results/earlier/<model>/`, and the task
+  is answered again. A run that answered nothing new says so on its row:
+  "answers reused from #46 (same questions) · re-graded". `judge.json`
+  records `bank_sha256` and `topic` per task, and a result counts — on the
+  Loop board, in the answers, the propose gate, the averages and the
+  Leaderboard — only while that fingerprint is the task's current one;
+  everything else, including every entry written before this, is **history**:
+  kept in `judge.json` under `history` (score, date, judge; no items) and
+  shown on the model page under **Earlier exams (retired question sets)**,
+  nowhere else. `/api/answers` applies the same rule. The daily item cap is
+  **per provider**: `local` is unlimited unless `LOCAL_DAILY_ITEM_CAP` is
+  set, a paid provider keeps `LLM_DAILY_ITEM_CAP`, and a judge batch counts
+  against the judge's provider; the Review tab shows use per provider. Also
+  in 10b, from the live rehearsal: the generation register follows the bank
+  — the layperson's only for a topic whose items are at least half people
+  asking about their own situation (`conversational`, `context_rich`,
+  `telegraphic`, or carrying `subject`), a worked explanation for everything
+  else, and a criteria file's `audience` still overrides both; a field whose
+  values are a sentence per question (the new banks' `intent`) is never put
+  in a request. Opening a topic page ticks exactly that topic in Sit the
+  exam; "Review the spec" lands on the proposal and marks it. vLLM is reached
+  over a shared Docker network (`LOCAL_BASE_URL=http://gemma-vllm:8000/v1`,
+  SERVICE.md § The local model).
 
 **Deploy steps**, once 10a–10c are all merged — as one sequence; the `build`
 step is also what writes 10b's question-set fingerprints:

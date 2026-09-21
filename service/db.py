@@ -65,7 +65,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   allow_remote_code INTEGER NOT NULL DEFAULT 0,  -- submitter opted in to executing the upload's code
   load_missing TEXT DEFAULT '',                  -- JSON: checkpoint keys transformers had to invent
   tasks       TEXT DEFAULT '[]',                 -- JSON: narrow a suite to these tasks (one exam topic)
-  judge_batch TEXT DEFAULT ''                    -- the judge batch THIS run submitted (not the model's newest)
+  judge_batch TEXT DEFAULT '',                   -- the judge batch THIS run submitted (not the model's newest)
+  reuse_note  TEXT DEFAULT ''                    -- "answers reused from #46 (same questions) · re-graded"
 );
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
 -- find-the-gap: an LLM proposes a skill spec from diagnose-half failures, a
@@ -173,7 +174,7 @@ CREATE TABLE IF NOT EXISTS repairs (
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
          "finished_at", "gpu_seconds", "arch", "allow_remote_code", "load_missing",
-         "tasks", "judge_batch"]
+         "tasks", "judge_batch", "reuse_note"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -199,7 +200,8 @@ def init() -> None:
                      "ALTER TABLE submissions ADD COLUMN tasks TEXT DEFAULT '[]'",
                      "ALTER TABLE llm_batches ADD COLUMN progress TEXT DEFAULT ''",
                      "ALTER TABLE submissions ADD COLUMN judge_batch TEXT DEFAULT ''",
-                     "ALTER TABLE proposals ADD COLUMN override TEXT"):
+                     "ALTER TABLE proposals ADD COLUMN override TEXT",
+                     "ALTER TABLE submissions ADD COLUMN reuse_note TEXT DEFAULT ''"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:
@@ -618,15 +620,29 @@ def batches_list(limit: int = 200) -> list[dict]:
     return [dict(zip(_BATCH_COLS, r)) for r in rows]
 
 
-def llm_items_today() -> int:
-    """Batch items submitted since local midnight — the number the spend
-    guard compares against LLM_DAILY_ITEM_CAP."""
+def _midnight() -> float:
     lt = time.localtime()
-    midnight = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1))
+    return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1))
+
+
+def llm_items_today(provider: str | None = None) -> int:
+    """Batch items submitted since local midnight — to one provider, which
+    is what the spend guard compares against that provider's daily cap
+    (config.daily_cap), or to all of them."""
+    q = "SELECT COALESCE(SUM(n_items), 0) FROM llm_batches WHERE created_at>=?"
+    args: tuple = (_midnight(),)
+    if provider is not None:
+        q, args = q + " AND provider=?", args + (provider,)
     with closing(_conn()) as c:
-        row = c.execute("SELECT COALESCE(SUM(n_items), 0) FROM llm_batches WHERE created_at>=?",
-                        (midnight,)).fetchone()
+        row = c.execute(q, args).fetchone()
     return int(row[0] or 0)
+
+
+def llm_items_today_by_provider() -> dict[str, int]:
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT provider, SUM(n_items) FROM llm_batches WHERE created_at>=? "
+                         "GROUP BY provider", (_midnight(),)).fetchall()
+    return {p: int(n or 0) for p, n in rows}
 
 
 def taint_links() -> list[dict]:

@@ -78,11 +78,19 @@ REDACTED = "[question text removed]"
 # ---------------------------------------------------------------------------
 
 def _judge_file(model_dir: Path) -> dict | None:
+    """judge.json with only the topics graded on the questions each task
+    holds now. A grade on a retired question set is history: a proposal, a
+    gate or a justification built from it would be about questions nobody
+    sits any more (judge.split_by_bank)."""
     p = Path(model_dir) / "judge.json"
     try:
-        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+        j = json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
     except (OSError, json.JSONDecodeError):
         return None
+    if j is None:
+        return None
+    import judge as _judge
+    return _judge.split_by_bank(j, _exam.current_fingerprints(config.JUDGED_TASKS_DIR))[0]
 
 
 def weak_topics(model_dir: Path) -> list[dict]:
@@ -189,11 +197,37 @@ def topic_question_grams(task: str) -> set[str]:
 
 AUDIENCE_FIELDS = ("style", "subject", "intent")
 AUDIENCE_TOP = 4
+# Two registers. The layperson one was written for medicine and law, whose
+# questions are people asking about their own situation; applied to physics
+# (styles quantitative, conceptual, derivation) it asked for rigour in the
+# governing equations and got "When you notice your heating or cooling system
+# isn't performing…". It applies only when at least half a topic's items are
+# written as a person asking — one of LAYPERSON_STYLES — or say who is asking
+# (`subject`). Every other topic gets the worked explanation. A criteria
+# file's `audience` string replaces either.
+LAYPERSON_STYLES = {"conversational", "context_rich", "telegraphic"}
+LAYPERSON_SHARE = 0.5
 DEFAULT_REGISTER = (
     "guidance a layperson can read and act on — what to do, what to watch for, when to "
     "escalate — not clinical notes, case files, legal memoranda or textbook exposition. "
     "Second person is fine.")
 DEFAULT_WHO = "members of the public asking about their own situation"
+EXPLAINER_REGISTER = (
+    "a worked explanation for someone learning or practising the subject — set the problem "
+    "up, state the assumptions, carry units and check limiting cases where they apply, and "
+    "name the common mistake. Prose, never question-and-answer pairs.")
+EXPLAINER_WHO = "people learning or practising the subject"
+# a field is listed only when its values are labels — `quantitative`,
+# `case_analysis` — not a sentence per question: the 37-topic banks' `intent`
+# is a different sentence on every item, and the top four of those would put
+# four questions' descriptions, report half included, into a generator's
+# request. A label is one short token
+LABEL_MAX_CHARS = 40
+
+
+def is_label_set(counts, n: int = 0) -> bool:
+    return bool(counts) and all(len(v) <= LABEL_MAX_CHARS and not re.search(r"\s", v)
+                                for v in counts)
 
 
 def _share_line(counts: dict) -> str:
@@ -228,9 +262,23 @@ def audience_for(topic: str, task: str | None = None, root: Path | None = None) 
         register = str(spec.get("audience") or "").strip()
     except Exception:                  # noqa: BLE001 — no criteria file, or none readable
         register = ""
-    parts = [f"{f}s: {_share_line(counts[f])}" for f in AUDIENCE_FIELDS if counts[f]]
-    return (f"Audience: {DEFAULT_WHO} ({'; '.join(parts)}).\n"
-            f"Register for documents: {register or DEFAULT_REGISTER}")
+    who, default = register_for(rows, counts)
+    parts = [f"{f}s: {_share_line(counts[f])}" for f in AUDIENCE_FIELDS
+             if is_label_set(counts[f], len(rows))]
+    return (f"Audience: {who}" + (f" ({'; '.join(parts)})" if parts else "") + ".\n"
+            f"Register for documents: {register or default}")
+
+
+def register_for(rows: list[dict], counts: dict) -> tuple[str, str]:
+    """(who asks, the default register): the layperson's when at least half
+    the topic's items are a person asking about their own situation — or say
+    who is asking — and the worked explanation for everything else."""
+    n = len(rows) or 1
+    asking = sum(v for k, v in counts["style"].items() if k in LAYPERSON_STYLES)
+    subject = sum(counts["subject"].values())
+    if asking / n >= LAYPERSON_SHARE or subject / n >= LAYPERSON_SHARE:
+        return DEFAULT_WHO, DEFAULT_REGISTER
+    return EXPLAINER_WHO, EXPLAINER_REGISTER
 
 
 def justifications_for(model_dir: Path, task: str,

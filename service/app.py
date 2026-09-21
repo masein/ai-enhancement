@@ -113,6 +113,26 @@ def demo_report_stamp() -> float:
         return 0.0
 
 
+def current_fingerprints() -> dict[str, str] | None:
+    """task -> the question set it holds now (None: no exam built here). A
+    judged result counts only when it was graded on exactly that set
+    (judge.split_by_bank)."""
+    return exam_build.current_fingerprints(config.JUDGED_TASKS_DIR)
+
+
+def judge_now(model: str) -> tuple[dict | None, list[dict]]:
+    """A model's judge.json as everything but its model page reads it: only
+    the topics graded on the question set the task holds now, and the rest
+    as history. Answers, proposals and the gate go through here."""
+    import judge as _judge
+    p = config.OUT_DIR / model.replace("/", "__") / "judge.json"
+    try:
+        j = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None, []
+    return _judge.split_by_bank(j, current_fingerprints(), _mtime(p))
+
+
 def _judge_identity() -> dict:
     import judge as _judge
     return _judge.identity()
@@ -132,11 +152,14 @@ def _calibration() -> dict | None:
 def _tree_key() -> tuple:
     # the taint join reads the database, so its state is part of the key too:
     # a training run registering a dataset changes what the board should show
+    # and so is the built exam: a rebuild with other questions turns every
+    # judged result on the old ones into history without touching a judge.json
+    exam = _mtime(config.JUDGED_TASKS_DIR / "manifest.json")
     if not config.OUT_DIR.is_dir():
-        return (0, 0.0, db.taint_stamp(), demo_report_stamp())
+        return (0, 0.0, db.taint_stamp(), demo_report_stamp(), exam)
     files = [f for pat in _WATCH for f in config.OUT_DIR.rglob(pat)]
     return (len(files), max((f.stat().st_mtime for f in files), default=0.0),
-            db.taint_stamp(), demo_report_stamp())
+            db.taint_stamp(), demo_report_stamp(), exam)
 
 
 def taint_for(model_ids) -> dict[str, list[str]]:
@@ -205,7 +228,8 @@ def results_payload() -> dict:
                                        taint=taint_for(by_model.keys()),
                                        parents=parents_for(by_model.keys()),
                                        calibration=_calibration(),
-                                       judge_identity=_judge_identity())
+                                       judge_identity=_judge_identity(),
+                                       fingerprints=current_fingerprints())
         payload["live"] = True
         # the loop's audit trail, per tainted model: run, datasets, proposals
         trails = trail_for([m["id"] for m in payload["models"]])
@@ -643,7 +667,10 @@ def _llm_status() -> dict:
     used = prop.dir_bytes(config.DATASETS_DIR)
     return {"configured": not why, "reason": why,
             "provider": config.LLM_PROVIDER, "model": config.LLM_MODEL,
-            "usage_today": db.llm_items_today(), "daily_cap": config.LLM_DAILY_ITEM_CAP,
+            # the generator's own provider: what Propose and Generate spend
+            "usage_today": db.llm_items_today(config.LLM_PROVIDER),
+            "daily_cap": config.daily_cap(config.LLM_PROVIDER),
+            "usage": llm_usage(),
             "max_items_per_batch": config.LLM_MAX_ITEMS_PER_BATCH,
             # what THIS provider is asked for per request: a local generator
             # gets one document, because its replies are capped
@@ -1266,13 +1293,17 @@ def answers(model: str, topic: str, limit: int = 200):
         raise HTTPException(404, f"{topic!r} is not an exam topic")
     task = exam_build.topic_task(topic)
     model_dir = config.OUT_DIR / model.replace("/", "__")
-    jf = model_dir / "judge.json"
-    if not jf.exists():
+    if not (model_dir / "judge.json").exists():
         raise HTTPException(404, f"{model} has no judged run on file — submit it with "
                                  f"suite=judged first")
-    j = json.loads(jf.read_text(encoding="utf-8"))
-    t = (j.get("tasks") or {}).get(task)
+    # only answers to the questions the topic holds now: a retired answer
+    # shown against a new topic's question would be an answer to another one
+    j, earlier = judge_now(model)
+    t = ((j or {}).get("tasks") or {}).get(task)
     if not t:
+        if any(e.get("task") == task for e in earlier):
+            raise HTTPException(404, f"{model} sat {topic!r} only on an earlier question set — "
+                                     f"its answers are history; sit the current one")
         raise HTTPException(404, f"{model}'s judged run does not cover {topic!r}")
     import judge as _judge
     spec = _judge.rubric_for(task).criteria or {}
@@ -1336,15 +1367,38 @@ def judge_status():
             if cal else None}
 
 
-def _spend_check(n_items: int) -> None:
+def _spend_check(n_items: int, provider: str | None = None) -> None:
+    """The per-batch limit, and the day's limit for the provider this request
+    goes to — its own use only: a judge batch on another provider, or on the
+    same local server, is not this request's spend."""
     if n_items > config.LLM_MAX_ITEMS_PER_BATCH:
         raise HTTPException(422, f"{n_items} batch items exceeds LLM_MAX_ITEMS_PER_BATCH="
                                  f"{config.LLM_MAX_ITEMS_PER_BATCH}")
-    used = db.llm_items_today()
-    if used + n_items > config.LLM_DAILY_ITEM_CAP:
-        raise HTTPException(429, f"today's LLM use ({used} items) plus this request "
-                                 f"({n_items}) would pass LLM_DAILY_ITEM_CAP="
-                                 f"{config.LLM_DAILY_ITEM_CAP}; try tomorrow or raise the cap")
+    provider = provider or config.LLM_PROVIDER
+    cap = config.daily_cap(provider)
+    if cap is None:
+        return
+    used = db.llm_items_today(provider)
+    if used + n_items > cap:
+        raise HTTPException(429, f"today's use of {provider} ({used} items) plus this request "
+                                 f"({n_items}) would pass {config.daily_cap_name(provider)}="
+                                 f"{cap}; try tomorrow or raise the cap")
+
+
+def llm_usage() -> list[dict]:
+    """Today's items per provider, against each one's cap — every provider
+    used today and every one configured, so the Review tab shows the judge's
+    spend beside the generator's."""
+    used = db.llm_items_today_by_provider()
+    names = [p for p in (config.LLM_PROVIDER, config.JUDGE_PROVIDER, config.EXAM_PROVIDER)
+             if p and p != "stub"]
+    names += sorted(p for p in used if p not in names)
+    return [{"provider": p, "items": used.get(p, 0), "cap": config.daily_cap(p),
+             "cap_name": config.daily_cap_name(p),
+             "roles": [r for r, v in (("generator", config.LLM_PROVIDER),
+                                      ("judge", config.JUDGE_PROVIDER),
+                                      ("exam writer", config.EXAM_PROVIDER)) if v == p]}
+            for p in dict.fromkeys(names)]
 
 
 def _require_llm() -> llm.Backend:

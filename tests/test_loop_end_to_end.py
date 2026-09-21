@@ -52,10 +52,22 @@ def test_the_whole_loop(tmp_path, monkeypatch):
         built = client.post("/api/exam/build").json()
         assert built["tasks"][TASK]["items"] == before_bank + 1
 
-        # 3 & 4. SIT AND JUDGE — the fixture's models have sat it; the judge
-        # records each item's half and what the model wrote
+        # 3 & 4. SIT AND JUDGE — the answers on file were given before the
+        # accepted question joined the bank: they answer other questions now
+        # and count for nothing but history (10b). So the models sit the topic
+        # again, and the judge records each item's half and what it wrote
+        fresh(appmod)
+        me = next(m for m in client.get("/api/results").json()["models"]
+                  if m["id"] == "fx/good-750m")
+        assert TASK not in me["judge"]["tasks"]
+        assert TASK in {e["task"] for e in me["judge"]["history"]}
+        make_fixture.sit_again(exam_root.parent, tree["out_dir"], [TASK])
+        fresh(appmod)
         j = json.loads((tree["models"]["fx/good-750m"]["dir"] / "judge.json").read_text())
         t = j["tasks"][TASK]
+        assert t["n"] == before_bank + 1
+        from service import config
+        assert t["bank_sha256"] == eb.current_fingerprints(config.JUDGED_TASKS_DIR)[TASK]
         assert t["n_report"] + t["n_diagnose"] == t["n"]
         assert all(it["half"] == dx.split_of(it["qid"]) for it in t["items"])
         assert j["canary"]["n"] == 30 and j["judge"]["id"] == "stub/overlap-v1"

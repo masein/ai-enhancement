@@ -121,6 +121,41 @@ def sha256_file(p: Path) -> str:
 
 
 # ---------------------------------------------------------------------------
+# which questions a task holds. `exam_law` held the retired law's 100
+# questions until phase 10 and holds the new Law's after it: the task name
+# says nothing about which questions an answer answered. The fingerprint does
+# — sha256 over the task's sorted item keys, which are content hashes
+# themselves — and a result counts only while its fingerprint is the task's.
+# ---------------------------------------------------------------------------
+
+def item_key(item: dict) -> str:
+    """An item's identity: the qid for an exam question, the MMLU document
+    hash for a control item."""
+    return str(item.get("qid") or item.get("mmlu_doc_hash") or item.get("id") or "")
+
+
+def fingerprint(keys) -> str:
+    return hashlib.sha256("\n".join(sorted(k for k in keys if k)).encode("utf-8")).hexdigest()
+
+
+def current_fingerprints(tasks: Path | None = None) -> dict[str, str] | None:
+    """task -> the fingerprint of the question set it holds now, from the
+    manifest the last build wrote. None when there is no manifest at all —
+    the exam is not known here, and nothing can be sorted into current and
+    history. A manifest from a build before fingerprints existed gives {}:
+    the exam is known, and no judged result is on it yet."""
+    p = Path(tasks) / "manifest.json" if tasks else None
+    if p is None or not p.is_file():
+        return None
+    try:
+        m = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {t: v["bank_sha256"] for t, v in (m.get("tasks") or {}).items()
+            if isinstance(v, dict) and v.get("bank_sha256")}
+
+
+# ---------------------------------------------------------------------------
 # files
 # ---------------------------------------------------------------------------
 
@@ -979,6 +1014,7 @@ def build(results_root: Path, root: Path, per_category: int = CONTROL_PER_CATEGO
         _write(p, items)
         halves = collections.Counter(half_of(r["qid"]) for r in rows)
         manifest["tasks"][task] = {"items": len(items), "sha256": sha256_file(p),
+                                   "bank_sha256": fingerprint(map(item_key, items)),
                                    "report": halves["report"], "diagnose": halves["diagnose"],
                                    "topic": topic, "built_from": "bank"}
         manifest["topics"][task] = topic
@@ -987,7 +1023,8 @@ def build(results_root: Path, root: Path, per_category: int = CONTROL_PER_CATEGO
     p = out / f"{CONTROL_TASK}.jsonl"
     _write(p, items)
     manifest["tasks"][CONTROL_TASK] = {
-        "items": len(items), "sha256": sha256_file(p), "report": 0, "diagnose": len(items),
+        "items": len(items), "sha256": sha256_file(p),
+        "bank_sha256": fingerprint(map(item_key, items)), "report": 0, "diagnose": len(items),
         "per_category": dict(collections.Counter(it["category"] for it in items)),
         "built_from": "mmlu diagnose half", "topic": None}
     written_tasks.append(CONTROL_TASK)
