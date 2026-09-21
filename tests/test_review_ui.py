@@ -806,10 +806,14 @@ def test_the_loop_board_does_not_rebuild_itself_when_nothing_moved(live, page):
     assert page.errors == []
 
 
-def test_the_queue_row_counts_the_judge_batch_up(live, page):
+def test_the_queue_row_counts_the_judge_batch_up(live, page, monkeypatch):
     """Phase 8g D2: "judging 40/130", not "judging 130 answers"."""
-    from service import db
+    from service import db, llm_poller
     base = live["base"]
+    # a batch in flight, held there: this fixture has no judge, so the live
+    # poller would fail the batch on its next tick — and a row whose grading
+    # failed says that instead of a count (10c), which made this a race
+    monkeypatch.setattr(llm_poller, "tick", lambda: 0)
     sid = db.add("fx/good-750m", "auto", "judged", "omar", "", tasks=["exam_law"])
     rid = db.judge_run_create("fx/good-750m", "b_live", 130, "stub/overlap-v1", "{}")
     db.batch_add("b_live", "judge", rid, 130, "anthropic", "claude-x")
