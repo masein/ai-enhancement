@@ -133,6 +133,53 @@ def judge_now(model: str) -> tuple[dict | None, list[dict]]:
     return _judge.split_by_bank(j, current_fingerprints(), _mtime(p))
 
 
+# Is the grading model answering, now? #50 answered law (37 GPU-seconds) and
+# then failed: vLLM had crashed three hours earlier and nothing was on the
+# port. A local judge is asked GET /v1/models with a two-second limit before a
+# judged run is queued, and the answer is kept for thirty seconds, so the page
+# can poll it and a burst of submissions asks once. An API judge is not
+# probed: its batches wait for the provider rather than fail.
+JUDGE_HEALTH_TTL = 30.0
+JUDGE_HEALTH_TIMEOUT = 2.0
+_JUDGE_HEALTH: dict = {"at": 0.0, "value": None}
+
+
+def judge_health(force: bool = False) -> dict:
+    """{ok, checked, provider, url, why}: `why` is a plain sentence naming
+    the URL that did not answer."""
+    import urllib.error
+    import urllib.request
+    now = time.time()
+    if not force and _JUDGE_HEALTH["value"] and now - _JUDGE_HEALTH["at"] < JUDGE_HEALTH_TTL:
+        return _JUDGE_HEALTH["value"]
+    prov = config.JUDGE_PROVIDER
+    if prov != "local" or config.JUDGE_MODEL == "stub":
+        v = {"ok": True, "checked": False, "provider": prov, "url": "", "why": ""}
+    else:
+        url = config.LOCAL_BASE_URL.rstrip("/")
+        try:
+            req = urllib.request.Request(url + "/models", headers=(
+                {"Authorization": f"Bearer {config.JUDGE_API_KEY}"} if config.JUDGE_API_KEY else {}))
+            with urllib.request.urlopen(req, timeout=JUDGE_HEALTH_TIMEOUT) as r:
+                ok = 200 <= r.status < 300
+            why = "" if ok else f"the grading model at {url} answered {r.status}"
+        except urllib.error.HTTPError as e:
+            ok, why = False, f"the grading model at {url} answered {e.code}"
+        except Exception as e:                          # noqa: BLE001 — down is down
+            reason = getattr(e, "reason", None) or e
+            ok, why = False, f"the grading model isn't answering at {url} ({reason})"
+        v = {"ok": ok, "checked": True, "provider": prov, "url": url, "why": why}
+    _JUDGE_HEALTH.update(at=now, value=v)
+    return v
+
+
+@app.get("/api/judge/health")
+def judge_health_endpoint():
+    """For the header's live dot and the judged controls: cheap to poll, the
+    probe itself runs at most every thirty seconds."""
+    return judge_health()
+
+
 def _judge_identity() -> dict:
     import judge as _judge
     return _judge.identity()
@@ -281,6 +328,12 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "judged (free response + judge)")
     chosen: list[str] = []
     if s.suite == "judged":
+        # before a GPU second is spent on answers nobody could grade
+        h = judge_health()
+        if not h["ok"]:
+            raise HTTPException(503, f"{h['why'][:1].upper()}{h['why'][1:]}, so this judged run "
+                                     f"would spend GPU time on answers nobody can grade. Start "
+                                     f"it, then queue the run — nothing was queued.")
         why = config.judged_blocked()
         if why:
             raise HTTPException(503, why)
@@ -346,7 +399,14 @@ def submissions(limit: int = 100):
             r["judge"] = {"batch_id": run["batch_id"], "n_items": run["n_items"],
                           "status": b.get("status") or run.get("status"),
                           "progress": b.get("progress") or "",
-                          "judge_id": run.get("judge_id")}
+                          "judge_id": run.get("judge_id"),
+                          "error": b.get("error") or run.get("error") or ""}
+        for r in judged:
+            # the answers are on disk and only the grading failed: a retry
+            # re-grades them (10b's resume answers nothing again)
+            r["judge_failed"] = bool(
+                (r["status"] == "failed" and str(r.get("error") or "").startswith("judge:"))
+                or (r.get("judge") or {}).get("status") == "failed")
     return rows
 
 
@@ -1263,6 +1323,42 @@ def _judged_models(payload: dict) -> list[dict]:
     return sorted(out, key=lambda x: (-x["topics"], -x["at"], x["id"]))
 
 
+PACE_RUNS = 5
+
+
+def judged_pace() -> dict | None:
+    """How long a judged run takes per answer, from the last few that
+    answered anything: the GPU time the runner recorded plus the judge
+    batch's own time, over the items the judge graded. The Sit and Queue
+    panels turn a topic count into minutes with it — never a constant, which
+    would be wrong on the next card and the next judge. None before any run."""
+    runs = {r["batch_id"]: r for r in db.judge_runs(200)}
+    secs = items = used = 0.0
+    for s in db.recent(300):
+        if used >= PACE_RUNS:
+            break
+        run = runs.get(s.get("judge_batch") or "")
+        if s["suite"] != "judged" or s["status"] != "done" or not (s.get("gpu_seconds") or 0) \
+                or not run or run["status"] != "done" or not run.get("finished_at") \
+                or not run.get("n_items"):
+            continue
+        secs += s["gpu_seconds"] + max(0.0, run["finished_at"] - run["created_at"])
+        items += run["n_items"]
+        used += 1
+    return {"sec_per_answer": round(secs / items, 3), "runs": int(used)} if items else None
+
+
+def built_items() -> dict[str, int]:
+    """task -> how many questions the built task holds: what a ticked topic
+    costs in answers."""
+    try:
+        m = json.loads((config.JUDGED_TASKS_DIR / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {t: int(v.get("items") or 0) for t, v in (m.get("tasks") or {}).items()
+            if isinstance(v, dict)}
+
+
 @app.get("/api/loop")
 def loop_board(model: str = ""):
     """One row per topic: the bank, the rubric, where `model`'s judged run
@@ -1279,6 +1375,8 @@ def loop_board(model: str = ""):
                        for t in exam_build.TOPICS],
             "model": chosen, "models": models,
             "judged_blocked": blocked, "tasks_built": config.judged_tasks(),
+            "judge_health": judge_health(),
+            "built_items": built_items(), "pace": judged_pace(),
             "floor": report.PROPOSE_MIN_N,
             "gap_dataset_flag": "--gap-dataset"}
 

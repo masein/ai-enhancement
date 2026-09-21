@@ -123,7 +123,11 @@ def test_submit_answers_with_a_toast_and_no_line_that_stays(live, page):
     assert "Queued #" in t.text_content() and "org/toast-me" in t.text_content()
     assert t.locator("[data-toast-link]").count() == 1
     assert page.locator("[role=status] [data-toast='submit']").count() == 1   # a live region
-    page.wait_for_selector("[data-toast='submit']", state="detached", timeout=8000)  # 4 s
+    # a toast with a link stays eight seconds (10c: four was gone before
+    # anyone reached "see it")
+    page.wait_for_timeout(5000)
+    assert t.count() == 1
+    page.wait_for_selector("[data-toast='submit']", state="detached", timeout=8000)
     assert "queued" not in (page.locator("#view .card").first.text_content() or "").lower() \
         or "Queued #" not in page.locator("#view").text_content()
     assert page.errors == []
@@ -339,12 +343,15 @@ def test_the_model_page_leads_with_numbers(live, page):
         assert not card.locator("[data-provisional='judge']").is_visible()   # behind "why?"
         why.locator("summary").click()
         assert card.locator("[data-provisional='judge']").is_visible()
-        # one topic's tables at a time
-        sw = card.locator("[data-topic-switch] [data-topic-pick]")
+        # one topic's tables at a time, picked from a select (10c: 36 of them)
+        sw = card.locator("select[data-topic-switch] option")
         assert sw.count() >= 2
         assert card.locator("[data-criteria-table]").count() == 1
-        sw.nth(1).click()
-        page.wait_for_function("document.querySelectorAll('[data-criteria-table]').length === 1")
+        second = sw.nth(1).get_attribute("value")
+        card.locator("select[data-topic-switch]").select_option(second)
+        page.wait_for_function("document.querySelectorAll('[data-criteria-table]').length === 1 "
+                               "&& document.querySelector('select[data-topic-switch]').value === "
+                               f"'{second}'")
         # no "Training compute: Unknown" tile
         assert "Training compute" not in page.locator(".tiles").first.text_content()
         # last evaluated counts the judged run

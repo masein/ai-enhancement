@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 import pytest
 
-from conftest import go_tab, set_name
+from conftest import all_rows, go_tab, set_name
 
 
 pytestmark = pytest.mark.dashboard
@@ -91,6 +91,7 @@ def test_exam_curation_in_the_browser(live, page):
     rows = page.locator("[data-panel='rubrics'] tr[data-rubric-row]")
     # one per topic in categories.yaml that has questions: all 37 but Arts,
     # delivered empty, which folds into the one row that names it (9b-7)
+    all_rows(page, "rubrics")                        # 25 a page since 36 topics (10c)
     assert rows.count() == len(eb.TOPICS) - 1 == 36
     assert "General & Multidisciplinary" in text and "Economics" in text
     # filter to one topic by clicking it
@@ -392,6 +393,7 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
         page.goto(base + "/#tab=exam")
         page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
         panel = page.locator("[data-panel='rubrics']")
+        all_rows(page, "rubrics")                    # Medicine is on page 2 of 25
         row = panel.locator("tr[data-rubric-row='Medicine & Clinical Health']")
         assert f"{slug}.md v2" in row.text_content()
         assert "15 criteria" in row.text_content()
@@ -504,6 +506,8 @@ def test_the_loop_tab_is_one_row_per_topic_with_the_next_step(live, page):
         page.wait_for_selector("table.jd[data-loop-table] tbody tr")
         # every topic in categories.yaml: a row for each of the 36 with
         # questions, and Arts, delivered empty, named in the one folded row
+        assert page.locator("table.jd[data-loop-table] tbody tr[data-loop-row]").count() == 25
+        all_rows(page, "loop")                       # the shared pager, 25 a page (10c)
         assert page.locator("table.jd[data-loop-table] tbody tr[data-loop-row]").count() == 36
         fold = page.locator("table.jd[data-loop-table] tbody tr[data-empty-topics]")
         assert fold.count() == 1 and "Arts" in fold.text_content()
@@ -910,6 +914,7 @@ def test_the_rubrics_table_says_whether_a_topic_has_questions(live, page):
         page.goto(base + "/#tab=exam")
         page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
         panel = page.locator("[data-panel='rubrics']")
+        all_rows(page, "rubrics")
         med = panel.locator("tr[data-rubric-row='Medicine & Clinical Health']")
         assert med.locator("[data-bank]").first.get_attribute("data-bank") != "0"
         assert "report" in med.text_content() and "diagnose" in med.text_content()

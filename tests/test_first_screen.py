@@ -208,6 +208,9 @@ def test_the_loop_board_shows_one_model_and_what_it_has_not_sat(live, page):
             assert v in ("", default)
         sel.select_option("fx/chance-160m")
         page.wait_for_function("state.loop.model === 'fx/chance-160m' && state.loop.loaded")
+        # weakest first: a topic this model has not sat comes after every one it
+        # has, on the second page of 36 — the search finds it (10c)
+        page.get_by_label("find a topic").fill("law")
         law = page.locator("tr[data-loop-row='law']")
         law.locator("[data-not-sat]").wait_for()
         assert "Not sat" in law.text_content()
@@ -227,7 +230,9 @@ def test_the_loop_board_shows_one_model_and_what_it_has_not_sat(live, page):
 @pytest.mark.dashboard
 def test_read_the_results_lands_on_the_answers(live, page):
     page.goto(live["base"] + "/#tab=loop")
-    page.locator("tr[data-loop-row='economics'] a[data-read]").click()
+    # low on the board, where the scroll used to land past the answers: the
+    # last row of the first page, weakest first
+    page.locator("tr[data-loop-row] a[data-read]").last.click()
     page.wait_for_selector("[data-panel='answers']")
     page.wait_for_function("""() => { const r = document.querySelector('[data-panel=answers]')
       .getBoundingClientRect(); return r.top >= -2 && r.top < innerHeight / 2; }""")

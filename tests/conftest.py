@@ -217,8 +217,20 @@ def show_all_columns(page) -> None:
 
 
 def pick_topic(page, task: str) -> None:
-    """The model page shows one judged topic's tables at a time (phase 9c)."""
-    btn = page.locator(f"[data-topic-pick='{task}']")
-    if btn.count():
-        btn.click()
-        page.wait_for_selector(f"[data-topic-pick='{task}'][aria-pressed='true']")
+    """The model page shows one judged topic's tables at a time (phase 9c),
+    chosen in a select since there are thirty-six of them (10c)."""
+    sel = page.locator("select[data-topic-switch]")
+    if sel.count():
+        sel.select_option(task)
+        page.wait_for_function("document.querySelector('select[data-topic-switch]').value === "
+                               f"'{task}'")
+
+
+def all_rows(page, key: str, n: int = 100) -> None:
+    """A table behind the shared pager (25 a page since 36 topics, 10c), all
+    on one page: for a test about what the whole table holds."""
+    sel = page.locator(f"[data-pager='{key}'] select[aria-label='rows per page']")
+    if sel.count():
+        sel.select_option(str(n))
+        page.wait_for_function(f"document.querySelector(\"[data-pager='{key}'] "
+                               f"[data-page-range]\").dataset.pageRange.startsWith('1-')")

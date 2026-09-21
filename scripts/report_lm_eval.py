@@ -2151,7 +2151,11 @@ const state = {
         topic: '', just: {}, justOpen: '' },                               // Review tab
   ex: { status: null, candidates: [], loaded: false, msg: '', topic: '' },   // Exam tab
   topic: null,                         // open topic page, by slug (hash-routed)
-  loop: { rows: null, blocked: '', msg: '', loaded: false },                 // Loop tab
+  loop: { rows: null, blocked: '', msg: '', loaded: false, q: '' },          // Loop tab
+  judgeHealth: null,                   // {ok, url, why}: is the grading model answering
+  mine: new Set((() => { try { return JSON.parse(localStorage.getItem('bench-mine') || '[]'); }
+                         catch (e) { return []; } })()),   // queue rows this browser queued
+  qMark: null,                         // the queue row to mark, when one of mine moved
   loopSit: { model: '', kind: 'auto', tasks: null, msg: '', busy: false },   // sit-the-exam form
   ans: { model: '', rows: null, loading: false, topic: '', open: {}, seen: {}, fresh: {},
          acuity: 'all', flag: 'all', score: 'all', crit: 'all', sort: 'score' }, // Answers panel
@@ -3363,16 +3367,27 @@ function vJudged(m) {
     }
     // a topic graded criterion by criterion: what it was weak AT, the
     // critical failures in words, and the acuity the failures fell on — one
-    // topic at a time, picked with a segmented control. Every topic stacked
-    // made a 14,443 px page for a model judged on two.
+    // topic at a time. Every topic stacked made a 14,443 px page for a model
+    // judged on two; thirty-six segments of a switch do not fit a row, so it
+    // is a select, weakest first with the score, and a box that narrows it
     const crit = cats.filter(t => j.tasks[t].criteria_mean);
     const pick = crit.includes((state.mdlTopic || {})[m.id]) ? state.mdlTopic[m.id] : crit[0];
-    if (crit.length > 1) card.append(el('div', { class: 'ctrl', style: 'margin-top:14px' },
-      el('span', { class: 'small', text: 'topic' }),
-      el('div', { class: 'seg', role: 'group', 'aria-label': 'judged topic', 'data-topic-switch': '1' },
-        crit.map(t => el('button', { 'aria-pressed': String(t === pick), 'data-topic-pick': t,
-          text: frName(t), onclick: () => { state.mdlTopic = state.mdlTopic || {};
-            state.mdlTopic[m.id] = t; render(); } })))));
+    if (crit.length > 1) {
+      const tq = (state.mdlTopicQ || '').trim().toLowerCase();
+      const opts = crit.filter(t => t === pick || !tq || frName(t).toLowerCase().includes(tq));
+      card.append(el('div', { class: 'ctrl', style: 'margin-top:14px;flex-wrap:wrap' },
+        el('label', { class: 'small', for: 'mdlTopic', text: 'topic' }),
+        el('select', { id: 'mdlTopic', 'aria-label': 'judged topic', 'data-topic-switch': '1',
+            onchange: e => { state.mdlTopic = state.mdlTopic || {};
+              state.mdlTopic[m.id] = e.target.value; render(); } },
+          opts.map(t => el('option', { value: t, 'data-topic-pick': t,
+            selected: t === pick ? '' : null,
+            text: `${frName(t)} — ${num(pubScore(j.tasks[t]), 2)} / 4` }))),
+        el('input', { type: 'search', placeholder: 'find a topic', 'aria-label': 'find a judged topic',
+          'data-keep': 'mdl-topic-q', value: state.mdlTopicQ || '', style: 'min-width:140px',
+          oninput: e => { state.mdlTopicQ = e.target.value; render(); } }),
+        el('span', { class: 'count-note', text: `${crit.length} topics, weakest first` })));
+    }
     for (const t of crit.filter(t => t === pick)) {
       const v = j.tasks[t];
       if (!v.criteria_mean) continue;
@@ -3913,6 +3928,10 @@ function slugOfTopic(topic) {
 
 // every navigation goes through here, so history and state cannot disagree
 function navigate(patch) {
+  // entering the Queue starts it on page 1: the newest rows, where a new
+  // one — even a failure — is
+  if (patch.tab === 'queue' && (state.tab !== 'queue' || state.model || state.topic)
+      && state.pg.queue) state.pg.queue.page = 1;
   Object.assign(state, patch);
   const want = hashFor();
   // push history, then paint. Painting here rather than leaving it to the
@@ -4033,8 +4052,12 @@ function actNote(slot) {
 // A toast: every action that changes something says so — bottom-right, four
 // seconds, a polite live region, and a link to where the thing went. Errors
 // stay inline, next to the control that caused them. A toast that carries a
-// button stays long enough to press it.
+// link stays eight seconds and one with a button fifteen, and neither goes
+// while the pointer is on it or focus is in it: four seconds was gone before
+// anyone reached "see the queue".
 // ---------------------------------------------------------------------------
+const TOAST_MS = 4000, TOAST_LINK_MS = 8000, TOAST_ACTION_MS = 15000;
+
 function toast(text, opts = {}) {
   let box = document.getElementById('toasts');
   if (!box) {
@@ -4049,7 +4072,18 @@ function toast(text, opts = {}) {
       onclick: async () => { t.remove(); await opts.action.run(); } }) : '',
     el('button', { class: 'xbtn', 'aria-label': 'dismiss', text: '×', onclick: () => t.remove() }));
   box.append(t);
-  setTimeout(() => t.remove(), opts.ms || (opts.action ? 15000 : 4000));
+  // the clock runs only while nobody is on it: hover or focus stops it, and
+  // leaving gives the full time back rather than whatever was left
+  const ms = opts.ms || (opts.action ? TOAST_ACTION_MS : opts.go ? TOAST_LINK_MS : TOAST_MS);
+  let timer = null;
+  const arm = () => { clearTimeout(timer); timer = setTimeout(() => t.remove(), ms); };
+  const hold = () => { clearTimeout(timer); timer = null; };
+  const busy = () => t.matches(':hover') || t.contains(document.activeElement);
+  t.addEventListener('mouseenter', hold);
+  t.addEventListener('focusin', hold);
+  t.addEventListener('mouseleave', () => { if (!busy()) arm(); });
+  t.addEventListener('focusout', () => setTimeout(() => { if (!busy()) arm(); }, 0));
+  arm();
   return t;
 }
 const goQueue = () => navigate({ tab: 'queue', topic: null, model: null });
@@ -4101,14 +4135,86 @@ function pageNumbers(cur, n) {
 }
 
 // rows -> { rows: this page's slice, pager: the control (or '' when one page
-// of the smallest size holds everything) }
-function paged(key, rows, sig, redraw, dflt = 25) {
+// of the smallest size holds everything). `live`: one pager node for the
+// life of the page, updated in place (livePager) — for a table a poll
+// redraws while someone is clicking it
+function paged(key, rows, sig, redraw, dflt = 25, live = false) {
   const p = pgState(key, dflt);
   if (p.sig !== sig) { p.sig = sig; p.page = 1; }
   const pages = Math.max(1, Math.ceil(rows.length / p.size));
   if (p.page > pages) p.page = pages;
   const start = (p.page - 1) * p.size;
-  return { rows: rows.slice(start, start + p.size), pager: pager(key, rows.length, redraw) };
+  return { rows: rows.slice(start, start + p.size),
+           pager: (live ? livePager : pager)(key, rows.length, redraw) };
+}
+
+// The queue's pager was rebuilt on every refresh while a run was live, and a
+// click could land on a button that had just been replaced — the tab bar's
+// bug (#21) again. This one is built once per key and only its text, state
+// and number buttons change; one delegated handler reads the current page
+// when it is clicked, so no listener holds a stale one.
+const _livePagers = {};
+function livePager(key, total, redraw) {
+  const p = state.pg[key];
+  let nav = _livePagers[key];
+  if (!nav) {
+    nav = _livePagers[key] = el('nav', { class: 'pager', 'data-pager': key, 'aria-label': 'pages' });
+    nav._note = el('span', { class: 'count-note' });
+    nav._size = el('select', { 'aria-label': 'rows per page' });
+    nav._prev = el('button', { class: 'quiet', text: '‹ Prev', 'data-page-prev': '1' });
+    nav._nums = el('span', { class: 'pgnums', style: 'display:contents' });
+    nav._next = el('button', { class: 'quiet', text: 'Next ›', 'data-page-next': '1' });
+    nav.append(nav._note, nav._size, nav._prev, nav._nums, nav._next);
+    nav.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b || b.disabled || !nav.contains(b)) return;
+      const q = state.pg[key], pages = Math.max(1, Math.ceil(nav._total / q.size));
+      const n = b.dataset.pagePrev ? q.page - 1 : b.dataset.pageNext ? q.page + 1 : +b.dataset.page;
+      if (!n) return;
+      q.page = Math.min(Math.max(1, n), pages);
+      (nav._redraw || render)();
+    });
+    nav._size.addEventListener('change', e => {
+      const q = state.pg[key];
+      q.size = +e.target.value; q.page = 1;
+      try { localStorage.setItem('bench-pagesize-' + key, e.target.value); } catch (x) { /* private */ }
+      (nav._redraw || render)();
+    });
+  }
+  nav._total = total; nav._redraw = redraw;
+  nav.style.display = total <= PAGE_SIZES[0] ? 'none' : '';
+  const pages = Math.max(1, Math.ceil(total / p.size));
+  const from = total ? (p.page - 1) * p.size + 1 : 0, to = Math.min(total, p.page * p.size);
+  nav._note.dataset.pageRange = `${from}-${to}`;
+  nav._note.textContent = `${from}–${to} of ${total}`;
+  const sizes = [...new Set([...PAGE_SIZES, p.dflt])].sort((a, b) => a - b).map(String);
+  if ([...nav._size.options].map(o => o.value).join() !== sizes.join())
+    nav._size.replaceChildren(...sizes.map(n => el('option', { value: n, text: `${n} per page` })));
+  nav._size.value = String(p.size);
+  nav._prev.disabled = p.page <= 1;
+  nav._next.disabled = p.page >= pages;
+  // the number buttons: reused by position, added or dropped only when the
+  // count of them changes
+  const want = pageNumbers(p.page, pages);
+  const have = [...nav._nums.children];
+  want.forEach((n, i) => {
+    let node = have[i];
+    const isGap = n === '…';
+    if (!node || (node.tagName === 'SPAN') !== isGap) {
+      const fresh = isGap ? el('span', { class: 'se', text: '…' })
+                          : el('button', { class: 'pgnum' });
+      if (node) node.replaceWith(fresh); else nav._nums.append(fresh);
+      node = fresh;
+    }
+    if (!isGap) {
+      node.textContent = String(n);
+      node.dataset.page = String(n);
+      if (n === p.page) node.setAttribute('aria-current', 'page');
+      else node.removeAttribute('aria-current');
+    }
+  });
+  for (const extra of have.slice(want.length)) extra.remove();
+  return nav;
 }
 
 function pager(key, total, redraw) {
@@ -4781,29 +4887,44 @@ function vLeaderboard(ms) {
     { key: 'avg',    label: 'Avg',    num: true },
     ...DATA.accTasks.map(t => ({ key: t, label: t, num: true, task: t })),
     ...DATA.pplTasks.map(t => ({ key: t, label: t, num: true, task: t, lower: true })),
-    // judged columns exist on the board only once a person has agreed with the
-    // judge (kappa over the line); the kappa rides in the header
+    // judged topic columns exist on the board only once a person has agreed
+    // with the judge (kappa over the line); the kappa rides in the header.
+    // Thirty-six of them, so they start hidden, behind Columns ▾
     ...(DATA.judged && DATA.judged.calibration && DATA.judged.calibration.calibrated
         && DATA.models.some(m => m.judgeState && m.judgeState.ok)
-      ? [...DATA.judged.exam.filter(t => DATA.judged.tasks.includes(t)).map(t => ({
+      ? DATA.judged.exam.filter(t => DATA.judged.tasks.includes(t)).map(t => ({
           key: 'j:' + t, label: frName(t) + ' κ'
             + (((DATA.judged.calibration.per_category || {})[frName(t)] || {}).kappa
-               ?? DATA.judged.calibration.kappa), num: true, judged: t })),
-         { key: 'javg', label: `Judged avg κ${DATA.judged.calibration.kappa}`, num: true, judged: 'avg' }]
+               ?? DATA.judged.calibration.kappa), num: true, judged: t, group: 'judged' }))
+      : []),
+    // MMLU by category, one column each — the ~24 topics MMLU has subjects
+    // for, hidden until someone asks for them
+    ...lbCategoryCols(ms),
+    // one number for the exam, shown by default: the report-half mean over
+    // the topics judged on the questions they hold now (10b) — a preliminary
+    // judge's greyed, never marked best
+    ...(DATA.models.some(m => Object.keys((m.judge || {}).tasks || {}).some(t => t.startsWith('exam_')))
+      ? [{ key: 'javg', num: true, judged: 'avg', fixed: true,
+           label: 'Judged avg' + (DATA.judged && DATA.judged.calibration
+             && DATA.judged.calibration.calibrated ? ` κ${DATA.judged.calibration.kappa}` : '') }]
       : []),
     { key: 'date', label: 'Last eval', num: false },   // when its newest task ran
   ];
   // at most six task columns unless someone asks for more: 1,923 px in a
   // 1,234 px card was the table the tab is named after
-  const allTaskCols = cols.filter(c => c.task || c.judged);
+  const optional = c => (c.task || c.judged || c.cat) && !c.fixed;
+  const allTaskCols = cols.filter(optional);
   const shownTasks = lbShownTasks(allTaskCols);
   const nHidden = allTaskCols.length - shownTasks.size;
-  const visCols = cols.filter(c => !(c.task || c.judged) || shownTasks.has(c.key));
-  const jval = (m, c) => !(m.judgeState && m.judgeState.ok) ? null : c.judged === 'avg' ? m.judgedAvg
+  const visCols = cols.filter(c => !optional(c) || shownTasks.has(c.key));
+  const judgedOk = m => !!(m.judgeState && m.judgeState.ok);
+  const jval = (m, c) => c.judged === 'avg' ? m.judgedAvg
+    : !judgedOk(m) ? null
     : (m.tainted || []).includes(c.judged) ? null      // shown on the page, never ranked here
     : (((m.judge || {}).tasks || {})[c.judged] ? pubScore(m.judge.tasks[c.judged]) : null);
   const val = (m, c) => c.key === 'avg' ? officialAvg(m)
                       : c.judged ? jval(m, c)
+                      : c.cat ? ((mmluCats(m) || {})[c.cat] || {}).score_report
                       : c.task ? (cell(c.task, m.id) || {}).v : m[c.key];
   const sorted = [...ms].sort((a, b) => {
     const c = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg');
@@ -4835,7 +4956,8 @@ function vLeaderboard(ms) {
   const best = {}, tiedCount = {}, rng = {};
   for (const c of cols) {
     if (!c.num || c.key === 'params') continue;
-    const vs = ms.map(m => val(m, c)).filter(v => v != null);
+    const vs = ms.filter(m => c.judged !== 'avg' || judgedOk(m)).map(m => val(m, c))
+      .filter(v => v != null);
     if (vs.length > 1) {
       best[c.key] = c.lower ? Math.min(...vs) : Math.max(...vs);
       tiedCount[c.key] = c.lower
@@ -4936,8 +5058,22 @@ function vLeaderboard(ms) {
           title: (m.tainted || []).includes(c.judged)
             ? 'trained on data derived from this topic — shown on the model page, not ranked'
             : m.judgeState ? m.judgeState.reasons.join('; ') : 'not judged' });
-        return el('td', { class: 'num' + (v === best[c.key] ? ' best' : ''), text: num(v, 2) },
-          el('span', { class: 'se', text: ' /4' }));
+        const prelim = !judgedOk(m);
+        return el('td', { class: 'num' + (prelim ? ' dim' : v === best[c.key] ? ' best' : ''),
+          'data-judged-avg': c.judged === 'avg' ? (prelim ? 'preliminary' : 'counts') : null,
+          title: c.judged === 'avg' ? `report half, over the ${Object.keys((m.judge || {}).tasks || {})
+            .filter(t => t.startsWith('exam_')).length} topics judged on the current questions`
+            + (prelim ? ` — preliminary: ${(m.judgeState || {}).reasons.join('; ')}` : '') : '',
+          text: num(v, 2) }, el('span', { class: 'se', text: ' /4' }));
+      }
+      if (c.cat) {
+        const g = (mmluCats(m) || {})[c.cat];
+        if (!g || g.score_report == null) return el('td', { class: 'num', text: '—' });
+        const dim = g.n_report < CAT_MIN_N;
+        return el('td', { class: 'num' + (dim ? ' dim' : !dim && g.score_report === best[c.key] ? ' best' : ''),
+          title: `MMLU, ${c.cat}: ${g.n_report} leaderboard-half items`
+            + (dim ? ` — under ${CAT_MIN_N}, treat as noise` : '') },
+          pct(g.score_report), el('span', { class: 'se', text: ` ${g.n_report}` }));
       }
       const cc = cell(c.task, m.id);
       if (!cc) return el('td', { class: 'num', text: '—' });
@@ -5007,16 +5143,26 @@ function vLeaderboard(ms) {
 // column comes from — so nothing here is a diagnosis-half claim.
 const mmluCats = m => ((((m.diag || {}).tasks || {}).mmlu || {}).categories) || null;
 
+// MMLU by category as optional Leaderboard columns — one per topic MMLU has
+// subjects for, from the models' diagnoses
+function lbCategoryCols(ms) {
+  const have = ms.filter(mmluCats);
+  return (DATA.meta.categories || []).filter(c => have.some(m => mmluCats(m)[c]))
+    .map(c => ({ key: 'cat:' + c, label: 'MMLU ' + c, num: true, cat: c, group: 'cats' }));
+}
+
 // which task columns show: remembered per browser; by default the required
-// tasks, then the rest, six at most
+// tasks, then the rest, six at most — harness tasks only: the judged topics
+// and the MMLU categories are thirty-six and two dozen, and start hidden
 function lbShownTasks(taskCols) {
   const keys = taskCols.map(c => c.key);
   let want = null;
   try { want = JSON.parse(localStorage.getItem('bench-lb-shown') || 'null'); } catch (e) { /* none */ }
   if (state.lbShown) want = state.lbShown;
   if (!Array.isArray(want)) {
-    const req = (DATA.required || []).filter(t => keys.includes(t));
-    want = [...req, ...keys.filter(k => !req.includes(k))].slice(0, 6);
+    const plain = taskCols.filter(c => !c.group).map(c => c.key);
+    const req = (DATA.required || []).filter(t => plain.includes(t));
+    want = [...req, ...plain.filter(k => !req.includes(k))].slice(0, 6);
   }
   return new Set(want.filter(k => keys.includes(k)));
 }
@@ -5031,12 +5177,22 @@ function lbColumnsMenu(taskCols, shown) {
       open: state.lbColsOpen ? '' : null, ontoggle: e => { state.lbColsOpen = e.target.open; } },
     el('summary', { class: 'btn', text: 'Columns ▾' }),
     el('div', { class: 'colmenu-list' },
-      el('div', { class: 'small se', text: 'task columns to show' }),
-      taskCols.map(c => el('label', { class: 'small' },
-        el('input', { type: 'checkbox', 'data-column': c.key, checked: shown.has(c.key) ? '' : null,
-          onchange: e => save(e.target.checked ? [...shown, c.key]
-                                               : [...shown].filter(k => k !== c.key)) }),
-        ' ' + c.label)),
+      [[null, 'task columns to show'], ['judged', 'judged topics (rubric 0–4)'],
+       ['cats', 'MMLU by category']].flatMap(([g, head]) => {
+        const cs = taskCols.filter(c => (c.group || null) === g);
+        if (!cs.length) return [];
+        const keys = cs.map(c => c.key);
+        return [el('div', { class: 'small se', 'data-column-group': g || 'tasks' }, head + ' ',
+            g ? el('button', { class: 'quiet', style: 'padding:0 6px', text: 'all',
+              'data-column-group-all': g, onclick: () => save([...new Set([...shown, ...keys])]) }) : '',
+            g ? el('button', { class: 'quiet', style: 'padding:0 6px', text: 'none',
+              'data-column-group-none': g, onclick: () => save([...shown].filter(k => !keys.includes(k))) }) : ''),
+          ...cs.map(c => el('label', { class: 'small' },
+            el('input', { type: 'checkbox', 'data-column': c.key, checked: shown.has(c.key) ? '' : null,
+              onchange: e => save(e.target.checked ? [...shown, c.key]
+                                                   : [...shown].filter(k => k !== c.key)) }),
+            ' ' + c.label))];
+      }),
       el('div', { class: 'frm' },
         el('button', { class: 'quiet', text: 'show all', onclick: () => save(taskCols.map(c => c.key)) }),
         el('button', { class: 'quiet', text: 'the default six', onclick: () => {
@@ -6174,14 +6330,18 @@ async function queueCancel(r) {
   await loadQueue(); (state.queueRedraw || render)();
 }
 
-async function queueResubmit(r) {
+async function queueResubmit(r, regrade = false) {
   let tasks = [];
   try { tasks = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
   try {
     const j = await post('api/submissions', { hf_id: r.hf_id, kind: r.kind || 'auto',
       suite: r.suite, note: r.note || '', submitter: whoName() || r.submitter || '',
       ...(tasks.length ? { tasks } : {}) });
-    toast(j.note ? `#${j.id}: ${j.note}` : `Queued #${j.id} again — ${r.hf_id}`, { key: 'resubmit' });
+    rememberQueued(j.id);
+    markQueueRow(j.id);
+    toast(j.note ? `#${j.id}: ${j.note}`
+      : regrade ? `Grading #${r.id}'s answers again as #${j.id} — they are on disk, so no GPU`
+      : `Queued #${j.id} again — ${r.hf_id}`, { key: regrade ? 'regrade' : 'resubmit' });
   } catch (e) { state.qmsg = `#${r.id}: ${e.message}`; }
   await loadQueue(); (state.queueRedraw || render)();
 }
@@ -6217,6 +6377,12 @@ function queueActions(r) {
       onclick: () => { state.qConfirm = r.id; (state.queueRedraw || render)(); } })];
   }
   if (r.status === 'canceling') return [log, el('span', { class: 'small se', text: ' stopping…' })];
+  // only the grading failed: the answers are on disk, and a retry re-grades
+  // them — 10b's resume answers nothing again, so it costs no GPU
+  if (r.judge_failed)
+    return [log, ' ', el('button', { ...small, class: 'primary', 'data-row-regrade': String(r.id),
+      text: 'Retry grading', title: 'queue this run again: the answers it wrote are kept and '
+        + 'graded again — no GPU', onclick: () => queueResubmit(r, true) })];
   if (r.status === 'failed' || r.status === 'canceled')
     return [log, ' ', el('button', { ...small, 'data-row-resubmit': String(r.id), text: 'Resubmit',
       title: `the same model, suite${r.suite === 'judged' ? ' and topics' : ''}, queued again`,
@@ -6266,16 +6432,10 @@ function vQueue() {
   // exam; one ticked is the loop's usual unit of work
   const built = (state.loop.built || []);
   if (sf.tasks == null && built.length) sf.tasks = [...built];
-  const topicBoxes = sf.suite === 'judged' && built.length ? el('div', {},
-    el('p', { class: 'small', text: 'topics in this run:' }),
-    el('div', { class: 'frm', style: 'flex-wrap:wrap', 'data-submit-topics': '1' },
-      built.map(task => el('label', { class: 'small', style: 'margin-right:10px' },
-        el('input', { type: 'checkbox', 'data-submit-task': task,
-          checked: (sf.tasks || []).includes(task) ? '' : null,
-          onchange: e => { sf.tasks = e.target.checked ? [...(sf.tasks || []), task]
-                                                       : (sf.tasks || []).filter(t => t !== task); } }),
-        ' ' + frName(task))))) : '';
+  const topicBoxes = sf.suite === 'judged' && built.length ? el('div', { 'data-submit-topics': '1' },
+    el('p', { class: 'small', text: 'topics in this run:' }), topicPicker(sf, built, 'submit')) : '';
   f.suite.addEventListener('change', () => render());
+  const judgedOff = () => sf.suite === 'judged' && judgeDown();
   const btn = el('button', { class: 'primary', text: 'Submit model', onclick: async () => {
     const body = { hf_id: sf.hf_id.trim(), kind: sf.kind, suite: sf.suite,
                    submitter: whoName(), note: sf.note };
@@ -6284,6 +6444,7 @@ function vQueue() {
       if (sf.tasks.length < built.length) body.tasks = sf.tasks;
     }
     if (!body.hf_id) { state.qmsg = 'enter a Hugging Face model id first'; render(); return; }
+    if (judgedOff()) { state.qmsg = judgeWhy(); render(); return; }
     btn.disabled = true;
     try {
       const r = await fetch('api/submissions', { method: 'POST',
@@ -6292,6 +6453,7 @@ function vQueue() {
       const j = await r.json().catch(() => ({}));
       state.qmsg = r.ok ? '' : 'rejected: ' + (typeof j.detail === 'string' ? j.detail : r.status);
       if (r.ok) {
+        rememberQueued(j.id);
         toast(j.note ? `#${j.id}: ${j.note}` : `Queued #${j.id} — ${body.hf_id}`
               + (body.tasks ? ` · ${body.tasks.map(frName).join(', ')}` : ''),
               { key: 'submit', go: goQueue, link: 'see it' });
@@ -6300,7 +6462,8 @@ function vQueue() {
     } catch (e) { state.qmsg = 'submit failed — server unreachable?'; }
     await loadQueue(); render();
   }});
-  const qrow = r => el('tr', {},
+  const qrow = r => el('tr', { 'data-queue-row': String(r.id),
+      class: state.qMark === r.id ? 'landed' : null },
     el('td', { class: 'num', text: '#' + r.id }),
     el('td', { class: 'small', style: 'white-space:nowrap',
       title: `submitted ${absT(r.created_at)}`
@@ -6322,11 +6485,19 @@ function vQueue() {
     el('td', { class: 'small', text: r.progress || '' },
       // the GPU half finishing is not the job finishing: the judge batch is
       // still out, and the row says how far it is
-      r.judge ? el('div', { class: 'se', 'data-judge-progress': judgeCount(r.judge),
+      r.judge && !r.judge_failed ? el('div', { class: 'se', 'data-judge-progress': judgeCount(r.judge),
         title: `judge batch ${r.judge.batch_id}`,
         text: r.judge.status === 'done' ? `judged ${r.judge.n_items} answers`
           : `judging ${judgeCount(r.judge)}` }) : '',
-      r.error ? el('div', { class: 'down', text: r.error }) : ''),
+      // written for whoever reads the queue, not for whoever wrote the
+      // runner: one plain line, and the container hostnames behind details
+      r.judge_failed ? el('div', { 'data-judge-failed': '1' },
+        el('div', { class: 'down', text: 'The grading model isn\'t running. Start it, then '
+          + 'Retry grading — the answers are kept.' }),
+        el('details', { class: 'small' }, el('summary', { text: 'details' }),
+          el('div', { class: 'se', style: 'white-space:pre-wrap;overflow-wrap:anywhere',
+            text: [r.error, r.judge && r.judge.error].filter(Boolean).join('\n') })))
+        : r.error ? el('div', { class: 'down', text: r.error }) : ''),
     el('td', { class: 'num', text: r.gpu_seconds ? Math.round(r.gpu_seconds / 60) + ' min' : '—' }),
     el('td', { class: 'rowacts' }, queueActions(r)));
   // ---- queue filter + sort: a long shared queue needs "my jobs, failures first" ----
@@ -6395,12 +6566,13 @@ function vQueue() {
     const rs = qVisible();
     qCount.textContent = `${rs.length} of ${state.queue.length}`;
     const pg = paged('queue', rs, JSON.stringify([state.qQ, state.qStatus, state.qSort]),
-                     rebuildQueue);
-    qPager.replaceChildren(pg.pager);
+                     rebuildQueue, 25, true);
+    if (pg.pager.parentNode !== qPager) qPager.replaceChildren(pg.pager);
     qTbody.replaceChildren(...pg.rows.map(qrow));
   }
   state.queueRedraw = rebuildQueue;
   rebuildQueue();
+  if (judgedOff()) { btn.disabled = true; btn.title = judgeWhy(); }
   return [
     el('div', { class: 'card' },
       el('h2', { text: 'Submit a model' }),
@@ -6409,7 +6581,9 @@ function vQueue() {
         + 'checks the repo before any GPU is spent; one run at a time, per-task resume — '
         + 'resubmitting a finished model costs nothing, and a quick run upgrades to full by '
         + 'running only the missing tasks. Results land on this leaderboard automatically.' }),
-      el('div', { class: 'frm' }, f.hf_id, f.kind, f.suite, f.note, btn),
+      el('div', { class: 'frm' }, f.hf_id, f.kind, f.suite, f.note, btn,
+        sf.suite === 'judged' && judgeDown()
+          ? el('span', { class: 'propwhy', 'data-why': 'submit', text: judgeWhy() }) : ''),
       topicBoxes,
       state.qmsg ? el('p', { class: 'small', style: 'margin-top:8px', text: state.qmsg }) : ''),
     el('div', { class: 'card' },
@@ -6946,12 +7120,15 @@ async function loadLoop() {
     const j = await api('api/loop?model=' + encodeURIComponent(state.loop.model || ''));
     // re-render only when the board actually moved: rebuilding the view every
     // five seconds detaches whatever the person is reaching for
-    const sig = JSON.stringify([j.topics, j.judged_blocked, j.tasks_built, j.model, j.models]);
+    const sig = JSON.stringify([j.topics, j.judged_blocked, j.tasks_built, j.model, j.models,
+                                (j.judge_health || {}).ok, j.pace]);
     const changed = sig !== _loopSig || !state.loop.loaded || state.loop.failed;
     _loopSig = sig;
     Object.assign(state.loop, { rows: j.topics, blocked: j.judged_blocked,
                                 built: j.tasks_built || [], floor: j.floor, loaded: true,
-                                model: j.model || '', models: j.models || [], failed: '' });
+                                model: j.model || '', models: j.models || [], failed: '',
+                                items: j.built_items || {}, pace: j.pace || null });
+    if (j.judge_health) setJudgeHealth(j.judge_health);
     // the Queue tab reads it too: whether the judged suite is on, and its topics
     if (changed && (state.tab === 'loop' || state.tab === 'queue' || state.topic)
         && !state.model) render();
@@ -6961,6 +7138,36 @@ async function loadLoop() {
     state.loop.failed = String((e && e.message) || e);
     if ((state.tab === 'loop' || state.topic) && !state.model) render();
   } finally { _loopInFlight = false; }
+}
+
+// Is the grading model answering? Asked of the service (which asks the judge
+// at most every thirty seconds) on every poll, on every tab: a judged run
+// queued against a judge that is down spends GPU on answers nobody grades.
+let _judgeSig = null;
+function setJudgeHealth(h) {
+  if (!h || typeof h.ok !== 'boolean') return;        // an answer that says nothing
+  const sig = JSON.stringify([h.ok, h.why]);
+  state.judgeHealth = h;
+  if (sig === _judgeSig) return;
+  _judgeSig = sig;
+  renderFresh();
+  if ((state.tab === 'loop' || state.tab === 'queue' || state.topic) && !state.model) render();
+}
+async function loadJudgeHealth() {
+  try { setJudgeHealth(await api('api/judge/health')); } catch (e) { /* the banner says it */ }
+}
+const judgeDown = () => !!(state.judgeHealth && state.judgeHealth.ok === false);
+const judgeWhy = () => { const w = (state.judgeHealth || {}).why || 'the grading model is not answering';
+  return w[0].toUpperCase() + w.slice(1) + '. Start it, then queue the run — nothing is queued '
+    + 'until it answers.'; };
+function judgeChip() {
+  if (!judgeDown()) return '';
+  return el('span', { class: 'badge danger', 'data-judge-offline': '1', title: judgeWhy(),
+    text: 'judge offline' });
+}
+function judgeOfflineLine() {
+  if (!judgeDown()) return '';
+  return el('p', { class: 'warn', 'data-judge-offline-why': '1' }, judgeChip(), ' ', judgeWhy());
 }
 
 // the same words the network banner uses, inside the card that has no data:
@@ -7135,6 +7342,7 @@ function vLoop() {
         text: 'what the loop is and whose job each step is' })),
     state.loop.blocked ? el('p', { class: 'warn', 'data-loop-blocked': '1' },
       el('b', { text: 'No topic can be sat right now. ' }), state.loop.blocked) : '',
+    judgeOfflineLine(),
     state.loop.msg ? el('p', { class: 'small', 'data-loop-msg': '1', text: state.loop.msg }) : '',
     loopFailure(), loopCaveats(rows));
   const sel = head.querySelector('select[aria-label="results for"]');
@@ -7144,9 +7352,21 @@ function vLoop() {
       text: state.loop.failed ? 'No board to show yet — see above.' : '' }),
       state.loop.failed ? '' : skeleton(8, { 'data-loading': 'loop' }))];
   // topics with questions first; the ones without fold into one row that
-  // says so and opens — ten empty rows were two thirds of the board
-  const full = rows.filter(r => r.error || r.bank.accepted);
-  const empty = rows.filter(r => !r.error && !r.bank.accepted);
+  // says so and opens — ten empty rows were two thirds of the board. Of the
+  // rest, the weakest for the model in "Results for" first — the one the loop
+  // is for — then the ones it has not sat, by name; a search narrows both
+  const q = (state.loop.q || '').trim().toLowerCase();
+  const hit = r => !q || r.topic.toLowerCase().includes(q);
+  const score = r => r.last_judged && r.last_judged.score_report != null
+    ? r.last_judged.score_report : null;
+  const full = rows.filter(r => (r.error || r.bank.accepted) && hit(r)).sort((a, b) => {
+    const sa = score(a), sb = score(b);
+    if (sa != null && sb != null && sa !== sb) return sa - sb;
+    if ((sa == null) !== (sb == null)) return sa == null ? 1 : -1;
+    return natCmp(a.topic, b.topic);
+  });
+  const empty = rows.filter(r => !r.error && !r.bank.accepted && hit(r));
+  const pg = paged('loop', full, JSON.stringify([q, state.loop.model]), render, 25);
   const who = (models.find(m => m.id === state.loop.model) || {}).name || state.loop.model;
   const row = r => {
     const last = r.last_judged;
@@ -7209,7 +7429,17 @@ function vLoop() {
         el('th', { text: 'rubric' }), el('th', { text: who ? `results — ${who}` : 'results' }),
         el('th', { text: 'open proposal' }), el('th', { text: 'datasets' }),
         el('th', { text: 'next step' }))),
-      el('tbody', {}, full.map(row), fold, state.loop.showEmpty ? empty.map(row) : []))));
+      el('tbody', {}, pg.rows.map(row), fold, state.loop.showEmpty ? empty.map(row) : []))),
+    pg.pager);
+  const search = el('div', { class: 'toolbar' },
+    el('input', { type: 'search', placeholder: 'find a topic', 'aria-label': 'find a topic',
+      'data-keep': 'loop-q', value: state.loop.q || '', style: 'flex:1;min-width:160px',
+      oninput: e => { state.loop.q = e.target.value; render(); } }),
+    el('span', { class: 'count-note', 'data-loop-count': '1',
+      text: `${full.length} topic${full.length === 1 ? '' : 's'}`
+        + (q ? ` match “${state.loop.q.trim()}”` : ' with questions')
+        + (full.some(r => score(r) != null) ? ' · weakest first' : '') }));
+  table.prepend(search);
   return [head, table];
 }
 
@@ -7233,7 +7463,7 @@ function vTopic() {
   const last = r.last_judged;
   const st = loopStep(r);
   const headCard = el('div', { class: 'card', 'data-topic-page': r.slug }, back,
-    el('h2', { text: r.topic }),
+    el('h2', { text: r.topic }), judgeOfflineLine(),
     el('div', { class: 'kvs' },
       el('span', {}, el('b', { text: 'bank ' }), r.bank.accepted
         ? `${r.bank.accepted} (${r.bank.report} report / ${r.bank.diagnose} diagnose)` : 'empty'),
@@ -7266,21 +7496,66 @@ function judgingLine(r) {
         onclick: e => { e.preventDefault(); navigate({ tab: 'queue', topic: null }); } }), ' ')));
 }
 
+// The topic boxes a judged run is narrowed with, on the topic page's Sit panel
+// and the Queue tab's judged suite. Thirty-six don't fit a glance: a filter,
+// All and None over what the filter shows, and one line saying what the ticks
+// cost — "12 of 36 topics · about 1,200 answers · about 25 min". The minutes
+// come from the last judged runs (the service's pace), never a constant.
+const roundAbout = n => n < 100 ? n : n < 1000 ? Math.round(n / 10) * 10
+  : Math.round(n / 100) * 100;
+function durationWords(sec) {
+  const min = Math.max(1, Math.round(sec / 60));
+  if (min < 90) return `about ${min} min`;
+  const h = Math.floor(min / 60), m = Math.round((min % 60) / 10) * 10;
+  return `about ${h} h` + (m ? ` ${m} min` : '');
+}
+function costLine(tasks, built) {
+  const exam = built.filter(t => t.startsWith('exam_'));
+  const ticked = tasks.filter(t => built.includes(t));
+  const n = ticked.reduce((a, t) => a + ((state.loop.items || {})[t] || 0), 0);
+  const pace = state.loop.pace;
+  return `${ticked.filter(t => t.startsWith('exam_')).length} of ${exam.length} topics`
+    + (n ? ` · about ${roundAbout(n).toLocaleString('en')} answers` : '')
+    + (!n ? '' : pace && pace.sec_per_answer ? ` · ${durationWords(n * pace.sec_per_answer)}`
+       : ' · no judged run yet to time it by');
+}
+function topicPicker(st, built, key) {
+  const q = (st.pickQ || '').trim().toLowerCase();
+  const shown = built.filter(t => !q || frName(t).toLowerCase().includes(q));
+  const count = el('span', { class: 'count-note', 'data-pick-count': key,
+    text: costLine(st.tasks || [], built) });
+  const set = next => { st.tasks = next; count.textContent = costLine(next, built);
+    for (const b of box.querySelectorAll('input[type=checkbox]'))
+      b.checked = next.includes(b.dataset.task); };
+  const box = el('div', { class: 'frm topicpick', style: 'flex-wrap:wrap', 'data-topic-picks': key },
+    shown.map(task => el('label', { class: 'small', style: 'margin-right:10px' },
+      el('input', { type: 'checkbox', 'data-task': task,
+        [key === 'sit' ? 'data-sit-task' : 'data-submit-task']: task,
+        checked: (st.tasks || []).includes(task) ? '' : null,
+        onchange: e => set(e.target.checked ? [...(st.tasks || []), task]
+                                            : (st.tasks || []).filter(t => t !== task)) }),
+      ' ' + frName(task))),
+    shown.length ? '' : el('span', { class: 'small se', text: 'no topic matches' }));
+  return el('div', { 'data-picker': key },
+    el('div', { class: 'toolbar' },
+      el('input', { type: 'search', placeholder: 'find a topic', 'aria-label': 'find a topic',
+        'data-keep': key + '-pick-q', value: st.pickQ || '', style: 'flex:1;min-width:140px',
+        oninput: e => { st.pickQ = e.target.value; render(); } }),
+      el('button', { class: 'quiet', 'data-pick-all': key, text: q ? 'All shown' : 'All',
+        onclick: () => set([...new Set([...(st.tasks || []), ...shown])]) }),
+      el('button', { class: 'quiet', 'data-pick-none': key, text: q ? 'None shown' : 'None',
+        onclick: () => set((st.tasks || []).filter(t => !shown.includes(t))) }),
+      count),
+    box);
+}
+
 function loopSitPanel(r) {
   const s = state.loopSit;
   // a topic page ticks its own topic, exactly: the ticks belong to the page
   // they were made on, and law's must not ride along onto physics'
   if (s.tasks == null || s.page !== r.task) { s.tasks = [r.task]; s.page = r.task; }
   const built = state.loop.built || [];
-  const pick = el('div', { class: 'frm', style: 'flex-wrap:wrap' }, built.map(task => {
-    const id = 'sit-' + task;
-    const box = el('input', { type: 'checkbox', id, 'data-sit-task': task,
-      checked: s.tasks.includes(task) ? '' : null,
-      onchange: e => { s.tasks = e.target.checked ? [...s.tasks, task]
-                                                  : s.tasks.filter(t => t !== task); } });
-    return el('label', { class: 'small', for: id, style: 'margin-right:10px' }, box,
-      ' ' + frName(task));
-  }));
+  const pick = topicPicker(s, built, 'sit');
   const go = async () => {
     const body = { hf_id: s.model.trim(), kind: s.kind, suite: 'judged',
                    submitter: whoName(), tasks: s.tasks };
@@ -7294,6 +7569,7 @@ function loopSitPanel(r) {
     s.busy = false;
     if (res && res.ok) {
       s.msg = '';
+      rememberQueued(j.id);
       toast(`Queued #${j.id} — ${(j.tasks || []).map(frName).join(', ')}`,
             { key: 'sit', go: goQueue, link: 'see the queue' });
       loadQueue();
@@ -7315,8 +7591,12 @@ function loopSitPanel(r) {
         ['auto', 'base', 'instruct'].map(v => el('option', { value: v,
           selected: s.kind === v ? '' : null, text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
       rvNameInput(),
-      el('button', { 'data-sit': '1', disabled: (state.loop.blocked || s.busy) ? '' : null,
-        text: s.busy ? 'queueing…' : 'Queue this run', onclick: go })),
+      el('button', { 'data-sit': '1', disabled: (state.loop.blocked || s.busy || judgeDown())
+          ? '' : null,
+        title: judgeDown() ? judgeWhy() : '',
+        text: s.busy ? 'queueing…' : 'Queue this run', onclick: go }),
+      // disabled says why, beside it, not only on hover
+      judgeDown() ? el('span', { class: 'propwhy', 'data-why': 'sit', text: judgeWhy() }) : ''),
     el('p', { class: 'small', text: 'topics in this run:' }), pick,
     s.msg ? el('p', { class: 'small', 'data-sit-msg': '1', text: s.msg }) : '',
     el('p', { class: 'small' }, 'The queue is on ',
@@ -7879,6 +8159,10 @@ function exRubrics() {
       + 'the 0–4 into a fold of per-criterion scores. Changing either file changes its sha256, '
       + 'which is recorded in every judge.json: scores from before and after are not '
       + 'comparable, so re-sit the topic after a change.')),
+    st.rows == null ? '' : el('div', { class: 'toolbar' },
+      el('input', { type: 'search', placeholder: 'find a topic or file', 'aria-label': 'find a rubric',
+        'data-keep': 'rubric-q', value: st.q || '', style: 'flex:1;min-width:160px',
+        oninput: e => { st.q = e.target.value; render(); } })),
     st.rows == null ? skeleton(5, { 'data-loading': 'rubrics' })
       : el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
         el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { text: 'bank' }),
@@ -7927,6 +8211,7 @@ function exRubrics() {
             el('a', { href: '#', text: 'replace', onclick: e => { e.preventDefault();
               st.open = st.open === r.name ? '' : r.name; st.name = r.name;
               st.preview = null; st.content = ''; render(); } }))))))),
+    st.rows == null ? '' : st.pager || '',
     st.open ? exRubricUpload(st) : '',
     (st.changes || []).length ? el('p', { class: 'small', text: 'last change: '
       + st.changes.map(c => `${c.name}.${c.kind === 'criteria' ? 'criteria.json' : 'md'} by `
@@ -7937,7 +8222,13 @@ function exRubrics() {
 // same shared rubric used to be printed ten times over for empty topics.
 function rubRows(rows, st) {
   const has = r => ((st.banks || {})[r.topic] || {}).accepted;
-  const full = rows.filter(r => r.error || has(r)), empty = rows.filter(r => !r.error && !has(r));
+  // thirty-six topics: a search over the topic and its file's name, and the
+  // shared pager
+  const q = (st.q || '').trim().toLowerCase();
+  const hit = r => !q || r.topic.toLowerCase().includes(q) || (r.name || '').toLowerCase().includes(q);
+  const pg = paged('rubrics', rows.filter(r => (r.error || has(r)) && hit(r)), q, render, 25);
+  st.pager = pg.pager;
+  const full = pg.rows, empty = rows.filter(r => !r.error && !has(r) && hit(r));
   if (!empty.length) return full;
   const fold = el('tr', { 'data-empty-topics': String(empty.length) },
     el('td', { colspan: '5', class: 'small' },
@@ -8269,10 +8560,14 @@ function renderFresh() {
   const chip = document.querySelector('[data-stamp]');
   if (!chip || !LIVE || !DATA) return;
   const stale = NET.fails > 0 && NET.lastOk;
-  chip.dataset.fresh = stale ? 'stale' : 'ok';
-  chip.replaceChildren(el('span', { class: 'dot ' + (stale ? 'warn' : 'ok') }),
+  // the live dot covers the judge too: a board that refreshes while nothing
+  // can grade is not all green
+  const judge = judgeDown();
+  chip.dataset.fresh = stale ? 'stale' : judge ? 'judge-offline' : 'ok';
+  chip.title = judge ? judgeWhy() : '';
+  chip.replaceChildren(el('span', { class: 'dot ' + (stale || judge ? 'warn' : 'ok') }),
     stale ? `last update ${rel(NET.lastOk / 1000)} ago — retrying`
-          : `live · refreshed ${DATA.generated}`);
+          : `live · refreshed ${DATA.generated}` + (judge ? ' · judge offline' : ''));
 }
 
 // static shell bits (rendered whenever a payload arrives)
@@ -8378,10 +8673,29 @@ async function refreshResults() {
   finally { RESULTS_BUSY = false; }
 }
 
+// the rows this browser queued: when one of them changes status the Queue
+// goes back to page 1 and marks it — coming back to page 2 of the queue hid
+// a new row, even a failure
+function rememberQueued(id) {
+  if (!id) return;
+  state.mine.add(id);
+  try { localStorage.setItem('bench-mine', JSON.stringify([...state.mine].slice(-50))); }
+  catch (e) { /* private mode: this tab only */ }
+}
+function markQueueRow(id) {
+  state.qMark = id;
+  if (state.pg.queue) state.pg.queue.page = 1;
+  setTimeout(() => { if (state.qMark === id) { state.qMark = null;
+    if (state.tab === 'queue') (state.queueRedraw || render)(); } }, LANDED_MS);
+}
+
 async function loadQueue() {
   try {
     const rows = await api('api/submissions?limit=100');
     const prev = new Map(state.queue.map(r => [r.id, r]));
+    const moved = rows.find(r => state.mine.has(r.id) && prev.has(r.id)
+      && prev.get(r.id).status !== r.status);
+    if (moved) markQueueRow(moved.id);
     // new scores exist when a run's answers land (status -> done) AND, for a
     // judged run, again when its judge batch lands minutes later: the row is
     // already 'done' by then, so only the judge's own status says so
@@ -8469,6 +8783,7 @@ if (LIVE) {
     if (DATA && !DATA.models.length) { state.tab = 'queue'; render(); }
   });
   loadQueue();
+  loadJudgeHealth();
   setInterval(renderFresh, 15000);           // "3 min ago" has to count
   setInterval(() => {
     if (!netReady()) return;                 // still inside the backoff window
@@ -8477,6 +8792,7 @@ if (LIVE) {
     // would keep the numbers from before it for as long as the tab stayed open)
     if (RESULTS_DUE) refreshResults();
     loadQueue();
+    loadJudgeHealth();
     if (state.tab === 'training') loadTraining();
     if (state.tab === 'review') loadReview();
     if (state.tab === 'exam') loadExam();

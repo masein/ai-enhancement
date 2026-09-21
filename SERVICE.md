@@ -382,6 +382,15 @@ python bench_client.py --base http://…:8899 \
 cap, custom-code refusal) plus a `log` link with the raw output. Canceling is
 only possible while `queued` — a running job finishes its current task.
 
+A judged run is refused before anything is queued when the grading model is
+not answering: a `local` judge is asked `GET /v1/models` (two seconds; the
+answer is kept thirty) and the refusal names the URL it tried. The page shows
+**judge offline** on the Loop board and the topic page, disables *Queue this
+run* with the same words, and turns the header's live dot amber. A row whose
+answers were written but whose grading failed says so in one line and offers
+**Retry grading**, which re-grades the saved answers — no GPU, because the
+fingerprints match (`GET /api/judge/health`, `judge_failed` on each row).
+
 A fourth suite, `judged`, runs the exam (`exam_<topic>` tasks built from the
 curated bank, plus `fr_control_mmlu`) inside the lock, then **submits** the
 answers to the API judge as one batch (seconds, no GPU) and releases the

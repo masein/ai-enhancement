@@ -592,6 +592,30 @@ are retired: their files and judged runs stay, as history.
   over a shared Docker network (`LOCAL_BASE_URL=http://gemma-vllm:8000/v1`,
   SERVICE.md § The local model).
 
+- **10c — a board with 36 topics, and the phase-9 findings.** The Loop board
+  sorts weakest first for the model in "Results for", has a search box and
+  the shared pager at 25; Arts folds into the "topics without questions"
+  line. The Sit panel and Queue → judged share one topic picker: a filter,
+  All / None over what it shows, and "12 of 36 topics · about 1,200 answers ·
+  about 25 min" — the minutes from the last judged runs (`/api/loop` →
+  `pace`: GPU plus judge time per graded item over the last five), never a
+  constant. The model page picks a judged topic from a searchable select,
+  weakest first with its score. The Leaderboard's Columns menu has three
+  groups — tasks (six by default), judged topics and MMLU by category, the
+  last two hidden — and a **Judged avg** column is always shown (report half,
+  current question sets only; a preliminary judge's greyed). The Exam tab's
+  rubrics table has a search box and the pager. From the live check: a judged
+  run is refused, in plain words naming the URL tried, while the judge does
+  not answer `GET /v1/models` (2 s, cached 30 s); the Loop board and topic
+  page say **judge offline**, *Queue this run* is disabled with the reason,
+  and the header's live dot covers the judge. A row whose grading failed
+  leads with "The grading model isn't running. Start it, then Retry grading —
+  the answers are kept.", the raw text behind **details**, and a **Retry
+  grading** button (0 GPU, by 10b's resume). A toast with a link stays 8 s and
+  not while it is hovered or focused. The Queue starts on page 1 when you
+  enter it and when a row you queued changes status, and marks that row; its
+  pager is built once and updated in place.
+
 **Deploy steps**, once 10a–10c are all merged — as one sequence; the `build`
 step is also what writes 10b's question-set fingerprints:
 
