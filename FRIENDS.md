@@ -10,7 +10,8 @@ ask Masein for an invite). This guide lives at `/guide` on the same host.
 
 ## 1 · Benchmark a model in 30 seconds (no code)
 
-Open the dashboard → **Submit & Queue** → paste a model id → Submit.
+Open the dashboard → **Queue** → start typing a model id (it searches this board
+and the Hub) → Submit.
 
 - Any public Hugging Face id works: `HuggingFaceTB/SmolLM2-135M`
 - `suite`: **quick** = hellaswag + arc-easy + perplexity, minutes — use while
@@ -19,8 +20,9 @@ Open the dashboard → **Submit & Queue** → paste a model id → Submit.
   missing tasks.
 - `kind`: leave on **auto** (it detects chat templates; wrong templates move
   scores by tens of points).
-- Put **your name** in the submitter field. The queue shows live progress; when
-  it's done your model is on the Leaderboard with everyone else's.
+- Your **name** lives at the top right of the page, once, and goes on everything
+  you start. The queue shows live progress; when it's done your model is on the
+  Leaderboard with everyone else's.
 - Already uploaded a checkpoint (§2)? Its `local/<name>` id goes in the same
   box.
 
@@ -135,11 +137,11 @@ an owner.
 |---|---|---|
 | **Import a bank** | Questions written by a person arrive whole, under their name — Exam tab, import panel. An LLM can draft candidates instead, but nothing reaches the bank unread. | whoever owns the subject |
 | **Sit the exam** | One model answers that topic's questions. The judge grades every answer against the topic's rubric and criteria file, and folds a 0–4 in code. | anyone with a model |
-| **Read the results** | The answers, one card each: what the model wrote, the score, which flags fired, each criterion as a small cell with the three weakest named, and what the judge wrote about it. Diagnosis half only. | whoever wants to know why |
+| **Read the results** (the topic page) | The answers, one card each: what the model wrote, the score, which flags fired, each criterion as a small cell with the three weakest named, and what the judge wrote about it. Diagnosis half only. | whoever wants to know why |
 | **Propose** | On the topic page, and only there. An LLM reads the judge's *written assessments* — never the questions — and says what skill is missing. When the only thing wrong is the judge (a local model, not yet checked against a person), the button reads **Propose…** and asks first; what it makes is marked "proposed over a provisional judge", all the way to any model trained on it. | anyone, once the gate is clear |
 | **Review the spec** | A person approves, edits or rejects that sentence. This is the airlock: only approved text reaches a generator. | the reviewer |
 | **Generate** | A generator that has seen only the spec writes prose documents. A 13-gram gate drops anything that overlaps an exam question or a benchmark item. | the reviewer |
-| **Hand to training** | The dataset id and the `--gap-dataset` line. A run that consumes it registers it, and its checkpoints carry a taint badge on that topic. | whoever trains |
+| **Train** | The dataset id and the `--gap-dataset` line. A run that consumes it registers it, and its checkpoints carry a taint badge on that topic. | whoever trains |
 
 Two rules hold at every step. **The report half of each topic is never
 shown** — not on a page, not in an export, not in any request except the
@@ -167,7 +169,7 @@ checkpoints against its training steps.
 **Training** — your live curves, run compare, config diff, benchmark-vs-step.
 The runs list has a search box (name, project or person), a status filter and a
 sort menu — "best loss" and "recently updated" are the two you'll live in.
-**Submit & Queue** — submit models, watch progress, read failure logs. The
+**Queue** — submit models, watch progress, read failure logs. The
 queue is searchable and filterable the same way (find *your* jobs, failures
 first); click any column header to sort.
 **Leaderboard** — every model × every task, ± standard error, sortable, with a
@@ -235,7 +237,7 @@ The GPU is shared with real training jobs, so: one evaluation runs at a time
 uploaded checkpoints must be **safetensors** (pickle `.bin` files are refused —
 they execute code on load) and count against a shared storage quota, so delete
 old artifacts you don't need (`DELETE /api/artifacts/<name>`, scores stay).
-Always set your name as submitter — the queue should answer "whose job is this"
+Always set your name (top right) — the queue should answer "whose job is this"
 without archaeology.
 
 ## FAQ
@@ -259,7 +261,7 @@ normal reporting rhythm.
 **My run says "finished" but there are no benchmark scores yet.** "Finished"
 means the *training* finished; your checkpoints may still be in the eval queue
 (one runs at a time). The run's page shows "benchmarks: X/Y done" and the
-Submit & Queue tab shows live progress — scores appear as each one lands.
+Queue tab shows live progress — scores appear as each one lands.
 
 **Something else broke.** Every failed submission has a `log` link with the raw
 error, and the error messages are written to be actionable. If they aren't: Masein.

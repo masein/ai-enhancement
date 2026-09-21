@@ -181,3 +181,23 @@ def page(browser):
     pg.errors = errors
     yield pg
     ctx.close()
+
+
+def go_tab(page, label: str) -> None:
+    """A tab by its name: one of the six, or one under More ▾ (phase 9b)."""
+    t = page.get_by_role("tab", name=label, exact=True)
+    if not t.count():
+        page.locator("#moreBtn").click()
+        t = page.get_by_role("menuitem", name=label, exact=True)
+    t.click()
+
+
+def set_name(page, name: str) -> None:
+    """The one name, in the header, that every action records (phase 9b)."""
+    who = page.locator("#who")
+    who.wait_for()
+    if not who.locator("input").count():
+        who.locator("button[data-who]").click()
+    who.locator("input").fill(name)
+    who.locator("input").press("Enter")
+    page.wait_for_selector(f"#who button[data-who='{name}']")

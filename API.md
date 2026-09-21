@@ -323,14 +323,17 @@ commit writes the file and records who, when and both shas in
 
 ### The loop
 
-`GET /api/loop` — one row per topic in `categories.yaml`: the bank (accepted,
+`GET /api/loop[?model=]` — one row per topic in `categories.yaml`, for **one
+model** (`model`, default: the one with the most judged topics; `models` lists
+the choices): the bank (accepted,
 report/diagnose split, whether it is under the 30-question floor), which
 rubric and criteria file grade it, the most recently graded `judge.json`
 that covers it (model, `at` — when THAT topic's grades landed, from its own
 `judged_at`, not the file's last merge — folded report-half score, and the provisional /
 draft-rubric / single-provider / trained-on-it stamps), any open proposal,
 any datasets, and **`next`** — the one step to take, as `{step, label, ok,
-why}`. `propose` carries the same gate object `POST /api/proposals` enforces,
+why}`, one of Import → Sit → Propose → Review → Generate → Train, the same for
+everyone who looks (it no longer depends on anything a browser remembers). `propose` carries the same gate object `POST /api/proposals` enforces,
 for the last-judged model, and `propose_by_model` has one per model judged on
 the topic (the topic page proposes for the model whose answers are open):
 

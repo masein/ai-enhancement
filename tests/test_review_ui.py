@@ -12,6 +12,8 @@ from urllib.parse import quote
 
 import pytest
 
+from conftest import go_tab, set_name
+
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens"
@@ -97,7 +99,8 @@ def test_exam_curation_in_the_browser(live, page):
     cid = card.get_attribute("data-candidate")
     q = card.get_by_label("question")
     q.fill(q.input_value() + " Give one counterexample.")
-    card.get_by_label("your name").fill("Omar")
+    set_name(page, "Omar")                               # the one name, in the header
+    card = page.locator(f".rv[data-candidate='{cid}']")
     card.get_by_role("button", name="Accept into the bank").click()
     page.wait_for_function("document.querySelector('#view').textContent.includes('accepted →')")
     assert page.locator(f".rv[data-candidate='{cid}']").count() == 0
@@ -106,7 +109,6 @@ def test_exam_curation_in_the_browser(live, page):
     assert any(r.get("cid") == cid and r["edited"] and r["accepted_by"] == "Omar"
                for r in bank)
     card = page.locator(".rv[data-candidate]").first
-    card.get_by_label("your name").fill("Omar")
     card.get_by_label("reject reason").fill("recall, not understanding")
     card.get_by_role("button", name="Reject").click()
     page.wait_for_function("document.querySelector('#view').textContent.includes('rejected')")
@@ -182,8 +184,8 @@ def test_review_flow_in_the_browser(live, page):
     page.wait_for_selector(".card h2:has-text('Review')")
     assert "fake/fake-1" in page.locator("#view").text_content()
     assert "Nothing waiting" in page.locator("#view").text_content()
-    # a name, remembered for every decision on this page
-    page.get_by_label("your name").first.fill("Omar")
+    # a name, once, in the header: every decision on the page records it
+    set_name(page, "Omar")
 
     # the model page sends you to the topic page, and Propose is there
     card = open_topics(page, base, "fx/good-750m")
@@ -214,14 +216,12 @@ def test_review_flow_in_the_browser(live, page):
     # approve, edited
     ta = card.locator("textarea")
     ta.fill(ta.input_value() + " Emphasise direction of effect.")
-    card.get_by_label("your name").fill("Omar")
     card.get_by_role("button", name="Approve this spec").click()
     page.wait_for_selector(".rv[data-proposal] :text('Approved as edited')", timeout=E2E_MS)
     card = page.locator(".rv[data-proposal]").first
     assert "approved by Omar" in card.text_content()
     # generate
     card.get_by_label("item count").fill("20")
-    card.get_by_label("your name").fill("Omar")
     card.get_by_role("button", name="Generate data").click()
     page.wait_for_selector(".rv[data-dataset]:has-text('ready')", timeout=E2E_MS)
     ds = page.locator(".rv[data-dataset]").first
@@ -309,7 +309,7 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     panel.get_by_label("topic").select_option(topic)
     panel.get_by_label("written by").fill("Dr. Hossein")
     panel.get_by_label("source").fill("medicine_v1")
-    panel.get_by_label("your name").first.fill("Omar")
+    set_name(page, "Omar")
     before = len(eb.load_bank(root / "exam").get(topic, []))
     panel.get_by_role("button", name="Preview").click()
     page.wait_for_selector("[data-preview='counts']")
@@ -353,8 +353,11 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
     # the prose rubric is a draft; the criteria file is the author's own and
     # carries no status at all, so nothing claims it is one
     assert row.locator(".badge.taint", has_text="DRAFT").count() == 1
-    # a topic without a rubric of its own says which one grades it instead
-    assert "exam.md" in panel.locator("tr[data-rubric-row='history']").text_content()
+    # a topic without a rubric of its own says which one grades it instead —
+    # once, in words; the file's name and sha in the tooltip (phase 9b-9)
+    hist = panel.locator("tr[data-rubric-row='history'] [data-fallback]")
+    assert hist.text_content().strip() == "shared rubric"
+    assert "exam.md" in hist.get_attribute("title")
     # a criteria file the judge would refuse never gets a commit button
     row.get_by_role("link", name="replace").click()
     page.wait_for_selector("[data-upload='medicine_health']")
@@ -365,7 +368,7 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
     spec["criteria"][0]["id"] = "Relevance"
     upload(page, "new file", "medicine_health.criteria.json", "application/json",
            json.dumps(spec))
-    up.get_by_label("your name").first.fill("Dr. Hossein")
+    set_name(page, "Dr. Hossein")
     up.get_by_role("button", name="Check it").click()
     page.wait_for_selector("[data-problems]")
     problems = up.locator("[data-problems]").text_content()
@@ -404,7 +407,7 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
     # is no row at all — waiting on its text must tolerate that, not throw
     page.wait_for_function(
         "sha => { const r = document.querySelector(\"tr[data-rubric-row='medicine & health']\");"
-        "  return !!r && r.textContent.includes(sha); }", arg=sha)
+        "  return !!r && r.innerHTML.includes(sha); }", arg=sha)   # in the tooltip (9b-9)
     assert row.locator(".badge.taint", has_text="DRAFT").count() == 0
     assert page.errors == []
 
@@ -431,10 +434,11 @@ def test_the_loop_tab_is_one_row_per_topic_with_the_next_step(live, page):
     sit = page.locator("button[data-step='sit']").first
     if sit.count():
         assert sit.is_disabled()
-    # the step for a judged topic is to read what the judge made of it
+    # the step for a judged topic is to propose — the same for everyone who
+    # looks — and the button opens the topic page, where Propose lives
     btn = med.locator("button[data-step]")
-    assert btn.get_attribute("data-step") == "read"
-    btn.click()
+    assert btn.get_attribute("data-step") == "propose"
+    med.locator("a[data-read]").click()
     page.wait_for_selector("[data-topic-page='medicine_health']")
     assert "#topic=medicine_health" in page.url
     SCREENS.mkdir(exist_ok=True)
@@ -505,23 +509,32 @@ def test_sitting_one_topic_from_its_page(live, page):
 
 
 def test_the_tabs_are_named_once_and_ordered_by_how_often_they_are_opened(live, page):
-    """Phase 8e P6c: one name per tab, the hash equal to it, the old hashes
-    still landing, and the loop's tabs where the eye lands."""
+    """Phase 8e P6c, 9b-3: one name per tab, the hash equal to it, the old
+    hashes still landing — and six tabs, the rest under More ▾."""
     base = live["base"]
     page.goto(base + "/")
-    page.wait_for_selector("#tabs button")
-    labels = page.locator("#tabs button").all_text_contents()
-    assert labels[:4] == ["Overview", "Loop", "Models", "Leaderboard"]
-    assert "Evals" not in labels and "Provenance" in labels
+    page.wait_for_selector("#tabs button[role=tab]")
+    labels = page.locator("#tabs > button[role=tab]").all_text_contents()
+    assert labels == ["Overview", "Loop", "Models", "Leaderboard", "Queue"]
+    more = page.locator("#moreBtn")
+    assert more.text_content() == "More ▾" and more.get_attribute("aria-haspopup") == "menu"
+    more.click()
+    items = page.locator("#moreMenu [role=menuitem]:not([hidden])").all_text_contents()
+    assert items[:6] == ["Exam", "Review", "Training", "Tasks", "Perplexity & Loss", "Provenance"]
+    page.keyboard.press("Escape")
+    assert page.locator("#moreMenu").is_hidden()
     # the hash is the label, and the page said so in SERVICE.md
     for label, want in (("Loop", "loop"), ("Models", "models"),
-                        ("Submit & Queue", "queue"), ("Provenance", "provenance")):
-        page.get_by_role("tab", name=label, exact=True).click()
+                        ("Queue", "queue"), ("Provenance", "provenance"), ("Exam", "exam")):
+        go_tab(page, label)
         page.wait_for_selector("#view > *")
         assert page.evaluate("location.hash") == f"#tab={want}", label
+    # a tab under More names itself on the More button while it is open
+    assert page.locator("#moreBtn").text_content() == "Exam ▾"
+    assert page.locator("#moreBtn").get_attribute("aria-selected") == "true"
     # the hashes people already pasted somewhere
-    for old, label in (("runs", "Provenance"), ("submit", "Submit & Queue"),
-                       ("evals", "Provenance")):
+    for old, label in (("runs", "Provenance ▾"), ("submit", "Queue"),
+                       ("evals", "Provenance ▾"), ("review", "Review ▾")):
         page.goto(f"{base}/#tab={old}")
         page.wait_for_selector("#view > *")
         assert page.locator("#tabs button[aria-selected='true']").inner_text() == label, old
@@ -529,6 +542,7 @@ def test_the_tabs_are_named_once_and_ordered_by_how_often_they_are_opened(live, 
     page.goto(base + "/")
     page.wait_for_selector("[data-stamp]")
     assert "live · refreshed" in page.locator("[data-stamp]").text_content()
+    assert page.locator("[data-stamp] .dot.ok").count() == 1
     assert page.locator("#themeBtn").text_content().startswith("Theme")
     assert ":" not in page.locator("#themeBtn").text_content()
     assert "theme:" in page.locator("#themeBtn").get_attribute("title")
@@ -540,7 +554,7 @@ def test_the_loop_tab_says_what_failed_instead_of_loading_forever(live, page):
     until someone opened the console. Every other tab already had the 8c
     error line; this one now does too."""
     base = live["base"]
-    page.route("**/api/loop", lambda route: route.fulfill(
+    page.route("**/api/loop*", lambda route: route.fulfill(
         status=500, content_type="application/json", body='{"detail":"boom"}'))
     page.goto(base + "/#tab=loop")
     page.wait_for_selector("[data-loop-failed]", timeout=20000)
@@ -551,7 +565,7 @@ def test_the_loop_tab_says_what_failed_instead_of_loading_forever(live, page):
     assert "Nothing has loaded yet." in line
     assert "Loading…" not in page.locator("#view").text_content()
     # and when the service comes back, the board does
-    page.unroute("**/api/loop")
+    page.unroute("**/api/loop*")
     page.wait_for_selector("table.jd[data-loop-table] tbody tr", timeout=60000)
     assert page.locator("[data-loop-failed]").count() == 0
     # the 500 we injected is the only thing the console should have to say
@@ -565,13 +579,16 @@ def test_a_topic_on_the_shared_rubric_says_so_on_both_boards(live, page):
     page.goto(base + "/#tab=loop")
     page.wait_for_selector("table.jd[data-loop-table] tbody tr")
     hist = page.locator("tr[data-loop-row='history']")
-    assert "exam.md" in hist.text_content()
     assert hist.locator("[data-fallback]").count() == 1
+    assert "shared rubric" in hist.text_content()
+    assert "exam.md" in hist.locator("[data-fallback]").get_attribute("title")
     assert page.locator("tr[data-loop-row='law'] [data-fallback]").count() == 0
     page.goto(base + "/#tab=exam")
     page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
     row = page.locator("tr[data-rubric-row='history']")
-    assert "exam.md" in row.text_content() and "(fallback)" in row.text_content()
+    assert "shared rubric" in row.text_content()
+    assert "exam.md" in row.locator("[data-fallback]").get_attribute("title")
+    assert "(fallback)" not in row.text_content()            # said once, in words
     assert page.locator("[data-rubric-error]").count() == 0
     assert page.errors == []
 
@@ -629,27 +646,33 @@ def test_a_button_that_is_working_says_so_and_cannot_be_pressed_twice(live, page
 
 
 def test_typing_survives_the_poll(live, page):
-    """Phase 8g D1/D3: the board refreshes every five seconds. A person part
-    way through typing their name must not lose it, or the caret, or the
-    field — and the name must still be there on the next page they open."""
+    """Phase 8g D1/D3, 9b-4: the board refreshes every five seconds, and the
+    name is now one box, in the header. A person part way through typing it
+    must not lose it, or the caret, or the field — and the name must still be
+    there on the next page they open, and after a reload."""
     base = live["base"]
     page.goto(base + "/#tab=loop")
     page.wait_for_selector("table.jd[data-loop-table] tbody tr")
-    name = page.locator("[data-panel], .card").first.get_by_label("your name").first
-    name.click()
+    who = page.locator("#who")
+    if who.locator("button[data-who]").count():
+        who.locator("button[data-who]").click()
+    name = who.locator("input")
+    name.fill("")
     name.type("Omar")
-    page.wait_for_timeout(6500)                    # two polls land here
-    assert page.evaluate("document.activeElement && document.activeElement.dataset.keep"
-                         ) is not None             # still in the field
+    page.evaluate("refreshResults()")              # a results refresh redraws the header
+    page.wait_for_timeout(6500)                    # and two polls land here
+    assert page.evaluate("document.activeElement === document.querySelector('#who input')")
     name.type(" Affifi")
     assert name.input_value() == "Omar Affifi"
-    # and it is the same name on the topic page, and after a reload
+    name.press("Enter")
+    page.wait_for_selector("#who button[data-who='Omar Affifi']")
+    # the same name on the topic page, and after a reload
     page.goto(base + "/#topic=law")
     page.wait_for_selector("[data-topic-page='law']")
-    assert page.get_by_label("your name").first.input_value() == "Omar Affifi"
+    assert page.locator("#who button[data-who]").get_attribute("data-who") == "Omar Affifi"
     page.reload()
     page.wait_for_selector("[data-topic-page='law']")
-    assert page.get_by_label("your name").first.input_value() == "Omar Affifi"
+    assert page.locator("#who button[data-who]").get_attribute("data-who") == "Omar Affifi"
     assert page.errors == []
 
 
@@ -698,7 +721,7 @@ def test_a_refusal_replaces_the_last_success_rather_than_sitting_under_it(live, 
     page.goto(base + "/#tab=exam")
     page.wait_for_selector("[data-panel='import']")
     panel = page.locator("[data-panel='import']")
-    panel.get_by_label("your name").first.fill("Omar")
+    set_name(page, "Omar")
     panel.get_by_label("written by").fill("Dr. Hossein")
     # a good import first
     upload(page, "questions file", "computer_science_v1.json", "application/json",
@@ -734,7 +757,7 @@ def test_the_page_imports_the_wrapped_file_the_author_sent(live, page):
     page.goto(base + "/#tab=exam")
     page.wait_for_selector("[data-panel='import']")
     panel = page.locator("[data-panel='import']")
-    panel.get_by_label("your name").first.fill("Omar")
+    set_name(page, "Omar")
     panel.get_by_label("written by").fill("Dr. Hossein")
     upload(page, "questions file", "physics_engineering_v1.json", "application/json",
            PHYSICS_FILE.read_text(encoding="utf-8"))
@@ -771,8 +794,14 @@ def test_the_rubrics_table_says_whether_a_topic_has_questions(live, page):
         med = panel.locator("tr[data-rubric-row='medicine & health']")
         assert med.locator("[data-bank]").first.get_attribute("data-bank") != "0"
         assert "report" in med.text_content() and "diagnose" in med.text_content()
+        # a topic without questions folds into one row that names it (9b-7) …
+        fold = panel.locator("tr[data-empty-topics]")
+        assert fold.count() == 1 and "geography & world facts" in fold.text_content()
+        assert panel.locator("tr[data-rubric-row='geography & world facts']").count() == 0
+        # … and opens to its own row, which still says it has no questions
+        fold.locator("[data-show-empty]").click()
         empty = panel.locator("tr[data-rubric-row='geography & world facts'] [data-bank='0']")
-        assert empty.count() == 1
+        empty.wait_for()
         assert empty.text_content() == "no questions yet"
         # and an unversioned heading is not printed as an error
         assert "v?" not in panel.text_content()

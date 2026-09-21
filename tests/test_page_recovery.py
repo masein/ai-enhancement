@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import go_tab
+
 import report_lm_eval as report
 
 pytestmark = pytest.mark.dashboard
@@ -113,34 +115,45 @@ def test_recovery_clears_the_message(live):
     assert s.errors == []
 
 
-def test_the_board_checks_are_full_on_the_board_and_folded_elsewhere(live):
+def test_the_board_checks_are_one_line_on_every_tab(live):
+    """Phase 9b-1: the checks filled the first screen of Overview and the
+    Leaderboard. Now one line everywhere — "N checks · M about the judged
+    suite" — and, opened, one line per check with a severity dot, a Show me
+    to the rows it concerns, and the long text behind a disclosure."""
     s = live(fail=False)
     pg = s.open()
     pg.wait_for_selector("#view .card", timeout=20000)
-    assert pg.locator("#warnings .warn").count() >= 1          # Overview: in full
-    assert pg.locator("[data-warnings='collapsed']").count() == 0
-    pg.get_by_role("tab", name="Exam", exact=True).click()
-    pg.wait_for_selector("[data-warnings='collapsed']", timeout=20000)
-    fold = pg.locator("[data-warnings='collapsed']")
-    said = fold.locator("summary").text_content()
-    assert "check" in said
-    # phase 8g D4: what kind, not just how many — after a judged run most of
-    # them are about the judge, and a bare count says nothing about opening it
-    judged = pg.evaluate(
-        "DATA.warnings.filter(w => /judge|judged|rubric|criteria|canary|calibrat/i.test(w)).length")
+    for label in ("Overview", "Leaderboard", "Exam", "Provenance"):
+        go_tab(pg, label)
+        pg.wait_for_selector("[data-warnings='collapsed']", timeout=20000)
+        fold = pg.locator("[data-warnings='collapsed']")
+        assert fold.count() == 1, label
+        assert not fold.locator(".checklist").is_visible(), label       # one line, closed
+    said = pg.locator("[data-warnings='collapsed'] > summary").text_content()
+    n = pg.evaluate("DATA.checks.length")
+    assert n == pg.evaluate("DATA.warnings.length") and f"{n} check" in said
+    judged = pg.evaluate("DATA.checks.filter(c => c.judged).length")
     if judged:
         assert f"{judged} about the judged suite" in said
-    # folded, never dismissed: they open
-    assert not fold.locator(".warn").first.is_visible()
-    fold.locator("summary").click()
-    assert fold.locator(".warn").first.is_visible()
-    pg.get_by_role("tab", name="Leaderboard", exact=True).click()
-    pg.wait_for_selector("table.lb", timeout=20000)
-    assert pg.locator("[data-warnings='collapsed']").count() == 0
-    assert pg.locator("#warnings .warn").count() >= 1
+    # folded, never dismissed: they open, one line each
+    pg.locator("[data-warnings='collapsed'] > summary").click()
+    rows = pg.locator("[data-warnings='collapsed'] li[data-check]")
+    assert rows.count() == n
+    first = rows.first
+    assert first.locator(".dot").count() == 1
+    assert first.get_attribute("data-severity") in ("warning", "info")
+    assert not first.locator(".check-more > p").is_visible()            # the long text waits
+    first.locator(".check-more > summary").click()
+    assert first.locator(".check-more > p").is_visible()
+    # "Show me" goes to the rows: the preliminary check lands on Models, filtered
+    prelim = pg.locator("li[data-check='preliminary'] [data-show-me]")
+    if prelim.count():
+        prelim.click()
+        pg.wait_for_selector("input[data-filter='preliminary']:checked")
+        assert pg.evaluate("location.hash") == "#tab=models"
     # and exactly once per page: the Provenance tab used to print the same
     # findings again under its own "Warnings" heading
-    pg.get_by_role("tab", name="Provenance", exact=True).click()
+    go_tab(pg, "Provenance")
     pg.wait_for_selector("#view .card")
     assert pg.locator("#view .warn").count() == 0
     assert pg.locator("#view h2", has_text="Warnings").count() == 0
@@ -151,14 +164,16 @@ def test_the_exam_tab_shows_both_ways_a_bank_arrives(live):
     s = live(fail=False)
     pg = s.open()
     pg.wait_for_selector("#view .card", timeout=20000)
-    pg.get_by_role("tab", name="Exam", exact=True).click()
+    go_tab(pg, "Exam")
     pg.wait_for_selector("#view .card", timeout=20000)
     text = pg.locator("#view").text_content()
-    assert "A person's bank, imported whole:" in text and "exam_build.py" in text
-    assert "import" in text and "LLM candidates to curate:" in text
+    # phase 9b-9: the product's words, not the shell's — the import panel is
+    # how a person's bank arrives, and drafting is asked of whoever runs it
+    assert pg.locator("[data-panel='import']").count() == 1
+    assert "exam_build.py" not in text and "--root" not in text and "/app/" not in text
     # an empty bank is not a page bug, but the page is where someone finds out
     empty = pg.locator("[data-bank='empty']")
     assert empty.count() == 1
-    for cmd in ("migrate", "import", "draft"):
-        assert cmd in empty.text_content()
+    assert "Import a person's bank below" in empty.text_content()
+    assert "draft candidates" in empty.text_content()
     assert s.errors == []

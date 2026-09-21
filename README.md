@@ -45,7 +45,7 @@ Details, knobs and troubleshooting: [`SERVICE.md`](SERVICE.md). Manual
 
 ## Use it
 
-- **Browser:** open the dashboard → *Submit & Queue* tab → paste an `org/model`
+- **Browser:** open the dashboard → *Queue* tab → paste an `org/model`
   id. `quick` = minutes (iteration); `full` = the comparable number. Progress,
   errors and logs are on the same tab; results land on the leaderboard
   automatically.

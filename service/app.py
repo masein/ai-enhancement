@@ -1026,14 +1026,18 @@ def judge_justifications(model: str, topic: str, limit: int = 8):
 # here; they are the same objects the API enforces on submit and on propose.
 # ---------------------------------------------------------------------------
 
+# the loop's steps, in order: Import → Sit → Propose → Review → Generate →
+# Train. "Read the results" is not a step — reading is what the topic page is
+# for — and the step no longer depends on anything a browser remembers, so
+# two people looking at one board see the same next step.
 STEPS = {
     "import": "Import a bank",
     "sit": "Sit the exam",
-    "read": "Read the results",
     "propose": "Propose",
     "review": "Review the spec",
     "generate": "Generate",
-    "hand": "Hand to training",
+    "hand": "Train",
+    "unreadable": "Rubric unreadable",
 }
 
 
@@ -1051,11 +1055,13 @@ def _judged_at(model: str, t: dict | None = None) -> float | None:
         return None
 
 
-def _last_judged(payload: dict, task: str) -> dict | None:
-    """The most recently written judge.json that contains this topic, as the
-    board's 'where does this topic stand' line."""
+def _last_judged(payload: dict, task: str, model: str | None = None) -> dict | None:
+    """Where this topic stands for one model — `model`'s judged run of it —
+    or, with no model, the most recently graded one."""
     best = None
     for m in payload.get("models") or []:
+        if model and m["id"] != model:
+            continue
         t = ((m.get("judge") or {}).get("tasks") or {}).get(task)
         if not t:
             continue
@@ -1088,11 +1094,13 @@ def _dataset_kept(d: dict) -> int | None:
 
 
 def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
-              blocked: str) -> dict:
+              blocked: str, model: str | None = None) -> dict:
     task = exam_build.topic_task(topic)
     bank = (exam_build.summary(config.EXAM_DIR) or {}).get(topic) or {}
     rub = _rubric_row(topic)
-    last = _last_judged(payload, task)
+    # every score on the board is ONE model's: after #48 and #49 one column
+    # held the 135M on economics and medicine and the 360M on the rest
+    last = _last_judged(payload, task, model)
     mine = [p for p in props if p["category"] == topic]
     open_p = next((p for p in mine if p["status"] in ("pending", "proposed", "approved")), None)
     ds = [d for d in sets if d.get("proposal_id") in {p["id"] for p in mine}]
@@ -1100,15 +1108,14 @@ def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
     judged_rows = [m for m in payload.get("models") or []
                    if ((m.get("judge") or {}).get("tasks") or {}).get(task)]
     gates = {m["id"]: propose_gate(m, topic) for m in judged_rows}
+    gate = gates.get(last["model"]) if last else None
     if rub.get("error"):
         # a topic whose instrument cannot be read cannot be sat, judged or
         # proposed from; the row says which file is missing rather than
         # offering a button that would fail later
-        step, ok, why = "read", False, rub["error"]
+        step, ok, why = "unreadable", False, rub["error"]
     elif not bank.get("accepted"):
         step, ok, why = "import", True, ""
-    elif not last:
-        step, ok, why = "sit", not blocked, blocked
     elif open_p and open_p["status"] == "approved":
         step = "hand" if ready else "generate"
         ok, why = True, ""
@@ -1116,8 +1123,15 @@ def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
         step, ok, why = "review", True, ""
     elif ready:
         step, ok, why = "hand", True, ""
+    elif not last:
+        step, ok, why = "sit", not blocked, blocked
     else:
-        step, ok, why = "read", True, ""
+        # proposing opens the topic page; the gate is that model's, and a
+        # judge-only refusal still leaves the way in open (Propose… asks)
+        g = gate or {}
+        step = "propose"
+        ok = bool(g.get("ok") or g.get("overridable"))
+        why = "" if g.get("ok") else (g.get("why") or "")
     return {
         "topic": topic, "task": task, "slug": exam_build.task_slug(task),
         "error": rub.get("error", ""),
@@ -1144,17 +1158,19 @@ def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
                       "over_provisional_judge": prop.override_of(
                           next((q for q in mine if q["id"] == d.get("proposal_id")), {}))}
                      for d in ds],
-        "next": {"step": step, "label": STEPS[step], "ok": ok, "why": why},
+        "next": {"step": step, "ok": ok, "why": why,
+                 "label": "Propose…" if step == "propose" and gate and gate.get("overridable")
+                 else STEPS[step]},
     }
 
 
 def _loop_row_safe(topic: str, payload: dict, props: list[dict], sets: list[dict],
-                   blocked: str) -> dict:
+                   blocked: str, model: str | None = None) -> dict:
     """A row that cannot take the board down with it. One topic's files being
     unreadable is a fact about that topic, and the other fourteen rows are
     still the answer to 'what do I do next'."""
     try:
-        return _loop_row(topic, payload, props, sets, blocked)
+        return _loop_row(topic, payload, props, sets, blocked, model)
     except Exception as e:                                  # noqa: BLE001
         why = f"this topic could not be read: {e}"
         return {"topic": topic, "task": exam_build.topic_task(topic),
@@ -1166,19 +1182,38 @@ def _loop_row_safe(topic: str, payload: dict, props: list[dict], sets: list[dict
                            "criteria_sha256": ""},
                 "last_judged": None, "propose": None, "propose_by_model": {},
                 "proposal": None, "datasets": [], "error": why,
-                "next": {"step": "read", "label": "Read the results", "ok": False, "why": why}}
+                "next": {"step": "unreadable", "label": STEPS["unreadable"], "ok": False,
+                         "why": why}}
+
+
+def _judged_models(payload: dict) -> list[dict]:
+    """The models with judged exam topics, most topics first (then the most
+    recently graded): the board's model picker, and its default."""
+    out = []
+    for m in payload.get("models") or []:
+        ts = {t: v for t, v in ((m.get("judge") or {}).get("tasks") or {}).items()
+              if t in exam_build.TASK_TOPIC}
+        if ts and not m.get("duplicateOf"):
+            out.append({"id": m["id"], "name": m.get("name") or m["id"], "topics": len(ts),
+                        "at": max((_judged_at(m["id"], v) or 0) for v in ts.values())})
+    return sorted(out, key=lambda x: (-x["topics"], -x["at"], x["id"]))
 
 
 @app.get("/api/loop")
-def loop_board():
-    """One row per topic: the bank, the rubric, where the last judged run
-    left it, and the one next step."""
+def loop_board(model: str = ""):
+    """One row per topic: the bank, the rubric, where `model`'s judged run
+    left it (default: the model with the most judged topics), and the one
+    next step."""
     payload = results_payload()
     props = db.proposal_list(limit=500)
     sets = db.dataset_list(limit=500)
     blocked = config.judged_blocked()
-    return {"topics": [_loop_row_safe(t, payload, props, sets, blocked)
+    models = _judged_models(payload)
+    chosen = model if any(m["id"] == model for m in models) else (models[0]["id"] if models
+                                                                   else "")
+    return {"topics": [_loop_row_safe(t, payload, props, sets, blocked, chosen or None)
                        for t in exam_build.TOPICS],
+            "model": chosen, "models": models,
             "judged_blocked": blocked, "tasks_built": config.judged_tasks(),
             "floor": report.PROPOSE_MIN_N,
             "gap_dataset_flag": "--gap-dataset"}

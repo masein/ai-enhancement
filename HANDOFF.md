@@ -476,6 +476,17 @@ the report half, the provisional stamps and taint are untouched.
   restores the old gate word for word. Propose starts only on the topic page;
   the model page and Review link to it. One `pager()` for the answers, queue,
   Models, Leaderboard (ranked first), Provenance and Training.
+- **9b — the first screen and the way around.** The checks are one line on
+  every tab (`checks` in the payload: key, severity, one-line summary, a Show me
+  target; the long text behind a disclosure). Overview skips duplicate rows,
+  links the preliminary models, has a Loop card and a Submit button. Six tabs
+  and **More ▾**; every old hash still lands. One name, in the header; the
+  per-panel boxes are gone. The Loop board is one model's (`/api/loop?model=`),
+  the next step is the server's and the same for everyone (no read flag),
+  empty topics fold into one row, and buttons carry their context (Import on a
+  topic opens the import panel on it; Sit ticks it and focuses the model box).
+  No shell commands, container paths or sha prefixes on the page; long text
+  behind ⓘ. The refreshed stamp has a green dot, amber when the polls stop.
 
 ---
 

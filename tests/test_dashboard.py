@@ -18,6 +18,8 @@ from urllib.parse import quote
 
 import pytest
 
+from conftest import go_tab
+
 pytestmark = pytest.mark.dashboard
 
 # the tabs the FROZEN page has (the live one adds Training and Submit & Queue)
@@ -52,11 +54,13 @@ class Surface:
         return self.page
 
     def tab(self, label: str):
-        self.page.get_by_role("tab", name=label, exact=True).click()
+        go_tab(self.page, label)                      # one of the six, or under More ▾
         self.page.wait_for_selector("#view > *")
 
     def selected_tab(self) -> str:
-        return self.page.locator("#tabs button[aria-selected='true']").inner_text()
+        # a tab under More shows on the More button itself: "Provenance ▾"
+        return self.page.locator("#tabs button[aria-selected='true']").inner_text() \
+            .removesuffix(" ▾")
 
     def fits(self) -> bool:
         return self.page.evaluate(

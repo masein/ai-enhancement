@@ -397,7 +397,9 @@ upgrades to `full` by running only the missing tasks.
 ## The page's addresses
 
 Every view is in the URL, so a link to one is a link someone else can open.
-The hash is the tab's own label, lower-cased:
+Six tabs — Overview · Loop · Models · Leaderboard · Queue · **More ▾** — with Exam,
+Review, Training, Tasks, Perplexity & Loss, Provenance and the sandbox run under
+More. The hash is the tab's own label, lower-cased, wherever it lives:
 
 | Hash | What |
 |---|---|
@@ -406,7 +408,7 @@ The hash is the tab's own label, lower-cased:
 | `#topic=<slug>` | one topic's page: bank, rubric, sit, answers, propose (`#topic=law`) |
 | `#tab=models` | every model, with the filters that narrow it |
 | `#tab=leaderboard` | the table, then the radar of whatever compare holds |
-| `#tab=queue` | Submit & Queue |
+| `#tab=queue` | Queue: submit a model, and the queue |
 | `#tab=exam` | the bank, the import panel, the rubric and criteria files |
 | `#tab=review` | proposals awaiting a person, and the datasets |
 | `#tab=training` | training runs and their curves |
@@ -415,7 +417,7 @@ The hash is the tab's own label, lower-cased:
 | `#model=<id>` | one model's page (`#model=fx%2Fgood-750m`) |
 
 Older hashes still resolve: `#tab=runs` and `#tab=evals` land on Provenance,
-`#tab=submit` on Submit & Queue, `#tab=ppl` on Perplexity & Loss. A hash the
+`#tab=submit` on Queue, `#tab=ppl` on Perplexity & Loss. A hash the
 page does not know leaves you where you were rather than silently on
 Overview.
 

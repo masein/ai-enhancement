@@ -67,7 +67,9 @@ def test_the_next_step_walks_the_loop_in_order(svc, tmp_path, monkeypatch):
     # a bank with no judged run: sit the exam — and the reason it cannot be
     # sat is the API's own refusal, not a sentence the page made up
     med = rows(client)[TOPIC]
-    assert med["next"]["step"] == "read"          # the fixture has judged runs
+    # the fixture has judged runs: the next step is to propose — reading is
+    # what the topic page is for, and no longer a step a browser remembers
+    assert med["next"]["step"] == "propose"
     monkeypatch.setattr(config, "JUDGE_MODEL", "")
     blocked = client.get("/api/loop").json()["judged_blocked"]
     assert blocked and blocked == config.judged_blocked()
