@@ -281,7 +281,10 @@ def _trim_judge(j: dict | None) -> dict | None:
                                # topic carries. No per-item lists.
                                "criteria_mean", "criteria_n", "criteria_labels",
                                "criteria_conditional", "flags", "breakdowns",
-                               "breakdowns_constant", "unparseable")
+                               "breakdowns_constant", "unparseable",
+                               # when this topic's grades landed — its own
+                               # time, not the file's last merge
+                               "judged_at")
                               if t.get(k) is not None}
     return out
 
@@ -6978,19 +6981,42 @@ async function api(path, opts) {
   } catch (e) { netFail(path, e); throw e; }
 }
 
+// a results fetch the page owes itself: at boot, and whenever a run lands.
+// Cleared only by a fetch that worked — a failed one stays owed and the poll
+// retries it. "Retry only while there is no data" left a page that had any
+// data showing it for as long as the tab stayed open.
+// One fetch at a time; one asked for while another is out stays owed, since
+// the one in flight may have left before the judge's file landed.
+let RESULTS_DUE = true, RESULTS_ASKED = 0, RESULTS_BUSY = false;
 async function refreshResults() {
-  try { initData(await api('api/results')); } catch (e) { /* netFail said so; poll retries */ }
+  RESULTS_DUE = true;
+  const ask = ++RESULTS_ASKED;
+  if (RESULTS_BUSY) return;
+  RESULTS_BUSY = true;
+  try {
+    initData(await api('api/results'));
+    if (ask === RESULTS_ASKED) RESULTS_DUE = false;
+  } catch (e) { /* netFail said so; the poll retries while RESULTS_DUE */ }
+  finally { RESULTS_BUSY = false; }
 }
 
 async function loadQueue() {
   try {
     const rows = await api('api/submissions?limit=100');
-    const prev = new Map(state.queue.map(r => [r.id, r.status]));
-    const justFinished = rows.some(r => r.status === 'done' && prev.get(r.id)
-                                        && prev.get(r.id) !== 'done');
+    const prev = new Map(state.queue.map(r => [r.id, r]));
+    // new scores exist when a run's answers land (status -> done) AND, for a
+    // judged run, again when its judge batch lands minutes later: the row is
+    // already 'done' by then, so only the judge's own status says so
+    const judgeDone = r => ((r || {}).judge || {}).status === 'done';
+    const justFinished = rows.some(r => {
+      const p = prev.get(r.id);
+      return p && ((r.status === 'done' && p.status !== 'done')
+                   || (judgeDone(r) && !judgeDone(p)));
+    });
     const changed = rows.length !== state.queue.length || rows.some(r => {
-      const p = state.queue.find(o => o.id === r.id);
-      return !p || p.status !== r.status || p.progress !== r.progress;
+      const p = prev.get(r.id);
+      return !p || p.status !== r.status || p.progress !== r.progress
+        || JSON.stringify(p.judge || null) !== JSON.stringify(r.judge || null);
     });
     state.queue = rows;
     if (justFinished) await refreshResults();       // new scores -> re-render everything
@@ -7030,10 +7056,10 @@ if (LIVE) {
   loadQueue();
   setInterval(() => {
     if (!netReady()) return;                 // still inside the backoff window
-    // a page whose FIRST load failed has no data and nothing else would ever
-    // fetch it again: the queue poll would recover quietly and leave the board
-    // empty for as long as the tab stayed open
-    if (!DATA) refreshResults();
+    // a results fetch that failed is still owed: the first load (the board
+    // would stay empty), or the one a finished run asked for (the board
+    // would keep the numbers from before it for as long as the tab stayed open)
+    if (RESULTS_DUE) refreshResults();
     loadQueue();
     if (state.tab === 'training') loadTraining();
     if (state.tab === 'review') loadReview();

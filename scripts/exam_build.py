@@ -860,7 +860,10 @@ def _backend():
         raise SystemExit(2) from None
 
 
-def main() -> int:
+def parser() -> argparse.ArgumentParser:
+    """The command line, on its own so the docs' commands can be checked
+    against it: `--root` belongs to the top level and goes before the
+    subcommand."""
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", type=Path, default=None,
@@ -891,7 +894,11 @@ def main() -> int:
     b = sub.add_parser("build", help="write the harness tasks from the bank + the MMLU control set")
     b.add_argument("results", type=Path, help="results/full (source of the control set)")
     b.add_argument("--per-category", type=int, default=CONTROL_PER_CATEGORY)
-    a = ap.parse_args()
+    return ap
+
+
+def main() -> int:
+    a = parser().parse_args()
     root = a.root or Path(os.environ.get("BENCH_ROOT", ".")) / "exam"
     if a.cmd == "migrate":
         print(f"migrated {migrate_seeds(root)} items into {bank_dir(root)}")

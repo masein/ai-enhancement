@@ -1261,18 +1261,30 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
     return {**head, "canary": canary, "preliminary_reasons": reasons, "tasks": tasks}
 
 
-def merge_judged(model_dir: Path, out: dict, dest: Path | None = None) -> dict:
+def merge_judged(model_dir: Path, out: dict, dest: Path | None = None,
+                 when: float | None = None) -> dict:
     """A run narrowed to one topic must not wipe the others' scores out of
     judge.json — but it must not pretend they were graded by this run's
     instrument either. A previous task is carried over only when the judge id,
     the prompt and that task's rubric record are all identical to this run's;
     anything else is named in `judge.replaced` and dropped, because a file
-    that mixes two instruments under one heading is worse than a gap."""
+    that mixes two instruments under one heading is worse than a gap.
+
+    Each topic carries `judged_at`, the time ITS grades landed: this run's
+    topics get `when` (now), a carried topic keeps its own. The file's mtime
+    is the time of the last merge, and a one-topic run re-stamped every topic
+    in the file with it. A topic carried from a file written before this
+    field existed takes that file's mtime — the last time it was written, and
+    the best that file can say."""
+    when = int(time.time() if when is None else when)
+    for t in (out.get("tasks") or {}).values():
+        t["judged_at"] = when
     prev_path = (dest or model_dir) / "judge.json"
     if not prev_path.exists() or out.get("skipped"):
         return out
     try:
         prev = json.loads(prev_path.read_text(encoding="utf-8"))
+        prev_at = int(prev_path.stat().st_mtime)
     except (ValueError, OSError):
         return out
     if prev.get("skipped") or not isinstance(prev.get("tasks"), dict):
@@ -1287,7 +1299,7 @@ def merge_judged(model_dir: Path, out: dict, dest: Path | None = None) -> dict:
             continue
         prev_rub = (pj.get("rubrics") or {}).get(task)
         if same_judge and prev_rub == _rubric_record(task):
-            kept[task] = t
+            kept[task] = {**t, "judged_at": t.get("judged_at") or prev_at}
         else:
             dropped.append(task)
     if not kept and not dropped:
@@ -1306,6 +1318,31 @@ def merge_judged(model_dir: Path, out: dict, dest: Path | None = None) -> dict:
                                  "re-run suite=judged for these topics")
     merged["judge"] = judge
     return merged
+
+
+def backfill_judged_at(j: dict, runs: list[dict]) -> list[str]:
+    """Give each topic of a judge.json written before topics carried their own
+    time the time its grades landed, from the service's record of the runs
+    that graded this model: [{batch_id, finished_at, tasks}] (finished runs
+    only). The file's last writer must be one of those runs — a file written
+    by the CLI or the stub has no such record, and its mtime is the right
+    answer for all of it. A topic takes the newest run, finishing no later
+    than that last writer, whose plan graded it; a topic no run accounts for
+    is left alone. Returns the topics filled in; only adds `judged_at`."""
+    last = next((r for r in runs if r["batch_id"] == (j.get("judge") or {}).get("batch_id")),
+                None)
+    if not last:
+        return []
+    filled = []
+    for task, t in (j.get("tasks") or {}).items():
+        if not isinstance(t, dict) or t.get("judged_at"):
+            continue
+        at = max((r["finished_at"] for r in runs
+                  if task in r["tasks"] and r["finished_at"] <= last["finished_at"]), default=None)
+        if at:
+            t["judged_at"] = int(at)
+            filled.append(task)
+    return filled
 
 
 def write_judge(model_dir: Path, out: dict, dest: Path | None = None) -> Path:
@@ -1327,11 +1364,15 @@ def run_stub(model_dir: Path, results_root: Path | None = None, record: bool = F
                     threshold, caveat=False, record=record)
 
 
-def start_run(model_dir: Path, results_root: Path, only: list[str] | None = None) -> dict:
+def start_run(model_dir: Path, results_root: Path, only: list[str] | None = None,
+              submission: int | None = None) -> dict:
     """The service's entry point, called inside the GPU lock: plan, submit
     the batch (seconds), return. The poller finishes it. With JUDGE_MODEL=stub
     the file is written here and now. `only` narrows the run to the tasks the
-    submission asked for."""
+    submission asked for; `submission` is the queue row that asked, and the
+    batch id goes on it the moment the provider hands one back — before the
+    batch is registered, so the poller can never finish a batch whose row
+    does not know it."""
     from service import config, db, llm
     ident = identity()
     if config.JUDGE_MODEL == "stub":
@@ -1356,6 +1397,8 @@ def start_run(model_dir: Path, results_root: Path, only: list[str] | None = None
     if not reqs:
         return {"mode": "batch", "written": False}
     bid = backend.submit(reqs)
+    if submission:
+        db.update(submission, judge_batch=bid)
     rid = db.judge_run_create(plan["model"], bid, len(reqs), ident["id"], json.dumps(plan))
     db.batch_add(bid, "judge", rid, len(reqs), backend.name, backend.model)
     return {"mode": "batch", "written": False, "batch_id": bid, "run_id": rid, "n": len(reqs)}

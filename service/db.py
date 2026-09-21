@@ -7,6 +7,7 @@ want (the API thread and the worker thread interleave short transactions).
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import time
 from contextlib import closing
@@ -199,7 +200,42 @@ def init() -> None:
         # means the re-run only repeats the task that was interrupted.
         c.execute("UPDATE submissions SET status='queued', progress='re-queued after restart' "
                   "WHERE status IN ('preflight','waiting_gpu','waiting_lock','running')")
+        _backfill_judge_batch(c)
         c.commit()
+
+
+_BATCH_IN_PROGRESS = re.compile(r"judge batch (\S+) submitted")
+_BATCH_IN_LOG = re.compile(r"===== \[(\d+)\] judge: (\{.*?\}) =====")
+
+
+def _backfill_judge_batch(c: sqlite3.Connection) -> None:
+    """A judged row submitted before `judge_batch` existed names its batch
+    only in its progress text ("judge batch X submitted") and in its run log.
+    Recover it from there — the row's own words — and never from the model:
+    "the model's newest judge run" gave #45, #46 and #47 all #47's batch.
+    A batch id is taken only if a judge run by that id exists; a row whose
+    batch cannot be recovered shows no judge line rather than someone else's."""
+    rows = c.execute("SELECT id, hf_id, progress FROM submissions WHERE suite='judged' "
+                     "AND COALESCE(judge_batch, '')=''").fetchall()
+    for sid, hf_id, progress in rows:
+        found = [m.group(1) for m in _BATCH_IN_PROGRESS.finditer(progress or "")]
+        if not found:
+            log = config.LOGS_DIR / f"service_{sid}_{hf_id.replace('/', '__')}.log"
+            try:
+                text = log.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                text = ""
+            for m in _BATCH_IN_LOG.finditer(text):
+                try:
+                    bid = json.loads(m.group(2)).get("batch_id")
+                except ValueError:
+                    continue
+                if int(m.group(1)) == sid and bid:
+                    found.append(bid)
+        for bid in reversed(found):                 # the last one it submitted
+            if c.execute("SELECT 1 FROM judge_runs WHERE batch_id=?", (bid,)).fetchone():
+                c.execute("UPDATE submissions SET judge_batch=? WHERE id=?", (bid, sid))
+                break
 
 
 def add(hf_id: str, kind: str, suite: str, submitter: str, note: str,

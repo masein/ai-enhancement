@@ -739,6 +739,7 @@ def test_the_queue_row_counts_the_judge_batch_up(live, page):
     rid = db.judge_run_create("fx/good-750m", "b_live", 130, "stub/overlap-v1", "{}")
     db.batch_add("b_live", "judge", rid, 130, "anthropic", "claude-x")
     db.batch_progress("b_live", "40/130 done")
+    db.update(sid, judge_batch="b_live")       # as judge.start_run records it on submit
     page.goto(base + "/#tab=queue")
     page.wait_for_selector(f"table.jd tbody tr:has-text('#{sid}'), table tbody tr")
     page.wait_for_selector("[data-judge-progress]", timeout=20000)

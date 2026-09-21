@@ -50,6 +50,12 @@ async def lifespan(_app: FastAPI):
     # without eval_tasks/fr/ shipped and got as far as a person pressing a button
     startup.check_repo_files()
     db.init()
+    try:                         # topics re-dated by an old merge get their own time back
+        fixed = llm_poller.backfill_judged_at()
+        if fixed:
+            print(f"[judge] per-topic judged_at restored from the run records: {', '.join(fixed)}")
+    except Exception as e:       # noqa: BLE001 — a repair must never stop the service starting
+        print(f"[judge] could not restore per-topic judged_at: {e!r}")
     llm.startup_check()          # a set-but-broken LLM config fails here, not at a click
     worker.start()
     llm_poller.start()
@@ -285,21 +291,13 @@ def submissions(limit: int = 100):
     if judged:
         runs = {run["batch_id"]: run for run in db.judge_runs(200)}
         batches = {b["batch_id"]: b for b in db.batches_list(500) if b["kind"] == "judge"}
-        # by the batch THIS submission recorded. Matching on the model gave
-        # every judged row of a model the newest run's batch, so a finished
-        # 130-answer run showed the 680 of the one still going.
-        by_model: dict[str, list[dict]] = {}
-        for run in db.judge_runs(200):
-            by_model.setdefault(run["model"], []).append(run)
+        # by the batch THIS submission recorded when it submitted it, and by
+        # nothing else. Any match on the model — even "the newest run that
+        # started after this row" — gives every older row of that model the
+        # newest run's batch: #45, #46 and #47 all showed #47's 130/130. A
+        # row with no batch of its own shows no judge line.
         for r in judged:
-            bid = r.get("judge_batch") or ""
-            run = runs.get(bid)
-            if not run:
-                # a row from before the batch was recorded on it: the newest
-                # run of that model that started after the row did
-                started = r.get("started_at") or r.get("created_at") or 0
-                run = next((x for x in by_model.get(r["hf_id"], [])
-                            if (x.get("created_at") or 0) >= started), None)
+            run = runs.get(r.get("judge_batch") or "")
             if not run:
                 continue
             b = batches.get(run["batch_id"]) or {}
@@ -1004,10 +1002,13 @@ STEPS = {
 }
 
 
-def _judged_at(model: str) -> float | None:
-    """When this model's judge.json was written. The file itself carries no
-    timestamp on purpose (it must hash the same for the same inputs), so the
-    filesystem is the clock."""
+def _judged_at(model: str, t: dict | None = None) -> float | None:
+    """When this topic's grades landed: the `judged_at` the merge wrote on
+    it. The file's mtime is only the time of the last merge — a one-topic run
+    of economics made last night's law, medicine and physics read 09:25 — so
+    it is the answer only for a file from before topics carried their own."""
+    if t and t.get("judged_at"):
+        return float(t["judged_at"])
     p = config.OUT_DIR / model.replace("/", "__") / "judge.json"
     try:
         return p.stat().st_mtime
@@ -1023,7 +1024,7 @@ def _last_judged(payload: dict, task: str) -> dict | None:
         t = ((m.get("judge") or {}).get("tasks") or {}).get(task)
         if not t:
             continue
-        at = _judged_at(m["id"]) or 0
+        at = _judged_at(m["id"], t) or 0
         if best and at <= best["at"]:
             continue
         j = m.get("judge") or {}

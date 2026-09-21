@@ -20,6 +20,7 @@ from pathlib import Path
 from . import config, contamination, db, llm, proposals
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+import exam_build as _exam  # noqa: E402
 import judge as _judge  # noqa: E402
 
 _stop = threading.Event()
@@ -100,7 +101,7 @@ def _finish_judge(row: dict, results: dict[str, llm.Result]) -> None:
     run = db.judge_run_get(row["ref_id"])
     if not run:
         return
-    path = _judge.finish_run(run, results, config.OUT_DIR)
+    _judge.finish_run(run, results, config.OUT_DIR)
     db.judge_run_update(run["id"], status="done", finished_at=time.time())
     # the count stops where it landed, not where the last poll happened to
     # see it, and the submission stops saying the batch is out
@@ -108,15 +109,61 @@ def _finish_judge(row: dict, results: dict[str, llm.Result]) -> None:
     sub = db.submission_of_batch(row["batch_id"])
     if not sub:
         return
-    try:
-        topics = len([t for t in json.loads(Path(path).read_text(encoding="utf-8")).get("tasks")
-                      or {} if t != _judge.CONTROL_TASK])
-    except (OSError, ValueError, TypeError):
-        topics = 0
     when = time.strftime("%H:%M", time.localtime())
-    db.update(sub["id"], progress=(
-        f"judged: {topics} topic{'s' if topics != 1 else ''}, judge.json written {when}"
-        if topics else f"judged, judge.json written {when}"))
+    what = judged_what(run)
+    db.update(sub["id"], progress=(f"judged: {what}, judge.json written {when}" if what
+                                   else f"judged, judge.json written {when}"))
+
+
+def backfill_judged_at() -> list[str]:
+    """Once, at startup: a judge.json merged before topics carried their own
+    time stamped every topic with the merge (a one-topic run of economics at
+    09:25 re-dated last night's law, medicine and physics). The runs that
+    graded them are still in the database; put each topic's own time back.
+    Returns the models whose file was corrected."""
+    by_model: dict[str, list[dict]] = {}
+    for r in db.judge_runs(1000):
+        if r["status"] == "done" and r.get("finished_at"):
+            by_model.setdefault(r["model"], []).append(r)
+    fixed = []
+    for model, rs in by_model.items():
+        path = config.OUT_DIR / model.replace("/", "__") / "judge.json"
+        try:
+            j = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        tasks = j.get("tasks") or {}
+        if not isinstance(tasks, dict) or all(isinstance(t, dict) and t.get("judged_at")
+                                              for t in tasks.values()):
+            continue
+        runs = []
+        for r in rs:
+            try:
+                plan = json.loads((db.judge_run_get(r["id"]) or {}).get("plan") or "{}")
+            except ValueError:
+                continue
+            runs.append({"batch_id": r["batch_id"], "finished_at": r["finished_at"],
+                         "tasks": set(plan.get("tasks") or {})})
+        if _judge.backfill_judged_at(j, runs):
+            _judge.write_judge(path.parent, j)
+            fixed.append(model)
+    return fixed
+
+
+def judged_what(run: dict) -> str:
+    """The topics THIS run graded, from its own plan — not the merged
+    judge.json, which also holds every topic an earlier run left there: a
+    one-topic run of economics read "judged: 5 topics". Up to three are
+    named; past that the row's own task list names them, and a count says
+    enough."""
+    try:
+        tasks = list((json.loads(run.get("plan") or "{}").get("tasks") or {}))
+    except (ValueError, TypeError, AttributeError):
+        return ""
+    names = [_exam.TASK_TOPIC.get(t, t) for t in tasks if t != _judge.CONTROL_TASK]
+    if not names or len(names) > 3:
+        return f"{len(names)} topics" if names else ""
+    return names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
 
 
 def _mark_failed(r: dict, why: str) -> None:

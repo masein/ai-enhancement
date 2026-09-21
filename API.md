@@ -325,8 +325,9 @@ commit writes the file and records who, when and both shas in
 
 `GET /api/loop` — one row per topic in `categories.yaml`: the bank (accepted,
 report/diagnose split, whether it is under the 30-question floor), which
-rubric and criteria file grade it, the most recently written `judge.json`
-that covers it (model, folded report-half score, and the provisional /
+rubric and criteria file grade it, the most recently graded `judge.json`
+that covers it (model, `at` — when THAT topic's grades landed, from its own
+`judged_at`, not the file's last merge — folded report-half score, and the provisional /
 draft-rubric / single-provider / trained-on-it stamps), any open proposal,
 any datasets, and **`next`** — the one step to take, as `{step, label, ok,
 why}`. `propose` carries the same gate object `POST /api/proposals` enforces.
@@ -351,8 +352,14 @@ and the judge grades only those answers. An empty list still means the whole
 exam. A narrowed run keeps the topics it did not re-grade in `judge.json`
 only when the judge id, the prompt and that topic's rubric record are
 unchanged — otherwise they are dropped and named in `judge.replaced`, because
-one file must not mix two instruments. A judged row in `GET /api/submissions`
-carries its `tasks` and a `judge` block with the batch and its progress.
+one file must not mix two instruments. Each topic in `judge.json` carries
+`judged_at` (epoch seconds): the run's own topics get the time they landed, a
+kept topic keeps its own. A judged row in `GET /api/submissions` carries its
+`tasks` and a `judge` block with the batch **that row submitted** (recorded on
+the row as `judge_batch` when the batch is submitted — never looked up by
+model) and its progress; a row with no batch of its own has no `judge` block.
+When the batch lands the row's `progress` names the topics that run graded:
+`judged: economics, judge.json written 09:25`.
 
 ### Judged free response
 

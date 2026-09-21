@@ -355,16 +355,18 @@ directory is live. Changing either file changes its sha256, which every
 re-run `suite=judged` for that topic.
 
 ```bash
+# --root goes BEFORE the subcommand: it belongs to exam_build.py, not to
+# migrate/draft/build/import, and the parser rejects it anywhere else
 # once: the four skill suites' items into the bank, under 'other'
-sudo docker compose exec -T bench python3 scripts/exam_build.py migrate --root /home/masein/benchmarks/exam
+sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam migrate
 # each round: draft candidates (needs EXAM_*), curate them on the Exam tab, then build
-sudo docker compose exec -T bench python3 scripts/exam_build.py draft --root /home/masein/benchmarks/exam --per-topic 8
-sudo docker compose exec -T bench python3 scripts/exam_build.py build results/full --root /home/masein/benchmarks/exam
+sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam draft --per-topic 8
+sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam build results/full
 #   (the Exam tab's "Rebuild the harness tasks" button does the last step too)
 # a bank someone wrote by hand — or the Exam tab's "Import a bank" panel,
 # which runs this same code path, previews it first and records the name
-sudo docker compose exec -T bench python3 scripts/exam_build.py import eval_tasks/fr/medicine_v2.json \
-    --root /home/masein/benchmarks/exam --topic 'medicine & health' --approver 'Dr. Hossein'
+sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam \
+    import eval_tasks/fr/medicine_v2.json --topic 'medicine & health' --approver 'Dr. Hossein'
 # then per model:
 python clients/bench_client.py --base http://<ip>:8899 submit <model> --suite judged --submitter you
 ```

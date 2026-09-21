@@ -228,6 +228,7 @@ def test_the_queue_row_carries_the_judge_batch(svc, monkeypatch):
     rid = db.judge_run_create("fx/good-750m", "batch_1", 40, "stub/overlap-v1", "{}")
     db.batch_add("batch_1", "judge", rid, 40, "local", "chat")
     db.batch_progress("batch_1", "18/40 done")
+    db.update(sid, judge_batch="batch_1")      # as judge.start_run records it on submit
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
     assert json.loads(row["tasks"]) == [LAW]
     assert row["judge"]["progress"] == "18/40 done" and row["judge"]["n_items"] == 40
@@ -316,6 +317,7 @@ def test_a_batch_in_flight_reports_how_far_it_is(svc, monkeypatch):
                                                 "tasks": [LAW]}).json()["id"]
     rid = db.judge_run_create("fx/good-750m", "b_1", 130, "stub/overlap-v1", "{}")
     db.batch_add("b_1", "judge", rid, 130, "anthropic", "claude-x")
+    db.update(sid, judge_batch="b_1")
     # what the provider says while it runs, in the shape every backend returns
     assert llm._counted({"processing": 90, "succeeded": 40, "total": 130}) == "40/130 done"
     assert llm._counted({"succeeded": 38, "errored": 2, "total": 130}) == "40/130 done, 2 failed"

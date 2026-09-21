@@ -522,13 +522,14 @@ def run_submission(sub: dict) -> None:
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
             import judge as _judge
             try:
-                jr = _judge.start_run(config.OUT_DIR / safe, config.OUT_DIR, only=only)
+                # the row is passed in so the batch id lands on it at submit
+                # time: the queue shows THIS run's batch, never the model's
+                # newest, and the poller can say on the row when it lands
+                jr = _judge.start_run(config.OUT_DIR / safe, config.OUT_DIR, only=only,
+                                      submission=sid)
                 if jr.get("skipped"):
                     judge_note = f" · {jr['skipped']}"
                 elif jr.get("batch_id"):
-                    # on the row, so the queue shows THIS run's batch and the
-                    # poller can say on the row when it lands
-                    db.update(sid, judge_batch=jr["batch_id"])
                     judge_note = (f" · judge batch {jr['batch_id']} submitted ({jr['n']} answers); "
                                   f"judge.json lands when it completes")
                 elif jr.get("written"):
