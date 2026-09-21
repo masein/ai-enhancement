@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A government lawfully adopts an unpopular tax reform through the constitutionally required procedure, collects the tax efficiently, and faces large peaceful protests claiming the policy is unfair. Explain why legality, administrative effectiveness, public approval, and political legitimacy are distinct concepts, and identify what additional evidence would be needed to assess legitimacy.",
+    "intent": "Distinguish legality, effectiveness, approval, and legitimacy using a concrete institutional scenario.",
+    "domain": "Political Institutions — Legitimacy and Authority",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "Country A holds competitive elections but has weak tax collection, incomplete territorial control, and unreliable public-service delivery. Country B restricts political competition but has a professional bureaucracy and high tax compliance. Compare what this evidence says about regime type and state capacity without treating either as a proxy for the other.",
+    "intent": "Separate regime characteristics from administrative and coercive state capacity.",
+    "domain": "Political Institutions — State Capacity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparative_politics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A constitution gives parliament formal power to select the prime minister, but in practice party leaders negotiate the premiership before the parliamentary vote and legislators almost never deviate from the bargain. Analyze how formal and informal institutions jointly shape the outcome.",
+    "intent": "Identify the interaction of written rules, party bargaining, and unwritten conventions.",
+    "domain": "Political Institutions — Formal and Informal Institutions",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A reform must be approved by a lower chamber, an upper chamber controlled by a different coalition, and a separately elected president. Explain how these veto points can increase policy stability while also making change harder, and why the effect depends on actors' preferences rather than the number of institutions alone.",
+    "intent": "Apply veto-player reasoning while avoiding deterministic claims.",
+    "domain": "Political Institutions — Veto Players",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A country decentralizes education policy to regions while keeping national funding standards. Some regions innovate successfully, others underperform, and voters are unsure whether to blame regional or national officials. Analyze the trade-offs involving responsiveness, experimentation, coordination, inequality across regions, and accountability.",
+    "intent": "Evaluate federal or decentralized institutional trade-offs without ranking systems.",
+    "domain": "Political Institutions — Federalism and Decentralization",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A legislature delegates environmental inspections to an expert agency. Legislators want strict enforcement, but agency staff have better information about local conditions and face pressure to reduce workload. Explain the principal-agent problem and identify monitoring or incentive mechanisms that could reduce agency drift.",
+    "intent": "Apply delegation, information-asymmetry, and monitoring concepts to bureaucracy.",
+    "domain": "Political Institutions — Bureaucracy and Public Administration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A constitutional court issues a ruling against the executive. The executive publicly disagrees but complies because other institutions, professional associations, and much of the public expect compliance. Explain how judicial independence and institutional legitimacy can affect compliance even when courts lack direct control over implementation.",
+    "intent": "Analyze courts as political institutions rather than as legal doctrine.",
+    "domain": "Political Institutions — Courts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "In a legislature, most bills die in committee even though a majority of the full chamber might support them if they reached the floor. Explain how committee gatekeeping and agenda control can shape policy outcomes without changing legislators' underlying preferences.",
+    "intent": "Explain agenda-setting power and legislative organization.",
+    "domain": "Political Institutions — Legislatures",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "In a presidential system, the president and legislative majority are elected separately for fixed terms and belong to opposing blocs. A budget requires legislative approval, while the president can veto it but cannot dissolve the legislature. Analyze the bargaining incentives and possible sources of deadlock.",
+    "intent": "Apply presidential-system incentives to executive-legislative bargaining.",
+    "domain": "Political Institutions — Presidential Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "institutional_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 10,
+    "prompt": "In a parliamentary system, no party wins a majority. A cabinet must retain the confidence of a majority of legislators, and parties care about both ministerial offices and policy. Explain why a numerically viable coalition may still fail to form and what bargaining factors matter.",
+    "intent": "Analyze parliamentary coalition formation beyond seat arithmetic.",
+    "domain": "Political Institutions — Parliamentary Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "coalition_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 11,
+    "prompt": "The constitution of a hypothetical semi-presidential republic states that the president appoints the prime minister, but the cabinet must maintain parliamentary confidence. The president controls foreign-policy appointments, while the prime minister directs domestic administration. After an opposition parliamentary majority is elected, analyze how these rules could produce cohabitation and where authority may become contested.",
+    "intent": "Reason from supplied hybrid-executive rules rather than country stereotypes.",
+    "domain": "Political Institutions — Semi-Presidential Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "institutional_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 12,
+    "prompt": "Five municipalities share a river. Each benefits if all finance pollution monitoring, but each can save money by free riding on others' contributions. Explain the collective-action problem and compare how a binding intermunicipal agreement, selective incentives, or repeated interaction could alter incentives.",
+    "intent": "Apply public-goods and collective-action reasoning to local governance.",
+    "domain": "Political Institutions — Collective Action and Governance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "strategic_interaction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "In a single-member plurality district, voter L prefers Party A, then B, then C. Polling in the hypothetical district shows A at 15%, B at 43%, and C at 42%. Explain the difference between a sincere vote and a strategic vote for L, and why the electoral rule creates the incentive without determining L's choice.",
+    "intent": "Apply strategic-voting logic under plurality rules.",
+    "domain": "Elections & Political Behavior — Strategic Voting",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "electoral_system_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A proportional-representation election has a 5% legal threshold. Parties receive A 38%, B 27%, C 16%, D 9%, E 6%, and F 4%. First identify which parties qualify. Then explain why excluding F can change the seat shares of qualifying parties even if the formula allocates seats proportionally only among qualifying votes.",
+    "intent": "Interpret thresholds, denominators, and proportional representation.",
+    "domain": "Elections & Political Behavior — Proportional Representation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 15,
+    "prompt": "Two proportional systems use the same vote totals and allocation formula, but System X elects 3 representatives per district while System Y elects 15. Explain why the higher district magnitude generally lowers effective entry barriers and can improve proportionality, while noting why party geography and thresholds still matter.",
+    "intent": "Analyze district magnitude as an electoral-system mechanism.",
+    "domain": "Elections & Political Behavior — District Magnitude",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "electoral_system_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A 100-seat legislature is elected under two hypothetical rules using the same national votes: A 41%, B 34%, C 15%, D 10%. Rule 1 awards all seats in 100 single-member plurality districts whose local results vary by geography. Rule 2 allocates all 100 seats proportionally nationwide. Explain why national vote shares alone are sufficient to approximate seats under Rule 2 but not Rule 1, and identify the additional district-level information needed for Rule 1.",
+    "intent": "Compare vote-to-seat translation under district and national proportional systems.",
+    "domain": "Elections & Political Behavior — Votes and Seats",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "electoral_system_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 17,
+    "prompt": "A preferential election allows voters to rank candidates. No candidate has a majority of first preferences, so the lowest candidate is eliminated and ballots transfer to next preferences. Explain how this rule can make later preferences consequential and why first-choice vote share alone may not identify the eventual winner.",
+    "intent": "Reason about preferential voting without forecasting a real election.",
+    "domain": "Elections & Political Behavior — Preferential Voting",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "electoral_system_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "In a hypothetical jurisdiction, a presidential candidate wins in round one only with more than 50% of valid votes; otherwise the top two advance. The first-round shares are A 46%, B 31%, C 18%, D 5%. State what the rule implies procedurally, then explain why these first-round numbers alone do not justify a prediction about the runoff result.",
+    "intent": "Apply an explicit majority-runoff rule while preserving the forecasting boundary.",
+    "domain": "Elections & Political Behavior — Runoff Systems",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 19,
+    "prompt": "A 120-seat parliament requires 61 seats for confidence. Parties hold A 45, B 32, C 23, D 12, E 8 seats. Identify all two-party coalitions that reach 61 seats, then explain why ideological distance, office goals, and policy commitments can make some arithmetically feasible coalitions politically unlikely.",
+    "intent": "Combine coalition arithmetic with bargaining incentives.",
+    "domain": "Elections & Political Behavior — Parties and Coalitions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "coalition_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 20,
+    "prompt": "A governing party threatens to deny renomination to legislators who vote against a key bill. Explain how party discipline can improve legislative coordination while also reducing individual legislators' freedom to respond to local preferences.",
+    "intent": "Analyze party discipline and representation trade-offs.",
+    "domain": "Elections & Political Behavior — Political Parties",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "political_behavior",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "Turnout rises from 58% to 66% after automatic voter registration is introduced. During the same period, the election becomes unusually competitive and civic groups expand mobilization. Explain why the before-after difference does not by itself identify the causal effect of registration reform, and propose evidence or a design that would strengthen causal inference.",
+    "intent": "Distinguish turnout change from causal attribution.",
+    "domain": "Elections & Political Behavior — Turnout",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "Two surveys ask about the same spending proposal. Question 1 calls it an 'investment in public services' and finds 62% support; Question 2 calls it a 'tax-funded spending expansion' and finds 48% support. Explain what this difference suggests about measurement and framing, and what it does not establish about citizens' stable underlying preferences.",
+    "intent": "Interpret wording effects in public-opinion measurement.",
+    "domain": "Elections & Political Behavior — Public Opinion",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "survey_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A poll of 2,000 adults reports 52% support for a proposal with a stated sampling margin of error of ±2 percentage points, but response rates are low and respondents were recruited from an online panel. Explain why the margin of error does not capture coverage, nonresponse, weighting, or measurement error.",
+    "intent": "Separate sampling uncertainty from non-sampling polling errors.",
+    "domain": "Elections & Political Behavior — Polling",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "public_opinion",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "Districts with higher average income give Party A larger vote shares than poorer districts. Does this prove that higher-income individuals are more likely to vote for Party A? Explain the ecological-fallacy problem and name the individual-level evidence that would be needed.",
+    "intent": "Identify improper inference from aggregate to individual behavior.",
+    "domain": "Elections & Political Behavior — Voting Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "After a media campaign, awareness of an issue rises sharply, but average policy preferences change little. Analyze how this pattern could be consistent with agenda-setting effects without strong persuasion effects, and identify alternative explanations that should be checked.",
+    "intent": "Distinguish agenda setting from persuasion and consider rival explanations.",
+    "domain": "Elections & Political Behavior — Political Communication",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "political_behavior",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A hypothetical regime holds regular multiparty elections, but opposition parties face severe media restrictions, courts lack independence, and executive authority is weakly constrained. Using explicitly stated dimensions—electoral competition, civil liberties, and executive constraints—explain how the regime could score differently on 'electoral democracy' and 'liberal democracy' measures.",
+    "intent": "Classify regime features criterion by criterion without impressionistic labeling.",
+    "domain": "Comparative Politics — Regime Types",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "regime_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 27,
+    "prompt": "Ten countries that transitioned to democracy all experienced rising incomes beforehand. A researcher concludes that income growth causes democratization. Evaluate the claim using case-selection, omitted-variable, reverse-causality, and scope-condition concerns, and describe what additional comparison would be most informative.",
+    "intent": "Evaluate a democratization claim with causal-inference and selection-bias reasoning.",
+    "domain": "Comparative Politics — Democratization",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "An authoritarian government allows a legislature and limited elections, but uses them mainly to distribute offices, gather information about local grievances, and manage elites. Explain how political institutions can serve authoritarian survival without implying that such institutions are meaningless or fully democratic.",
+    "intent": "Analyze authoritarian institutions as mechanisms of co-optation and information.",
+    "domain": "Comparative Politics — Authoritarian Politics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_politics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "Over eight years, a hypothetical elected executive changes appointment rules to weaken independent oversight, reduces the legislature's investigative authority, and alters election administration in ways that systematically disadvantage opponents. Explain how to evaluate whether this constitutes democratic backsliding using observable institutional criteria rather than a political label alone.",
+    "intent": "Apply defined backsliding mechanisms to supplied institutional changes.",
+    "domain": "Comparative Politics — Democratic Backsliding",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "regime_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A mayor allocates emergency relief using published need-based criteria. Separately, party brokers distribute discretionary jobs to supporters whose loyalty they monitor. Explain why the second pattern is closer to clientelism or patronage and why targeted benefits alone do not establish clientelism.",
+    "intent": "Distinguish programmatic distribution from clientelistic exchange.",
+    "domain": "Comparative Politics — Clientelism and Patronage",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A government introduces a widely popular infrastructure program. Service quality improves, yet the governing coalition receives little electoral credit because responsibility is divided among national ministries, regional governments, and independent agencies. Analyze the information, attribution, and sanctioning problems that can weaken electoral accountability despite successful policy outcomes.",
+    "intent": "Explain why diffuse responsibility can break the link between performance and electoral reward.",
+    "domain": "Comparative Politics — Accountability and Governance",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A procurement system gives one official broad discretion, publishes little bid information, and rarely audits contracts. Explain how these institutional features can raise corruption risk, and distinguish a risk diagnosis from an accusation that any particular official accepted a bribe.",
+    "intent": "Analyze corruption incentives while avoiding unsupported allegations.",
+    "domain": "Comparative Politics — Corruption and Governance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "Two countries are very similar in income, colonial history, population size, and electoral competitiveness, but one has a centralized party nomination system and the other uses decentralized primaries. A researcher compares legislators' constituency behavior. Explain why this comparison can help isolate the nomination-system mechanism and what confounders may remain.",
+    "intent": "Apply controlled comparison without overstating causal identification.",
+    "domain": "Comparative Politics — Comparative Method",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A study examines only democracies that survived for at least 30 years and finds strong civil societies in all of them. Explain how selecting on survival can bias conclusions about what causes democratic durability.",
+    "intent": "Identify selection on the outcome and survivor bias.",
+    "domain": "Comparative Politics — Case Selection",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A researcher explains low institutional trust by saying a country has an 'anti-state political culture' but provides no survey data, behavioral measures, or historical mechanism. Evaluate the explanation and identify measurable evidence that could make a political-culture argument more testable.",
+    "intent": "Demand observable mechanisms for political-culture explanations.",
+    "domain": "Comparative Politics — Political Culture",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Country X adopts the same anti-corruption agency design used successfully in Country Y. In X, prosecutors are politically dependent, civil-service turnover is high, parties rely heavily on patronage, and local governments control much procurement. Analyze why institutional transfer may produce different results and identify complementary institutions and scope conditions that matter.",
+    "intent": "Evaluate institutional transfer using capacity, party-system, and informal-institution mechanisms.",
+    "domain": "Comparative Politics — Institutional Transfer",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "comparative_politics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "Foreign policy becomes less confrontational immediately after a new leader takes office, but commodity prices also fall, a rival state changes strategy, and parliament gains new oversight powers. Explain what evidence would distinguish a leader effect from institutional constraints and changing external conditions.",
+    "intent": "Separate leadership effects from structural and institutional alternatives.",
+    "domain": "Comparative Politics — Leadership and Institutions",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "alternative_explanations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "In a hypothetical democracy, the median-income voter would gain from a proposed tax-transfer reform, but a constitutional upper chamber overrepresents high-income regions and the reform needs approval in both chambers. Explain why a simple median-voter prediction may fail and how institutional veto points alter redistribution incentives.",
+    "intent": "Integrate voter preferences with institutional constraints in redistribution politics.",
+    "domain": "Political Economy & Policy — Redistribution",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A trade reform creates small benefits for millions of consumers but large losses for a few concentrated industries. Explain why the losing industries may organize more effectively for protection than consumers organize for the reform, without assuming lobbying automatically determines policy.",
+    "intent": "Apply concentrated-cost and collective-action reasoning to trade politics.",
+    "domain": "Political Economy & Policy — Trade Politics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A professional association with 5,000 members consistently influences technical regulation, while a much larger diffuse consumer population rarely mobilizes. Analyze how selective incentives, information advantages, and organizational costs can create this asymmetry.",
+    "intent": "Explain interest-group influence using collective-action mechanisms.",
+    "domain": "Political Economy & Policy — Interest Groups",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A government wants low inflation over the long term but faces short-term electoral incentives for expansionary policy. Explain how delegating monetary policy to an institution with operational independence could change credibility and time horizons, while noting why institutional independence does not eliminate political constraints or distributional effects.",
+    "intent": "Analyze credibility and delegation in political economy.",
+    "domain": "Political Economy & Policy — Political Institutions and Economic Policy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "Parliament unanimously passes a law guaranteeing rural clinics, but two years later many clinics remain closed because staffing is scarce, procurement is slow, and local administrators face conflicting directives. Explain why policy adoption should be distinguished from implementation and identify the main implementation bottlenecks.",
+    "intent": "Diagnose implementation failure despite broad legislative support.",
+    "domain": "Political Economy & Policy — Policy Implementation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A subsidy program creates a new group of beneficiaries and a specialized implementing agency. Five years later, both lobby strongly against repeal. Explain how this illustrates policy feedback and why feedback could still weaken, rather than strengthen, the original policy under different political conditions.",
+    "intent": "Apply policy-feedback reasoning without assuming one direction of effect.",
+    "domain": "Political Economy & Policy — Policy Feedback",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "Government revenue from a mineral export rises from 8% to 35% of total revenue after a price boom, while nonresource tax collection stagnates. Analyze how this change could affect accountability, rent distribution, and state capacity, and explain why it does not prove a deterministic 'resource curse.'",
+    "intent": "Evaluate resource-politics mechanisms and avoid deterministic inference.",
+    "domain": "Political Economy & Policy — Resource Politics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A donor funds local schools in regions selected for weak prior performance. After three years, funded regions still perform worse than unfunded regions. Explain why the raw comparison does not show the aid failed and discuss selection, baseline differences, implementation capacity, and appropriate evaluation strategies.",
+    "intent": "Evaluate foreign-aid effects with political and research-design reasoning.",
+    "domain": "Political Economy & Policy — Development and Foreign Aid",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A decentralization reform gives provinces authority to spend on health but leaves most revenue collection at the center. Explain how this fiscal mismatch can affect accountability, bargaining with the center, and incentives for local revenue effort.",
+    "intent": "Analyze fiscal decentralization and intergovernmental incentives.",
+    "domain": "Political Economy & Policy — Fiscal Politics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A regulator relies heavily on industry-provided technical information because it lacks internal expertise. Explain how this can improve policy information while also creating risks of capture or biased agenda setting, and identify institutional safeguards that address the information problem without assuming industry input is inherently illegitimate.",
+    "intent": "Analyze expertise, capture risk, and institutional safeguards.",
+    "domain": "Political Economy & Policy — Regulation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "Two low-income states receive similar infrastructure financing. State A has stable tax administration and merit-based procurement; State B has high bureaucratic turnover and fragmented authority. Explain why identical funding may produce different development outcomes through state-capacity mechanisms.",
+    "intent": "Connect development outcomes to administrative and institutional capacity.",
+    "domain": "Political Economy & Policy — Development",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_politics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A congestion-pricing policy reduces traffic in City A. City B considers adopting it, but has weaker public transit, lower administrative enforcement capacity, and a different commuting geography. Explain why the observed effect in A should not be assumed to transfer unchanged to B.",
+    "intent": "Evaluate comparative public-policy transfer and scope conditions.",
+    "domain": "Political Economy & Policy — Comparative Public Policy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A state increases defense spending after a neighboring rival grows stronger. Domestic elections are also approaching, and the defense ministry has lobbied for a larger budget. Show how systemic, domestic-political, and bureaucratic explanations operate at different levels of analysis and what evidence would distinguish them.",
+    "intent": "Compare IR explanations across levels of analysis.",
+    "domain": "International Relations — Levels of Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "international_relations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "Three states create a durable regional agreement after a long rivalry. Security threats have fallen, trade has become dense, and public rhetoric increasingly frames the states as members of a common community. Compare realist, liberal, constructivist, and domestic-politics explanations, specifying the mechanism each emphasizes and what evidence would discriminate among them.",
+    "intent": "Compare competing IR theories without treating one as universally correct.",
+    "domain": "International Relations — IR Theory",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "international_relations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "States operate without a central world government, yet they sign treaties, use diplomatic rules, and cooperate in international organizations. Explain why 'international anarchy' means absence of overarching central authority rather than absence of all rules or cooperation.",
+    "intent": "Clarify the concept of anarchy in international relations.",
+    "domain": "International Relations — International System",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "Two states can adopt a technology agreement that gives State A a gain of 10 units and State B a gain of 30 units relative to the status quo. Explain how a focus on absolute gains and a focus on relative gains can produce different attitudes toward the same agreement.",
+    "intent": "Apply absolute- versus relative-gains reasoning to cooperation.",
+    "domain": "International Relations — Cooperation and Gains",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "strategic_interaction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "State A can impose economic costs, provide financial inducements, shape institutional agendas, and attract foreign publics through culture and perceived legitimacy. Explain why these are different forms of power and why aggregate military capability alone would not capture them all.",
+    "intent": "Distinguish coercion, inducement, institutional influence, and attraction.",
+    "domain": "International Relations — Power",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Two countries depend heavily on the same trade relationship. Country A can redirect exports to several alternative markets within a year, while Country B has no near-term substitute supplier for a critical input. Explain why the relationship is interdependent but asymmetrically so, and how asymmetry can create bargaining leverage.",
+    "intent": "Distinguish mutual dependence from equal dependence.",
+    "domain": "International Relations — Interdependence",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "international_political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "Two states negotiate over fishing quotas and port access. State A values port access highly but quotas only moderately; State B has the reverse priorities. Explain how issue linkage can expand the bargaining space and why incomplete information about each side's priorities can still block agreement.",
+    "intent": "Apply multi-issue bargaining and information-asymmetry concepts.",
+    "domain": "International Relations — Diplomacy and Negotiation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "diplomacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A trade negotiator can reach an international compromise, but any treaty must later be ratified by a legislature in which a pivotal coalition rejects large agricultural concessions. The foreign counterpart knows this constraint may be genuine but could also be used strategically. Analyze the two-level game, including bargaining leverage, credibility, domestic ratification, and the risk that too narrow a domestic win-set prevents agreement.",
+    "intent": "Integrate international bargaining with domestic ratification constraints.",
+    "domain": "International Relations — Two-Level Games",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "foreign_policy_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 58,
+    "prompt": "Member states delegate inspection and reporting to an international organization because each distrusts the others' compliance claims. Explain how delegation can reduce information problems and transaction costs while creating a principal-agent problem between states and the organization.",
+    "intent": "Analyze delegation and monitoring in international organizations.",
+    "domain": "International Relations — International Organizations",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "international_organization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A treaty has weak centralized enforcement, yet most members comply most of the time. Identify political mechanisms that could sustain compliance, such as reciprocity, reputation, domestic implementation, repeated interaction, and monitoring, without assuming compliance proves strong legal coercion.",
+    "intent": "Explain treaty compliance at a political-science level.",
+    "domain": "International Relations — International Institutions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "international_organization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A foreign ministry prefers negotiation, a defense bureaucracy emphasizes deterrence, the executive office prioritizes domestic political timing, and legislators focus on industry effects. Explain how bureaucratic-politics reasoning could account for the final foreign policy while avoiding the claim that organizational interest mechanically determines policy.",
+    "intent": "Apply bureaucratic-politics reasoning to foreign policy.",
+    "domain": "International Relations — Foreign Policy Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "foreign_policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A behavior becomes widely regarded as inappropriate in diplomacy even though no binding treaty prohibits it. Explain how an international norm can influence state behavior through legitimacy, socialization, or reputational costs while remaining distinct from legally binding rules.",
+    "intent": "Distinguish norms from law and explain norm mechanisms.",
+    "domain": "International Relations — International Norms",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "international_relations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A sovereign state voluntarily joins a regional organization, accepts dispute-settlement procedures, and becomes economically dependent on neighboring markets. Explain why these choices can constrain policy while still being compatible with external sovereignty, and why sovereignty should not be equated with complete autonomy.",
+    "intent": "Clarify sovereignty under institutional and economic interdependence.",
+    "domain": "International Relations — Sovereignty",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "international_relations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "Twenty governments benefit from a shared disease-surveillance system, but each prefers others to bear more of the cost. Explain the collective-action problem and compare monitoring, cost-sharing rules, repeated interaction, and side payments as possible institutional mechanisms.",
+    "intent": "Apply collective-action reasoning to global governance.",
+    "domain": "International Relations — Global Governance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "international_organization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "State A deploys mobile air defenses near its border because it fears attack. State B cannot easily determine whether the deployment is purely defensive and responds with longer-range forces, leading A to increase readiness. Analyze this as a possible security dilemma, identify evidence that would distinguish defensive insecurity from offensive intent, and explain how signaling or transparency might reduce—but not eliminate—the problem.",
+    "intent": "Diagnose a security dilemma while separating capabilities from intentions.",
+    "domain": "Conflict & Security — Security Dilemma",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "State A threatens costs if State B attacks a partner; in a separate dispute, A threatens costs unless B withdraws from territory it already occupies. Explain why the first is deterrence and the second is compellence, focusing on whether the goal is to prevent or change behavior.",
+    "intent": "Distinguish deterrence from compellence conceptually.",
+    "domain": "Conflict & Security — Deterrence and Compellence",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A small ally wants a stronger defense guarantee because it fears abandonment. The major ally worries that a very unconditional guarantee could encourage risky behavior and entrap it in disputes it would prefer to avoid. Explain the alliance dilemma and the role of conditional commitments and burden sharing.",
+    "intent": "Analyze abandonment and entrapment incentives in alliances.",
+    "domain": "Conflict & Security — Alliances",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "Two states would both prefer a negotiated settlement to war, but each privately knows more about its military resilience than the other and has incentives to exaggerate strength. Explain how private information and incentives to misrepresent can cause bargaining failure.",
+    "intent": "Apply information problems from bargaining theory of war.",
+    "domain": "Conflict & Security — Bargaining Theory of War",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conflict_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "State A is becoming rapidly stronger. It offers State B a generous settlement today but cannot credibly promise not to demand more once the power shift is complete. Analyze how a commitment problem can shrink the bargaining range even when both sides understand the future balance of power, and identify institutional guarantees that might help without assuming they are always credible.",
+    "intent": "Analyze a dynamic commitment problem in conflict bargaining.",
+    "domain": "Conflict & Security — Commitment Problems",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "conflict_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "An internal conflict occurs in a region with weak state presence, difficult terrain, severe local grievances, profitable smuggling routes, and external sponsors. Explain why a multicausal account is stronger than attributing the conflict solely to ethnic identity, and identify evidence that would help separate grievance from opportunity mechanisms.",
+    "intent": "Compare competing explanations of civil conflict.",
+    "domain": "Conflict & Security — Civil Conflict",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conflict_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "Two armed factions reach a ceasefire but fear that disarming first will leave them vulnerable if the other defects. Explain the credible-commitment problem and how third-party monitoring, phased implementation, or power-sharing arrangements might change incentives at a general political level.",
+    "intent": "Analyze conflict termination and credible commitments without operational military advice.",
+    "domain": "Conflict & Security — Conflict Termination",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conflict_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "An international mission monitors a ceasefire and verifies troop separation, while a separate program reforms courts, supports elections, and rebuilds administrative capacity. Explain the difference between peacekeeping and broader peacebuilding functions.",
+    "intent": "Distinguish monitoring-oriented peacekeeping from long-term peacebuilding.",
+    "domain": "Conflict & Security — Peacekeeping and Peacebuilding",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "During a crisis, State A conducts a military exercise it considers routine. State B interprets it as preparation for attack because of prior hostile rhetoric and incomplete intelligence. Explain how prior beliefs, ambiguous signaling, organizational routines, and security-dilemma dynamics can create misperception.",
+    "intent": "Analyze crisis misperception without attributing unverified intent.",
+    "domain": "Conflict & Security — Crisis Bargaining",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "At a high conceptual level, explain why a survivable second-strike capability is often associated with deterrence credibility and why the same condition can also create escalation risks. Do not discuss weapon design, targeting, or operational employment.",
+    "intent": "Explain nuclear-deterrence logic only at a non-operational conceptual level.",
+    "domain": "Conflict & Security — Nuclear Deterrence",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A coalition imposes economic sanctions to change a target government's policy. Over time, some coalition members reduce enforcement, the target redirects trade, and domestic groups inside the target adapt unevenly. Explain why sanctions can simultaneously signal resolve, impose costs, and still fail to compel policy change.",
+    "intent": "Analyze sanctions through coalition, adaptation, and coercion mechanisms.",
+    "domain": "Conflict & Security — Economic Sanctions",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "international_political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A government responds to a terrorist attack with expanded surveillance and emergency powers. Analyze the political trade-offs involving prevention, civil liberties, public trust, and possible recruitment or backlash effects at a high level, without giving tactical advice to violent actors.",
+    "intent": "Evaluate counterterrorism trade-offs without operational content.",
+    "domain": "Conflict & Security — Terrorism and Political Violence",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "Members of a collective-security organization all benefit if aggression is deterred, but each prefers others to bear more of the enforcement costs. Explain the free-rider problem and how burden-sharing rules, repeated interaction, or reputational incentives might affect participation.",
+    "intent": "Apply collective-action reasoning to security cooperation.",
+    "domain": "Conflict & Security — Collective Security",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "strategic_interaction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A proposed trade agreement would lower prices for many consumers but expose a concentrated manufacturing sector to greater competition. Explain how domestic winners and losers, lobbying capacity, and legislative institutions can shape the government's negotiating position.",
+    "intent": "Connect domestic political coalitions to international trade bargaining.",
+    "domain": "International Political Economy & Global Governance — Trade Politics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "international_political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A sanctions coalition initially controls 80% of the target's relevant trade, but after two years coalition participation falls to 55%, the target reroutes supply chains, domestic elites shift costs onto politically weak groups, and the original demand remains unmet. Evaluate competing explanations for the outcome, including enforcement, target adaptation, distributional politics, signaling, and the possibility that the sanctions had goals other than compellence.",
+    "intent": "Synthesize international, domestic, and distributional mechanisms in sanctions analysis.",
+    "domain": "International Political Economy & Global Governance — Sanctions",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "international_political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "Country A receives 30% of its investment financing from mobile foreign capital, while Country B relies mainly on domestic savings. Both consider a new capital tax. Explain why international capital mobility may constrain the two governments differently and why observed tax rates alone would not prove the size of the constraint.",
+    "intent": "Analyze political effects of capital mobility and causal limits.",
+    "domain": "International Political Economy & Global Governance — Capital Mobility",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "international_political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "Several states peg their currencies to a shared reference but have different inflation preferences and exposure to shocks. Explain the coordination problem and why monetary cooperation can create credibility benefits while reducing policy autonomy.",
+    "intent": "Analyze monetary cooperation as a political trade-off.",
+    "domain": "International Political Economy & Global Governance — Monetary Cooperation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "international_political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "Two rival states benefit from a deeply integrated semiconductor supply chain. Each gains from continued trade, but each also worries that the other could restrict critical inputs during a crisis. Explain how interdependence can create both incentives for cooperation and vulnerabilities to coercion.",
+    "intent": "Analyze the dual cooperative and coercive effects of interdependence.",
+    "domain": "International Political Economy & Global Governance — Supply Chains",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "international_political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "In a climate agreement, every country benefits from global emissions reductions, but each bears domestic adjustment costs and has incentives to underprovide reductions. Explain the collective-action and distribution problems and how monitoring, finance, or differentiated commitments could alter incentives without prescribing a preferred burden-sharing formula.",
+    "intent": "Apply global collective-action reasoning to climate governance.",
+    "domain": "International Political Economy & Global Governance — Climate Governance",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "international_organization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A regional refugee system requires participating states to share reception responsibilities, but frontline states face larger immediate costs and inland states have stronger incentives to free ride. Analyze the burden-sharing problem and identify institutional mechanisms that could make cooperation more durable without endorsing a specific migration policy.",
+    "intent": "Analyze burden sharing and cooperation in migration governance.",
+    "domain": "International Political Economy & Global Governance — Migration Governance",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "international_organization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A multinational firm threatens to relocate investment if a small state changes regulation, but the state can coordinate with neighbors to reduce relocation options. Explain how market size, exit options, regulatory coordination, and asymmetric dependence affect bargaining power.",
+    "intent": "Analyze transnational corporate influence through outside options and coordination.",
+    "domain": "International Political Economy & Global Governance — Transnational Actors",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "international_political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A donor gives budget support for health, after which the recipient government increases health spending by less than the amount of aid and reallocates some domestic revenue elsewhere. Explain the concept of fungibility and why this pattern alone does not establish whether the aid improved overall welfare or health outcomes.",
+    "intent": "Interpret aid fungibility and limits of budget evidence.",
+    "domain": "International Political Economy & Global Governance — Development and Aid",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "political_economy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "States negotiate cross-border rules for digital platforms. They value interoperability but differ over privacy, content governance, and domestic regulatory autonomy. Explain the sovereignty, coordination, distribution, and compliance problems involved.",
+    "intent": "Analyze digital global governance through institutional and distributional mechanisms.",
+    "domain": "International Political Economy & Global Governance — Digital Governance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "international_organization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A researcher hypothesizes that stronger legislative oversight reduces bureaucratic corruption. Identify a plausible dependent variable, independent variable, mechanism, and at least two confounders that should be considered.",
+    "intent": "Translate a political-science claim into a basic research design.",
+    "domain": "Political Science Methods — Research Design",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "Countries with greater social trust also have more effective public institutions. Explain why the correlation could reflect trust causing institutional effectiveness, effective institutions causing trust, or omitted variables affecting both, and state what evidence could help distinguish these possibilities.",
+    "intent": "Identify reverse causality and omitted-variable problems.",
+    "domain": "Political Science Methods — Causal Inference",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "In a survey experiment, respondents are randomly assigned to read either a neutral description of a policy or the same description with an endorsement from a party leader. Support differs by 7 percentage points between groups. Explain what random assignment strengthens, what the treatment effect estimates for the sample, and why external validity may still be limited.",
+    "intent": "Interpret randomized political survey experiments and external validity.",
+    "domain": "Political Science Methods — Experiments",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A constitutional reform unexpectedly applies only to municipalities just above a population threshold, creating otherwise similar municipalities on either side of the cutoff. Explain why this might approximate a natural experiment and what evidence is needed to assess whether crossing the threshold is plausibly exogenous.",
+    "intent": "Evaluate the identifying assumptions of a natural experiment.",
+    "domain": "Political Science Methods — Natural Experiments",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "An index defines democracy as the average of four 0–100 scores: electoral competition 80, participation 70, civil liberties 50, and executive constraints 40. Calculate the index score under equal weighting, then explain why the number depends on the operationalization and why a different weighting scheme could change cross-country rankings.",
+    "intent": "Combine composite-index arithmetic with construct-validity reasoning.",
+    "domain": "Political Science Methods — Measurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A 'governance quality' index combines bureaucratic effectiveness, corruption perceptions, rule-of-law survey items, and tax capacity. Country A scores high on capacity but poorly on perceived corruption; Country B is the reverse. The published ranking changes substantially when perception indicators receive double weight. Evaluate the index's construct validity, weighting assumptions, comparability, and the inferential limits of treating the final rank as a natural fact.",
+    "intent": "Critically evaluate composite political indices and weighting sensitivity.",
+    "domain": "Political Science Methods — Indices and Composite Measures",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A case study claims that a new coalition rule caused legislative compromise. The timeline shows the rule was adopted, party leaders changed candidate-selection incentives, legislators altered bargaining behavior, and compromise increased afterward. Explain what additional within-case evidence would strengthen the proposed mechanism and why chronology alone is not process tracing.",
+    "intent": "Evaluate a causal mechanism with process-tracing logic.",
+    "domain": "Political Science Methods — Process Tracing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A country retains an old electoral administration system even after most parties agree a different system would now be more efficient. Explain how switching costs, sunk investments, organizational routines, and increasing returns can create path dependence, while distinguishing this explanation from merely saying 'history matters.'",
+    "intent": "Explain institutional persistence through a specific path-dependence mechanism.",
+    "domain": "Political Science Methods — Comparative Historical Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "Several neighboring countries adopt similar transparency laws within five years. Explain how learning, competition, emulation, and external pressure could each generate diffusion, and identify evidence that would help distinguish among these mechanisms.",
+    "intent": "Compare alternative mechanisms of policy diffusion.",
+    "domain": "Political Science Methods — Policy Diffusion",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "alternative_explanations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A government statement claims a reform is successful, an advocacy group says it failed, an academic article uses administrative data to estimate mixed effects, and a news report summarizes all three. Explain how source incentives, methodology, primary evidence, and the claim being evaluated should affect the weight given to each source.",
+    "intent": "Evaluate political sources without automatically privileging or dismissing categories.",
+    "domain": "Political Science Methods — Source Evaluation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "In a survey of 1,000 eligible voters, 600 say they definitely intend to vote. Of those 600, 420 report high political interest. Of the remaining 400, 120 report high political interest. Calculate the share reporting high interest among intended voters and among others, then explain why this association does not by itself prove that interest causes turnout.",
+    "intent": "Use correct denominators and distinguish association from causation.",
+    "domain": "Political Science Methods — Quantitative Political Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A cross-national dataset shows that countries which decentralize later experience faster local-service improvement than countries that do not. Explain how panel data could help account for preexisting country differences, while noting remaining concerns such as policy selection, time-varying confounders, and reverse causality.",
+    "intent": "Interpret panel evidence without overstating causal identification.",
+    "domain": "Political Science Methods — Comparative Data",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A hypothetical country moves from a 3% to a 7% proportional-representation threshold while all voter preferences initially remain unchanged. Analyze which incentives could change for small parties, larger parties, voters, and coalition formation, and explain why the long-run party-system effect cannot be inferred mechanically from the rule change alone.",
+    "intent": "Conduct conditional institutional scenario analysis with endogenous strategic responses.",
+    "domain": "Cross-disciplinary — Scenario Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "scenario_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 100,
+    "prompt": "Five states negotiate a cross-border energy agreement. All gain from a stable grid, but gains are unequal; one pivotal state faces legislative ratification, another fears supply vulnerability, monitoring is technically difficult, and two allies worry that concessions may signal weakness to a rival. Build an integrated analysis that separates distributional conflict, collective action, domestic ratification, interdependence, alliance signaling, monitoring, and uncertainty, and state what evidence would discriminate among competing explanations for whether cooperation is durable.",
+    "intent": "Synthesize domestic politics, IPE, institutions, alliances, and uncertainty in a single multilevel problem.",
+    "domain": "Cross-disciplinary — Domestic–International Interaction",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  }
+]

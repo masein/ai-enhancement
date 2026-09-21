@@ -5,6 +5,13 @@ to whatever the author sends — his files go in verbatim and the platform
 reads them. So the test is: every delivered file, in whatever shape, comes
 out of the loader in ONE internal shape, and that shape is what the prompt,
 the fold and the page are built from. docs/CRITERIA-SCHEMA.md is the table.
+
+Phase 10 delivered 36 topics at once and retired the five before them. The
+36 are what the judge reads now; the retired five are kept whole in
+eval_tasks/fr/retired/, and they are still the only files with some of the
+layouts the loader learned — a criterion numbered by its row, a flag list
+with a cap in it, a bank wrapped in {"questions": [...]} — so the tests of
+those paths read them from there.
 """
 
 from __future__ import annotations
@@ -19,18 +26,17 @@ import judge as jd
 
 REPO = Path(__file__).resolve().parents[1]
 RUBRICS = REPO / "eval_tasks" / "fr" / "rubrics"
-DELIVERED = {
-    "computer science": "computer_science",
-    "economics": "economics",
-    "physics & engineering": "physics_engineering",
-    "law": "law",
-    "medicine & health": "medicine_health",
-}
-NEW = ["computer_science", "economics", "physics_engineering"]
+RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+# every topic but Arts arrived with a rubric and a criteria file
+DELIVERED = [t for t in eb.TOPICS if t != "Arts"]
+# the 36 the judge reads, then the 5 it no longer does
+CRITERIA = sorted(RUBRICS.glob("*.criteria.json")) + sorted(
+    (RETIRED / "rubrics").glob("*.criteria.json"))
 
 
-def raw(slug: str) -> dict:
-    return json.loads((RUBRICS / f"{slug}.criteria.json").read_text(encoding="utf-8"))
+def retired(slug: str) -> dict:
+    return json.loads((RETIRED / "rubrics" / f"{slug}.criteria.json").read_text(
+        encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------------
@@ -40,69 +46,112 @@ def raw(slug: str) -> dict:
 def test_the_topics_slugs_reach_the_delivered_file_names():
     """The file name is how a rubric finds its topic; if these disagree the
     topic is silently graded by the shared rubric."""
-    for topic, slug in DELIVERED.items():
+    # the names with capitals, "&" and an acronym in them, spelled out by hand
+    for topic, slug in (("Medicine & Clinical Health", "medicine_clinical_health"),
+                        ("AI & Machine Learning", "ai_machine_learning"),
+                        ("IT", "it"), ("Law", "law"),
+                        ("Political Science & International Relations",
+                         "political_science_international_relations")):
         assert eb.task_slug(eb.topic_task(topic)) == slug
+    # every delivered file belongs to a topic, and every topic but Arts has one
+    stems = {p.name[:-len(".criteria.json")] for p in RUBRICS.glob("*.criteria.json")}
+    assert stems == {eb.task_slug(eb.topic_task(t)) for t in DELIVERED}
+    for topic in DELIVERED:
+        slug = eb.task_slug(eb.topic_task(topic))
         assert (RUBRICS / f"{slug}.md").is_file()
-        assert (RUBRICS / f"{slug}.criteria.json").is_file()
         r = jd.rubric_for(eb.topic_task(topic))
-        assert r.name == slug and r.fallback is False and r.criteria is not None
+        assert r.name == slug and r.fallback is False and r.criteria is not None, topic
+    assert jd.rubric_for(eb.topic_task("Arts")).fallback is True
 
 
-def test_the_three_new_rubrics_are_the_authors_own_and_not_drafts():
-    """He wrote the 0–4 anchors this time, so nothing is stamped DRAFT."""
-    for slug in NEW:
-        r = jd.rubric_for(eb.topic_task(
-            next(t for t, s in DELIVERED.items() if s == slug)))
-        assert r.status == "", slug
+def test_the_36_new_rubrics_are_the_authors_own_and_not_drafts():
+    """He wrote the 0–4 anchors, so nothing is stamped DRAFT."""
+    for topic in DELIVERED:
+        r = jd.rubric_for(eb.topic_task(topic))
+        assert r.status == "", topic
         for anchor in range(5):
-            assert str(anchor) in r.text, slug
+            assert str(anchor) in r.text, topic
 
 
 def test_every_delivered_file_normalises_to_one_shape():
-    """The table in docs/CRITERIA-SCHEMA.md, asserted."""
-    for slug in DELIVERED.values():
-        spec = jd.normalise_criteria(raw(slug), RUBRICS / f"{slug}.criteria.json")
-        assert len(spec["criteria"]) >= 15, slug
-        for c in spec["criteria"]:
-            assert isinstance(c["id"], str) and c["id"] == c["id"].lower(), (slug, c)
-            assert c["id"].replace("_", "").isalnum(), (slug, c["id"])
-            assert c["name"] and isinstance(c["name"], str)
-            assert c["definition"]
-            assert jd.weight_of(spec, c["id"]) > 0
-        assert isinstance(spec["flags"], list) and spec["flags"], slug
-        for f in spec["flags"]:
-            assert f["id"] and f["condition"]
-            assert jd.normalise_effect(f["effect"]) == f["effect"], (slug, f["effect"])
-            assert isinstance(f["examples"], list) and isinstance(f["not_critical"], list)
-        assert isinstance(spec["evaluation_principles"], list)
-        assert jd.validate_criteria(raw(slug)) == [], slug
+    """The table in docs/CRITERIA-SCHEMA.md, asserted row by row over all 41
+    files: whatever layout a file arrived in, what the loader reads is what
+    the file said. (tests/test_37_topics.py checks the same files come out
+    carrying every key of the one shape; this checks the values are his.)"""
+    assert len(CRITERIA) == 41
+    layouts: dict[str, int] = {}
+    for p in CRITERIA:
+        where = p.relative_to(REPO)
+        raw = json.loads(p.read_text(encoding="utf-8"))
+        spec = jd.normalise_criteria(raw, p)
+        assert jd.validate_criteria(raw) == [], where
+        assert len(spec["criteria"]) >= 15, where
+        # a criterion: the slug the model repeats back, and words for a person
+        for c, given in zip(spec["criteria"], raw["criteria"], strict=True):
+            if isinstance(given["id"], int) or str(given["id"]).isdigit():
+                # a row number, and the slug in `name`
+                assert (c["id"], c["name"]) == (given["name"],
+                                                jd.label_of({"id": given["name"]})), where
+            elif given.get("name"):
+                assert (c["id"], c["name"]) == (given["id"], given["name"]), where
+            else:
+                assert (c["id"], c["name"]) == (given["id"], jd.label_of(given)), where
+            assert c["definition"] == given["definition"], where
+            assert jd.weight_of(spec, c["id"]) == float(given.get("weight", 1)) > 0, where
+        # the flags: one layout per file, read as one list in the file's order
+        keys = [k for k in jd._FLAG_KEYS if k in raw]
+        assert len(keys) == 1, where
+        layouts[keys[0]] = layouts.get(keys[0], 0) + 1
+        flags = raw[keys[0]] if isinstance(raw[keys[0]], list) else [raw[keys[0]]]
+        assert [f["id"] for f in spec["flags"]] == [f["id"] for f in flags], where
+        for f, given in zip(spec["flags"], flags):
+            assert f["condition"] == given["condition"], where
+            assert f["effect"] == jd.normalise_effect(given["effect"]) is not None, where
+            assert f["examples"] == given.get("examples", []), where
+            assert f["not_critical"] == next((given[k] for k in jd._NOT_CRITICAL_KEYS
+                                              if k in given), []), where
+        # his principles, under whichever name, one sentence each
+        said = [k for k in jd._PRINCIPLE_KEYS if k in raw]
+        n_said = len(raw[said[0]]) if said else 0
+        assert len(spec["evaluation_principles"]) == n_said, where
+        # and everything the table does not name rides along untouched
+        for k in set(raw) - {"criteria", *jd._FLAG_KEYS, *jd._PRINCIPLE_KEYS}:
+            assert spec[k] == raw[k], (where, k)
+    # the "seen in" column: medicine and law (retired) wrote a list; computer
+    # science and physics (retired) `critical_flag`; economics (retired) and
+    # 30 of the 36 `critical_error_flag`; the other six the two new layouts
+    assert layouts == {"flags": 2, "critical_flag": 2, "critical_error_flag": 31,
+                       "critical_error": 4, "critical_flags": 2}
 
 
 def test_a_row_number_is_not_a_criterion_id():
-    """Physics numbers its criteria 1..20 and puts the slug in `name`. The
-    model has to repeat the id back, so the id must be the word."""
-    spec = jd.normalise_criteria(raw("physics_engineering"))
-    assert [c["id"] for c in raw("physics_engineering")["criteria"]][:3] == [1, 2, 3]
+    """Physics & engineering numbered its criteria 1..20 and put the slug in
+    `name`. The model has to repeat the id back, so the id must be the word.
+    The file is retired, and still the only one written that way."""
+    spec = jd.normalise_criteria(retired("physics_engineering"))
+    assert [c["id"] for c in retired("physics_engineering")["criteria"]][:3] == [1, 2, 3]
     ids = jd.criteria_ids(spec)
     assert ids[0] == "relevance" and all(not i.isdigit() for i in ids)
     assert jd.criteria_labels(spec)["relevance"] == "Relevance"
-    # and computer science, which writes it the other way round, is unchanged
-    cs = jd.normalise_criteria(raw("computer_science"))
+    # and computer science, which wrote it the other way round, is unchanged
+    cs = jd.normalise_criteria(retired("computer_science"))
     assert jd.criteria_ids(cs)[0] == "relevance"
     assert jd.criteria_labels(cs)["relevance"] == "Relevance"
 
 
 def test_a_single_flag_object_under_any_of_its_names_becomes_the_list():
-    assert "critical_flag" in raw("computer_science")
-    assert "critical_error_flag" in raw("economics")
-    assert "flags" in raw("law")
+    # the layouts of the retired files; the two the 36 added are in
+    # tests/test_37_topics.py
+    assert "critical_flag" in retired("computer_science")
+    assert "critical_error_flag" in retired("economics")
+    assert "flags" in retired("law")
     for slug, fid in (("computer_science", "critical_technical_error"),
                       ("economics", "critical_economic_error"),
                       ("physics_engineering", "critical_physics_engineering_error")):
-        spec = jd.normalise_criteria(raw(slug))
+        spec = jd.normalise_criteria(retired(slug))
         assert jd.flag_ids(spec) == [fid]
         assert jd.effect_of(spec["flags"][0]) == "zero_score"     # written "score=0"
-    assert jd.flag_ids(jd.normalise_criteria(raw("law"))) == [
+    assert jd.flag_ids(jd.normalise_criteria(retired("law"))) == [
         "critical_legal_error", "fabricated_authority"]
 
 
@@ -116,7 +165,7 @@ def test_the_effect_spellings_he_has_used(written, read_as):
 
 
 def test_an_effect_nobody_can_apply_still_refuses_to_load(tmp_path, monkeypatch):
-    spec = raw("computer_science")
+    spec = retired("computer_science")
     spec["critical_flag"]["effect"] = "halve_it"
     with pytest.raises(jd.CriteriaError) as e:
         jd.normalise_criteria(spec, tmp_path / "computer_science.criteria.json")
@@ -142,29 +191,34 @@ def test_set_at_n_makes_the_score_that_number():
 def test_the_authors_calibration_travels_in_the_request():
     """His examples of what counts as critical, what does not, and how the
     topic is graded are the difference between a flag that fires on anything
-    and one that means something. They belong in the request."""
-    for slug, topic in (("physics_engineering", "physics & engineering"),
-                        ("economics", "economics")):
+    and one that means something. They belong in the request — for every
+    topic he delivered."""
+    with_principles = []
+    for topic in DELIVERED:
         r = jd.rubric_for(eb.topic_task(topic))
         text = jd.build_criteria_prompt(r.text, r.criteria, "a question?",
                                         "Domain: x. Style: y.", "an answer")
-        f = r.criteria["flags"][0]
-        assert f"{f['id']} — {f['condition'][:40]}" in text
-        for ex in f["examples"][:2]:
-            assert f"counts as {f['id']}: {ex}" in text
-        for ex in f["not_critical"][:2]:
-            assert f"does NOT count as {f['id']}: {ex}" in text
+        for f in r.criteria["flags"]:
+            assert f"{f['id']} — {f['condition'][:40]}" in text, topic
+            assert f["examples"], topic
+            for ex in f["examples"][:2]:
+                assert f"counts as {f['id']}: {ex}" in text, topic
+            for ex in f["not_critical"][:2]:
+                assert f"does NOT count as {f['id']}: {ex}" in text, topic
         for p in r.criteria["evaluation_principles"][:2]:
-            assert p in text
+            assert p in text, topic
         if r.criteria["evaluation_principles"]:
+            with_principles.append(topic)
             assert "HOW THIS TOPIC IS GRADED" in text
             assert text.index("HOW THIS TOPIC IS GRADED") < text.index("CRITERIA (0.0")
         # a conditional criterion is told what to do, one line each
         cond = jd.conditional_ids(r.criteria)
-        assert len(cond) >= 10
+        assert len(cond) >= 10, topic
         for cid in sorted(cond)[:3]:
             line = next(x for x in text.splitlines() if x.startswith(cid + " — "))
             assert "Return null for it when it does not apply" in line
+    # principles arrived in six of the 36, under three names
+    assert len(with_principles) == 6
 
 
 def test_the_judge_grades_the_new_topics_end_to_end(tmp_path):
@@ -172,7 +226,7 @@ def test_the_judge_grades_the_new_topics_end_to_end(tmp_path):
     turns it into a 0–4 — the path that was silently broken while physics
     numbered its criteria."""
     from service import llm
-    for topic in ("computer science", "economics", "physics & engineering"):
+    for topic in DELIVERED:
         task = eb.topic_task(topic)
         spec = jd.rubric_for(task).criteria
         prompt = jd.build_criteria_prompt(jd.rubric_for(task).text, spec, "q?",
@@ -190,37 +244,38 @@ def test_the_judge_grades_the_new_topics_end_to_end(tmp_path):
 # the banks, and the tables they earn
 # ---------------------------------------------------------------------------
 
-BANKS = {"computer science": "computer_science_v1", "economics": "economics_v1",
-         "physics & engineering": "physics_engineering_v1",
-         "law": "law_v2", "medicine & health": "medicine_v2"}
+# the five banks of phases 8b–8g, each under the topic that replaced its own:
+# their metadata is what the table rules below were written against
+BANKS = {"Computer Science": "computer_science_v1", "Economics": "economics_v1",
+         "Physics & Astronomy": "physics_engineering_v1",
+         "Law": "law_v2", "Medicine & Clinical Health": "medicine_v2"}
 
 
 @pytest.fixture(scope="module")
 def five(tmp_path_factory) -> Path:
-    """Every delivered bank in one exam root."""
+    """Every retired bank in one exam root."""
     root = tmp_path_factory.mktemp("five") / "exam"
     for topic, stem in BANKS.items():
-        eb.import_bank(root, REPO / "eval_tasks" / "fr" / f"{stem}.json", topic,
-                       "Dr. Hossein", stem)
+        eb.import_bank(root, RETIRED / f"{stem}.json", topic, "Dr. Hossein", stem)
     return root
 
 
 def test_a_wrapped_questions_file_imports_like_a_bare_one(tmp_path):
     """Physics & engineering arrived as {"questions": [...]}. A file is not
     refused over its wrapping, and the preview says what it found."""
-    src = REPO / "eval_tasks" / "fr" / "physics_engineering_v1.json"
+    src = RETIRED / "physics_engineering_v1.json"
     data = json.loads(src.read_text(encoding="utf-8"))
     assert isinstance(data, dict) and list(data) == ["questions"]
-    r = eb.import_bank(tmp_path / "exam", src, "physics & engineering", "Dr. Hossein", "p")
+    r = eb.import_bank(tmp_path / "exam", src, "Physics & Astronomy", "Dr. Hossein", "p")
     assert r["imported"] == 100 and r["wrapper"] == "questions"
-    plan = eb.plan_import(tmp_path / "bare", data["questions"], "physics & engineering", "x")
+    plan = eb.plan_import(tmp_path / "bare", data["questions"], "Physics & Astronomy", "x")
     assert plan["imported"] == 100 and plan["wrapper"] == ""
     # and one that wraps nothing usable is still refused, in words
     with pytest.raises(ValueError, match="not a JSON array"):
-        eb.import_bank(tmp_path / "e", {"a": [], "b": []}, "economics", "x")
+        eb.import_bank(tmp_path / "e", {"a": [], "b": []}, "Economics", "x")
 
 
-def test_the_three_new_banks_land_whole(five):
+def test_the_retired_banks_land_whole_under_their_new_topics(five):
     for topic, stem in BANKS.items():
         rows = eb.load_bank(five)[topic]
         assert len(rows) == 100, topic
@@ -238,14 +293,14 @@ def test_the_tables_a_topic_earns_are_the_ones_that_split_it(five):
     """By what the field does, not by its name: a field with one value on
     every item is a sentence, a field with a hundred is nothing at all."""
     want = {
-        # the new three: acuity is routine throughout and intent is a
+        # the three of phase 8g: acuity is routine throughout and intent is a
         # sentence per question, so difficulty and domain carry them
-        "computer science": ["difficulty", "domain"],
-        "economics": ["difficulty", "domain"],
-        "physics & engineering": ["difficulty", "domain"],
+        "Computer Science": ["difficulty", "domain"],
+        "Economics": ["difficulty", "domain"],
+        "Physics & Astronomy": ["difficulty", "domain"],
         # and the two that were already tabulated keep exactly their tables
-        "law": ["acuity", "difficulty", "jurisdiction_required", "intent"],
-        "medicine & health": ["acuity", "difficulty", "intent"],
+        "Law": ["acuity", "difficulty", "jurisdiction_required", "intent"],
+        "Medicine & Clinical Health": ["acuity", "difficulty", "intent"],
     }
     for topic, expect in want.items():
         items = [{"meta": r["meta"]} for r in eb.load_bank(five)[topic]]
@@ -253,7 +308,7 @@ def test_the_tables_a_topic_earns_are_the_ones_that_split_it(five):
         fields, constant = jd.breakdown_fields(items, spec)
         assert fields == expect, topic
         assert len(fields) <= jd.BREAKDOWN_MAX_TABLES
-        if topic in ("computer science", "economics", "physics & engineering"):
+        if topic in ("Computer Science", "Economics", "Physics & Astronomy"):
             assert constant == ["acuity", "jurisdiction_required"], topic
         else:
             assert constant == [], topic
@@ -265,7 +320,7 @@ def test_a_constant_field_is_said_once_instead_of_drawn(five):
               "criteria": {c: 0.5 for c in jd.criteria_ids(spec)},
               "flags": {f: False for f in jd.flag_ids(spec)}, "half": "diagnose",
               "qid": f"{i:064d}"}
-             for i, r in enumerate(eb.load_bank(five)["computer science"][:20])]
+             for i, r in enumerate(eb.load_bank(five)["Computer Science"][:20])]
     blocks = jd._criteria_blocks(items, spec)
     assert set(blocks["breakdowns"]) == {"difficulty", "domain"}
     assert blocks["breakdowns_constant"] == {"acuity": "routine",
@@ -275,7 +330,7 @@ def test_a_constant_field_is_said_once_instead_of_drawn(five):
 def test_the_reference_line_carries_what_the_judge_must_read(five):
     """These topics state the intent as a sentence; it is the author's
     statement of what the question tests, so the judge sees it."""
-    one = eb.load_bank(five)["computer science"][0]
+    one = eb.load_bank(five)["Computer Science"][0]
     assert one["reference"].startswith("Acuity: ")
     for label in ("Intent: ", "Domain: ", "Difficulty: ", "Style: "):
         assert label in one["reference"], label
@@ -284,34 +339,45 @@ def test_the_reference_line_carries_what_the_judge_must_read(five):
 
 
 def test_no_report_half_question_of_any_bank_leaves_it(five, tmp_path, monkeypatch):
-    """Five banks now, one rule, over the bodies actually sent."""
+    """Every bank delivered — the five retired ones and the 36 of the exam
+    now — one rule, over the bodies actually sent."""
     from service import config, llm, proposals as prop
-    monkeypatch.setattr(config, "EXAM_DIR", five)
+    current = tmp_path / "exam"
+    eb.import_dir(current, REPO / "eval_tasks" / "fr" / "banks", "Dr. Hossein")
     monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)
-    fake = llm.FakeBatches("fake-exam", tmp_path)
-    for topic in BANKS:
-        task = eb.topic_task(topic)
-        fake.submit(eb.draft_requests(five, topic, 2))
-        fake.submit([prop.proposal_request(1, "m", task, topic,
-                                           [{"qid": "q", "score": 1, "justification": "vague"}],
-                                           {"diagnose_items": 1, "diagnose_weak": 1}, "rubric",
-                                           audience=prop.audience_for(topic, task))])
-    sent = "\n".join(r["system"] + "\n" + r["user"] for r in fake.recorded())
-    for topic in BANKS:
-        rows = eb.load_bank(five)[topic]
-        report = [r for r in rows if eb.half_of(r["qid"]) == "report"]
-        assert report, topic
-        for r in report:
-            assert r["prompt"] not in sent and r["prompt"][:60] not in sent
-            assert r["qid"] not in sent
+    for root in (five, current):
+        # the audience line is counted from whichever bank is the service's
+        monkeypatch.setattr(config, "EXAM_DIR", root)
+        topics = [t for t, rows in eb.load_bank(root).items() if rows]
+        assert len(topics) == (5 if root == five else 36)
+        fake = llm.FakeBatches("fake-exam", tmp_path / f"fake-{len(topics)}")
+        for topic in topics:
+            task = eb.topic_task(topic)
+            fake.submit(eb.draft_requests(root, topic, 2))
+            fake.submit([prop.proposal_request(1, "m", task, topic,
+                                               [{"qid": "q", "score": 1,
+                                                 "justification": "vague"}],
+                                               {"diagnose_items": 1, "diagnose_weak": 1},
+                                               "rubric",
+                                               audience=prop.audience_for(topic, task))])
+        sent = "\n".join(r["system"] + "\n" + r["user"] for r in fake.recorded())
+        for topic in topics:
+            rows = eb.load_bank(root)[topic]
+            report = [r for r in rows if eb.half_of(r["qid"]) == "report"]
+            assert report, topic
+            for r in report:
+                assert r["prompt"] not in sent and r["prompt"][:60] not in sent
+                assert r["qid"] not in sent
 
 
 # ---------------------------------------------------------------------------
 # the wrapped file, through both doors
 # ---------------------------------------------------------------------------
 
-PHYSICS = REPO / "eval_tasks" / "fr" / "physics_engineering_v1.json"
-PHYS_TOPIC = "physics & engineering"
+# retired, and still the one wrapped bank there has been; it goes in under the
+# physics half of the topic it was
+PHYSICS = RETIRED / "physics_engineering_v1.json"
+PHYS_TOPIC = "Physics & Astronomy"
 
 
 def test_the_real_wrapped_file_imports_from_the_page(tmp_path, monkeypatch):
@@ -379,7 +445,7 @@ def test_a_file_that_wraps_nothing_usable_is_still_refused(tmp_path, monkeypatch
     from conftest import make_service
     client, _, _ = make_service(tmp_path, monkeypatch)
     try:
-        body = {"topic": "economics", "approver": "x"}
+        body = {"topic": "Economics", "approver": "x"}
         for text in ('{"a": [], "b": []}', '{"questions": {"not": "a list"}}', '"a string"'):
             r = client.post("/api/exam/import/preview", json={**body, "text": text})
             assert r.status_code == 422, text

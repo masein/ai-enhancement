@@ -1,0 +1,193 @@
+{
+  "task": "Score one answer to one Public Health & Wellness benchmark question from 0 to 4.",
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the question asked, prioritizes the supplied public-health or wellness context, and avoids material digressions that do not help answer the task.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "public_health_accuracy",
+      "name": "Public-Health Accuracy",
+      "definition": "Uses correct public-health concepts and distinctions, including incidence versus prevalence, risk versus rate, mortality versus case fatality, prevention versus treatment, surveillance, burden, and population-level interpretation where relevant.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "wellness_accuracy",
+      "name": "Wellness Accuracy",
+      "definition": "When wellness guidance is relevant, keeps it evidence-informed, proportionate, feasible, low-risk, and appropriately general; avoids miracle claims, unsupported universal prescriptions, overmedicalization, and pseudoscientific mechanisms.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "epidemiologic_reasoning",
+      "name": "Epidemiologic Reasoning",
+      "definition": "Correctly identifies the relevant population, time period, exposure, outcome, numerator, denominator, and epidemiologic measure; distinguishes association from causation and population measures from individual conclusions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Uses key concepts with their correct meaning and does not substitute jargon for mechanism; makes material distinctions explicitly when the question depends on them.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When calculations or numeric interpretation are required, chooses the correct measure and denominator, performs arithmetic correctly, preserves units and time frames, and interprets the result consistently with the calculation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "study_design_reasoning",
+      "name": "Study-Design Reasoning",
+      "definition": "When study design is relevant, explains why a design fits or fails the research question, including temporal ordering, comparison structure, randomization or lack of it, bias, loss to follow-up, and internal/external validity as applicable.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "screening_and_risk_interpretation",
+      "name": "Screening and Risk Interpretation",
+      "definition": "When screening or risk is relevant, correctly handles sensitivity, specificity, predictive values, prevalence, false positives/negatives, lead-time bias, length bias, overdiagnosis, baseline risk, and absolute versus relative effects as applicable.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "causal_reasoning",
+      "name": "Causal Reasoning",
+      "definition": "When causal claims are at issue, assesses temporality, plausible mechanisms, confounding, bias, reverse causation, mediation, effect modification, alternative explanations, consistency, and intervention evidence without treating correlation alone as proof.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "population_health_reasoning",
+      "name": "Population-Health Reasoning",
+      "definition": "When relevant, distinguishes population effects from individual prognosis, considers exposure prevalence and total burden, recognizes heterogeneity, and explains how small average effects can create large population benefits.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_evaluation",
+      "name": "Evidence Evaluation",
+      "definition": "When claims depend on evidence, weighs study design, sample size, measurement quality, replication, conflicts or incentives where relevant, effect size, uncertainty, generalizability, and the difference between plausibility and demonstrated benefit.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "health_behavior_and_communication",
+      "name": "Health Behavior and Communication",
+      "definition": "When behavior or communication is relevant, accounts for motivation, capability, opportunity, environment, social context, adherence, trust, numeracy, framing, plain language, and the need to inform rather than manipulate.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions",
+      "name": "Assumptions",
+      "definition": "Makes material assumptions explicit, does not invent missing facts, and distinguishes conclusions that follow from the prompt from those that require additional information.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_calibration",
+      "name": "Uncertainty Calibration",
+      "definition": "Matches confidence to the strength and precision of evidence, identifies important unknowns, avoids false certainty or false reassurance, and states what additional evidence would materially change the assessment.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "equity_and_context",
+      "name": "Equity and Context",
+      "definition": "When relevant, considers subgroup differences, access barriers, differential exposure or vulnerability, intervention reach, local context, and whether average improvement masks stable or widening disparities; separates empirical from normative claims.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "systems_and_program_reasoning",
+      "name": "Systems and Program Reasoning",
+      "definition": "When interventions or systems are relevant, links identified problem to mechanism and measurable outcome while considering reach, adoption, fidelity, capacity, bottlenecks, incentives, spillovers, scalability, sustainability, and unintended consequences.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the task at an appropriate depth, including required calculations, comparisons, qualifications, or decision factors, without requiring exhaustive treatment of irrelevant details.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent definitions, calculations, assumptions, causal claims, and conclusions; later statements do not materially contradict earlier reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Explains the reasoning in understandable, well-organized language, using technical terms only when they improve precision and defining or translating them when needed.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "practical_public_health_reasoning",
+      "name": "Practical Public-Health Reasoning",
+      "definition": "When action or prioritization is required, proposes feasible steps that match the level of evidence and urgency, protects against material harms, considers implementation constraints, and avoids individualized diagnosis or prescribing unless explicitly appropriate.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_flags": [
+    {
+      "id": "critical_public_health_wellness_error",
+      "condition": "A materially false central epidemiologic, quantitative, causal, screening, prevention, risk, or wellness claim fundamentally invalidates the answer or creates a materially unsafe or misleading conclusion.",
+      "effect": "score=0",
+      "examples": [
+        "Fundamentally confusing incidence and prevalence in a way that changes the conclusion.",
+        "Using a materially wrong denominator that reverses a population comparison.",
+        "Fundamentally misinterpreting sensitivity, specificity, or predictive value.",
+        "Claiming that a positive screening test automatically proves disease.",
+        "Claiming that increased survival time after diagnosis necessarily proves reduced mortality.",
+        "Fundamentally misinterpreting absolute versus relative risk.",
+        "Claiming that correlation alone establishes a public-health cause.",
+        "Making a major quantitative error that changes the substantive conclusion.",
+        "Using fundamentally incorrect outbreak reasoning that drives the central recommendation.",
+        "Recommending an obviously unsafe wellness practice as the central answer.",
+        "Presenting a pseudoscientific mechanism as established fact when it is central to the answer.",
+        "Claiming statistical significance automatically establishes practical or health importance.",
+        "Claiming absence of statistical significance proves no effect.",
+        "Fundamentally misrepresenting a study design in a way that invalidates the inference.",
+        "Ignoring a clearly stated confounder that invalidates the claimed causal conclusion.",
+        "Treating a population-level association as proof of an individual's outcome.",
+        "Fabricating evidence required to support the answer.",
+        "Asserting certainty where the supplied evidence is clearly insufficient.",
+        "Fundamentally misinterpreting hazard, exposure, and risk.",
+        "Recommending an intervention based on a materially wrong effect estimate or denominator."
+      ],
+      "not_critical_examples": [
+        "Minor arithmetic errors that do not change the conclusion.",
+        "Harmless rounding.",
+        "Minor terminology mistakes.",
+        "Small omissions.",
+        "Defensible differences in public-health strategy.",
+        "Reasonable uncertainty.",
+        "Different valid program designs.",
+        "Legitimate disagreements about policy trade-offs.",
+        "Alternative evidence-consistent, low-risk wellness approaches.",
+        "Minor imprecision that does not materially affect the population-health conclusion."
+      ]
+    }
+  ],
+  "score_scale": {
+    "4": "Accurate, directly responsive, well-supported public-health or wellness reasoning; correct calculations and interpretation where relevant; appropriate treatment of uncertainty and context.",
+    "3": "Substantially correct and useful, with one meaningful omission, minor epidemiologic imprecision, limited reasoning gap, incomplete qualification, or insufficient consideration of an important secondary factor; main conclusion remains correct.",
+    "2": "Partly correct or directionally useful but with important omissions, weak epidemiologic reasoning, incomplete interpretation, questionable assumptions, poor treatment of bias/confounding, or insufficient risk communication.",
+    "1": "Contains a substantial public-health, wellness, epidemiologic, quantitative, causal, screening, or evidence-evaluation misunderstanding but does not meet the critical-error threshold; limited useful understanding.",
+    "0": "Critical Public Health & Wellness error, no answer, off-topic answer, unrelated fabrication, or equivalent fundamental failure."
+  }
+}

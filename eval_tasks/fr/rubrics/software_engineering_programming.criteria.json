@@ -1,0 +1,170 @@
+{
+  "benchmark": "Software Engineering & Programming",
+  "score_range": {
+    "min": 0,
+    "max": 4
+  },
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the question actually asked, prioritizes material requirements, and avoids unrelated framework, pattern, or jargon discussion.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "technical_accuracy",
+      "name": "Technical Accuracy",
+      "definition": "States technically correct software-engineering facts and conclusions under the stated language, runtime, database, API, or system assumptions. Material factual errors reduce credit even when prose is polished.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "programming_correctness",
+      "name": "Programming Correctness",
+      "definition": "When code or pseudocode is required, the implementation satisfies the specification beyond the sample case, terminates as required, preserves invariants, respects language semantics, and does not introduce material bugs. Minor syntax slips may be non-critical when intent is unambiguous.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "code_reasoning",
+      "name": "Code Reasoning",
+      "definition": "When code is supplied, accurately traces control flow, evaluation order, mutation, scope, references/values, exceptions, side effects, resource lifetime, and execution order rather than inferring intended behavior from names.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "debugging_and_root_cause_analysis",
+      "name": "Debugging and Root-Cause Analysis",
+      "definition": "When diagnosis is requested, uses the supplied evidence to identify the most likely causal mechanism, distinguishes cause from symptom, proposes a targeted fix, and gives relevant verification steps rather than an unfocused list of possibilities.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "implementation_quality",
+      "name": "Implementation Quality",
+      "definition": "When implementation is requested, chooses appropriate algorithms/data structures, handles material boundaries and errors, and produces understandable maintainable code without unnecessary abstraction or complexity.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "testing_reasoning",
+      "name": "Testing Reasoning",
+      "definition": "When testing is relevant, selects appropriate test levels and boundaries, tests behavior and invariants, handles nondeterminism, identifies missing integration coverage, and does not equate line coverage or a passing suite with correctness.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "software_design_reasoning",
+      "name": "Software Design Reasoning",
+      "definition": "When design is relevant, assigns cohesive responsibilities, manages dependencies and state, selects abstractions that reduce rather than add complexity, and accepts simple designs when they satisfy requirements.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "api_and_contract_reasoning",
+      "name": "API and Contract Reasoning",
+      "definition": "When interfaces or APIs are relevant, specifies clear request/response or call semantics, validation, error behavior, compatibility, null/optional handling, idempotency, and versioning as required by the scenario.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "database_and_state_reasoning",
+      "name": "Database and State Reasoning",
+      "definition": "When persistent data is relevant, preserves keys, constraints, relationships, transaction boundaries, state invariants, join/cardinality semantics, migration safety, and concurrency behavior. A schema or query that permits required data corruption cannot receive full credit.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "concurrency_and_async_reasoning",
+      "name": "Concurrency and Async Reasoning",
+      "definition": "When overlapping execution is possible, identifies shared state, atomicity/visibility needs, relevant interleavings, synchronization, cancellation, bounded concurrency, and deadlock risks. Sequentially correct reasoning is insufficient if concurrency changes behavior.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "distributed_and_reliability_reasoning",
+      "name": "Distributed and Reliability Reasoning",
+      "definition": "When networked or asynchronous components are involved, accounts for partial failure, ambiguous timeouts, retries, duplicate delivery, ordering, stale state, idempotency, backoff, recovery, and overload interactions as applicable.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "security_reasoning",
+      "name": "Security Reasoning",
+      "definition": "When security is relevant, identifies the real trust boundary and threat, distinguishes authentication from authorization, validates untrusted input at server/system boundaries, protects secrets/credentials, and applies least privilege and safe defaults.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "performance_and_scalability_reasoning",
+      "name": "Performance and Scalability Reasoning",
+      "definition": "When performance is relevant, reasons from workload and measurements, distinguishes latency/throughput and average/tail behavior, identifies the actual limiting resource, and evaluates algorithmic, I/O, contention, cache, and capacity effects before optimizing.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "edge_cases_and_failure_modes",
+      "name": "Edge Cases and Failure Modes",
+      "definition": "When material, considers empty/missing/duplicate/malformed input, invalid state, retries, concurrent operations, partial failure, large workloads, and other boundary conditions that can change correctness.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_constraints",
+      "name": "Assumptions and Constraints",
+      "definition": "Identifies and respects stated constraints, makes necessary assumptions explicit, recognizes missing information when it affects correctness, and does not invent requirements or environmental guarantees.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "tradeoff_and_maintainability_reasoning",
+      "name": "Trade-off and Maintainability Reasoning",
+      "definition": "When alternatives exist, connects the recommendation to requirements and trade-offs among simplicity, maintainability, latency, consistency, availability, testability, security, cost, scalability, and operational complexity instead of rewarding buzzwords.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the task at the level needed to support a reliable conclusion, including required fix/verification/design elements, without requiring irrelevant detail.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent claims, assumptions, state transitions, code behavior, and recommendations; does not contradict earlier reasoning or propose a fix that violates the stated design.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Explains the reasoning and conclusion clearly enough to review and implement, distinguishes facts from assumptions, and uses precise terminology without unnecessary jargon or verbosity.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_software_engineering_programming_error",
+    "condition": "A materially false central programming, system-design, data-integrity, concurrency, security, reliability, migration, capacity, API-compatibility, or implementation claim fundamentally invalidates the answer or would create a severe software failure. The flag applies only when the error is central, not to minor syntax issues, modest inefficiency, small omissions, reasonable alternative designs, stylistic differences, or explicitly stated reasonable assumptions.",
+    "effect": "score=0",
+    "examples": [
+      "Proposes code that fundamentally fails the specified behavior or declares it correct despite a supplied counterexample.",
+      "Introduces data loss or a destructive schema change while presenting the migration as safe across old/new application-version overlap.",
+      "Ignores a race condition that breaks a central business invariant or claims a non-atomic operation is safely atomic without synchronization.",
+      "Introduces deadlock as the concurrency fix or treats arbitrary sleeps as correct synchronization.",
+      "Treats retries of a non-idempotent payment-like operation as harmless, or assumes at-least-once delivery means exactly-once execution.",
+      "Uses fundamentally incorrect transaction reasoning that permits lost or corrupted data.",
+      "Omits a required server-side authorization check while claiming the endpoint is secure, or trusts client-provided authorization state as the central control.",
+      "Stores passwords in plaintext or an equivalently unsafe reversible/raw form while presenting it as appropriate credential storage.",
+      "Suppresses a critical error in a way that silently corrupts state.",
+      "Makes a major capacity calculation error that invalidates the proposed system design.",
+      "Recommends a performance optimization that changes required semantics without recognizing the change.",
+      "Claims high test coverage proves correctness while the central failure remains untested.",
+      "Presents a clearly breaking API change as backward compatible.",
+      "Fundamentally misdiagnoses a production incident in a way that would materially worsen the outage."
+    ]
+  }
+}

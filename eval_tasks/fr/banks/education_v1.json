@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "Students can solve a new algebra procedure correctly while the teacher's worked example is visible, but one week later most cannot solve a closely related problem without the example. What does this pattern suggest about immediate performance versus durable learning, and what instructional change would best test and strengthen retention?",
+    "intent": "Distinguish supported short-term performance from retained learning; propose delayed retrieval or independent practice with feedback.",
+    "domain": "Learning & Development — Learning vs Performance",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "learning_science",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "Before teaching fraction addition, a teacher finds that many students believe 1/8 is larger than 1/6 because 8 is larger than 6. How should the teacher use this information when planning instruction?",
+    "intent": "Identify a plausible misconception, elicit reasoning, contrast representations or cases, and rebuild understanding rather than merely restating the rule.",
+    "domain": "Learning & Development — Prior Knowledge / Misconceptions",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "pedagogical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "Novices are learning a six-step laboratory procedure that requires interpreting an unfamiliar diagram while remembering several new terms. The teacher can either present all steps and explanations at once or segment the procedure with modeling and brief guided practice. Which design better fits the learners, and why?",
+    "intent": "Apply limited working-memory and element-interactivity reasoning without treating all difficulty as harmful.",
+    "domain": "Learning & Development — Cognitive Load",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "instructional_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "Two groups study the same vocabulary for 30 minutes. Group A rereads the list four times. Group B attempts to recall each word twice and then checks corrective feedback. Both groups feel equally prepared. Which group would you expect to have the stronger basis for later retention, and what qualification should be added?",
+    "intent": "Distinguish retrieval practice from passive review; note that task quality, feedback, prior knowledge, and delay matter.",
+    "domain": "Learning & Development — Retrieval Practice",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A course allocates 120 minutes to practice. Plan A uses one 120-minute session. Plan B uses four 30-minute sessions distributed across two weeks. For material that must be remembered a month later, how should an educator reason about the likely trade-off between the two plans?",
+    "intent": "Explain spacing versus massed practice and avoid claiming one universal interval is optimal.",
+    "domain": "Learning & Development — Spacing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "learning_science",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "Students can solve blocked sets of one problem type but struggle when different problem types are mixed. A teacher proposes interleaving several types during later practice. What learning problem is this intended to address, and why might practice performance initially decline?",
+    "intent": "Explain discrimination among strategies, varied practice, and the distinction between harder practice and weaker learning.",
+    "domain": "Learning & Development — Interleaving / Varied Practice",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "learning_science",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A student has the prerequisite knowledge for a course but has begun skipping assignments. The student says the work feels pointless, doubts improvement is possible, and does not feel comfortable asking questions. Why is 'the student lacks motivation' an incomplete explanation, and what educational factors should be investigated?",
+    "intent": "Analyze expectancy, value, self-efficacy, belonging, task design, and context rather than treating motivation as a fixed trait.",
+    "domain": "Learning & Development — Motivation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "After rereading notes, students rate their mastery as 9/10, yet a closed-book practice task reveals major gaps. What metacognitive error is evident, and how could instruction improve calibration?",
+    "intent": "Distinguish familiarity from retrieval or application and propose monitoring based on performance evidence.",
+    "domain": "Learning & Development — Metacognition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "Students learn to calculate percentage discounts in textbook exercises but fail to recognize an equivalent problem in a workplace invoice. What does this reveal about transfer, and what kinds of practice could make transfer more likely?",
+    "intent": "Explain that transfer is not automatic; use abstraction, varied contexts, comparison, cues, and domain knowledge.",
+    "domain": "Learning & Development — Transfer",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "pedagogical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "In a programming course, complete worked examples help beginners but advanced learners report that the same examples slow them down. How can both observations be educationally plausible?",
+    "intent": "Reason about expertise, prior knowledge, guidance, and the need to fade support as knowledge develops.",
+    "domain": "Learning & Development — Novice vs Expert",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A teacher wants to make practice 'productively difficult' and considers removing all hints from a task that many students cannot yet begin. Is this a sound application of productive difficulty? Explain what would make challenge useful rather than an irrelevant barrier.",
+    "intent": "Separate learning-relevant effort from unsupported overload; connect challenge to prerequisites and scaffolding.",
+    "domain": "Learning & Development — Productive Difficulty",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A school proposes giving each student a fixed 'visual,' 'auditory,' or 'kinesthetic' label and requiring teachers to match lessons to that label. How should the claim be evaluated without rejecting useful multimodal teaching?",
+    "intent": "Distinguish learner preferences and modality-appropriate representation from the unsupported matching hypothesis.",
+    "domain": "Learning & Development — Learning Styles Claim",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A course objective says, 'Students will evaluate the strength of evidence in an argument,' but instruction consists mainly of memorizing terminology and the final test asks only for definitions. What is the central instructional-design problem?",
+    "intent": "Identify misalignment among objective, instruction, and assessment and explain consequences for validity.",
+    "domain": "Curriculum & Instruction — Learning Objectives / Alignment",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "instructional_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A curriculum introduces multi-step chemical equations before students have learned the prerequisite meaning of symbols and conservation ideas. Students repeatedly memorize procedures without understanding. How should the sequence be redesigned?",
+    "intent": "Identify prerequisite dependencies, conceptual progression, and the need to build foundations before complex application.",
+    "domain": "Curriculum & Instruction — Curriculum Sequencing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "curriculum_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A history course has six weeks left. One option adds eight new topics with minimal practice; another covers four topics with more source analysis, retrieval, and comparison across cases. How should the teacher reason about breadth versus depth?",
+    "intent": "Analyze trade-offs among coverage, understanding, practice, transfer, and course goals without assuming a universal winner.",
+    "domain": "Curriculum & Instruction — Breadth vs Depth",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "curriculum_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A curriculum revisits 'ecosystems' in three successive years, but each year repeats nearly identical definitions and worksheets. Does this constitute meaningful progression? What would need to change?",
+    "intent": "Explain that revisiting requires increased complexity, new applications, stronger connections, or deeper reasoning.",
+    "domain": "Curriculum & Instruction — Spiral / Revisited Curriculum",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "curriculum_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A teacher models how to solve a new ratio problem, thinks aloud about each decision, guides students through several examples, checks responses, and then removes prompts during independent practice. Why is it inaccurate to describe this as merely 'passive lecturing'?",
+    "intent": "Characterize explicit instruction as explanation, modeling, guided practice, checking, feedback, and gradual independence.",
+    "domain": "Curriculum & Instruction — Explicit Instruction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "pedagogical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "Two classes must learn how to design a fair experiment. Class A contains novices with weak prerequisite knowledge; Class B has already mastered core variables and controls. Compare how much explicit guidance versus inquiry you would use in each class, and justify the difference.",
+    "intent": "Synthesize prior knowledge, task complexity, guidance, inquiry, scaffolding, and learning goals rather than choose a universal method.",
+    "domain": "Curriculum & Instruction — Explicit Instruction vs Inquiry",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "Students learn a new statistical procedure from fully worked examples. After several successful lessons, they still wait for the teacher to supply every step. How should the examples be changed to support independent performance?",
+    "intent": "Use fading, completion problems, prompts, self-explanation, and independent practice rather than permanent full support.",
+    "domain": "Curriculum & Instruction — Worked Examples",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "instructional_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A student can complete grade-level tasks when given a checklist, worked first step, and occasional hints. A colleague argues that these supports 'lower the standard.' How should the teacher distinguish scaffolding from lowering the learning demand?",
+    "intent": "Explain temporary support that preserves the core goal and is gradually removed.",
+    "domain": "Curriculum & Instruction — Scaffolding",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A mixed-readiness class shares the objective of explaining causes of a historical event. Some students need vocabulary support and structured source questions; others can work with less structure and more complex sources. What would effective differentiation look like without creating 30 unrelated curricula?",
+    "intent": "Preserve a common core goal while adapting access, pace, representation, support, or task complexity based on readiness.",
+    "domain": "Curriculum & Instruction — Differentiation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "pedagogical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "Students are placed in groups of four to solve a complex problem, but one student does all the work while others copy the answer. What features should be added if the goal is genuine collaborative learning?",
+    "intent": "Use meaningful interdependence, individual accountability, roles or structures, peer explanation, and monitoring.",
+    "domain": "Curriculum & Instruction — Collaborative Learning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "lesson_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "In peer tutoring, a confident student explains a misconception to a partner, and the partner adopts it. Does this show that peer learning is ineffective? What design features would reduce this risk while preserving peer explanation?",
+    "intent": "Analyze peer learning conditions, monitoring, prompts, verification, feedback, and teacher oversight.",
+    "domain": "Curriculum & Instruction — Peer Learning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "During seminar discussion, a small group of confident students talks almost continuously while many others remain silent. The instructor concludes the discussion is excellent because 'students did most of the talking.' What additional evidence is needed to judge discussion quality?",
+    "intent": "Evaluate reasoning quality, participation distribution, use of evidence, questioning, listening, and learning rather than talk time alone.",
+    "domain": "Curriculum & Instruction — Classroom Discussion",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "lesson_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "An adult technical course aims to develop safe equipment troubleshooting. Learners have uneven prior experience, limited weekly study time, and must transfer the skill to varied workplaces. Design an instructional sequence that combines modeling, guided practice, varied cases, feedback, independent performance, and delayed checking of retention.",
+    "intent": "Integrate adult context, prior knowledge, explicit support, varied practice, transfer, feedback, and retention.",
+    "domain": "Curriculum & Instruction — Integrated Instructional Design",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "instructional_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "Students believe heavier objects always fall faster. A science teacher demonstrates one counterexample and immediately moves on. Why might the misconception persist, and what additional instructional moves could support conceptual change?",
+    "intent": "Elicit the learner model, use contrasting evidence and explanation, connect observations to a better model, and check reconstruction.",
+    "domain": "Curriculum & Instruction — Science Education",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "pedagogical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A teacher gives a five-question quiz halfway through a unit, studies the errors, reteaches two concepts, and regroups students for targeted practice. Why is the quiz functioning formatively?",
+    "intent": "Define formative assessment by the use of evidence to adapt teaching and learning, not by format or stakes alone.",
+    "domain": "Assessment & Measurement — Formative Assessment",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "formative_assessment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A final exam is normally used for grades, but the instructor also analyzes item-level errors to redesign the next course offering. Is the exam purely summative? Explain how assessment purpose depends on use.",
+    "intent": "Distinguish summative reporting/certification from formative use of evidence and allow multiple purposes.",
+    "domain": "Assessment & Measurement — Summative vs Formative Purpose",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assessment_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "Before beginning long division, a teacher administers a short task on place value, multiplication facts, and interpreting remainders. Several students show distinct prerequisite gaps. What is the diagnostic value of this assessment?",
+    "intent": "Explain diagnosis of prior knowledge and misconceptions to inform instructional planning.",
+    "domain": "Assessment & Measurement — Diagnostic Assessment",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "assessment_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "The stated objective is to evaluate students' ability to construct evidence-based arguments, but the test consists entirely of isolated vocabulary definitions. What validity concern arises?",
+    "intent": "Identify underrepresentation of the target construct and weak alignment between intended interpretation and test content.",
+    "domain": "Assessment & Measurement — Validity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assessment_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A writing assessment gives nearly identical scores when rescored by multiple trained raters, but its rubric rewards grammar almost exclusively even though the intended construct is quality of argument. What can be concluded about reliability and validity?",
+    "intent": "Distinguish scoring consistency from whether the assessment represents the intended construct.",
+    "domain": "Assessment & Measurement — Reliability vs Validity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "measurement_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A learner is reported at the 80th percentile on a norm-referenced test. The parent says, 'So the learner answered 80% of the questions correctly.' Is that conclusion justified? Explain.",
+    "intent": "Correctly distinguish percentile rank from percent correct.",
+    "domain": "Assessment & Measurement — Percentiles",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "measurement_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "Student A meets a defined proficiency standard but ranks below the class median because most classmates exceed the standard. How can both statements be true?",
+    "intent": "Distinguish criterion-referenced interpretation from norm-referenced standing.",
+    "domain": "Assessment & Measurement — Criterion vs Norm Referencing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A course grade combines achievement tests (60%), homework completion (20%), attendance (10%), and classroom behavior (10%). A student asks what the final grade means. What interpretive problem should the instructor acknowledge?",
+    "intent": "Analyze how combining achievement, effort, attendance, and behavior changes what the grade communicates.",
+    "domain": "Assessment & Measurement — Grading",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assessment_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A presentation rubric has four levels but the criteria are 'confidence,' 'creativity,' and 'professional look,' while the course objective is evidence-based reasoning. How should the rubric be revised?",
+    "intent": "Align rubric criteria and performance levels with the target construct; improve transparency and scoring consistency.",
+    "domain": "Assessment & Measurement — Rubrics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assessment_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A multiple-choice science item includes one correct answer, two obviously silly distractors, and one distractor reflecting a common misconception. Most low- and high-performing students choose the correct answer. What could be improved if the item is intended to reveal understanding?",
+    "intent": "Reason about plausible distractors, misconception diagnosis, guessing, item difficulty, discrimination, and construct fit.",
+    "domain": "Assessment & Measurement — Multiple Choice",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assessment_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A program must assess whether trainee nurses can communicate a safe handoff. A short selected-response test is cheap and reliable; a simulated handoff is authentic but expensive and has lower inter-rater consistency. Design an assessment strategy and justify the trade-offs among validity, reliability, feasibility, and stakes.",
+    "intent": "Integrate construct representation, performance assessment, scoring consistency, cost, and consequences rather than choose one metric mechanically.",
+    "domain": "Assessment & Measurement — Performance Assessment",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "assessment_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A mathematics assessment uses long, culturally unfamiliar reading passages to test routine computation. Multilingual learners score much lower, even when they demonstrate the computations correctly in less language-heavy tasks. What measurement problem should be investigated?",
+    "intent": "Distinguish the target mathematics construct from construct-irrelevant language/context demands and consider accessible redesign.",
+    "domain": "Assessment & Measurement — Bias / Accessibility",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assessment_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "On an item answered by 90% of students, the proportion correct is similar among students who otherwise score high and low on the test. What do 'item difficulty' and 'item discrimination' mean here, and why is a difficult item not automatically a good item?",
+    "intent": "Interpret proportion correct and discrimination conceptually, avoiding the assumption that difficulty equals quality.",
+    "domain": "Assessment & Measurement — Item Difficulty / Discrimination",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "measurement_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A placement test has a cut score of 70 and a substantial standard error around individual scores. One student scores 69 and another 71. The institution wants to make irreversible placements based on the two-point difference alone. What should an evaluator say about measurement precision and decision risk?",
+    "intent": "Use measurement-error reasoning, caution around cut scores, and consequences of high-stakes use.",
+    "domain": "Assessment & Measurement — Measurement Error / Cut Scores",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A teacher returns essays with only a grade and the comment 'Good job.' What information is missing if the goal is to improve the next essay?",
+    "intent": "Explain actionable task/process feedback that identifies what to improve and how.",
+    "domain": "Classroom Practice — Feedback",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "pedagogical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "After explaining a concept, a teacher asks, 'Does everyone understand?' The class is silent, so the teacher moves on. What would be a stronger check for understanding?",
+    "intent": "Use elicited student responses, diagnostic questions, brief tasks, or sampling rather than self-report silence.",
+    "domain": "Classroom Practice — Checking for Understanding",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "formative_assessment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A class loses ten minutes each lesson during transitions because students do not know where materials are or what to do next. The teacher proposes harsher punishments. What classroom-management response more directly addresses the instructional problem?",
+    "intent": "Use explicit routines, expectations, rehearsal, monitoring, and consistent reinforcement before relying on punishment.",
+    "domain": "Classroom Practice — Classroom Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "classroom_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "Students rarely volunteer answers because mistakes are mocked by peers, although the teacher's explanations are strong. How can classroom climate affect learning, and what should the teacher change?",
+    "intent": "Connect psychological safety, belonging, peer norms, participation, and high academic expectations.",
+    "domain": "Classroom Practice — Classroom Climate",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "classroom_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A student repeatedly calls out during independent work and receives teacher attention each time. What educational behavior-support questions should be asked before deciding on a response?",
+    "intent": "Consider antecedents, consequences, expectations, reinforcement, replacement behavior, and consistency without diagnosis.",
+    "domain": "Classroom Practice — Behavior Support",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "Students enthusiastically complete a fast-paced digital game and rate the lesson as highly enjoyable, but a delayed assessment shows no advantage over ordinary practice. What conclusion should the teacher draw about engagement and learning?",
+    "intent": "Separate enjoyment, participation, and immediate activity from durable learning; use outcome evidence.",
+    "domain": "Classroom Practice — Engagement vs Learning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A school reports that a student attends 95% of lessons but often copies answers without thinking and rarely completes challenging tasks. Why is attendance alone an incomplete measure of engagement?",
+    "intent": "Distinguish attendance from behavioral, cognitive, and emotional engagement.",
+    "domain": "Classroom Practice — Attendance / Engagement",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A school is comparing two discipline approaches. One reduces classroom disruption quickly but removes students from instruction more often; the other keeps students in class more often but requires intensive staff training and consistent follow-through. How should leaders compare the educational trade-offs?",
+    "intent": "Analyze learning time, climate, consistency, implementation capacity, unintended effects, and evidence without imposing one ideology.",
+    "domain": "Classroom Practice — School Discipline",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "practical_educational_judgment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A digital course presents key diagrams only as images with tiny labels and no alternative description. What accessibility barriers could this create, and how could the design preserve the learning goal while improving access?",
+    "intent": "Identify visual and digital access barriers and redesign representation without changing the target construct.",
+    "domain": "Inclusion & Learner Variability — Accessibility",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "accessibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "On a history assessment, a student with a motor impairment is allowed to dictate responses instead of handwriting them. The target is historical reasoning, not handwriting. Is this more like an accommodation or a modification, and why?",
+    "intent": "Distinguish access-condition changes from changes to the underlying learning expectation.",
+    "domain": "Inclusion & Learner Variability — Accommodations / Modifications",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "inclusion_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A multilingual student gives sophisticated oral explanations in the home language and solves science problems correctly with diagrams, but performs poorly on a language-dense science test in the language of instruction. Design an assessment approach that better separates science understanding from language proficiency while still measuring essential scientific language.",
+    "intent": "Integrate construct validity, language demands, multiple evidence sources, scaffolds, and preservation of the intended content construct.",
+    "domain": "Inclusion & Learner Variability — Multilingual Learners",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "assessment_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A student with individualized learning goals receives support from a classroom teacher, specialist, and family, but the team rarely shares progress data. What general special-education practice problem does this create?",
+    "intent": "Emphasize individualized goals, progress monitoring, collaboration, functional impact, and coordinated support without jurisdiction-specific law.",
+    "domain": "Inclusion & Learner Variability — Special Education Concepts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "inclusion_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A student is physically present in the general classroom all day but cannot access the materials, rarely participates, and receives no meaningful support. Why is physical placement alone insufficient to establish inclusion?",
+    "intent": "Address access, participation, belonging, curriculum and assessment access, and support.",
+    "domain": "Inclusion & Learner Variability — Inclusion",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "inclusion_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "An instructor offers captions, readable text, optional audio, keyboard-accessible activities, and several ways to demonstrate the same target skill. What educational design principle is being served even if no framework name is used?",
+    "intent": "Recognize barrier reduction through multiple means of representation and expression without rewarding terminology alone.",
+    "domain": "Inclusion & Learner Variability — Barrier-Reducing Design",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "accessibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Two students face the same learning objective. One has reliable internet and prior coursework; the other has intermittent access and missed prerequisite instruction. Is giving both exactly the same optional online resources necessarily equivalent educational access? Explain.",
+    "intent": "Distinguish equal treatment from differential support in response to different barriers, without requiring a political conclusion.",
+    "domain": "Inclusion & Learner Variability — Equality / Equity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "inclusion_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "School A offers 180 hours of mathematics instruction and qualified specialist support; School B offers 120 hours and frequent teacher vacancies. Their average test scores differ. What must be considered before attributing the difference to student ability?",
+    "intent": "Use opportunity-to-learn reasoning: instructional time, curriculum access, teacher availability, materials, and prior opportunities.",
+    "domain": "Inclusion & Learner Variability — Opportunity to Learn",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A school groups students by prior attainment for mathematics. Higher groups receive richer problems and experienced teachers, lower groups receive more repetitive work, and movement between groups is rare. Scores later diverge further. What evidence would be needed to judge whether grouping itself caused the divergence?",
+    "intent": "Analyze selection, prior attainment, opportunity to learn, teacher assignment, mobility, expectations, and possible peer effects.",
+    "domain": "Inclusion & Learner Variability — Tracking / Ability Grouping",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A teacher says, 'Students from this demographic group usually struggle, so I will give this learner easier work from the start.' What is wrong with this reasoning, and what information should guide differentiation instead?",
+    "intent": "Reject demographic stereotyping; use individual prior knowledge, readiness, observed needs, goals, and ongoing evidence.",
+    "domain": "Inclusion & Learner Variability — Learner Variability",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "In an early-childhood classroom, children build a pretend shop while the teacher introduces number words, compares quantities, and asks children to explain choices. Is play-based learning being undermined by intentional teaching? Explain.",
+    "intent": "Show that play, exploration, language, social interaction, and intentional teaching can coexist.",
+    "domain": "Educational Contexts — Early Childhood",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "pedagogical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "Students entering a new secondary school level show a sharp drop in assignment completion during the first month. What information should the school gather before concluding that motivation has declined?",
+    "intent": "Consider transition demands, routines, workload, expectations, prior knowledge, relationships, access, and measurement.",
+    "domain": "Educational Contexts — Primary / Secondary Transitions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A student reads words accurately and fluently but struggles to understand a text about an unfamiliar scientific topic. Why would it be premature to diagnose the problem as weak decoding?",
+    "intent": "Consider vocabulary, background knowledge, language comprehension, strategy use, and text demands.",
+    "domain": "Educational Contexts — Literacy Instruction",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "literacy_instruction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Students submit polished final essays, but the course provides no explicit time for planning, drafting, revision, or feedback. What important aspects of writing instruction are missing?",
+    "intent": "Treat writing as a process involving planning, drafting, revising, feedback, organization, genre, and audience.",
+    "domain": "Educational Contexts — Writing Instruction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "literacy_instruction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "Students can execute a multiplication algorithm quickly but cannot explain why it works or recognize when to use it in a word problem. How should instruction develop both procedural fluency and conceptual understanding?",
+    "intent": "Avoid a false dichotomy; connect representations, explanation, practice, and application.",
+    "domain": "Educational Contexts — Numeracy / Mathematics Learning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "numeracy_instruction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A university lecture enrolls 500 students. The instructor wants students to remember core concepts, apply them in seminars, and receive useful feedback without making grading unmanageable. Design a feasible blend of lecture, retrieval, peer discussion, automated low-stakes checks, and sampled human feedback.",
+    "intent": "Integrate scale constraints, active retrieval, discussion quality, feedback, assessment purpose, and feasibility.",
+    "domain": "Educational Contexts — Higher Education",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "instructional_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Adult learners in an evening certification course have substantial workplace experience but little study time. Some prior experience is accurate and some reflects outdated practice. How should the instructor use prior experience without assuming it is always an asset?",
+    "intent": "Use relevance and experience while diagnosing misconceptions and respecting time constraints and diverse goals.",
+    "domain": "Educational Contexts — Adult Learning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "Trainees can describe a safety procedure correctly on a written test but make errors when performing it under realistic time pressure. What does this imply for vocational assessment and instruction?",
+    "intent": "Distinguish declarative knowledge from competent performance and use simulation, observation, practice, and feedback.",
+    "domain": "Educational Contexts — Vocational / Professional Education",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assessment_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A teacher knows advanced mathematics but repeatedly chooses examples that obscure common student misconceptions. What kind of teacher knowledge is missing from the statement 'strong subject knowledge is enough'?",
+    "intent": "Distinguish subject-matter knowledge from pedagogical knowledge, learner knowledge, pedagogical content knowledge, and assessment knowledge.",
+    "domain": "Teachers & Organizations — Teacher Knowledge",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "Teachers attend a one-day workshop on questioning techniques, report high satisfaction, but classroom observations three months later show little change. What does this reveal about professional learning?",
+    "intent": "Distinguish attendance/satisfaction from changed practice; consider practice, feedback, coaching, collaboration, and sustained implementation.",
+    "domain": "Teachers & Organizations — Professional Learning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "teacher_development",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "An instructional coach observes a lesson, agrees with the teacher on one specific goal, models an alternative routine, and schedules practice plus follow-up observation. Why is this likely to provide more actionable learning than a generic evaluation score alone?",
+    "intent": "Explain observation, goal specificity, modeling, feedback, deliberate practice, trust, and follow-through.",
+    "domain": "Teachers & Organizations — Instructional Coaching",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "teacher_development",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "Teacher A has taught for 20 years but rarely reviews student work or changes instruction. Teacher B has taught for 8 years, anticipates misconceptions, uses routines efficiently, and adapts from evidence. Why is years of experience alone an incomplete proxy for expertise?",
+    "intent": "Distinguish experience duration from pattern recognition, adaptive expertise, feedback use, and instructional knowledge.",
+    "domain": "Teachers & Organizations — Teacher Expertise",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A school schedules teachers so that instructors of the same subject never have common planning time, while the curriculum requires tightly coordinated progression across classes. What organizational consequence should leaders anticipate?",
+    "intent": "Connect schedules and information flow to curriculum coherence, collaboration, and consistent learning opportunities.",
+    "domain": "Teachers & Organizations — School Organization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "school_improvement",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A school leader has funds for either a new initiative or protected time for teachers to analyze student work, rehearse lessons, and receive coaching on an existing priority. What evidence and implementation questions should guide the allocation?",
+    "intent": "Use instructional leadership, priorities, opportunity cost, capacity, evidence, and implementation rather than novelty.",
+    "domain": "Teachers & Organizations — Educational Leadership",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "practical_educational_judgment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A school adopts a well-known improvement program but student outcomes do not change. What should the school investigate before concluding either that the program is ineffective or that teachers failed?",
+    "intent": "Diagnose problem definition, implementation quality, dosage, fit, capacity, measures, and causal evidence.",
+    "domain": "Teachers & Organizations — School Improvement",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "school_improvement",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A literacy intervention is implemented exactly as written in every classroom, yet results remain weak because examples assume vocabulary most students do not know. Should leaders prioritize stricter fidelity or thoughtful adaptation? Explain how to preserve core components while responding to context.",
+    "intent": "Balance fidelity, core components, local adaptation, learner needs, implementation quality, and evidence.",
+    "domain": "Teachers & Organizations — Fidelity / Adaptation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "program_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A school buys tablets and reports that each student now has a device. What additional questions are needed before claiming the purchase improved learning?",
+    "intent": "Separate technology access from pedagogy; ask what learning problem is addressed, how practice changes, and what outcome evidence exists.",
+    "domain": "Technology & Digital Learning — Technology vs Pedagogy",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "education_technology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "An online lesson displays dense text while a narrator reads the same text word-for-word and decorative animations compete for attention. How could the lesson be redesigned to reduce unnecessary processing while preserving essential content?",
+    "intent": "Use concise signaling, complementary media, reduced redundancy, and removal of irrelevant decoration without reciting named principles.",
+    "domain": "Technology & Digital Learning — Multimedia",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "education_technology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "An asynchronous course has high-quality videos but low completion. Students report uncertainty about pacing, few opportunities for feedback, and little interaction. Which online-learning design problems should be addressed?",
+    "intent": "Analyze self-regulation, structure, feedback, interaction, access, and engagement rather than modality alone.",
+    "domain": "Technology & Digital Learning — Online Learning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "education_technology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A blended course moves basic explanations and retrieval practice online so classroom time can be used for coached application. Under what conditions is this division of modes educationally coherent?",
+    "intent": "Explain the function of each mode, alignment, accessibility, preparation, feedback, and transfer.",
+    "domain": "Technology & Digital Learning — Blended Learning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "education_technology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "An AI system gives students fluent essay feedback within seconds. In a sample, some comments accurately identify reasoning gaps, while others invent facts or reward superficial style. Design a safe educational workflow for using the tool.",
+    "intent": "Integrate factual verification, goal alignment, specificity, student checking, teacher oversight, bias, privacy, and overreliance.",
+    "domain": "Technology & Digital Learning — AI-Generated Feedback",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "education_technology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "Students can use generative AI for a take-home assignment, but the instructor still needs evidence of each student's own reasoning. How could the assessment be redesigned to support learning and academic integrity rather than rely only on detection and punishment?",
+    "intent": "Use transparent rules, process evidence, drafts, oral defense, in-class components, reflection, and authentic task design.",
+    "domain": "Technology & Digital Learning — Academic Integrity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assessment_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A school proposes an AI tutor because students use it frequently and satisfaction is high. Pilot data show more practice time but no clear improvement on delayed assessments, and usage data are incomplete for some students. What can and cannot be concluded?",
+    "intent": "Separate engagement from learning; consider delayed outcomes, missing data, selection, implementation, privacy, and uncertainty.",
+    "domain": "Technology & Digital Learning — AI in Education",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "System X reports higher international assessment scores than System Y. X samples 15-year-olds; Y reports grade-10 students, has a larger share of recent language learners, and teaches some tested content later in the curriculum. What must be checked before comparing system quality?",
+    "intent": "Integrate sampled population, age/grade, demographics, language, curriculum alignment, scale interpretation, and institutional context.",
+    "domain": "Education Systems & Policy — Comparative Education",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "comparative_education",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "Two countries have the same average international scale score, but one has much wider score dispersion and different participation rates among eligible students. Why would ranking them by the mean alone be incomplete?",
+    "intent": "Interpret means, distribution, sampling/participation, uncertainty, and limits of a single indicator.",
+    "domain": "Education Systems & Policy — International Assessment",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_education",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A government-funded reading policy specifies daily tutoring and progress monitoring. Schools receive funds, but half cannot recruit tutors and many omit progress monitoring. End-of-year outcomes are weak. What evidence would distinguish policy-design failure from implementation failure?",
+    "intent": "Separate theory of change from implementation; examine staffing, dosage, fidelity, monitoring, and outcome measures.",
+    "domain": "Education Systems & Policy — Policy vs Implementation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "education_policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "Schools are judged almost entirely by the percentage of students above one pass threshold. Some schools shift resources toward students just below the threshold and away from students far below or already above it. What incentive effect is illustrated, and how might an accountability design reduce distortion?",
+    "intent": "Analyze metric-target incentives, gaming, curriculum/resource distortion, multiple measures, and unintended consequences neutrally.",
+    "domain": "Education Systems & Policy — Accountability / Goodhart Effects",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "education_policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A high-stakes test is well aligned to the curriculum and scored consistently, but schools respond by eliminating untested subjects and drilling narrow item formats. Does this response prove the test itself is invalid? Explain the relevant validity and consequence questions.",
+    "intent": "Distinguish assessment quality from consequences of use; consider intended interpretation, stakes, incentives, and curriculum narrowing.",
+    "domain": "Education Systems & Policy — High-Stakes Assessment",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assessment_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A hypothetical education system moves most students into either academic or vocational pathways at age 14. Another delays selection until age 16. What evidence would be needed to compare their educational consequences without assuming one structure is universally better?",
+    "intent": "Compare opportunity, mobility, curriculum, transitions, later outcomes, selection, and context without national stereotypes.",
+    "domain": "Education Systems & Policy — Education Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_education",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A policy offers schools funding if they adopt a new mathematics program. What questions should an analyst ask about objectives, mechanism, incentives, school capacity, implementation, measurement, and unintended effects before judging the policy?",
+    "intent": "Provide politically neutral policy analysis focused on mechanism, evidence, implementation, and trade-offs.",
+    "domain": "Education Systems & Policy — Policy Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "education_policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "Twenty schools are randomized to a tutoring program or usual instruction. By follow-up, 8% of control students and 28% of tutoring students are missing outcome data, and several treatment schools delivered less than half the planned tutoring. What threatens a simple causal claim based only on observed follow-up means?",
+    "intent": "Analyze randomization, differential attrition, compliance/dosage, intention-to-treat versus received treatment, and missing-data uncertainty.",
+    "domain": "Educational Research — Randomized Experiments",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "Students who voluntarily attend after-school tutoring score 12 points higher than non-attendees at year end. The attendees also had higher prior grades and attendance before tutoring began. What causal conclusion is justified?",
+    "intent": "Recognize selection and confounding; do not infer tutoring caused the entire difference from observational association.",
+    "domain": "Educational Research — Observational Studies / Selection",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A district introduces a new curriculum in 2025 while a similar district does not. Scores rise by 6 points in the adopting district and 3 points in the comparison district, but the adopting district also changes its test and student composition. What assumptions would a difference-in-differences style argument require, and which facts here complicate it?",
+    "intent": "Reason conceptually about comparable trends, stable measurement, composition, concurrent changes, and causal assumptions.",
+    "domain": "Educational Research — Quasi-Experimental Design",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A five-year study follows the same students annually, but students with the lowest initial scores are much more likely to leave the study. How can this attrition affect conclusions about average growth?",
+    "intent": "Explain longitudinal attrition bias and distinguish true growth from changing observed sample composition.",
+    "domain": "Educational Research — Longitudinal Studies",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "Researchers conduct 25 in-depth classroom observations and interviews to understand why teachers adapt a curriculum differently. A critic says the study is useless because the sample is too small to estimate a national average. What is wrong with the criticism?",
+    "intent": "Match evidence to research question; explain what qualitative research can reveal about process and meaning and what it cannot generalize statistically.",
+    "domain": "Educational Research — Qualitative Research",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A district wants to evaluate a year-long teacher professional-development program. Design a mixed-method evaluation that can address whether student outcomes changed, whether teacher practice changed, and how implementation differed across schools.",
+    "intent": "Combine outcome data, observations, interviews, implementation measures, comparison strategy, sampling, and uncertainty.",
+    "domain": "Educational Research — Mixed Methods / Program Evaluation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "program_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A study treats 900 students as 900 fully independent observations even though they are taught in 30 classrooms and the intervention was assigned by classroom. Why can this be a problem even without doing multilevel-model calculations?",
+    "intent": "Recognize clustered data, shared classroom influences, unit of assignment, and overstated precision if dependence is ignored.",
+    "domain": "Educational Research — Clustered Data / Unit of Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "Students are selected for an intervention immediately after an unusually low test score. Their average score rises on the next test. Why does this improvement alone not establish that the intervention worked?",
+    "intent": "Explain regression to the mean, measurement error, and the need for a credible comparison.",
+    "domain": "Educational Research — Regression to the Mean",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "An intervention raises average scores by 0.7 points on a 100-point scale in a sample of 40,000 students, and the difference is statistically significant. What else is needed before calling the effect educationally important?",
+    "intent": "Distinguish statistical detectability from magnitude, practical meaning, cost, feasibility, baseline variation, and learning value.",
+    "domain": "Educational Research — Statistical vs Educational Significance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A program distributes 10,000 books, trains 500 teachers, and reports 95% workshop attendance. Student reading outcomes do not improve. How should a program evaluation distinguish inputs, activities, outputs, implementation, outcomes, and impact?",
+    "intent": "Separate delivery metrics from learning effects; examine logic model, implementation, mechanisms, and outcome evidence.",
+    "domain": "Educational Research — Program Evaluation / Logic Model",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "program_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A school's average mathematics score rises from 68 to 72. During the same period, the share of students entering midyear falls from 20% to 5%, the test changes to an easier form, and one subgroup's average declines. What additional analysis is required before claiming the school improved learning?",
+    "intent": "Integrate composition, measurement comparability, subgroup aggregation, baseline, growth versus attainment, and uncertainty.",
+    "domain": "Cross-Disciplinary — Educational Data Interpretation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A school introduces a new science curriculum. Immediate unit-test scores rise, delayed transfer tasks do not, classroom observations show high fidelity, student work reveals two persistent misconceptions, multilingual learners show larger score gaps on language-heavy items, and attendance improves slightly. Design the next cycle of instructional and evaluation decisions without assuming a single cause.",
+    "intent": "Synthesize learning versus performance, misconceptions, curriculum, assessment validity, inclusion, implementation, data interpretation, causal limits, and uncertainty.",
+    "domain": "Cross-Disciplinary — Integrated Educational Judgment",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "practical_educational_judgment",
+    "jurisdiction_required": false
+  }
+]

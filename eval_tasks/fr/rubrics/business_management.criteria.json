@@ -1,0 +1,211 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the stated business problem, objective, decision, or analytical task. Penalize digressions and generic management advice that does not respond to the facts or requested decision.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "business_accuracy",
+      "name": "Business Accuracy",
+      "definition": "Uses materially correct management, strategy, organizational, operating, marketing, product, and decision logic. A plausible recommendation based on incorrect business logic should score poorly even if well written.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "strategic_reasoning",
+      "name": "Strategic Reasoning",
+      "definition": "When strategy is relevant, identifies coherent choices about where to compete, how to create and capture value, required capabilities, competitor implications, and accepted trade-offs rather than listing desirable initiatives.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "organizational_reasoning",
+      "name": "Organizational Reasoning",
+      "definition": "When organization is relevant, correctly reasons about structure, decision rights, authority, accountability, coordination, information flow, culture, and actual behavior rather than assuming an org-chart change solves the problem.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "leadership_and_people_reasoning",
+      "name": "Leadership and People Reasoning",
+      "definition": "When people or leadership are relevant, matches the response to team capability, urgency, motivation, incentives, trust, role clarity, development needs, and system constraints without reducing behavior to personality or pay alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "operations_reasoning",
+      "name": "Operations Reasoning",
+      "definition": "When operations are relevant, correctly identifies demand, capacity, bottlenecks, variability, queues, lead time, throughput, quality, service levels, and system effects; avoids local optimization that worsens total performance.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "marketing_and_customer_reasoning",
+      "name": "Marketing and Customer Reasoning",
+      "definition": "When marketing or customer issues are relevant, reasons correctly about segment, need, positioning, value proposition, channel, price, acquisition, retention, brand, and customer economics rather than equating marketing with promotion.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "product_and_innovation_reasoning",
+      "name": "Product and Innovation Reasoning",
+      "definition": "When product or innovation is relevant, connects customer problem to business objective, prioritization, experimentation, lifecycle, capability, adoption, and measurable outcome; does not reward feature accumulation or novelty alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "decision_quality",
+      "name": "Decision Quality",
+      "definition": "Frames the decision appropriately, identifies viable alternatives, uses decision-relevant evidence, and reaches a conclusion proportionate to the facts. A strategically coherent alternative should receive full credit when it satisfies the stated objective and constraints.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When calculation matters, uses the supplied numbers, denominators, units, rates, and arithmetic correctly. Minor numerical errors that do not change the recommendation are less serious than errors that reverse the decision.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "data_and_metric_interpretation",
+      "name": "Data and Metric Interpretation",
+      "definition": "When data or metrics are relevant, interprets what they actually measure, checks denominators and construction, distinguishes absolute from relative change, and recognizes gaming, selection bias, confounding, and short- versus long-term effects.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "risk_and_uncertainty_reasoning",
+      "name": "Risk and Uncertainty Reasoning",
+      "definition": "When uncertainty is relevant, distinguishes risk from issue, likelihood from impact, and expected outcome from certainty; identifies downside, residual risk, mitigations, reversibility, scenarios, and the cost of waiting for more information.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "stakeholder_reasoning",
+      "name": "Stakeholder Reasoning",
+      "definition": "When stakeholders materially affect the decision, identifies relevant interests, influence, conflicts, dependencies, and communication needs. Penalize ignoring a central stakeholder whose response changes feasibility or value.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "execution_and_implementation_reasoning",
+      "name": "Execution and Implementation Reasoning",
+      "definition": "When implementation matters, translates recommendations into feasible actions, sequencing, ownership, capabilities, dependencies, adoption mechanisms, and measures. A sound strategy with an unrealistic or missing execution path should lose credit.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "incentives_and_behavioral_effects",
+      "name": "Incentives and Behavioral Effects",
+      "definition": "When incentives or metrics shape behavior, identifies intended and unintended responses, gaming, crowding-out, local optimization, and downstream consequences. Penalize recommendations that reward behavior opposite to the stated objective.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_evidence",
+      "name": "Assumptions and Evidence",
+      "definition": "When evidence is incomplete or uncertain, separates facts from assumptions, identifies unsupported causal claims, states what cannot be concluded, and requests or proposes the most decision-relevant additional evidence without demanding false certainty.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "tradeoff_and_systems_reasoning",
+      "name": "Trade-off and Systems Reasoning",
+      "definition": "When choices have competing effects, explicitly analyzes trade-offs, feedback loops, shifted bottlenecks, second-order effects, and cross-functional consequences rather than optimizing a single metric or function in isolation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the major elements necessary for a sound answer at the question's difficulty without requiring irrelevant breadth. Small omissions are acceptable; missing a decision-critical factor should materially reduce the score.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internal consistency among facts, calculations, assumptions, recommendations, and implementation implications. Penalize contradictions such as identifying a constraint and then recommending an action that ignores it.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates reasoning in a precise, understandable, decision-useful way. Jargon, framework names, length, or citations do not earn credit unless they clarify substantive business reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_business_management_error",
+    "condition": "A materially false central strategic, managerial, organizational, operational, quantitative, metric, causal, or decision-making claim that fundamentally invalidates the answer or reverses the substantive recommendation.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally misunderstands the stated business objective.",
+      "Recommends a strategy directly contradicted by critical facts in the prompt.",
+      "Makes a major quantitative error that reverses the management decision.",
+      "Treats revenue growth as equivalent to profitability when the distinction is central.",
+      "Treats high utilization as proof of high throughput despite clear bottleneck evidence.",
+      "Interprets customer acquisition growth as business improvement despite supplied severe churn and negative unit economics.",
+      "Recommends expansion without recognizing a clearly binding capacity constraint.",
+      "Fundamentally misinterprets an experiment or business metric in a way that reverses the conclusion.",
+      "Asserts causation from an explicitly confounded observational comparison when that causal claim drives the recommendation.",
+      "Recommends incentives that clearly reward behavior opposite to the stated organizational objective while failing to recognize the conflict.",
+      "Ignores a central stakeholder or execution constraint that makes the recommendation infeasible.",
+      "Claims a merger synergy is guaranteed despite supplied evidence that integration costs or constraints may eliminate it.",
+      "Recommends decentralization to solve a problem explicitly caused by inconsistent local control without addressing that mechanism.",
+      "Recommends centralization to improve responsiveness where supplied facts show central bottlenecks are the main cause of delay.",
+      "Uses materially incorrect break-even, marginal, retention, churn, conversion, or productivity reasoning that reverses the business choice.",
+      "Treats sunk costs as relevant future benefits in a way that drives the decision.",
+      "Recommends a product or market strategy that clearly conflicts with the specified target segment and positioning.",
+      "Claims statistical significance automatically implies commercially meaningful impact when supplied economics show otherwise.",
+      "Recommends a major change while ignoring a supplied critical operational or organizational dependency that makes execution impossible."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the recommendation.",
+      "Minor terminology mistakes.",
+      "Small omissions.",
+      "Reasonable alternative strategies.",
+      "Legitimate differences in leadership approach.",
+      "Reasonable uncertainty.",
+      "Differences in prioritization where several approaches are defensible.",
+      "Non-central missing metrics.",
+      "Reasonable implementation assumptions.",
+      "Stylistic differences."
+    ]
+  },
+  "score_scale": {
+    "min": 0,
+    "max": 4
+  },
+  "evaluation_principles": [
+    "Strategy requires choices: where to compete, how to create value, what capabilities matter, and what trade-offs are accepted.",
+    "Goals are not strategy.",
+    "Revenue is not profit.",
+    "Metrics shape behavior.",
+    "Activity is not outcome.",
+    "Utilization is not throughput.",
+    "Customer acquisition is not retention.",
+    "Correlation is not causation.",
+    "Statistical significance is not business significance.",
+    "Incentives have second-order effects.",
+    "Organizational structure changes information flow, decision rights, coordination, and accountability but does not automatically change culture or capability.",
+    "Culture is reinforced behavior, not slogans or perks.",
+    "Change requires adoption, not merely announcement or technical installation.",
+    "Forecasts contain uncertainty and should not be treated as certainties.",
+    "Growth can increase complexity, coordination cost, quality problems, and management bottlenecks.",
+    "Operational improvements can shift bottlenecks.",
+    "Customer value and company value capture are distinct.",
+    "Sunk costs should not drive future choices solely because they were already incurred.",
+    "Multiple valid strategies can satisfy the same facts and constraints.",
+    "Execution feasibility matters.",
+    "Frameworks are tools, not answers.",
+    "Management jargon without mechanism, action, evidence, and trade-offs should not receive high credit.",
+    "Citations do not compensate for incorrect business reasoning."
+  ]
+}

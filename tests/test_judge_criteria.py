@@ -6,7 +6,14 @@ of the criteria, then each true flag's effect in the file's order. The model
 is never asked for the 0–4, so a grade is reproducible from what was
 recorded. Nothing about medicine or law is special-cased: both files are
 read by one loader, and a topic's tables come from the metadata its own
-items carry."""
+items carry.
+
+Phase 10 replaced both files. The new Medicine & Clinical Health file is
+the one the fixture's topic is graded by, so it is SPEC here. The law file
+delivered in 8d is retired, but it is still the only file with two flags —
+one zeroing, one capping — and a flag that shares its id with a criterion,
+so every test of that path reads it from where it was retired to (nothing
+in the service reads that folder)."""
 
 from __future__ import annotations
 
@@ -22,13 +29,20 @@ import judge_calibrate as jc
 from service import proposals as prop
 
 REPO = Path(__file__).resolve().parents[1]
-TASK = "exam_medicine_health"
-TOPIC = "medicine & health"
+TASK = "exam_medicine_clinical_health"
+TOPIC = "Medicine & Clinical Health"
 LAW_TASK = "exam_law"
 SPEC = jd.rubric_for(TASK).criteria
-LAW = jd.rubric_for(LAW_TASK).criteria
+NEW_LAW = jd.rubric_for(LAW_TASK).criteria
+RETIRED = REPO / "eval_tasks" / "fr" / "retired" / "rubrics"
+LAW_FILE = RETIRED / "law.criteria.json"
+# read the way rubric_for reads a file, path and all, so an effect it could
+# not apply would refuse here too
+LAW = jd.normalise_criteria(json.loads(LAW_FILE.read_text(encoding="utf-8")), LAW_FILE)
+LAW_PROSE = (RETIRED / "law.md").read_text(encoding="utf-8")
 IDS = jd.criteria_ids(SPEC)
 FLAGS = jd.flag_ids(SPEC)
+NO_TOPIC = "exam_arts"          # the one topic delivered without a rubric of its own
 
 
 def reply(spec=SPEC, **over) -> str:
@@ -44,26 +58,40 @@ def reply(spec=SPEC, **over) -> str:
 # ---------------------------------------------------------------------------
 
 def test_both_delivered_files_load_and_say_what_they_grade():
-    assert jd.validate_criteria(SPEC) == [] and jd.validate_criteria(LAW) == []
-    assert len(IDS) == 15 and len(set(IDS)) == 15
-    assert len(jd.criteria_ids(LAW)) == 23
-    assert FLAGS == ["critical_safety_failure"]
+    assert jd.validate_criteria(SPEC) == [] and jd.validate_criteria(NEW_LAW) == []
+    assert len(IDS) == 20 and len(set(IDS)) == 20
+    assert len(jd.criteria_ids(NEW_LAW)) == 20
+    assert FLAGS == ["critical_medicine_clinical_health_error"]
+    assert jd.flag_ids(NEW_LAW) == ["critical_legal_error"]
+    # the retired law file still loads, with the second flag the tests below need
+    assert jd.validate_criteria(LAW) == [] and len(jd.criteria_ids(LAW)) == 23
     assert jd.flag_ids(LAW) == ["critical_legal_error", "fabricated_authority"]
-    # `topic` is informational — the FILE NAME decides which task it grades
-    assert isinstance(SPEC["topic"], str) and isinstance(LAW["topic"], str)
-    assert jd.rubric_name(TASK) == "medicine_health" and jd.rubric_name(LAW_TASK) == "law"
-    assert jd.rubric_for("exam_history").criteria is None      # no file, no criteria path
+    # what a file says about itself is informational — the FILE NAME decides
+    # which task it grades. The retired files said `topic`; the new ones say
+    # `task` or `benchmark`, or nothing, and grade the same way
+    assert LAW["topic"] == "law" and "topic" not in SPEC and NEW_LAW["benchmark"] == "Law"
+    assert jd.rubric_name(TASK) == "medicine_clinical_health"
+    assert jd.rubric_name(LAW_TASK) == "law"
+    assert jd.rubric_for(NO_TOPIC).criteria is None      # no file, no criteria path
     for r in (jd.rubric_for(TASK), jd.rubric_for(LAW_TASK)):
         assert len(r.criteria_sha256) == 64
-        assert r.status == "draft"          # the prose anchors are not signed off yet
+        # the author wrote these anchors himself: nothing is stamped DRAFT
+        assert r.status == ""
     # a label is optional in the schema; the page still has words for every id
-    assert jd.criteria_labels(SPEC)["red_flag_coverage"] == "Red flag coverage"
     assert jd.criteria_labels(LAW)["jurisdiction_awareness"] == "Jurisdiction awareness"
+    assert jd.criteria_labels(SPEC)["triage_and_urgency"] == "Triage and urgency"
 
 
 def test_equal_weights_with_the_key_and_without_it():
-    assert SPEC["weights"] == "equal" and LAW["weights"] == "equal"
-    assert all(jd.weight_of(SPEC, cid) == 1.0 for cid in IDS)
+    # the retired law file says "equal" and puts 1.0 on every row; the new
+    # medicine file leaves the key out and puts 0.05 on every row — equal too
+    assert LAW["weights"] == "equal" and "weights" not in SPEC
+    assert all(jd.weight_of(LAW, cid) == 1.0 for cid in jd.criteria_ids(LAW))
+    assert all(jd.weight_of(SPEC, cid) == 0.05 for cid in IDS)
+    # so twenty weights of a twentieth fold exactly as twenty of one would
+    halves = {cid: float(i % 2) for i, cid in enumerate(IDS)}
+    unweighted = {"criteria": [{"id": cid, "definition": "d"} for cid in IDS]}
+    assert jd.fold(halves, NO_FLAGS, SPEC) == jd.fold(halves, {}, unweighted) == 2
     bare = {"criteria": [{"id": "a", "definition": "d"}, {"id": "b", "definition": "d"}]}
     assert jd.validate_criteria(bare) == []                    # no weights key at all
     assert jd.weight_of(bare, "a") == 1.0
@@ -80,8 +108,10 @@ def test_an_effect_this_judge_cannot_apply_refuses_to_load(tmp_path, monkeypatch
     assert any("cap_at_9_of_4" in p and "fabricated_authority" in p
                for p in jd.validate_criteria(spec))
     spec["flags"][1]["effect"] = "melt_the_score"
+    # installed where an upload from the page lands, which the judge reads
+    # before the repo's own copy
     (tmp_path / "rubrics").mkdir()
-    (tmp_path / "rubrics" / "law.md").write_text(jd.rubric_for(LAW_TASK).text, encoding="utf-8")
+    (tmp_path / "rubrics" / "law.md").write_text(LAW_PROSE, encoding="utf-8")
     (tmp_path / "rubrics" / "law.criteria.json").write_text(json.dumps(spec), encoding="utf-8")
     from service import config
     monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)
@@ -90,19 +120,22 @@ def test_an_effect_this_judge_cannot_apply_refuses_to_load(tmp_path, monkeypatch
     # the file and the string it could not apply, both named
     assert "melt_the_score" in str(e.value) and "law.criteria.json" in str(e.value)
     assert "fabricated_authority" in str(e.value)
-    # every effect the two delivered files ask for is one it can apply
+    # every effect the retired law file asks for is one it can apply, and the
+    # new files' "score=0" is read as the same zero
     assert {jd.effect_of(f) for f in LAW["flags"]} == {"zero_score", "cap_at_1_of_4"}
+    assert [jd.effect_of(f) for f in SPEC["flags"]] == ["zero_score"]
     assert jd.effect_words("zero_score") == "sets the whole score to 0"
     assert jd.effect_words("cap_at_1_of_4") == "caps the whole score at 1 of 4"
 
 
 def test_a_criterion_and_a_flag_may_share_an_id_and_stay_apart():
-    """Law scores `fabricated_authority` 0–1 AND flags it: the criterion is
-    about invention at all, the flag about invention that carries the
-    answer."""
+    """The retired law file scores `fabricated_authority` 0–1 AND flags it:
+    the criterion is about invention at all, the flag about invention that
+    carries the answer. No new file does, and the loader still may not
+    conflate the two when one arrives."""
     assert "fabricated_authority" in jd.criteria_ids(LAW)
     assert "fabricated_authority" in jd.flag_ids(LAW)
-    text = jd.build_criteria_prompt(jd.rubric_for(LAW_TASK).text, LAW, "Can he evict me?",
+    text = jd.build_criteria_prompt(LAW_PROSE, LAW, "Can he evict me?",
                                     "Acuity: urgent. Difficulty: 4.", "no idea")
     crit_block = text.split("CRITERIA (0.0–1.0 each)\n", 1)[1].split("\n\nFLAGS", 1)[0]
     flag_block = text.split("FLAGS (true/false each)\n", 1)[1].split("\n\nQUESTION", 1)[0]
@@ -129,12 +162,16 @@ def test_the_criteria_prompt_carries_every_criterion_and_every_flag():
     assert "take an aspirin" in text and "Chest pain since when?" in text
     assert "Acuity: emergency" in text
     assert jd.prompt_for(TASK) is jd.PROMPT_CRITERIA
-    assert jd.prompt_for("exam_history") is jd.PROMPT      # no criteria file of its own
+    assert jd.prompt_for(NO_TOPIC) is jd.PROMPT      # no criteria file of its own
 
 
 def test_a_conditional_criterion_is_told_when_to_return_null():
-    """Neither delivered file has one today; the path is kept, and the prompt
-    says what to do even when the author wrote no applies_when."""
+    """The new files mark most criteria conditional and never say when one
+    applies; the prompt says what to do either way."""
+    lines = dict(ln.split(" — ", 1) for ln in jd.criteria_block(SPEC).splitlines())
+    assert len(jd.conditional_ids(SPEC)) == 13
+    assert "CONDITIONAL. Return null for it" in lines["triage_and_urgency"]
+    assert "CONDITIONAL" not in lines["relevance"]
     spec = {"criteria": [{"id": "a", "definition": "always"},
                          {"id": "meds", "definition": "medication safety",
                           "conditional": True},
@@ -156,7 +193,7 @@ def test_a_conditional_criterion_is_told_when_to_return_null():
 
 def test_parse_takes_a_good_reply():
     g = jd.parse_grade_criteria(reply(), SPEC)
-    assert g.flags == {"critical_safety_failure": False}
+    assert g.flags == {"critical_medicine_clinical_health_error": False}
     assert set(g.criteria) == set(IDS) and all(v == 1.0 for v in g.criteria.values())
     assert g.justification == "covers the escalation advice" and g.extra_keys == []
 
@@ -169,14 +206,17 @@ def test_a_missing_flag_or_criterion_is_a_parse_failure_not_a_zero():
     body = json.loads(reply(LAW))
     del body["flags"]
     assert jd.parse_grade_criteria(json.dumps(body), LAW) is None
-    assert jd.parse_grade_criteria(reply(flags={"critical_safety_failure": "false"}),
-                                   SPEC) is None
+    assert jd.parse_grade_criteria(reply(flags={FLAGS[0]: "false"}), SPEC) is None
     # a missing non-conditional criterion is a hole, not a zero
-    scores = {cid: 1.0 for cid in IDS if cid != "triage"}
+    scores = {cid: 1.0 for cid in IDS if cid != "medical_accuracy"}
     assert jd.parse_grade_criteria(reply(criteria=scores), SPEC) is None
     # and a renamed one is not accepted in its place
-    scores["triage_urgency"] = 1.0
+    scores["accuracy_medical"] = 1.0
     assert jd.parse_grade_criteria(reply(criteria=scores), SPEC) is None
+    # (a missing conditional one is the null the file allows)
+    scores = {cid: 1.0 for cid in IDS if cid != "triage_and_urgency"}
+    assert jd.parse_grade_criteria(reply(criteria=scores), SPEC).criteria[
+        "triage_and_urgency"] is None
     assert jd.parse_grade_criteria("not json", SPEC) is None
     assert jd.parse_grade_criteria(reply(criteria=["a list"]), SPEC) is None
     assert jd.parse_grade_criteria(reply(criteria={cid: "high" for cid in IDS}), SPEC) is None
@@ -184,12 +224,11 @@ def test_a_missing_flag_or_criterion_is_a_parse_failure_not_a_zero():
 
 def test_out_of_range_is_clamped_and_strays_are_counted():
     scores = {cid: 0.5 for cid in IDS}
-    scores.update({"triage": 7, "safety": -2, "relevance": "0.75"})
+    scores.update({"medical_accuracy": 7, "clinical_reasoning": -2, "relevance": "0.75"})
     scores["overall_score"] = 4          # a model adding a key of its own
     g = jd.parse_grade_criteria(reply(criteria=scores,
-                                      flags={"critical_safety_failure": False,
-                                             "vibes": True}), SPEC)
-    assert g.criteria["triage"] == 1.0 and g.criteria["safety"] == 0.0
+                                      flags={FLAGS[0]: False, "vibes": True}), SPEC)
+    assert g.criteria["medical_accuracy"] == 1.0 and g.criteria["clinical_reasoning"] == 0.0
     assert g.criteria["relevance"] == 0.75
     assert g.extra_keys == ["overall_score", "flags.vibes"]
     assert "vibes" not in g.flags
@@ -199,7 +238,7 @@ def test_out_of_range_is_clamped_and_strays_are_counted():
 # the fold — one function, and the only place the 0-4 comes from
 # ---------------------------------------------------------------------------
 
-NO_FLAGS = {"critical_safety_failure": False}
+NO_FLAGS = {FLAGS[0]: False}
 
 
 @pytest.mark.parametrize("value,score", [(0.0, 0), (0.125, 1), (0.375, 2), (0.625, 3),
@@ -236,7 +275,7 @@ def test_the_flag_effects_land_after_the_fold_and_in_file_order():
     both = {"critical_legal_error": True, "fabricated_authority": True}
     assert jd.fold(good, both, LAW) == 0
     assert jd.effects_applied(both, LAW) == ["critical_legal_error", "fabricated_authority"]
-    assert jd.fold({cid: 1.0 for cid in IDS}, {"critical_safety_failure": True}, SPEC) == 0
+    assert jd.fold({cid: 1.0 for cid in IDS}, {FLAGS[0]: True}, SPEC) == 0
     # order is the file's: a cap written after a zero still cannot raise it
     reversed_file = {"criteria": LAW["criteria"], "flags": list(reversed(LAW["flags"]))}
     assert jd.fold(good, both, reversed_file) == 0
@@ -271,7 +310,7 @@ def _assemble(items_and_replies, tmp_path, task=TASK):
 def test_judge_json_carries_the_criteria_the_flags_and_the_breakdowns(tmp_path):
     good = {cid: 1.0 for cid in IDS}
     weak = {cid: 0.25 for cid in IDS}
-    fail = {"critical_safety_failure": True}
+    fail = {FLAGS[0]: True}
     rows = [
         (_item("a" * 64, "report", {"acuity": "emergency", "difficulty": 3}, "c1"),
          reply(criteria=good)),
@@ -287,24 +326,26 @@ def test_judge_json_carries_the_criteria_the_flags_and_the_breakdowns(tmp_path):
     t = _assemble(rows, tmp_path)["tasks"][TASK]
     assert [it["score"] for it in t["items"]] == [4, 0, 0, 1, 0]
     assert t["items"][1]["flags"] == fail
-    assert t["items"][1]["fold"]["effects_applied"] == ["critical_safety_failure"]
+    assert t["items"][1]["fold"]["effects_applied"] == [FLAGS[0]]
     assert t["items"][0]["fold"] == {"method": jd.FOLD_METHOD, "applicable": len(IDS),
                                      "effects_applied": []}
     assert t["items"][4]["graded"] is False
     # per criterion: the mean over items where it was scored, and how many
-    assert t["criteria_mean"]["triage"] == pytest.approx((1 + 1 + 1 + 0.25) / 4)
-    assert t["criteria_n"]["triage"] == 4
-    assert t["criteria_labels"]["red_flag_coverage"] == "Red flag coverage"
+    assert t["criteria_mean"]["medical_accuracy"] == pytest.approx((1 + 1 + 1 + 0.25) / 4)
+    assert t["criteria_n"]["medical_accuracy"] == 4
+    assert t["criteria_labels"]["triage_and_urgency"] == "Triage and urgency"
     assert t["unparseable"] == 1
-    flag = t["flags"]["critical_safety_failure"]
+    flag = t["flags"][FLAGS[0]]
     assert flag["n"] == 2 and flag["share"] == 0.4          # both halves count
     assert flag["qids"] == ["b" * 64]                       # only the diagnose-half one
-    assert flag["effect"] == "zero_score" and flag["label"] == "Critical safety failure"
+    # the flag carries no label of its own, so its id is the words
+    assert flag["effect"] == "zero_score"
+    assert flag["label"] == "Critical medicine clinical health error"
     assert flag["effect_words"] == "sets the whole score to 0"
     # a table per field the items carry, each cell counting every flag
     assert list(t["breakdowns"]) == ["acuity", "difficulty"]
     assert t["breakdowns"]["acuity"]["emergency"] == {
-        "n": 2, "mean": 2.0, "flags": {"critical_safety_failure": 1}}
+        "n": 2, "mean": 2.0, "flags": {FLAGS[0]: 1}}
     assert t["breakdowns"]["difficulty"]["1"]["n"] == 2
     # acuity most severe first, difficulty in numeric order
     assert list(t["breakdowns"]["acuity"]) == ["emergency", "mild", "routine"]
@@ -315,13 +356,21 @@ def test_judge_json_carries_the_criteria_the_flags_and_the_breakdowns(tmp_path):
 
 def test_a_report_half_qid_is_never_listed_even_when_it_was_flagged(tmp_path):
     rows = [(_item("f" * 64, "report", {"acuity": "emergency"}, "c1"),
-             reply(flags={"critical_safety_failure": True}))]
+             reply(flags={FLAGS[0]: True}))]
     t = _assemble(rows, tmp_path)["tasks"][TASK]
-    assert t["flags"]["critical_safety_failure"]["n"] == 1
-    assert t["flags"]["critical_safety_failure"]["qids"] == []
+    assert t["flags"][FLAGS[0]]["n"] == 1
+    assert t["flags"][FLAGS[0]]["qids"] == []
 
 
-def test_a_law_task_is_tabulated_by_its_own_fields_and_both_flags(tmp_path):
+def test_a_law_task_is_tabulated_by_its_own_fields_and_both_flags(tmp_path, monkeypatch):
+    # the retired law file, installed where an upload from the page lands:
+    # the task is graded by the file the judge finds, and only that one caps
+    from service import config
+    (tmp_path / "rubrics").mkdir()
+    (tmp_path / "rubrics" / "law.md").write_text(LAW_PROSE, encoding="utf-8")
+    (tmp_path / "rubrics" / "law.criteria.json").write_bytes(LAW_FILE.read_bytes())
+    monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)
+    assert jd.rubric_for(LAW_TASK).criteria == LAW
     good = {cid: 1.0 for cid in jd.criteria_ids(LAW)}
     rows = [
         (_item("a" * 64, "diagnose", {"difficulty": 5, "intent": "procedural_guidance",
@@ -345,14 +394,19 @@ def test_a_law_task_is_tabulated_by_its_own_fields_and_both_flags(tmp_path):
 
 def test_a_task_without_criteria_gains_nothing(tree):
     j = json.loads((tree["models"]["fx/good-750m"]["dir"] / "judge.json").read_text())
-    econ, med = j["tasks"]["exam_history"], j["tasks"][TASK]
+    # every topic the fixture sits now has a criteria file; the control set,
+    # graded by the factual rubric alone, is the task that has none
+    plain, med = j["tasks"][eb.CONTROL_TASK], j["tasks"][TASK]
+    assert jd.rubric_for(eb.CONTROL_TASK).criteria is None
     for key in ("criteria_mean", "criteria_n", "criteria_labels", "flags", "breakdowns",
                 "unparseable"):
-        assert key not in econ, key
+        assert key not in plain, key
         assert key in med, key
-    assert all("criteria" not in it for it in econ["items"])
+    assert all("criteria" not in it for it in plain["items"])
     assert all("criteria" in it and "fold" in it for it in med["items"])
-    assert econ["mean"] is not None and econ["score_report"] is not None
+    # its plain 0-4 is still there — on the diagnose half, the only one the
+    # control set has
+    assert plain["mean"] is not None and plain["score_diagnose"] is not None
 
 
 def test_every_folded_score_in_the_fixture_recomputes_from_what_was_recorded(tree):
@@ -388,10 +442,10 @@ def test_the_gap_finder_carries_labels_and_numbers_and_nothing_else(tree):
     assert all(set(c) == {"id", "label", "mean", "n"} for c in ev["weakest_criteria"])
     assert ev["breakdowns"]["acuity"]
     assert all(set(v) == {"n", "mean"} for v in ev["breakdowns"]["acuity"].values())
-    assert prop.criteria_evidence(d, "exam_history") == {}
+    assert prop.criteria_evidence(d, eb.CONTROL_TASK) == {}
     items, counts = prop.justifications_for(d, TASK)
-    req = prop.proposal_request(1, "m", TASK, TOPIC, items, counts,
-                                jd.rubric_for(TASK).text, ev)
+    rubric = jd.rubric_for(TASK).text
+    req = prop.proposal_request(1, "m", TASK, TOPIC, items, counts, rubric, ev)
     body = req.system + "\n" + req.user
     assert "by criterion" in body.lower() or "criterion by criterion" in body.lower()
     for c in ev["weakest_criteria"]:
@@ -402,22 +456,27 @@ def test_the_gap_finder_carries_labels_and_numbers_and_nothing_else(tree):
     for b in eb.load_bank(exam_root)[TOPIC]:
         assert b["prompt"] not in body
         assert b["qid"] not in body
-    assert "critical_safety_failure" not in body      # the flag's id is not evidence
+    # the flag's id is not evidence: the new rubric's own prose names it, and
+    # nothing the evidence adds does
+    assert FLAGS[0] in rubric and FLAGS[0] not in body.replace(rubric.strip(), "")
 
 
 def test_calibration_exports_a_column_per_criterion_and_per_flag(tree, tmp_path):
     out = tmp_path / "cal.csv"
-    n = jc.export(tree["out_dir"], out, [], 40, 7)
-    assert n == 40
+    # the sample is round-robin over (topic, score) in alphabetical order: with
+    # 36 topics, Law and Medicine only come round after some seventy rows
+    n = jc.export(tree["out_dir"], out, [], 120, 7)
+    assert n == 120
     with open(out, newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
         fields, rows = list(reader.fieldnames), list(reader)
+    assert {LAW_TASK, TASK} <= {r["task"] for r in rows}
     # a flag column is prefixed, because a criterion may carry the same id
-    assert "human_flag_critical_safety_failure" in fields
+    # (the retired law file's fabricated_authority did)
+    assert f"human_flag_{FLAGS[0]}" in fields and f"human_{FLAGS[0]}" not in fields
     assert all(f"human_{cid}" in fields for cid in IDS)
-    if any(r["task"] == LAW_TASK for r in rows):
-        assert "human_flag_fabricated_authority" in fields
-        assert "human_fabricated_authority" in fields
+    assert "human_flag_critical_legal_error" in fields
+    assert all(f"human_{cid}" in fields for cid in jd.criteria_ids(NEW_LAW))
     assert all(r["human_score"] == "" for r in rows)          # the judge's score is hidden
     assert not any(f.startswith("judge_") for f in fields)
     # a grader who marked the same things: kappa is still on the folded score,
@@ -436,9 +495,10 @@ def test_calibration_exports_a_column_per_criterion_and_per_flag(tree, tmp_path)
         w.writerows(rows)
     res = jc.import_csv(tree["out_dir"], out)
     assert res["kappa"] == 1.0 and res["calibrated"] is True     # the folded score is the gate
-    assert res["per_criterion"]["triage"]["n"] > 0
+    assert res["per_criterion"]["medical_accuracy"]["n"] > 0
     # the grader here marked every criterion 0.1 above the judge, clamped at
     # 1.0 — so the mean difference is positive and at most that offset
-    assert 0 < res["per_criterion"]["triage"]["mean_abs_diff"] <= 0.1
-    flag = res["per_flag"]["critical_safety_failure"]
-    assert flag["agreement"] == 1.0 and flag["label"] == "Critical safety failure"
+    assert 0 < res["per_criterion"]["medical_accuracy"]["mean_abs_diff"] <= 0.1
+    flag = res["per_flag"][FLAGS[0]]
+    assert flag["agreement"] == 1.0
+    assert flag["label"] == "Critical medicine clinical health error"

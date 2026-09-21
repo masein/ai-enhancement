@@ -1,0 +1,180 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the historical or archaeological task, evidence, period, and analytical question asked. Irrelevant fact lists, unrelated context, or generic theory do not earn credit.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "historical_accuracy",
+      "name": "Historical Accuracy",
+      "definition": "Uses historically accurate chronology, institutions, actors, concepts, and regional context when relevant. Distinguishes a minor date slip from errors that reverse sequence, create anachronism, or materially alter the interpretation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "archaeological_accuracy",
+      "name": "Archaeological Accuracy",
+      "definition": "Accurately reasons from archaeological evidence, context, preservation, sampling, and formation processes where applicable; does not equate an artifact directly with behavior, ethnicity, religion, or political form without supporting evidence.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "chronological_reasoning",
+      "name": "Chronological Reasoning",
+      "definition": "Establishes correct temporal order, duration, overlap, and relative/absolute sequence. Penalizes chronology-reversing errors far more heavily than minor non-central date imprecision.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "source_criticism",
+      "name": "Source Criticism",
+      "definition": "Evaluates provenance, authorship, audience, purpose, information access, incentives, omissions, survival, source dependence, and evidential limits. Merely calling a source 'biased' is insufficient.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "primary_source_interpretation",
+      "name": "Primary Source Interpretation",
+      "definition": "Interprets what a primary source can and cannot support in light of genre, context, intended use, audience, and corroboration. Does not treat contemporaneity or primary status as automatic truthfulness.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "historical_contextualization",
+      "name": "Historical Contextualization",
+      "definition": "Explains actors, institutions, texts, categories, and decisions within their political, social, economic, cultural, technological, environmental, and institutional setting, avoiding distortive presentism.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "causal_reasoning",
+      "name": "Causal Reasoning",
+      "definition": "Distinguishes sequence from causation, triggers from deeper causes, and correlation from mechanism; considers structural, institutional, contingent, and unintended effects without treating outcomes as inevitable.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "historiographical_reasoning",
+      "name": "Historiographical Reasoning",
+      "definition": "Represents plausible scholarly interpretations fairly, identifies assumptions and evidential differences, and explains how new evidence, methods, or questions can change conclusions without assuming newer scholarship is automatically correct.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "comparative_and_global_reasoning",
+      "name": "Comparative and Global Reasoning",
+      "definition": "Compares genuinely comparable dimensions, preserves regional and temporal context, recognizes common mechanisms and differences, and avoids treating one region's institutions or periodization as the universal default.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "material_culture_reasoning",
+      "name": "Material Culture Reasoning",
+      "definition": "Separates observed object properties from inferred function, exchange, status, identity, or social meaning; supports inferences with technological, spatial, compositional, use-wear, contextual, or comparative evidence where relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "stratigraphy_and_context_reasoning",
+      "name": "Stratigraphy and Context Reasoning",
+      "definition": "Correctly reasons about superposition, cuts, fills, interfaces, primary/secondary context, residuality, intrusion, reuse, redeposition, and association. Fundamental reversal of a supplied stratigraphic sequence is a severe error.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "dating_and_chronology_reasoning",
+      "name": "Dating and Chronology Reasoning",
+      "definition": "Distinguishes relative from chronometric dating, sample age from event age, and ranges from exact dates; considers calibration, contamination, old-wood/reuse effects, sample association, and compatibility with stratigraphy.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_and_spatial_reasoning",
+      "name": "Quantitative and Spatial Reasoning",
+      "definition": "Uses appropriate units, denominators, rates, stocks/flows, boundaries, spatial scales, detection probabilities, and comparability assumptions; recognizes changing definitions, missing data, and survey/recovery bias.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_integration",
+      "name": "Evidence Integration",
+      "definition": "Explains how textual, material, environmental, demographic, oral, spatial, and quantitative evidence corroborate, contradict, constrain, or complement one another without automatically privileging one evidence type.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_uncertainty_and_alternatives",
+      "name": "Assumptions, Uncertainty, and Alternatives",
+      "definition": "Makes assumptions explicit, calibrates confidence, distinguishes absence of evidence from evidence of absence where appropriate, and considers plausible alternative interpretations. Does not present contested or incomplete evidence with unwarranted certainty.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "heritage_and_research_ethics",
+      "name": "Heritage and Research Ethics",
+      "definition": "Where relevant, distinguishes scientific interest, legal ownership/permission, provenance, descendant-community concerns, destructive analysis, stewardship, looting risks, publication duties, and jurisdiction-specific heritage obligations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Addresses the material parts of the prompt and the evidence needed to support the conclusion. Minor omissions are distinguished from missing an essential source, causal mechanism, dating issue, or contextual constraint.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internal consistency across chronology, causal claims, source evaluation, quantitative interpretation, and archaeological sequence; does not contradict its own premises or evidence.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Presents a coherent, precise, and intelligible argument that separates evidence, inference, uncertainty, and conclusion. Jargon, theory names, citations, or fact volume do not substitute for reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_history_archaeology_error",
+    "condition": "A materially false central historical, chronological, archaeological, evidential, or causal claim that fundamentally invalidates the answer or reverses the substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Placing a central event, institution, technology, or source in the wrong historical period in a way that invalidates the argument.",
+      "Reversing the chronology of key events or materially confusing BCE and CE sequencing.",
+      "Inventing a primary source or archaeological finding central to the answer.",
+      "Materially misattributing a source when authorship is essential to interpretation.",
+      "Treating a source written centuries later as contemporary eyewitness evidence without qualification.",
+      "Treating dependent accounts as independent corroboration when the supplied evidence clearly shows textual dependence.",
+      "Claiming chronology alone establishes causation when the conclusion depends on that claim.",
+      "Using an anachronistic political or national category as if it existed unchanged in the earlier period when the conclusion depends on it.",
+      "Treating a contingent historical development as inevitable when the prompt explicitly supplies viable alternatives.",
+      "Fundamentally misreading stratigraphic superposition or a supplied cut/fill relationship.",
+      "Treating disturbed material as secure primary context despite explicit evidence of disturbance.",
+      "Treating an intrusive artifact as dating an earlier sealed deposit.",
+      "Treating a radiocarbon estimate as the exact date of an event despite supplied uncertainty or sample-association problems.",
+      "Ignoring an old-wood, reuse, contamination, or association problem that reverses the archaeological chronology.",
+      "Inferring ethnicity or political identity directly from one artifact style when the prompt explicitly supplies contrary evidence.",
+      "Treating absence of finds as definitive absence despite clearly inadequate survey coverage.",
+      "Ignoring a major preservation or recovery bias that reverses the archaeological conclusion.",
+      "Making a major demographic or quantitative error that reverses the historical conclusion.",
+      "Presenting a contested interpretation as certain despite supplied conflicting primary or archaeological evidence."
+    ],
+    "not_critical_examples": [
+      "Minor date errors that do not affect chronology.",
+      "Small arithmetic errors that do not change the conclusion.",
+      "Minor terminology mistakes.",
+      "Reasonable alternative interpretations or legitimate historiographical disagreement.",
+      "Reasonable uncertainty or cautious causal claims.",
+      "Minor omissions or reasonable approximations.",
+      "Different defensible periodization choices.",
+      "Minor artifact-identification differences that do not affect interpretation."
+    ]
+  }
+}

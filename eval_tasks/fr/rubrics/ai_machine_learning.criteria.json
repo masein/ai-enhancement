@@ -1,0 +1,189 @@
+{
+  "benchmark": "AI & Machine Learning",
+  "score_scale": {
+    "min": 0,
+    "max": 4
+  },
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the specific AI/ML question, requested decision, and supplied scenario without substituting a different problem or spending substantial space on irrelevant background.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "ai_ml_accuracy",
+      "name": "AI/ML Accuracy",
+      "definition": "Makes technically correct central claims about AI, machine learning, data, models, training, inference, evaluation, deployment, and system behavior.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Keeps important distinctions clear, including training vs inference, validation vs test, prediction vs causation, confidence vs correctness, discrimination vs calibration, retrieval vs generation, and model vs system capability.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "model_reasoning",
+      "name": "Model Reasoning",
+      "definition": "When model choice or behavior is relevant, explains mechanisms, assumptions, inductive biases, limitations, and trade-offs rather than relying on architecture names or parameter count alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When numerical reasoning is required, uses the correct quantities, denominators, formulas or probability logic, performs the calculation accurately, and interprets the result in context.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "data_reasoning",
+      "name": "Data Reasoning",
+      "definition": "When data is relevant, correctly analyzes representativeness, labels, missingness, imbalance, leakage, contamination, duplicates, provenance, sampling, preprocessing, and dataset limitations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "training_and_optimization_reasoning",
+      "name": "Training and Optimization Reasoning",
+      "definition": "When training behavior is relevant, distinguishes optimization problems from data, capacity, regularization, and generalization issues and interprets losses, gradients, learning rates, and stopping behavior appropriately.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "generalization_reasoning",
+      "name": "Generalization Reasoning",
+      "definition": "When performance beyond the training data matters, correctly reasons about overfitting, underfitting, train-validation-test separation, bias-variance behavior, domain mismatch, and transfer to deployment conditions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evaluation_reasoning",
+      "name": "Evaluation Reasoning",
+      "definition": "When evaluation is relevant, identifies the intended construct, selects metrics that match objectives and error costs, preserves independent test evidence, recognizes contamination and evaluator bias, and accounts for statistical and practical uncertainty.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "llm_and_generative_ai_reasoning",
+      "name": "LLM and Generative AI Reasoning",
+      "definition": "When generative AI is relevant, accurately reasons about tokenization, context, attention, prompting, pretraining, adaptation, sampling, hallucination, generative mechanisms, retrieval grounding, and their limitations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "system_level_reasoning",
+      "name": "System-Level Reasoning",
+      "definition": "When an AI system has multiple components, traces behavior across model, retriever, tools, data stores, orchestration, validators, cache, monitoring, policy controls, and human workflow rather than attributing everything to the base model.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "failure_analysis",
+      "name": "Failure Analysis",
+      "definition": "When diagnosing errors, localizes plausible root causes, distinguishes systematic from incidental failures, proposes discriminating tests, and avoids vague advice that would not isolate the responsible component.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions",
+      "name": "Assumptions",
+      "definition": "When conclusions depend on assumptions, states or tests the material assumptions instead of silently treating them as facts; flags underdetermined cases rather than fabricating certainty.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_and_calibration",
+      "name": "Uncertainty and Calibration",
+      "definition": "When probabilities or uncertainty matter, distinguishes confidence from correctness, calibration from discrimination, and aleatoric or data uncertainty from model or knowledge uncertainty where useful; supports abstention or qualification when warranted.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "robustness_and_shift_reasoning",
+      "name": "Robustness and Shift Reasoning",
+      "definition": "When deployment conditions may vary, considers realistic perturbations, subgroups, rare cases, OOD inputs, covariate or concept changes, temporal or geographic drift, and whether the system degrades gracefully.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "safety_and_deployment_reasoning",
+      "name": "Safety and Deployment Reasoning",
+      "definition": "When deployment or safety is relevant, considers permissions, misuse and accidental harm, fallback behavior, monitoring, escalation, human oversight quality, privacy/security constraints, and consequences of failure.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the question and the factors necessary to support the conclusion, while allowing concise answers when the task is simple.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally compatible claims, calculations, assumptions, and recommendations; does not contradict its own stated evidence or reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Presents the reasoning in a precise, understandable way with enough structure to follow the conclusion, without rewarding unnecessary jargon, length, or architecture-name dropping.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "practical_ai_judgment",
+      "name": "Practical AI Judgment",
+      "definition": "When a design or decision is requested, connects technical evidence to the real objective, constraints, operational capacity, trade-offs, uncertainty, monitoring needs, and acceptable failure behavior rather than asserting a context-free best choice.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_ai_machine_learning_error",
+    "condition": "A materially false central AI, machine-learning, quantitative, evaluation, causal, or system-design claim that fundamentally invalidates the answer or reverses its substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Recommending evaluation on the training set as valid evidence of generalization.",
+      "Fundamentally misinterpreting train, validation, and test sets.",
+      "Accepting severe target or temporal leakage as legitimate predictive information.",
+      "Making a major metric calculation error that reverses the conclusion.",
+      "Claiming high accuracy on an extremely imbalanced dataset necessarily implies a useful model.",
+      "Fundamentally reversing precision and recall where the distinction determines the decision.",
+      "Claiming high confidence guarantees correctness.",
+      "Claiming a high benchmark score proves universal model superiority.",
+      "Claiming correlation, attention weight, or feature importance proves causation.",
+      "Fundamentally misinterpreting calibration.",
+      "Claiming retrieval automatically prevents hallucination.",
+      "Treating a retrieval failure as proof that the language model lacks the knowledge, without evidence.",
+      "Claiming repeated tuning on the test set leaves it unbiased.",
+      "Claiming more parameters, data, or compute necessarily guarantee better task performance.",
+      "Claiming a generated explanation is necessarily a faithful description of internal computation.",
+      "Endorsing obvious specification gaming as successful reward design.",
+      "Claiming a human-in-the-loop design automatically guarantees safety.",
+      "Ignoring an explicit material distribution shift when drawing a deployment conclusion.",
+      "Making a major end-to-end reliability calculation error that reverses the conclusion.",
+      "Treating benchmark contamination or memorized answers as valid evidence of generalization.",
+      "Fabricating experimental results, tool outputs, or measurements required to support the conclusion."
+    ],
+    "non_examples": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Small terminology mistakes.",
+      "Harmless approximation differences.",
+      "Reasonable architecture disagreements.",
+      "Defensible alternative metrics or thresholds when justified.",
+      "Reasonable hyperparameter choices.",
+      "Legitimate differences in system design.",
+      "Small omissions.",
+      "Reasonable uncertainty.",
+      "Minor imprecision that does not materially alter the model, evaluation, or deployment conclusion."
+    ]
+  }
+}

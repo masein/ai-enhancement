@@ -1,0 +1,175 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Addresses the actual question and prioritizes information that bears on the requested conclusion, interpretation, or task rather than drifting into unrelated material.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "factual_accuracy",
+      "name": "Factual Accuracy",
+      "definition": "Uses materially correct factual claims. Central errors that change the reasoning or conclusion are penalized more heavily than minor peripheral imperfections.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "reasoning_quality",
+      "name": "Reasoning Quality",
+      "definition": "Connects premises, evidence, and conclusions through valid and appropriately complete reasoning, avoiding unsupported leaps, circularity, and conclusions that do not follow.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Uses relevant concepts and distinctions correctly, including scope, definitions, categories, necessary versus sufficient conditions, and claims at the appropriate level of generality.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When numerical reasoning is required, selects correct quantities, denominators, units, formulas or arithmetic, and interprets the numerical result in context.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_evaluation",
+      "name": "Evidence Evaluation",
+      "definition": "When evidence is supplied or discussed, assesses how strongly it supports the claim, considering design, sample, controls, uncertainty, alternatives, and whether the evidence matches the conclusion.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "causal_reasoning",
+      "name": "Causal Reasoning",
+      "definition": "When causation matters, distinguishes association from causation, identifies plausible mechanisms and confounders, and does not claim causality beyond what the evidence or assumptions support.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "source_criticism",
+      "name": "Source Criticism",
+      "definition": "When sources matter, evaluates relevance, expertise, independence, methodology, provenance, incentives, context, and corroboration rather than relying on source labels alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "multidisciplinary_synthesis",
+      "name": "Multidisciplinary Synthesis",
+      "definition": "When multiple domains are relevant, connects them through coherent mechanisms, avoids cross-domain contradictions, and includes only disciplines that materially improve the analysis.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "contextual_understanding",
+      "name": "Contextual Understanding",
+      "definition": "Interprets facts, claims, data, or events in the relevant historical, geographic, scientific, social, institutional, linguistic, or practical context.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "assumptions",
+      "name": "Assumptions",
+      "definition": "When conclusions depend on unstated or uncertain premises, identifies the material assumptions, explains their role, and avoids smuggling them in as facts.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_calibration",
+      "name": "Uncertainty Calibration",
+      "definition": "When uncertainty is material, matches confidence to evidence strength and distinguishes what is established, highly supported, plausible, possible, speculative, or not determined.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "data_interpretation",
+      "name": "Data Interpretation",
+      "definition": "When tables, charts, rates, averages, samples, or trends are involved, reads them correctly, uses appropriate comparisons, and notices misleading scales, denominators, aggregation, or selection.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "comparison_and_tradeoffs",
+      "name": "Comparison and Trade-offs",
+      "definition": "When alternatives are compared, uses relevant dimensions consistently, identifies material benefits, costs, risks, distributional effects, and opportunity costs without forcing a false single winner.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "method_selection",
+      "name": "Method Selection",
+      "definition": "When a solution method must be chosen, selects an approach appropriate to the question and available information, including the right calculation, evidence type, experiment, comparison, or troubleshooting sequence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "error_detection",
+      "name": "Error Detection",
+      "definition": "When a flawed claim or method is presented, identifies the actual mechanism of error and explains why it matters rather than merely naming a fallacy or bias.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the major components needed for a useful answer at the requested depth, including important constraints, alternatives, or missing information, without requiring exhaustive coverage of every conceivable point.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internal consistency across factual claims, calculations, definitions, assumptions, and conclusions, including when integrating several domains.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Explains the reasoning in a clear, interpretable, and appropriately structured way, with enough detail to show how the conclusion follows but without rewarding unnecessary length or jargon.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "practical_usefulness",
+      "name": "Practical Usefulness",
+      "definition": "When the task is practical, gives analysis that can guide action by identifying objectives, constraints, risks, trade-offs, next checks, or decision-relevant information without pretending one option is universally best.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_general_multidisciplinary_error",
+    "condition": "A materially false central factual, logical, quantitative, scientific, historical, geographic, causal, or evidentiary claim that fundamentally invalidates the response or reverses its substantive conclusion. This includes fabricated evidence required for the conclusion, a decisive misreading of supplied evidence, a central correlation-as-causation error, a major quantitative error that changes the conclusion, fundamentally impossible scientific reasoning, a chronology or geographic error that determines the answer, a logically invalid inference that destroys the conclusion, asserting a unique answer when the supplied information clearly underdetermines it, or a cross-disciplinary synthesis whose central conclusion depends on mutually incompatible claims.",
+    "effect": "score=0",
+    "examples": [
+      "A materially false central factual claim that changes the answer.",
+      "A major quantitative or unit error that reverses the conclusion.",
+      "Fundamentally impossible physical or scientific reasoning used as the core explanation.",
+      "A seriously incorrect chronology that invalidates the historical reasoning.",
+      "A major geographic error that determines the answer.",
+      "Treating correlation as proof of causation when that inference is central.",
+      "Fundamentally misreading a supplied table, chart, or body of evidence.",
+      "Fabricating evidence or facts required for the conclusion.",
+      "Reversing a central causal relationship.",
+      "Basing the conclusion on a logically invalid inference that destroys it.",
+      "Claiming the information uniquely determines an answer when it clearly does not.",
+      "Presenting speculation as established fact when that distinction is central.",
+      "Materially mischaracterizing the strongest source or evidence.",
+      "A multidisciplinary conclusion that depends on mutually incompatible claims."
+    ],
+    "not_critical_examples": [
+      "Minor factual inaccuracies that do not affect the conclusion.",
+      "Minor arithmetic mistakes or harmless rounding.",
+      "Small omissions or stylistic weaknesses.",
+      "Legitimate differences in interpretation.",
+      "Reasonable approximations or clearly stated alternative assumptions.",
+      "Failure to mention a secondary consideration.",
+      "A different but reasonable practical recommendation.",
+      "Cautious qualification where certainty is impossible."
+    ]
+  }
+}

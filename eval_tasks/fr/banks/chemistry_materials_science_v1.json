@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A sample contains 4.00 g H2 and 32.0 g O2. For 2 H2 + O2 -> 2 H2O, determine the limiting reagent, the theoretical mass of water, and the mass of excess reagent remaining. Use M(H2)=2.016 g/mol, M(O2)=32.00 g/mol, M(H2O)=18.015 g/mol.",
+    "intent": "Apply stoichiometry, identify the limiting reagent, and check mass consistency.",
+    "domain": "General Chemistry & Stoichiometry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "stoichiometric",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A process engineer feeds 10.0 mol N2 and 24.0 mol H2 to a reactor for N2 + 3 H2 -> 2 NH3. The single-pass conversion of the limiting reagent is 60.0%. Determine moles of NH3 produced and moles of each reactant leaving. State why using 60% of the stoichiometric NH3 maximum is or is not equivalent here.",
+    "intent": "Reason from stoichiometric extent and conversion rather than plug-in yield alone.",
+    "domain": "General Chemistry & Stoichiometry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A compound contains only C, H, and O. Combustion of 0.500 g produces 0.733 g CO2 and 0.300 g H2O. Determine the empirical formula. Use M(CO2)=44.01 g/mol and M(H2O)=18.015 g/mol.",
+    "intent": "Infer elemental mole ratios from combustion data.",
+    "domain": "General Chemistry & Stoichiometry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "stoichiometric",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "25.0 mL of 0.150 M CaCl2 is mixed with 40.0 mL of 0.100 M Na2CO3. Assuming complete precipitation of CaCO3 and additive volumes, determine the precipitate mass and concentrations of the major spectator ions after reaction. Use M(CaCO3)=100.09 g/mol.",
+    "intent": "Combine solution stoichiometry, limiting reagent analysis, and post-reaction concentrations.",
+    "domain": "General Chemistry & Stoichiometry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A 2.00 L vessel at 298 K contains 0.100 mol CH4 and 0.250 mol O2. Methane burns completely to CO2 and H2O(g) until one reactant is exhausted. Assuming ideal gases and the final temperature returns to 298 K, calculate the final total pressure. Use R=0.082057 L atm mol^-1 K^-1.",
+    "intent": "Use gas stoichiometry and ideal-gas reasoning after reaction.",
+    "domain": "General Chemistry & Stoichiometry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A 12.0 M HCl stock solution is used to prepare 500.0 mL of approximately 0.250 M HCl. Calculate the ideal stock volume. Then explain why the final concentration is defined by making the solution up to the final volume rather than by adding the calculated amount of water to the stock.",
+    "intent": "Apply dilution quantitatively and explain the physical meaning of final volume.",
+    "domain": "General Chemistry & Stoichiometry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A synthesis is reported to give 8.20 g product from 5.00 g of reagent A. The balanced reaction is 2 A -> B, M(A)=50.0 g/mol, M(B)=90.0 g/mol, and A is the only limiting reagent. Determine the reported percent yield and assess whether the report is chemically plausible under the stated assumptions.",
+    "intent": "Check a stated yield against stoichiometric limits and chemical feasibility.",
+    "domain": "General Chemistry & Stoichiometry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A student writes the ionic equation Al3+ + 2 OH- -> Al(OH)3(s). Identify the conservation error, write a balanced ionic equation, and explain why charge conservation is as important as atom conservation in solution stoichiometry.",
+    "intent": "Detect and correct a mass/charge-balance error.",
+    "domain": "General Chemistry & Stoichiometry",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "Chlorine has two common isotopes, 35Cl and 37Cl, with abundances 75.78% and 24.22%. Using isotopic masses 34.96885 u and 36.96590 u, calculate the average atomic mass and explain why no single chlorine atom has exactly that average mass.",
+    "intent": "Connect isotope abundance to weighted-average atomic mass.",
+    "domain": "Atomic Structure & Periodicity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "Compare the expected first ionization energies of Mg and Al and explain the well-known departure from a simple left-to-right increase across the period using orbital occupancy and shielding.",
+    "intent": "Explain a periodic-trend exception mechanistically.",
+    "domain": "Atomic Structure & Periodicity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "Rank Na, Na+, and F- by radius and justify the ordering using electron count, shell occupancy, and effective nuclear charge rather than a memorized trend alone.",
+    "intent": "Reason about atomic and ionic size from electronic structure.",
+    "domain": "Atomic Structure & Periodicity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "An Fe atom has ground-state electron configuration [Ar]3d6 4s2. For Fe2+ and Fe3+, give the likely electron configurations and state the number of unpaired electrons expected for isolated high-spin ions. Explain why 4s electrons are removed before 3d electrons.",
+    "intent": "Use electron configurations to reason about oxidation and magnetism.",
+    "domain": "Atomic Structure & Periodicity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A ceramic plate has coefficient of thermal expansion α=8.0e-6 K^-1. If a constrained 0.50 m length experiences a uniform temperature rise of 200 K, calculate the free thermal expansion it would have if unconstrained. Then explain qualitatively why a steep temperature gradient can cause thermal-shock cracking even when the average temperature is safe.",
+    "intent": "Connect thermal expansion, constraint, gradients, and thermal-shock failure.",
+    "domain": "Thermal Properties",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structure_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "Draw the major Lewis structures of NO3-, assign formal charges, and explain why the three N-O bonds are equivalent in the real ion even though an individual Lewis contributor contains one double bond.",
+    "intent": "Distinguish resonance contributors from rapidly interconverting structures and use formal charge correctly.",
+    "domain": "Chemical Bonding & Molecular Structure",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "structure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "CO2 has polar C=O bonds but zero molecular dipole in its equilibrium geometry, whereas H2O is polar. Explain the difference using geometry and vector addition of bond dipoles.",
+    "intent": "Distinguish bond polarity from molecular polarity.",
+    "domain": "Chemical Bonding & Molecular Structure",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "For O2, O2+, and O2-, use a qualitative molecular-orbital picture to compare bond order and magnetic behavior. State which species should have the shortest bond and why.",
+    "intent": "Apply MO occupancy to bond order and magnetism.",
+    "domain": "Chemical Bonding & Molecular Structure",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structure_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "NH3 and NF3 are both trigonal pyramidal, yet their dipole moments differ greatly. Explain why a VSEPR description alone cannot predict the magnitude of the dipole and what additional bonding information matters.",
+    "intent": "Recognize the limitations of VSEPR for quantitative polarity.",
+    "domain": "Chemical Bonding & Molecular Structure",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "Compare the dominant intermolecular forces in CH4, CH3Cl, and CH3OH and predict the qualitative boiling-point order. Distinguish those intermolecular forces from the covalent bonds inside each molecule.",
+    "intent": "Relate intermolecular forces to macroscopic boiling behavior.",
+    "domain": "Chemical Bonding & Molecular Structure",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "structure_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A ceramic powder compact is sintered at a higher temperature and develops lower porosity but noticeably larger grains. Explain the competing effects on density, strength, diffusion-controlled densification, and possible grain-growth penalties. State what microscopy and density measurements would test the explanation.",
+    "intent": "Trace sintering conditions through porosity and grain structure to properties.",
+    "domain": "Ceramics & Glasses",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "process_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "Using average bond enthalpies D(H-H)=436 kJ/mol, D(Cl-Cl)=243 kJ/mol, and D(H-Cl)=431 kJ/mol, estimate ΔH for H2 + Cl2 -> 2 HCl. State a key limitation of using average bond enthalpies.",
+    "intent": "Estimate reaction enthalpy from bond energies and discuss model limits.",
+    "domain": "Chemical Bonding & Molecular Structure",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A gas absorbs 500 J of heat and does 180 J of expansion work on the surroundings. Using the chemistry sign convention ΔU=q+w with w negative for work done by the system, calculate ΔU and explain why q and w are path-dependent whereas U is a state function.",
+    "intent": "Apply the first law and distinguish state from path functions.",
+    "domain": "Thermochemistry & Thermodynamics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A 50.0 g metal sample at 100.0 °C is placed in 100.0 g water at 20.0 °C in an insulated cup. Final temperature is 24.5 °C. Use c_water=4.184 J g^-1 K^-1 and neglect the cup heat capacity to determine the metal heat capacity. Identify the main approximation.",
+    "intent": "Use calorimetry and identify a modeling assumption.",
+    "domain": "Thermochemistry & Thermodynamics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "For a reaction, ΔH°=+50.0 kJ/mol and ΔS°=+120 J mol^-1 K^-1, assumed temperature-independent over the range considered. Estimate the temperature above which the reaction becomes thermodynamically favorable under standard-state conditions.",
+    "intent": "Interpret competing enthalpy and entropy terms in ΔG.",
+    "domain": "Thermochemistry & Thermodynamics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "thermodynamic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A reaction has ΔG°=-20.0 kJ/mol at 298 K but is experimentally negligible over several hours. Explain why this does not contradict thermodynamics, identify kinetic quantities that could explain the observation, and state what a catalyst can change and cannot change.",
+    "intent": "Distinguish thermodynamic favorability from kinetic accessibility and catalyst effects.",
+    "domain": "Thermochemistry & Thermodynamics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "thermodynamic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "At 298 K, a reaction has ΔG°=+5.70 kJ/mol. Calculate its equilibrium constant using ΔG°=-RT ln K with R=8.314 J mol^-1 K^-1. Explain why K less than 1 does not mean zero product forms.",
+    "intent": "Connect standard free energy to equilibrium quantitatively and conceptually.",
+    "domain": "Thermochemistry & Thermodynamics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A thermoplastic polymer is tested well below, near, and well above its glass-transition temperature Tg. Explain the expected changes in modulus and time-dependent deformation. Then explain how strain rate and physical aging can shift the observed response even though repeat-unit chemistry is unchanged.",
+    "intent": "Connect glass transition, viscoelastic timescales, strain rate, and aging.",
+    "domain": "Polymers",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "structure_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A liquid freezes spontaneously below its melting point even though the entropy of the liquid-to-solid system decreases. Explain using the entropy change of the surroundings and the total entropy change of the universe.",
+    "intent": "Distinguish system entropy from total entropy generation.",
+    "domain": "Thermochemistry & Thermodynamics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A phase transformation has a lower-Gibbs-energy product phase at 500 K but a large positive interfacial energy for nucleation. Explain how both facts can be true and why the lower-G phase may fail to appear on laboratory timescales.",
+    "intent": "Connect thermodynamic driving force, interfaces, and metastability.",
+    "domain": "Thermochemistry & Thermodynamics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "For CaCO3(s) ⇌ CaO(s) + CO2(g), write Kp and explain why the pure solids are omitted. If the measured CO2 pressure is below the equilibrium pressure at fixed temperature, predict the spontaneous direction of change.",
+    "intent": "Construct a heterogeneous equilibrium expression and use Q versus K.",
+    "domain": "Chemical Equilibrium",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "equilibrium_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "For N2O4(g) ⇌ 2 NO2(g), a 1.00 L vessel initially contains 0.100 mol N2O4 and no NO2. At equilibrium 0.040 mol N2O4 remains. Calculate Kc.",
+    "intent": "Determine equilibrium composition and compute Kc.",
+    "domain": "Chemical Equilibrium",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "During casting of the same alloy, one region cools much faster than another. Explain how cooling rate can change dendrite scale, segregation, porosity risk, and final mechanical properties. Identify which effects are equilibrium-composition issues and which arise from non-equilibrium solidification kinetics.",
+    "intent": "Connect casting cooling rate to solidification microstructure and properties.",
+    "domain": "Materials Processing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "process_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "AgCl(s) has Ksp=1.8e-10 at 25 °C. Estimate its molar solubility in pure water and in 0.100 M NaCl, neglecting activities. Explain the common-ion effect quantitatively.",
+    "intent": "Compare solubility with and without a common ion.",
+    "domain": "Chemical Equilibrium",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A metal ion M2+ forms ML2 with overall formation constant β2=1.0e8. A sample has total metal 1.0e-4 M and free ligand 1.0e-2 M. Neglect other complexes and ligand depletion. Estimate the fraction of dissolved metal present as ML2, and state whether the assumption of negligible ligand depletion is self-consistent.",
+    "intent": "Solve a simple complexation equilibrium and test an approximation.",
+    "domain": "Chemical Equilibrium",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "An exothermic gas-phase equilibrium produces fewer gas moles on the product side. Explain separately the effects of increasing temperature, compressing the system, and adding a catalyst. Use equilibrium thermodynamics rather than treating Le Châtelier's principle as a catch-all slogan.",
+    "intent": "Distinguish temperature, pressure, and catalyst effects on equilibrium.",
+    "domain": "Chemical Equilibrium",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "Calculate the pH of 0.0100 M HCl at 25 °C assuming complete dissociation and ideal dilute behavior. Then explain why 'strong acid' refers to ionization tendency, not concentration.",
+    "intent": "Compute simple pH and distinguish acid strength from concentration.",
+    "domain": "Acids, Bases & Solution Chemistry",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A 0.100 M weak acid HA has Ka=1.0e-5 at 25 °C. Estimate its pH using the usual weak-acid approximation, then check whether x<<0.100 M is sufficiently valid.",
+    "intent": "Solve weak-acid equilibrium and verify the approximation.",
+    "domain": "Acids, Bases & Solution Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A buffer contains 0.200 mol HA and 0.300 mol A- in 1.00 L, with pKa=4.76. Calculate the pH. Then 0.050 mol HCl is added with negligible volume change. Calculate the new pH and explain why buffer capacity, not only the initial pH, matters.",
+    "intent": "Use stoichiometry before Henderson-Hasselbalch and reason about buffer capacity.",
+    "domain": "Acids, Bases & Solution Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "25.00 mL of 0.1000 M acetic acid (Ka=1.8e-5) is titrated with 0.1000 M NaOH. At the equivalence point, explain why the pH is above 7 and estimate it using Kb=Kw/Ka, Kw=1.0e-14, neglecting activity effects.",
+    "intent": "Distinguish equivalence from neutral pH and calculate hydrolysis.",
+    "domain": "Acids, Bases & Solution Chemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "equilibrium_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "For the amphiprotic ion HCO3-, explain qualitatively how it can act as both a Brønsted acid and base. Given pKa1(H2CO3)=6.35 and pKa2(HCO3-)=10.33, estimate the pH of a solution containing only NaHCO3 using the amphiprotic approximation pH≈(pKa1+pKa2)/2 and state its assumptions.",
+    "intent": "Reason about amphiprotic behavior and approximation limits.",
+    "domain": "Acids, Bases & Solution Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "model_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A 1.0 M electrolyte solution is analyzed using concentrations as though it were ideal. Explain why activities may differ materially from concentrations at this ionic strength and what kind of error this can introduce into equilibrium or pH calculations.",
+    "intent": "Recognize when dilute-solution assumptions break down.",
+    "domain": "Acids, Bases & Solution Chemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "For a reaction with rate law r=k[A]^2[B], by what factor does the rate change if [A] is doubled and [B] is halved at constant temperature? Explain why the reaction orders cannot be inferred from the balanced overall equation unless the reaction is an elementary step.",
+    "intent": "Apply a rate law and distinguish reaction order from stoichiometry.",
+    "domain": "Chemical Kinetics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A first-order reaction has k=0.0231 min^-1. Calculate its half-life and the fraction remaining after 60.0 min.",
+    "intent": "Apply the integrated first-order rate law.",
+    "domain": "Chemical Kinetics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "The rate constant of a reaction doubles when temperature increases from 298 K to 308 K. Estimate the activation energy using ln(k2/k1)=-(Ea/R)(1/T2-1/T1), R=8.314 J mol^-1 K^-1.",
+    "intent": "Infer activation energy from temperature dependence.",
+    "domain": "Chemical Kinetics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A proposed mechanism is: (1) NO2 + NO2 ⇌ NO3 + NO, fast pre-equilibrium; (2) NO3 + CO -> NO2 + CO2, slow. Derive the rate law predicted for CO2 formation in terms of [NO2], [NO], and [CO], and compare it with an experimental law r=k[NO2]^2[CO]/[NO].",
+    "intent": "Test a mechanism against stoichiometry and an observed rate law.",
+    "domain": "Chemical Kinetics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A heterogeneous catalytic reaction speeds up strongly when catalyst surface area increases but the equilibrium composition is unchanged. Explain the roles of adsorption, surface sites, activation barriers, and why equilibrium remains fixed at the same temperature.",
+    "intent": "Explain catalytic surface area, adsorption, active sites, and kinetic barriers without confusing equilibrium.",
+    "domain": "Surfaces, Interfaces & Nanomaterials",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A reaction A->P competes with A->Q. Path 1 has lower activation energy but P is less stable than Q. Explain how temperature and reaction time can lead to kinetic versus thermodynamic product control, and why the statement 'the slowest step is always rate determining' is not a sufficient analysis.",
+    "intent": "Reason about competing pathways and kinetic versus thermodynamic control.",
+    "domain": "Chemical Kinetics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "kinetic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "Given standard reduction potentials E°(Cu2+/Cu)=+0.34 V and E°(Zn2+/Zn)=-0.76 V, calculate E°cell for a Zn|Zn2+||Cu2+|Cu galvanic cell and identify anode, cathode, oxidizing agent, and reducing agent.",
+    "intent": "Apply standard potentials and electrode roles in a galvanic cell.",
+    "domain": "Electrochemistry & Redox Chemistry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "electrochemical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "For the Zn/Cu cell with reaction Zn(s)+Cu2+->Zn2++Cu(s), calculate E at 298 K when [Zn2+]=1.0 M and [Cu2+]=1.0e-3 M using E=E°-(0.05916/n)log Q and E°=1.10 V. Use n=2.",
+    "intent": "Apply the Nernst equation under non-standard conditions.",
+    "domain": "Electrochemistry & Redox Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "An electrolytic cell deposits Cu from Cu2+. What mass of Cu is deposited by a current of 2.00 A for 30.0 min? Use F=96485 C/mol, M(Cu)=63.546 g/mol, and Cu2+ + 2e- -> Cu.",
+    "intent": "Apply Faraday's law with charge stoichiometry.",
+    "domain": "Electrochemistry & Redox Chemistry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A concentration cell uses identical Ag/Ag+ electrodes with [Ag+]=1.0 M in one half-cell and 1.0e-3 M in the other at 298 K. Determine the cell voltage magnitude using E=(0.05916/n)log(C_high/C_low), n=1, and state which side acts as the cathode during spontaneous discharge.",
+    "intent": "Reason about concentration-cell direction and potential.",
+    "domain": "Electrochemistry & Redox Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "electrochemical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "Steel is electrically connected to copper in aerated seawater. Explain why galvanic corrosion of steel can accelerate, how relative exposed areas matter qualitatively, and why a coating defect on a small steel area adjacent to a large copper area can be especially damaging.",
+    "intent": "Connect galvanic coupling to corrosion rate and geometry.",
+    "domain": "Corrosion & Degradation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A battery has a thermodynamic open-circuit voltage of 3.7 V but delivers 3.2 V under high current. Give thermodynamic and non-thermodynamic reasons for the difference, including concentration polarization, ohmic loss, and charge-transfer overpotential, and propose measurements that could separate them.",
+    "intent": "Distinguish equilibrium voltage from operating voltage and diagnose losses.",
+    "domain": "Functional Materials / Batteries",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "Rank ethanol, phenol, and acetic acid by acidity and justify the ordering using stabilization of their conjugate bases by resonance and inductive effects.",
+    "intent": "Explain relative organic acidity mechanistically.",
+    "domain": "Organic Chemistry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "Enantiopure (R)-2-bromobutane reacts with ethoxide in ethanol. Explain the competing SN2 and E2 pathways, including inversion expected for an SN2 substitution event, anti-periplanar geometry for E2, and how base/nucleophile strength and temperature affect the mixture. State what stereochemical/product evidence would help distinguish the pathways.",
+    "intent": "Analyze competing substitution and elimination mechanisms.",
+    "domain": "Organic Chemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "For addition of HBr to propene under ordinary ionic conditions, predict the major constitutional product and explain the regioselectivity in terms of carbocation stability. Then state why invoking the product rule without a mechanistic explanation is incomplete.",
+    "intent": "Predict regioselectivity from intermediate stability.",
+    "domain": "Organic Chemistry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A metal part made by powder-bed fusion shows high strength but strong build-direction anisotropy and internal porosity. Explain how rapid solidification, thermal gradients, texture, residual stress, lack-of-fusion defects, and post-build heat treatment can affect the measured properties. Propose two characterization methods that would discriminate among these causes.",
+    "intent": "Reason through additive-manufacturing process, structure, defects, and anisotropic properties.",
+    "domain": "Materials Processing",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "processing_microstructure_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A compound with molecular formula C4H8O2 shows a strong IR absorption near 1740 cm^-1 and a broad O-H band is absent. Its 1H NMR has a triplet integrating to 3H, a quartet integrating to 2H, and a singlet integrating to 3H. Propose a likely structure and explain why the data support it without claiming absolute uniqueness beyond the stated evidence.",
+    "intent": "Integrate IR and NMR evidence to infer a plausible structure.",
+    "domain": "Organic Chemistry",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "spectroscopy_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "An E2 elimination on a substituted cyclohexane is observed only from a conformation in which the leaving group and beta-H are anti-periplanar. Explain how conformational analysis can control which alkene forms.",
+    "intent": "Link stereoelectronic requirements to product selectivity.",
+    "domain": "Organic Chemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A thin protective coating adheres well initially but delaminates after thermal cycling. The coating has a substantially lower thermal-expansion coefficient than the substrate. Explain how residual stress, thermal-expansion mismatch, interfacial adhesion, coating thickness, and defects can contribute, and propose measurements to distinguish interfacial failure from cohesive cracking.",
+    "intent": "Analyze thin-film/interface failure under thermal cycling.",
+    "domain": "Surfaces, Interfaces & Thin Films",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "Design a plausible two-step route to convert 1-bromopropane into propanoic acid using broadly familiar functional-group transformations. Focus on reaction logic and carbon-count consequences rather than named reactions, and note any route that would accidentally change the carbon skeleton.",
+    "intent": "Use retrosynthetic logic and track carbon skeleton changes.",
+    "domain": "Organic Chemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "synthesis_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "For octahedral [Fe(H2O)6]2+, Fe2+ is d6 and H2O is a weak-field ligand. Predict high-spin versus low-spin behavior and the number of unpaired electrons. Explain how crystal-field splitting competes with pairing energy.",
+    "intent": "Connect d-electron count and ligand field to magnetism.",
+    "domain": "Inorganic / Coordination Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Two octahedral complexes have the same metal oxidation state but one absorbs at much higher visible-light energy. Explain how a larger ligand-field splitting changes the absorption wavelength and why absorption energy alone does not determine absorption intensity.",
+    "intent": "Relate ligand-field splitting to color and distinguish position from intensity.",
+    "domain": "Inorganic / Coordination Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structure_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "Determine the oxidation state and d-electron count of Co in [Co(NH3)5Cl]Cl2. Then distinguish the metal oxidation state from formal charge assigned to individual ligands.",
+    "intent": "Use charge balance in coordination compounds without conflating bookkeeping schemes.",
+    "domain": "Inorganic / Coordination Chemistry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A square-planar d8 metal complex is diamagnetic, whereas a tetrahedral d8 complex of another metal can be paramagnetic. Explain qualitatively how geometry changes d-orbital splitting and electron pairing.",
+    "intent": "Relate coordination geometry to magnetic behavior.",
+    "domain": "Inorganic / Coordination Chemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "structure_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A catalytic cycle alternates a metal center between oxidation states +1 and +3 while forming and breaking M-C and M-H bonds. Explain why electron counting and oxidation-state bookkeeping can be useful but are not identical descriptions of real charge distribution.",
+    "intent": "Distinguish organometallic bookkeeping models from physical charge.",
+    "domain": "Inorganic / Coordination Chemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A high-temperature alloy component slowly elongates under a constant applied stress for thousands of hours while also forming an oxide scale. Distinguish creep from ordinary room-temperature plastic deformation, explain how diffusion and dislocation processes can contribute to creep, and discuss how oxidation could interact with damage at the surface.",
+    "intent": "Analyze coupled high-temperature creep and environmental degradation.",
+    "domain": "Creep & Degradation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A calibration line for absorbance versus concentration is A=0.020+0.500c, with c in mmol/L. An unknown gives A=0.370. Determine c. Then explain what the nonzero intercept could indicate and why R^2 alone would not prove the method is valid.",
+    "intent": "Use calibration quantitatively and assess calibration quality.",
+    "domain": "Analytical Chemistry & Chemical Measurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "An analyte is measured five times with results 9.98, 10.02, 9.99, 10.01, and 10.00 mg/L, but a certified reference value is 9.50 mg/L. Characterize the precision and accuracy and identify the likely type of error.",
+    "intent": "Distinguish precision, accuracy, random error, and systematic bias.",
+    "domain": "Analytical Chemistry & Chemical Measurement",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A matrix suppresses an analyte's instrumental response unpredictably across samples. Compare external calibration, internal-standard calibration, and standard addition, and identify which is most directly suited to compensating for sample-specific matrix effects when feasible.",
+    "intent": "Select an appropriate calibration strategy under matrix effects.",
+    "domain": "Analytical Chemistry & Chemical Measurement",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "model_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A reported method has a detection limit of 0.2 µg/L and a quantification limit of 0.7 µg/L. A sample gives an estimated concentration of 0.3 µg/L. Explain what can and cannot be claimed about presence and quantitative accuracy.",
+    "intent": "Distinguish detection from reliable quantification.",
+    "domain": "Analytical Chemistry & Chemical Measurement",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A chromatogram shows two partially overlapping peaks. Explain why increased detector sensitivity does not necessarily improve selectivity or chromatographic resolution, and name experiment-level changes that could improve separation.",
+    "intent": "Distinguish sensitivity, selectivity, and separation quality.",
+    "domain": "Analytical Chemistry & Chemical Measurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "In a one-dimensional particle-in-a-box model, energy levels scale as n^2/L^2. If box length doubles, by what factor does the n=1 to n=2 transition energy change? State why this model can capture a qualitative conjugation trend while remaining approximate for real molecules.",
+    "intent": "Apply a quantum model and discuss its limitations.",
+    "domain": "Physical / Quantum Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "An IR spectrum shows a stretching band shift from 1650 cm^-1 to 1700 cm^-1 after a structural change. Explain why a higher frequency often reflects a larger effective force constant but also depends on reduced mass and coupling, so bond strength alone is not a complete explanation.",
+    "intent": "Interpret vibrational frequency with an appropriate physical model.",
+    "domain": "Spectroscopy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A 1H NMR signal integrates to 6H and appears as a doublet, while another integrates to 1H and appears approximately as a septet. Propose a common local proton connectivity motif and explain what integration and splitting each reveal.",
+    "intent": "Infer local proton connectivity from NMR integration and multiplicity.",
+    "domain": "Spectroscopy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "spectroscopy_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A mass spectrum has a molecular-ion peak at m/z 86 and strong fragments at m/z 43 and 57. Explain what the molecular-ion peak constrains, what fragmentation can suggest, and why those fragments alone do not uniquely determine a single structure.",
+    "intent": "Distinguish molecular-mass evidence from structural inference.",
+    "domain": "Spectroscopy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_uncertainty_and_model_limits",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A BCC metal has lattice parameter a=0.330 nm and atomic mass 55.85 g/mol. Calculate its theoretical density using 2 atoms per unit cell and NA=6.022e23 mol^-1.",
+    "intent": "Calculate density from unit-cell geometry and composition.",
+    "domain": "Crystallography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "For first-order Bragg diffraction with wavelength 0.154 nm, a peak occurs at 2θ=44.0°. Calculate the plane spacing d using nλ=2d sinθ. If alloying causes the peak to shift to lower 2θ, explain the corresponding change in d.",
+    "intent": "Use Bragg's law and interpret peak shifts.",
+    "domain": "Crystallography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "Two polycrystalline samples have the same crystal structure and lattice parameter, but one has much smaller grains. Explain which measurements could show the same atomic-scale structure while revealing different grain-scale microstructures.",
+    "intent": "Distinguish crystallographic structure from microstructure.",
+    "domain": "Materials Structure & Crystallography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A rolled sheet shows much higher yield strength when loaded along one direction than another. Explain how crystallographic texture and microstructural alignment can produce anisotropic macroscopic behavior even though the alloy chemistry is unchanged.",
+    "intent": "Connect texture to anisotropic mechanical properties.",
+    "domain": "Materials Structure & Crystallography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structure_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "An XRD pattern shifts to lower angles after alloying and the peaks also broaden. Give at least three plausible causes spanning lattice-parameter change, finite coherent-domain size, and microstrain, and propose complementary evidence needed before assigning a unique cause.",
+    "intent": "Diagnose multiple causes of diffraction shift and broadening.",
+    "domain": "Materials Structure & Crystallography",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "data_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A glass and a crystal have the same chemical composition. Explain why the crystal shows sharp Bragg peaks while the glass shows broad diffuse scattering, and relate the difference to long-range order rather than simply to bond strength.",
+    "intent": "Connect diffraction signatures to structural order.",
+    "domain": "Materials Structure & Crystallography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "structure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "The equilibrium vacancy fraction is approximated by exp(-Qv/kT). For Qv=1.0 eV and k=8.617e-5 eV/K, estimate the vacancy fraction at 1000 K. Explain why vacancy concentration and vacancy mobility are distinct concepts.",
+    "intent": "Estimate defect concentration and distinguish population from mobility.",
+    "domain": "Defects & Diffusion",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A diffusion coefficient follows D=D0 exp(-Q/RT) with D0=1.0e-5 m2/s and Q=180 kJ/mol. Estimate D at 1000 K using R=8.314 J mol^-1 K^-1. Explain why a modest temperature increase can strongly accelerate diffusion.",
+    "intent": "Apply Arrhenius diffusion kinetics and interpret temperature sensitivity.",
+    "domain": "Defects & Diffusion",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A polycrystal has finer grains after processing. Explain why grain boundaries can simultaneously strengthen the material against dislocation motion and provide faster diffusion paths than the crystal interior.",
+    "intent": "Relate grain boundaries to both mechanics and transport.",
+    "domain": "Defects, Diffusion & Microstructure",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structure_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A cold-worked metal is annealed and its strength decreases while ductility increases. Explain recovery, recrystallization, and grain growth as distinct possible stages and what microscopy or hardness data would help identify which stage occurred.",
+    "intent": "Connect heat treatment to defect density, grains, and mechanical behavior.",
+    "domain": "Defects, Diffusion & Microstructure",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "microstructure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "At a binary alloy composition of 40 wt% B, a two-phase alpha+beta region has tie-line endpoints 20 wt% B in alpha and 70 wt% B in beta. Use the lever rule to calculate phase fractions.",
+    "intent": "Use a tie line and lever rule correctly.",
+    "domain": "Phase Diagrams & Transformations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "phase_diagram",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "An alloy of overall composition 35 wt% B lies in an alpha+beta field with alpha=15 wt% B and beta=60 wt% B. Explain the difference between overall alloy composition, phase compositions, and phase fractions, and calculate the fractions.",
+    "intent": "Distinguish phase composition from bulk composition and fraction.",
+    "domain": "Phase Diagrams & Transformations",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "phase_diagram",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "An alloy is solution-treated in a single-phase region, rapidly quenched to retain a supersaturated solid solution, and then aged. Hardness first rises and later falls. Explain precipitation strengthening during aging and overaging/coarsening at long times.",
+    "intent": "Explain a non-equilibrium heat-treatment sequence through microstructure and properties.",
+    "domain": "Phase Diagrams & Transformations",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A eutectic phase diagram predicts equilibrium phases at room temperature, but a rapidly cooled alloy contains a metastable phase not shown as stable there. Explain why this does not invalidate the equilibrium diagram and identify kinetic factors that control the observed microstructure.",
+    "intent": "Distinguish equilibrium phase stability from transformation kinetics.",
+    "domain": "Phase Diagrams & Transformations",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A tensile specimen has E=200 GPa. In the linear-elastic regime, what strain results from 300 MPa stress? If a different alloy has the same E but a much higher yield strength, explain why stiffness and strength are different properties.",
+    "intent": "Calculate elastic strain and distinguish modulus from yield strength.",
+    "domain": "Mechanical Properties",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "Two materials have the same yield strength, but one has a much larger area under its complete stress-strain curve before fracture. Which is tougher, and why does toughness differ from hardness and ductility?",
+    "intent": "Distinguish toughness from related mechanical properties.",
+    "domain": "Mechanical Properties",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A component fails after 10^6 cycles at a stress well below its monotonic tensile strength. Explain why fatigue is plausible, how stress concentration and surface defects can matter, and what fracture-surface evidence could support the diagnosis.",
+    "intent": "Reason from cyclic loading to fatigue failure mechanisms.",
+    "domain": "Mechanical Properties",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "An alloy becomes stronger and harder but substantially less ductile after heat treatment. Give at least three plausible microstructural explanations and identify specific measurements that would discriminate among precipitation hardening, grain refinement, and formation of a brittle second phase.",
+    "intent": "Diagnose competing structure-property mechanisms from incomplete evidence.",
+    "domain": "Mechanical Properties",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "For a semiconductor, conductivity is σ=q(nμn+pμp). If n increases by a factor of 100 after n-type doping but electron mobility decreases by a factor of 2 because of impurity scattering, estimate the conductivity change if holes are negligible. Explain why carrier concentration alone does not determine conductivity and identify the majority carrier on the n-type side of a p-n junction.",
+    "intent": "Connect doping, carrier density, mobility, and conductivity.",
+    "domain": "Electronic Properties",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A transparent material begins absorbing strongly for photon energies above 3.0 eV. Estimate the corresponding wavelength threshold using E(eV)=1240/λ(nm), and explain how a band gap can control optical transmission without implying that all sub-gap light is perfectly transmitted.",
+    "intent": "Relate band gap to optical absorption while noting other loss mechanisms.",
+    "domain": "Optical Properties",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A ferromagnetic material has a wide hysteresis loop, high coercivity, and high remanence. Explain why such a material may be useful for permanent magnets but undesirable for transformer cores, connecting domain-wall motion and hysteretic energy loss.",
+    "intent": "Connect magnetic hysteresis parameters to application behavior.",
+    "domain": "Magnetic Properties",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structure_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "Two polymer samples have identical repeat-unit chemistry but different glass-transition temperatures and tensile behavior. Identify how molecular weight, crystallinity, plasticizer content, tacticity, crosslink density, and thermal history could contribute, and propose measurements to distinguish among them.",
+    "intent": "Infer polymer structure/processing variables from property differences.",
+    "domain": "Polymers",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "structure_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A porous ceramic is considered for a lightweight thermal-insulating panel that must also carry modest mechanical load and survive thermal cycling. The processing route is changed to increase porosity by 25%. Explain competing effects on density, stiffness, strength, thermal conductivity, and thermal-shock behavior, and identify what additional performance data are needed before deciding whether the higher-porosity material satisfies the stated application.",
+    "intent": "Analyze trade-offs caused by processing-induced porosity.",
+    "domain": "Ceramics & Glasses",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "process_property",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A unidirectional fiber composite contains 60 vol% fibers with Ef=230 GPa and a matrix with Em=3.0 GPa. Estimate the longitudinal modulus using the simple rule of mixtures. Then explain why transverse modulus and strength require more attention to interfaces, geometry, and failure mechanisms.",
+    "intent": "Use a composite approximation and identify its domain of validity.",
+    "domain": "Composites",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "model_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A nanoparticle catalyst shows higher activity per gram after particle size is reduced, but the smallest particles agglomerate during use and activity then falls. Explain the roles of surface-area-to-volume ratio, surface energy, aggregation, accessible active area, and transport. Design a minimal experiment to distinguish intrinsic size effects from aggregation effects.",
+    "intent": "Connect nanoscale surface effects, aggregation, and experimental discrimination.",
+    "domain": "Surfaces, Interfaces & Nanomaterials",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  }
+]

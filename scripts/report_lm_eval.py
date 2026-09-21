@@ -1589,6 +1589,9 @@ th .dir { font-size:9px; }
 .ac-tag { font-size:10px; color:var(--muted); border:1px solid var(--border);
   border-radius:999px; padding:1px 7px; flex:none; }
 .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0 4px; }
+/* a select is as wide as its longest option — an author's criterion label can
+   be longer than a phone is wide */
+select { max-width:100%; }
 .toolbar input, .toolbar select { font:inherit; font-size:var(--fs-1); color:var(--text-primary);
   background:var(--plane); border:1px solid var(--border); border-radius:var(--r-1);
   padding:5px 9px; }
@@ -1710,7 +1713,10 @@ th .dir { font-size:9px; }
 .dxcat .num { font-variant-numeric:tabular-nums; min-width:6ch; text-align:right; }
 .dxcat.dim > summary { color:var(--muted); }
 .dxcat.dim .dxcname { font-weight:500; }
-.dxcat .dxsub { margin:2px 0 8px 20px; width:auto; min-width:60%; }
+.dxcat .dxsub { margin:2px 0 8px 20px; width:auto; min-width:60%; max-width:calc(100% - 20px); }
+/* a subject is one long word (high_school_government_and_politics): let it
+   break rather than push the table past a phone's width */
+.dxsub td:first-child { overflow-wrap:anywhere; }
 .dxperm { margin:14px 0 4px; }
 .dxperm .dxsub { width:auto; min-width:60%; }
 .lb td.dim { color:var(--muted); }
@@ -1946,7 +1952,7 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .anscard .score { font-size:var(--fs-4); font-weight:650; letter-spacing:-.02em; line-height:1.1; }
 .anscard .side .badge { margin:4px 0 0 4px; }
 .critrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-.critcells { display:flex; gap:2px; flex-wrap:nowrap; }
+.critcells { display:flex; gap:2px; flex-wrap:wrap; min-width:0; }
 .critcell { width:14px; height:14px; border-radius:3px; flex:none; box-shadow:inset 0 0 0 1px var(--border); }
 .critcell.na { background:none; border:1px dashed var(--axis); box-sizing:border-box; }
 .badge.new { color:var(--text-primary); font-weight:600; }
@@ -2931,7 +2937,7 @@ function dxCategories(mid, t, v, atChance) {
   if (v.unmapped && v.unmapped.length)
     wrap.append(el('p', { class: 'warn' }, el('b', { text: 'Mapping gap: ' }),
       `${v.unmapped.length} group${v.unmapped.length > 1 ? 's' : ''} not in `
-      + `scripts/categories.yaml rolled into "other": ${v.unmapped.join(', ')}. `
+      + `scripts/categories.yaml rolled into "General & Multidisciplinary": ${v.unmapped.join(', ')}. `
       + 'Add them to the file and re-run diagnose.py.'));
   return wrap;
 }
@@ -8013,13 +8019,40 @@ function render() {
   if (state.after) {
     const a = state.after;
     state.after = null;
+    if (a.scroll) settleOn(a.scroll);
     requestAnimationFrame(() => {
       const t = a.scroll && document.querySelector(a.scroll);
       if (t) t.scrollIntoView({ block: 'start' });
       const f = a.focus && document.querySelector(a.focus);
       if (f) f.focus();
     });
+  } else if (_settle) {
+    requestAnimationFrame(settleAgain);
   }
+}
+
+// A button that scrolls to a panel usually lands before the panel's data
+// does: the page is short, the scroll stops early, and when the answers
+// arrive and the page grows the browser puts the old offset back — with 37
+// topics, "Read the results" from low on the board landed past the answers.
+// So for a few seconds after, every render puts the panel back where the
+// button put it, until the person scrolls or types for themselves.
+let _settle = null;
+const SETTLE_MS = 4000;
+
+function settleOn(sel) {
+  _settle = { sel, until: Date.now() + SETTLE_MS };
+  const stop = () => { _settle = null; };
+  for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown'])
+    window.addEventListener(ev, stop, { once: true, passive: true, capture: true });
+}
+
+function settleAgain() {
+  if (!_settle || Date.now() > _settle.until) { _settle = null; return; }
+  const t = document.querySelector(_settle.sel);
+  if (!t) return;
+  const top = t.getBoundingClientRect().top;
+  if (top < -2 || top > innerHeight / 2) t.scrollIntoView({ block: 'start' });
 }
 
 // The tab bar is the one thing on the page that must survive a render. A

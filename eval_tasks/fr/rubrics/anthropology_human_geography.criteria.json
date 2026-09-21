@@ -1,0 +1,182 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the question asked, prioritizes the supplied evidence and requested task, and avoids tangents or generic anthropology/geography commentary that does not help resolve the case.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "anthropological_accuracy",
+      "name": "Anthropological Accuracy",
+      "definition": "Uses anthropological concepts accurately; distinguishes culture from race and nationality, norms from individual behavior, and observation from interpretation; avoids cultural essentialism, stereotyping, and unjustified generalization from limited ethnographic evidence.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "human_geographic_accuracy",
+      "name": "Human-Geographic Accuracy",
+      "definition": "Uses human-geographic concepts accurately; distinguishes space, place, location, scale, accessibility, networks, counts and rates, and does not infer mechanism solely from proximity, clustering, or mapped association.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Defines and applies the relevant concepts precisely enough to distinguish nearby ideas such as stock versus flow, household versus family, cultural region versus legal border, correlation versus causation, and map representation versus underlying reality.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "cultural_and_social_reasoning",
+      "name": "Cultural and Social Reasoning",
+      "definition": "When relevant, interprets practices, identities, exchange, kinship, religion, language, power, gender, or consumption in context; recognizes heterogeneity and change; and supports cultural interpretations with evidence rather than labels or stereotypes.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "ethnographic_and_fieldwork_reasoning",
+      "name": "Ethnographic and Fieldwork Reasoning",
+      "definition": "When relevant, reasons appropriately about participant observation, interviews, rapport, positionality, sampling, triangulation, representation, reflexivity, and what ethnographic evidence can and cannot generalize to wider populations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "demographic_and_migration_reasoning",
+      "name": "Demographic and Migration Reasoning",
+      "definition": "When relevant, correctly distinguishes population size, density, natural increase, age structure, fertility, mortality, migration stock, migration flows, net migration, mobility, and displacement, using the correct population and denominator.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "spatial_and_scale_reasoning",
+      "name": "Spatial and Scale Reasoning",
+      "definition": "When relevant, reasons correctly about spatial units, geographic scale, aggregation, networks, accessibility, distance, spatial dependence, and scale-sensitive conclusions, including cases where patterns change or reverse across scales.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "urban_rural_and_economic_geography_reasoning",
+      "name": "Urban, Rural, and Economic-Geography Reasoning",
+      "definition": "When relevant, explains land use, housing, segregation, rural restructuring, industrial location, agglomeration, production networks, development, or uneven development using appropriate spatial, institutional, historical, and economic mechanisms rather than one-factor determinism.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "human_environment_reasoning",
+      "name": "Human-Environment Reasoning",
+      "definition": "When relevant, integrates environmental conditions with vulnerability, livelihoods, technology, institutions, resource access, history, and adaptation; avoids treating hazards or environmental conditions as mechanically determining social outcomes.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "archaeological_and_biological_anthropology_reasoning",
+      "name": "Archaeological and Biological-Anthropology Reasoning",
+      "definition": "When relevant, respects archaeological context, provenance, association, dating uncertainty, disturbance, preservation bias, and alternative interpretations; and treats human biological variation as continuous and historically shaped rather than as discrete social races.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When calculation or numerical interpretation is required, uses the correct formula, units, denominator, and arithmetic, and interprets magnitudes correctly. Minor arithmetic slips that do not change the conclusion are less serious than denominator or quantity errors that reverse interpretation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "spatial_data_and_map_interpretation",
+      "name": "Spatial Data and Map Interpretation",
+      "definition": "When relevant, selects and interprets spatial units, normalization, projection, classification, resolution, GIS operations, and thematic-map conventions appropriately; does not treat raw population-dependent counts as rates or map appearance as self-validating evidence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "comparative_and_historical_reasoning",
+      "name": "Comparative and Historical Reasoning",
+      "definition": "When relevant, compares cases along explicit dimensions, preserves local and historical context, recognizes path dependence without determinism, and avoids assuming superficially similar societies, regions, or periods are interchangeable.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "causal_and_mechanistic_reasoning",
+      "name": "Causal and Mechanistic Reasoning",
+      "definition": "When relevant, separates correlation, spatial association, mechanism, and causality; identifies plausible confounding, selection, institutional pathways, temporal ordering, or spatial dependence; and avoids claiming a causal mechanism from maps or co-occurrence alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "methods_evidence_and_uncertainty",
+      "name": "Methods, Evidence, and Uncertainty",
+      "definition": "When relevant, matches claims to the strength and type of evidence, distinguishes observation from inference, notes methodological limitations, and calibrates uncertainty. A careful alternative interpretation supported by the evidence should receive full credit even if it differs from a preferred theory.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "context_heterogeneity_and_alternative_explanations",
+      "name": "Context, Heterogeneity, and Alternative Explanations",
+      "definition": "When relevant, recognizes internal group variation, temporal and situational change, scale dependence, and multiple plausible mechanisms; does not force one homogeneous cultural meaning or one causal story when the supplied evidence supports alternatives.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the requested task, including calculations, comparisons, qualifications, alternative explanations, or evidence needs that are essential to a correct answer, without requiring irrelevant breadth.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally compatible claims, quantities, definitions, and conclusions; does not contradict earlier reasoning, switch units or denominators without explanation, or make claims that conflict with the supplied evidence.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Explains reasoning in a clear, organized, and intelligible way. Technical terms are used to clarify the case rather than substitute for explanation; jargon, citations, or theorist names do not compensate for weak reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_anthropology_human_geography_error",
+    "condition": "A materially false central anthropological, demographic, archaeological, spatial, methodological, or geographic claim that fundamentally invalidates the answer or reverses the substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Treating culture as biologically determined in a central explanation.",
+      "Presenting socially defined racial groups as discrete biological races in a way that drives the conclusion.",
+      "Making a deterministic claim about every individual based on group identity.",
+      "Fundamentally confusing migration stock with migration flow.",
+      "Using a fundamentally incorrect population-rate denominator in a way that reverses the interpretation.",
+      "Interpreting raw population-dependent counts on a map as rates when population size is the main driver.",
+      "Committing an ecological fallacy that is central to the conclusion.",
+      "Claiming spatial correlation or clustering proves a specific causal mechanism.",
+      "Ignoring a clearly important scale effect that reverses the geographic interpretation.",
+      "Treating an artifact from disturbed context as definitive evidence of a social practice.",
+      "Treating one ethnographic informant as representative of an entire culture when the conclusion depends on it.",
+      "Assuming a contemporary culture is unchanged from historical evidence without justification.",
+      "Presenting environmental conditions as mechanically determining social outcomes.",
+      "Inferring ethnicity directly from material culture without supporting evidence.",
+      "Equating cultural relativism with mandatory ethical approval of every practice.",
+      "Treating a legal border and a cultural boundary as necessarily identical.",
+      "Claiming one map projection preserves every spatial property.",
+      "Interpreting neighborhood-level relationships as individual-level relationships.",
+      "Asserting a single causal explanation despite supplied evidence supporting multiple plausible mechanisms."
+    ],
+    "not_critical": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Small terminology mistakes.",
+      "Reasonable alternative cultural interpretations.",
+      "Legitimate theoretical disagreements.",
+      "Cautious uncertainty.",
+      "Minor omissions.",
+      "Reasonable approximations.",
+      "Different valid scale choices when clearly justified.",
+      "Minor historical-detail errors.",
+      "Plausible competing interpretations where evidence is genuinely incomplete."
+    ]
+  }
+}

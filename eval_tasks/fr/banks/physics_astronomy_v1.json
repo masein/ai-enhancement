@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A student walks 30 m east and then 10 m west along a straight hallway. What total distance did the student travel, and what is the displacement? State the sign convention you use.",
+    "intent": "Distinguish path length from vector displacement and use a consistent sign convention.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A ball is launched from level ground at 20 m/s at 35° above horizontal. Neglect air resistance and use g = 9.8 m/s². Find the time of flight and horizontal range, and identify which velocity component changes during the flight.",
+    "intent": "Apply two-dimensional kinematics while distinguishing horizontal and vertical motion.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "An elevator moves upward at constant speed. A passenger says, 'Because we are moving upward, the normal force from the floor must be larger than my weight.' Evaluate the claim using a free-body diagram and Newton's laws.",
+    "intent": "Test the common misconception that motion direction determines net-force direction.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "Block A (4.0 kg) rests on a horizontal table with kinetic friction coefficient 0.20 and is connected by a light string over a frictionless pulley to hanging block B (2.0 kg). Starting from rest, determine the acceleration and string tension. Use g = 9.8 m/s² and explain which external forces prevent momentum of the two-block subsystem from being conserved.",
+    "intent": "Solve a constrained two-body system and distinguish force analysis from momentum conservation.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "multi_step_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A 1000 kg car rounds a flat circular curve of radius 50 m at 12 m/s. What horizontal force provides the centripetal acceleration? If the coefficient of static friction is 0.40, is slipping expected? Use g = 9.8 m/s².",
+    "intent": "Identify the real force responsible for centripetal acceleration and test the static-friction limit.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conservation_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A small block starts from rest at height h above the bottom of a frictionless vertical loop of radius R. Derive the minimum h, measured from the loop bottom, that allows the block to maintain contact all the way around. Explain why setting the normal force equal to zero at the top is a limiting condition rather than an assumption valid everywhere.",
+    "intent": "Combine energy conservation with the contact-force condition in circular motion.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "derivation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A 0.20 kg puck moving at 6.0 m/s east collides on frictionless ice with a 0.30 kg puck initially at rest. Afterward the first puck moves at 2.0 m/s north. Determine the second puck's velocity vector. Is kinetic energy conserved? Show how you decide.",
+    "intent": "Use vector momentum conservation and independently test whether the collision is elastic.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "multi_step_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A firework shell moving through empty space explodes into two fragments. Explain what happens to the center-of-mass motion during the explosion, and distinguish that statement from the motion of either fragment.",
+    "intent": "Apply center-of-mass and momentum reasoning to an internal explosion.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A uniform 4.0 m horizontal beam of mass 20 kg is hinged to a wall at its left end and supported at its right end by a cable making 30° above the beam. A 40 kg sign hangs 3.0 m from the hinge. Find the cable tension and the horizontal and vertical hinge-force components. Use g = 9.8 m/s².",
+    "intent": "Apply static torque balance and force balance without conflating them.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "multi_step_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A solid cylinder and a thin-walled hoop, with the same mass and radius, roll without slipping from rest down the same incline through the same vertical drop. Which reaches the bottom first, and how do their translational speeds compare? Explain using rotational inertia and energy.",
+    "intent": "Relate rolling constraints, rotational inertia, and energy to translational acceleration.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A satellite is initially in a circular orbit of radius r around a planet. It receives a brief tangential prograde impulse that increases its speed but leaves it below local escape speed. Immediately after the burn, which of its position, speed, specific orbital energy, and angular momentum have changed? Describe the new orbit and explain why the satellite does not simply move onto a larger circular orbit at that instant.",
+    "intent": "Analyze an impulsive orbital maneuver using energy and angular momentum.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "orbital_mechanics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "Starting from Newtonian gravity, derive the escape speed from the surface of a spherical body of mass M and radius R, assuming no atmosphere and that the body's rotation is negligible. State where the zero of gravitational potential energy is chosen.",
+    "intent": "Derive escape speed from energy conservation with explicit assumptions.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "derivation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A 0.50 kg mass hangs from a vertical spring of spring constant 200 N/m. It is displaced 3.0 cm downward from its equilibrium position and released. Neglect damping. Find the angular frequency and maximum speed, and explain why gravity does not change the oscillation frequency about equilibrium.",
+    "intent": "Apply simple harmonic motion around a shifted equilibrium point.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A solid cylinder of mass M and radius R rolls without slipping down an incline of angle θ while a light string wound around its axle pulls a hanging mass m over a pulley of radius r and moment of inertia I_p. The pulley axle is frictionless and the string does not slip. Set up a complete system of equations sufficient to determine the cylinder acceleration, hanging-mass acceleration, both string tensions, and the static-friction force. Explain which accelerations are constrained to be equal and which are not, and identify a limiting case that checks your equations.",
+    "intent": "Build and check a coupled translational-rotational constrained-motion model.",
+    "domain": "Classical Mechanics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "model_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "Charges +3.0 μC and −2.0 μC are fixed 0.40 m apart. Find the electric field vector at the midpoint. State the direction explicitly; do not use electric potential in place of electric field.",
+    "intent": "Compute a superposed electric field with correct signs and direction.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A solid insulating sphere of radius R has uniform volume charge density ρ. Use Gauss's law to derive E(r) for r < R and r > R. Explain why a spherical Gaussian surface is efficient here and why the same shortcut would fail for an arbitrary nonspherical charge distribution.",
+    "intent": "Use symmetry to justify a Gauss-law solution and identify its limits.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "derivation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "Two identical positive point charges are fixed symmetrically at x = ±a. At x = 0, what are the electric field and electric potential? Explain why one can be zero while the other is not.",
+    "intent": "Distinguish vector electric field from scalar electric potential.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "An initially neutral isolated conductor contains an empty cavity. A point charge +q is placed inside the cavity without touching the conductor. What total charge appears on the cavity surface and on the outer conductor surface? What can be said about the field inside the conducting material? Explain which conclusions follow from electrostatic equilibrium and Gauss's law.",
+    "intent": "Reason about induced charge and conductor equilibrium without assuming unnecessary symmetry.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A parallel-plate capacitor is connected to an ideal battery of voltage V. While it remains connected, a dielectric with relative permittivity κ completely fills the gap. Compare the capacitance, charge, voltage, stored field energy, and energy supplied or absorbed by the battery before and after insertion.",
+    "intent": "Track coupled changes in a battery-connected capacitor and distinguish fixed voltage from fixed charge.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A 12 V ideal battery feeds a 2.0 kΩ resistor in series with a branch containing a 4.0 kΩ resistor in parallel with a 10 μF capacitor. The capacitor is initially uncharged. Immediately after a switch is closed and after a long time, find the battery current and the capacitor voltage. Identify the effective Thevenin resistance seen by the capacitor for the charging time constant.",
+    "intent": "Analyze a mixed resistor-capacitor network at transient endpoints and determine its time constant.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "multi_step_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "Two wires have the same length and carry the same current. Wire A has twice the radius and the same resistivity as wire B. Compare their resistances and Joule-heating powers if each is connected separately to an ideal current source that holds the current fixed.",
+    "intent": "Use resistivity geometry correctly and distinguish fixed-current from fixed-voltage power scaling.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "proportional_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A positive ion enters a region with uniform electric field E to the right and magnetic field B into the page. Its velocity is upward. Give the directions of the electric and magnetic forces. For what speed magnitude, if any, can the net force vanish? Express the answer in terms of E and B.",
+    "intent": "Distinguish electric and magnetic forces and apply the vector Lorentz force.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "vectors",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A straight wire carries current east in a uniform magnetic field directed north. What is the direction of the magnetic force on the wire? If the wire is rotated so that it also points north, what happens to the force magnitude?",
+    "intent": "Apply the magnetic force on a current and its angular dependence.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A long coaxial cable has current +I uniformly distributed over the cross-section of a solid inner conductor of radius a, and return current −I flows uniformly through a thin outer cylindrical shell of radius b. Derive the magnetic-field magnitude in the regions r < a, a < r < b, and r > b.",
+    "intent": "Use Ampère's law with symmetry and correctly account for enclosed current.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "derivation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A rectangular conducting loop moves at constant speed into a region of uniform magnetic field directed into the page. Describe the induced-current direction while the loop is entering, fully inside, and leaving the field. Explain the answer using magnetic flux change and Lenz's law, not just a memorized right-hand rule.",
+    "intent": "Apply Faraday-Lenz reasoning to changing magnetic flux and distinguish flux from field strength.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A conducting rod of length L slides at speed v on frictionless parallel rails in a uniform magnetic field B perpendicular to the rail plane. The rails are connected through resistance R. Derive the induced current and the external force required to maintain constant speed, and show that mechanical power input equals electrical dissipation.",
+    "intent": "Connect motional emf, magnetic force, and energy conservation.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "derivation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "Two electrically isolated loops have self-inductances L1 and L2, mutual inductance M, and resistances R1 and R2. At t = 0 an ideal voltage source V is connected to loop 1; loop 2 has no source. Using the sign convention that positive currents produce mutually aiding flux, write the coupled differential equations. Determine the initial current derivatives at t = 0+ if both currents start at zero, and explain how the answer changes if the winding sense of loop 2 is reversed. State the physical constraint on M relative to L1 and L2.",
+    "intent": "Analyze a coupled-inductor transient, sign convention, and energy-consistency constraint.",
+    "domain": "Electricity and Magnetism",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "multi_step_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "For a mass in simple harmonic motion x(t) = A cos(ωt + φ), what is the velocity when the displacement is at its maximum positive value? Explain the phase relation between displacement and velocity.",
+    "intent": "Interpret phase in simple harmonic motion rather than substituting blindly.",
+    "domain": "Oscillations, Waves, and Optics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A driven damped oscillator is swept through driving frequency. Sketch or describe how the steady-state amplitude and phase lag change near resonance for weak damping, and explain why the frequency of maximum amplitude need not be exactly the undamped natural frequency.",
+    "intent": "Reason about resonance, damping, and phase response.",
+    "domain": "Oscillations, Waves, and Optics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "graph_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A string of length 1.20 m is fixed at both ends and supports transverse waves at 180 m/s. Find its first three allowed frequencies. Explain why the particles of the string do not travel from one end to the other with the wave.",
+    "intent": "Apply standing-wave boundary conditions while distinguishing particle motion from wave propagation.",
+    "domain": "Oscillations, Waves, and Optics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "Two tuning forks produce frequencies of 440 Hz and 444 Hz. What beat frequency is heard? What physical feature of the superposed waves produces the beats?",
+    "intent": "Relate close frequencies to amplitude modulation.",
+    "domain": "Oscillations, Waves, and Optics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A stationary observer hears a 500 Hz siren from an ambulance approaching at 25 m/s. Take the sound speed as 343 m/s and assume the source moves directly toward the observer. Find the observed frequency. Then state qualitatively how the answer would differ if the observer moved toward a stationary source at the same 25 m/s.",
+    "intent": "Apply the Doppler effect and distinguish source motion from observer motion in a medium.",
+    "domain": "Oscillations, Waves, and Optics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A point sound source in open space doubles its pressure-amplitude at a fixed location while frequency is unchanged. By what factor does the intensity change? Separately, if instead the observer's distance from the same source doubles, by what factor does intensity change in the far field?",
+    "intent": "Distinguish wave amplitude from intensity and apply inverse-square scaling.",
+    "domain": "Oscillations, Waves, and Optics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "proportional_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A converging thin lens has focal length 20 cm. An object is placed 60 cm from the lens. Find the image distance and magnification, then state whether the image is real or virtual and upright or inverted.",
+    "intent": "Use the thin-lens relation while separately interpreting image position and orientation.",
+    "domain": "Oscillations, Waves, and Optics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "In a double-slit experiment with slit separation d, each slit has finite width a. Explain why the observed pattern contains narrow interference fringes under a broader single-slit diffraction envelope. What happens to fringe spacing and envelope width if wavelength increases while d and a stay fixed?",
+    "intent": "Distinguish two-slit interference from finite-aperture diffraction and reason by scaling.",
+    "domain": "Oscillations, Waves, and Optics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Two telescopes observe the same wavelength. Telescope A has twice the aperture diameter of telescope B but only one quarter the detector quantum efficiency. Compare their diffraction-limited angular resolution. Then explain why aperture alone is insufficient to predict which telescope yields higher signal-to-noise for a faint point source in a fixed exposure.",
+    "intent": "Separate diffraction resolution from photon-collection and detector-noise considerations.",
+    "domain": "Oscillations, Waves, and Optics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A gas absorbs 500 J of heat while doing 300 J of work on its surroundings. Using the convention ΔU = Q − W_by, find the change in internal energy and explain the signs.",
+    "intent": "Apply the first law with an explicit heat/work sign convention.",
+    "domain": "Thermodynamics and Statistical Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "One mole of an ideal gas expands reversibly and isothermally from volume V to 2V at temperature T. Derive the work done by the gas and the heat absorbed. Explain why the internal-energy change is zero for this ideal-gas process.",
+    "intent": "Connect reversible isothermal work, heat, and ideal-gas internal energy.",
+    "domain": "Thermodynamics and Statistical Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "derivation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "The same ideal gas expands from the same initial state to twice its initial volume either reversibly isothermally or reversibly adiabatically. Without assuming specific numerical values, compare the final temperatures and the work done by the gas. State the physical reason for the difference.",
+    "intent": "Contrast isothermal and adiabatic expansion using energy transfer and state variables.",
+    "domain": "Thermodynamics and Statistical Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A heat engine operates between reservoirs at 600 K and 300 K. What is the maximum possible efficiency? If a proposed engine claims 70% efficiency while interacting only with those reservoirs in a cycle, what principle is violated?",
+    "intent": "Apply the Carnot bound as a maximum, not as a universal actual efficiency.",
+    "domain": "Thermodynamics and Statistical Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "limiting_case",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "Two equal amounts of the same ideal gas initially occupy equal volumes separated by a partition, but one side is at temperature T1 and the other at T2. The container is rigid and insulated. After the partition is removed and equilibrium is reached, what can be said about total internal energy and total entropy? Explain why entropy can increase although no heat enters the combined system.",
+    "intent": "Distinguish energy conservation from entropy production in an isolated irreversible process.",
+    "domain": "Thermodynamics and Statistical Mechanics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "An ideal gas undergoes free expansion into vacuum in an insulated container. For an ideal gas, what are Q, W, ΔU, and ΔT? Is the process reversible? Explain why the entropy can still increase.",
+    "intent": "Analyze free expansion and separate state functions from path-dependent quantities.",
+    "domain": "Thermodynamics and Statistical Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A macrostate can be realized by 10^20 microstates, while another macrostate of the same isolated system can be realized by 10^30 microstates. Which is overwhelmingly more probable under equal a priori weighting, and what entropy difference separates them? Express the latter as ΔS = k_B ln(Ω2/Ω1).",
+    "intent": "Connect multiplicity, probability, and microscopic entropy.",
+    "domain": "Thermodynamics and Statistical Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A two-level system has energies 0 and Δ. In thermal equilibrium at temperature T, derive the ratio of excited-state to ground-state populations. Explain the high-temperature and low-temperature limits.",
+    "intent": "Use Boltzmann factors and test physically meaningful limiting cases.",
+    "domain": "Thermodynamics and Statistical Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "boundary_and_limiting_cases",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A refrigerator removes 600 J from a 270 K cold reservoir per cycle and rejects heat to a 300 K room. What is the minimum work input allowed by thermodynamics for that cooling, assuming reversible operation? State why a real refrigerator requires at least this much work.",
+    "intent": "Use reversible refrigerator performance to establish a thermodynamic lower bound on work.",
+    "domain": "Thermodynamics and Statistical Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "multi_step_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "An inventor proposes a cyclic device that extracts 1000 J of heat from a single reservoir at 300 K and converts all 1000 J to work, returning every component of the device to its initial state. The inventor argues that energy is conserved, so the device must be possible. Diagnose the argument using both the first and second laws. Then identify what additional change in the surroundings would be required to make complete conversion of a finite amount of heat into work possible without violating thermodynamics.",
+    "intent": "Discover the hidden second-law violation in a superficially energy-conserving perpetual-motion claim.",
+    "domain": "Thermodynamics and Statistical Mechanics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "An electron and a proton have the same nonrelativistic momentum magnitude p. Compare their de Broglie wavelengths. Does either particle's larger mass make its wavelength smaller at fixed momentum?",
+    "intent": "Apply de Broglie wavelength and distinguish fixed momentum from fixed speed.",
+    "domain": "Quantum Mechanics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A one-dimensional wavefunction is ψ(x) = A x for 0 ≤ x ≤ L and zero elsewhere. Determine the normalization constant A, then compute the probability of finding the particle in the interval 0 ≤ x ≤ L/2.",
+    "intent": "Normalize a wavefunction and compute probability from |ψ|².",
+    "domain": "Quantum Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "multi_step_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A normalized quantum state is a superposition of energy eigenstates with probabilities 0.25 for E1 and 0.75 for E2. What are the possible outcomes of one ideal energy measurement, with what probabilities, and what is the expectation value of energy? Explain why the expectation value need not itself be an obtainable single-shot result.",
+    "intent": "Distinguish measurement outcomes from expectation values.",
+    "domain": "Quantum Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A student says the Heisenberg uncertainty principle only reflects imperfect measuring instruments and would disappear with a sufficiently precise apparatus. Explain what is wrong with this claim, using position and momentum as the example.",
+    "intent": "Distinguish intrinsic quantum uncertainty from ordinary experimental error.",
+    "domain": "Quantum Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A particle in an infinite square well 0 < x < L is initially in the normalized state ψ(x,0) = (1/√2)[φ1(x) + e^{iπ/3}φ2(x)], where φn are normalized energy eigenstates with energies En = n²π²ħ²/(2mL²). Find the possible energy outcomes and probabilities, the expectation value of energy, and the state at time t. Then determine whether the position probability density is time-independent, and justify your answer from the evolving relative phase.",
+    "intent": "Combine normalization, measurement probabilities, expectation values, and coherent time evolution.",
+    "domain": "Quantum Mechanics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "derivation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "For a particle tunneling through a rectangular barrier of width a and height V0 > E, the transmission probability is approximately proportional to exp(−2κa), with κ = √[2m(V0−E)]/ħ when the barrier is sufficiently opaque. Use this expression to compare how transmission changes if a doubles or if the particle mass quadruples. State the approximation's qualitative domain of validity.",
+    "intent": "Interpret exponential tunneling sensitivity and state the approximation regime.",
+    "domain": "Quantum Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "proportional_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A spin-1/2 particle is prepared in the +z state. It is measured along x, and the +x outcome is obtained. It is then measured along z. What are the probabilities for ±z on the final measurement? Explain why this sequence is not equivalent to merely revealing a pre-existing z value.",
+    "intent": "Reason about sequential spin measurements and state preparation.",
+    "domain": "Quantum Mechanics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "Why can two electrons in the same atom not occupy the same complete set of quantum numbers? Distinguish the Pauli exclusion principle from electrostatic repulsion.",
+    "intent": "Explain fermionic antisymmetry at an introductory conceptual level.",
+    "domain": "Quantum Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "For hydrogen, take En = −13.6 eV/n². What photon energy is emitted in a transition from n = 3 to n = 2? Is the photon's wavelength longer or shorter than for the n = 2 to n = 1 transition? No numerical value of hc is required unless you choose to calculate wavelength.",
+    "intent": "Apply quantized energy levels to photon emission and compare transition energies.",
+    "domain": "Quantum Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A finite one-dimensional potential well supports several bound energy eigenstates. A particle is prepared in an arbitrary superposition of two of them. Explain which quantities remain fixed in time, which relative phase changes, and how the behavior differs conceptually from a scattering state above the well. Avoid assuming that an arbitrary superposition has a single definite energy.",
+    "intent": "Distinguish bound eigenstates, superpositions, and scattering behavior.",
+    "domain": "Quantum Mechanics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "Two lightning strikes occur simultaneously at the front and rear of a train according to an observer on the ground. The train moves toward the front strike. Are the strikes necessarily simultaneous in the train frame? Explain using relativity of simultaneity rather than signal-travel delay alone.",
+    "intent": "Apply relativity of simultaneity and separate coordinate timing from light-propagation effects.",
+    "domain": "Relativity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "Muons have a proper mean lifetime of 2.2 μs. A beam travels at 0.98c in the laboratory. Compute the Lorentz factor and the mean distance traveled in the lab before decay, using c = 3.00×10^8 m/s. Explain which lifetime is the proper time.",
+    "intent": "Apply time dilation with a clear identification of proper time.",
+    "domain": "Relativity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A spacecraft has proper length 120 m. It moves past Earth at 0.80c. What length is measured by Earth observers? Which frame measures the proper length, and why is the contraction not a mechanical compression of the spacecraft in its own frame?",
+    "intent": "Apply length contraction and distinguish proper length from physical deformation.",
+    "domain": "Relativity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "Two events have spacetime separation Δx = 900 m and Δt = 2.0 μs in an inertial frame. Using c = 3.00×10^8 m/s and the interval s² = c²Δt² − Δx², classify the separation as timelike, lightlike, or spacelike. Can there be a frame in which the two events are simultaneous? Can one event causally influence the other without faster-than-light propagation? Justify using the invariant interval.",
+    "intent": "Use a spacetime invariant to reason about simultaneity and causality.",
+    "domain": "Relativity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "multi_step_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A spaceship moves at 0.70c relative to Earth and launches a probe forward at 0.60c relative to the spaceship. Find the probe speed relative to Earth using relativistic velocity addition. Compare with the Galilean sum and explain why the relativistic result remains below c.",
+    "intent": "Apply relativistic velocity addition and compare with the classical approximation.",
+    "domain": "Relativity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "An electron is accelerated until its kinetic energy equals its rest energy mc². Derive its Lorentz factor and speed as a fraction of c. Then compare with the nonrelativistic estimate K = ½mv² and explain why that approximation fails here.",
+    "intent": "Compare relativistic and classical kinetic-energy models and identify breakdown of an approximation.",
+    "domain": "Relativity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "model_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A photon is emitted upward from the surface of a weakly gravitating body and received at higher altitude. Is it gravitationally redshifted or blueshifted? Explain using gravitational time dilation or energy reasoning, and distinguish this from an ordinary Doppler shift due to relative motion.",
+    "intent": "Explain gravitational redshift and separate it from kinematic Doppler effects.",
+    "domain": "Relativity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "Consider a freely falling observer crossing the event horizon of a sufficiently large, nonrotating black hole while a distant stationary observer watches. Reconcile the statements that the infalling observer locally measures light moving at c, crosses the horizon in finite proper time, and does not encounter a material surface there, while distant Schwarzschild coordinates assign an ever-increasing coordinate time to approach the horizon. Identify which statements are local invariants and which are coordinate-dependent descriptions.",
+    "intent": "Integrate local measurement, proper time, event horizons, and coordinate dependence without treating the horizon as a material surface.",
+    "domain": "Relativity",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "An atom absorbs a photon whose energy exactly matches the gap between two allowed electronic levels. What happens to the photon and atom in the idealized picture? Why will a photon with insufficient energy not simply provide a 'partial excitation' to a stationary energy eigenstate?",
+    "intent": "Apply quantized energy levels to absorption.",
+    "domain": "Atomic, Nuclear, and Particle Physics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A laser medium has an upper and lower lasing level. Explain why population inversion is needed for net optical amplification and how stimulated emission differs from spontaneous emission in the emitted photon's relation to the stimulating field.",
+    "intent": "Explain the mechanism behind laser gain.",
+    "domain": "Atomic, Nuclear, and Particle Physics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A radioactive sample has a half-life of 6.0 h and initially contains 8.0×10^12 undecayed nuclei. How many remain after 18 h? What fraction of the original activity remains if the decay constant is unchanged?",
+    "intent": "Apply exponential radioactive decay and relate activity to remaining nuclei.",
+    "domain": "Atomic, Nuclear, and Particle Physics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A nucleus has Z protons and N neutrons. The total mass of the separated nucleons exceeds the nuclear mass by Δm. Explain what this mass defect means physically and express the binding energy in terms of Δm and c. Why does a larger binding energy not mean the bound nucleus has larger mass than its separated nucleons?",
+    "intent": "Relate mass defect to nuclear binding energy without reversing the sign.",
+    "domain": "Atomic, Nuclear, and Particle Physics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "In beta-minus decay, a neutron in a nucleus transforms into a proton, an electron, and an electron antineutrino. Check electric charge before and after, and explain why the antineutrino is needed for energy-momentum and lepton-number accounting in the full decay description.",
+    "intent": "Use conservation laws to interpret beta decay.",
+    "domain": "Atomic, Nuclear, and Particle Physics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conservation_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A hypothetical isolated decay is proposed: proton → positron + photon. Using only electric charge, baryon number, and lepton number in the usual introductory bookkeeping, identify which conservation laws this process violates or satisfies. Do not assume a process is allowed merely because charge is conserved.",
+    "intent": "Determine physical permissibility from multiple conservation laws.",
+    "domain": "Atomic, Nuclear, and Particle Physics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conservation_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "You want to create a particle-antiparticle pair, each of rest mass M, using a projectile particle of rest mass m hitting an identical target particle at rest. Explain, using energy-momentum conservation and the invariant center-of-momentum energy, why the projectile's threshold kinetic energy is larger than 2Mc² in a fixed-target experiment but can approach the pair rest-energy requirement in a symmetric collider. A symbolic derivation is sufficient.",
+    "intent": "Use relativistic invariants to expose the hidden momentum cost in fixed-target production thresholds.",
+    "domain": "Atomic, Nuclear, and Particle Physics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "derivation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "An intrinsic semiconductor has a full valence band and empty conduction band at zero temperature in the simplest band picture. Explain why raising temperature can increase its electrical conductivity, in contrast with the common temperature trend for a metal.",
+    "intent": "Use band structure and carrier populations to compare semiconductors with metals.",
+    "domain": "Condensed Matter, Fluids, and Continuum Physics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A material becomes superconducting below a critical temperature. Which of the following claims follow from ideal superconductivity and which do not: zero DC electrical resistance, expulsion of magnetic flux in the Meissner state, zero entropy, and infinite thermal conductivity? Explain briefly.",
+    "intent": "Distinguish core superconducting phenomena from unsupported overgeneralizations.",
+    "domain": "Condensed Matter, Fluids, and Continuum Physics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A fully submerged object of volume 0.020 m³ is in water of density 1000 kg/m³. What buoyant force acts on it? Use g = 9.8 m/s². Does the answer depend on the object's own mass? Explain.",
+    "intent": "Apply Archimedes' principle and distinguish displaced-fluid properties from object mass.",
+    "domain": "Condensed Matter, Fluids, and Continuum Physics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Water flows steadily through a long horizontal pipe whose diameter narrows, but the measured downstream pressure drop is much larger than ideal Bernoulli theory predicts. Give at least two physical reasons the simple Bernoulli equation may fail to account for the measurement, and identify what additional terms or modeling changes would be needed.",
+    "intent": "Recognize limits of inviscid Bernoulli modeling and diagnose missing physics.",
+    "domain": "Condensed Matter, Fluids, and Continuum Physics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "For flow through geometrically similar pipes, Reynolds number scales as Re = ρvD/μ. If the fluid and temperature are unchanged, how must the characteristic speed v scale with pipe diameter D to keep Re fixed? Why is Reynolds number useful when comparing laminar and turbulent tendencies?",
+    "intent": "Use dimensionless scaling to compare dynamically similar flows.",
+    "domain": "Condensed Matter, Fluids, and Continuum Physics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "dimensional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A metal rod of length L, cross-sectional area A, Young's modulus Y, and thermal-expansion coefficient α is rigidly clamped between immovable supports. Its temperature is raised uniformly by ΔT while remaining in the linear-elastic regime. Derive the thermal stress, state whether it is tensile or compressive, and explain what assumption would fail if the supports or rod yielded appreciably.",
+    "intent": "Combine thermal expansion with elasticity under a mechanical constraint.",
+    "domain": "Condensed Matter, Fluids, and Continuum Physics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "derivation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "Star A and Star B have the same luminosity, but Star B is three times farther away. Ignoring extinction, what is the ratio of their observed fluxes? Explain why equal luminosity does not imply equal apparent brightness.",
+    "intent": "Apply inverse-square flux scaling and distinguish luminosity from observed brightness.",
+    "domain": "Stellar Physics and Astrophysics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "Two stars have the same apparent bolometric flux. Star A has parallax twice that of Star B. Assuming the parallaxes are accurate and extinction is negligible, compare their distances and luminosities. What additional information would be needed to infer their radii?",
+    "intent": "Infer luminosity from flux and parallax while recognizing the temperature-radius degeneracy.",
+    "domain": "Stellar Physics and Astrophysics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "astronomy_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A star's effective temperature increases by 10% while its bolometric luminosity remains unchanged. Treat it as a blackbody. By what factor must its radius change? Use L = 4πR²σT⁴ and explain the scaling.",
+    "intent": "Combine Stefan-Boltzmann scaling to infer a radius change.",
+    "domain": "Stellar Physics and Astrophysics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "On an H-R diagram, one group of stars is hot but faint and another is cool but luminous. Using L = 4πR²σT⁴, what does this imply qualitatively about their radii? Identify the likely broad stellar categories represented without relying on catalog-specific examples.",
+    "intent": "Interpret the H-R diagram through temperature, luminosity, and radius.",
+    "domain": "Stellar Physics and Astrophysics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "graph_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A binary system has a circular orbit with measured period P and physical semimajor-axis separation a for the relative orbit. Derive the total mass M1 + M2 in terms of P, a, and G. What additional measurement is needed to determine the two individual masses rather than only their sum?",
+    "intent": "Use binary orbital dynamics and identify the missing information for individual masses.",
+    "domain": "Stellar Physics and Astrophysics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "derivation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A main-sequence star is in long-term hydrostatic equilibrium. Explain what is balancing what locally, and why saying only that 'gravity equals pressure' is imprecise. What qualitative change occurs if the core's energy production suddenly drops while gravity initially remains essentially unchanged?",
+    "intent": "Explain hydrostatic equilibrium as a pressure-gradient balance and reason about loss of support.",
+    "domain": "Stellar Physics and Astrophysics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "Suppose an approximate main-sequence scaling gives luminosity L ∝ M^3.5 and available fusion fuel roughly proportional to M. Derive how main-sequence lifetime scales with mass and explain why higher-mass stars can have shorter lifetimes despite having more fuel.",
+    "intent": "Use scaling laws to connect mass, luminosity, fuel, and stellar lifetime.",
+    "domain": "Stellar Physics and Astrophysics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "proportional_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A compact-object binary has a well-measured orbital period, radial-velocity curve for the visible star, and no detected light from the companion. The mass function implies a minimum companion mass above a typical white-dwarf mass, but orbital inclination is unknown. Explain what can and cannot be concluded about the companion's nature from these data alone, and name at least two additional observations that could reduce the degeneracy.",
+    "intent": "Separate robust dynamical constraints from model-dependent compact-object identification.",
+    "domain": "Stellar Physics and Astrophysics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "observational_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "Outer stars in a spiral galaxy orbit much faster than predicted if only the observed luminous matter supplies the gravity. Explain the standard dynamical inference, and identify at least one alternative category of explanation that would require observational testing. Distinguish the evidence for extra gravitating influence from any claim about the microscopic identity of dark matter.",
+    "intent": "Interpret flat rotation curves while separating observation, inference, and underlying particle model.",
+    "domain": "Galactic, Extragalactic Astronomy, and Cosmology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_and_model_limits",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A galaxy spectrum shows several known atomic absorption lines shifted to longer wavelength by the same fractional amount. List at least three physically distinct contributions that can produce measured redshift in astronomy, and explain what additional context is needed before interpreting the entire shift as cosmological expansion.",
+    "intent": "Distinguish cosmological, peculiar-velocity, and gravitational contributions to redshift.",
+    "domain": "Galactic, Extragalactic Astronomy, and Cosmology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "observational_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A galaxy cluster gravitationally lenses background galaxies. A lens model requires substantially more projected mass than is inferred from the cluster's starlight alone. What does lensing directly constrain, what assumptions enter the mass reconstruction, and why does the result not by itself identify the microscopic composition of the unseen mass?",
+    "intent": "Interpret gravitational-lensing mass evidence and its model dependence.",
+    "domain": "Galactic, Extragalactic Astronomy, and Cosmology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "astronomy_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "For nearby galaxies where the linear Hubble-Lemaître approximation is valid, take H0 = 70 km s⁻¹ Mpc⁻¹. Ignoring peculiar velocity, estimate the recession speed of a galaxy at 100 Mpc. Why would applying v = H0d without qualification become inadequate at sufficiently large redshift?",
+    "intent": "Use the low-redshift expansion relation and state its regime of validity.",
+    "domain": "Galactic, Extragalactic Astronomy, and Cosmology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "Explain how the near-blackbody cosmic microwave background and the abundance of light elements support a hot early-universe model in different ways. Distinguish these observations from the full set of assumptions required by any particular cosmological parameter fit.",
+    "intent": "Connect independent cosmological observations to the Big Bang model without overstating model uniqueness.",
+    "domain": "Galactic, Extragalactic Astronomy, and Cosmology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "Suppose a cosmological analysis combines Type Ia supernova distance-redshift data, baryon acoustic oscillation measurements, and a cosmic microwave background angular scale. The combined fit favors late-time accelerated expansion within a flat ΛCDM model. Explain which parts of the statement are observational inputs and which are model-dependent inferences. Give at least two assumptions whose relaxation could shift inferred parameters, and describe one cross-check that would test for a hidden systematic rather than merely adding more data of the same type.",
+    "intent": "Separate data from cosmological model inference and design a systematic-error cross-check.",
+    "domain": "Galactic, Extragalactic Astronomy, and Cosmology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_and_model_limits",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A planet orbits a star of mass M in a circular orbit of radius a. Derive the orbital period using Newtonian gravity. State the assumptions under which the usual Keplerian result is accurate.",
+    "intent": "Derive Kepler's third-law form from Newtonian gravity and state modeling assumptions.",
+    "domain": "Planetary Science and Solar-System Astronomy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "derivation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A moon orbits increasingly close to a planet. Explain qualitatively what the Roche limit represents and why whether disruption occurs depends on the moon's internal strength and density, not only on orbital distance.",
+    "intent": "Interpret the Roche-limit concept and its model dependence.",
+    "domain": "Planetary Science and Solar-System Astronomy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "Two planets have the same surface temperature but different escape speeds. Their upper atmospheres contain the same light gas species. Explain qualitatively which planet is more vulnerable to thermal atmospheric escape and why a comparison of molecular thermal speed with escape speed is more relevant than temperature alone.",
+    "intent": "Relate thermal molecular speeds to atmospheric escape.",
+    "domain": "Planetary Science and Solar-System Astronomy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "An exoplanet transit reduces a star's brightness by 1.0% and the planet is small compared with the star. Neglect limb darkening. Estimate Rp/R★. What key planetary property does transit depth primarily constrain, and what does it not determine by itself?",
+    "intent": "Use transit depth to infer radius ratio while recognizing missing mass information.",
+    "domain": "Planetary Science and Solar-System Astronomy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "astronomy_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "An exoplanet produces both transits and a stellar radial-velocity signal with the same period. The transit gives Rp/R★ and orbital inclination near 90°, while the radial-velocity semi-amplitude K is measured. Explain how the two methods jointly constrain planet radius, minimum/dynamical mass, and mean density, and identify which stellar properties must still be known. Then explain why radial velocity alone usually leaves an M sin i degeneracy.",
+    "intent": "Combine transit and radial-velocity observables to infer planetary properties and identify remaining dependencies.",
+    "domain": "Planetary Science and Solar-System Astronomy",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "astronomy_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A diffraction-limited telescope observes at wavelength 500 nm with aperture diameter 2.0 m. Using θ ≈ 1.22λ/D, estimate the angular resolution in radians and arcseconds (1 rad = 206265 arcsec). If the aperture diameter doubles, how do angular resolution and collecting area scale?",
+    "intent": "Combine diffraction-limited resolution with aperture-area scaling.",
+    "domain": "Observational Astronomy, Experimental Physics, and Measurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "multi_step_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A detector repeatedly measures a stable reference source with 0.5% scatter, but every measurement is 3.0% higher than a trusted calibrated value. Classify the 0.5% and 3.0% effects as random uncertainty or systematic bias. Explain what repeated measurements can and cannot fix, and propose a calibration test.",
+    "intent": "Distinguish precision from accuracy and random from systematic error.",
+    "domain": "Observational Astronomy, Experimental Physics, and Measurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "Two optical telescopes separated by baseline B are combined as an interferometer at wavelength λ. Explain why the achievable angular resolution can scale roughly as λ/B even though neither individual mirror has diameter B. What practical information about the source may still be incomplete if the interferometer samples only a few baselines?",
+    "intent": "Explain interferometric resolution and incomplete spatial-frequency sampling.",
+    "domain": "Observational Astronomy, Experimental Physics, and Measurement",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "physical_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "An experiment compares two models for a weak signal. Model A predicts a parameter value of 1.00 and Model B predicts 1.08. The experiment reports 1.06 ± 0.02 statistical uncertainty, but a calibration offset is independently constrained only to ±0.04 and could shift all measurements in the same direction. Assess whether the result decisively discriminates between the models. Show how the systematic uncertainty changes the interpretation, and propose one additional measurement or experimental design change that would most directly reduce the ambiguity.",
+    "intent": "Combine statistical and systematic uncertainty with model discrimination and experiment design.",
+    "domain": "Observational Astronomy, Experimental Physics, and Measurement",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  }
+]

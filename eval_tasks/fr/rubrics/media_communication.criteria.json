@@ -1,0 +1,182 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the question actually asked, uses the supplied media/communication context, and prioritizes the decision, claim, audience, or evidence at issue rather than generic advice.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "media_communication_accuracy",
+      "name": "Media & Communication Accuracy",
+      "definition": "Uses media, communication, journalism, audience, platform, PR, advertising, and research concepts accurately. Does not equate exposure with persuasion, engagement with impact, virality with truth, repetition with corroboration, or official status with definitive accuracy.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Distinguishes related constructs when the distinction matters, including sender intention vs audience interpretation, reach vs impressions vs frequency, reporting vs analysis vs opinion, publicity vs public relations, false vs misleading vs unverified content, and construct vs operational measure.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "message_and_rhetorical_reasoning",
+      "name": "Message & Rhetorical Reasoning",
+      "definition": "When relevant, explains how wording, sequencing, evidence, framing, tone, visuals, credibility, emotion, calls to action, and medium serve a communication purpose. Device names without mechanism or evidence receive little credit.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "audience_and_reception_reasoning",
+      "name": "Audience & Reception Reasoning",
+      "definition": "When relevant, identifies intended, actual, target, and affected audiences; considers prior knowledge, attitudes, trust, accessibility, media habits, decoding, and heterogeneity; and supports segmentation only when it justifies different strategies rather than stereotyping groups.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "journalism_and_verification_reasoning",
+      "name": "Journalism & Verification Reasoning",
+      "definition": "When relevant, separates verified fact from allegation, traces provenance, evaluates source access, expertise, incentives and independence, recognizes source dependence, seeks corroboration, preserves uncertainty, and distinguishes corrections, clarifications, updates, and retractions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "media_effects_and_causal_reasoning",
+      "name": "Media Effects & Causal Reasoning",
+      "definition": "When relevant, distinguishes exposure, selection, reinforcement, persuasion, knowledge, attitude and behavior; does not infer causal media effects from correlation alone; and considers self-selection, confounding, reverse causality, reciprocal effects, randomization, timing, and alternative mechanisms.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "public_relations_and_crisis_reasoning",
+      "name": "PR & Crisis Reasoning",
+      "definition": "When relevant, aligns objectives, stakeholders, messages, channels and evaluation; in crises separates confirmed facts, unknowns, immediate action, update process, responsibility and remediation; and does not treat messaging as a substitute for operational correction.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "advertising_and_campaign_reasoning",
+      "name": "Advertising & Campaign Reasoning",
+      "definition": "When relevant, connects objective, target audience, proposition, creative approach, channel, timing and metric; distinguishes awareness, recall, persuasion, conversion and profitability; and recognizes attribution, audience overlap, sponsorship and disclosure constraints.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "digital_social_and_platform_reasoning",
+      "name": "Digital, Social & Platform Reasoning",
+      "definition": "When relevant, analyzes content, user behavior, network structure, ranking, moderation, platform incentives and measurement limits together; does not attribute observed outcomes to algorithms without evidence or treat engagement as sentiment or impact.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "misinformation_and_fact_checking_reasoning",
+      "name": "Misinformation & Fact-Checking Reasoning",
+      "definition": "When relevant, identifies the exact claim, distinguishes false, misleading, unverified, satirical and manipulated content, traces provenance, weighs primary evidence, preserves uncertainty, and proposes proportionate correction without restating unsupported material as fact.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "political_and_public_communication_reasoning",
+      "name": "Political & Public Communication Reasoning",
+      "definition": "When relevant, analyzes political or public communication neutrally by separating rhetoric, framing, factual claims, audience, institutions, media strategy and evidence. Partisan conclusions, endorsements, best/worst rankings, voter-direction, or independent election predictions are errors.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When relevant, performs arithmetic correctly, uses the proper numerator and denominator, distinguishes unique reach from impressions and frequency, avoids double counting, and does not let a small numerical error overturn a sound conclusion unless the error is material.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "research_design_and_measurement_reasoning",
+      "name": "Research Design & Measurement Reasoning",
+      "definition": "When relevant, identifies the research question, sample, unit of analysis, exposure and outcome measures, reliability, validity, sampling, randomization, spillovers, nonresponse, recall, and design limitations. Method choice should match the inferential goal.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "data_and_metric_interpretation",
+      "name": "Data & Metric Interpretation",
+      "definition": "When relevant, interprets counts, rates, audience analytics, survey estimates and campaign metrics in relation to the objective. Recognizes that high reach, CTR, watch time, engagement or recall can coexist with low trust, conversion, comprehension, persuasion or impact.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "ethics_and_public_interest_reasoning",
+      "name": "Ethics & Public-Interest Reasoning",
+      "definition": "When relevant, weighs truthfulness, accuracy, harm, dignity, privacy, consent, manipulation, independence, sponsorship, source protection, vulnerable audiences and public interest. Ethical trade-offs should be reasoned rather than reduced to one absolute slogan.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_alternatives_and_uncertainty",
+      "name": "Assumptions, Alternatives & Uncertainty",
+      "definition": "When relevant, identifies unsupported assumptions, plausible alternative explanations, missing evidence, conflicts among objectives, audience heterogeneity, source dependence and measurement error; calibrates confidence; and avoids false certainty, including unsupported platform-effect or verification claims.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material dimensions required to answer the question at its assigned difficulty, without omitting an essential audience, evidence, source, metric, ethical, causal, or implementation consideration. Reasonable alternative strategies can receive full credit when technically and ethically justified.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internal consistency across factual claims, calculations, source assessments, causal conclusions, recommendations, and uncertainty. The answer should not use one standard of evidence in one section and contradict it elsewhere.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the reasoning in a precise, organized, audience-appropriate way. Necessary distinctions and conclusions are easy to identify; unnecessary jargon, buzzwords, citations, or length do not substitute for explanation.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_media_communication_error",
+    "condition": "A materially false central communication, journalistic, causal, quantitative, verification, ethical, political-neutrality, or media-system claim fundamentally invalidates the answer or reverses the substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Presenting an unverified allegation as established fact when verification is central to the task.",
+      "Inventing a source, quotation, statistic, media item, or piece of evidence central to the answer.",
+      "Claiming multiple reports independently corroborate a story when they all derive from one original source.",
+      "Fundamentally confusing reach with impressions or frequency in a way that reverses the campaign conclusion.",
+      "Fundamentally confusing engagement with persuasion, trust, or behavioral impact.",
+      "A major arithmetic or denominator error that reverses the campaign or research conclusion.",
+      "Claiming a cross-sectional correlation proves a causal media effect.",
+      "Ignoring clearly supplied self-selection evidence when causal interpretation is central.",
+      "Claiming virality establishes credibility, truth, or importance.",
+      "Treating an official statement as incontrovertible proof despite supplied contradictory evidence.",
+      "Recommending publication of uncertain breaking-news claims as confirmed facts.",
+      "Categorically labeling content false when the supplied evidence establishes only that it is unverified.",
+      "Treating synthetic or manipulated media as authentic despite decisive provenance evidence to the contrary.",
+      "Claiming an algorithm caused an audience pattern when no evidence of algorithmic exposure is supplied.",
+      "Claiming high click-through rate proves profitability when conversion or cost data contradict that conclusion.",
+      "Presenting a partisan judgment, endorsement, best/worst ranking, voter-direction, or independent election prediction as objective political-communication analysis.",
+      "Recommending deceptive sponsorship practices while ignoring a clearly supplied disclosure requirement.",
+      "Stating that crisis communication alone resolves a substantive operational failure.",
+      "Recommending false reassurance in a public-safety scenario despite material uncertainty."
+    ],
+    "not_critical_examples": [
+      "Minor terminology errors.",
+      "Small calculation errors that do not change the conclusion.",
+      "Reasonable alternative message or campaign strategies.",
+      "Different valid audience segmentations.",
+      "Legitimate interpretation differences.",
+      "Minor omissions.",
+      "Cautious uncertainty.",
+      "Different defensible crisis-response sequences.",
+      "Reasonable ethical disagreement.",
+      "Minor platform-specific imprecision."
+    ]
+  }
+}

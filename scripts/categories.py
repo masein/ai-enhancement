@@ -1,8 +1,8 @@
-"""MMLU subjects -> the human categories in scripts/categories.yaml.
+"""The exam's topics, and MMLU subjects -> those topics (scripts/categories.yaml).
 
 Read here without pyyaml on purpose: diagnose.py and report_lm_eval.py run
 with whatever python the box has (`sudo python3 …` on the server), and a
-dependency for a fifteen-line flat file is a dependency too many. The reader
+dependency for a flat file of topic names is a dependency too many. The reader
 accepts exactly the shape the file documents and refuses anything else, so a
 stray indent or a duplicate subject fails loudly instead of silently
 reshuffling a category.
@@ -15,7 +15,9 @@ import re
 from pathlib import Path
 
 YAML_PATH = Path(__file__).with_name("categories.yaml")
-OTHER = "other"        # where an unmapped subject lands — visible, never dropped
+# where an unmapped subject lands — visible, never dropped. Until the 37-topic
+# exam (phase 10) this was a bucket called `other`; it is a real topic now
+OTHER = "General & Multidisciplinary"
 
 _CAT = re.compile(r"^([A-Za-z][A-Za-z0-9 &,'\-]*?):\s*$")
 _SUB = re.compile(r"^\s+-\s+([a-z0-9_]+)\s*$")
@@ -62,18 +64,26 @@ def load(path: Path = YAML_PATH) -> dict[str, str]:
 
 
 def category_order(path: Path = YAML_PATH) -> list[str]:
-    """Categories in file order, `other` last whatever the file says — it is
-    the bucket for what the file does not know, and reads that way."""
+    """Categories in file order, the fallback (OTHER) last whatever the file
+    says — it is the bucket for what the file does not know, and reads that
+    way."""
     cats = list(_table(path))
     return [c for c in cats if c != OTHER] + [OTHER]
 
 
+def with_subjects(path: Path = YAML_PATH) -> list[str]:
+    """The topics MMLU has something to say about — 24 of the 37. The others
+    have no MMLU caution line and no control items."""
+    return [c for c in category_order(path) if _table(path).get(c)]
+
+
 def topic_slug(name: str) -> str:
-    """'medicine & health' -> 'medicine_health': the topic as a task name."""
+    """'Medicine & Clinical Health' -> 'medicine_clinical_health': the topic
+    as a task name."""
     return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
 
 
 def categorize(subject: str, path: Path = YAML_PATH) -> str | None:
     """The category, or None when the subject is not in the file. Callers
-    that roll up decide what None means (diagnose.py: `other`, and listed)."""
+    that roll up decide what None means (diagnose.py: OTHER, and listed)."""
     return load(path).get(subject)

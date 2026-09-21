@@ -18,9 +18,13 @@ import judge as jd
 from conftest import make_service
 
 REPO = Path(__file__).resolve().parents[1]
-TOPIC = "medicine & health"
-TASK = "exam_medicine_health"
+TOPIC = "Medicine & Clinical Health"
+TASK = "exam_medicine_clinical_health"
 LAW = "exam_law"
+# the provenance tests below are about the banks of that run — the files
+# whose source and author came out wrong — so they import those files,
+# now retired, into the topic that replaced theirs
+RETIRED = REPO / "eval_tasks" / "fr" / "retired"
 
 
 @pytest.fixture
@@ -177,23 +181,24 @@ def test_a_finished_judge_run_stops_counting_and_says_so(svc, monkeypatch):
 def test_a_source_is_never_the_topics_own_name(tmp_path):
     """Two of the five banks recorded "economics" and "physics & engineering"
     as their source, which says nothing about where the questions came from."""
-    assert eb.source_for("economics", "economics", "economics.json") == "import"
-    assert eb.source_for("", "economics", "economics_v1.json") == "economics_v1"
-    assert eb.source_for("physics_engineering", "physics & engineering", "x.json") == "x"
-    assert eb.source_for("law_v2", "law", "law_v2.json") == "law_v2"
-    assert eb.source_for("", "law", "") == "import"
+    assert eb.source_for("economics", "Economics", "economics.json") == "import"
+    assert eb.source_for("Economics", "Economics", "economics.json") == "import"
+    assert eb.source_for("", "Economics", "economics_v1.json") == "economics_v1"
+    assert eb.source_for("physics_astronomy", "Physics & Astronomy", "x.json") == "x"
+    assert eb.source_for("law_v2", "Law", "law_v2.json") == "law_v2"
+    assert eb.source_for("", "Law", "") == "import"
     root = tmp_path / "exam"
-    out = eb.import_bank(root, REPO / "eval_tasks" / "fr" / "economics_v1.json", "economics",
+    out = eb.import_bank(root, RETIRED / "economics_v1.json", "Economics",
                          "Dr. Hossein", "economics")          # the topic, as the page sent it
     assert out["source"] == "economics_v1"                    # the file's own name instead
-    assert {r["source"] for r in eb.load_bank(root)["economics"]} == {"economics_v1"}
+    assert {r["source"] for r in eb.load_bank(root)["Economics"]} == {"economics_v1"}
 
 
 def test_the_import_records_the_author_and_who_ran_it(svc):
     client, _, _ = svc
     from service import config, db
-    items = json.loads((REPO / "eval_tasks" / "fr" / "law_v2.json").read_text("utf-8"))[:5]
-    body = {"topic": "law", "approver": "Dr. Hossein", "imported_by": "masein",
+    items = json.loads((RETIRED / "law_v2.json").read_text("utf-8"))[:5]
+    body = {"topic": "Law", "approver": "Dr. Hossein", "imported_by": "masein",
             "source": "", "filename": "law_v2.json", "items": items}
     pre = client.post("/api/exam/import/preview", json=body).json()
     # the preview says what will be written, before a hundred records carry it
@@ -201,7 +206,7 @@ def test_the_import_records_the_author_and_who_ran_it(svc):
     assert pre["source"] == "law_v2"
     got = client.post("/api/exam/import", json=body).json()
     assert got["source"] == "law_v2"
-    mine = [r for r in eb.load_bank(config.EXAM_DIR)["law"] if r.get("source") == "law_v2"]
+    mine = [r for r in eb.load_bank(config.EXAM_DIR)["Law"] if r.get("source") == "law_v2"]
     # one of these five is already in the fixture's own law bank, and a
     # matching qid is skipped — that is the qid doing its job
     assert len(mine) == got["imported"] and got["imported"] + got["skipped"] == 5
@@ -215,12 +220,12 @@ def test_a_second_import_does_not_overwrite_a_recorded_source(tmp_path):
     """The file has not changed, so neither has what it is: an import that
     says nothing about the source must not replace one that said something."""
     root = tmp_path / "exam"
-    src = REPO / "eval_tasks" / "fr" / "law_v2.json"
-    eb.import_bank(root, src, "law", "Dr. Hossein", "law_v2")
-    before = {r["qid"]: (r["source"], r["accepted_by"]) for r in eb.load_bank(root)["law"]}
-    again = eb.import_bank(root, src, "law", "someone else", "")
+    src = RETIRED / "law_v2.json"
+    eb.import_bank(root, src, "Law", "Dr. Hossein", "law_v2")
+    before = {r["qid"]: (r["source"], r["accepted_by"]) for r in eb.load_bank(root)["Law"]}
+    again = eb.import_bank(root, src, "Law", "someone else", "")
     assert (again["imported"], again["updated"], again["skipped"]) == (0, 0, 100)
-    after = {r["qid"]: (r["source"], r["accepted_by"]) for r in eb.load_bank(root)["law"]}
+    after = {r["qid"]: (r["source"], r["accepted_by"]) for r in eb.load_bank(root)["Law"]}
     assert after == before
 
 
@@ -230,16 +235,16 @@ def test_correcting_a_bank_in_place_never_moves_a_question(tmp_path):
     would re-roll the split, orphan every judged result and quietly change
     what five published scores are about. Two fields move; nothing else."""
     root = tmp_path / "exam"
-    eb.import_bank(root, REPO / "eval_tasks" / "fr" / "economics_v1.json", "economics",
+    eb.import_bank(root, RETIRED / "economics_v1.json", "Economics",
                    "masein", "economics")
-    rows = eb.load_bank(root)["economics"]
+    rows = eb.load_bank(root)["Economics"]
     qids_before = [r["qid"] for r in rows]
     halves_before = {r["qid"]: eb.half_of(r["qid"]) for r in rows}
     bodies_before = {r["qid"]: (r["prompt"], r["reference"], json.dumps(r["meta"], sort_keys=True))
                      for r in rows}
-    out = eb.set_provenance(root, "economics", source="economics_v1", approver="Dr. Hossein")
+    out = eb.set_provenance(root, "Economics", source="economics_v1", approver="Dr. Hossein")
     assert out["changed"] == 100 and out["rows"] == 100
-    after = eb.load_bank(root)["economics"]
+    after = eb.load_bank(root)["Economics"]
     assert [r["qid"] for r in after] == qids_before          # byte-identical, in order
     assert {r["qid"]: eb.half_of(r["qid"]) for r in after} == halves_before
     assert {r["qid"]: (r["prompt"], r["reference"], json.dumps(r["meta"], sort_keys=True))
@@ -248,26 +253,28 @@ def test_correcting_a_bank_in_place_never_moves_a_question(tmp_path):
     assert {r["accepted_by"] for r in after} == {"Dr. Hossein"}
     # and it refuses to write the topic's own name as a source
     with pytest.raises(ValueError, match="says nothing about where"):
-        eb.set_provenance(root, "economics", source="economics")
+        eb.set_provenance(root, "Economics", source="economics")
+    with pytest.raises(ValueError, match="says nothing about where"):
+        eb.set_provenance(root, "Economics", source="Economics")
     # only the rows that carry a given source, when asked
-    eb.set_provenance(root, "economics", source="mixed", only_source="nothing-matches-this")
-    assert {r["source"] for r in eb.load_bank(root)["economics"]} == {"economics_v1"}
+    eb.set_provenance(root, "Economics", source="mixed", only_source="nothing-matches-this")
+    assert {r["source"] for r in eb.load_bank(root)["Economics"]} == {"economics_v1"}
 
 
 def test_the_cli_corrects_a_bank_and_says_what_it_did(tmp_path):
     import subprocess
     import sys
     root = tmp_path / "exam"
-    eb.import_bank(root, REPO / "eval_tasks" / "fr" / "economics_v1.json", "economics",
+    eb.import_bank(root, RETIRED / "economics_v1.json", "Economics",
                    "masein", "economics")
     r = subprocess.run([sys.executable, str(REPO / "scripts" / "exam_build.py"),
-                        "--root", str(root), "set-source", "--topic", "economics",
+                        "--root", str(root), "set-source", "--topic", "Economics",
                         "--source", "economics_v1", "--approver", "Dr. Hossein"],
                        capture_output=True, text=True, timeout=120, cwd=REPO)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "100 of 100 rows updated" in r.stdout and "Dr. Hossein" in r.stdout
-    assert {x["accepted_by"] for x in eb.load_bank(root)["economics"]} == {"Dr. Hossein"}
+    assert {x["accepted_by"] for x in eb.load_bank(root)["Economics"]} == {"Dr. Hossein"}
     bad = subprocess.run([sys.executable, str(REPO / "scripts" / "exam_build.py"),
-                          "--root", str(root), "set-source", "--topic", "economics"],
+                          "--root", str(root), "set-source", "--topic", "Economics"],
                          capture_output=True, text=True, timeout=120, cwd=REPO)
     assert bad.returncode == 2 and "nothing to set" in bad.stderr

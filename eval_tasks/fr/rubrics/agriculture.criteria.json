@@ -1,0 +1,182 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the agricultural question, uses the supplied context, and avoids materially irrelevant discussion. A technically correct calculation that does not inform the agricultural task should not receive full credit.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "agronomic_accuracy",
+      "name": "Agronomic Accuracy",
+      "definition": "Uses broadly correct agricultural science and management relationships, including context dependence, timing, limiting factors, and diminishing returns. Does not treat yield, growth, efficiency, or profitability as interchangeable.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "soil_and_nutrient_accuracy",
+      "name": "Soil and Nutrient Accuracy",
+      "definition": "When relevant, correctly distinguishes soil texture from structure, water content from plant-available water, salinity from sodicity, total from plant-available nutrients, and fertilizer applied from nutrient availability, uptake, and removal; maintains plausible nutrient and soil-process reasoning.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "crop_science_reasoning",
+      "name": "Crop Science Reasoning",
+      "definition": "When relevant, correctly connects establishment, phenology, canopy development, source-sink relations, stress, competition, yield components, genetics, or horticultural management to crop outcomes without relying on crop trivia or unsupported universal recommendations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "plant_health_reasoning",
+      "name": "Plant Health Reasoning",
+      "definition": "When relevant, distinguishes symptoms from causes, pest presence from economic injury, resistance from immunity or tolerance, and short-term suppression from long-term management; handles diagnostic uncertainty and integrated crop-protection mechanisms appropriately.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "animal_science_reasoning",
+      "name": "Animal Science Reasoning",
+      "definition": "When relevant, correctly reasons about dry-matter and nutrient intake, maintenance and production needs, growth, reproduction, feed efficiency, stocking, grazing, environment, genetics, and welfare without inferring health or efficiency from production alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "water_and_irrigation_reasoning",
+      "name": "Water and Irrigation Reasoning",
+      "definition": "When relevant, correctly handles crop water use, root-zone storage, irrigation depth and volume, efficiency, timing, drainage, salinity, waterlogging, drought sensitivity, and the distinction between irrigation applied and water actually available or used.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "agricultural_engineering_reasoning",
+      "name": "Agricultural Engineering Reasoning",
+      "definition": "When relevant, correctly reasons about field capacity, efficiency, power, traction, compaction, machinery matching, timeliness, utilization, maintenance, and operational constraints rather than assuming greater machine capacity is always preferable.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "farm_economic_reasoning",
+      "name": "Farm Economic Reasoning",
+      "definition": "When relevant, distinguishes revenue from profit, fixed from variable and sunk from relevant costs, average from marginal response, and biological from economic optima; considers opportunity cost, cash constraints, timeliness, price risk, and production risk as appropriate.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "systems_and_resource_reasoning",
+      "name": "Systems and Resource Reasoning",
+      "definition": "When relevant, identifies interactions and resource flows among crops, livestock, soil, nutrients, water, labor, machinery, land, finance, and environment; recognizes system boundaries, bottlenecks, feedbacks, and opportunity costs across enterprises.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When calculations are required, selects the correct quantity and equation, uses compatible units and bases, performs arithmetic accurately, and checks magnitude and biological or operational plausibility. Minor arithmetic slips are distinguished from errors that change the management conclusion.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "experimental_reasoning",
+      "name": "Experimental Reasoning",
+      "definition": "When relevant, identifies experimental units, controls, replication, randomization, blocking, confounding, pseudoreplication, interactions, field variability, and limits to generalization; does not treat statistical significance alone as proof of agronomic importance.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "data_interpretation",
+      "name": "Data Interpretation",
+      "definition": "When relevant, accurately reads agricultural tables, maps, response curves, records, sensor outputs, or trial results; distinguishes raw observations from modeled estimates, absolute from relative changes, averages from variability, and statistical from practical differences.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "causal_and_mechanistic_reasoning",
+      "name": "Causal and Mechanistic Reasoning",
+      "definition": "Explains important biological, physical, chemical, ecological, technical, or economic mechanisms and distinguishes association from causal evidence. A correct recommendation reached through materially invalid reasoning should lose credit.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "assumptions_and_model_selection",
+      "name": "Assumptions and Model Selection",
+      "definition": "When relevant, chooses an appropriate agricultural model or decision framework, states or recognizes material assumptions, respects the model's valid range, identifies hidden limiting factors, and requests additional information when a unique inference is not supported.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "risk_and_uncertainty",
+      "name": "Risk and Uncertainty",
+      "definition": "When relevant, distinguishes expected outcomes from variability and downside risk, characterizes uncertainty in data or mechanisms, avoids unsupported certainty, and identifies sensitivity to weather, prices, pests, inputs, timing, or model assumptions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "sustainability_and_tradeoff_reasoning",
+      "name": "Sustainability and Trade-off Reasoning",
+      "definition": "When relevant, evaluates measurable outcomes such as productivity, soil condition, water use, nutrient loss, biodiversity, emissions, resilience, labor, and economic viability; recognizes that a practice may improve one objective while worsening another and does not reward labels or slogans.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the question at a depth appropriate to its difficulty, including essential constraints, assumptions, calculations, mechanisms, trade-offs, or requested additional information, without requiring irrelevant domains.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent units, assumptions, causal claims, numerical results, and management conclusions. Does not contradict earlier reasoning or use incompatible bases such as wet weight and dry matter without conversion.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the agricultural reasoning clearly and efficiently, defines necessary distinctions, labels units and assumptions, and presents conclusions in a way that can be evaluated without rewarding unnecessary length, jargon, or citations.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_agriculture_error",
+    "condition": "A materially false central agronomic, soil, crop, livestock, water, engineering, economic, quantitative, or experimental claim that fundamentally invalidates the answer or would lead to a seriously misleading agricultural conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "A major fertilizer-rate calculation error that changes the management conclusion.",
+      "Fundamentally misunderstanding plant-available soil water.",
+      "Claiming more fertilizer necessarily increases yield without limit.",
+      "Fundamentally incorrect irrigation-volume or water-balance reasoning.",
+      "Confusing salinity with sodicity in a way that reverses management interpretation.",
+      "Treating total soil nutrient content as equivalent to immediately plant-available nutrient supply.",
+      "Recommending crop management from a fundamentally incorrect diagnosis.",
+      "Treating pest presence as proof that intervention is economically justified.",
+      "Fundamentally incorrect stocking-rate or carrying-capacity reasoning.",
+      "Confusing as-fed and dry-matter feed composition in a way that invalidates the ration conclusion.",
+      "A fundamentally incorrect machinery-capacity calculation that changes feasibility.",
+      "Claiming the treatment with highest yield necessarily produces the highest profit.",
+      "Fundamentally misunderstanding marginal input response.",
+      "Treating one unreplicated field observation as proof of a causal treatment effect.",
+      "Ignoring a clearly confounded experiment and asserting causal certainty.",
+      "Recommending a practice based on a calculation with incompatible units.",
+      "Fundamentally incorrect interpretation of a central crop-response, soil, livestock, or farm dataset.",
+      "Reversing a central biological or agronomic relationship.",
+      "Recommending a management decision based on a fundamentally invalid agricultural calculation."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the substantive conclusion.",
+      "Small rounding differences.",
+      "Minor terminology mistakes.",
+      "Reasonable alternative management strategies.",
+      "Legitimate regional differences.",
+      "Reasonable agronomic assumptions that are clearly stated.",
+      "Small omissions.",
+      "Reasonable uncertainty about a non-central mechanism.",
+      "Different valid approaches to resource allocation.",
+      "Minor disagreement about management intensity where evidence permits several options."
+    ]
+  }
+}

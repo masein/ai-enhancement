@@ -1,0 +1,181 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the educational question, stated goal, learner or system context, and decision being asked about; avoids tangents that do not help resolve the task.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "education_accuracy",
+      "name": "Education Accuracy",
+      "definition": "Makes materially correct claims about teaching, learning, curriculum, assessment, inclusion, educational systems, and research as applicable; avoids unsupported universal claims.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Uses educational concepts with the distinctions required by the task, such as learning vs performance, reliability vs validity, growth vs attainment, and correlation vs causation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "learning_and_development_reasoning",
+      "name": "Learning and Development Reasoning",
+      "definition": "When relevant, correctly reasons from prior knowledge, misconceptions, memory, retrieval, spacing, cognitive load, motivation, metacognition, transfer, development, and expertise to instructional implications.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "pedagogical_reasoning",
+      "name": "Pedagogical Reasoning",
+      "definition": "When relevant, selects or compares instructional approaches based on learning goals, learner knowledge, task complexity, guidance, practice, feedback, and mechanisms rather than slogans or method labels.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "curriculum_and_instructional_design",
+      "name": "Curriculum and Instructional Design",
+      "definition": "When relevant, evaluates objectives, prerequisites, sequencing, coherence, progression, breadth/depth, modeling, guided practice, independent practice, and alignment across curriculum, instruction, and assessment.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assessment_and_measurement_reasoning",
+      "name": "Assessment and Measurement Reasoning",
+      "definition": "When relevant, identifies the intended construct and use; reasons correctly about formative/summative/diagnostic purposes, validity, reliability, accessibility, scoring, rubrics, measurement error, and score interpretation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When numerical reasoning is required, uses correct arithmetic, denominators, units, comparisons, growth/level distinctions, percentage or percentile interpretation, and does not overstate precision.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "classroom_and_learning_environment_reasoning",
+      "name": "Classroom and Learning Environment Reasoning",
+      "definition": "When relevant, reasons about routines, expectations, transitions, participation, climate, belonging, behavior support, discussion, questioning, engagement, and instructional time in relation to learning.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "inclusion_and_accessibility_reasoning",
+      "name": "Inclusion and Accessibility Reasoning",
+      "definition": "When relevant, identifies access barriers and supports participation while preserving the intended learning construct; avoids deficit assumptions and distinguishes accommodations from changed expectations when needed.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "learner_variability_and_context",
+      "name": "Learner Variability and Context",
+      "definition": "When relevant, accounts for prior knowledge, language, disability, pace, motivation, background, experience, interests, and within-group variability without stereotyping or inferring individual ability from group averages.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_research_reasoning",
+      "name": "Evidence and Research Reasoning",
+      "definition": "When relevant, matches claims to study design; identifies confounding, selection, attrition, measurement limits, sampling, implementation, replication, and the difference between association and causal evidence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "educational_data_interpretation",
+      "name": "Educational Data Interpretation",
+      "definition": "When relevant, interprets educational data using appropriate baselines, denominators, subgroup patterns, missingness, composition, measurement comparability, uncertainty, and growth versus attainment.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "technology_and_media_reasoning",
+      "name": "Technology and Media Reasoning",
+      "definition": "When relevant, evaluates technology through the learning processes and practices it enables, including accessibility, multimedia design, online interaction, AI accuracy, privacy, bias, oversight, and overreliance.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "system_organization_and_policy_reasoning",
+      "name": "System Organization and Policy Reasoning",
+      "definition": "When relevant, reasons neutrally about school organization, leadership, education systems, policy mechanisms, incentives, capacity, implementation, accountability, and unintended effects.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_uncertainty",
+      "name": "Assumptions and Uncertainty",
+      "definition": "When relevant, identifies key assumptions, missing information, alternative explanations, measurement limits, and uncertainty; calibrates confidence instead of fabricating certainty.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "practical_educational_judgment",
+      "name": "Practical Educational Judgment",
+      "definition": "When relevant, proposes feasible educational actions that fit the objective, learners, evidence, constraints, implementation capacity, and likely trade-offs; allows multiple defensible approaches.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material considerations needed to answer the question at its stated difficulty without substituting unnecessary breadth or length for substance.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally coherent reasoning, terminology, calculations, assumptions, and conclusions; does not contradict earlier claims or apply incompatible standards.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the reasoning in a clear, organized, interpretable way appropriate to the task; necessary qualifications are explicit and jargon does not substitute for explanation.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_education_error",
+    "condition": "A materially false central educational, assessment, quantitative, causal, inclusion, or research claim that fundamentally invalidates the answer or would lead to a materially misleading educational decision.",
+    "effect": "score=0",
+    "examples": [
+      "Claiming immediate classroom performance necessarily demonstrates durable learning.",
+      "Claiming a reliable test is necessarily valid for every intended use.",
+      "Fundamentally misinterpreting percentile rank as percent correct where the distinction determines the conclusion.",
+      "Claiming correlation between teacher practice and achievement proves the practice caused the achievement difference.",
+      "Treating a large convenience sample as automatically representative.",
+      "Recommending a high-stakes student placement based on an assessment that clearly does not measure the relevant construct.",
+      "Fundamentally misinterpreting formative and summative assessment in a way that invalidates the recommendation.",
+      "Claiming accommodations necessarily make an assessment unfair or lower standards.",
+      "Treating limited proficiency in the language of instruction as proof of low general ability.",
+      "Claiming engagement or enjoyment proves learning occurred.",
+      "Claiming matching teaching to a supposed learning style has established causal benefit.",
+      "Making a major quantitative error that reverses interpretation of achievement, growth, attendance, or intervention results.",
+      "Treating absence of statistical significance as proof that an intervention has no effect.",
+      "Treating one successful classroom as proof a method works universally.",
+      "Ignoring major differential attrition in a study and concluding strong causal effectiveness.",
+      "Claiming a curriculum is effective merely because all intended content was taught.",
+      "Fundamentally misinterpreting growth and attainment.",
+      "Fabricating student data, assessment properties, research findings, curriculum requirements, or educational regulations required for the conclusion.",
+      "Making a central recommendation based on a demographic stereotype about learner ability.",
+      "Asserting certainty where the supplied educational evidence is clearly insufficient."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Minor terminology mistakes.",
+      "Reasonable pedagogical differences or defensible curriculum choices.",
+      "Different valid classroom-management approaches or grading-policy choices.",
+      "Legitimate interpretation differences where evidence is mixed.",
+      "Small omissions or reasonable approximations.",
+      "Cautious uncertainty.",
+      "Different evidence-consistent instructional strategies."
+    ]
+  }
+}

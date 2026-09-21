@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "Most members of a community approve of a customary practice, and the practice has persisted for generations. Does that fact by itself establish that the practice is morally right? Explain what additional premise or reasoning would be needed.",
+    "intent": "Test the descriptive-versus-normative distinction and the need for a normative bridge premise.",
+    "domain": "Ethical Foundations — Descriptive vs Normative Claims",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "ethical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A company observes that employees who answer messages late at night are promoted more often. A manager concludes, 'Therefore employees ought to be available every night.' Analyze the inference and identify any missing normative assumption.",
+    "intent": "Evaluate an is-to-ought inference in a self-contained workplace case.",
+    "domain": "Ethical Foundations — Is–Ought Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "argument_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A relief agency can either fund one program expected to prevent 90 serious harms this year or a rule-based program expected to prevent 75 this year but to build trust and improve future participation. Compare how act-consequentialist and rule-consequentialist reasoning could assess the choice, including uncertainty and long-term effects.",
+    "intent": "Distinguish act and rule consequentialist reasoning without reducing either to short-term arithmetic.",
+    "domain": "Ethical Foundations — Consequentialism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "consequentialist_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A recruiter withholds a material fact about a job because disclosure would make a candidate less likely to accept. The candidate's decision would benefit the firm. Analyze the case from a duty-based perspective focused on deception, respect for persons, and the use of another person as a means.",
+    "intent": "Apply deontological reasoning to manipulation and respect for persons.",
+    "domain": "Ethical Foundations — Duties and Respect for Persons",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "duty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A student proposes this rule for themself: 'I may make a promise I do not intend to keep whenever breaking it would solve a serious inconvenience for me.' Analyze whether the principle can coherently function as a general rule and explain what exactly is being universalized.",
+    "intent": "Test universalization by identifying and evaluating the maxim rather than asking only what would happen if everyone did it.",
+    "domain": "Ethical Foundations — Universalization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A colleague tells the truth in a needlessly humiliating way and defends the action by saying, 'Honesty is a virtue.' How would virtue ethics assess the action in terms of character, practical wisdom, context, and the relationship among honesty, compassion, and tact?",
+    "intent": "Apply virtue ethics as context-sensitive character reasoning.",
+    "domain": "Ethical Foundations — Virtue Ethics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "virtue_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "Two people can each provide the same hour of help. One is a stranger in mild difficulty; the other is a dependent family member facing a serious but non-emergency need. Analyze how care ethics and an impartial ethical approach might differ about the significance of relationship, dependency, and vulnerability.",
+    "intent": "Compare relational obligations with impartial reasoning without caricaturing care ethics.",
+    "domain": "Ethical Foundations — Care Ethics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A public library can reduce theft by recording every visitor's reading history for five years. The policy is effective, but most visitors are unaware of the retention. Analyze the conflict among privacy, collective benefit, consent, proportionality, and institutional trust without assuming that either privacy or security is absolute.",
+    "intent": "Analyze a rights conflict and proportionality in a nonpartisan institutional case.",
+    "domain": "Ethical Foundations — Rights and Privacy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "rights_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A competent adult chooses a difficult course of action after strong advice from family and friends, but no threats, deception, or material pressure are used. Does the presence of influence by itself defeat autonomy? Explain what features would matter.",
+    "intent": "Distinguish autonomy from freedom from all influence.",
+    "domain": "Ethical Foundations — Autonomy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A junior employee says 'yes' to a supervisor's optional request after being told that refusal is formally allowed, but the supervisor controls future assignments and has repeatedly hinted that 'team players' are rewarded. Analyze whether the agreement is ethically adequate consent, considering voluntariness, information, scope, and power imbalance.",
+    "intent": "Evaluate consent conditions under structural pressure.",
+    "domain": "Ethical Foundations — Consent",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A bystander can prevent a stranger's minor injury at negligible cost but does nothing. Another person actively causes the same injury. What moral significance, if any, might different ethical frameworks assign to doing harm versus allowing harm?",
+    "intent": "Distinguish causing harm from failing to prevent it without presupposing that the distinction is always decisive.",
+    "domain": "Ethical Foundations — Doing vs Allowing Harm",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A doctor-like professional administers a treatment to relieve severe pain, foreseeing but not intending a small risk of shortening life. The harmful effect is not used as the means of relief. Explain why intention, foresight, means, and proportionality can matter ethically, without assuming one framework settles the case.",
+    "intent": "Analyze intention versus foresight and double-effect-type reasoning conceptually.",
+    "domain": "Ethical Foundations — Intention and Foresight",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ethical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "An engineer chooses a safety intervention that predictably prevents many accidents but will also cause a small, unavoidable harm to a few people. The harm is foreseen, not desired, and is not itself the mechanism producing the benefit. Analyze the ethical relevance of intention, means, necessity, and proportionality.",
+    "intent": "Apply double-effect-type distinctions without requiring the historical label.",
+    "domain": "Ethical Foundations — Double-Effect-Type Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "normative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "Three people contribute to a harmful outcome: one designed a process while unaware of a hidden defect, one manager ignored repeated warnings, and one operator followed instructions under credible threat of job loss. Distinguish causal responsibility from moral responsibility and compare the roles of knowledge, negligence, control, coercion, and foreseeability.",
+    "intent": "Analyze distributed moral responsibility and distinguish causation from blameworthiness.",
+    "domain": "Ethical Foundations — Moral Responsibility",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "Two drivers make the same equally careless choice. By chance, one route is empty and no one is harmed; on the other route a pedestrian is injured. Should their moral blame be identical, different, or partly different? Present more than one defensible view and explain the role of outcome luck.",
+    "intent": "Test moral-luck reasoning without requiring a single theory.",
+    "domain": "Ethical Foundations — Moral Luck",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "During an emergency, a person breaks a promise because a misleading but reasonable report made them believe keeping it would cause serious harm. Explain the difference between saying the breach was justified and saying it was wrongful but excused.",
+    "intent": "Distinguish justification from excuse using an ethical rather than legal example.",
+    "domain": "Ethical Foundations — Justification vs Excuse",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A person gives up a rare vacation to spend several weeks helping strangers after a disaster, even though they had no special role obligation to do so. Explain why an ethical theory might classify the action as supererogatory rather than obligatory, merely permissible, or impermissible.",
+    "intent": "Test the distinction among obligation, permission, prohibition, and supererogation.",
+    "domain": "Ethical Foundations — Supererogation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A counselor has promised confidentiality, but a client reveals a credible plan to cause serious harm to another person. Without appealing to jurisdiction-specific law, analyze the competing ethical reasons involving trust, promise-keeping, harm prevention, rights, and professional role obligations.",
+    "intent": "Analyze a genuine moral dilemma with competing duties and harms.",
+    "domain": "Ethical Foundations — Moral Dilemmas",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "moral_dilemma",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A school gives every student exactly the same amount of time for an exam. One student has a documented condition that substantially slows reading but does not affect mastery of the subject. Explain how equal treatment, equality of opportunity, equity, and fairness can come apart in this case.",
+    "intent": "Distinguish equality from equity and fair access.",
+    "domain": "Ethical Foundations — Equality and Equity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A grant committee uses a transparent, consistent, conflict-free lottery among applicants who all meet minimum criteria. Later it is discovered that the eligibility rule systematically excluded people with the greatest needs. Explain why a fair procedure may still produce a substantively questionable result.",
+    "intent": "Distinguish procedural justice from substantive and need-based considerations.",
+    "domain": "Ethical Foundations — Procedural and Distributive Justice",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "normative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A competent patient refuses a beneficial treatment after receiving and understanding the relevant information. The care team believes refusal will significantly worsen the patient's condition. Analyze the ethical conflict among autonomy, beneficence, nonmaleficence, and respect for informed refusal, without giving medical advice.",
+    "intent": "Apply core bioethical principles to treatment refusal.",
+    "domain": "Applied Ethics — Bioethics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "applied_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "Two patients need the last available treatment slot. One is more likely to benefit immediately; the other has waited much longer and has fewer alternatives. Develop and compare at least two fair allocation principles, stating what each principle values and what it leaves unresolved.",
+    "intent": "Analyze scarce-resource allocation under competing justice principles.",
+    "domain": "Applied Ethics — Resource Allocation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "normative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "Researchers can answer an important question only if participants are temporarily misled about the study's purpose, after which they will be fully debriefed. The study poses low physical risk but could cause embarrassment. Explain why informed consent, deception, scientific value, alternatives, and debriefing all matter.",
+    "intent": "Evaluate research deception without treating consent as the sole ethical criterion.",
+    "domain": "Applied Ethics — Research Ethics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "applied_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A study recruits people who depend on the research institution for essential services. Participants sign a clear consent form, but declining might feel risky to them even though services are officially unaffected. Analyze voluntariness, vulnerability, power imbalance, social value, and risk.",
+    "intent": "Assess research consent in a vulnerable population context.",
+    "domain": "Applied Ethics — Research with Vulnerable Participants",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "An online store makes the 'decline extra warranty' button visually obscure while making the purchase button prominent. The warranty is legal and sometimes useful. Analyze the practice in terms of manipulation, autonomy, consumer welfare, and fair dealing.",
+    "intent": "Evaluate a business practice ethically rather than legally or financially.",
+    "domain": "Applied Ethics — Business Ethics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "applied_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A consultant is asked to recommend a vendor while quietly owning shares in one bidder. The consultant believes the favored bidder is genuinely best. Distinguish actual conflict, potential conflict, and appearance of conflict, and explain why disclosure or recusal may matter even if the recommendation is substantively good.",
+    "intent": "Analyze conflicts of interest and institutional trust.",
+    "domain": "Applied Ethics — Professional Conflicts of Interest",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "An employee has strong evidence that a product defect could seriously harm users. Internal reports have been repeatedly ignored, but public disclosure could expose confidential information and cause large collateral losses. Analyze the ethical case for and against whistleblowing, including evidence quality, proportionality, loyalty, and alternatives.",
+    "intent": "Evaluate whistleblowing under competing role and public-harm considerations.",
+    "domain": "Applied Ethics — Whistleblowing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "moral_dilemma",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "An automated screening system cannot simultaneously equalize false-positive rates and positive predictive value across two groups because their underlying outcome rates differ. Explain why the technical incompatibility does not by itself determine which fairness criterion is morally correct, and identify the ethical questions that remain.",
+    "intent": "Separate mathematical fairness constraints from normative fairness choices.",
+    "domain": "Applied Ethics — Algorithmic Fairness",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "ethical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "An automated decision causes repeated harm because developers used a brittle model, managers deployed it without testing, and staff trusted its outputs despite visible anomalies. The software itself has no independent moral agency. Analyze how responsibility may be distributed among developers, deployers, organizations, and users.",
+    "intent": "Analyze distributed responsibility for automated systems.",
+    "domain": "Applied Ethics — Automated Decision Responsibility",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A university proposes continuous location tracking of students to improve emergency response. Participation is technically optional, but refusing makes access to several campus services less convenient. Analyze privacy, consent, proportionality, public benefit, contextual expectations, and less intrusive alternatives.",
+    "intent": "Evaluate surveillance ethics without turning the question into cybersecurity or law.",
+    "domain": "Applied Ethics — Privacy and Surveillance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "rights_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A city can save money today by choosing infrastructure that is expected to create difficult-to-reverse environmental costs several decades from now. The size of those future costs is uncertain. Analyze obligations to future generations, uncertainty, reversibility, and intergenerational justice.",
+    "intent": "Evaluate long-term environmental responsibility under uncertainty.",
+    "domain": "Applied Ethics — Future Generations",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "applied_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A proposal would substantially improve human convenience but would increase suffering for large numbers of sentient animals. Compare how welfare-based, rights-based, and moral-status approaches might assess the trade-off, including what each view must say about human interests.",
+    "intent": "Analyze animal ethics without presupposing a single theory of moral status.",
+    "domain": "Applied Ethics — Animal Ethics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "Policy A would create a larger future population with slightly lower average well-being than Policy B, while still leaving nearly everyone with lives worth living. Explain how total-welfare, average-welfare, and person-affecting approaches can disagree about which policy is preferable.",
+    "intent": "Test population-ethics reasoning using a clear hypothetical.",
+    "domain": "Applied Ethics — Population Ethics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "normative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A new technology has a small but poorly understood chance of causing very severe and irreversible harm. Delaying deployment also has real costs because the technology could prevent existing harms. Explain what a proportionate precautionary analysis should consider beyond 'never act under uncertainty.'",
+    "intent": "Apply precaution while considering evidence, reversibility, alternative risks, and proportionality.",
+    "domain": "Applied Ethics — Ethics of Risk",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A recommendation system learns which emotional states make users easiest to persuade and changes content timing accordingly. Users know recommendations are personalized but do not know that emotional vulnerability is being inferred. Analyze autonomy, manipulation, welfare, consent, accountability, and the value of human oversight.",
+    "intent": "Evaluate technology-mediated manipulation across several ethical dimensions.",
+    "domain": "Applied Ethics — Technology and Autonomy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "applied_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Two societies disagree deeply about whether a practice is morally permissible. Does that disagreement by itself show that there is no attitude-independent moral truth? Explain how a moral realist and an anti-realist might interpret the same disagreement.",
+    "intent": "Test whether disagreement is incorrectly treated as proof of relativism or anti-realism.",
+    "domain": "Metaethics — Moral Realism and Disagreement",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "metaethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "Anthropologists document wide variation in moral customs across cultures. Explain why descriptive cultural diversity does not by itself establish metaethical relativism, and state what extra claim a relativist would need.",
+    "intent": "Distinguish descriptive diversity from a metaethical thesis.",
+    "domain": "Metaethics — Relativism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "argument_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "Compare the claims 'I disapprove of lying' and 'Lying is morally wrong.' Under a simple subjectivist theory they may be closely connected, but they are not grammatically or conceptually identical. Explain what changes when moral truth is made dependent on individual attitudes.",
+    "intent": "Probe subjectivism through the difference between attitude reports and moral claims.",
+    "domain": "Metaethics — Subjectivism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "metaethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "Would a moral claim have to be universally accepted in order to count as objective? Explain why agreement and objectivity are distinct ideas.",
+    "intent": "Test a basic but important misconception about moral objectivity.",
+    "domain": "Metaethics — Moral Objectivity",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "Two people disagree about an assisted-dying case. One believes the patient is fully informed; the other thinks the patient is misinformed. They also disagree about whether autonomy outweighs a duty not to intentionally end life. Diagnose which parts of the dispute are factual and which are normative.",
+    "intent": "Separate factual disagreement from disagreement about principles and weighting.",
+    "domain": "Metaethics — Diagnosing Moral Disagreement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A decision-maker finds consequentialist, rights-based, and care-ethical arguments all plausible, and the available evidence about outcomes is incomplete. Explain how moral uncertainty differs from factual uncertainty and describe a reasonable way to reason without pretending either uncertainty has vanished.",
+    "intent": "Evaluate reasoning under both moral and factual uncertainty.",
+    "domain": "Metaethics — Moral Uncertainty",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A person feels intense disgust toward a harmless unfamiliar practice and treats that reaction as decisive proof that the practice is wrong. Explain how emotions can contribute to moral perception while still requiring critical assessment and reasons.",
+    "intent": "Analyze the evidential and motivational role of emotion in ethics.",
+    "domain": "Metaethics — Ethics and Emotion",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A custom has different moral meanings in two cultural settings because one context makes participation voluntary and the other makes refusal socially dangerous. Explain how cultural context can alter ethical assessment without implying that culture automatically determines moral truth.",
+    "intent": "Integrate contextual sensitivity with resistance to crude cultural relativism.",
+    "domain": "Metaethics — Ethics and Culture",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A person regularly joins family religious rituals, identifies with the tradition, and supports its community institutions but is uncertain about several formal doctrines. Explain why religious identity and participation cannot always be inferred from doctrinal assent alone.",
+    "intent": "Distinguish belief, practice, identity, and belonging.",
+    "domain": "Religious Literacy — Belief and Practice",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "religious_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "One community emphasizes assent to a creed while another gives greater weight to disciplined ritual practice, yet both also care about belief and conduct. Explain the orthodoxy–orthopraxy distinction without classifying either community as purely one or the other.",
+    "intent": "Explain correct-belief and correct-practice emphases without false dichotomy.",
+    "domain": "Religious Literacy — Orthodoxy and Orthopraxy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A religious community's contemporary teaching differs in emphasis from an older formulation, and members debate whether the change is development, reinterpretation, or departure. Explain how doctrine can function as teaching, interpretive framework, and community commitment while still permitting internal disagreement.",
+    "intent": "Analyze doctrinal continuity and development without assuming perfect uniformity.",
+    "domain": "Religious Literacy — Doctrine",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "doctrinal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A repeated communal action uses familiar words, gestures, and objects to mark an important transition in life. Explain why describing the act as 'mere repetition' misses possible ritual functions involving memory, identity, sacred meaning, and community.",
+    "intent": "Test conceptual understanding of ritual.",
+    "domain": "Religious Literacy — Ritual",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "ritual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "The same religious symbol is used by two communities, but one treats it mainly as a theological sign and the other emphasizes historical identity and communal memory. What does this show about interpreting religious symbols?",
+    "intent": "Analyze how symbolic meaning can vary across communities.",
+    "domain": "Religious Literacy — Religious Symbols",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "religious_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "Two translations of a sacred text render one key term as 'justice' and 'righteousness' respectively. Without knowledge of the original language, explain what a careful interpreter can and cannot conclude, and what contextual evidence would help.",
+    "intent": "Evaluate translation-sensitive interpretation without requiring sacred-language expertise.",
+    "domain": "Religious Literacy — Sacred Texts and Translation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "text_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A short teaching says, 'Build your house on rock rather than sand.' One reader treats this as construction advice; another as a moral-spiritual metaphor about stable commitments; a third asks about its original literary setting. Compare literal, contextual, and theological readings and explain why genre matters.",
+    "intent": "Test multi-level interpretation of a self-contained figurative teaching.",
+    "domain": "Religious Literacy — Text Interpretation and Genre",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "text_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "In a tradition, an authoritative text is read together with centuries of commentary and established community practice. A critic says, 'Only the text matters; later interpretation is irrelevant.' Explain why that claim may misunderstand how religious authority can be structured.",
+    "intent": "Analyze relations among scripture, commentary, tradition, and practice.",
+    "domain": "Religious Literacy — Text and Tradition",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "argument_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A religious community recognizes a canonical text, trained scholars, local teachers, and personal experience as possible sources of guidance, but gives them different authority in different questions. Explain why asking 'Who is the authority?' may be too simple and how authority can be layered.",
+    "intent": "Analyze multiple sources and levels of religious authority.",
+    "domain": "Religious Literacy — Religious Authority",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "religious_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "Someone describes themself as religious because of ancestry, community belonging, seasonal rituals, and moral formation, although they rarely attend formal worship. Analyze religious identity as a combination of belief, practice, culture, community, and self-identification rather than a single variable.",
+    "intent": "Test multidimensional religious identity and lived religion.",
+    "domain": "Religious Literacy — Religious Identity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A Christian congregation teaches forgiveness while also maintaining that wrongdoing may require accountability and repair. Explain why forgiveness need not mean excusing the wrong, forgetting it, or removing every consequence, and note that Christian traditions can differ in emphasis.",
+    "intent": "Analyze a Christian ethical concept with internal diversity.",
+    "domain": "Religious Traditions — Christianity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "religious_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Two Christian communities both regard the Bible as authoritative, but one gives greater formal weight to historic church tradition and the other emphasizes direct scriptural interpretation by the community. Explain how both can claim scriptural authority while disagreeing about interpretive authority.",
+    "intent": "Represent Christian denominational diversity in scripture-and-tradition reasoning.",
+    "domain": "Religious Traditions — Christianity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "doctrinal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A Jewish family treats some mitzvot as everyday obligations that shape food, time, charity, and relationships, while members differ in observance. Explain why Judaism cannot be reduced either to abstract belief or to ethnicity alone.",
+    "intent": "Connect covenantal obligation, practice, identity, and diversity at a high level.",
+    "domain": "Religious Traditions — Judaism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "religious_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "Two Jewish interpreters agree that Torah and inherited interpretation are authoritative but disagree about how an older rule should apply under new social conditions. Explain how legal-ethical reasoning can involve text, precedent, purpose, communal practice, and disagreement without implying that one interpreter represents all Judaism.",
+    "intent": "Analyze high-level Jewish interpretive reasoning while recognizing denominational and methodological diversity.",
+    "domain": "Religious Traditions — Judaism",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "text_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "In an Islamic ethical discussion, two people perform the same charitable act, but one seeks recognition while the other intends sincere service. Explain why intention can matter morally even when the outward action is the same, and situate the answer alongside the importance of charity without claiming one school speaks for all Muslims.",
+    "intent": "Analyze intention and charity in Islamic ethics with internal diversity.",
+    "domain": "Religious Traditions — Islam",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "religious_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "Muslim jurists in a hypothetical discussion agree on the authority of foundational sources but disagree about how public welfare, analogy, and precedent bear on a new ethical problem. Explain why such disagreement does not show that Islamic law is identical to state law or that Islam has one uniform legal method.",
+    "intent": "Analyze Islamic jurisprudential diversity at a high conceptual level.",
+    "domain": "Religious Traditions — Islam",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "doctrinal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A Hindu character has competing responsibilities to family, profession, and a wider duty of non-harm. Explain how reasoning in terms of dharma can involve role, context, and moral tension rather than simply following one fixed rule, and note that Hindu traditions interpret dharma differently.",
+    "intent": "Apply dharma to a conflict of duties without flattening Hindu diversity.",
+    "domain": "Religious Traditions — Hindu Traditions",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "religious_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A speaker says, 'Karma means whatever happens to someone is morally deserved.' Explain why this is an oversimplification, including the difference between causal-moral ideas associated with karma and a blanket judgment that every present misfortune is deserved.",
+    "intent": "Correct a common oversimplification of karma without claiming a single Hindu interpretation.",
+    "domain": "Religious Traditions — Hindu Traditions",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Two actions prevent the same amount of immediate suffering, but one is done from compassion and the other from resentment and a wish to gain status. Explain why Buddhist ethics may give moral significance to intention and mental cultivation rather than reducing the comparison to outcomes alone.",
+    "intent": "Analyze intention, compassion, and suffering in Buddhist ethics.",
+    "domain": "Religious Traditions — Buddhism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "religious_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A critic argues that because some Buddhist traditions teach non-self, they cannot make sense of moral responsibility. Give a charitable reply that distinguishes denial of a permanent independent self from denial of causal continuity, intention, ethical cultivation, and responsibility.",
+    "intent": "Test nuanced doctrinal reasoning about non-self and responsibility.",
+    "domain": "Religious Traditions — Buddhism",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A Sikh gurdwara serves a free communal meal to people regardless of background. Explain how langar can express service, equality, community, and devotion, while avoiding the claim that one practice exhausts Sikh ethics or identity.",
+    "intent": "Connect a Sikh practice to ethical and communal meanings.",
+    "domain": "Religious Traditions — Sikhism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "ritual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A Jain householder wants to reduce harm in ordinary life but cannot practice the same degree of ascetic discipline as a renunciant. Explain how a strong commitment to ahimsa can coexist with different practical obligations for different forms of life within Jain traditions.",
+    "intent": "Analyze nonviolence and differentiated practice in Jainism without overgeneralization.",
+    "domain": "Religious Traditions — Jainism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "religious_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A person faces a conflict between deference to an elder and preventing serious unfairness to a younger family member. Analyze how Confucian role ethics could consider filial responsibility, humane conduct, virtue, ritual propriety, and good judgment rather than treating obedience as absolute.",
+    "intent": "Apply Confucian ethics to a role conflict without reducing it to obedience.",
+    "domain": "Religious Traditions — Confucian Traditions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "religious_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A manager hears that Daoist wu wei means 'never intervene' and decides to ignore a preventable workplace problem. Explain why non-forcing can instead concern responsive, non-coercive action aligned with circumstances rather than literal inactivity.",
+    "intent": "Correct a common misunderstanding of wu wei and apply it to action.",
+    "domain": "Religious Traditions — Daoist Traditions",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A local Shinto community treats a shrine festival as a practice of place, continuity, purification, and communal participation. Explain why analyzing the practice only as assent to a creed would miss important dimensions of Shinto religious life, while avoiding claims about all Shinto communities.",
+    "intent": "Analyze practice-centered religious life in a tradition-specific but non-essentializing way.",
+    "domain": "Religious Traditions — Shinto",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "religious_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A case study describes one Indigenous community in which responsibilities to land are taught through oral histories, seasonal ceremonies, kinship, and ancestral narratives. What can a careful analyst infer about the role of relationality and tradition in that community, and what should they avoid generalizing to Indigenous religions worldwide?",
+    "intent": "Interpret a fully supplied Indigenous-religion case while preventing global essentialization.",
+    "domain": "Religious Traditions — Indigenous Traditions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A recently formed religious movement organizes around a charismatic teacher, shared rituals, and a strong communal identity. Identify neutral questions an analyst should ask about authority, conversion, internal dissent, and practice without assuming that being new or small makes the group illegitimate or dangerous.",
+    "intent": "Evaluate a new religious movement with neutral analytical criteria.",
+    "domain": "Religious Traditions — New Religious Movements",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "religious_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "Person A says, 'I do not believe in any gods.' Person B says, 'I am not confident enough to say whether any gods exist.' Explain how these statements can correspond to atheistic and agnostic positions without assuming that either label fixes the person's ethics, politics, or broader worldview.",
+    "intent": "Distinguish atheism from agnosticism and avoid worldview overgeneralization.",
+    "domain": "Religious Traditions — Atheism and Agnosticism",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A secular humanist argues for honesty by appealing to human welfare, dignity, reciprocity, and the social conditions needed for trust. Explain why this counts as substantive moral reasoning even though it does not appeal to divine command.",
+    "intent": "Represent secular humanist ethical reasoning without treating it as all nonreligious thought.",
+    "domain": "Religious Traditions — Secular Humanism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "religious_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A naturalist says that meaning can arise through relationships, creative work, service, and projects within a finite life. A critic replies that naturalism necessarily implies nihilism. Analyze why that inference does not follow simply from the absence of supernatural commitments.",
+    "intent": "Test accurate representation of a naturalistic secular worldview.",
+    "domain": "Religious Traditions — Secular and Naturalistic Worldviews",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "argument_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "Compare material assistance in Christianity, Judaism, Islam, and Sikhism along two dimensions: whether giving can be framed as obligation as well as virtue, and how community practice gives the act religious meaning. Identify meaningful similarities without claiming the traditions use identical concepts.",
+    "intent": "Compare charity and almsgiving across traditions while avoiding false equivalence.",
+    "domain": "Religious Ethics — Comparative Charity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_religion",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Jain and Buddhist traditions both contain strong resources for non-harm, but they do not necessarily ground or interpret non-harm in the same way. Compare the role of intention, discipline, suffering, and practical restraint without treating ahimsa and Buddhist non-harm as exact equivalents.",
+    "intent": "Conduct a conceptually precise comparison of non-harm traditions.",
+    "domain": "Religious Ethics — Non-Harm Across Traditions",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "Compare one form of Hindu dharma reasoning with Confucian role ethics in a case where family obligations conflict with impartial fairness. What is genuinely similar about role-sensitive duty, and what differences in metaphysical, social, or moral framing prevent simple equivalence?",
+    "intent": "Compare role-based ethical reasoning across traditions on its own terms.",
+    "domain": "Religious Ethics — Duty and Role",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A Sikh service organization and a secular humanist group cooperate on a community kitchen. Compare how each might justify the same act through service, equality, human welfare, dignity, or community, while explaining why shared action does not imply identical worldviews.",
+    "intent": "Compare religious and secular ethical justification without reducing either side.",
+    "domain": "Religious Ethics — Religious and Secular Service",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "interfaith_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A Christian ethic of forgiveness and a Buddhist ethic emphasizing compassion both respond to wrongdoing, but they may frame selfhood, moral repair, ultimate aims, and religious motivation differently. Compare the overlap and the limits of the analogy.",
+    "intent": "Compare ethical concepts without treating theological similarity as identity.",
+    "domain": "Religious Ethics — Forgiveness and Compassion",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "Compare Jewish halakhic reasoning and Islamic jurisprudential reasoning at a high level as traditions in which authoritative sources, interpretation, precedent, and learned debate can shape religious obligations. Identify important structural similarities while explaining why neither system is identical to the other or to modern state law.",
+    "intent": "Compare two religious legal-ethical traditions without false equivalence.",
+    "domain": "Religious Ethics — Religious Law and Ethics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_religion",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A religious community has an old rule prohibiting a practice, a broader principle emphasizing mercy, and a long interpretive tradition recognizing exceptions in cases of severe hardship. A member argues that any exception abandons the rule; another argues that the principle can guide contextual application. Analyze both arguments, distinguishing authority, rule, principle, precedent, and moral reasoning.",
+    "intent": "Analyze whether contextual interpretation can remain authority-respecting when rules and principles interact.",
+    "domain": "Religious Ethics — Rule, Principle, and Authority",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "text_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A professional's sincere religious conscience forbids participation in a routine institutional service. Refusal would not end the service, but it would impose delay and stigma on clients unless the institution reorganizes staffing. Analyze conscience, role obligation, third-party burden, accommodation, fairness, and proportionality from both religious and secular ethical perspectives.",
+    "intent": "Integrate conscience, institutional responsibility, third-party harm, and accommodation without giving a legal conclusion.",
+    "domain": "Religious Ethics — Conscience and Institutional Obligation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "moral_dilemma",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A ritual rule is violated, a person has also deceived a friend, and neither act violates state law. Explain why ritual impurity or ritual breach, religious sin, moral wrongdoing, and legal wrongdoing are distinct categories that may overlap but should not be collapsed into one another.",
+    "intent": "Distinguish religious, moral, ritual, and legal categories of fault.",
+    "domain": "Religious Ethics — Sin, Wrongdoing, and Ritual Norms",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "After a serious betrayal, the wrongdoer apologizes sincerely but has not yet repaired the material damage. Compare forgiveness, repentance, restitution, reconciliation, and accountability. Explain why a religious or secular ethic could support forgiveness while still requiring repair or boundaries.",
+    "intent": "Analyze forgiveness and repentance without equating them with erasing consequences.",
+    "domain": "Religious Ethics — Forgiveness and Repentance",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "ethical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A peace movement argues that nonviolence is a strict religious duty. Another group from the same broad tradition permits defensive force under demanding conditions of necessity, proportionality, and protection of noncombatants. Explain how to compare the two positions without assuming the whole religion is pacifist or permissive of violence.",
+    "intent": "Analyze religious pacifism and just-war-type reasoning with intra-traditional diversity.",
+    "domain": "Religious Ethics — Nonviolence and Defensive Force",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "comparative_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "Religious communities with incompatible theological beliefs cooperate on disaster relief. Explain how shared ethical action can rest on overlapping reasons such as compassion, duty, service, or human dignity without requiring doctrinal agreement, and identify one risk of pretending the reasons are identical.",
+    "intent": "Analyze interreligious ethical cooperation and principled overlap.",
+    "domain": "Religious Ethics — Interreligious Cooperation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "interfaith_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "Consider the argument: contingent things exist; contingent things require an explanation; the totality of contingent reality cannot explain itself; therefore there is a necessary foundation of reality. Identify the major inferential steps and at least two premises an objector could challenge without merely naming the argument.",
+    "intent": "Evaluate the structure and assumptions of a generic cosmological argument.",
+    "domain": "Theology & Philosophy of Religion — Cosmological Arguments",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "philosophy_of_religion",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "Suppose someone argues that an apparently fine-tuned life-permitting universe is evidence of design. Explain how a careful evaluation should compare design with alternative explanations, distinguish likelihood from certainty, and avoid both 'complexity proves a designer' and 'a natural explanation would automatically disprove all theology.'",
+    "intent": "Assess a design-style inference while considering alternatives and evidential limits.",
+    "domain": "Theology & Philosophy of Religion — Design Arguments",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "An argument defines God as a necessarily existing maximally great being and claims that if such a being is genuinely possible, necessary existence follows. Explain what work the modal premise is doing and why critics can challenge the move from conceivability or possibility to existence.",
+    "intent": "Analyze an ontological-style argument without requiring historical attribution.",
+    "domain": "Theology & Philosophy of Religion — Ontological Arguments",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "argument_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "Distinguish the logical problem of evil from the evidential problem of evil. Then compare how free-will, soul-making, and skeptical responses address different parts of the challenge, noting what each response would still need to establish.",
+    "intent": "Compare major forms of the problem of evil and their replies without treating the issue as settled.",
+    "domain": "Theology & Philosophy of Religion — Problem of Evil",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "An argument from divine hiddenness says that some sincere, nonresistant people lack belief in a perfectly loving God, and that this is surprising if such a God seeks relationship with persons. Reconstruct the argument and give at least two distinct types of response without assuming either theism or atheism.",
+    "intent": "Analyze divine hiddenness with fair reconstruction and reply.",
+    "domain": "Theology & Philosophy of Religion — Divine Hiddenness",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "One person treats faith as trust informed by evidence; another uses the word for commitment that goes beyond what the evidence strictly compels. Explain why 'faith means belief without evidence' is too narrow as a universal definition and compare possible relations between faith and reason.",
+    "intent": "Analyze multiple conceptions of faith and reason neutrally.",
+    "domain": "Theology & Philosophy of Religion — Faith and Reason",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A person reports a powerful religious experience that they interpret as contact with the divine. Explain how the experience might provide personal justification while still falling short of publicly compelling proof. Consider testimony, alternative explanations, background beliefs, and interpretive underdetermination.",
+    "intent": "Distinguish personal evidence from public proof in religious epistemology.",
+    "domain": "Theology & Philosophy of Religion — Religious Experience",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "Several sincere witnesses report an event that would be extraordinary if accurate. There is no obvious natural explanation, but the evidence is incomplete and the witnesses share the same religious expectations. Explain how to assess the claim using testimony, prior plausibility, alternative explanations, and the difference between 'unexplained' and 'miraculous.'",
+    "intent": "Evaluate a miracle claim without presupposing naturalism or supernaturalism.",
+    "domain": "Theology & Philosophy of Religion — Miracles",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A community calls a text 'revealed.' From inside that theology, the claim grounds authority and interpretation. From an academic historical standpoint, one can instead study when the text appeared, how it was transmitted, and how communities received it. Explain why these are different questions and what each standpoint can legitimately conclude.",
+    "intent": "Distinguish internal theological reasoning from external academic analysis of revelation.",
+    "domain": "Theology & Philosophy of Religion — Revelation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "theological_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "An argument says, 'An action is morally right solely because God commands it.' An objector asks whether the command makes the act right or whether a perfectly good God commands it because it is right. Reconstruct the tension, then analyze at least two possible replies, such as grounding morality in divine nature or rejecting an independent standard, and explain what each reply gains and risks.",
+    "intent": "Evaluate divine-command ethics together with a Euthyphro-type objection and replies.",
+    "domain": "Theology & Philosophy of Religion — Divine Command Ethics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "theological_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "Three theologians respond differently to other religions: one says only one tradition is salvifically sufficient, another says one tradition is uniquely normative but others may participate in its saving truth, and a third holds that multiple traditions can be valid paths. Distinguish exclusivist, inclusivist, and pluralist approaches, and explain why none is the same thing as social tolerance.",
+    "intent": "Differentiate theological pluralism categories from civic tolerance.",
+    "domain": "Religion & Society — Religious Pluralism",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_religion",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A religious statement says that the universe has a sacred purpose, while a separate claim says that a particular physical event occurred 6,000 years ago. Explain why the first may be theological or metaphysical while the second is empirically testable, and why scientific explanation of the event would not by itself settle the first claim.",
+    "intent": "Distinguish empirical, theological, metaphysical, and symbolic claims in religion-and-science reasoning.",
+    "domain": "Religion & Society — Religion and Science",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "argument_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A migrant religious community keeps some rituals unchanged, adapts others to local schedules, creates new institutions, and develops practices that differ from communities in the country of origin. Explain how this case illustrates continuity, adaptation, diaspora identity, and lived religion without assuming migration necessarily weakens or strengthens religion.",
+    "intent": "Analyze religious change and lived practice in migration.",
+    "domain": "Religion & Society — Migration and Lived Religion",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "Within one religious tradition, some communities permit a particular leadership role for women while others restrict it, each citing scripture, tradition, and theology differently. What evidence would be needed before making a responsible claim about 'the tradition's' position, and how should an analyst distinguish doctrine, interpretation, institution, and lived practice?",
+    "intent": "Test evidence-sensitive analysis of gender, authority, and intra-religious diversity.",
+    "domain": "Religion & Society — Gender and Religious Authority",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A public institution has a neutral rule that creates a serious burden on a minority religious practice. Exempting participants is administratively feasible but shifts modest costs to others; refusing an exemption preserves uniformity but may exclude the minority from an important benefit. Analyze freedom of conscience, fairness, equal concern, third-party burden, institutional neutrality, proportionality, and the distinction between ethical analysis and jurisdiction-specific legal judgment.",
+    "intent": "Integrate ethical and religious reasoning in a difficult accommodation case while remaining politically and legally neutral.",
+    "domain": "Religion & Society — Religious Accommodation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "moral_dilemma",
+    "jurisdiction_required": false
+  }
+]

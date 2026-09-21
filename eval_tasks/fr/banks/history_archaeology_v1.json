@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A chronology lists: (1) a port city receives a new customs charter in 1712; (2) customs revenue doubles between 1714 and 1720; (3) a paved road linking the port to inland markets opens in 1718; (4) population rises sharply after 1722. Explain which claims are chronological descriptions and which would require causal evidence. Identify at least two mechanisms and one alternative explanation that should be tested before attributing the population increase to the road.",
+    "intent": "Distinguish chronology from causation and propose evidence for mechanisms.",
+    "domain": "Historical Reasoning & Methods — chronology and causation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "Two settlements are dated by documentary references: Settlement A is first mentioned in 420 BCE and abandoned by 360 BCE; Settlement B is first mentioned in 390 BCE and continues until 40 BCE. Which settlement existed earlier, which overlapped longer with the other, and why would saying that B 'replaced' A require more than these dates?",
+    "intent": "Reason correctly with BCE chronology and distinguish sequence from replacement.",
+    "domain": "Historical Reasoning & Methods — BCE chronology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "chronology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A textbook divides a region's past into 'ancient,' 'medieval,' and 'modern' periods using dates borrowed from European political history. The region itself experienced a major urban and commercial transformation two centuries earlier than the textbook's 'modern' boundary. Explain why the textbook periodization may obscure local change, and propose a more defensible principle for setting period boundaries.",
+    "intent": "Evaluate periodization as an analytical tool and recognize regional variation.",
+    "domain": "Historical Reasoning & Methods — periodization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A kingdom loses a major battle in 1848 and its government collapses six months later. The treasury had run chronic deficits for a decade, provincial tax compliance had been falling, the army had suffered repeated pay arrears, and rival elites had blocked administrative reform. Explain why the battle may be a trigger rather than a sufficient cause, and identify evidence needed to distinguish fiscal, institutional, military, and elite-conflict mechanisms.",
+    "intent": "Separate short-term trigger from long-term causes and identify mechanisms.",
+    "domain": "Political & Institutional History — state collapse",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A reform decree issued in 1905 failed in one province but succeeded in another. Both provinces had the same formal law, but the successful province had denser local administrative offices, stronger tax records, and long-standing cooperation with municipal elites. Explain how path dependence and institutional capacity could account for the divergence without implying that the successful outcome was inevitable.",
+    "intent": "Use contingency and path dependence without teleology.",
+    "domain": "Historical Reasoning & Methods — contingency and institutions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "Source A is a merchant's private letter written in 1764 to a business partner complaining that new harbor fees are 'ruining trade.' Source B is the port authority's annual report for 1764 claiming collections rose while ship arrivals were stable. Evaluate what each source can support, considering authorship, audience, purpose, access to information, and omitted evidence. Do not reduce the analysis to calling either source 'biased.'",
+    "intent": "Perform specific primary-source criticism using provenance and purpose.",
+    "domain": "Historical Reasoning & Methods — primary sources",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "source_criticism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "Three chronicles written around 1320 describe a rebellion of 1298 in nearly identical wording. A surviving 1305 chronicle contains the same narrative and turns of phrase. Explain why the three later chronicles are not necessarily independent corroboration, and describe what evidence would help establish textual dependence.",
+    "intent": "Recognize source dependence and limits of repeated testimony.",
+    "domain": "Historical Reasoning & Methods — corroboration and source dependence",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_criticism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A census from 1880 classifies occupations into 'agriculture,' 'industry,' and 'domestic service.' A 1910 census uses 'agriculture,' 'manufacturing,' 'transport,' 'clerical,' 'domestic service,' and 'other.' A historian claims clerical work grew from 0% to 8% between 1880 and 1910. Explain why the claim is not directly supported and propose a method for making the two censuses more comparable.",
+    "intent": "Reason about changing historical categories and denominator comparability.",
+    "domain": "Social, Economic & Cultural History — quantitative history",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A historian argues that a political movement was primarily driven by urban artisans because surviving pamphlets were mostly printed in cities. Another historian notes that rural petitions survive poorly because local archives were destroyed in a later war. Explain how source survival and selection bias affect the first claim and what additional evidence could test it.",
+    "intent": "Evaluate archival survival bias and underrepresentation.",
+    "domain": "Historical Reasoning & Methods — archives and selection bias",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "An interview recorded in 1995 recounts a factory strike that occurred in 1952. The interviewee accurately names the factory and several coworkers but merges two separate confrontations into a single dramatic episode. Explain how the testimony can still be valuable evidence, distinguishing memory of events from retrospective meaning and community memory.",
+    "intent": "Interpret oral history as evidence without treating memory as a literal recording.",
+    "domain": "Social, Economic & Cultural History — oral history",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "primary_source_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "Two historians use the same tax registers. Historian A argues that rising arrears show peasant impoverishment. Historian B argues that arrears reflect declining state enforcement after local officials stopped collecting consistently. Identify what each interpretation explains, what assumptions each makes, and what additional evidence would discriminate between them.",
+    "intent": "Compare plausible historiographical interpretations and identify discriminating evidence.",
+    "domain": "Historical Reasoning & Methods — historiography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "historiography",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A city newspaper in 1912 describes a new housing code as a response to 'dangerous overcrowding.' Municipal inspection records show violations were concentrated in districts that also had the highest recent in-migration. Explain how the newspaper and administrative data could be combined without assuming that either fully represents residents' experiences.",
+    "intent": "Integrate press and administrative evidence while noting representational limits.",
+    "domain": "Global & Environmental History — urban history",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A political speech from 1870 calls a multilingual border population 'members of the nation,' while a census from the same year classifies them by language and legal residence. Explain why 'nation,' 'state,' ethnicity, and citizenship should not be treated as interchangeable categories when interpreting these sources.",
+    "intent": "Detect conceptual anachronism and distinguish historical categories.",
+    "domain": "Political & Institutional History — nationalism and citizenship",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A modern essay says that a thirteenth-century trading league 'behaved like a modern corporation with a national foreign policy.' Identify the anachronistic elements in this claim. Then show how the modern terms could still be used carefully as analytical analogies if their limits are made explicit.",
+    "intent": "Distinguish anachronistic claims from cautiously defined analytical categories.",
+    "domain": "Historical Reasoning & Methods — anachronism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A state archive contains 12,000 tax files from merchants but only 300 records involving day laborers. Explain why the numerical imbalance does not by itself show that merchants were forty times more important to the economy. Discuss literacy, administrative priorities, record-creation practices, preservation, and alternative evidence.",
+    "intent": "Reason about archival production and survival rather than treating archives as representative samples.",
+    "domain": "Historical Reasoning & Methods — archives",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "source_criticism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A historian calls a new law in 1820 'historically significant' because it was famous in later textbooks. Provide a stronger test of significance using contemporaneous effects, long-term consequences, scale, and effects on institutions or social groups. Explain why fame alone is insufficient.",
+    "intent": "Distinguish historical significance from later fame.",
+    "domain": "Historical Reasoning & Methods — significance",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A ruler orders a costly canal project. The decree survives, but financial accounts show construction stalled after three years and local petitions complain that labor obligations were frequently evaded. Explain why the decree is evidence of intention rather than proof of implementation, and identify what additional sources would show the policy's actual reach.",
+    "intent": "Distinguish prescriptive intention from implementation and lived practice.",
+    "domain": "Political & Institutional History — governance",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "primary_source_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A scholar claims that the introduction of a printing technology 'inevitably produced political reform.' The supplied timeline shows the technology spread rapidly in three regions, but major political reform occurred only in one of them over the next century. Explain what is wrong with the inevitability claim and propose a comparative design that could test mechanisms linking print to political change.",
+    "intent": "Reject teleology and design a comparative causal test.",
+    "domain": "Historical Reasoning & Methods — technology and political change",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "Constructed primary-source set for this benchmark: Source A is a governor's report written immediately after a food riot and sent to the central ministry; it blames 'agitators.' Source B is a local magistrate's diary written the same week; it mentions grain-price spikes and unpaid wages. Source C is a memoir written forty years later by an organizer; it emphasizes political repression. Evaluate the evidential strengths and limits of all three without assuming the closest-in-time source is automatically the most truthful.",
+    "intent": "Compare primary sources by provenance, audience, access, and retrospective interpretation.",
+    "domain": "Historical Reasoning & Methods — primary source comparison",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "primary_source_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A population series reports 1.2 million people in 1750, 1.4 million in 1775, and 1.7 million in 1800. Boundaries changed in 1780 to include a district of about 180,000 people. Explain why the apparent acceleration after 1775 may be partly a measurement artifact. What adjusted comparisons or additional data would be needed to estimate real demographic growth?",
+    "intent": "Interpret historical demographic series with changing boundaries.",
+    "domain": "Global & Environmental History — historical demography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "demographic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "Compare two empires described as follows. Empire X ruled through locally hereditary tax collectors and demanded fixed tribute. Empire Y stationed salaried officials, conducted regular censuses, and rotated provincial governors. Identify meaningful similarities and differences in administrative strategy, and explain why both can be 'empires' without assuming a single model of imperial rule.",
+    "intent": "Compare forms of imperial governance without flattening institutional variation.",
+    "domain": "Political & Institutional History — empires",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparative_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A colony's railway mileage triples between 1890 and 1910 while exports of one cash crop quadruple. Colonial budgets show most new lines connected plantation districts to export ports rather than local market towns. Explain at least three plausible mechanisms linking infrastructure, extraction, labor, and trade, and identify evidence needed before concluding that the railway improved general welfare.",
+    "intent": "Analyze colonial infrastructure without equating aggregate export growth with welfare.",
+    "domain": "Political & Institutional History — colonialism",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "economic_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A decolonization case includes: mass strikes in 1946–48, a costly colonial war in 1949–52, negotiations beginning in 1953, and independence in 1956. Explain why no single stage alone is a complete explanation. Discuss domestic mobilization, colonial military costs, international context, and inherited institutions.",
+    "intent": "Analyze multiple mechanisms in decolonization without assuming one universal path.",
+    "domain": "Political & Institutional History — decolonization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "Two states sign a treaty after a decade of recurring border crises. The treaty creates a neutral buffer zone and a joint commission for disputed water access. Explain how a diplomatic historian could assess whether the treaty reduced conflict because of institutional design, changing strategic interests, exhaustion after prior crises, or broader international pressure.",
+    "intent": "Evaluate competing diplomatic explanations using supplied institutional context.",
+    "domain": "Political & Institutional History — diplomatic history",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A premodern army suffers a campaign failure despite winning two field engagements. Records show its supply route crossed a mountain pass closed by early snow, fodder prices tripled, and desertion rose after pay arrears. Explain the failure in terms of logistics, geography, finance, manpower, and political objectives without offering present-day tactical guidance.",
+    "intent": "Use military-history evidence analytically, emphasizing logistics and institutions.",
+    "domain": "Political & Institutional History — military history",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "During a prolonged war, a government expands taxation, conscription, and grain requisition. After the war, some fiscal offices remain while conscription is abolished. Explain how warfare can expand state capacity while producing uneven institutional legacies. Distinguish temporary mobilization from lasting administrative change.",
+    "intent": "Analyze reciprocal effects of war and state institutions.",
+    "domain": "Political & Institutional History — war and society",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A region's real output per person rises 18% over thirty years, but real wages for unskilled urban workers remain flat and rents rise sharply. Explain why aggregate growth does not establish improved living standards for all groups. Identify distributional, consumption, housing, and household evidence needed for a fuller conclusion.",
+    "intent": "Distinguish growth, distribution, and living standards.",
+    "domain": "Social, Economic & Cultural History — economic history",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "economic_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "Factory output increases after mechanized equipment is introduced, but the same decade also sees cheaper coal, a new canal, and expanded credit. Explain why productivity gains cannot automatically be attributed to mechanization alone. Propose evidence that would help separate technology, energy, transport, and finance effects.",
+    "intent": "Evaluate multiple explanations of industrialization and productivity.",
+    "domain": "Social, Economic & Cultural History — industrialization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "Household account books from 1860 list men's wages but omit most unpaid food processing, childcare, and home textile work performed by women and children. Explain how relying only on wage records would distort labor history and suggest evidence for reconstructing paid, unpaid, subsistence, and household labor.",
+    "intent": "Recognize invisible and gendered labor in historical evidence.",
+    "domain": "Social, Economic & Cultural History — labor history",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "social_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "Two unfree labor systems differ: in System A status is legally inheritable and people can be sold separately from land; in System B labor obligations attach to landholding and transfer is constrained by local custom. Explain why treating both simply as 'slavery' would obscure important legal and social differences, while still allowing comparison of coercion, labor extraction, and resistance.",
+    "intent": "Compare coerced labor systems without collapsing distinct legal statuses.",
+    "domain": "Social, Economic & Cultural History — slavery and unfree labor",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A household census from 1700 lists residents by relationship to a household head but excludes servants who sleep in detached work buildings. Explain how the source can still inform family history while undercounting some forms of household membership and labor.",
+    "intent": "Interpret household structure from imperfect census categories.",
+    "domain": "Social, Economic & Cultural History — family and household",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "primary_source_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A moral conduct manual tells married women to avoid market trading, yet court records from the same town repeatedly show married women suing debtors over market transactions. Explain why the two source types should not be treated as contradictory in a simple way. Distinguish prescriptive norms from observed practice.",
+    "intent": "Distinguish prescriptive gender norms from descriptive evidence.",
+    "domain": "Social, Economic & Cultural History — gender history",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "evidence_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A school register shows average enrollment age falling from 10 to 8 over fifty years, while apprenticeship contracts show entry ages rising from 12 to 14. Explain what these trends might suggest about changing childhood and education, and what they do not prove about all families.",
+    "intent": "Interpret changing childhood institutions using two quantitative source types.",
+    "domain": "Social, Economic & Cultural History — childhood and family",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "An elite festival painting depicts thousands of cheerful participants in a city square. Police reports from the same festival note arrests, crowd-control problems, and complaints from shopkeepers. Explain what the painting can reveal about representation and political symbolism without treating it as a literal record of ordinary experience.",
+    "intent": "Separate cultural representation from lived practice.",
+    "domain": "Social, Economic & Cultural History — cultural history",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cultural_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A political pamphlet from 1640 repeatedly uses a word translated today as 'liberty.' In context, the pamphlet applies the term mainly to corporate privileges and protection from arbitrary taxation, not universal individual rights. Explain why the modern translation can mislead unless the historical concept is reconstructed from contemporary usage.",
+    "intent": "Interpret concepts in historical linguistic and institutional context.",
+    "domain": "Social, Economic & Cultural History — intellectual history",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "An eighteenth-century scientific society rejects one experimental apparatus, while a rival society funds a competing design. Decades later, the rejected design becomes standard after manufacturing techniques improve. Explain why this sequence challenges a linear 'inevitable progress' narrative and highlights institutional and technical contingency.",
+    "intent": "Analyze science and technology historically without teleology.",
+    "domain": "Global & Environmental History — history of science and technology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A ruler funds one religious institution while allowing other communities to maintain their own courts for family matters. Later polemical chronicles describe the period as one of uniform religious persecution. Explain how a historian should assess institutional practice, local variation, and the later chronicles without adjudicating theological truth.",
+    "intent": "Analyze religion-state relations using conflicting institutional and narrative evidence.",
+    "domain": "Social, Economic & Cultural History — religious history",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_criticism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "Tree-ring evidence indicates a multi-year drought during a period of rural unrest. Tax records also show rising arrears, and petitions complain about both crop failure and new collection practices. Explain how to integrate environmental and institutional causes without claiming that drought mechanically caused rebellion.",
+    "intent": "Integrate climate and social mechanisms without environmental determinism.",
+    "domain": "Global & Environmental History — environmental history",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "evidence_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A city's population doubles between 1850 and 1880. Sewer construction expands mostly after 1870, while mortality from waterborne disease begins falling only after 1875. Explain how migration, density, infrastructure, governance, and public-health institutions could be analyzed together without assuming that population growth or sewer construction alone explains the mortality trend.",
+    "intent": "Connect urbanization, infrastructure, and health using chronology and mechanisms.",
+    "domain": "Global & Environmental History — urban history",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "An estate map from 1770 labels large areas as 'waste,' but rent books list seasonal grazing fees collected from nearby villagers for those same lands. Explain why the map's category should not be read as evidence that the land was unused, and discuss common rights, landlord perspective, and rural economic practice.",
+    "intent": "Contextualize agrarian categories and combine map and rent evidence.",
+    "domain": "Global & Environmental History — rural and agrarian history",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A port's foreign-born population is 20,000 in 1900 and 35,000 in 1910. Over the same decade, immigration registers record 60,000 arrivals and 30,000 departures. Explain the difference between migrant stock and migration flow, and why neither figure alone tells the full story of settlement or return migration.",
+    "intent": "Distinguish demographic stocks and flows.",
+    "domain": "Global & Environmental History — migration history",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "demographic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A Central Asian frontier region contains multilingual market towns, mobile pastoral groups, forts, and seasonal trading routes that cross boundaries later claimed by several states. Explain why treating the area as an empty 'edge' of states would misrepresent historical mobility, local authority, exchange, and the mismatch between modern borders and earlier political or cultural zones.",
+    "intent": "Analyze a Central Asian borderland as an inhabited zone rather than an empty state margin.",
+    "domain": "Global & Environmental History — Central Asian borderlands",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "spatial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A nineteenth-century cholera board attributes disease to 'miasma' and orders street cleaning. Mortality falls after both street cleaning and a separate change in water supply. Explain how to reconstruct the board's historical reasoning while separately evaluating the likely effects of the interventions. Do not turn the answer into current clinical advice.",
+    "intent": "Separate historical disease concepts from retrospective biomedical interpretation.",
+    "domain": "Global & Environmental History — disease and public health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A city court record from 1790 grants property rights to a resident classified as a 'burgher' but denies the same rights to a long-term migrant resident. Explain how legal status, local citizenship, residence, and rights can differ historically, and why modern national citizenship categories should not be projected backward without qualification.",
+    "intent": "Interpret historical legal membership using period-appropriate categories.",
+    "domain": "Political & Institutional History — rights and citizenship",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A standardized national school curriculum introduced in 1885 emphasizes a single language and a shared heroic past. Local school reports show uneven implementation in multilingual districts. Explain how education could contribute to nation formation while leaving room for local resistance, bilingual practice, and alternative identities.",
+    "intent": "Analyze nationalism through institutions without treating nations as timeless.",
+    "domain": "Political & Institutional History — nationalism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A revolution follows a harvest crisis, state debt, elite conflict, and a sudden military mutiny. Compare a structural explanation emphasizing fiscal institutions with a contingent explanation emphasizing the mutiny. Show how both may be necessary, and identify evidence that would reveal their interaction.",
+    "intent": "Compare structural and contingent explanations of revolution.",
+    "domain": "Political & Institutional History — revolution",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "historiography",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A monument erected in 1920 commemorates an 1870 uprising as a unified national struggle. Contemporary 1870 letters reveal disagreements among participants about local taxes, dynastic loyalty, and social reform. Explain why the monument is stronger evidence for later historical memory than for the original motives of all participants.",
+    "intent": "Distinguish memory of an event from evidence about the event itself.",
+    "domain": "Historical Reasoning & Methods — historical memory",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "source_criticism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "An ancient state's surviving royal inscriptions claim annual tribute from distant regions. Archaeological survey finds imported prestige goods in the capital but little evidence of direct administrative presence in those regions. Give at least three models that could reconcile the texts and archaeology, such as episodic tribute, diplomatic gift exchange, indirect rule, or rhetorical exaggeration, and state what evidence would discriminate among them.",
+    "intent": "Integrate ancient texts and archaeology without privileging either automatically.",
+    "domain": "Chronological Coverage — Ancient / state formation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "For a post-classical trading network, coin finds, ceramics, and travelers' accounts indicate movement among East African ports, the Arabian Peninsula, South Asia, Southeast Asia, and East Asia between the ninth and twelfth centuries. Explain why describing this simply as a European 'medieval trade route' would be an inappropriate periodization, and analyze the network in terms of regional nodes, exchange, mobility, and the different political settings connected by the network.",
+    "intent": "Use globally appropriate periodization and analyze an Afro-Eurasian interregional network.",
+    "domain": "Chronological Coverage — Medieval / Post-Classical global history",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "global_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A study of an early modern trans-Pacific commodity chain links silver mined in the Americas, merchants in East Asia, shipping through Southeast Asian and Pacific island ports, and taxation by multiple states. Explain why this is better analyzed as a connected global process than as separate national histories, while still preserving local institutional differences and avoiding the assumption that Europe supplies the default chronology or causal center.",
+    "intent": "Analyze early modern trans-Pacific connections across multiple regions.",
+    "domain": "Chronological Coverage — Early Modern global history",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "global_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "During survey, Team A finds many surface artifacts on plowed fields but few in densely vegetated areas. Team B concludes that settlement was concentrated only on the plowed fields. Explain why visibility and detection bias must be considered before accepting that conclusion, and propose a survey strategy to test it.",
+    "intent": "Recognize archaeological survey detection bias and propose better sampling.",
+    "domain": "Archaeological Methods — survey",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "archaeological_context",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "An excavation exposes a floor, a hearth cut into that floor, and a later pit that cuts both the floor and the hearth. The pit is then sealed by a collapse layer. Reconstruct the relative sequence from earliest to latest and explain which relationships establish it.",
+    "intent": "Apply stratigraphic superposition and cut relationships.",
+    "domain": "Archaeological Methods — stratigraphy",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "stratigraphic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A deep layer contains one modern glass fragment next to hundreds of earlier ceramics. Field notes record a rodent burrow running from the surface into the layer. Explain why the glass fragment should not automatically date the entire deposit and identify the likely formation process.",
+    "intent": "Recognize intrusive material and bioturbation.",
+    "domain": "Archaeological Methods — site formation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "stratigraphic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "An archaeologist proposes excavating 80% of a site to 'maximize knowledge.' The research question concerns whether domestic craft production was concentrated in a few households or dispersed across the settlement. Explain why a targeted sampling and recording strategy may be preferable, considering excavation's destructive nature and the need to preserve future research potential.",
+    "intent": "Choose research design appropriate to a question rather than maximizing excavation.",
+    "domain": "Archaeological Methods — research design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A surface scatter contains ceramics, slag, and animal bone within a 30-meter radius, but later plowing has moved artifacts downslope. Explain why spatial proximity alone does not establish that all finds derive from one activity or occupational episode.",
+    "intent": "Distinguish association from proximity in secondary context.",
+    "domain": "Archaeological Methods — context and association",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "archaeological_context",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A building foundation cuts an earlier occupation layer. The foundation trench fill contains old pottery sherds redeposited from the earlier layer. Explain why those sherds are residual and cannot directly date the construction event.",
+    "intent": "Recognize residual material in a cut and fill.",
+    "domain": "Archaeological Methods — stratigraphy and context",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "dating_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "Three pottery styles form a consistent sequence across several undisturbed sites: Style A below B, and B below C. At a fourth site only B and C occur. What relative chronological inference is justified, and what precise calendar claims are not justified without independent dating?",
+    "intent": "Use seriation for relative dating without inventing calendar dates.",
+    "domain": "Archaeological Methods — relative dating",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "dating_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A timber beam from a building yields a calibrated radiocarbon range centered about 150 years earlier than short-lived seeds sealed under the building's floor. The beam has visible evidence of reuse. Explain why the seed dates may better approximate construction, and discuss old-wood/reuse effects, sample association, and uncertainty.",
+    "intent": "Distinguish sample age from event age and evaluate reuse.",
+    "domain": "Archaeological Methods — radiocarbon reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "dating_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A charcoal sample from a hearth yields a broad calibrated range of 760–540 BCE. The associated ceramic assemblage is independently placed within 650–580 BCE. Explain how the two forms of dating can constrain one another without converting the radiocarbon result into a single exact year.",
+    "intent": "Integrate radiocarbon and artifact chronology with uncertainty.",
+    "domain": "Archaeological Methods — absolute and relative dating",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "dating_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A volcanic deposit securely overlies a settlement and is independently dated to 79 CE. A repair floor lies below the deposit but above an earlier abandonment layer. Explain what the volcanic date can and cannot establish about the repair floor's calendar date.",
+    "intent": "Use a terminus relationship without false precision.",
+    "domain": "Archaeological Methods — chronological reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "dating_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A cemetery has graves that cut earlier graves, but some grave fills contain older residual pottery. Explain how cut relationships, not simply artifact age in the fills, should structure the relative sequence.",
+    "intent": "Prioritize stratigraphic relationships over residual artifacts.",
+    "domain": "Bioarchaeology & Scientific Methods — burial stratigraphy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "stratigraphic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "An excavation finds later pottery in a deeper layer beneath earlier pottery. Field records note that a large storage pit was dug from an upper level and later backfilled with mixed soil. Explain at least three formation processes that could create the apparent chronological reversal and identify which observations would distinguish them.",
+    "intent": "Explain chronological inversion through site-formation processes.",
+    "domain": "Archaeological Methods — site formation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "stratigraphic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A remote-sensing survey identifies a rectangular magnetic anomaly beside a road. No excavation has yet occurred. Explain the difference between detecting an anomaly, interpreting it as a possible structure, and confirming an archaeological feature.",
+    "intent": "Calibrate interpretation of geophysical anomalies.",
+    "domain": "Bioarchaeology & Scientific Methods — remote sensing",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A LiDAR survey reveals rectilinear earthworks under forest canopy, while pedestrian survey recovers few surface artifacts because leaf litter is thick. Explain how the two methods provide complementary evidence and why low artifact visibility should not be treated as absence of settlement.",
+    "intent": "Integrate remote sensing with visibility-aware field survey.",
+    "domain": "Archaeological Methods — survey and remote sensing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Two survey zones have the same area. Zone A was walked at 10-meter transect spacing and had 80% ground visibility; Zone B was walked at 40-meter spacing and had 20% visibility. A researcher compares raw site counts and concludes Zone A had four times the ancient population. Explain why the counts are not directly comparable and what adjustment or resampling strategy is needed.",
+    "intent": "Use denominators and detection probability in archaeological survey comparison.",
+    "domain": "Archaeological Methods — quantitative survey",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "quantitative_history",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A mound has five major occupation phases. Because excavation can expose only 10% of the site, propose a strategy for testing whether craft production shifted from household to centralized areas over time. Address sampling, vertical sequence, spatial coverage, recording, and preservation.",
+    "intent": "Design an archaeological sampling strategy tied to a diachronic question.",
+    "domain": "Archaeological Methods — excavation design",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A trench profile shows, from bottom to top: natural soil; occupation layer A; a ditch cut through A; ditch fill B; occupation layer C sealing the ditch; a later pit cutting C and B; pit fill D; modern topsoil. Reconstruct the sequence and explain why artifacts residual in fill D cannot date occupation layer C.",
+    "intent": "Reconstruct a multi-context stratigraphic sequence including cuts and fills.",
+    "domain": "Archaeological Methods — stratigraphy",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "stratigraphic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A luminescence date applies to the last time mineral grains were sufficiently exposed to light before burial. A sample was taken from sediment that may have been mixed during a later construction cut. Explain why contextual association is as important as laboratory precision when interpreting the date.",
+    "intent": "Explain what a chronometric method dates and how disturbance limits inference.",
+    "domain": "Archaeological Methods — chronometric dating",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "dating_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A cave layer yields animal bone dated to 12,000–11,500 years ago and charcoal dated to 9,800–9,400 years ago. Sediment micromorphology indicates burrowing and localized mixing. Explain why the layer cannot simply be assigned one date and how to reason about multiple depositional episodes.",
+    "intent": "Integrate conflicting dates with disturbance evidence.",
+    "domain": "Archaeological Methods — dating uncertainty",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "dating_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A site report gives three calibrated radiocarbon ranges that overlap only partially. Rather than averaging their midpoints, explain how an archaeologist should consider sample material, stratigraphic order, association with events, and the probability ranges.",
+    "intent": "Avoid false precision when synthesizing multiple radiocarbon dates.",
+    "domain": "Archaeological Methods — radiocarbon synthesis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "dating_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A ceramic vessel has soot on its exterior, starch residue inside, and repair holes near the rim. Separate the directly observed evidence from inferences about cooking, storage, repair, and social value. Which inferences are strongest and which require comparison with other vessels or contexts?",
+    "intent": "Distinguish observed artifact properties from functional and social inference.",
+    "domain": "Material & Environmental Archaeology — ceramic analysis",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "artifact_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "At one site, locally made pottery imitates the decoration of imported wares but uses different clay and firing technology. Explain why stylistic similarity alone does not prove imported origin or ethnic identity, and what compositional, technological, and contextual evidence could clarify production and exchange.",
+    "intent": "Separate style, origin, and identity in ceramic interpretation.",
+    "domain": "Material & Environmental Archaeology — ceramics and exchange",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "artifact_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A lithic scatter contains many early-stage flakes made from local stone, few finished tools, and several exhausted cores. Another nearby site has mostly finished tools of nonlocal stone and little production debris. Explain what these patterns may suggest about procurement, reduction, mobility, and site function without assuming a single explanation.",
+    "intent": "Interpret lithic production sequences and mobility cautiously.",
+    "domain": "Material & Environmental Archaeology — lithic analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "artifact_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "Flotation samples from hearths recover abundant charred wheat at one settlement, while hand collection at a second settlement recovers almost no seeds. Explain why recovery method and preservation prevent a direct dietary comparison unless sampling procedures are made comparable.",
+    "intent": "Recognize recovery bias in archaeobotanical comparison.",
+    "domain": "Material & Environmental Archaeology — archaeobotany",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "environmental_archaeology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Pollen cores indicate increasing grassland, charcoal frequency rises, and crop phytoliths appear during the same centuries. Explain several possible relationships among land clearance, burning, cultivation, and climate. Identify evidence needed to avoid attributing all vegetation change to human activity.",
+    "intent": "Integrate multiple environmental proxies without determinism.",
+    "domain": "Material & Environmental Archaeology — environmental archaeology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "environmental_archaeology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A faunal assemblage contains cattle, sheep/goat, deer, and fish. Cut marks occur on some cattle and deer bones, while many fish bones were recovered only from fine-screened samples. Explain why species presence alone does not equal dietary importance and how recovery, butchery, age profiles, and taphonomy matter.",
+    "intent": "Interpret zooarchaeological diet evidence with recovery and taphonomic limits.",
+    "domain": "Material & Environmental Archaeology — zooarchaeology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "bioarchaeology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "Two cemetery groups differ in average stature and dental stress markers, but they also date to different centuries and were excavated with different recovery standards. Explain why a direct claim of social inequality between the groups is premature and what controls are needed.",
+    "intent": "Evaluate bioarchaeological comparison with chronological and sampling confounds.",
+    "domain": "Bioarchaeology & Scientific Methods — bioarchaeology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "bioarchaeology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A skeleton shows a healed fracture and repetitive-stress changes. Explain why these observations do not by themselves identify a person's occupation, and what comparative, contextual, and population-level evidence would be needed for a cautious activity interpretation.",
+    "intent": "Calibrate inference from skeletal markers.",
+    "domain": "Bioarchaeology & Scientific Methods — human remains",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "bioarchaeology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "One burial contains many grave goods; another has none. Both are in the same cemetery and period. Explain why grave wealth alone cannot establish exact social status, religion, or lifetime wealth, and list alternative explanations involving ritual, age, kinship, cemetery practice, or preservation.",
+    "intent": "Avoid overinterpreting grave goods as direct social identity.",
+    "domain": "Bioarchaeology & Scientific Methods — burial archaeology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "bioarchaeology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "Animal bones from a riverside site are highly fragmented and abraded, with many small dense bones but few fragile juvenile bones. Explain how water transport, scavenging, density-mediated survival, and recovery practices could shape the assemblage before inferring hunting preferences.",
+    "intent": "Use taphonomy to separate post-depositional processes from human behavior.",
+    "domain": "Bioarchaeology & Scientific Methods — taphonomy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "bioarchaeology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A regional survey finds large sites near rivers, small sites on uplands, and monuments on ridgelines. Explain how access to water, agriculture, movement, visibility, preservation, and survey intensity could each contribute. Do not infer site function from location alone.",
+    "intent": "Reason across landscape scale while considering detection and multiple mechanisms.",
+    "domain": "Landscape & Society — landscape archaeology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "spatial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "Settlement A covers 40 hectares but has sparse architecture; Settlement B covers 15 hectares with dense public buildings and storage facilities. Explain why site area, population, political importance, and function are related but not interchangeable.",
+    "intent": "Distinguish settlement size from population, function, and political centrality.",
+    "domain": "Landscape & Society — settlement archaeology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "settlement_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "In a settlement, grinding stones cluster in courtyards, storage jars in back rooms, and metalworking debris in two houses. Explain how these patterns can support activity-area hypotheses while recognizing reuse, cleaning, refuse movement, and multifunctional space.",
+    "intent": "Interpret household spatial pattern without assuming one-to-one social mapping.",
+    "domain": "Landscape & Society — household archaeology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "settlement_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "Obsidian from a distant geological source appears at three coastal sites. Inland sites have visually similar glassy stone but have not been compositionally tested. Explain why the evidence supports movement of material to the coast but does not yet establish direct long-distance trade, coastal migration, or inland absence.",
+    "intent": "Distinguish artifact movement, sourcing, trade, migration, and untested resemblance.",
+    "domain": "Landscape & Society — trade and exchange",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A chemical sourcing study assigns 70% of sampled ceramics to local clay and 30% to a distant production zone. Explain why this result can establish probable production origins for the sampled vessels but not the exact social mechanism of movement, such as trade, gifts, or migration.",
+    "intent": "Explain evidential limits of archaeometric sourcing.",
+    "domain": "Bioarchaeology & Scientific Methods — archaeometry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "artifact_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "Human tooth enamel isotope values differ between two burial clusters. Local baseline values vary substantially between the river valley and nearby uplands, and the graves span 150 years. Explain why exact birthplace or population identity cannot be inferred without stronger baselines and chronological control.",
+    "intent": "Interpret mobility isotopes with baseline and chronology uncertainty.",
+    "domain": "Bioarchaeology & Scientific Methods — isotopic evidence",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "bioarchaeology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A shipwreck contains amphorae from three production regions, personal objects of mixed origins, and cargo concentrated in one hold. Currents have redistributed lighter materials downslope. Explain what can be inferred about cargo, shipboard activity, and trade, and how underwater site formation complicates the pattern.",
+    "intent": "Interpret maritime assemblages with underwater disturbance.",
+    "domain": "Material & Environmental Archaeology — maritime archaeology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "archaeological_context",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A plantation ledger lists weekly rations, while excavation of worker housing finds locally hunted animal bones and handmade cooking vessels absent from the ledger. Explain how the material evidence may complicate the written record without automatically 'disproving' it.",
+    "intent": "Integrate documentary and material evidence in historical archaeology.",
+    "domain": "Cross-disciplinary — historical archaeology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A city has monumental architecture, craft workshops, and standardized weights, but no surviving palace or royal inscriptions. Explain why these features may support complex administration and specialized production without proving a highly centralized monarchy.",
+    "intent": "Avoid equating monumentality with one political form.",
+    "domain": "Landscape & Society — archaeology of complex societies",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A mobile foraging society leaves thin, widely dispersed artifact scatters and a few repeatedly used aggregation sites. Explain why low artifact density does not imply social simplicity, and how mobility and seasonality affect archaeological visibility.",
+    "intent": "Interpret mobile societies without equating sparse material remains with simple social organization.",
+    "domain": "Landscape & Society — hunter-gatherer archaeology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "archaeological_context",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "At a site, domesticated cereal morphology appears by 7000 BCE, permanent houses become common only after 6600 BCE, and storage capacity expands after 6400 BCE. Explain why domestication, cultivation, agricultural dependence, and sedentism should not be treated as simultaneous stages of one inevitable sequence.",
+    "intent": "Distinguish related but non-synchronous processes in the archaeology of agriculture.",
+    "domain": "Landscape & Society — archaeology of agriculture",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "chronology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A museum receives an unprovenanced bronze object said to come from a recently looted cemetery. Explain the archaeological information lost when provenience and context are missing, and outline ethical reasons to avoid treating market authenticity alone as sufficient scholarly value. Do not provide advice that could facilitate looting or trafficking.",
+    "intent": "Evaluate provenance, context loss, and archaeological ethics.",
+    "domain": "Heritage & Ethics — looting and provenance",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "In the United States, for purposes of this benchmark use the following simplified NAGPRA rule: a federally funded museum that determines human remains in its control are culturally affiliated with a present-day federally recognized tribe must follow the statute's consultation and repatriation process. A museum has well-documented remains, multiple lines of affiliation evidence, and a research team requesting destructive sampling before consultation. Explain the legal/institutional issue and the distinct ethical stewardship issue. Base the answer only on the supplied rule and facts.",
+    "intent": "Distinguish supplied U.S. repatriation-law obligations from broader research ethics.",
+    "domain": "Heritage & Ethics — U.S. repatriation context",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 94,
+    "prompt": "In England and Wales, for purposes of this benchmark assume a simplified heritage rule: excavation on a protected scheduled monument requires prior authorization, and unauthorized removal of finds can violate heritage law. A research team proposes metal-detecting and small test pits on such a monument without authorization because the work is 'minimally invasive.' Explain why the legal requirement remains central and how archaeological research design differs from legal permission.",
+    "intent": "Distinguish archaeological method from jurisdiction-specific permitting requirements.",
+    "domain": "Heritage & Ethics — England and Wales heritage law",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 95,
+    "prompt": "A national museum acquired an object in 1902 under colonial administration. The present claimant is a descendant community. For this benchmark, assume the relevant jurisdiction has no automatic statutory repatriation right for this category of object, but the museum's ethics code requires provenance review, consultation, and consideration of cultural significance. Analyze the difference between legal ownership, provenance history, ethical stewardship, and possible negotiated return without assuming one universal normative outcome.",
+    "intent": "Analyze repatriation claims by separating legal and ethical dimensions.",
+    "domain": "Heritage & Ethics — repatriation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 96,
+    "prompt": "A late antique city is described in elite texts as having 'declined' after 500 CE. Archaeological evidence shows reduced monumental construction but continued neighborhood occupation, expansion of craft production, and new burial areas. Explain how institutional contraction and social/economic transformation can coexist, and why 'decline' may be too coarse a period label.",
+    "intent": "Integrate textual and material evidence to reassess a historical transition.",
+    "domain": "Cross-disciplinary — text and archaeology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "evidence_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A coastal region shows a 35% decline in surveyed settlement counts after 1200 CE. At the same time, later deposits are more deeply buried by alluvium, survey visibility is lower in valley bottoms, and written tax records indicate continuing cultivation. Evaluate whether the settlement decline is real. Your answer should weigh archaeological detection, preservation, documentary evidence, and the possibility of genuine demographic change.",
+    "intent": "Distinguish true absence from survey and preservation bias using mixed evidence.",
+    "domain": "Cross-disciplinary — settlement, survey, and historical records",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A historian claims that a conquest in 1520 caused a region's population to fall by 60% by 1570. Supplied evidence: censuses use different household definitions; one epidemic is documented in the 1540s; forced relocation concentrated dispersed communities; tribute registers omit some exempt groups; pollen evidence suggests partial field abandonment. Evaluate the causal claim and propose the most defensible reconstruction, separating demographic change from administrative reclassification and settlement concentration.",
+    "intent": "Integrate demographic, institutional, environmental, and documentary evidence in a difficult causal reconstruction.",
+    "domain": "Cross-disciplinary — historical demography and colonial change",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "demographic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "Four evidence streams conflict about migration into a highland valley. Texts written a century later describe a mass incoming people; local ceramics change style gradually; strontium isotope data show about 20% of sampled individuals are nonlocal relative to present baselines; settlement size increases while survey coverage also improves. Compare migration, exchange, imitation, demographic growth, and sampling explanations. State what each evidence stream can establish and what additional evidence would discriminate among models.",
+    "intent": "Synthesize textual, material, isotopic, settlement, and sampling evidence without overclaiming.",
+    "domain": "Cross-disciplinary — migration and material culture",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A research article argues that a twentieth-century political institution remained 'unchanged' because the same constitutional name and formal offices persisted from 1920 to 1980. Yet voting rules, fiscal capacity, party organization, social composition of officeholders, and administrative reach all changed substantially. Explain how formal institutional continuity can coexist with deep social and functional transformation, and identify the presentist or overly static assumptions in the original claim.",
+    "intent": "Detect presentism and distinguish formal continuity from substantive historical change.",
+    "domain": "Chronological Coverage — Modern / Contemporary institutional history",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  }
+]

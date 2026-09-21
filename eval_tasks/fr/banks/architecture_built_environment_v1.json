@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A civic hall's public entrance is the same size, depth, lighting level, and material treatment as two adjacent service doors. Without relying mainly on signs, what spatial and formal changes could make the public entrance legible while preserving a restrained facade?",
+    "intent": "Apply hierarchy, threshold, sequence, and human-scale reasoning to entrance design.",
+    "domain": "Architectural Design: Design Fundamentals",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "design_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A small library is planned as a deep rectangular floor plate with reading areas in the center, noisy children's activities near the quiet study zone, and staff workrooms remote from the service desk. Identify the main planning conflicts and propose a better zoning logic.",
+    "intent": "Diagnose functional relationships, noise conflicts, supervision, and daylight implications.",
+    "domain": "Architectural Design: Programming",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "programming_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A community center must serve daytime childcare, evening classes, weekend events, and occasional private counseling. Which spaces should be shared, which should be separable, and what operational information is still needed before fixing the plan?",
+    "intent": "Translate changing user groups and schedules into adjacency, privacy, and flexibility requirements.",
+    "domain": "Architectural Design: Programming",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "programming_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A museum visitor route repeatedly crosses staff art-handling routes between loading, storage, and galleries. Explain the risks created by the crossings and reorganize the circulation conceptually without assuming a specific building shape.",
+    "intent": "Reason about front-of-house/back-of-house separation, security, servicing, and visitor clarity.",
+    "domain": "Architectural Design: Circulation / Wayfinding",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "circulation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A school has three identical corridor intersections with no exterior views, no visible stairs, and classrooms labeled only by numbers. What architectural changes could improve wayfinding before adding more signage?",
+    "intent": "Use landmarks, sightlines, hierarchy, daylight, and spatial differentiation to improve legibility.",
+    "domain": "Architectural Design: Circulation / Wayfinding",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "spatial_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A two-wing office uses a narrow central connector that is the only everyday route between teams, the only accessible route to one wing, and a major informal meeting spot. What problems can arise from combining these roles, and what alternatives should be considered?",
+    "intent": "Evaluate circulation capacity, inclusion, social use, redundancy, and conflicts.",
+    "domain": "Architectural Design: Circulation / Wayfinding",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A housing proposal maximizes saleable area by reducing all shared circulation to the smallest possible footprint, producing long blind corridors and no daylight at common decision points. Why can this be a false efficiency?",
+    "intent": "Distinguish circulation area efficiency from legibility, comfort, safety, and social quality.",
+    "domain": "Architectural Design: Housing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "Compare a courtyard organization and a compact deep-plan organization for a small residential care building whose users benefit from short routes, daylight, outdoor access, and easy orientation. What are the principal trade-offs?",
+    "intent": "Compare spatial organizations against circulation, daylight, supervision, and envelope implications.",
+    "domain": "Architectural Design: Spatial Organization",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A hotel places guest elevators, housekeeping carts, room-service movement, and refuse transfer in one visible lobby. What circulation hierarchy would reduce conflict while keeping the plan operationally compact?",
+    "intent": "Separate public, staff, service, and dirty flows without excessive duplication.",
+    "domain": "Architectural Design: Building Typologies",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "circulation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "An open-plan workplace has excellent daylight but persistent complaints about distraction and confidential calls. Management proposes adding more acoustic ceiling absorption only. What else should be examined in the spatial layout?",
+    "intent": "Distinguish room absorption from zoning, separation, behavior, and sound transmission needs.",
+    "domain": "Architectural Design: Workplace",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A classroom can fit 30 desks by plan area, but once occupied the teacher cannot reach several students without moving chairs and wheelchair turning becomes difficult. What does this reveal about using area-per-person alone as a planning metric?",
+    "intent": "Apply human-scale, movement, furniture-clearance, and inclusive-use reasoning.",
+    "domain": "Architectural Design: Human Scale / Education",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A small clinic at a nonclinical planning level has one corridor used by arriving visitors, staff moving supplies, and removal of bagged waste. Without invoking medical regulations, what planning principles should guide a safer and clearer arrangement?",
+    "intent": "Reason about user separation, privacy, clean/dirty movement, and operational clarity.",
+    "domain": "Architectural Design: Healthcare Planning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "programming_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A public library has 1,800 m² gross floor area. The listed rooms total 1,260 m² net usable area. What percentage of the gross area remains for circulation, structure, toilets, walls, services, and other support uses, and why should that remainder not automatically be labeled wasted space?",
+    "intent": "Calculate gross-to-net remainder and interpret support/circulation area appropriately.",
+    "domain": "Architectural Design: Programming",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A community building needs a 240-seat hall, divisible meeting rooms, a kitchen serving both the hall and an outdoor plaza, and a quiet counseling suite. Propose an adjacency strategy and identify at least two conflicts that a simple room-area schedule would miss.",
+    "intent": "Convert a mixed program into adjacency, separation, servicing, and acoustic relationships.",
+    "domain": "Architectural Design: Programming",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "programming_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A four-story building puts the main stair behind an unmarked opaque door at the end of a secondary corridor while elevators are visible from the entrance. Explain how this arrangement affects everyday route choice, wayfinding, and resilience of circulation.",
+    "intent": "Analyze visible circulation hierarchy and dependence on vertical transport.",
+    "domain": "Architectural Design: Circulation / Wayfinding",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "spatial_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A dual-aspect apartment and a single-aspect apartment have the same floor area and window area. Why might their daylight, ventilation, privacy, furniture planning, and overheating behavior still differ substantially?",
+    "intent": "Compare housing configurations using multiple performance mechanisms rather than area alone.",
+    "domain": "Architectural Design: Housing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A linear school plan provides every classroom with an exterior wall but creates very long travel between shared facilities. A compact plan shortens travel but makes some rooms deep and internal. How should the design team compare the two options?",
+    "intent": "Evaluate competing circulation, daylight, supervision, expansion, and envelope effects.",
+    "domain": "Architectural Design: Spatial Organization",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A community hall is designed around a dramatic central stair that cannot be used by many mobility-impaired users, while the lift is reached through a service corridor. Why is this more than a compliance issue, and how could the circulation hierarchy be redesigned inclusively?",
+    "intent": "Integrate accessibility with dignity, route equivalence, wayfinding, and spatial hierarchy.",
+    "domain": "Architectural Design: Inclusive Circulation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "accessibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A site slopes south toward a noisy arterial road, has its best distant views to the south, and receives quieter neighborhood access from the north. What competing factors should influence building placement, orientation, entries, and outdoor-space location?",
+    "intent": "Synthesize topography, views, noise, access, solar orientation, and public/private edges.",
+    "domain": "Site & Environmental Design: Site Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "site_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "Two possible building pads on a sloping site differ by 3 m in elevation over a 60 m horizontal run. What is the average slope percentage, and what design issues beyond the number itself matter for step-free access, drainage, and excavation?",
+    "intent": "Calculate slope and connect it to grading, accessibility, and site-disturbance decisions.",
+    "domain": "Site & Environmental Design: Topography / Grading",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A hot-arid climate has intense sun, low humidity, and large day-night temperature swings. Explain when external shading, thermal mass, night ventilation, and compact form can work together, and what could make one of these strategies ineffective.",
+    "intent": "Apply climate-specific passive design rather than generic checklists.",
+    "domain": "Site & Environmental Design: Climate-Responsive Design",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "environmental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A warm-humid building is shaded well but has little air movement and high internal moisture loads. Why might adding more exposed thermal mass provide limited comfort benefit compared with improving ventilation and moisture control?",
+    "intent": "Distinguish thermal mass from air movement and humidity control in a warm-humid climate.",
+    "domain": "Site & Environmental Design: Thermal Comfort",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "An office has a fully glazed west facade. Afternoon glare and cooling loads are severe, but occupants value the view. Compare external vertical shading, internal blinds, glazing changes, and changes to window area in terms of what each can and cannot solve.",
+    "intent": "Reason about orientation-specific solar control, glare, cooling, views, and facade design.",
+    "domain": "Site & Environmental Design: Solar Control / Shading",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A north-facing studio in the northern hemisphere has even daylight but insufficient light at the back of a deep room. Why would simply enlarging the same window not necessarily produce a good daylight solution, and what other strategies could improve distribution?",
+    "intent": "Distinguish daylight quantity from distribution, glare, geometry, and surface reflectance.",
+    "domain": "Site & Environmental Design: Daylighting",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "environmental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A 10 m deep classroom receives daylight from one long side only. Measurements show adequate illuminance near the windows but much lower values at the back, while glare occurs at the front. What design variables should be adjusted before concluding that more glazing is required?",
+    "intent": "Interpret uneven daylight and glare using room depth, window geometry, shading, and reflectance.",
+    "domain": "Site & Environmental Design: Daylighting",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A naturally ventilated office sits beside a polluted, noisy road in a mild climate. Under what conditions might mixed-mode or mechanical ventilation be preferable even though outdoor temperatures are often suitable for opening windows?",
+    "intent": "Evaluate natural ventilation against air quality, noise, security, comfort, and internal loads.",
+    "domain": "Site & Environmental Design: Natural Ventilation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A room is held at 22°C, yet occupants near a large cold window feel uncomfortable while people near the interior do not. What physical comfort mechanisms can explain the difference, and what design responses target the cause rather than only raising air temperature?",
+    "intent": "Use radiant temperature, downdraft/air movement, surface temperature, and enclosure reasoning.",
+    "domain": "Site & Environmental Design: Thermal Comfort",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A site plan sends all roof runoff to a landscaped basin. Explain the difference between reducing runoff volume, delaying peak flow, and improving water quality, and identify which site strategies contribute to each objective.",
+    "intent": "Differentiate stormwater performance objectives and connect them to spatial measures.",
+    "domain": "Site & Environmental Design: Landscape / Water",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A 4,000 m² site has 1,600 m² of building footprint, 900 m² of conventional paving, 500 m² of permeable paving, and the remainder planted. Calculate site coverage by building footprint and total impervious surface if the permeable paving is treated as pervious for this exercise. Why are those two percentages not interchangeable?",
+    "intent": "Calculate and distinguish building coverage from imperviousness.",
+    "domain": "Site & Environmental Design: Site Planning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A low-energy building has excellent insulation but large unshaded equator-facing glazing in a climate with hot summers. The annual heating demand falls, yet summer overheating increases. Explain why both results can be true and what design changes could rebalance performance.",
+    "intent": "Integrate insulation, solar gain, seasonal performance, shading, and comfort.",
+    "domain": "Site & Environmental Design: Passive Design",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A proposed courtyard improves daylight and creates protected outdoor space, but the site is in a hot climate with weak winds and intense solar exposure. What microclimate questions should be answered before assuming the courtyard will be comfortable?",
+    "intent": "Evaluate shade, radiant exposure, airflow, surface materials, vegetation, and time-of-day effects.",
+    "domain": "Site & Environmental Design: Microclimate",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "site_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "An accessible path must rise 1.2 m between two terraces. The concept sketch provides 18 m of horizontal run. Calculate the average gradient as a percentage and explain why this calculation alone is insufficient to confirm a usable route.",
+    "intent": "Calculate gradient while recognizing landings, route geometry, user effort, weather, and local requirements.",
+    "domain": "Site & Environmental Design: Topography / Accessibility",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A flood-prone site must remain accessible, preserve a mature tree belt, allow emergency/service access, and keep critical building functions operational during a design flood. Develop a site and ground-floor strategy, explicitly addressing topography, drainage, access continuity, landscape, and which uses can tolerate flood exposure.",
+    "intent": "Synthesize resilience, grading, access, landscape, program, and operational continuity.",
+    "domain": "Site & Environmental Design: Resilient Site Planning",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "design_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "Winter moisture damage appears on the interior side of an insulated wall, but no obvious rain entry is visible. Before blaming the cladding, what moisture mechanisms should be investigated and what evidence would help distinguish them?",
+    "intent": "Diagnose condensation, air leakage, vapor transport, capillary/rain entry, and drying limits without premature certainty.",
+    "domain": "Building Technology: Envelope / Moisture",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "building_pathology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A reinforced-concrete balcony slab continues through the insulated facade with no thermal break. Explain the likely effects on heat loss, interior surface temperature, condensation risk, and local comfort.",
+    "intent": "Apply thermal-bridge reasoning to a common structural penetration.",
+    "domain": "Building Technology: Envelope / Thermal Bridges",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "envelope_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A design team argues that a very airtight apartment building needs less deliberate ventilation because 'fresh air will leak in anyway.' Identify the conceptual error and describe the relationship between airtightness and controlled ventilation.",
+    "intent": "Distinguish uncontrolled infiltration from intentional ventilation and indoor-air-quality provision.",
+    "domain": "Building Technology: Airtightness / Ventilation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A facade relies on a single exposed sealant joint as the only defense against wind-driven rain. Why is this fragile, and what layered water-management principles would make the junction more robust?",
+    "intent": "Apply drainage, redundancy, pressure moderation conceptually, and maintainability at an interface.",
+    "domain": "Building Technology: Envelope / Detailing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "construction_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A wall assembly has continuous insulation in the field but repeated metal brackets bypass the insulation. Why can the whole-wall thermal performance be materially worse than the insulation's nominal rating?",
+    "intent": "Explain repeating thermal bridges and whole-assembly performance.",
+    "domain": "Building Technology: Envelope / Thermal Bridges",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A roof leaks only during wind-driven rain. The membrane field tests dry, but staining clusters near parapet transitions and penetrations. What should the investigation prioritize, and why?",
+    "intent": "Diagnose interface failures, drainage paths, flashing, penetrations, and wind-driven entry.",
+    "domain": "Building Technology: Envelope / Building Pathology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "Compare concrete, steel, and engineered timber for a mid-span institutional floor where vibration, fire strategy, construction speed, structural depth, moisture exposure during construction, and embodied impacts all matter. Why is there no universally best material?",
+    "intent": "Compare material-system trade-offs in an architectural context.",
+    "domain": "Building Technology: Materials",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "material_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "Why does reinforced concrete commonly combine concrete with steel reinforcement instead of relying on concrete alone for all actions? Keep the explanation at an architectural/structural-concept level.",
+    "intent": "Distinguish compressive strength from tensile behavior and composite action.",
+    "domain": "Building Technology: Concrete",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A long-span steel roof is selected because it minimizes columns. What architectural issues still need coordination before calling the solution complete, including structural depth, fire protection, corrosion exposure, connections, services, and erection?",
+    "intent": "Recognize that span efficiency does not eliminate detailing, fire, service, and constructability constraints.",
+    "domain": "Building Technology: Steel / Structure",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structural_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A mass-timber concept is described as 'carbon neutral because wood stores carbon.' What additional lifecycle, sourcing, durability, fire, and end-of-life considerations are needed before making that claim?",
+    "intent": "Challenge simplistic environmental claims about timber with lifecycle-system reasoning.",
+    "domain": "Building Technology: Timber",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A masonry wall in an older building carries floor joists, while a newer brick facade nearby is hung from a frame. Why is it unsafe to infer structural role from appearance alone?",
+    "intent": "Distinguish load-bearing masonry from veneer/infill and identify evidence needed before alteration.",
+    "domain": "Building Technology: Masonry / Structure",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A developer proposes replacing an opaque insulated wall with floor-to-ceiling glazing to 'improve sustainability through daylight.' What performance changes should be tested before accepting the claim?",
+    "intent": "Integrate daylight, heat loss/gain, glare, acoustics, comfort, and embodied/operational effects.",
+    "domain": "Building Technology: Glass / Glazing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "Trace the gravity load path for a simple framed building from a roof slab through beams and columns to the ground. Then explain what must be checked if one ground-floor column is removed to create a larger lobby.",
+    "intent": "Test continuous load-path reasoning and consequences of removing support.",
+    "domain": "Building Technology: Structure / Load Paths",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structural_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "An office grid of 7.5 m by 7.5 m works well structurally, but a new laboratory program needs large service zones and several column-free rooms. What options can reconcile program, structural depth, facade rhythm, services, and construction cost without assuming the grid must remain unchanged?",
+    "intent": "Integrate structural-grid decisions with planning, facade, services, and constructability.",
+    "domain": "Building Technology: Structure / Grids",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "design_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A building has columns and beams sized for gravity loads but no obvious bracing, shear walls, moment frames, or stiff core. Why is vertical-load capacity alone insufficient to establish stability?",
+    "intent": "Distinguish gravity load paths from lateral stability.",
+    "domain": "Building Technology: Structure / Lateral Stability",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "Two foundation concepts are being considered: shallow footings on variable near-surface soils and piles extending to a deeper competent layer. Without geotechnical design values, what site and building information would drive the choice?",
+    "intent": "Relate soil variability, loads, groundwater, settlement, excavation, and neighboring conditions to foundation concept.",
+    "domain": "Building Technology: Foundations",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A building places toilets, kitchens, and utility sinks randomly across a large floor plate on every level. Explain how grouping wet areas can affect drainage stacks, hot-water distribution, coordination, maintenance, and future flexibility.",
+    "intent": "Integrate plumbing distribution with architectural planning.",
+    "domain": "Building Technology: Building Services / Plumbing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "building_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "An office ceiling is designed with very shallow depth because the architecture aims for maximum floor-to-ceiling height. Late coordination reveals large ducts, sprinklers, lighting, cable trays, and structure all competing for the same zone. What should have been coordinated earlier?",
+    "intent": "Analyze service-zone planning, structural depth, ceiling clearances, and access.",
+    "domain": "Building Technology: Building Services / Coordination",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "bim_coordination",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A mechanical system maintains temperature but CO₂ and odor complaints persist in meeting rooms. Why might increasing heating or cooling capacity fail to solve the problem?",
+    "intent": "Distinguish thermal conditioning from ventilation and indoor-air-quality control.",
+    "domain": "Building Technology: HVAC Concepts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "An older school receives new high-efficiency mechanical equipment, but plant rooms are inaccessible for filter changes and major components cannot be removed without demolition. What design principle has been neglected?",
+    "intent": "Evaluate maintenance access, replacement paths, lifecycle durability, and service planning.",
+    "domain": "Building Technology: Building Services / Maintenance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A corridor lighting retrofit reduces installed lighting power by 40%, but lights now remain on continuously because controls are poorly zoned and daylight sensors were omitted. Why can installed power and actual energy use tell different stories?",
+    "intent": "Connect lighting design, controls, operation, and measured performance.",
+    "domain": "Building Technology: Electrical / Lighting",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A 12-story residential building has elevators that serve all floors, and the design team proposes relying on them as the only emergency escape route because they are the fastest everyday circulation. What is wrong with this reasoning at a conceptual level?",
+    "intent": "Distinguish normal vertical transport from protected emergency egress unless explicitly designed for that role.",
+    "domain": "Building Technology: Fire / Vertical Transportation",
+    "acuity": "high",
+    "difficulty": 2,
+    "style": "life_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A theater lobby is quiet, but speech inside the auditorium is muddy even though the walls block outside noise well. What acoustic distinction explains why good sound insulation does not guarantee good room acoustics?",
+    "intent": "Distinguish transmission loss/separation from absorption and reverberation control.",
+    "domain": "Building Technology: Acoustics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "Two apartments share a wall. Adding absorptive panels inside each room reduces reverberation but neighbors still hear speech through the partition. Why did the intervention address the wrong mechanism?",
+    "intent": "Differentiate within-room absorption from inter-room sound insulation and flanking paths.",
+    "domain": "Building Technology: Acoustics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A protected exit corridor is penetrated by multiple unsealed service openings and propped-open doors. The corridor is otherwise constructed with fire-resistant walls. Explain why the compartment may still fail as a life-safety strategy.",
+    "intent": "Apply compartmentation integrity, opening protection, smoke, and protected-route reasoning.",
+    "domain": "Building Technology: Fire / Compartmentation",
+    "acuity": "high",
+    "difficulty": 3,
+    "style": "life_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A public hall has two exits, but furniture storage has blocked one and temporary event partitions create a long dead-end route to the other. What should be prioritized immediately, and what longer-term design/management issues does this expose?",
+    "intent": "Prioritize usable, redundant egress and recognize that temporary layouts can defeat life-safety intent.",
+    "domain": "Building Technology: Fire / Means of Egress",
+    "acuity": "high",
+    "difficulty": 3,
+    "style": "life_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A renovated public building provides a code-minimum ramp to a side door, but the main entrance has steps, the side route is poorly lit and hard to find, internal doors are difficult to operate, and signs rely only on small text. Why is the building still poorly inclusive even if one step-free route exists?",
+    "intent": "Evaluate accessibility as an integrated journey including dignity, wayfinding, operation, sensory access, and internal circulation.",
+    "domain": "Building Technology: Accessibility / Inclusive Design",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "accessibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "Put these broad construction stages into a logical dependency sequence and explain the main dependencies: foundations, primary structure, weather-tight enclosure, major services rough-in, interior finishes, commissioning. Where can overlap occur without violating the dependencies?",
+    "intent": "Reason about construction sequence rather than memorize a contractor-specific method.",
+    "domain": "Construction & Delivery: Sequencing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "construction_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A facade module is prefabricated off site to tight factory tolerances, but the concrete frame is built to wider site tolerances. What interface problems can arise and how should the design accommodate them?",
+    "intent": "Integrate manufacturing, site tolerances, adjustment zones, waterproofing, and assembly.",
+    "domain": "Construction & Delivery: Prefabrication / Tolerances",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "construction_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A modular hotel concept uses highly repeated room pods, but the site has constrained crane access, a low bridge on the delivery route, and many one-off corner conditions. Why might prefabrication still be advantageous, and why might it not deliver the expected speed or cost savings?",
+    "intent": "Evaluate repetition, transport, lifting, customization, logistics, and schedule dependencies.",
+    "domain": "Construction & Delivery: Prefabrication / Modular",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A minimalist roof-edge detail hides gutters and joints, leaving almost no fall, inspection access, or tolerance for construction variation. What failure modes should be anticipated even if the rendered appearance is elegant?",
+    "intent": "Connect detailing aesthetics to drainage, tolerances, maintenance, and weatherproofing.",
+    "domain": "Construction & Delivery: Constructability / Detailing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Stone cladding is fixed rigidly across a long facade with no allowance for thermal movement, while the backup structure is expected to move differently. What kinds of distress could result and what detailing principle is missing?",
+    "intent": "Reason about differential movement, joints, fixings, cracking, and interface durability.",
+    "domain": "Construction & Delivery: Movement / Detailing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "building_pathology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A new ceiling conceals valves, dampers, and junction boxes behind continuous plasterboard with no access panels. What lifecycle and operational consequences follow from this decision?",
+    "intent": "Assess maintainability, inspection, replacement, disruption, and lifecycle cost.",
+    "domain": "Construction & Delivery: Maintenance / Constructability",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A BIM model shows a large duct passing through a structural beam, a drainage pipe crossing above the ceiling without enough fall, and a light fixture occupying the same space as a sprinkler main. What should a coordination review resolve, and who needs to be involved?",
+    "intent": "Resolve multidisciplinary spatial clashes while preserving structural, drainage, ceiling, and architectural requirements.",
+    "domain": "Construction & Delivery: BIM / Coordination",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "bim_coordination",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A coordinated BIM model has no geometric clashes, so the team concludes the building information is correct. Why is clash-free geometry insufficient to establish model quality?",
+    "intent": "Distinguish 3D coordination from data accuracy, completeness, version control, and constructability.",
+    "domain": "Construction & Delivery: BIM / Information",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A floor level changes late in design by 300 mm. Identify likely downstream effects on stairs, ramps, facade modules, structure, ducts, drainage, ceiling zones, and prefabricated components.",
+    "intent": "Trace coordination consequences of a late dimensional change.",
+    "domain": "Construction & Delivery: Design Change / Coordination",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "Which representation is most useful for each task, and why: understanding horizontal room relationships, checking vertical floor-to-roof relationships, reviewing the external face of a facade, and resolving a window-to-wall junction?",
+    "intent": "Distinguish plan, section, elevation, and detail by the information each communicates.",
+    "domain": "Construction & Delivery: Drawings / Representation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A client asks to reduce cost by removing external shading, simplifying the facade waterproofing to exposed sealant, and replacing durable access panels with permanently closed finishes. How would you distinguish value engineering from cost cutting in this case?",
+    "intent": "Evaluate cost changes against performance, maintainability, risk, and lifecycle value.",
+    "domain": "Construction & Delivery: Cost / Value",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "In a design-build process, how can earlier contractor involvement affect constructability feedback, information flow, coordination, and responsibility compared with a more sequential design-bid-build process? Avoid making contract-law claims.",
+    "intent": "Compare project-delivery process implications without jurisdiction-specific legal assumptions.",
+    "domain": "Construction & Delivery: Project Delivery",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A recurring crack appears where a long masonry wall meets a concrete frame. Repointing the crack has failed twice. What evidence and mechanisms should be investigated before specifying another repair?",
+    "intent": "Distinguish symptom treatment from causes such as differential movement, restraint, settlement, or moisture.",
+    "domain": "Construction & Delivery: Building Pathology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "building_pathology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "An existing flat roof repeatedly ponds after rain. The waterproof membrane is relatively new, yet internal leakage occurs near drains during storms. What should be investigated about falls, drain capacity/obstruction, overflow paths, membrane interfaces, and structural deflection before deciding on a repair?",
+    "intent": "Diagnose roof drainage and interface failure without assuming membrane age identifies the cause.",
+    "domain": "Construction & Delivery: Building Pathology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Two neighborhoods have the same number of dwellings per hectare. One uses six-story perimeter blocks with courtyards; the other uses widely spaced towers. What urban qualities can differ even though residential density is the same?",
+    "intent": "Distinguish density from building height and compare frontage, open space, microclimate, permeability, and public realm.",
+    "domain": "Urban & Built Environment: Density / Urban Form",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A superblock shortens vehicle travel but forces pedestrians to make long detours to reach destinations 150 m away as the crow flies. What aspects of connectivity and walkability does the layout undermine?",
+    "intent": "Analyze route directness, block permeability, crossings, destinations, comfort, and accessibility.",
+    "domain": "Urban & Built Environment: Walkability / Connectivity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "urban_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A new mixed-use block places loading docks, late-night venues, family housing bedrooms, and a daycare play yard on the same narrow service lane. What conflicts should be resolved through land-use placement, access, timing, buffering, and facade design?",
+    "intent": "Identify mixed-use compatibility and servicing conflicts at block scale.",
+    "domain": "Urban & Built Environment: Mixed Use",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A public plaza is large and well paved but remains empty at midday. It has little shade, blank building edges, strong wind, no seating with backs, and two difficult road crossings. Why does area alone fail to predict public-space quality?",
+    "intent": "Evaluate microclimate, edges, access, comfort, activity, and pedestrian connection.",
+    "domain": "Urban & Built Environment: Public Realm",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "urban_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A street redesign must accommodate buses, cyclists, pedestrians, deliveries, trees, stormwater, accessible crossings, and limited curb width. How should the design team reason about trade-offs rather than maximizing a single mode?",
+    "intent": "Balance competing street functions, safety, accessibility, drainage, and spatial constraints.",
+    "domain": "Urban & Built Environment: Streets / Public Realm",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A district has small blocks, many intersections, and continuous sidewalks, but most ground-floor frontages are blank parking garages and daily destinations are far away. Why can the street network be connected yet still perform poorly for walking?",
+    "intent": "Distinguish geometric connectivity from destination access, frontage quality, comfort, and perceived safety.",
+    "domain": "Urban & Built Environment: Walkability / Frontage",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A transit station is surrounded by high-density housing but separated from shops and schools by a six-lane road with infrequent crossings. What first/last-mile and public-realm issues limit transit-oriented performance despite the density?",
+    "intent": "Apply TOD concepts through actual pedestrian access, mixed use, crossings, and network integration.",
+    "domain": "Urban & Built Environment: Transit-Oriented Development",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "urban_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A 10,000 m² site contains 24,000 m² of total floor area and a 4,000 m² building footprint. Calculate the floor-area ratio and site coverage, then explain why two projects with the same FAR can have very different urban forms.",
+    "intent": "Calculate FAR and site coverage while distinguishing intensity from massing.",
+    "domain": "Urban & Built Environment: Density Metrics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A 6-hectare neighborhood contains 420 dwellings. Calculate gross dwelling density in dwellings per hectare. Then explain what additional information would be needed to compare living conditions with another neighborhood at the same gross density.",
+    "intent": "Calculate gross density and identify missing information about built form, open space, unit mix, streets, and occupancy.",
+    "domain": "Urban & Built Environment: Density Metrics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A narrow urban street overheats in summer despite newly installed light-colored paving. It has little tree canopy, dark facades, limited airflow, and high nighttime heat release from surrounding mass. Why can changing one surface property be insufficient?",
+    "intent": "Integrate shade, material albedo, heat storage, canyon geometry, vegetation, and airflow.",
+    "domain": "Urban & Built Environment: Urban Heat / Microclimate",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "environmental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A redevelopment proposal increases permeability by adding mid-block passages, but all passages are narrow, poorly overlooked, and close overnight. What does this reveal about measuring permeability only by route count?",
+    "intent": "Evaluate connectivity together with visibility, publicness, hours, comfort, and actual usability.",
+    "domain": "Urban & Built Environment: Urban Morphology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "Design a concept for a mixed-use urban block beside a transit stop where the objectives are high density, good residential daylight, active streets, quiet private courtyards, service access, pedestrian permeability, and usable public space. Explain the main massing and circulation trade-offs rather than proposing one stylistic solution.",
+    "intent": "Synthesize density, daylight, privacy, frontage, servicing, permeability, and public realm.",
+    "domain": "Urban & Built Environment: Integrated Urban Design",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "design_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A city block proposal claims that a 20-story tower is necessarily denser than a 7-story perimeter block on the same site. What information would you need to test the claim, and which density measures could lead to different conclusions?",
+    "intent": "Challenge height-equals-density reasoning using footprint, floor area, dwellings, plot size, and open space.",
+    "domain": "Urban & Built Environment: Density / Morphology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "Option A demolishes an existing office and replaces it with a highly efficient new building. Option B retains the structure, upgrades the envelope and services, but achieves somewhat higher operational energy use. What lifecycle information is needed to compare the options fairly?",
+    "intent": "Compare adaptive reuse and new construction across embodied impact, operations, maintenance, lifespan, and functional performance.",
+    "domain": "Sustainability & Existing Buildings: Lifecycle / Adaptive Reuse",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "sustainability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A historic civic building must gain step-free access, improved fire separation, better winter comfort, and modern services without unnecessarily damaging significant fabric. Develop a decision framework for interventions and explain where reversibility, minimum intervention, compatibility, and user needs may conflict.",
+    "intent": "Balance heritage significance with accessibility, life safety, energy, services, and usability.",
+    "domain": "Sustainability & Existing Buildings: Conservation / Adaptation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "adaptive_reuse",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A retrofit cuts modeled heating demand by 35% but adds carbon-intensive facade materials that are expected to be replaced twice over 60 years. Why can operational and embodied conclusions point in different directions?",
+    "intent": "Distinguish operational savings from embodied impacts and replacement cycles.",
+    "domain": "Sustainability & Existing Buildings: Operational vs Embodied",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "sustainability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A building is designed for low annual energy use but loses all ventilation and cooling during power outages, causing dangerous indoor temperatures during heat waves. Why is low energy use not the same as resilience, and what passive-survivability measures might matter?",
+    "intent": "Distinguish sustainability from hazard resilience and operational continuity.",
+    "domain": "Sustainability & Existing Buildings: Resilience",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "An office was predicted to use 90 kWh/m²·year but has used 135 kWh/m²·year for two consecutive years. List the main categories of evidence needed to diagnose the performance gap before blaming occupants.",
+    "intent": "Investigate weather, occupancy, controls, schedules, commissioning, construction quality, equipment, and model assumptions.",
+    "domain": "Sustainability & Existing Buildings: Building Performance",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A post-occupancy survey reports frequent glare in a supposedly 'daylight-optimized' office, while measured lighting energy is also higher than predicted. What observations and measurements would help test whether the daylight strategy, controls, user behavior, or shading operation is responsible?",
+    "intent": "Use post-occupancy evidence to test design claims and competing explanations.",
+    "domain": "Sustainability & Existing Buildings: Evidence-Based Design / POE",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "An adaptive-reuse proposal converts a shallow industrial building into housing but retains a very deep internal extension with no exterior wall. What program, daylight, ventilation, egress, servicing, and structural questions must be resolved before assuming the whole footprint can become dwellings?",
+    "intent": "Test reuse feasibility against inherited geometry, access, services, safety, and housing performance.",
+    "domain": "Sustainability & Existing Buildings: Adaptive Reuse / Housing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "adaptive_reuse",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A century-old solid masonry wall is retrofitted internally with insulation. Soon afterward, localized mold appears near floor edges and window reveals. What mechanisms and interface conditions should be investigated before adding more insulation?",
+    "intent": "Diagnose thermal bridges, reduced drying, air leakage, rain/moisture sources, and surface temperatures in retrofit.",
+    "domain": "Sustainability & Existing Buildings: Retrofit / Building Pathology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "building_pathology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A flexible office fit-out uses a regular structural grid and demountable partitions, but fixed service risers, low floor-to-floor height, and densely routed ceiling services make future conversion difficult. What does this show about designing for adaptability?",
+    "intent": "Recognize that adaptability depends on structure, services, dimensional capacity, and access—not partitions alone.",
+    "domain": "Sustainability & Existing Buildings: Flexibility / Adaptability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A proposed office floor is 2,400 m² gross. Usable work and meeting areas total 1,560 m², building core/support totals 480 m², and circulation totals 360 m². Calculate the percentage of gross area used for circulation and the net-to-gross ratio using usable work/meeting area as net. Then explain why neither metric alone establishes plan quality.",
+    "intent": "Perform area calculations and interpret them alongside wayfinding, access, support needs, and usability.",
+    "domain": "Cross-disciplinary: Quantitative / Spatial Performance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A facade study reports four alternatives: A has the lowest modeled heating demand, B the lowest cooling demand, C the lowest embodied impact, and D the best daylight autonomy. No option is best on every metric. How should the team compare them without collapsing the decision into one unsupported 'sustainability score'?",
+    "intent": "Interpret multi-metric performance data using objectives, weights, trade-offs, uncertainty, and lifecycle boundaries.",
+    "domain": "Cross-disciplinary: Data Interpretation / Trade-offs",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A renovation concept widens a public corridor by removing a wall shown on an old plan as nonstructural. Site inspection reveals beams bearing into the wall and cracks near its base. What should happen before demolition proceeds?",
+    "intent": "Integrate drawing uncertainty, structural evidence, investigation, temporary safety, and design coordination.",
+    "domain": "Cross-disciplinary: Existing Building / Safety",
+    "acuity": "high",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A complex civic building must fit a constrained urban site with noisy streets to the west, good daylight potential to the south, a protected historic facade to retain, public and staff entrances, an accessible primary route, a large column-free hall, service deliveries, low operational energy targets, and a requirement to keep embodied impacts low. Develop a coherent design strategy and explain the major uncertainties and trade-offs across program, site, structure, envelope, circulation, accessibility, construction, and lifecycle.",
+    "intent": "Synthesize the full architecture/built-environment problem without assuming a single predetermined solution.",
+    "domain": "Cross-disciplinary: Integrated Design Judgment",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "design_decision",
+    "jurisdiction_required": false
+  }
+]

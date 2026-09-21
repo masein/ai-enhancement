@@ -213,10 +213,10 @@ def test_json_mode_follows_the_flag_for_openai_and_is_ignored_by_anthropic(monke
 
 
 def test_every_caller_that_parses_json_asks_for_it(tree, tmp_path):
-    prop = proposals.proposal_request(1, "m", "exam_economics", "economics", [],
+    prop = proposals.proposal_request(1, "m", "exam_economics", "Economics", [],
                                       {"diagnose_items": 0, "diagnose_weak": 0}, "rubric")
-    gens = proposals.generation_requests(1, "spec", "economics", 4, "doc", 7)
-    drafts = eb.draft_requests(tmp_path / "exam", "economics", 8)
+    gens = proposals.generation_requests(1, "spec", "Economics", 4, "doc", 7)
+    drafts = eb.draft_requests(tmp_path / "exam", "Economics", 8)
     judged, _ = jd.plan_requests(tree["models"]["fx/chance-160m"]["dir"], "claude")
     assert prop.json and gens and drafts and judged
     assert all(r.json for r in gens + drafts + judged)
@@ -231,11 +231,11 @@ def test_a_local_generator_is_asked_for_one_document_at_a_time(monkeypatch):
     monkeypatch.setattr(config, "LLM_PROVIDER", "local")
     assert proposals.items_per_request("doc") == 1
     assert proposals.items_per_request("free") == 10          # short; two fit easily
-    reqs = proposals.generation_requests(1, "spec", "economics", 4, "doc", 7)
+    reqs = proposals.generation_requests(1, "spec", "Economics", 4, "doc", 7)
     assert len(reqs) == 4 and all("Write 1 document." in r.user for r in reqs)
     monkeypatch.setattr(config, "LLM_PROVIDER", "anthropic")
     assert proposals.items_per_request("doc") == 2
-    reqs = proposals.generation_requests(1, "spec", "economics", 4, "doc", 7)
+    reqs = proposals.generation_requests(1, "spec", "Economics", 4, "doc", 7)
     assert len(reqs) == 2 and all("Write 2 documents." in r.user for r in reqs)
     # and one document comes back as the object itself, not in an array
     doc = {"title": "Margins first", "text": "word " * 200}
@@ -441,7 +441,7 @@ def test_a_local_proposer_and_generator_stamp_the_spec_and_the_dataset(vllm, tmp
         monkeypatch.setattr(config, "LLM_PROVIDER", "local")
         monkeypatch.setattr(config, "LLM_MODEL", "gemma")
         llm.reset()
-        body = {"model": "fx/good-750m", "topic": "economics", "requested_by": "t"}
+        body = {"model": "fx/good-750m", "topic": "Economics", "requested_by": "t"}
         r = client.post("/api/proposals", json=body)
         assert r.status_code == 503 and "serves ['chat'], not 'gemma'" in r.json()["detail"]
         monkeypatch.setattr(config, "LLM_MODEL", "chat")
@@ -479,7 +479,7 @@ def test_a_local_proposer_and_generator_stamp_the_spec_and_the_dataset(vllm, tmp
 def test_a_pinned_loop_carries_no_stamp(tmp_path, monkeypatch):
     client, _, _ = make_service(tmp_path, monkeypatch, judge_model="stub")
     try:
-        pid = client.post("/api/proposals", json={"model": "fx/good-750m", "topic": "economics",
+        pid = client.post("/api/proposals", json={"model": "fx/good-750m", "topic": "Economics",
                                                   "requested_by": "t"}).json()["id"]
         llm_poller.tick()
         assert "provisional" not in client.get(f"/api/proposals/{pid}").json()["evidence"]
@@ -496,11 +496,11 @@ def test_a_pinned_loop_carries_no_stamp(tmp_path, monkeypatch):
 def test_a_local_exam_writer_is_asked_for_one_question_at_a_time(vllm, tmp_path, monkeypatch):
     monkeypatch.setattr(config, "EXAM_PROVIDER", "local")
     assert eb.candidates_per_request() == 1 and eb.candidates_per_request("openai") == 4
-    reqs = eb.draft_requests(tmp_path / "exam", "economics", 3)
+    reqs = eb.draft_requests(tmp_path / "exam", "Economics", 3)
     assert len(reqs) == 3 and all("Write 1 new question." in r.user for r in reqs)
     b = llm.LocalOpenAI("chat", "", tmp_path)
-    r = eb.draft(tmp_path / "exam", b, ["economics"], per_topic=3, wait=True, poll_s=0.02)
-    assert r["written"] == {"economics": 3} and r["unusable"] == {}
+    r = eb.draft(tmp_path / "exam", b, ["Economics"], per_topic=3, wait=True, poll_s=0.02)
+    assert r["written"] == {"Economics": 3} and r["unusable"] == {}
     assert len(vllm.bodies) == 3                      # one question per request, three rows
 
 
@@ -509,7 +509,7 @@ def test_a_reply_nothing_can_be_curated_from_is_counted_not_silent(vllm, tmp_pat
     # of question texts with no reference answers
     monkeypatch.setattr(vllm_stub, "DRAFT_SHAPE", "strings")
     b = llm.LocalOpenAI("chat", "", tmp_path)
-    r = eb.draft(tmp_path / "exam", b, ["economics"], per_topic=3, wait=True, poll_s=0.02)
+    r = eb.draft(tmp_path / "exam", b, ["Economics"], per_topic=3, wait=True, poll_s=0.02)
     assert r["written"] == {}
     assert len(r["unusable"]) == 3
     cid, why = sorted(r["unusable"].items())[0]
@@ -523,9 +523,9 @@ def test_a_reply_nothing_can_be_curated_from_is_counted_not_silent(vllm, tmp_pat
 def test_a_local_exam_writer_stamps_its_candidates_and_the_bank_keeps_it(vllm, tmp_path):
     b = llm.LocalOpenAI("chat", "", tmp_path)
     root = tmp_path / "exam"
-    r = eb.draft(root, b, ["economics"], per_topic=4, wait=True, poll_s=0.02)
-    assert r["written"] == {"economics": 4}
-    cands = eb.load_candidates(root, "economics")
+    r = eb.draft(root, b, ["Economics"], per_topic=4, wait=True, poll_s=0.02)
+    assert r["written"] == {"Economics": 4}
+    cands = eb.load_candidates(root, "Economics")
     assert len(cands) == 4 and all(c["drafted_by"] == "local/chat" for c in cands)
     assert all(c["provisional"] is True and c["weights"] == WEIGHTS for c in cands)
     assert cands[0]["provisional_reason"] == "drafted by a local model — not a pinned benchmark"

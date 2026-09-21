@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A line has three serial operations with sustained capacities of 60, 45, and 55 parts/hour. The first two operations each have 99% yield and the final operation has 98% yield. Ignoring starvation/blocking and assuming unlimited demand, identify the bottleneck, estimate the maximum good-part throughput per hour, and explain why raising utilization at the 60-part/hour operation alone would not increase system output.",
+    "intent": "Analyze bottleneck-limited throughput and distinguish utilization from system output.",
+    "domain": "Manufacturing Processes - Fundamentals",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "production_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A company needs 80,000 aluminum housings per year. Each housing has thin ribs, several bosses, a general dimensional tolerance of ±0.20 mm, and two bearing bores that require ±0.015 mm after processing. Compare machining from billet with near-net-shape casting followed by finish machining of the bores. Discuss tooling cost, material yield, cycle time, repeatability, and the need for secondary machining rather than assuming one process is universally best.",
+    "intent": "Select and compare manufacturing routes using geometry, tolerance, volume, and economics.",
+    "domain": "Manufacturing Processes - Process Selection",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "process_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A 50 mm diameter steel shaft is turned at a cutting speed of 180 m/min with a feed of 0.25 mm/rev. The tool travels 120 mm along the part and allowance for approach is neglected. Calculate the spindle speed, axial feed rate, and approximate cutting time. Then explain one reason why simply increasing cutting speed may reduce rather than improve sustained productivity.",
+    "intent": "Calculate turning parameters and relate speed to tool life and productivity.",
+    "domain": "Manufacturing Processes - Machining",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A bent sheet-steel bracket consistently springs open by about 2.5° after unloading. Material lot records show yield strength increased by 12% while thickness and tooling are unchanged. Explain the likely mechanism, how the material change can affect springback, and two process or tooling adjustments that could be evaluated without assuming the nominal bend angle alone controls the final geometry.",
+    "intent": "Relate material behavior and bending process parameters to springback.",
+    "domain": "Manufacturing Processes - Forming",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "forming_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "An aluminum casting has rounded internal voids in several regions, but a separate defect cluster appears only at a thick junction that is last to solidify. Explain how the evidence can distinguish gas porosity from shrinkage porosity, why the thick junction is a hot-spot risk, and what gating/feeding or solidification changes should be investigated.",
+    "intent": "Diagnose casting porosity using morphology and solidification evidence.",
+    "domain": "Manufacturing Processes - Casting",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "casting_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A welded frame meets static load requirements but shows angular distortion after welding and fatigue cracks begin near a weld toe after repeated service loading. Distinguish the roles of heat input, residual stress, geometric stress concentration, weld profile, and base-material strength. Identify process or design changes that could reduce distortion and fatigue risk.",
+    "intent": "Analyze welding distortion and fatigue at a joint without conflating metallurgy and geometry.",
+    "domain": "Manufacturing Processes - Joining",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "joining_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A stainless-steel component can be made either by additive manufacturing or by machining from billet. Annual demand is 300 parts. Additive requires a one-time setup of €2,000, €180 build cost per part, and €70 post-processing per part. Machining requires a €7,000 fixture, €120 material per part, and €95 machining cost per part. Ignoring financing, calculate the annual cost of each route at 300 parts and discuss how tolerance, surface finish, inspection, and future volume could alter the decision.",
+    "intent": "Compare additive and conventional manufacturing using cost and technical constraints.",
+    "domain": "Manufacturing Processes - Additive Manufacturing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "cost_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "An injection-molded polypropylene cover previously cooled for 18 s and was dimensionally stable. Cooling was reduced to 11 s to increase output, after which warpage rose sharply while fill pressure and part mass stayed similar. Explain how cooling time, mold temperature, through-thickness temperature gradients, shrinkage, and residual stress could interact, and identify measurements that would test the explanation.",
+    "intent": "Diagnose polymer warpage after a cycle-time change.",
+    "domain": "Manufacturing Processes - Polymer Processing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A pressed ceramic compact has a green density of 58% of theoretical density. After sintering it reaches 94% of theoretical density and its linear dimensions shrink by 14%. Explain why compaction density is not final density, why sintering is not the same as bulk melting, and how nonuniform green density can contribute to distortion or cracking.",
+    "intent": "Connect powder compaction, sintering, densification, and dimensional change.",
+    "domain": "Manufacturing Processes - Ceramic & Powder Processing",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "Two batches of the same quenched steel reach similar hardness immediately after quenching. Batch A is tempered at a lower temperature than Batch B. Explain the expected qualitative differences in hardness, toughness, residual stress, and dimensional stability, and why choosing the hardest condition is not automatically the best manufacturing decision.",
+    "intent": "Reason about quench-and-temper trade-offs in production.",
+    "domain": "Manufacturing Processes - Heat Treatment",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A shop is choosing between two alloys for a high-volume machined fitting. Alloy X has 15% higher tensile strength but causes roughly twice the tool wear and requires 25% lower cutting speed; Alloy Y meets the design strength requirement with margin and machines cleanly. Explain why selecting the 'strongest' alloy can increase total manufacturing cost and what additional service and process evidence should drive the choice.",
+    "intent": "Evaluate practical material selection using machinability and service requirements.",
+    "domain": "Materials & Product Behavior - Applied Materials",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A rotating shaft failed after 18 months. The fracture surface shows a small origin at a keyway, progressive beach-mark-like regions over most of the section, and a final rough overload zone. Operating logs show peak torque never exceeded the shaft's static yield estimate. Explain the most plausible failure sequence and distinguish fatigue initiation, crack growth, final overload, and the role of the keyway.",
+    "intent": "Interpret a fatigue fracture without confusing final overload with root cause.",
+    "domain": "Materials & Product Behavior - Fatigue & Fracture",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A sliding guide develops polished grooves and debris, while an adjacent exposed fastener shows reddish corrosion products. Explain why these observations indicate different degradation mechanisms, what evidence would distinguish abrasive/adhesive wear from corrosion, and why a corrosion-resistant coating alone may not solve the guide problem.",
+    "intent": "Distinguish wear from corrosion in a manufacturing system.",
+    "domain": "Materials & Product Behavior - Wear & Corrosion",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A 600 mm long aluminum fixture is calibrated at 20°C and used at 32°C. Use a linear thermal-expansion coefficient of 23×10^-6 /°C. Estimate the length increase and explain how this could bias a tight dimensional inspection if the part and fixture are at different temperatures.",
+    "intent": "Quantify thermal expansion and connect it to dimensional metrology.",
+    "domain": "Materials & Product Behavior - Thermal Effects",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A stainless-steel fastener is installed in a large aluminum plate in a wet, chloride-containing environment. Corrosion localizes around the aluminum near the joint. Explain a plausible galvanic mechanism, the importance of area ratio and electrolyte exposure, and mitigation options involving isolation, coatings, drainage, or material pairing.",
+    "intent": "Diagnose galvanic corrosion from service conditions.",
+    "domain": "Materials & Product Behavior - Corrosion",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A protective coating meets its 80–100 µm thickness requirement but peels after humidity exposure. Cross-sections show thickness is uniform. Production records reveal the alkaline cleaning rinse was shortened and water-break-free verification was skipped. Explain why thickness alone is insufficient, how surface contamination can reduce adhesion, and what evidence should be collected before blaming coating chemistry.",
+    "intent": "Connect surface preparation to coating adhesion and service performance.",
+    "domain": "Materials & Product Behavior - Surface Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "An extruded polymer tube begins showing discoloration and brittle cracking after a heater-zone setpoint is increased by 25°C to raise throughput. Dimensions initially remain acceptable. Explain how thermal residence time and polymer degradation could produce this pattern and what process data would help distinguish degradation from a purely mechanical sizing problem.",
+    "intent": "Diagnose polymer thermal degradation during extrusion.",
+    "domain": "Materials & Product Behavior - Polymer Degradation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A steel support operates continuously at elevated temperature under a load well below its room-temperature yield strength. After long service it shows permanent elongation. Explain why this may be creep rather than ordinary elastic deformation, what variables govern creep risk, and why room-temperature strength alone is insufficient for the assessment.",
+    "intent": "Distinguish creep from elastic deformation in service.",
+    "domain": "Materials & Product Behavior - Creep",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A fiber-reinforced composite panel is very stiff along the fiber direction but deflects more than expected transverse to the fibers. Explain why anisotropy matters to machining, drilling, fastening, and dimensional prediction, and why a single scalar 'strength' value is inadequate for manufacturing decisions.",
+    "intent": "Apply composite anisotropy to manufacturing and assembly.",
+    "domain": "Materials & Product Behavior - Composites",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "materials_and_processing_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A nonferromagnetic aluminum plate must be inspected for fine surface-breaking cracks around fastener holes without sectioning the part. Compare dye penetrant and eddy-current inspection for this task, noting accessibility, surface condition, defect orientation, and what each method can and cannot establish.",
+    "intent": "Choose an NDT method based on material, defect type, and access.",
+    "domain": "Materials & Product Behavior - Nondestructive Testing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "process_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A micrometer repeatedly reads a 25.000 mm reference as 25.018, 25.019, 25.018, and 25.019 mm. Explain what this pattern says about precision/repeatability versus accuracy/bias, what calibration or adjustment actions are justified, and why high resolution on the display would not by itself make the measurement accurate.",
+    "intent": "Distinguish repeatability, bias, accuracy, resolution, and calibration.",
+    "domain": "Metrology & Quality - Dimensional Measurement",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "metrology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A gauge R&R study estimates standard deviations of 0.006 mm from repeatability, 0.004 mm from reproducibility, and 0.008 mm from true part-to-part variation. Treat the components as independent. Estimate the combined measurement-system standard deviation and compare it with part-to-part variation. Explain why a large measurement contribution can make an apparently variable process difficult to diagnose.",
+    "intent": "Quantify measurement variation and separate it from part variation.",
+    "domain": "Metrology & Quality - Measurement Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A hole is specified as 20.000 to 20.030 mm and a mating shaft as 19.980 to 20.010 mm. Calculate the minimum and maximum possible clearance. State whether the fit is always clearance, always interference, or can transition between the two, and explain why nominal dimensions alone are insufficient.",
+    "intent": "Compute worst-case fit and interpret assembly behavior.",
+    "domain": "Metrology & Quality - Tolerances & Fits",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "tolerance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "An assembly stack consists of A = 12.00±0.05 mm, B = 8.00±0.04 mm, and C = 5.00±0.03 mm arranged so total gap G = 30.20 mm - (A+B+C). Using worst-case arithmetic, calculate the nominal gap and its minimum and maximum values. Determine whether a required minimum gap of 5.00 mm is guaranteed.",
+    "intent": "Perform a worst-case tolerance stack and judge functional clearance.",
+    "domain": "Metrology & Quality - Tolerance Stack-Up",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A flange has a bolt-hole pattern whose function is to align with a mating housing. Inspectors currently check each hole's X and Y coordinates from arbitrary part edges, but the edges are not functionally important and vary after trimming. Explain why a datum system tied to the functional mounting surfaces would improve interpretation of location error, without requiring symbol memorization.",
+    "intent": "Explain functional datum selection and positional control.",
+    "domain": "Metrology & Quality - GD&T Concepts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tolerance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "An X-bar chart has all points inside its 3-sigma control limits, but the process mean is only 0.02 mm below the upper specification limit and many individual parts fail inspection. Explain why 'in control' does not mean 'capable,' distinguish control limits from specification limits, and state what additional data are needed to assess capability.",
+    "intent": "Distinguish statistical stability from specification conformance.",
+    "domain": "Metrology & Quality - SPC",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "spc_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A stable process has LSL = 9.80 mm, USL = 10.20 mm, mean = 10.08 mm, and standard deviation = 0.030 mm. Calculate Cp and Cpk using Cp=(USL-LSL)/(6σ) and Cpk=min[(USL-mean)/(3σ),(mean-LSL)/(3σ)]. Interpret both indices, including the effect of off-centering.",
+    "intent": "Calculate and interpret Cp and Cpk for a stable process.",
+    "domain": "Metrology & Quality - Process Capability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "capability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A stable process produces a diameter with mean 15.000 mm and standard deviation 0.040 mm; specification is 15.000±0.080 mm. Without relying only on a capability label, explain why this process is centered yet still marginal/incapable by common capability expectations, and identify whether reducing spread or shifting the mean is the more relevant improvement.",
+    "intent": "Reason about a centered but excessively variable process.",
+    "domain": "Metrology & Quality - Process Capability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "capability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A batch contains 1,000 units. Inspection finds 70 total defects distributed across 50 defective units. Of the 1,000 units, 930 pass all steps the first time, 45 are successfully reworked, and 25 are scrapped. Calculate first-pass yield, final good-unit yield after rework, and explain why '70 defects' is not the same as '70 defectives.'",
+    "intent": "Calculate yield measures and distinguish defects from defectives.",
+    "domain": "Metrology & Quality - Quality Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A shaft process appears to drift upward by 0.025 mm over two weeks. Production then finds that a reference master measured by the same gauge also shifted upward by 0.022 mm over the same period. Machine temperatures, tool offsets, and raw material were stable. Analyze the competing hypotheses of real process drift versus measurement-system drift, identify the strongest evidence, and propose a verification plan before changing the machining process.",
+    "intent": "Separate process variation from measurement drift using contradictory evidence.",
+    "domain": "Metrology & Quality - Measurement Systems",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A four-task assembly has task times A=35 s, B=25 s, C=40 s, D=20 s. Precedence is A before B and C; both B and C must finish before D. The target line cycle time is 60 s. Determine the theoretical minimum number of stations from total work content, then propose a feasible station assignment that respects precedence and the 60 s limit.",
+    "intent": "Balance a simple line while respecting precedence and indivisible tasks.",
+    "domain": "Production Systems - Line Balancing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A production family averages 240 units of work-in-process and exits the factory at 80 units/day. Assuming a stable long-run system, use Little's Law to estimate average manufacturing lead time. Then explain why reducing local cycle time at a non-bottleneck may not reduce this lead time if WIP and queues remain unchanged.",
+    "intent": "Use Little's Law and system reasoning to interpret lead time.",
+    "domain": "Production Systems - Flow & WIP",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A machine takes 90 minutes to change over and then runs at 2 minutes/part. Demand is 150 parts/day for each of three products. Discuss how very large batches can reduce setup frequency yet increase WIP, response time, and obsolescence risk, and how setup reduction changes the economic trade-off.",
+    "intent": "Analyze batch size and setup-time effects on flow.",
+    "domain": "Production Systems - Production Planning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A line has nominal cycle times of 40, 42, 39, and 38 s at four serial stations. The 42 s station also suffers 12% downtime with average repair duration 18 minutes and has a 7-minute changeover every 50 units. Upstream stations keep producing during short stops, creating queues. Diagnose the effective constraint, explain why nominal cycle time alone understates the bottleneck, and identify the highest-value measurements or changes to test first.",
+    "intent": "Analyze a hidden bottleneck created by downtime, changeovers, and variability.",
+    "domain": "Production Systems - Bottlenecks",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "bottleneck_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "Average demand for a component is 120 units/day, replenishment lead time is 6 days, and management wants 180 units of safety stock. Calculate a basic reorder point assuming the safety stock already reflects desired variability protection. Explain how longer or more variable lead time would affect the policy.",
+    "intent": "Calculate reorder point and distinguish cycle demand from safety stock.",
+    "domain": "Production Systems - Inventory",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Supplier A charges €4.70 per part, averages 21 days lead time, and has 2.0% incoming defects. Supplier B charges €5.05, averages 8 days lead time, and has 0.3% defects. The part is critical and a shortage stops production. Explain why lowest purchase price may not minimize total manufacturing cost, and identify the inventory, quality, downtime, and resilience data needed for a decision.",
+    "intent": "Evaluate supplier cost, quality, lead time, and risk trade-offs.",
+    "domain": "Production Systems - Supply Chain",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A job-shop has three work centers. Orders frequently wait several days before Work Center 2 even though its average utilization is only 72%. Product routes differ and arrivals are highly variable. Explain how variability, sequencing, batch release, and temporary congestion can create long queues even when average utilization is below 100%, and what data should be examined before buying another machine.",
+    "intent": "Reason about queues and routing in a variable job-shop.",
+    "domain": "Production Systems - Job Shop",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "production_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A factory is considering moving a product family from departmental machines into a manufacturing cell. The family has moderate volume, similar routings, and frequent handoffs between departments. Explain the likely effects on travel, WIP, visual control, flexibility, and equipment utilization, including one reason a cell could be a poor choice.",
+    "intent": "Evaluate cellular manufacturing as a system design choice.",
+    "domain": "Production Systems - Cellular Manufacturing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "Demand is rising by 20%. Management proposes buying a second milling machine because the existing mill runs 88% of scheduled time. However, downstream heat treatment limits output to 900 parts/week while the mill can supply 1,150 parts/week. Analyze the actual capacity constraint and compare alternatives such as heat-treatment expansion, scheduling changes, outsourcing, or process improvement.",
+    "intent": "Identify the true system constraint before capacity investment.",
+    "domain": "Production Systems - Capacity Expansion",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A plant reports average machine utilization of 95%, yet customer shipments are late, WIP has doubled, and finished throughput is unchanged. Explain at least three mechanisms by which high utilization can coexist with poor system performance, including bottlenecks, variability, queueing, blocking/starvation, or large batch release.",
+    "intent": "Distinguish local utilization from total-system throughput.",
+    "domain": "Production Systems - Flow & Bottlenecks",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "production_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "An automated press will not start. The HMI shows Start command ON, guard-closed sensor ON, hydraulic pressure permissive ON, but the part-present sensor remains OFF even though a part is physically in the nest. Explain how to separate a sensor/wiring problem from logic or process-state problems and describe a safe diagnostic sequence without bypassing the interlock.",
+    "intent": "Troubleshoot a failed start permissive safely.",
+    "domain": "Automation & Control - PLC Concepts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "automation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A conveyor motor remains energized after the normal Stop command. The PLC input for Stop changes correctly, but the motor output bit stays ON until power is cycled. Explain possible logic causes such as a latched state or reset path failure, and what observations would distinguish a logic issue from a welded contactor or output hardware fault.",
+    "intent": "Diagnose an output that remains energized.",
+    "domain": "Automation & Control - PLC Concepts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "automation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A dryer suddenly reports product temperature 18°C above normal, yet an independent handheld probe and product quality remain unchanged. The installed temperature transmitter also shows a gradual zero shift during weekly checks. Explain why the sensor should be treated as evidence rather than physical truth and how to confirm whether the process or measurement channel changed.",
+    "intent": "Distinguish sensor drift from a real process excursion.",
+    "domain": "Automation & Control - Instrumentation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "instrumentation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A robot places parts with a spread of only ±0.05 mm around its taught position, but the average placement is consistently 0.8 mm away from the required fixture location. Explain the difference between repeatability and accuracy and identify calibration, coordinate-frame, tooling, or fixture checks that are more relevant than simply slowing the robot.",
+    "intent": "Distinguish robotic repeatability from absolute accuracy.",
+    "domain": "Automation & Control - Robotics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "automation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A robot cell's pick-and-place motion is sped up by 15%, but total cell throughput falls 6% and fault stops increase. Logs show the downstream vision station has unchanged inspection time, queue occupancy before vision is frequently full, and robot gripper vacuum alarms increased. Explain how a local speed increase can reduce system throughput and identify the hidden constraints and reliability trade-offs.",
+    "intent": "Analyze why faster robot motion can reduce cell throughput.",
+    "domain": "Automation & Control - Robotics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "bottleneck_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A temperature-control loop oscillates after a controller gain increase. The heater saturates at 100% during each recovery, the temperature sensor has about 20 s of filtering delay, and the process itself has a long thermal lag. Explain how controller aggressiveness, sensor delay, process lag, and actuator saturation can interact, and propose a safer tuning/diagnostic strategy than further increasing gain.",
+    "intent": "Diagnose control-loop oscillation with lag and saturation.",
+    "domain": "Automation & Control - Process Control",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "control_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A pressure transmitter is rated 0–10 bar and outputs the same maximum reading whenever the process is above about 10 bar. Operators interpret the flat trace as stable pressure. Explain sensor saturation, why the recorded signal cannot establish actual pressure above range, and what instrumentation change is needed if 12 bar operation must be measured.",
+    "intent": "Recognize sensor saturation and range limitations.",
+    "domain": "Automation & Control - Instrumentation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "instrumentation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A vision system misses dark scratches on a glossy metal surface. Software thresholds have been repeatedly adjusted, but defect detection remains inconsistent as ambient lighting changes. Explain how illumination geometry, glare, contrast, focus, and field of view should be checked before assuming the image algorithm is the main problem.",
+    "intent": "Distinguish optical/lighting problems from algorithm problems.",
+    "domain": "Automation & Control - Machine Vision",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A guarded automated cell has a door interlock that has begun intermittently dropping out during production, causing nuisance stops. Production suggests defeating the interlock until maintenance arrives. Identify the safe manufacturing response, explain why a production permissive is not a substitute for independent protection, and outline fault-finding steps that preserve the protective function.",
+    "intent": "Prioritize safe-state troubleshooting of an intermittent safety interlock.",
+    "domain": "Automation & Control - Functional Safety",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "safety_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A pneumatic cylinder is commanded to extend. The PLC output indicator turns ON and the solenoid coil measures correct voltage, but the cylinder does not move; air supply pressure upstream is normal and the valve exhaust sounds abnormal. Identify the most plausible fault classes and what checks distinguish actuator/valve, mechanical jam, downstream restriction, and logic problems.",
+    "intent": "Separate logic, actuator, and physical-process faults.",
+    "domain": "Automation & Control - Actuation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "automation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A machine has MTBF = 120 h and MTTR = 6 h. Using steady-state availability A = MTBF/(MTBF+MTTR), calculate inherent availability. Then explain why two machines with the same reliability can have different availability if their repair times differ.",
+    "intent": "Calculate availability and distinguish it from reliability.",
+    "domain": "Maintenance & Reliability - Reliability",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A bearing failure mode gives a reliable vibration warning 2–4 weeks before functional failure, while calendar age varies widely from 4 to 18 months. Compare fixed-interval preventive replacement with vibration-based predictive maintenance and explain which evidence makes one strategy more appropriate.",
+    "intent": "Choose maintenance strategy based on failure behavior.",
+    "domain": "Maintenance & Reliability - Predictive Maintenance",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "maintenance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "Vibration at 1× running speed on a motor-pump set has doubled over three months while overall flow and pressure remain normal. Axial vibration is also elevated, bearing temperature is unchanged, and the coupling was recently replaced. Discuss misalignment, imbalance, looseness, and sensor error as competing hypotheses and identify measurements that would discriminate among them.",
+    "intent": "Diagnose a vibration trend without overclaiming the mechanism.",
+    "domain": "Maintenance & Reliability - Condition Monitoring",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "maintenance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A gearbox shows rising vibration at a gear-mesh frequency, but oil particle counts remain flat and infrared temperature has fallen slightly after a cooling-system upgrade. Load also increased by 10% during the same period. Explain what can and cannot be concluded from the conflicting condition signals, identify confounders, and propose a prioritized verification plan before scheduling a major overhaul.",
+    "intent": "Reconcile contradictory condition-monitoring signals and confounders.",
+    "domain": "Maintenance & Reliability - Condition Monitoring",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Two identical pumps are installed in parallel for redundancy. Both fail during the same event after contaminated cooling water enters a shared seal-flush header. Explain why component redundancy did not guarantee system reliability, identify the common-cause failure path, and suggest design or monitoring changes that reduce dependence on the shared vulnerability.",
+    "intent": "Identify a common-cause failure in a redundant system.",
+    "domain": "Maintenance & Reliability - Reliability",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A bearing repeatedly fails with blue discoloration and smeared race surfaces. Oil level is often low after weekend shutdowns, and the lubrication line has a slow leak. Explain how lubrication failure can create heat and surface damage, distinguish the observed damage from the root cause, and identify corrective and verification actions.",
+    "intent": "Trace bearing damage to a lubrication-system root cause.",
+    "domain": "Maintenance & Reliability - Lubrication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A motor's casing temperature has risen from 62°C to 78°C over two months at the same production load. Ambient temperature is 5°C higher, fan guards are partially clogged, and current draw is unchanged. Explain how to separate environmental, cooling, electrical, and mechanical causes before concluding the motor is failing internally.",
+    "intent": "Use thermal and operating evidence for maintenance diagnosis.",
+    "domain": "Maintenance & Reliability - Thermal Monitoring",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "maintenance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A critical machine uses a gearbox that fails on average once every four years, but replacement lead time is 14 weeks and a failure stops the line. The spare costs €18,000 and can degrade if stored poorly. Explain the spare-parts decision using downtime consequence, lead time, failure probability, preservation, and possible repair/loan alternatives.",
+    "intent": "Evaluate a critical spare-parts strategy.",
+    "domain": "Maintenance & Reliability - Spare Parts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A low-cost exhaust fan has no safety or quality consequence if it fails, replacement takes 20 minutes, and failures are random with no detectable wear trend. Explain why run-to-failure may be rational here and why a calendar-based preventive replacement program is not automatically superior.",
+    "intent": "Match maintenance policy to consequence and failure behavior.",
+    "domain": "Maintenance & Reliability - Maintenance Strategy",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "maintenance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A press tie rod fractures. The final fracture region is rough, but microscopy finds a smaller pre-existing crack that originated at a threaded root and grew over many cycles. Explain why the visible final fracture is not necessarily the root cause and what loading, geometry, material, and assembly evidence should be investigated.",
+    "intent": "Distinguish final overload from fatigue initiation and contributing factors.",
+    "domain": "Maintenance & Reliability - Failure Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A furnace heats 500 kg of steel from 25°C to 825°C each batch. Use an average specific heat of 0.60 kJ/(kg·K). If furnace-to-load efficiency is 40%, estimate the required input energy in MJ, ignoring phase change. Then explain why actual energy use may be higher due to furnace walls, exhaust, openings, and soak time.",
+    "intent": "Apply an industrial energy balance to process heating.",
+    "domain": "Applied Sciences - Thermodynamics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "An injection mold has a 6 mm thick region that cools much more slowly than surrounding 2 mm walls and produces sink/warpage. Explain qualitatively how conduction distance, local heat capacity, coolant-channel placement, and cycle time interact. Identify process or design changes that could improve uniform cooling.",
+    "intent": "Connect heat transfer to molding quality and cycle time.",
+    "domain": "Applied Sciences - Heat Transfer",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "applied_science",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A compressed-air header is at 7.0 bar(g), but a tool sees only 5.1 bar(g) during peak use. Static pressure recovers when the tool stops. Explain why this pattern points toward flow-related pressure drop or restriction rather than simply proving the compressor is defective, and identify measurements to localize the loss.",
+    "intent": "Distinguish supply pressure from point-of-use pressure under flow.",
+    "domain": "Applied Sciences - Fluid Systems",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A centrifugal pump delivers less flow after a filter change. Suction pressure is much lower than before, discharge pressure is also reduced, and the new filter has a finer rating. Explain how added suction restriction can reduce flow and potentially contribute to cavitation risk, and what checks should precede pump replacement.",
+    "intent": "Diagnose pump performance using pressure and restriction evidence.",
+    "domain": "Applied Sciences - Fluid Systems",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A 1,000 L process bath is at 12.0% concentration by volume and must be reduced to 9.0% by adding water only, assuming additive volumes and no material removal. Calculate the final bath volume and the amount of water to add. State the mass-balance assumption used.",
+    "intent": "Perform a concentration dilution calculation for an industrial bath.",
+    "domain": "Applied Sciences - Industrial Chemistry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A cleaning bath has the correct nominal pH, but coating adhesion is poor. Conductivity has doubled and rinse-water quality recently changed. Explain why pH alone does not establish bath condition, how dissolved salts or contamination could affect cleaning/rinsing, and what measurements or controls should be checked.",
+    "intent": "Interpret industrial cleaning chemistry without overrelying on pH.",
+    "domain": "Applied Sciences - Industrial Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A machine-vision camera images a 120 mm wide field of view onto 2,400 horizontal pixels. Estimate the object-space pixel size in mm/pixel. A defect is 0.08 mm wide. Explain why having roughly 1.6 pixels across the defect is generally weak evidence for reliable dimensional measurement, even before lens distortion and calibration uncertainty are considered.",
+    "intent": "Relate field of view and pixel sampling to inspection limits.",
+    "domain": "Applied Sciences - Applied Optics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A powder-drying process is suspected of leaving excess moisture that later causes blistering. Compare a direct gravimetric moisture-loss method with a spectroscopic proxy. Explain what each can establish, the need for calibration/reference samples, and why a correlation model must be validated over the production range.",
+    "intent": "Evaluate analytical methods for an industrial moisture decision.",
+    "domain": "Applied Sciences - Analytical Methods",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "experimental_and_data_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A laboratory metal-ion test shows elevated concentration in product samples, but the reagent blank is also elevated and a certified reference material reads 8% high. Explain what these controls imply about contamination or calibration bias, what results should not yet be trusted, and what steps are needed before making a production decision.",
+    "intent": "Use blanks and reference materials to judge measurement reliability.",
+    "domain": "Applied Sciences - Laboratory Methods",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "metrology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A laboratory reactor is scaled from 5 L to 5,000 L by keeping the same fill fraction and nominal impeller tip speed. At production scale, the batch develops a 20°C internal temperature gradient and reaction time doubles. Explain why geometric scale-up does not preserve heat-transfer area-to-volume ratio, mixing time, mass transfer, or control dynamics, and propose measurements/pilot tests needed before changing chemistry.",
+    "intent": "Identify invalid linear scale-up assumptions across heat and mass transfer.",
+    "domain": "Applied Sciences - Scale-Up",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "scale_up",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "An MES reports 100% completion for a lot, but physical count shows 12 missing units and one machine's count signal is known to double-pulse occasionally. Explain why production records are not automatically physical truth, how to reconcile genealogy/count data with floor evidence, and what data-quality controls should be added.",
+    "intent": "Distinguish digital records from actual production state.",
+    "domain": "Digital & Data - MES",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A low-risk commodity fastener is used in thousands of assemblies, while a safety-critical machined component requires linkage to material heat, machine, operator, inspection, and rework history. Explain why traceability depth should differ by risk and purpose, and identify the minimum useful traceability elements for each case.",
+    "intent": "Select an appropriate level of manufacturing traceability.",
+    "domain": "Digital & Data - Traceability",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A digital twin predicts a furnace's energy use within 2% during steady production but performs poorly after maintenance changes burner tuning. Explain why model validity depends on current parameters and boundary conditions, and what revalidation or data-update steps are needed before using the twin for optimization.",
+    "intent": "Evaluate digital-twin usefulness and model drift.",
+    "domain": "Digital & Data - Digital Manufacturing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A CAM program produces a part that is shifted 6 mm in X but has correct feature-to-feature dimensions. Simulation looked correct. Explain how work offsets, coordinate systems, setup origin, fixture location, and program geometry could produce this result, and how to isolate the source before editing toolpaths.",
+    "intent": "Troubleshoot a CAD/CAM coordinate-system error.",
+    "domain": "Digital & Data - CAD/CAM",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A two-factor experiment varies molding temperature (low/high) and packing pressure (low/high). At low temperature, higher pressure reduces sink by 0.10 mm; at high temperature, higher pressure reduces sink by 0.35 mm. Explain what this pattern suggests about interaction and why an independent one-factor-at-a-time conclusion about pressure could be misleading.",
+    "intent": "Recognize a process interaction in a factorial experiment.",
+    "domain": "Digital & Data - Experimental Design",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A new cutting fluid is tested on Monday shift and the old fluid on night shift. Tool life improves 18% with the new fluid, but the shifts use different machines and operators. Explain the confounding problem and redesign the comparison using randomization, blocking, or crossover so that a causal conclusion is more defensible.",
+    "intent": "Identify confounding and improve experimental design.",
+    "domain": "Digital & Data - Experimental Design",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "Plant data show defect rate is strongly correlated with outside temperature. The same hot days also coincide with higher production volume and longer machine running hours. Explain why correlation does not identify the mechanism, name plausible confounders, and specify measurements or experiments that could separate ambient-temperature effects from production-load effects.",
+    "intent": "Avoid false causal inference from correlated production data.",
+    "domain": "Digital & Data - Industrial Analytics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "Average cycle time is unchanged at 52 s, but on-time delivery worsens. The 95th percentile cycle time rose from 68 s to 105 s while the median stayed near 49 s. Explain why the average hides tail behavior and how increased variability can create queues and delivery problems even when mean performance looks stable.",
+    "intent": "Interpret cycle-time distributions beyond averages.",
+    "domain": "Digital & Data - Industrial Analytics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A monthly downtime Pareto shows 42% of recorded downtime under 'minor stops,' 25% under 'material shortage,' 18% under 'maintenance,' and the rest split across other codes. Explain how to use the Pareto to prioritize investigation without assuming the largest category is already a root cause, and identify what further stratification would be useful.",
+    "intent": "Use downtime data to prioritize investigation without confusing category and cause.",
+    "domain": "Digital & Data - Industrial Analytics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "After a supplier change, defect rate rises. Management claims the supplier caused the problem because the dates coincide. However, the same week also introduced a new inspection gauge and a faster machine recipe. Supplier incoming measurements remain statistically similar to the old source. Evaluate the causal claim, identify competing explanations and measurement confounding, and design a safe evidence-gathering sequence.",
+    "intent": "Test a production root-cause claim against confounded changes.",
+    "domain": "Digital & Data - Root Cause Analytics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A hydraulic press has stopped with a worker reporting a jam near the die. System pressure is zero at the gauge, but an accumulator can store hydraulic energy and the ram is elevated. Explain the immediate hazard controls and why a zero pressure reading at one point does not prove all stored energy is dissipated. Do not propose bypassing guards or interlocks.",
+    "intent": "Recognize stored-energy hazards and establish a safe state before troubleshooting.",
+    "domain": "Safety & Sustainability - Manufacturing Safety",
+    "acuity": "critical",
+    "difficulty": 4,
+    "style": "safety_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A heated process vessel normally operates at 4 bar(g). The pressure trend is rising rapidly through 5.5 bar(g), the normal control valve is fully open trying to relieve the process load, and a separate high-pressure protection trip has activated. Production wants to reset and continue because product quality still looks acceptable. Explain the safe decision logic and why product conformance does not justify defeating or resetting protective functions without resolving the cause.",
+    "intent": "Prioritize independent protection and safe shutdown during abnormal pressure.",
+    "domain": "Safety & Sustainability - Process Safety",
+    "acuity": "critical",
+    "difficulty": 4,
+    "style": "safety_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "Operators report strong solvent odor after a local exhaust duct is damaged. The coating line is still producing acceptable finish. Explain why acceptable product quality does not establish safe exposure conditions, what immediate controls and exposure/ventilation checks are appropriate, and why production targets should not override hazard control.",
+    "intent": "Separate product quality from occupational process safety.",
+    "domain": "Safety & Sustainability - Chemical Safety",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "safety_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "An assembly task requires 30 N hand force, 18 reaches per minute, and repeated shoulder-level work for most of an 8-hour shift. Defects also rise near the end of the shift. Explain how force, repetition, posture, reach, and fatigue can interact, and propose workstation/process changes that reduce both ergonomic risk and error likelihood rather than blaming operators.",
+    "intent": "Apply ergonomics and human-factors reasoning to production design.",
+    "domain": "Safety & Sustainability - Ergonomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "safety_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A process consistently produces parts within dimensional specification, but operators must reach past an unguarded moving mechanism to clear occasional jams. Explain why product acceptance and process safety are separate criteria, and identify engineering changes that address the jam and exposure without treating personal caution as the primary safeguard.",
+    "intent": "Distinguish conforming product from safe manufacturing conditions.",
+    "domain": "Safety & Sustainability - Production Quality vs Safety",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "safety_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A 75 kW motor runs at an average electrical input of 60 kW for 4,000 h/year. A proposed process improvement reduces average input to 54 kW with unchanged output. Calculate annual energy savings in kWh. Then explain why peak demand, motor efficiency, and total system losses may still matter to the economic analysis.",
+    "intent": "Calculate manufacturing energy savings and distinguish power from energy.",
+    "domain": "Safety & Sustainability - Energy Efficiency",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A furnace exhaust contains usable heat, but recovering more heat would increase pressure drop and fan power and could lower exhaust temperature enough to cause condensation/corrosion. Explain why maximum heat recovery is not automatically optimal and what energy, materials, maintenance, and process constraints should be evaluated.",
+    "intent": "Evaluate a waste-heat recovery trade-off at system level.",
+    "domain": "Safety & Sustainability - Resource Efficiency",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A solvent-cleaning process has rising VOC emissions per finished unit even though total solvent purchase is unchanged. Production yield has fallen from 96% to 88% and rework uses additional cleaning. Explain how poor yield can worsen environmental intensity and identify prevention-oriented actions before adding end-of-pipe treatment.",
+    "intent": "Connect yield loss, rework, and environmental performance.",
+    "domain": "Safety & Sustainability - Environmental Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "After an emergency-stop circuit is repaired, the machine can be reset while a guard door remains open because the reset logic checks only the E-stop channel. Explain why reset logic must not create unexpected hazardous motion, why production control and safety functions must be distinguished, and what functional checks should be completed before return to service.",
+    "intent": "Reason about fail-safe reset and independent safety conditions.",
+    "domain": "Safety & Sustainability - Functional Safety",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "safety_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A conveyor emergency stop is being used routinely as the normal production stop because it is physically closest to the operator. Explain why normal control and emergency-stop functions should be distinct, what human-factors or control-layout issue this reveals, and what safer redesign or operating changes should be considered.",
+    "intent": "Distinguish emergency stopping from normal operational control.",
+    "domain": "Safety & Sustainability - Human Factors",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "safety_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "Process A has fixed tooling cost €30,000 and variable cost €18/part. Process B has fixed tooling cost €6,000 and variable cost €26/part. Calculate the break-even production volume. Then explain why tolerance capability, yield, lead time, maintenance, and investment risk can still change the preferred choice on either side of break-even.",
+    "intent": "Calculate break-even volume and interpret process-selection economics.",
+    "domain": "Manufacturing Management - Economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A part costs €42 to make internally, including €9 of allocated factory overhead that will remain even if production is outsourced. Avoidable internal material, labor, and machine costs total €33. A supplier offers €36 with equivalent stated quality but 6-week lead time. Explain the relevant-cost comparison and what capacity, quality, lead-time, IP, and supply-risk factors still matter.",
+    "intent": "Distinguish avoidable cost from sunk/allocated cost in make-vs-buy.",
+    "domain": "Manufacturing Management - Make vs Buy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "cost_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A plant needs 15% more output for the next 18 months. Options are overtime, a second shift, outsourcing, a new machine, or reducing changeover losses. Current bottleneck utilization is 92%, but 11% of its scheduled time is lost to changeovers. Explain what data should be gathered and how to compare temporary capacity actions with structural improvement before buying equipment.",
+    "intent": "Evaluate capacity expansion options using the actual constraint.",
+    "domain": "Manufacturing Management - Capacity Expansion",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A new product prototype passed dimensional inspection and functional testing on five hand-built units. Pilot production of 200 units then shows 6% rework, variable assembly time, and one supplier dimension near its limit. Explain why prototype success does not establish stable production capability and what NPI work is needed on tooling, work instructions, supplier readiness, inspection, and capacity.",
+    "intent": "Distinguish prototype success from production readiness.",
+    "domain": "Manufacturing Management - New Product Introduction",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A supplier certificate states material hardness is within specification, but incoming sampling finds a bimodal hardness distribution across lots and machining tool wear is erratic. Explain why documentation alone is not proof of a capable supplier process, and outline containment, verification, and supplier-corrective-action steps.",
+    "intent": "Evaluate supplier capability using data rather than documentation alone.",
+    "domain": "Manufacturing Management - Supplier Quality",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quality_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A new heat-treatment recipe produces one successful 100-part run with all measured parts conforming. Management declares the process validated. Explain why one run is insufficient evidence of repeatability and capability, and identify what installation/operation checks, repeated production evidence, critical-parameter control, and acceptance criteria should be demonstrated.",
+    "intent": "Distinguish a successful trial from process qualification/validation.",
+    "domain": "Manufacturing Management - Process Validation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quality_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A company can outsource a machined subassembly for 8% lower unit price, but the supplier has twice the lead time and only one qualified production site. Internal production is currently capacity-constrained. Explain the trade-offs among cost, capacity relief, resilience, quality control, flexibility, and working capital, and identify conditions under which either choice could be defensible.",
+    "intent": "Evaluate outsourcing without assuming the lowest unit price is best.",
+    "domain": "Manufacturing Management - Outsourcing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "An aging machine requires a €35,000 repair expected to restore 3 years of service with €12,000/year maintenance. A replacement costs €120,000, is expected to last 8 years, and reduces maintenance by €8,000/year while also saving €10,000/year in energy. Ignoring discounting and resale, compare the simple 3-year cash cost of repairing versus replacing over the same 3-year horizon, then discuss reliability, capacity, quality, and remaining life that the simple calculation omits.",
+    "intent": "Compare repair-versus-replace economics and nonfinancial constraints.",
+    "domain": "Manufacturing Management - Lifecycle Cost",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A complex titanium bracket is needed in quantities of 50, 500, or 5,000 per year. Additive manufacturing avoids dedicated forming tooling and can consolidate geometry, but requires support removal, stress relief, machining of interfaces, and inspection. Conventional machining has high material waste but mature tolerance control; forging plus machining has high tooling cost but favorable material utilization at volume. Build a decision framework across volume, tolerance, finish, material properties, lead time, yield, qualification, and lifecycle cost. Do not force a single winner for all volumes.",
+    "intent": "Synthesize technical and economic trade-offs among additive, machining, and forging.",
+    "domain": "Manufacturing Management - Manufacturing Decision",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A CNC-turned steel shaft gradually shifts 0.030 mm oversize over a shift while Ra surface roughness worsens from 1.2 to 2.4 µm. Machine coolant rises from 22°C to 31°C, tool flank wear increases, a reference master checked on the shop-floor gauge reads 0.008 mm high by shift end, and a cold-start geometry check the next morning is nominal. Analyze how tool wear, thermal growth, workholding, machine geometry, and measurement bias could each contribute; identify discriminating measurements; and propose a correction sequence that avoids changing multiple variables blindly.",
+    "intent": "Integrate machining, thermal, metrology, and troubleshooting evidence in a dimensional-drift diagnosis.",
+    "domain": "Manufacturing Management - Multi-Factor Troubleshooting",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  }
+]

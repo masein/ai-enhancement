@@ -1,0 +1,171 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the stated Design question, its users, context, objective, and requested task without substituting a different problem or drifting into unrelated implementation, marketing, or aesthetic commentary.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "design_accuracy",
+      "name": "Design accuracy",
+      "definition": "Applies sound design reasoning and does not make materially false claims about visual communication, interaction, usability, accessibility, product design, service design, research, evaluation, ethics, or sustainability.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual precision",
+      "definition": "Uses design concepts precisely and preserves important distinctions such as problem versus solution, goal versus task, affordance versus signifier, legibility versus readability, stated preference versus observed behavior, and prototype versus validated implementation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "problem_framing",
+      "name": "Problem framing",
+      "definition": "When relevant, identifies the underlying user or system problem, objectives, stakeholders, constraints, assumptions, unknowns, and success criteria instead of accepting a requested feature as the need by default.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "user_and_context_reasoning",
+      "name": "User and context reasoning",
+      "definition": "When relevant, reasons from users’ goals, tasks, capabilities, expertise, language, physical variation, environments, devices, interruptions, and other context-of-use factors rather than assuming one average user.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "design_research_reasoning",
+      "name": "Design research reasoning",
+      "definition": "When relevant, matches research methods to the question, distinguishes what people say from what they do, addresses sampling and moderation limits, and keeps claims proportional to the evidence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "information_architecture_reasoning",
+      "name": "Information architecture reasoning",
+      "definition": "When relevant, organizes content around user goals and mental models, uses understandable labels, supports navigation/search/browse and findability, and allows appropriate overlap or multiple schemes rather than forcing an incoherent taxonomy.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "visual_communication_reasoning",
+      "name": "Visual communication reasoning",
+      "definition": "When relevant, connects hierarchy, alignment, spacing, typography, contrast, color, imagery, grouping, and composition to attention, comprehension, scanning, meaning, legibility, and readability rather than subjective taste alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "interaction_and_usability_reasoning",
+      "name": "Interaction and usability reasoning",
+      "definition": "When relevant, reasons about controls, mappings, states, transitions, feedback, discoverability, learnability, efficiency, error prevention, error recovery, and user control across both happy paths and failure states.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "product_form_and_function_reasoning",
+      "name": "Product form and function reasoning",
+      "definition": "When relevant, integrates form, physical affordances, ergonomics, user variation, materials, durability, manufacturability, assembly, maintenance, safety, packaging, and lifecycle rather than optimizing appearance in isolation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "service_and_system_reasoning",
+      "name": "Service and system reasoning",
+      "definition": "When relevant, reasons across journeys, touchpoints, frontstage and backstage dependencies, handoffs, queues, channels, wayfinding, and failure recovery instead of optimizing one touchpoint at the expense of the end-to-end service.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "accessibility_and_inclusive_design",
+      "name": "Accessibility and inclusive design",
+      "definition": "When relevant, identifies and removes unnecessary barriers across perception, input, focus, reading order, labels, contrast, color use, cognition, language, device, environment, and physical variation while preserving the core task.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "prototyping_and_iteration",
+      "name": "Prototyping and iteration",
+      "definition": "When relevant, selects prototype form and fidelity according to what must be learned, recognizes prototype limitations, and proposes evidence-driven iteration rather than assuming higher fidelity or repeated redesign is inherently better.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evaluation_and_testing",
+      "name": "Evaluation and testing",
+      "definition": "When relevant, uses representative tasks and appropriate measures such as success, errors, time, assistance, comprehension, findability, and satisfaction, and does not count moderator rescue or a misaligned metric as proof of success.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "tradeoff_and_constraint_reasoning",
+      "name": "Trade-off and constraint reasoning",
+      "definition": "When relevant, explicitly incorporates constraints and competing objectives, explains trade-offs, avoids universal rules where context matters, and justifies choices against the stated design objective.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "sustainability_and_design_ethics",
+      "name": "Sustainability and design ethics",
+      "definition": "When relevant, considers user agency, informed choice, privacy, manipulation risk, vulnerable users, lifecycle impacts, durability, repairability, material use, reuse, and end-of-life without rewarding deceptive conversion or one-attribute sustainability claims.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_uncertainty",
+      "name": "Evidence and uncertainty",
+      "definition": "When relevant, separates observation from inference, identifies missing evidence and uncertainty, avoids fabricated research or unjustified causal claims, and proposes proportionate validation when conclusions remain uncertain.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the question and includes the major design factors needed for a useful answer, without requiring exhaustive discussion of irrelevant principles.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally coherent recommendations, terminology, assumptions, calculations, and rationale; later claims do not contradict earlier stated goals, constraints, or evidence.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the design reasoning in a clear, specific, organized, and actionable way, using terminology only where it helps explain mechanisms or decisions.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_design_error",
+    "condition": "A materially false central design, accessibility, interaction, research, usability, safety, product, service, ethics, sustainability, quantitative, or evaluation claim that fundamentally invalidates the answer or would lead to a seriously misleading or harmful design decision. Reasonable stylistic differences, defensible alternative solutions, minor terminology errors, small quantitative errors that do not change the conclusion, and cautious uncertainty are not critical.",
+    "effect": "score=0",
+    "examples": [
+      "Solving the requested feature instead of the explicitly evidenced underlying user problem in a way that invalidates the recommendation.",
+      "Hiding a critical system state where safety, irreversible loss, or consequential action depends on users understanding that state.",
+      "Removing necessary error recovery from a high-consequence workflow.",
+      "Relying exclusively on color for critical information despite an explicit color-vision accessibility requirement.",
+      "Claiming a design is accessible while ignoring an explicitly stated inability to operate it with a required input method.",
+      "Counting a usability task as successful when the moderator completed or directly instructed the decisive interaction.",
+      "Treating one participant's preference as established evidence about all users when that generalization drives the design decision.",
+      "Using a research method that cannot answer the stated research question and presenting its result as decisive evidence.",
+      "Making a major quantitative interpretation error that reverses the conclusion about user performance or task success.",
+      "Treating visual attractiveness as proof of usability despite explicit evidence that users cannot complete the task.",
+      "Removing essential information solely to achieve a minimalist appearance, causing the design to fail its stated task.",
+      "Claiming fewer clicks prove a better workflow when the redesign materially increases errors or cognitive burden.",
+      "Recommending an irreversible destructive action without appropriate warning, recovery, or confirmation in a high-risk context.",
+      "Fundamentally reversing the meanings of affordance and signifier in a way that causes the interaction problem to be misdiagnosed.",
+      "Designing only for an average physical user despite supplied anthropometric evidence showing substantial exclusion.",
+      "Recommending a physical design that clearly violates an explicit safety constraint supplied in the question.",
+      "Treating a high-fidelity prototype as validated implementation when core task structure remains untested.",
+      "Claiming an A/B metric proves overall design superiority when the metric is explicitly misaligned with the user goal.",
+      "Endorsing a deceptive pattern intended to trick users into a choice contrary to their stated interests.",
+      "Fabricating user research findings, usability results, constraints, or accessibility evidence required for the conclusion."
+    ]
+  }
+}

@@ -964,12 +964,18 @@ def _rubric_check(body: RubricIn) -> dict:
         else:
             problems.extend(_judge.validate_criteria(spec))
     else:
-        if "# Rubric" not in body.content:
-            problems.append("a rubric starts with a '# Rubric — <topic> (version N)' heading; "
-                            "the version is recorded in every judge.json")
+        # the author's shape, not ours: the 36 rubrics of the 37-topic exam
+        # open with '# <Topic> Evaluation Criteria' and anchor with '### 4 —
+        # Strong', and they grade. A heading and five anchors are what the
+        # judge needs; a version is recorded when there is one
+        if not re.search(r"^# \S", body.content, re.M):
+            problems.append("a rubric starts with a '# <title>' heading — DRAFT in it is how "
+                            "a rubric says it is not signed off yet")
         for anchor in range(5):
-            if f"**{anchor}**" not in body.content:
-                problems.append(f"no anchor for {anchor} — the 0-4 scale needs all five")
+            if not re.search(rf"\*\*{anchor}\*\*|^#{{1,6}}\s*{anchor}(?:\s|$)", body.content,
+                             re.M):
+                problems.append(f"no anchor for {anchor} (a '**{anchor}**' or a '### {anchor}' "
+                                f"heading) — the 0-4 scale needs all five")
     current = _judge.rubric_path(body.name, suffix)
     was = current.read_text(encoding="utf-8") if current else ""
     new_sha = hashlib.sha256(body.content.encode("utf-8")).hexdigest()
@@ -1739,9 +1745,9 @@ max-width:46em;padding:0 16px"><h1>No demo run yet</h1>
 <p>A demo run writes its own page here — its own exam bank, its own results tree, its own
 numbers, none of them on the leaderboard. Run one on the box:</p>
 <pre style="background:#f4f4f5;padding:12px;border-radius:6px;overflow:auto">cd $BENCH_ROOT &amp;&amp; python3 aienh/scripts/demo_loop.py \\
-    --topic "medicine &amp; health" \\
-    --import aienh/eval_tasks/fr/medicine_v2.json \\
-    --approver "Dr. Hossein" --model HuggingFaceTB/SmolLM2-360M-Instruct</pre>
+    --topic "Medicine &amp; Clinical Health" \\
+    --import aienh/eval_tasks/fr/banks/medicine_clinical_health_v1.json \\
+    --approver masein --model HuggingFaceTB/SmolLM2-360M-Instruct</pre>
 <p>It prints this URL when it finishes. See <code>DEMO.md</code> for the rest, including
 what a green run does not prove.</p>
 <p><a href="/">← the live dashboard</a></p></body></html>"""

@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "Two crackers have the same moisture content, but cracker A has a lower water activity than cracker B because more of its water is bound by solutes. Explain which cracker is generally less supportive of microbial growth and why moisture content alone cannot answer the question.",
+    "intent": "Distinguish water activity from moisture content and connect water availability to microbial growth.",
+    "domain": "Food Chemistry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "food_chemistry",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A manufacturer reformulates a sauce by lowering pH while keeping salt, packaging, and refrigeration unchanged. Explain how the pH change could alter microbial growth potential, protein behavior, flavor, and chemical stability, and identify why the effect is not determined by pH alone.",
+    "intent": "Reason across chemistry, microbiology, and product quality after an acidification change.",
+    "domain": "Food Chemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "food_chemistry",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "Bread becomes firmer during refrigerated storage even though it has not visibly dried. Explain how starch retrogradation can contribute to the texture change and distinguish that mechanism from simple moisture loss.",
+    "intent": "Explain starch retrogradation mechanistically and separate it from dehydration.",
+    "domain": "Food Chemistry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A powdered food develops rancid aromas during storage. The moisture content is low, but the product contains unsaturated fat and is exposed to oxygen and light. Explain the most plausible chemical deterioration pathway and how antioxidants or packaging could slow it.",
+    "intent": "Apply lipid-oxidation reasoning to shelf-life control.",
+    "domain": "Food Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "food_chemistry",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A dairy emulsion separates after a change in processing temperature. Explain how protein denaturation, interfacial stability, and viscosity could contribute to emulsion breakdown, and distinguish denaturation from protein hydrolysis.",
+    "intent": "Connect protein chemistry to emulsion stability and distinguish mechanisms.",
+    "domain": "Food Chemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "processing_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A baked product becomes darker and develops toasted aromas after a longer bake, despite no evidence of microbial growth. Compare Maillard browning and caramelization as explanations and state what compositional information would help distinguish their contributions.",
+    "intent": "Differentiate nonenzymatic browning pathways using composition and process conditions.",
+    "domain": "Food Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A fruit puree has pH 3.4. After addition of a weak-acid ingredient, a small amount of strong base is added and the pH changes very little. Explain what this suggests about buffering capacity and why pH alone does not measure the total amount of acid present.",
+    "intent": "Interpret buffering and distinguish pH from titratable acid capacity.",
+    "domain": "Food Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A frozen food retains most of its water but forms large ice crystals during slow freezing, damaging texture after thawing. Explain why freezing can preserve by reducing water mobility without eliminating all microorganisms, and why freezing rate affects texture.",
+    "intent": "Integrate phase behavior, preservation, and texture changes during freezing.",
+    "domain": "Food Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "processing_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A ready-to-eat food is mildly acidic, refrigerated, packaged with little oxygen, and has moderately reduced water activity. Explain why microbial growth should be assessed from the combination of hurdles rather than from any single factor.",
+    "intent": "Apply multiple-hurdle microbial ecology reasoning.",
+    "domain": "Food Microbiology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "food_microbiology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A food sample contains a high total microbial count but no detected pathogen in the tested portion. Explain why the result neither proves the food is unsafe nor proves the entire lot is pathogen-free.",
+    "intent": "Distinguish microbial load, pathogenicity, sampling, and detection limits.",
+    "domain": "Food Microbiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A cooked food is cooled very slowly through temperatures that permit rapid bacterial growth. Explain why spore-forming organisms can still create risk even when cooking killed most vegetative cells.",
+    "intent": "Reason about spores, survival, germination, and post-cook growth.",
+    "domain": "Food Microbiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "food_microbiology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A fermented vegetable reaches a stable low pH because acid-producing microbes dominate. Explain how competition, acidification, salt, and temperature can jointly shape the microbial community, and why fermentation organisms should not automatically be treated as pathogens.",
+    "intent": "Explain microbial ecology in fermentation and distinguish beneficial from pathogenic organisms.",
+    "domain": "Food Microbiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "food_microbiology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A sanitation program repeatedly removes free-floating bacteria from a processing line, yet contamination recurs from the same equipment niche. Explain how a biofilm could account for this pattern and why cleaning must precede effective disinfection when organic material is present.",
+    "intent": "Apply biofilm and sanitation principles to recurrent contamination.",
+    "domain": "Food Microbiology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A refrigerated ready-to-eat product shows no odor, slime, or discoloration. Explain why this observation is insufficient to conclude that the product is microbiologically safe.",
+    "intent": "Distinguish sensory spoilage from pathogen presence.",
+    "domain": "Food Microbiology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "food_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A heat treatment reduces a target microorganism by 5 log10 units. If the starting level is 1,000,000 cells per unit, calculate the expected average survivor level under the idealized log-reduction model and explain why real-process variability still matters.",
+    "intent": "Calculate a microbial log reduction and interpret process variability.",
+    "domain": "Food Microbiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "Two organisms experience the same heating process, but organism X has a larger D-value at that temperature than organism Y. Without using any organism names, explain which organism is more heat resistant and how that affects expected survival.",
+    "intent": "Interpret D-values conceptually.",
+    "domain": "Food Microbiology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A batch of cooked rice is left warm for several hours, then reheated until steaming. Explain why reheating may not fully remove the risk if a heat-stable toxin formed during the holding period, and distinguish foodborne intoxication from infection.",
+    "intent": "Distinguish infection from preformed-toxin intoxication and identify the control point.",
+    "domain": "Food Safety / HACCP",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "food_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "Raw poultry juices drip onto a salad that will receive no further cooking. Identify the hazard pathway, the exposure route, and the most effective type of control, and explain why later cooking of the poultry does not protect the salad.",
+    "intent": "Analyze cross-contamination and prevention of post-process exposure.",
+    "domain": "Food Safety / HACCP",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "food_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A severe toxin is present only in a sealed, inaccessible laboratory vial, while a milder contaminant is widespread in a frequently eaten food. Explain how the hazard and risk can differ in these two cases.",
+    "intent": "Distinguish hazard severity from exposure-dependent risk.",
+    "domain": "Food Safety / HACCP",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A ready-to-eat food has a control step that reliably prevents allergen cross-contact. A manager proposes calling every subsequent inspection point a critical control point. Explain why not every step should be labeled critical and what makes a point genuinely critical in a HACCP-style system.",
+    "intent": "Distinguish critical control points from general monitoring and prerequisite controls.",
+    "domain": "Food Safety / HACCP",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "food_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "At a thermal control step, a monitored critical limit is missed for part of a batch. Describe the logical sequence of containment, product disposition, root-cause correction, documentation, and verification that should follow, without relying on jurisdiction-specific rules.",
+    "intent": "Apply corrective-action and verification reasoning after a process deviation.",
+    "domain": "Food Safety / HACCP",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "practical_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A company has validated that a heating step can control the target hazard under defined conditions, but operators do not consistently record time and temperature. Distinguish validation from routine monitoring and verification, and explain what evidence each provides.",
+    "intent": "Differentiate validation, monitoring, and verification.",
+    "domain": "Food Safety / HACCP",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A food contains a pathogen at a very low average concentration that is unevenly distributed. A single sample tests negative. Explain why the negative result does not establish absence from the lot and what sampling or process evidence would strengthen confidence.",
+    "intent": "Interpret negative microbiological testing under heterogeneous contamination.",
+    "domain": "Food Safety / HACCP",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "diagnostic_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A cafeteria outbreak includes vomiting beginning 3 hours after a shared meal in many people, while another group develops diarrhea and fever 36 hours later after eating a different item. Explain how incubation pattern can help distinguish toxin-mediated illness from infection without claiming that timing alone proves the cause.",
+    "intent": "Use incubation and symptom pattern to compare outbreak mechanisms while preserving uncertainty.",
+    "domain": "Food Safety / HACCP",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "outbreak_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A cleaning chemical is accidentally over-concentrated on a food-contact surface and residue remains before production resumes. Classify the primary hazard type, explain the exposure pathway, and identify why absence of microorganisms would not resolve the safety concern.",
+    "intent": "Recognize a chemical food-safety hazard and its exposure route.",
+    "domain": "Food Safety / HACCP",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "food_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A metal fragment detector is installed after slicing, while upstream equipment damage can generate fragments. Explain the difference between preventing fragment generation and detecting fragments, and discuss what evidence would be needed to judge whether the detector is an adequate control.",
+    "intent": "Analyze a physical-hazard control as prevention versus detection.",
+    "domain": "Food Safety / HACCP",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A liquid food receives a pasteurization process that substantially reduces vegetative pathogens but is not designed to destroy all spores. Explain why calling the product sterile would be incorrect and what additional controls may still be needed.",
+    "intent": "Distinguish pasteurization from sterilization and identify residual hazards.",
+    "domain": "Food Processing / Preservation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "processing_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A manufacturer can use either a higher-temperature shorter-time process or a lower-temperature longer-time process that provides similar target lethality. Explain why product quality and nutrient retention may differ even when microbial lethality is comparable.",
+    "intent": "Reason about equivalent lethality and quality trade-offs.",
+    "domain": "Food Processing / Preservation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "At a fixed temperature, a target organism has a D-value of 2 minutes. A food contains 10^7 target cells at the cold spot before heating. Under the idealized decimal-reduction model, how long is required for a 6-log reduction, and what expected level remains at the cold spot?",
+    "intent": "Use D-value kinetics to calculate process time and survivor level.",
+    "domain": "Food Processing / Preservation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A retort process is satisfactory near the container wall but under-processes the geometric center. Explain why the cold spot governs safety validation and how heat-transfer differences can produce this pattern.",
+    "intent": "Connect heat transfer, cold spots, and process validation.",
+    "domain": "Food Processing / Preservation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "processing_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A shelf-stable product is reformulated with less salt and a higher pH while the thermal process remains unchanged. Explain why the old process validation may no longer be sufficient even if packaging is unchanged.",
+    "intent": "Identify how formulation changes can invalidate preservation assumptions.",
+    "domain": "Food Processing / Preservation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A dried food absorbs moisture during humid storage but still looks acceptable. Explain how increased water activity can shorten shelf life and alter microbial risk even if total composition has changed only slightly.",
+    "intent": "Connect packaging failure, water activity, shelf life, and safety.",
+    "domain": "Food Processing / Preservation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A vacuum-packaged chilled food has extended sensory shelf life. Explain why reduced oxygen may suppress some spoilage organisms yet not guarantee safety, and identify other hurdles that still matter.",
+    "intent": "Evaluate modified atmosphere as one component of hurdle preservation.",
+    "domain": "Food Processing / Preservation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "food_microbiology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A fruit beverage is preserved by mild heating plus acidification. A proposal would reduce heating intensity to improve flavor. Describe how you would evaluate whether the new combination still controls the target hazard, including the roles of pH, time, temperature, and validation data.",
+    "intent": "Balance quality and microbial safety in a multi-hurdle process redesign.",
+    "domain": "Food Processing / Preservation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "practical_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A high-pressure process greatly reduces vegetative microorganisms but has limited effect on some spores under the chosen conditions. Explain why refrigerated storage or other hurdles may still be necessary and why the process should not be described as universally sterilizing.",
+    "intent": "Interpret a nonthermal preservation process and residual risk.",
+    "domain": "Food Processing / Preservation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "processing_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A process engineer estimates that a heating step should deliver 7 log reductions, but temperature records show intermittent drops and a colder-than-expected product zone. Explain how you would reason about actual lethality, uncertainty, and whether the affected lot can be assumed safe.",
+    "intent": "Integrate thermal kinetics, process records, cold spots, and uncertainty after deviation.",
+    "domain": "Food Processing / Preservation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "In a blinded triangle sensory test, panelists receive three coded samples and must identify the odd sample. Explain what this test can show and why it does not directly measure which product consumers prefer.",
+    "intent": "Distinguish analytical discrimination from hedonic preference.",
+    "domain": "Food Quality / Sensory",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quality_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A sensory panel always evaluates sample A before sample B and reports stronger flavor for B. Identify possible order and adaptation effects and explain how randomization or counterbalancing could improve the design.",
+    "intent": "Identify sensory-study bias and propose better experimental control.",
+    "domain": "Food Quality / Sensory",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A crisp snack has excellent initial texture but rapidly loses crispness after opening. Explain how moisture migration and package barrier properties can drive the quality change, and distinguish this from evidence of microbiological danger.",
+    "intent": "Connect moisture transfer to texture while separating quality from safety.",
+    "domain": "Food Quality / Sensory",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quality_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "Two foods provide the same energy per serving, but one contains more vitamins, minerals, and fiber. Explain why equal calorie content does not imply equal nutrient density and why nutrient density does not by itself determine a universally 'healthy' choice.",
+    "intent": "Distinguish energy density, nutrient density, and context-dependent dietary interpretation.",
+    "domain": "Food Nutrition / Composition",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "nutrition_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A fortified cereal contains a large amount of an added mineral, but the meal also contains compounds that reduce absorption. Explain why nutrient content on paper can differ from bioavailable nutrient intake.",
+    "intent": "Distinguish nutrient content from bioavailability.",
+    "domain": "Food Nutrition / Composition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "nutrition_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A food-processing study reports a statistically significant 2% decrease in vitamin concentration after a new process. Explain what additional information is needed to judge biological or practical importance.",
+    "intent": "Distinguish statistical significance from practical nutritional importance.",
+    "domain": "Food Nutrition / Composition",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "During conversion of muscle to meat, pH decline and rigor development affect water-holding capacity and tenderness. Explain why unusually rapid or slow postmortem biochemical change can alter meat quality without implying a foodborne infection.",
+    "intent": "Relate postmortem biochemistry to meat quality and distinguish quality from safety.",
+    "domain": "Animal-Product Science",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quality_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "Bulk-tank milk from a farm shows a sustained increase in somatic cell count and reduced shelf-life performance. Explain how udder inflammation can affect milk quality, while also noting why the bulk-tank indicator alone does not identify the exact cause in each cow.",
+    "intent": "Connect mastitis-related herd indicators to milk quality while preserving diagnostic uncertainty.",
+    "domain": "Animal-Product Science",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "herd_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A flock produces more cracked eggs after a housing and nutrition change. Explain how shell quality, handling, mineral nutrition, bird health, and storage can interact, and why cracked shells matter for both product quality and microbial exposure.",
+    "intent": "Integrate production, nutrition, physical quality, and food-safety consequences.",
+    "domain": "Animal-Product Science",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "Stored feed becomes warm and damp, develops visible mold, and is less palatable. Explain how moisture can promote fungal growth, nutrient degradation, and mycotoxin risk, and why visible mold intensity is not a precise measure of toxin concentration.",
+    "intent": "Link feed storage conditions to spoilage, toxin risk, and uncertainty.",
+    "domain": "Feed Safety",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A dehydrated dog has tachycardia, weak pulses, prolonged capillary refill, and reduced urine production. Explain how reduced circulating volume can connect the cardiovascular and renal findings, and identify which findings suggest impaired perfusion rather than a specific diagnosis.",
+    "intent": "Use integrated cardiovascular and renal physiology to interpret dehydration findings.",
+    "domain": "Veterinary Anatomy / Physiology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "clinical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A horse exercising in hot humid conditions has rising body temperature despite sweating. Explain how heat production, evaporative cooling, humidity, and dehydration interact to impair thermoregulation.",
+    "intent": "Apply thermoregulatory physiology in a species-specific scenario.",
+    "domain": "Veterinary Anatomy / Physiology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "clinical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A ruminant develops a sustained fall in rumen pH after a sudden increase in rapidly fermentable concentrate. Explain how fermentation rate, volatile fatty acid production, buffering, intake behavior, and fiber digestion can interact.",
+    "intent": "Explain ruminal acidosis risk mechanistically without reducing it to one feed variable.",
+    "domain": "Veterinary Anatomy / Physiology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "nutrition_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A cat has persistent vomiting and cannot maintain water intake. Explain how gastrointestinal losses can alter extracellular fluid volume and acid-base status, and why the exact acid-base pattern depends on what is lost and on renal compensation.",
+    "intent": "Reason about fluid and acid-base consequences without overclaiming a single pattern.",
+    "domain": "Veterinary Anatomy / Physiology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A dairy cow in early lactation mobilizes large amounts of body fat because energy demand exceeds intake. Explain how negative energy balance can affect metabolism, body condition, and disease susceptibility without assuming every thin cow has the same disorder.",
+    "intent": "Integrate endocrine-metabolic physiology with production stage and disease risk.",
+    "domain": "Veterinary Anatomy / Physiology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "clinical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A dog presents with acute abdominal distension, repeated unproductive retching, weakness, and pale mucous membranes. Identify the immediate priorities, explain why this is high acuity, and distinguish stabilization priorities from confirmation of the underlying diagnosis.",
+    "intent": "Recognize an abdominal emergency and prioritize immediate threats before definitive diagnosis.",
+    "domain": "Veterinary Clinical Reasoning",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "clinical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "An older cat has weight loss despite a good appetite, increased thirst, and intermittent vomiting. Construct a problem list and a prioritized differential diagnosis, then identify initial tests that would most efficiently narrow the possibilities.",
+    "intent": "Build a differential from nonspecific signs and choose discriminating tests.",
+    "domain": "Veterinary Clinical Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "differential_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A horse has sudden severe colic, sweating, repeated rolling, and increasing heart rate. Explain which features increase urgency, what broad differential categories should be considered, and what information would change the next decision.",
+    "intent": "Prioritize severe colic while maintaining a broad differential.",
+    "domain": "Veterinary Clinical Reasoning",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "clinical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A cow shortly after calving is weak and recumbent. Explain why metabolic, neurologic, traumatic, infectious, and toxic causes may all need consideration, and identify the history and examination findings that would help separate them.",
+    "intent": "Avoid premature closure in a common production-animal presentation.",
+    "domain": "Veterinary Clinical Reasoning",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "differential_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A puppy has vomiting and diarrhea with moderate dehydration. A rapid screening test is negative for one important infectious cause. Explain why the result may reduce but not eliminate that diagnosis and what pre-test probability and test sensitivity contribute to interpretation.",
+    "intent": "Interpret a negative screening test in clinical context.",
+    "domain": "Veterinary Diagnostics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "diagnostic_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "In a population with 1% disease prevalence, a screening test has 95% sensitivity and 90% specificity. In 10,000 animals, calculate the expected true positives, false negatives, false positives, and true negatives, then explain why many positive results may be false positives.",
+    "intent": "Compute a diagnostic 2x2 table and interpret predictive value in low prevalence.",
+    "domain": "Veterinary Diagnostics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A herd-level screening test becomes positive in several animals, but individual confirmatory testing is pending. Explain why a screening result should not be treated as definitive proof of disease and how herd prevalence affects interpretation.",
+    "intent": "Distinguish screening from confirmation and incorporate prevalence.",
+    "domain": "Veterinary Diagnostics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "diagnostic_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A dog has anemia on a complete blood count. The reticulocyte response is low. Explain how this finding changes the differential between regenerative loss/destruction and reduced red-cell production, while identifying what additional data are still needed.",
+    "intent": "Use hematologic pattern recognition to refine but not close a differential.",
+    "domain": "Veterinary Diagnostics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "diagnostic_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A cat has azotemia and concentrated urine on one visit, then persistent azotemia with poorly concentrated urine after rehydration. Explain how serial hydration status and urine concentration alter interpretation of pre-renal versus renal contributions.",
+    "intent": "Interpret chemistry and urinalysis dynamically rather than from one result.",
+    "domain": "Veterinary Diagnostics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A horse with respiratory signs has a PCR-positive nasal swab for a pathogen that can be shed by infected animals. Explain what the result establishes, what it does not establish about disease causation or infectiousness at that moment, and what context matters.",
+    "intent": "Interpret molecular detection in relation to infection, shedding, and clinical disease.",
+    "domain": "Veterinary Diagnostics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "diagnostic_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Two diagnostic tests conflict: a highly sensitive screening assay is positive, but a highly specific confirmatory assay is negative in an animal with low pre-test probability. Explain several plausible reasons for the discordance and how you would update confidence without forcing certainty.",
+    "intent": "Reconcile conflicting diagnostic results using test characteristics and pre-test probability.",
+    "domain": "Veterinary Diagnostics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A respiratory disease spreads through a calf group after several purchased calves are introduced. Explain how incubation, asymptomatic shedding, mixing stress, stocking density, and ventilation could jointly contribute to transmission.",
+    "intent": "Integrate host, environment, and transmission factors in a group outbreak.",
+    "domain": "Veterinary Infectious Disease / Parasitology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "herd_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A flock has a parasite with an environmental stage that survives on pasture. Explain how treatment of infected animals alone may fail to stop transmission and identify management points that could interrupt the life cycle.",
+    "intent": "Apply parasite life-cycle reasoning to control.",
+    "domain": "Veterinary Infectious Disease / Parasitology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "biosecurity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A parasite requires an intermediate host before becoming infective to the definitive host. Explain why controlling the intermediate host or preventing contact with it can reduce transmission, and why direct animal-to-animal isolation may be insufficient.",
+    "intent": "Reason from an indirect parasite life cycle to intervention points.",
+    "domain": "Veterinary Infectious Disease / Parasitology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "After repeated use of the same antiparasitic class, treatment efficacy appears to decline across a flock. Explain how selection for resistant parasites can occur and what evidence would be needed before concluding that resistance, rather than dosing or administration error, is responsible.",
+    "intent": "Distinguish true antiparasitic resistance from treatment failure due to other causes.",
+    "domain": "Veterinary Infectious Disease / Parasitology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A multi-animal viral outbreak shows new clinical cases even after obviously sick animals are isolated. Explain how preclinical shedding, incubation periods, shared equipment, and personnel movement could account for continued transmission.",
+    "intent": "Analyze continued outbreak spread despite isolation of clinical cases.",
+    "domain": "Veterinary Infectious Disease / Parasitology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "biosecurity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A zoonotic enteric organism is detected in some animals on a farm, but most carriers have no signs. Explain why asymptomatic carriage can still matter for occupational and food-chain exposure without implying that every exposed person will become ill.",
+    "intent": "Connect carrier states, shedding, exposure, and zoonotic risk.",
+    "domain": "Veterinary Infectious Disease / Parasitology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "one_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A veterinary drug is supplied at 50 mg/mL. A treatment protocol in the question specifies a dose of 5 mg/kg for a 20 kg dog. Calculate the required milligrams and volume, showing dimensional consistency. Do not add any dosing recommendation beyond the supplied protocol.",
+    "intent": "Perform a bounded veterinary dose-and-volume calculation using supplied data only.",
+    "domain": "Veterinary Pharmacology / Toxicology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "Two regimens deliver the same total daily milligrams but at different dosing intervals. Explain why equal daily dose does not guarantee equal peak and trough concentrations, efficacy, or toxicity.",
+    "intent": "Distinguish dose from dosing interval using pharmacokinetic reasoning.",
+    "domain": "Veterinary Pharmacology / Toxicology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "pharmacology_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A food-producing animal finishes a drug course today. Explain why residues do not instantly disappear, why pharmacologic half-life is not interchangeable with a legal withdrawal period, and why product, species, route, and context matter.",
+    "intent": "Explain tissue depletion and withdrawal concepts without inventing current legal times.",
+    "domain": "Veterinary Pharmacology / Toxicology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "pharmacology_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A dog is exposed to a household toxicant. The amount ingested is uncertain, the timing may have been 1-4 hours ago, and mild neurologic signs are present. Explain which exposure variables most affect risk assessment and why 'natural' or 'household' origin does not establish safety.",
+    "intent": "Structure an acute toxicology assessment under uncertain exposure.",
+    "domain": "Veterinary Pharmacology / Toxicology",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "toxicology_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "Two cattle consume the same concentration of a toxicant in feed, but one eats twice as much feed per kilogram of body weight. Explain why concentration alone is insufficient and how total dose per body weight changes toxicologic risk.",
+    "intent": "Distinguish concentration from dose in feed toxicology.",
+    "domain": "Veterinary Pharmacology / Toxicology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A herd shows poor response to an antimicrobial. Explain why treatment failure alone does not prove antimicrobial resistance and list the categories of evidence needed to distinguish resistance from wrong diagnosis, poor drug delivery, inadequate exposure, or severe disease.",
+    "intent": "Analyze antimicrobial treatment failure without prematurely attributing resistance.",
+    "domain": "Veterinary Pharmacology / Toxicology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "pharmacology_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A growing pig eats 2.4 kg of feed per day and gains 0.8 kg per day. Calculate feed conversion ratio as feed intake divided by weight gain, and explain what a lower ratio would generally mean if health and carcass quality were otherwise comparable.",
+    "intent": "Calculate and interpret a production feed-conversion metric.",
+    "domain": "Animal Nutrition / Ruminant / Reproduction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A lactating dairy ration is reformulated with more rapidly fermentable carbohydrate and less effective fiber. Explain the expected effects on chewing, saliva buffering, rumen pH, fiber digestion, and risk of subacute ruminal acidosis.",
+    "intent": "Integrate ration composition with rumen physiology and health trade-offs.",
+    "domain": "Animal Nutrition / Ruminant / Reproduction",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "nutrition_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "Two feeds contain the same crude protein percentage, but one has lower digestibility and an imbalanced amino-acid profile for a monogastric species. Explain why equal crude protein does not imply equal usable protein value.",
+    "intent": "Distinguish crude nutrient content from digestibility and amino-acid adequacy.",
+    "domain": "Animal Nutrition / Ruminant / Reproduction",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "nutrition_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A group of laying hens reduces feed intake during hot weather while nutrient concentrations in the diet stay unchanged. Explain why total daily nutrient intake may fall and how this can affect production and health.",
+    "intent": "Connect environmental stress, intake, nutrient supply, and production.",
+    "domain": "Animal Nutrition / Ruminant / Reproduction",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "nutrition_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A beef ration is 60% ingredient A and 40% ingredient B on a dry-matter basis. Ingredient A contains 12% crude protein and B contains 20%. Calculate the ration crude-protein percentage on the same basis.",
+    "intent": "Perform a weighted-average ration calculation with consistent basis.",
+    "domain": "Animal Nutrition / Ruminant / Reproduction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A dairy herd's conception rate falls while heat stress, body-condition loss, and uterine disease all increase. Explain why reproductive performance should be investigated as a multi-factor problem rather than attributed to a single cause.",
+    "intent": "Integrate environment, nutrition, and disease in reproductive performance.",
+    "domain": "Animal Nutrition / Ruminant / Reproduction",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "herd_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "In a calf group, many neonates become ill during the first two weeks of life. Records show delayed colostrum feeding, crowded pens, cold weather, and inconsistent sanitation. Explain how passive transfer, thermoregulation, pathogen exposure, and management can interact.",
+    "intent": "Analyze interacting causes of neonatal morbidity at herd level.",
+    "domain": "Animal Nutrition / Ruminant / Reproduction",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "herd_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A lamb weighs 4.0 kg at birth and 12.4 kg at 28 days. Calculate average daily gain in kg/day and explain why growth rate should be interpreted alongside health, milk access, litter size, and starting weight.",
+    "intent": "Calculate growth rate and place it in biological context.",
+    "domain": "Animal Nutrition / Ruminant / Reproduction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A high-producing dairy herd has low lameness treatment rates but frequent short steps, hock lesions, long standing times, and reduced lying behavior. Explain why productivity and recorded treatment counts alone are insufficient to conclude that welfare is good.",
+    "intent": "Use multiple welfare indicators rather than productivity alone.",
+    "domain": "Animal Health / Production / Welfare",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "welfare_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "Pigs in barren pens show repetitive oral behaviors and increased aggression despite normal growth rates. Explain how behavior can reveal welfare problems that are not captured by productivity or absence of overt disease.",
+    "intent": "Connect abnormal behavior, environment, and welfare.",
+    "domain": "Animal Health / Production / Welfare",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "welfare_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A broiler farm reduces stocking density, but respiratory disease remains high. Explain why ventilation, litter moisture, pathogen pressure, vaccination, and biosecurity may still need investigation rather than assuming density was the sole cause.",
+    "intent": "Analyze a production-health problem with multiple management determinants.",
+    "domain": "Animal Health / Production / Welfare",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "herd_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A farm introduces new goats directly into the resident herd because they appear healthy. Explain why visual health does not eliminate infectious risk and how quarantine, testing strategy, movement control, and source history can reduce introduction risk.",
+    "intent": "Apply external biosecurity principles to animal introduction.",
+    "domain": "Animal Health / Production / Welfare",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "biosecurity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "Fish in an aquaculture tank gather near the surface and feed poorly after a warm night. Dissolved oxygen is low and stocking density is high. Explain how temperature, oxygen solubility, metabolic demand, and density can interact to produce the signs.",
+    "intent": "Connect aquatic environmental conditions to fish health.",
+    "domain": "Animal Health / Production / Welfare",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A pasture-based system has lower stocking density than a housed system but greater wildlife contact and parasite exposure. Explain why neither production system is universally superior for health or welfare and identify the context-dependent trade-offs.",
+    "intent": "Compare production systems without assuming a universal winner.",
+    "domain": "Animal Health / Production / Welfare",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A wildlife population increasingly uses feed stores and water sources near livestock facilities. Explain how shared resources can create bidirectional spillover or spillback pathways and what types of surveillance could clarify the interface.",
+    "intent": "Apply disease-ecology reasoning at a wildlife-livestock interface.",
+    "domain": "Animal Health / Production / Welfare",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "one_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "During transport, animals experience long duration, crowding, heat, and limited water. Explain how these stressors can affect welfare, dehydration, injury risk, immune function, and subsequent disease susceptibility.",
+    "intent": "Integrate transport stress, physiology, disease risk, and welfare.",
+    "domain": "Animal Health / Production / Welfare",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "welfare_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "In a herd of 500 cattle, 50 new cases of a disease occur during a month among 400 animals initially at risk. Calculate the cumulative incidence for that month using the appropriate denominator, and explain why dividing by all 500 cattle would answer a different question.",
+    "intent": "Calculate incidence and justify the denominator.",
+    "domain": "Population Health / One Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "On one day, 80 of 1,000 birds in a flock are currently affected by a condition. During the next week, 30 new cases occur among birds that were not affected at the start. Distinguish the point prevalence on day 1 from the subsequent incidence proportion.",
+    "intent": "Differentiate prevalence from incidence using supplied counts.",
+    "domain": "Population Health / One Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "On Farm A, 40 of 200 exposed calves develop disease; on Farm B, 10 of 200 exposed calves develop disease. Calculate the risk ratio for Farm A versus Farm B and explain why the association does not by itself prove the exposure caused disease.",
+    "intent": "Calculate and interpret a relative risk while preserving causal caution.",
+    "domain": "Population Health / One Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "At a banquet, 60 of 80 people who ate dish X became ill, compared with 15 of 75 who did not eat dish X. Calculate both attack rates and the risk ratio, then explain why the result supports but does not by itself prove dish X as the source.",
+    "intent": "Use outbreak attack rates and relative risk to evaluate a suspected food vehicle.",
+    "domain": "Population Health / One Health",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "outbreak_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "Three neighboring farms develop similar respiratory disease after animals from one market were distributed among them. Design an initial multi-farm investigation that addresses case definition, movement history, sampling, common exposures, alternative hypotheses, and immediate control measures.",
+    "intent": "Plan a structured multi-farm outbreak investigation without premature causal closure.",
+    "domain": "Population Health / One Health",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "outbreak_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A farm reduces antimicrobial use after improving vaccination, housing, and biosecurity, while disease incidence remains stable. Explain how these changes could reduce selection pressure without implying that zero antimicrobial use or zero disease risk is required.",
+    "intent": "Connect infection prevention, antimicrobial use, selection pressure, and stewardship.",
+    "domain": "Population Health / One Health",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "one_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A dairy farm has rising mastitis incidence, increased antimicrobial use, higher bulk-tank somatic cell counts, and more discarded milk. Explain how animal health, milk quality, antimicrobial resistance risk, management, economics, and food-chain considerations interact.",
+    "intent": "Integrate herd health, product quality, stewardship, and food-system effects.",
+    "domain": "Population Health / One Health",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "one_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A foodborne organism is detected in livestock, in runoff near the farm, and in some human cases, but the available genetic data cannot resolve direction of transmission. Explain which animal, food, human, and environmental pathways should be investigated and how uncertainty should be communicated.",
+    "intent": "Trace plausible One Health pathways without overstating directionality.",
+    "domain": "Population Health / One Health",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "one_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A new herd screening program finds many positives in a region where true disease prevalence is believed to be very low. Explain how false positives, confirmatory testing, sampling strategy, and the consequences of unnecessary culling should be considered in program design.",
+    "intent": "Integrate diagnostic-test performance with population-level decision consequences.",
+    "domain": "Population Health / One Health",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "practical_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A proposed intervention would reduce livestock infection by restricting wildlife access to feed and water, but it may alter wildlife movement and concentrate animals at other sites. Evaluate the intervention using animal health, food safety, environmental, welfare, and One Health considerations, including uncertainties and possible unintended effects.",
+    "intent": "Evaluate a cross-system intervention with competing animal, human, and environmental outcomes.",
+    "domain": "Population Health / One Health",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "one_health",
+    "jurisdiction_required": false
+  }
+]

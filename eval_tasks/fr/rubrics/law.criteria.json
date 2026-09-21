@@ -1,156 +1,188 @@
 {
-  "topic": "law",
-  "weights": "equal",
+  "benchmark": "Law",
+  "scale": {
+    "min": 0,
+    "max": 4
+  },
   "criteria": [
     {
       "id": "relevance",
-      "definition": "Whether the answer directly addresses the user's actual legal question and circumstances without substantial irrelevant material.",
-      "weight": 1.0,
+      "name": "Relevance",
+      "definition": "Directly addresses the legal question asked, prioritizes legally material issues, and avoids tangents or indiscriminate issue dumping.",
+      "weight": 0.05,
       "conditional": false
     },
     {
       "id": "legal_accuracy",
-      "definition": "Whether the legal propositions stated are correct, including definitions, rules, exceptions, and conclusions.",
-      "weight": 1.0,
+      "name": "Legal Accuracy",
+      "definition": "States and applies the governing legal principles accurately, does not invent law, and avoids material doctrinal, procedural, evidentiary, or interpretive error.",
+      "weight": 0.05,
       "conditional": false
     },
     {
-      "id": "jurisdiction_awareness",
-      "definition": "Whether the answer recognizes when the applicable law depends on jurisdiction and avoids presenting jurisdiction-specific rules as universal.",
-      "weight": 1.0,
-      "conditional": false
+      "id": "jurisdiction_and_authority",
+      "name": "Jurisdiction and Authority",
+      "definition": "When jurisdiction or authority hierarchy matters, identifies the governing system, distinguishes binding from persuasive or secondary authority, and does not import unsupported rules from another jurisdiction.",
+      "weight": 0.05,
+      "conditional": true
     },
     {
-      "id": "applicability",
-      "definition": "Whether the answer correctly connects the relevant legal rule to the facts actually supplied by the user.",
-      "weight": 1.0,
-      "conditional": false
+      "id": "issue_spotting",
+      "name": "Issue Spotting",
+      "definition": "Identifies and prioritizes the material legal issues, threshold questions, defenses, procedural barriers, and secondary issues raised by the facts without listing remote doctrines.",
+      "weight": 0.05,
+      "conditional": true
     },
     {
-      "id": "fact_sensitivity",
-      "definition": "Whether the answer identifies missing or material facts that could change the legal analysis or outcome.",
-      "weight": 1.0,
-      "conditional": false
+      "id": "rule_identification",
+      "name": "Rule Identification",
+      "definition": "Identifies the correct supplied or otherwise applicable legal rule, framework, elements, factors, exceptions, and burdens necessary to answer the question.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "application_to_facts",
+      "name": "Application to Facts",
+      "definition": "Connects specific facts to each relevant legal requirement, explains supporting and contrary facts, and does not replace application with conclusory labels.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "statutory_interpretation",
+      "name": "Statutory Interpretation",
+      "definition": "When statutory or regulatory text is at issue, uses the actual text, defined terms, grammar, context, structure, exceptions, cross-references, and genuine ambiguity without inventing language.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "precedent_reasoning",
+      "name": "Precedent Reasoning",
+      "definition": "When cases matter, identifies the holding and material facts, distinguishes dicta, assesses hierarchy and procedural posture, and reasons carefully by analogy or distinction.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "procedural_reasoning",
+      "name": "Procedural Reasoning",
+      "definition": "Applies the standard appropriate to the current procedural stage, respects the roles of judge and factfinder, and correctly handles jurisdiction, timing, preservation, or review where relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "element_and_defense_analysis",
+      "name": "Element and Defense Analysis",
+      "definition": "Separately addresses every material element, applicable exception, and meaningful defense, and does not treat a prima facie showing as final liability when a defense remains.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_fact_reasoning",
+      "name": "Evidence and Fact Reasoning",
+      "definition": "Distinguishes allegations, testimony, documents, findings, inferences, assumptions, authentication, admissibility, weight, and established facts as the task requires.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "remedies_reasoning",
+      "name": "Remedies Reasoning",
+      "definition": "Separates liability from entitlement to relief, correctly applies remedy prerequisites and limitations, and calculates or scopes relief only from supported facts and rules.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "counterarguments",
+      "name": "Counterarguments",
+      "definition": "Where the issue is genuinely contestable, identifies and fairly analyzes the strongest legally supported competing argument without manufacturing false balance.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_missing_facts",
+      "name": "Assumptions and Missing Facts",
+      "definition": "Identifies legally decisive missing facts or rules, labels necessary assumptions, and does not silently fill gaps with unsupported factual or legal premises.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_and_qualification",
+      "name": "Uncertainty and Qualification",
+      "definition": "Calibrates confidence to the clarity of the law, evidence, and procedural posture; acknowledges ambiguity, conflicting authority, or unresolved facts where they genuinely matter.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "legal_source_reasoning",
+      "name": "Legal Source Reasoning",
+      "definition": "Evaluates whether cited or supplied sources are primary or secondary, controlling or persuasive, current, jurisdictionally relevant, and actually supportive of the proposition asserted.",
+      "weight": 0.05,
+      "conditional": true
     },
     {
       "id": "completeness",
-      "definition": "Whether the response covers the material legal issues needed to answer the question adequately.",
-      "weight": 1.0,
+      "name": "Completeness",
+      "definition": "Covers all material parts of the requested legal analysis at a depth proportionate to the question, without omitting a dispositive issue or requested subpart.",
+      "weight": 0.05,
       "conditional": false
     },
     {
-      "id": "legal_reasoning",
-      "definition": "Whether the reasoning is coherent, logically valid, and legally sound rather than merely asserting a conclusion.",
-      "weight": 1.0,
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent facts, rules, burdens, dates, calculations, and conclusions throughout the answer.",
+      "weight": 0.05,
       "conditional": false
     },
     {
-      "id": "authority_quality",
-      "definition": "Whether the response uses or recommends appropriate types of legal authority when authority is relevant, and correctly distinguishes binding from persuasive or secondary sources.",
-      "weight": 1.0,
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Presents legal reasoning in a clear, organized, precise, and readable way; terminology serves the analysis rather than substituting for it.",
+      "weight": 0.05,
       "conditional": false
     },
     {
-      "id": "authority_accuracy",
-      "definition": "Whether any statutes, regulations, cases, legal doctrines, quotations, or other authorities mentioned are accurately characterized.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "procedural_awareness",
-      "definition": "Whether the answer correctly recognizes the relevant stage of a legal or court process and gives advice appropriate to that stage.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "deadline_awareness",
-      "definition": "Whether the answer recognizes potentially important limitation periods, filing deadlines, response deadlines, or other time-sensitive requirements without inventing a deadline.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "actionability",
-      "definition": "Whether the answer provides practical, legally sensible next steps the user can take.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "risk_awareness",
-      "definition": "Whether the answer identifies material legal, procedural, financial, criminal, or other risks associated with the user's situation.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "uncertainty_calibration",
-      "definition": "Whether the answer expresses the appropriate level of certainty and does not present uncertain or jurisdiction-dependent conclusions as definitive.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "legal_professional_boundaries",
-      "definition": "Whether the answer appropriately distinguishes general legal information from individualized legal advice and recommends qualified local counsel when the circumstances warrant it.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "evidence_analysis",
-      "definition": "Whether the answer appropriately identifies relevant evidence, evidentiary limitations, preservation considerations, and the distinction between having evidence and proving a legal claim.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "alternative_interpretations",
-      "definition": "Whether the answer considers plausible competing interpretations, exceptions, defenses, or legal positions when they are material.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "internal_consistency",
-      "definition": "Whether the answer's legal propositions and recommendations are consistent with one another and contain no material contradictions.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "communication_quality",
-      "definition": "Whether the answer is clear, organized, readable, appropriately concise, and understandable to a non-lawyer.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "helpfulness",
-      "definition": "Whether the response materially helps the user understand the legal issue and decide what practical step to take next.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "proportionality",
-      "definition": "Whether the level of concern, caution, and recommended action is proportionate to the legal risk and procedural situation.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "unsupported_claims",
-      "definition": "Whether the response avoids inventing facts, assuming missing circumstances, or asserting conclusions unsupported by the stated facts or law.",
-      "weight": 1.0,
-      "conditional": false
-    },
-    {
-      "id": "fabricated_authority",
-      "definition": "Whether the response avoids invented or nonexistent statutes, cases, sections, quotations, citations, agencies, or other legal authorities.",
-      "weight": 1.0,
-      "conditional": false
+      "id": "practical_legal_judgment",
+      "name": "Practical Legal Judgment",
+      "definition": "When practical judgment is called for, distinguishes stronger from weaker legal positions based on authority and facts, flags consequential deadlines or verification needs, and avoids generic disclaimers in place of analysis.",
+      "weight": 0.05,
+      "conditional": true
     }
   ],
-  "flags": [
-    {
-      "id": "critical_legal_error",
-      "condition": "material legal error that could plausibly cause significant harm",
-      "effect": "zero_score"
-    },
-    {
-      "id": "fabricated_authority",
-      "condition": "fabricated legal authority materially affects the answer",
-      "effect": "cap_at_1_of_4"
-    }
-  ]
+  "critical_error_flag": {
+    "id": "critical_legal_error",
+    "condition": "A materially false central legal claim, jurisdictional assumption, procedural error, authority error, evidentiary error, or element-level mistake fundamentally invalidates the answer or reverses its substantive legal conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Inventing a legal rule central to the answer.",
+      "Applying the law of the wrong jurisdiction without justification where the choice controls the result.",
+      "Treating nonbinding authority as controlling where the distinction determines the result.",
+      "Fundamentally misidentifying the holding of a supplied precedent.",
+      "Ignoring an explicit statutory exception that reverses the outcome.",
+      "Omitting a required element and nevertheless concluding liability is established.",
+      "Shifting an outcome-determinative burden of proof to the wrong party.",
+      "Treating allegations as established facts contrary to the procedural posture.",
+      "Applying a trial standard at the pleading stage in a way that invalidates the conclusion.",
+      "Treating a time-barred claim as timely despite clear supplied deadline facts.",
+      "Interpreting a statute contrary to an explicit supplied definition.",
+      "Treating possession as ownership where the distinction controls.",
+      "Treating authentication as proof that a document's contents are true.",
+      "Treating relevance as sufficient for admissibility despite a supplied exclusion rule.",
+      "Using fundamentally incorrect causation reasoning that reverses liability.",
+      "Treating a prima facie case as final liability despite an expressly supplied complete defense.",
+      "Ignoring an effective-date change and applying the wrong version of law.",
+      "Fabricating a precedent, statute, procedural fact, or legal authority required for the conclusion.",
+      "Asserting certainty where supplied authorities genuinely conflict and no controlling authority resolves the issue.",
+      "Recommending a legal conclusion that directly contradicts controlling law provided in the question."
+    ],
+    "not_critical": [
+      "Minor terminology errors.",
+      "Harmless citation-format mistakes.",
+      "Reasonable differences in argument emphasis.",
+      "Defensible alternative interpretations.",
+      "Reasonable uncertainty.",
+      "Small omissions that do not change the conclusion.",
+      "Differences in organization.",
+      "Failure to mention a weak secondary argument.",
+      "Minor factual imprecision that does not affect legal analysis.",
+      "Alternative remedies where several are legally available."
+    ]
+  }
 }

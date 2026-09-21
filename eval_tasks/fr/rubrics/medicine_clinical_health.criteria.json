@@ -1,0 +1,184 @@
+{
+  "task": "Score one answer to one Medicine & Clinical Health question from 0 to 4 using the applicable criteria below.",
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the clinical question, requested task, and supplied context without drifting into unrelated material or substituting a different problem.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "medical_accuracy",
+      "name": "Medical accuracy",
+      "definition": "Uses medically sound facts and distinctions; does not confuse symptoms with diagnoses, risk factors with disease, abnormal tests with confirmed disease, or screening with diagnosis.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clinical_reasoning",
+      "name": "Clinical reasoning",
+      "definition": "Connects history, examination, physiology, tests, time course, and context into a coherent argument. A correct label reached through unsafe or unsupported reasoning should score lower than a justified conclusion.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "diagnostic_reasoning",
+      "name": "Diagnostic reasoning",
+      "definition": "When diagnosis is part of the task, identifies the leading diagnosis or diagnostic category, uses supporting and opposing evidence, recognizes missing information, and avoids keyword-matching or unjustified certainty.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "differential_prioritization",
+      "name": "Differential prioritization",
+      "definition": "When alternatives matter, ranks likely and dangerous possibilities and explains which need urgent exclusion; does not substitute an indiscriminate list for prioritization.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "triage_and_urgency",
+      "name": "Triage and urgency",
+      "definition": "When acuity matters, correctly distinguishes routine, urgent, emergency, and immediate-stabilization needs. Missing an obvious time-critical emergency or delaying stabilization is a major failure and may trigger the critical flag.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "management_and_treatment",
+      "name": "Management and treatment",
+      "definition": "When management is requested, selects clinically appropriate therapy or supportive care, sequences actions sensibly, allows reasonable alternatives, and does not delay necessary treatment for nonessential testing.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "medication_safety",
+      "name": "Medication safety",
+      "definition": "When medications are relevant, considers indication, allergy, contraindications, interactions, renal/hepatic function, pregnancy, age, weight, route, monitoring, and adverse effects as applicable. A dangerous contraindicated recommendation should be heavily penalized and may be critical.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative correctness",
+      "definition": "When calculations are required, uses the correct equation, arithmetic, units, and clinically plausible interpretation. Minor arithmetic slips differ from major dose or unit errors that materially change management.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "investigation_selection",
+      "name": "Investigation selection",
+      "definition": "When testing is part of the task, chooses investigations that reduce meaningful uncertainty or change management, respects urgency and pretest probability, and avoids unnecessary duplication or delaying stabilization.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "test_and_data_interpretation",
+      "name": "Test and data interpretation",
+      "definition": "When laboratory, ECG, imaging, physiologic, or diagnostic-test data are supplied, interprets them in context and respects test limitations rather than treating an abnormal or negative result as automatically definitive.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "risk_benefit_reasoning",
+      "name": "Risk-benefit reasoning",
+      "definition": "When decisions involve trade-offs, compares expected benefit, harm, burden, competing risks, and consequences of action versus inaction rather than optimizing one metric in isolation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_based_reasoning",
+      "name": "Evidence-based reasoning",
+      "definition": "When evidence is relevant, distinguishes association from causation, relative from absolute effect, statistical from clinical significance, surrogate from patient-important outcomes, and trial evidence from patient-specific applicability.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_calibration",
+      "name": "Uncertainty calibration",
+      "definition": "When evidence is incomplete or conflicting, states what is known, what remains uncertain, and what would reduce uncertainty. Appropriate caution should receive credit; unjustified diagnostic certainty should be penalized.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "patient_specific_reasoning",
+      "name": "Patient-specific reasoning",
+      "definition": "When relevant, accounts for comorbidities, physiology, function, goals, preferences, adherence, social context, treatment burden, pregnancy, age, and other supplied characteristics that alter the decision.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "safety_netting_and_follow_up",
+      "name": "Safety-netting and follow-up",
+      "definition": "When ongoing care or outpatient uncertainty is relevant, gives a reassessment plan, monitoring needs, treatment-failure criteria, and warning signs that should trigger escalation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "communication_and_clarity_of_plan",
+      "name": "Communication and clarity of plan",
+      "definition": "Presents the clinical reasoning and plan in a usable sequence, uses plain language when communicating with patients, distinguishes facts from uncertainty, and avoids coercive or needlessly technical framing.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the clinically important parts of the requested task, especially any element necessary for safety, while not requiring exhaustive irrelevant detail.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internal consistency across diagnosis, interpretation, urgency, treatment, and follow-up; recommendations do not contradict supplied facts or one another.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Explains the answer precisely and intelligibly, with priorities and causal logic easy to follow; jargon or citations do not substitute for reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_medicine_clinical_health_error",
+    "condition": "A materially false or unsafe central medical claim that would fundamentally mislead clinical reasoning, miss a time-critical condition, recommend a clearly dangerous intervention, reverse the substantive conclusion, or create a major foreseeable risk. If present, the final score is 0 regardless of other strengths.",
+    "effect": "score=0",
+    "examples": [
+      "Failing to recognize an obvious emergency and recommending routine follow-up.",
+      "Recommending delay in evaluation for a presentation strongly indicating stroke, myocardial infarction, sepsis, anaphylaxis, shock, or another time-critical emergency.",
+      "Recommending a clearly contraindicated treatment that creates major foreseeable harm.",
+      "A major medication-dose or unit calculation error capable of materially changing safety.",
+      "Recommending a medication despite a supplied severe allergy or major contraindication.",
+      "Fundamentally incorrect interpretation of a life-threatening electrolyte abnormality.",
+      "Fundamentally incorrect acid-base reasoning that changes emergency management.",
+      "Confusing hypoglycemia with hyperglycemia in a central treatment recommendation.",
+      "Treating unstable hemodynamics as clinically reassuring.",
+      "Claiming a negative test fully excludes a dangerous diagnosis when the supplied sensitivity or pretest probability does not support that conclusion.",
+      "Interpreting invasive infection as harmless colonization when the scenario clearly indicates clinical infection.",
+      "Treating acute delirium as chronic dementia and missing an urgent reversible cause.",
+      "Failing to recognize severe respiratory failure.",
+      "Recommending oral outpatient management for a clearly unstable patient.",
+      "Continuing a clearly harmful medication after the prompt establishes a serious adverse reaction.",
+      "Making a major anticoagulation error that reverses bleeding/thrombosis management.",
+      "Materially incorrect interpretation of a pregnancy emergency.",
+      "Asserting a diagnosis with certainty when supplied evidence contradicts it and management depends on that error.",
+      "Fundamentally misunderstanding a critical laboratory or ECG finding.",
+      "Recommending management based on a calculation with incorrect units that materially changes treatment."
+    ],
+    "not_critical": [
+      "Minor arithmetic errors that do not affect management.",
+      "Small terminology errors.",
+      "Minor omissions.",
+      "Reasonable differences among accepted guidelines.",
+      "Different valid treatment choices.",
+      "Conservative uncertainty.",
+      "Small differences in follow-up timing when safety is preserved.",
+      "Reasonable diagnostic alternatives.",
+      "Minor over-testing that does not create meaningful harm.",
+      "Stylistic differences or omitted nonessential detail."
+    ]
+  }
+}

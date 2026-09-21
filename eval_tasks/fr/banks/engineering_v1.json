@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A proposed empirical relation for the mechanical power required by a pump is P = ρ g Q H², where ρ is density, g is gravitational acceleration, Q is volumetric flow rate, and H is head. Use dimensional analysis to determine whether this expression can represent power. If not, identify the dimensional problem and give the dimensionally consistent dependence using the same variables, without introducing an efficiency term.",
+    "intent": "Detect a dimensionally impossible engineering result and correct the governing dependence.",
+    "domain": "Engineering Fundamentals",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "dimensional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A 600 N sign is suspended by two cables that make angles of 35° and 50° above the horizontal on the left and right, respectively. Assuming a pin joint at the sign and negligible cable mass, determine the two cable tensions. State the equilibrium equations and explain why both horizontal and vertical force balance are required.",
+    "intent": "Apply vector equilibrium rather than treating cable forces as scalar supports.",
+    "domain": "Engineering Fundamentals",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A motor consumes 12 kW of electrical power and delivers 9.6 kW of shaft power while operating steadily. Determine its efficiency and the rate of waste heat generation if all losses ultimately become heat near the motor. Explain why energy and power should not be interchanged in the calculation.",
+    "intent": "Apply steady-state energy conservation and distinguish power from energy.",
+    "domain": "Engineering Fundamentals",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A perfectly mixed 2.0 m³ tank initially contains water with 0 kg/m³ salt. Brine enters at 0.10 m³/min with 5.0 kg/m³ salt, and liquid leaves at the same volumetric rate. Density is constant. Formulate the transient salt balance and determine the salt concentration after 10 min. Clearly define the system boundary and accumulation term before calculating.",
+    "intent": "Formulate a transient mass balance with an explicit system boundary.",
+    "domain": "Engineering Fundamentals",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "process_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "Two geometrically similar air ducts are operated with the same fluid. The second duct has every linear dimension doubled. If the design goal is to preserve Reynolds number, how must the average velocity change? How would volumetric flow rate then scale? Explain the scaling rather than only giving ratios.",
+    "intent": "Use similarity and scaling to connect Reynolds number, velocity, and flow rate.",
+    "domain": "Engineering Fundamentals",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "estimation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "An engineer is asked to select a heat sink so that an electronic module 'never exceeds 85°C.' The only supplied information is that the module dissipates 40 W and ambient air is nominally 25°C. Before selecting a heat sink, identify the missing engineering information that materially affects the decision, distinguish requirements from assumptions, and propose the minimum model needed for a first-pass estimate.",
+    "intent": "Formulate an underspecified engineering problem without inventing data.",
+    "domain": "Engineering Problem Formulation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A technician reports that a hydraulic cylinder experiences 'a pressure of 20 kN.' Explain the dimensional error. If the piston diameter is 50 mm and the applied axial force is 20 kN, calculate the corresponding ideal fluid pressure, neglecting friction.",
+    "intent": "Distinguish force from pressure and maintain unit consistency.",
+    "domain": "Engineering Fundamentals",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A 24 V DC battery supplies a steady 6 A load for 30 minutes. Determine the electrical power delivered and the energy delivered in both Wh and joules. Explain the physical distinction between the two quantities.",
+    "intent": "Distinguish electrical power from energy using consistent units.",
+    "domain": "Engineering Fundamentals",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A pressure sensor is specified as ±1% of full scale on a 0–10 bar range. It reads 2.0 bar. A second sensor is specified as ±0.05 bar. Ignoring other uncertainty sources, compare their absolute uncertainty at this reading and explain why '1%' cannot be interpreted without knowing what the percentage refers to.",
+    "intent": "Interpret measurement specifications and compare absolute uncertainty.",
+    "domain": "Engineering Measurement and Instrumentation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A 5 kg aluminum block (c = 900 J/kg·K) is heated by convection in air. A preliminary model treats the block as a single uniform temperature. Explain what physical condition must hold for a lumped-capacitance model to be credible, what additional property/data would be needed to check that condition, and what error is expected if large internal temperature gradients actually develop.",
+    "intent": "Judge when a simplifying thermal model is acceptable and when it breaks down.",
+    "domain": "Modeling and Approximation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A simply supported 6 m beam carries a uniformly distributed load of 4 kN/m over the full span and a 10 kN point load 1.5 m from the left support. Determine the vertical reactions at both supports. Show the free-body logic and use the correct moment arms.",
+    "intent": "Apply beam equilibrium with distributed and concentrated loads.",
+    "domain": "Statics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "structural_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "In a pin-jointed truss, member AB is connected only by frictionless pins at A and B and carries no intermediate load. A proposed free-body diagram shows independent horizontal and vertical reaction components at the cut through AB. Explain what is wrong with that representation and how the force in a true two-force member must act.",
+    "intent": "Recognize two-force-member behavior and avoid overconstraining a free-body diagram.",
+    "domain": "Statics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A 5 m uniform ladder weighing 200 N rests against a smooth vertical wall and a rough horizontal floor. The ladder makes 60° with the floor. The coefficient of static friction at the floor is 0.35. A 700 N person stands 3.5 m up the ladder from the bottom. Determine whether static equilibrium is possible without slipping. State all support reactions and the impending-slip criterion.",
+    "intent": "Combine moment equilibrium and friction limits to assess static stability.",
+    "domain": "Statics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structural_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A 1200 kg car traveling at 20 m/s brakes on level pavement. The total approximately constant braking force opposing motion is 8.0 kN. Neglect aerodynamic drag. Use a suitable method to determine stopping distance, and explain why the result could be obtained by either work-energy or Newtonian kinematics.",
+    "intent": "Select and apply an appropriate dynamics method while relating energy and force formulations.",
+    "domain": "Dynamics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A 2.0 kg cart moving at 5.0 m/s strikes and sticks to a stationary 3.0 kg cart on a horizontal low-friction track. Determine the common velocity immediately after impact and the kinetic energy lost. Explain why momentum can be conserved during the impact even though kinetic energy is not.",
+    "intent": "Distinguish impulse-momentum conservation from kinetic-energy conservation in impact.",
+    "domain": "Dynamics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A flywheel has a mass moment of inertia of 12 kg·m². A constant net torque of 30 N·m is applied from rest for 8 s. Neglect drag. Determine angular acceleration, final angular speed, and rotational kinetic energy, and verify the energy result using torque times angular displacement.",
+    "intent": "Connect rotational dynamics, kinematics, and work-energy consistently.",
+    "domain": "Dynamics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A steel rod 1.2 m long and 20 mm in diameter is in series with an aluminum rod 0.8 m long and 25 mm in diameter. They carry a tensile load of 40 kN. Use E_steel = 200 GPa and E_aluminum = 70 GPa. Determine total elongation and the stress in each rod. Explain why equal force does not imply equal stress or equal strain.",
+    "intent": "Analyze axial deformation of members in series and distinguish force, stress, and strain.",
+    "domain": "Mechanics of Materials",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structural_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A solid circular shaft 30 mm in diameter and 1.0 m long transmits 1.2 kN·m torque. Use G = 80 GPa. Determine the maximum torsional shear stress and angle of twist. Then state how each quantity would scale if the diameter were increased by 10% while torque and length stayed fixed.",
+    "intent": "Analyze shaft torsion and reason about geometric sensitivity.",
+    "domain": "Mechanics of Materials",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structural_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A simply supported steel beam of span 4 m carries a 12 kN point load at midspan. The second moment of area is 8.0×10⁻⁶ m⁴ and E = 200 GPa. Determine the maximum bending moment, maximum bending stress if the extreme-fiber distance is 60 mm, and midspan deflection using δ = PL³/(48EI). Explain which result is a strength check and which is a serviceability check.",
+    "intent": "Combine beam bending and deflection while distinguishing strength from stiffness.",
+    "domain": "Mechanics of Materials",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structural_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A rotating steel shaft has diameter 38 mm and a shoulder fillet. At the shoulder, the nominal alternating bending moment is ±420 N·m and a steady torque of 300 N·m acts simultaneously. Use a bending fatigue stress-concentration factor Kf = 1.7 and torsional factor Kfs = 1.4. Material yield strength is 620 MPa and corrected endurance limit is 240 MPa. Assume von Mises combination for the mean/static yielding check and use the distortion-energy form of alternating equivalent stress for a first-pass fatigue check. Determine whether yielding or fatigue is more likely to govern, state any extra information required for a complete fatigue criterion, and explain why nominal stress alone is inadequate.",
+    "intent": "Integrate combined loading, stress concentration, yield, and fatigue reasoning.",
+    "domain": "Machine Design and Failure",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A pinned-pinned steel column is 3.0 m long with E = 200 GPa, area 1800 mm², and second moment of area about its weak axis 2.5×10⁶ mm⁴. Material yield strength is 300 MPa. Compare Euler buckling load with the axial yield load. Which failure mode should a preliminary design check treat as governing, and what modeling limitation should be noted?",
+    "intent": "Distinguish elastic instability from material yielding in a column.",
+    "domain": "Mechanics of Materials",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structural_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A steel bracket repeatedly cracks at a sharp internal corner after roughly 80,000 load cycles, even though the nominal elastic stress is only 55% of yield strength. Explain the most plausible failure mechanism, why static yield strength is not sufficient to clear the design, what evidence would confirm the mechanism, and name two design changes that attack the mechanism rather than merely increasing nominal section thickness.",
+    "intent": "Diagnose fatigue dominated by stress concentration rather than static yielding.",
+    "domain": "Machine Design and Failure",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A rooftop mechanical unit is supported by secondary beams that frame into girders, which frame into columns and then foundations. Explain the gravity load path and identify two ways an apparently adequate local beam could still be part of an unsafe system if connections or downstream members are not checked.",
+    "intent": "Reason about structural load paths and interfaces rather than isolated member strength.",
+    "domain": "Structural Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "Two floor systems both satisfy the same ultimate strength requirement. System A is much lighter but has half the flexural stiffness of System B. Occupants report uncomfortable vibration and noticeable deflection under normal use. Explain why this is a serviceability problem rather than necessarily a strength failure, and discuss how redundancy and stiffness distribution can affect the system response.",
+    "intent": "Distinguish structural serviceability, strength, stiffness, and redundancy.",
+    "domain": "Structural Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A centrifugal pump and motor set develops a strong 1× running-speed vibration after a coupling replacement. Axial vibration has also increased, bearing temperature is rising, and lubricant contains metallic debris. Build a diagnosis that distinguishes imbalance, misalignment, bearing damage, and lubrication problems. Explain what measurements would discriminate among them, how one fault can accelerate another, and how to verify the corrective action safely.",
+    "intent": "Diagnose interacting vibration, alignment, bearing, and lubrication failure mechanisms.",
+    "domain": "Vibrations",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "At a depth of 6 m in saturated soil, total vertical stress is 120 kPa and pore-water pressure is 45 kPa. Determine effective vertical stress. Then explain qualitatively what happens to effective stress if the water table rises and total stress at that depth remains approximately unchanged.",
+    "intent": "Apply effective-stress reasoning and distinguish total stress from pore pressure.",
+    "domain": "Geotechnical Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A compacted embankment is densified by rollers during construction, while a saturated clay foundation beneath it settles gradually over months. Explain why the first process is compaction and the second is consolidation, including the roles of air, water drainage, and time.",
+    "intent": "Distinguish compaction from consolidation mechanistically.",
+    "domain": "Geotechnical Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A cut slope in layered soil has been stable through a dry season, then shows tension cracks and small movements after prolonged rainfall. Explain how infiltration and groundwater can reduce stability through pore-pressure changes and seepage forces. Identify the site data needed before selecting drainage, geometry changes, or reinforcement, and avoid assuming the soil is homogeneous.",
+    "intent": "Analyze groundwater-driven slope instability with uncertainty in stratigraphy.",
+    "domain": "Geotechnical Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "failure_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A proposed shallow footing carries a service load of 900 kN on a 3 m × 3 m area. A geotechnical assessment gives an allowable bearing pressure of 150 kPa at the founding depth and predicts 40 mm total settlement at that pressure, while the project serviceability limit is 25 mm. Ignoring eccentricity, assess the design and explain why bearing-capacity adequacy and settlement adequacy are separate checks.",
+    "intent": "Distinguish bearing pressure capacity from settlement serviceability.",
+    "domain": "Geotechnical Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "Traffic on a uniform road segment has average density 30 vehicles/km/lane and space-mean speed 60 km/h. Estimate flow per lane using q = kv. State why this calculation alone does not establish the road's maximum capacity.",
+    "intent": "Apply the basic traffic-flow relation while distinguishing operating flow from capacity.",
+    "domain": "Transportation Engineering",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "An intersection approach receives 700 vehicles/h during a peak period, while the signal timing and saturation conditions provide an average discharge capacity of 600 vehicles/h for 30 min. Assume an initially empty queue and constant rates. Estimate the queue growth in vehicles over that interval, then explain what additional behavior would matter if the queue became long enough to block an upstream intersection.",
+    "intent": "Reason about demand, throughput, queue accumulation, and network spillback.",
+    "domain": "Transportation Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A vehicle travels at 25 m/s. Driver perception-reaction time is 1.5 s, and constant braking deceleration after reaction is 6.0 m/s². On level road, estimate total stopping distance. Identify which portion is affected by reaction time and which by braking capability.",
+    "intent": "Decompose stopping distance into reaction and braking components.",
+    "domain": "Transportation Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A 12 ha watershed has runoff coefficient C = 0.55 and design rainfall intensity i = 70 mm/h. Using the Rational Method Q = C i A with consistent SI units, estimate peak runoff. State the key conceptual limitation: annual rainfall totals alone do not determine this design peak.",
+    "intent": "Calculate a design runoff estimate and distinguish peak rainfall intensity from annual totals.",
+    "domain": "Water Resources Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A reservoir starts with 1.2×10⁶ m³ of water. For the next 6 h, inflow is 80 m³/s, controlled outflow is 55 m³/s, and net evaporation plus seepage loss is 2 m³/s. Assuming constant rates, determine storage after 6 h. State the continuity equation and identify the accumulation term.",
+    "intent": "Apply a transient water balance with storage.",
+    "domain": "Water Resources Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A road embankment is planned across soft ground beside a drainage channel. Higher fill shortens the bridge approach but increases foundation settlement, lateral soil loading, and the consequence of blocking drainage. Explain how soil strength, groundwater, hydraulic conveyance, staging, and constructability interact. Identify analyses or field information needed before fixing the embankment geometry.",
+    "intent": "Integrate geotechnical, hydraulic, structural, and construction constraints in infrastructure design.",
+    "domain": "Civil Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A vertical water column is 8.0 m deep and open to the atmosphere. Using ρ = 1000 kg/m³ and g = 9.81 m/s², determine the gauge pressure at the bottom. Explain why the result is pressure rather than force, and what extra information would be needed to determine total force on a flat bottom plate.",
+    "intent": "Apply hydrostatics and distinguish pressure from force.",
+    "domain": "Fluid Mechanics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "fluid_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "Water flows steadily from a large open reservoir through a pipe to a discharge point 18 m higher. The pipe flow rate is 0.030 m³/s, total head loss at that flow is 7 m, and velocity at the discharge is 4 m/s. Both free surface and discharge are at atmospheric pressure. Determine the minimum pump head required using the energy equation. If pump efficiency is 75%, estimate shaft power. Explain why ideal Bernoulli without pump and loss terms would be invalid.",
+    "intent": "Apply the extended energy equation with elevation, velocity, losses, and pump work.",
+    "domain": "Fluid Mechanics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "fluid_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "Oil with density 850 kg/m³ and dynamic viscosity 0.12 Pa·s flows in a 25 mm diameter pipe at 0.40 m/s. Calculate Reynolds number and classify the flow using Re < 2300 as laminar and Re > 4000 as turbulent. Explain why the classification matters when selecting a pressure-drop model.",
+    "intent": "Use Reynolds number to select an appropriate flow regime model.",
+    "domain": "Fluid Mechanics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "fluid_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A centrifugal pump that previously operated quietly now shows crackling noise, vibration, unstable discharge pressure, and a reduced flow rate after the suction tank level was lowered. Explain why cavitation is plausible, what measurements would support or refute that diagnosis, and which corrective actions address suction conditions rather than merely throttling the discharge.",
+    "intent": "Troubleshoot pump cavitation from interacting hydraulic symptoms.",
+    "domain": "Hydraulic and Pneumatic Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A hydraulic cylinder must exert 50 kN while extending at 0.08 m/s. The piston area is 0.010 m². Neglect rod area and use an overall hydraulic efficiency of 80%. Determine ideal cylinder pressure, ideal flow rate, and approximate input hydraulic power required after accounting for efficiency. Explain the pressure-flow trade-off implied by actuator force and speed.",
+    "intent": "Relate actuator force, speed, pressure, flow, and efficiency.",
+    "domain": "Hydraulic and Pneumatic Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A steady-flow adiabatic turbine receives steam at a rate of 2.0 kg/s. Inlet and exit specific enthalpies are 3200 and 2600 kJ/kg. Changes in kinetic and potential energy are negligible. Estimate turbine power output. State the control-volume energy balance and sign convention used.",
+    "intent": "Apply the steady-flow first law to a turbine control volume.",
+    "domain": "Thermodynamics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "thermal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A refrigerator removes 3.0 kW of heat from a cold space while consuming 1.0 kW of electrical power. Determine its COP and heat rejected to the room. Explain why a COP greater than 1 does not violate the first law and why COP is not the same quantity as a heat-engine thermal efficiency.",
+    "intent": "Distinguish refrigeration COP from efficiency while conserving energy.",
+    "domain": "Thermodynamics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "thermal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "An adiabatic compressor would require 150 kJ/kg of work in an ideal isentropic process between specified inlet and outlet pressures. The actual compressor consumes 190 kJ/kg. Using η_c = w_ideal / w_actual, determine isentropic efficiency and explain what the difference represents physically. Then state why an efficiency above 100% under this definition would signal inconsistent data or calculation.",
+    "intent": "Interpret compressor efficiency and physical limits.",
+    "domain": "Thermodynamics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "thermal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A wall has two layers in series: 0.10 m brick with k = 0.70 W/m·K and 0.05 m insulation with k = 0.040 W/m·K. Area is 12 m². Inside and outside surface temperatures are 20°C and 0°C. Neglect contact resistance and convection. Determine steady heat loss and the temperature drop across each layer.",
+    "intent": "Use a thermal-resistance network for one-dimensional conduction.",
+    "domain": "Heat Transfer",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "thermal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A hot cylindrical pipe already has a thick layer of low-conductivity insulation. A proposal doubles the insulation thickness and claims it will halve heat loss. Explain why the benefit need not be proportional, identify the relevant resistance changes, and note the additional effect of changing outer surface area for a cylinder. A numerical result is not required.",
+    "intent": "Reason about insulation trade-offs and non-proportional thermal resistance.",
+    "domain": "Heat Transfer",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A counterflow heat exchanger cools 1.5 kg/s of oil with c_p = 2.0 kJ/kg·K from 120°C to 80°C using water that enters at 20°C with c_p = 4.18 kJ/kg·K. Neglect heat loss to surroundings. Determine heat-transfer rate and the water flow required if water may leave at no more than 50°C. Check whether the specified temperature directions are physically plausible.",
+    "intent": "Apply a heat-exchanger energy balance and a temperature feasibility check.",
+    "domain": "Heat Transfer",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "thermal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A process cooling loop uses a centrifugal pump, long piping, a fouling heat exchanger, and a variable-speed motor. Operators observe falling flow, rising motor current, rising process temperature, and a suction pressure that is drifting downward; one flow sensor intermittently disagrees with a clamp-on meter. Build a coupled diagnosis that considers hydraulic restriction, pump operating point, cavitation risk, motor loading, fouling, and sensor error. Identify the safest discriminating tests and explain why changing pump speed before establishing the cause could worsen the problem.",
+    "intent": "Diagnose a coupled thermal-fluid-electrical system under degrading and uncertain measurements.",
+    "domain": "Thermal-Fluid Systems",
+    "acuity": "urgent",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A 24 V source feeds a 6 Ω resistor in series with a parallel combination of 12 Ω and 4 Ω. Determine source current, voltage across the parallel branch, and current in each parallel resistor. Check that Kirchhoff's current law is satisfied at the branch node.",
+    "intent": "Analyze a mixed series-parallel DC circuit and verify KCL.",
+    "domain": "Electrical Engineering Fundamentals",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "circuit_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A node is connected to a 12 V source through 4 kΩ, to ground through 6 kΩ, and to a 5 V source through 10 kΩ. Write the nodal equation using currents leaving the node and solve for node voltage. Then verify that the current signs are physically consistent.",
+    "intent": "Apply nodal analysis with multiple source-connected branches.",
+    "domain": "Circuit Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "circuit_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A linear network viewed from two terminals has open-circuit voltage 10 V and short-circuit current 2 A. Determine its Thevenin equivalent and the power delivered to a 5 Ω load. Explain the physical meaning of the Thevenin resistance.",
+    "intent": "Construct and use a Thevenin equivalent from terminal measurements.",
+    "domain": "Circuit Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "circuit_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A 10 kΩ resistor charges a 100 µF capacitor from an ideal 5 V step source. The capacitor is initially uncharged. Determine the time constant and capacitor voltage after one time constant. Explain why capacitor voltage cannot jump instantaneously in this ideal RC circuit.",
+    "intent": "Analyze first-order RC transient behavior.",
+    "domain": "Circuit Analysis",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "circuit_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A single-phase load draws 10 A RMS from a 230 V RMS source at power factor 0.80 lagging. Determine apparent power and real power. If the current waveform is assumed sinusoidal, estimate peak current. Explain why RMS values are used for power calculations.",
+    "intent": "Distinguish RMS, peak, apparent power, real power, and power factor.",
+    "domain": "Electrical Engineering Fundamentals",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "An op-amp circuit is configured for non-inverting gain 11 and powered from ±12 V rails. A 1.5 V input would ideally demand 16.5 V output. Explain the expected actual behavior, why linear-gain equations stop applying in saturation, and what design changes could prevent clipping if the required output really is 16.5 V.",
+    "intent": "Recognize op-amp saturation and the limits of linear circuit models.",
+    "domain": "Electronics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "circuit_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A high-impedance temperature sensor produces 100 mV full scale, but connecting it directly to an ADC with 10 kΩ input resistance reduces the indicated signal by 20%. The cable also runs beside a motor drive and picks up switching noise. Explain the separate loading and noise mechanisms, propose a signal-conditioning approach, and identify measurements that would confirm each mechanism.",
+    "intent": "Diagnose sensor loading and electrical noise in measurement circuitry.",
+    "domain": "Electronics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A vibration signal contains a strong 1.8 kHz component. It is sampled at 2.5 kHz with no analog anti-alias filter. Determine the alias frequency observed below Nyquist and explain why digital filtering after sampling cannot recover the original frequency uniquely.",
+    "intent": "Identify aliasing and distinguish it from ordinary measurement noise.",
+    "domain": "Signals and Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A synchronous state machine has two flip-flops and combinational logic whose worst-case propagation delay is 18 ns. The receiving flip-flop requires 4 ns setup time, and clock-to-Q delay of the launching flip-flop is 3 ns. Ignoring skew, determine the minimum clock period and maximum ideal clock frequency. Explain why logical correctness alone is insufficient if timing fails.",
+    "intent": "Reason about sequential-logic timing constraints.",
+    "domain": "Digital Logic and Embedded Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A microcontroller counts a mechanical pushbutton press using an interrupt on every rising edge. One physical press often increments the count several times within 10 ms. Explain the likely cause, why the software can still be logically correct yet behavior wrong, and give two credible hardware or software debounce strategies.",
+    "intent": "Diagnose an embedded hardware-interface timing problem.",
+    "domain": "Digital Logic and Embedded Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A temperature loop with PID control has become sluggish after a larger heat exchanger was installed. Increasing proportional gain reduces steady error initially but then causes overshoot, while the control valve repeatedly hits 100% output. Explain how process dynamics and actuator saturation affect tuning, why 'increase gain' is not a universal fix, and what tests or model updates should precede retuning.",
+    "intent": "Troubleshoot a feedback loop with changed process dynamics and actuator limits.",
+    "domain": "Control Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "control_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A servo axis was stable before its load inertia doubled and a flexible coupling was installed. Afterward, the same controller gains produce oscillation near a structural mode; the position sensor is on the motor side, while the controlled tool is on the load side. Explain how added inertia, compliance, sensor location, phase lag, and controller bandwidth can destabilize the loop. Propose a staged diagnostic and retuning approach that avoids exciting the structure.",
+    "intent": "Analyze control instability caused by equipment modification and hidden flexible dynamics.",
+    "domain": "Control Systems",
+    "acuity": "urgent",
+    "difficulty": 5,
+    "style": "control_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A three-phase 400 V line-to-line motor load draws 120 A at 0.82 power factor. Estimate real power using P = √3 V_L I_L PF. During starts, the remote bus sags enough to reset nearby control electronics, while the feeder protection occasionally trips. Develop an engineering diagnosis that distinguishes steady voltage drop, starting inrush, conductor impedance, protection settings, and power-quality sensitivity. Identify the measurements needed before changing protection or conductor size.",
+    "intent": "Integrate three-phase power, voltage regulation, protection, and power-quality reasoning.",
+    "domain": "Power Engineering",
+    "acuity": "critical",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "Two liquid streams mix at steady state with no reaction. Stream 1 is 2.0 kg/s and contains 10 wt% solute; Stream 2 is 3.0 kg/s and contains 2 wt% solute. Determine total outlet flow and outlet solute mass fraction. Show total and component mass balances.",
+    "intent": "Apply total and component balances to a mixer.",
+    "domain": "Mass and Energy Balances",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "process_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A process recycles 90% of a separator gas stream containing an inert impurity and purges the remaining 10%. Fresh feed contains 1 mol% inert. Explain why a purge is needed to prevent inert accumulation, identify the correct overall system boundary for a simple steady-state inert balance, and describe qualitatively how decreasing purge fraction affects recycle flow and inert concentration.",
+    "intent": "Reason about recycle, purge, accumulation, and system-boundary selection.",
+    "domain": "Mass and Energy Balances",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "process_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A perfectly mixed process vessel contains 500 kg of liquid. Feed enters at 8 kg/min and product leaves at 6 kg/min for 20 min, with no reaction and constant density. Determine inventory after 20 min. Then state why a steady-state assumption would be invalid during this interval.",
+    "intent": "Apply transient total mass balance and distinguish accumulation from steady state.",
+    "domain": "Mass and Energy Balances",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A hot process stream with heat-capacity rate 40 kW/K cools from 160°C to 110°C in a heat exchanger. Neglect heat loss. A cold stream has heat-capacity rate 50 kW/K and enters at 30°C. Determine the cold-stream outlet temperature and check whether the result is consistent with the first law and basic temperature feasibility.",
+    "intent": "Apply an energy balance to a process heat exchanger.",
+    "domain": "Chemical Engineering Fundamentals",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "process_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A first-order liquid reaction A→products has rate constant k = 0.20 min⁻¹ in an ideal CSTR of volume 2.0 m³ with volumetric flow 0.50 m³/min. Feed concentration is 1.0 mol/L and density is constant. Using X = kτ/(1+kτ) for a first-order CSTR, determine residence time and conversion. Explain why residence time and reaction rate are related but not identical concepts.",
+    "intent": "Apply a reactor model and distinguish residence time from kinetic rate.",
+    "domain": "Reaction Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "process_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A reversible reaction is thermodynamically favorable at the operating temperature, but a plant observes negligible conversion over the available residence time without catalyst. Explain why thermodynamic favorability does not imply a fast reaction and distinguish equilibrium limits from kinetic limitations.",
+    "intent": "Distinguish reaction thermodynamics from kinetics.",
+    "domain": "Reaction Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A feed contains 100 kmol/h of component A and 300 kmol/h of inert carrier. A separator recovers 90% of A into a product stream, but 20% of the inert also enters that product. Determine the product flow rate and A mole fraction. Explain the distinction between recovery and purity.",
+    "intent": "Use component balances to distinguish separation recovery from product purity.",
+    "domain": "Separation Processes",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "process_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A membrane system separates a gas component because of a partial-pressure driving force. A proposal doubles membrane area but leaves feed pressure, permeate pressure, composition, and mass-transfer conditions unchanged. Explain why throughput may increase while product purity need not improve proportionally, and identify the main trade-offs among area, stage cut, recovery, and purity.",
+    "intent": "Reason about separation driving force and purity/recovery trade-offs.",
+    "domain": "Separation Processes",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A reactor temperature transmitter suddenly reads 15°C higher, but an independent skin-temperature sensor, cooling-water outlet temperature, and product composition show no corresponding change. Explain why the abnormal reading may be an instrumentation fault rather than a real process upset. Propose a safe sequence to distinguish sensor bias, transmitter failure, wiring fault, and true process heating.",
+    "intent": "Distinguish process behavior from sensor or transmitter failure.",
+    "domain": "Process Control and Instrumentation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A continuous exothermic process uses fresh feed, recycle, a cooled reactor, and a downstream separator. Product purity degrades while reactor temperature begins to oscillate. Recycle composition is slowly drifting, the cooling valve is near its limit, and one temperature sensor has significant lag. Build a coupled explanation involving recycle accumulation, kinetics, heat removal, controller dynamics, and measurement lag. Identify safe tests and safeguards before changing setpoints or disabling interlocks.",
+    "intent": "Diagnose a coupled recycle-reaction-heat-transfer-control problem with safety constraints.",
+    "domain": "Process Safety",
+    "acuity": "critical",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A manufacturer needs 20,000 aluminum housings per year. Each has a shallow complex cavity, moderate dimensional tolerances, and several threaded holes. Compare machining from billet, casting followed by finish machining, and additive manufacturing for this volume. Explain which characteristics drive the process choice rather than simply selecting the most precise process.",
+    "intent": "Select a manufacturing route based on geometry, volume, tolerance, and finishing needs.",
+    "domain": "Manufacturing Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "Three parts stack along an assembly axis. Their dimensions are 20.00±0.10 mm, 15.00±0.05 mm, and 10.00±0.08 mm. Using worst-case linear stack-up, determine nominal total length and tolerance. If the mating space is 45.00±0.15 mm, determine whether guaranteed clearance exists and quantify the worst-case minimum clearance.",
+    "intent": "Perform a quantitative tolerance stack and assess assembly feasibility.",
+    "domain": "Tolerances and Fits",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A shaft diameter has specification limits 19.90–20.10 mm. A stable process has mean 20.04 mm and standard deviation 0.025 mm. Using Cp = (USL−LSL)/(6σ) and Cpk = min[(USL−μ)/(3σ),(μ−LSL)/(3σ)], calculate Cp and Cpk. Explain why a capable spread can still be poorly centered.",
+    "intent": "Interpret process capability and distinguish spread from centering.",
+    "domain": "Quality Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A machining process has been stable around a fixed mean, then eight consecutive measurements appear above the historical centerline while remaining inside specification limits. Explain why this can indicate a special-cause process shift even though no part is yet out of specification, and distinguish control limits from specification limits.",
+    "intent": "Distinguish process control from product specification compliance.",
+    "domain": "Quality Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "An automated line has four stations with mean cycle times of 40, 45, 60, and 42 s. The 60 s station has 95% uptime; the others have 99% uptime. Buffers are small, quality loss at the bottleneck is 4%, and upstream variability causes periodic starvation. Explain why nominal cycle time alone overpredicts line throughput, identify the effective bottleneck, and propose the most informative data to collect before investing in another machine.",
+    "intent": "Analyze throughput using bottlenecks, downtime, quality loss, and variability.",
+    "domain": "Industrial Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A thin aluminum plate is finish-milled flat to tight tolerance while clamped at four corners. It passes inspection in the fixture but bows after unclamping. Explain how workholding force and residual stress can create this behavior, how to test the hypothesis, and how fixture or process changes could reduce distortion.",
+    "intent": "Diagnose manufacturing distortion caused by workholding and residual stress.",
+    "domain": "Manufacturing Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A design uses twelve unique fastener sizes, several blind assembly steps, and ±0.01 mm tolerances on features whose only function is cosmetic alignment within ±0.5 mm. Identify the design-for-assembly and design-for-manufacturing problems, distinguish functional requirements from unnecessary precision, and propose simplifications without changing product function.",
+    "intent": "Identify over-constrained and unnecessarily complex manufacturing requirements.",
+    "domain": "Design for Manufacturing and Assembly",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A plant can make products A and B. Each A earns $40 contribution and uses 2 machine-hours and 1 labor-hour. Each B earns $55 contribution and uses 1 machine-hour and 3 labor-hours. Weekly capacity is 100 machine-hours and 120 labor-hours. Formulate the linear-programming objective and constraints. Without using solver syntax, explain how to test whether any proposed production plan is feasible before calling it optimal.",
+    "intent": "Formulate an engineering resource-allocation optimization problem and enforce feasibility.",
+    "domain": "Operations Research for Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "optimization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "Rewrite the vague requirement 'The pump system shall be fast and reliable' into a small set of measurable engineering requirements. Include at least one performance metric, one reliability or availability metric, operating conditions, and an acceptance criterion. Explain which parts are requirements versus implementation choices.",
+    "intent": "Turn ambiguous stakeholder language into measurable, verifiable engineering requirements.",
+    "domain": "Requirements Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A subsystem passes every specified interface and performance test in the laboratory, but users find that the complete product does not solve the intended operational problem. Explain the difference between verification and validation and identify what the laboratory evidence does and does not establish.",
+    "intent": "Distinguish verification from validation.",
+    "domain": "Systems Engineering",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A battery-powered sensor node, radio, and heater each meet their individual power budgets when tested separately. In the integrated system, the battery voltage collapses during simultaneous radio transmission and heater startup. Explain why component-level optimization missed a system interface problem, identify relevant shared-resource constraints, and propose an integration test that would reveal the issue early.",
+    "intent": "Analyze emergent system behavior caused by shared electrical resources and interfaces.",
+    "domain": "Systems Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A system has three independent components in series with reliabilities 0.98, 0.97, and 0.99 for a mission. Calculate system reliability. Explain why adding more series components generally reduces mission reliability if no redundancy or repair is available.",
+    "intent": "Calculate reliability of a series system and interpret the result.",
+    "domain": "Reliability Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A safety function uses two identical pumps in parallel, and an analyst multiplies their independent failure probabilities to claim extremely high reliability. Both pumps share one suction tank, one power bus, one cooling-water source, and the same maintenance procedure. Explain why the independence assumption is weak, identify common-cause failure paths, and describe how architecture, testing, or diversity could improve the safety claim without pretending redundancy guarantees safety.",
+    "intent": "Detect invalid independence assumptions and common-cause failure in redundant systems.",
+    "domain": "Reliability Engineering",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A repairable machine has MTBF = 500 h and mean time to repair MTTR = 10 h. Using steady-state availability A = MTBF/(MTBF+MTTR), estimate availability. Explain why high availability does not necessarily mean high mission reliability over a long no-repair mission.",
+    "intent": "Distinguish availability from reliability quantitatively and conceptually.",
+    "domain": "Reliability Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "In an automated valve system, a position sensor can fail high, causing the controller to believe the valve is open when it is actually closed; this can overfill an upstream vessel. Construct a qualitative FMEA chain from failure mode to local effect to system effect, identify existing or potential detection controls, and propose mitigations. Do not invent arbitrary risk-priority numbers.",
+    "intent": "Build a realistic FMEA chain without relying on arbitrary scores.",
+    "domain": "Failure Modes and Effects Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "safety_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A machine guard door opens while a hazardous rotating tool is still coasting down. The current design only removes motor power; stored kinetic energy remains for several seconds. Identify the hazard and safe-state requirement, explain why power removal alone is not enough, and propose fail-safe interlocking or monitored-stop concepts that prevent access until motion is below the defined safe threshold. Include how to detect interlock failure.",
+    "intent": "Design safety logic around stored energy, safe state, and safeguard failure.",
+    "domain": "Safety Engineering",
+    "acuity": "critical",
+    "difficulty": 4,
+    "style": "safety_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "An aircraft wing is gradually increased in angle of attack at constant speed. Explain why lift initially rises, why drag also changes, and why beyond stall angle additional angle of attack can reduce lift rather than increase it. Distinguish angle-of-attack effects from simply 'more speed means more lift.'",
+    "intent": "Reason about lift, drag, and stall without simplistic monotonic assumptions.",
+    "domain": "Aerodynamics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "An aircraft flies with an airspeed of 60 m/s due north while a 15 m/s wind blows due east. Neglect vertical motion. Determine groundspeed magnitude and ground-track direction relative to north. Explain why airspeed and groundspeed differ.",
+    "intent": "Use vector addition to distinguish airspeed from groundspeed.",
+    "domain": "Aerospace Engineering",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "An electric motor delivers 120 N·m torque at 3000 rpm. Determine mechanical power in kW. If torque remains constant while speed halves, what happens to power? Explain why high torque does not by itself imply high power.",
+    "intent": "Distinguish torque from power in rotating machinery.",
+    "domain": "Propulsion and Energy Conversion",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A battery pack is rated 80 kWh energy capacity and 200 kW maximum discharge power. Ignoring efficiency limits, determine the minimum time over which it could deliver 200 kW before exhausting 80 kWh. Explain why energy capacity and power capacity are different design constraints.",
+    "intent": "Distinguish energy storage capacity from power capability.",
+    "domain": "Energy Engineering",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A site has a 50 MW wind farm with 35% annual capacity factor and proposes a 20 MW / 80 MWh battery. Estimate annual wind energy generation. Then explain what the battery power and energy ratings do and do not imply about smoothing multiday low-wind periods, and identify the trade-off between short-duration power support and long-duration energy shifting.",
+    "intent": "Integrate capacity factor with storage power/energy limits and renewable variability.",
+    "domain": "Renewable Energy Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A wastewater plant treats 10,000 m³/day with influent BOD concentration 250 mg/L. A process removes 92% of BOD. Calculate influent BOD load in kg/day and expected effluent concentration, assuming the stated removal applies to concentration and flow change is negligible. Explain why percent removal alone is insufficient without influent concentration.",
+    "intent": "Use flow-concentration mass loading and treatment efficiency correctly.",
+    "domain": "Water and Wastewater Treatment",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "An air-pollution control device receives 5.0 kg/h of particulate and captures 96%. Determine emitted particulate mass rate. If plant throughput doubles and capture efficiency stays unchanged, determine the new emission rate and explain why a high percentage efficiency can still produce a large absolute emission at high throughput.",
+    "intent": "Apply a contaminant mass balance and distinguish efficiency from absolute emissions.",
+    "domain": "Environmental Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "Three colocated air-quality sensors show 40, 41, and 95 µg/m³ after a storm. The high-reading sensor recently missed calibration, has visible water ingress, and also shows increased electrical noise. Explain how to assess whether the 95 µg/m³ value reflects a real local plume or a measurement artifact, including calibration, redundancy, environmental interference, and independent confirmation.",
+    "intent": "Interpret conflicting environmental measurements using uncertainty and sensor limitations.",
+    "domain": "Environmental Monitoring",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A city experienced severe flash flooding despite having lower total annual rainfall than the previous year. Explain why this is not contradictory. Discuss storm intensity, duration, antecedent soil moisture, impervious area, drainage capacity, and storage, and identify which data are relevant to peak-flood risk.",
+    "intent": "Reason about flood risk from hydrologic mechanisms rather than annual rainfall totals.",
+    "domain": "Water Resources Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "Two pumps meet the same duty. Pump A costs $40,000 initially and $9,000/year in energy and maintenance. Pump B costs $55,000 initially and $6,000/year. Assume a 10-year life, no salvage value, and a 6% annual discount rate. Using the present-worth factor P/A = [1-(1+i)^(-n)]/i, compare lifecycle present cost. Explain why lowest first cost need not be lowest lifecycle cost.",
+    "intent": "Use discounted lifecycle cost to compare engineering alternatives.",
+    "domain": "Engineering Economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A packaged process skid is mechanically installed, electrically connected, and has passed individual equipment checks. The project manager wants to declare it operational immediately. Explain the difference among installation completion, commissioning, integrated functional testing, acceptance, and readiness for intended use. Identify the evidence needed before handover.",
+    "intent": "Distinguish construction completion from commissioning and operational readiness.",
+    "domain": "Construction and Commissioning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A lightweight composite panel passes one static proof test at room temperature with a load equal to 1.2 times nominal service load. In service it will see millions of cycles, −30°C to 70°C temperature changes, moisture, impact damage, and manufacturing variation. Evaluate whether the single proof test is sufficient to validate the design. Identify the missing failure modes, uncertainty sources, and test matrix needed to support a defensible validation claim.",
+    "intent": "Judge whether experimental evidence is sufficient for real service validation.",
+    "domain": "Experimental Engineering",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "experiment_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "During qualification testing, an engineer discovers that a sensor had a calibration drift that could change a reported pass margin from +4% to approximately 0%. Management asks to leave the report unchanged because the product probably still passes. Explain the engineering and professional-judgment issues, including data integrity, uncertainty, disclosure, retest or reanalysis, and public-safety implications if the requirement is safety-related.",
+    "intent": "Apply engineering ethics and professional judgment to uncertain test evidence.",
+    "domain": "Engineering Ethics and Professional Judgment",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "An automated high-temperature production cell suddenly stops after a sequence of events: cooling-water flow falls, a drive motor current rises, product temperature rises, a vibration sensor saturates, the controller commands more pump speed, the shared electrical bus voltage sags, and several sensors reboot. Build a physically consistent cascading-failure explanation across hydraulic, thermal, mechanical, electrical, control, and instrumentation domains. Identify which readings may be misleading, define a safe recovery sequence, and specify evidence needed before restart. Do not assume the first failed component is the root cause.",
+    "intent": "Trace a multidisciplinary cascading failure and plan safe system recovery under uncertain measurements.",
+    "domain": "Multi-Disciplinary Engineering Reasoning",
+    "acuity": "urgent",
+    "difficulty": 5,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  }
+]

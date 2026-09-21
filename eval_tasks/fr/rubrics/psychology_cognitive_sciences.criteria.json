@@ -1,0 +1,293 @@
+{
+  "task": "Score ONE answer to ONE Psychology & Cognitive Sciences question from 0–4.",
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the question asked, uses the supplied evidence, and avoids irrelevant material. The conclusion must answer the stated intent rather than substitute a nearby topic.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "psychological_accuracy",
+      "name": "Psychological Accuracy",
+      "definition": "Uses psychological principles correctly; distinguishes behavior from inferred constructs, learning from temporary performance, confidence from accuracy, motivation from performance, trait tendencies from single behaviors, and group-level patterns from individual conclusions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "cognitive_science_accuracy",
+      "name": "Cognitive Science Accuracy",
+      "definition": "Represents cognitive-science concepts and levels of explanation accurately; avoids treating one task as process-pure, one theoretical framework as universally established, or descriptive model fit as proof of psychological truth.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Distinguishes construct from operationalization, observation from inference, description from explanation, association from mechanism, and theoretical variables from the measures used to estimate them.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "cognitive_mechanism_reasoning",
+      "name": "Cognitive Mechanism Reasoning",
+      "definition": "When mechanism is relevant, explains a coherent chain from stimulus/task through representation or process to observable response, states assumptions, and considers alternative mechanisms or discriminating predictions rather than merely naming a construct.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "perception_attention_and_memory_reasoning",
+      "name": "Perception, Attention, and Memory Reasoning",
+      "definition": "When relevant, correctly separates sensation from perception, attention from awareness, working memory from long-term memory, and encoding from storage and retrieval; incorporates interference, cueing, task demands, and speed-accuracy considerations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "learning_and_decision_reasoning",
+      "name": "Learning and Decision Reasoning",
+      "definition": "When relevant, correctly analyzes conditioning, reinforcement, extinction, prediction error, exploration/exploitation, habit versus goal-directed control, risk, utility, framing, and learning versus short-lived performance change.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "language_and_reasoning_analysis",
+      "name": "Language and Reasoning Analysis",
+      "definition": "When relevant, accurately analyzes lexical access, ambiguity, context, syntax/semantics/pragmatics, deductive versus inductive reasoning, validity versus truth, and probabilistic versus certain conclusions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "developmental_and_individual_difference_reasoning",
+      "name": "Developmental and Individual-Difference Reasoning",
+      "definition": "When relevant, accounts for age-appropriate task demands, strategy, prior knowledge, expertise, exposure, variability, and measurement equivalence; avoids deterministic inference from demographic or group averages.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When quantitative reasoning is required, selects the relevant quantities, performs material calculations correctly, interprets probabilities and effect estimates appropriately, and separates minor arithmetic slips from errors that alter the substantive conclusion.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "experimental_design_reasoning",
+      "name": "Experimental Design Reasoning",
+      "definition": "When relevant, identifies independent/dependent variables, controls, randomization, counterbalancing, order and expectancy effects, task demands, manipulation checks, and the strongest causal conclusion justified by the design.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "psychometric_and_measurement_reasoning",
+      "name": "Psychometric and Measurement Reasoning",
+      "definition": "When relevant, distinguishes reliability from validity, latent construct from indicator, and test score from trait; recognizes measurement error, range restriction, floor/ceiling effects, norm dependence, response bias, and measurement non-equivalence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "statistical_and_data_interpretation",
+      "name": "Statistical and Data Interpretation",
+      "definition": "When relevant, interprets means, variability, correlations, effect sizes, confidence intervals, statistical power, significance, interactions, multiple comparisons, regression, and uncertainty without confusing statistical evidence with theoretical or causal importance.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "neuroscience_reasoning",
+      "name": "Neuroscience Reasoning",
+      "definition": "When relevant, distinguishes neural correlation, necessity, sufficiency, and causal perturbation; respects temporal/spatial-resolution limits, distributed processing, network effects, lesion limitations, and avoids definitive reverse inference.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "computational_and_model_reasoning",
+      "name": "Computational and Model Reasoning",
+      "definition": "When relevant, evaluates assumptions, qualitative and quantitative predictions, fit, complexity, parameter identifiability, generalization, and competing models; fitted parameters are treated as model-dependent estimates rather than directly observed psychological entities.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "causal_inference_and_alternative_explanations",
+      "name": "Causal Inference and Alternative Explanations",
+      "definition": "When relevant, separates association, prediction, explanation, and intervention; identifies confounds, temporal assumptions, regression to the mean, mediation limits, and plausible alternative mechanisms with discriminating evidence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_and_evidence_limits",
+      "name": "Uncertainty and Evidence Limits",
+      "definition": "When relevant, calibrates certainty to design and measurement quality, recognizes ambiguity and statistical uncertainty, allows reasonable alternative cognitive models, and states what the supplied evidence cannot establish.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material reasoning steps needed for a correct answer, including central comparisons, assumptions, requested calculations, qualifications, and alternative explanations when necessary, without requiring irrelevant conditional content.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally compatible claims, calculations, terminology, and conclusions; later statements do not contradict earlier reasoning or the supplied data.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the reasoning in a precise, readable, appropriately structured way, with enough explanation to show why the conclusion follows and without using jargon as a substitute for reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_psychology_cognitive_sciences_error",
+    "condition": "A materially false central psychological, cognitive, experimental, psychometric, quantitative, neuroscientific, or causal claim that fundamentally invalidates the answer or reverses the substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally confusing negative reinforcement with punishment when central to the answer.",
+      "Claiming extinction necessarily erases the original learned association.",
+      "Fundamentally incorrect memory reasoning that reverses an encoding-versus-retrieval conclusion.",
+      "Treating memory confidence as equivalent to memory accuracy when central to the analysis.",
+      "Claiming correlation proves a psychological mechanism.",
+      "Inferring causality from an observational design despite a clearly supplied confound.",
+      "Claiming a brain region's activation proves that region uniquely implements a cognitive function.",
+      "Using reverse inference as definitive proof of a mental state.",
+      "Treating fMRI timing as if it had millisecond temporal precision.",
+      "Fundamentally confusing reliability with validity in evaluating a psychological measure.",
+      "Treating a highly reliable test as necessarily valid.",
+      "Ignoring a clearly dominant speed-accuracy trade-off and interpreting faster responses as better cognition.",
+      "Claiming a statistically nonsignificant result proves no psychological effect despite clearly inadequate power.",
+      "Treating a significant p-value as proof of theoretical importance.",
+      "Claiming group-average differences determine the characteristics of every individual group member.",
+      "Inferring intelligence, mental disorder, or cognitive impairment from insufficient anecdotal evidence.",
+      "Treating training improvement on the trained task as proof of broad cognitive transfer.",
+      "Fundamentally incorrect base-rate or conditional-probability reasoning that changes the conclusion.",
+      "Treating a fitted computational-model parameter as a directly observed psychological process.",
+      "Claiming one experimental task uniquely and purely measures one cognitive construct when the supplied evidence contradicts this."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Small terminology mistakes.",
+      "Reasonable differences among cognitive theories.",
+      "Legitimate alternative models.",
+      "Cautious uncertainty.",
+      "Minor omissions.",
+      "Reasonable approximations.",
+      "Different defensible interpretations where evidence is ambiguous.",
+      "Small disagreements about effect magnitude.",
+      "Minor historical attribution errors."
+    ]
+  },
+  "score_anchors": {
+    "4": "The answer is psychologically and cognitively accurate, directly addresses the question, correctly interprets relevant behavioral or neural evidence, applies an appropriate mechanism or model, recognizes important assumptions and measurement limitations, and reaches a sound conclusion. Experimental answers distinguish observation from causal inference; measurement answers distinguish reliability, validity, construct, and error; neuroscience answers avoid unjustified reverse inference; ambiguous evidence is handled with plausible alternatives and calibrated certainty.",
+    "3": "The answer is substantially correct and useful but contains one meaningful omission, minor psychological imprecision, limited reasoning gap, non-central quantitative error, or insufficient qualification regarding evidence, measurement, or alternatives. The central conclusion remains sound.",
+    "2": "The answer is partly correct or directionally useful but has important omissions, incomplete cognitive reasoning, weak experimental interpretation, significant psychometric or quantitative problems, or inadequate consideration of competing mechanisms. Meaningful correction is required.",
+    "1": "The answer contains a substantial psychology/cognitive-science misunderstanding, inappropriate mechanism, major non-critical experimental error, weak interpretation, or badly incomplete analysis, but does not meet the critical-error threshold.",
+    "0": "Critical Psychology & Cognitive Sciences error, no answer, off-topic answer, unrelated fabrication, or equivalent fundamental failure."
+  },
+  "important_evaluation_principles": [
+    {
+      "title": "Behavior is evidence, not direct access to mental processes",
+      "text": "Psychological mechanisms are inferred from patterns of behavior and other measurements."
+    },
+    {
+      "title": "Constructs are not measurements",
+      "text": "Working memory, attention, intelligence, motivation, and similar constructs are theoretical variables operationalized imperfectly by tasks and scales."
+    },
+    {
+      "title": "Correlation is not causation",
+      "text": "Association does not establish psychological mechanism."
+    },
+    {
+      "title": "Neural activation is not explanation by itself",
+      "text": "A brain-imaging difference does not automatically explain cognition."
+    },
+    {
+      "title": "Reverse inference requires caution",
+      "text": "Observing activation associated with a task does not prove a particular mental process occurred."
+    },
+    {
+      "title": "Reliability is not validity",
+      "text": "A measure may produce highly consistent results while measuring the wrong construct."
+    },
+    {
+      "title": "Confidence is not accuracy",
+      "text": "Confidence and performance should be evaluated separately."
+    },
+    {
+      "title": "Learning is not temporary performance",
+      "text": "Short-term improvement during practice may not imply durable learning or transfer."
+    },
+    {
+      "title": "Training is not broad transfer",
+      "text": "Improvement on trained tasks does not automatically generalize to unrelated cognitive abilities."
+    },
+    {
+      "title": "Attention is not awareness",
+      "text": "These constructs overlap but are not interchangeable."
+    },
+    {
+      "title": "One task rarely measures one pure process",
+      "text": "Cognitive tasks typically involve multiple abilities and strategies."
+    },
+    {
+      "title": "Reaction time requires accuracy context",
+      "text": "Faster responses can reflect better processing, a lower response threshold, guessing, or strategic trade-offs."
+    },
+    {
+      "title": "Group averages do not determine individuals",
+      "text": "Population-level effects should not be treated as deterministic individual characteristics."
+    },
+    {
+      "title": "Heritability is not immutability",
+      "text": "A heritable psychological trait can still be influenced by environment and development."
+    },
+    {
+      "title": "Developmental differences require age-appropriate measurement",
+      "text": "Poorer task performance can reflect task demands rather than absence of the underlying competence."
+    },
+    {
+      "title": "Statistical significance is not theoretical importance",
+      "text": "A small robust effect may be theoretically meaningful; a statistically significant effect may still be practically or theoretically weak."
+    },
+    {
+      "title": "Nonsignificance is not proof of no effect",
+      "text": "Power and precision matter."
+    },
+    {
+      "title": "Models are approximations",
+      "text": "Computational and cognitive models should be evaluated by assumptions, fit, prediction, and discriminating evidence."
+    },
+    {
+      "title": "Multiple models can fit the same data",
+      "text": "Model fit alone does not establish psychological truth."
+    },
+    {
+      "title": "Levels of explanation differ",
+      "text": "Behavioral, computational, neural, developmental, and functional explanations answer related but non-identical questions."
+    },
+    {
+      "title": "Replication requires interpretation",
+      "text": "Replication evidence depends on power, population, measurement, procedure, and effect heterogeneity."
+    },
+    {
+      "title": "No theory worship",
+      "text": "Do not reward allegiance to one psychological school or model."
+    },
+    {
+      "title": "No neuroscience worship",
+      "text": "Neural measurements do not automatically outrank behavioral evidence."
+    },
+    {
+      "title": "No jargon worship",
+      "text": "Psychological terminology without valid reasoning should not receive high credit."
+    },
+    {
+      "title": "No citation worship",
+      "text": "Citations do not compensate for incorrect psychological, methodological, or causal reasoning."
+    }
+  ]
+}

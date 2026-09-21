@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A 54-year-old with intermittent central chest pressure on exertion reports that it resolves within 5 minutes of rest. No pain is present now. What additional history most changes the probability of myocardial ischemia, what dangerous alternatives still matter, and what is the appropriate urgency of evaluation?",
+    "intent": "Elicit discriminating history, prioritize ischemia while retaining dangerous alternatives, and determine urgency.",
+    "domain": "Core Clinical Reasoning / Cardiology",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "differential_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A 29-year-old has a new severe headache. Which history and examination features would make this a same-day or emergency problem rather than a routine headache evaluation, and why?",
+    "intent": "Identify headache red flags and connect them to triage decisions.",
+    "domain": "Core Clinical Reasoning / Neurology",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "triage",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A 67-year-old with sudden severe dyspnea is using accessory muscles, has oxygen saturation 82% on room air, respiratory rate 34/min, blood pressure 86/54 mmHg, and is confused. Explain the immediate priorities before a complete diagnosis, the first focused bedside assessments, and the disposition.",
+    "intent": "Recognize respiratory and circulatory instability and prioritize stabilization.",
+    "domain": "Emergency Medicine / Pulmonology",
+    "acuity": "emergency",
+    "difficulty": 4,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "An 81-year-old becomes acutely inattentive and disoriented on postoperative day 2 after hip surgery. Baseline cognition was intact. Opioids were increased overnight; urinalysis shows pyuria but no urinary symptoms. How should the problem be represented, what reversible contributors should be sought, and why is chronic dementia a poor initial explanation?",
+    "intent": "Recognize delirium, avoid anchoring on nonspecific tests, and identify reversible contributors.",
+    "domain": "Geriatrics / Neurology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A 76-year-old presents with fatigue, poor appetite, and temperature 37.8 C. They take a beta blocker and have a resting heart rate of 72/min. Explain why serious infection cannot be excluded by the modest fever and normal heart rate alone, and what clinical data should determine next steps.",
+    "intent": "Interpret atypical illness presentation in an older adult and avoid false reassurance.",
+    "domain": "Internal Medicine / Geriatrics",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A 63-year-old has 6 kg unintentional weight loss, fatigue, hemoglobin 9.8 g/dL, MCV 72 fL, and no overt bleeding. Ferritin is low. Prioritize the major diagnostic possibilities and explain what evaluation is needed before simply prescribing iron long term.",
+    "intent": "Interpret iron-deficiency pattern and prioritize evaluation for a source, including occult blood loss.",
+    "domain": "Internal Medicine / Hematology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "diagnostic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A 70-year-old with heart failure taking a thiazide has sodium 124 mmol/L, mild nausea, no seizures, and no focal deficits. What information is needed to classify the hyponatremia, what medication and volume-status issues matter, and why should rapid correction be avoided?",
+    "intent": "Classify hyponatremia and reason safely about cause and correction.",
+    "domain": "Nephrology / Electrolytes",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "lab_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A patient with sepsis has ABG: pH 7.31, PaCO2 24 mmHg, HCO3- 12 mmol/L. Serum Na is 138 mmol/L and Cl is 100 mmol/L. Calculate the anion gap, determine the primary acid-base disorder, assess whether respiratory compensation is broadly appropriate using expected PaCO2 about 1.5 x HCO3- + 8 +/- 2, and explain what a deviation would imply.",
+    "intent": "Perform and interpret anion-gap and compensation calculations in critical illness.",
+    "domain": "Nephrology / Acid-Base / Emergency Medicine",
+    "acuity": "urgent",
+    "difficulty": 5,
+    "style": "acid_base",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A 72-year-old's creatinine rises from 1.0 to 1.9 mg/dL after 3 days of vomiting while taking an ACE inhibitor and an NSAID. Blood pressure is 98/60 mmHg and mucous membranes are dry. Explain the likely contributors to acute kidney injury, which medications should be reconsidered now, and what would argue against assuming simple volume depletion is the whole explanation.",
+    "intent": "Integrate volume status, medication effects, and alternative causes of AKI.",
+    "domain": "Internal Medicine / Nephrology / Medication Safety",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "multimorbidity",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A patient has bilateral leg edema, albumin 2.1 g/dL, creatinine 1.1 mg/dL, elevated jugular venous pressure, and bibasilar crackles. Explain why edema alone does not identify a single cause and how the examination and laboratory findings change the differential.",
+    "intent": "Integrate cardiac, hepatic, renal, and protein-loss explanations for edema.",
+    "domain": "Internal Medicine / Multisystem",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "differential_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A 59-year-old has 40 minutes of crushing chest pain with diaphoresis. ECG shows 2 mm ST elevation in contiguous anterior leads. Blood pressure is 92/58 mmHg. What are the immediate priorities, which actions should not be delayed for additional testing, and what features influence medication safety?",
+    "intent": "Recognize STEMI with hemodynamic concern and prioritize time-critical management.",
+    "domain": "Cardiology / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 4,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A 78-year-old with atrial fibrillation on anticoagulation presents with melena, hemoglobin 7.2 g/dL, heart rate 118/min, and blood pressure 88/56 mmHg. Explain the immediate priorities and how active bleeding, thromboembolic risk, anticoagulant effect, and later resumption decisions interact.",
+    "intent": "Balance resuscitation and hemorrhage control with anticoagulation-related thromboembolic risk.",
+    "domain": "Cardiology / Gastroenterology / Medication Safety",
+    "acuity": "emergency",
+    "difficulty": 5,
+    "style": "clinical_prioritization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A patient taking a beta blocker reports dizziness. Heart rate is 38/min and blood pressure is 84/50 mmHg. ECG shows regular P waves with intermittent nonconducted P waves. Explain why this is not a routine medication side-effect visit and what should be prioritized.",
+    "intent": "Recognize unstable bradyarrhythmia and distinguish medication contribution from immediate physiologic risk.",
+    "domain": "Cardiology / Medication Safety",
+    "acuity": "emergency",
+    "difficulty": 3,
+    "style": "ECG_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A 74-year-old with known reduced-ejection-fraction heart failure develops pneumonia, rising creatinine, cool extremities, lactate elevation, pulmonary crackles, and blood pressure 82/48 mmHg. Explain how cardiogenic shock, distributive shock, congestion, and intravascular depletion can coexist, what bedside data help separate dominant mechanisms, and how treatment priorities may conflict.",
+    "intent": "Integrate shock physiology, heart failure, infection, and renal dysfunction under uncertainty.",
+    "domain": "Cardiology / Internal Medicine / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 5,
+    "style": "multimorbidity",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A 68-year-old has recurrent syncope while walking uphill, a harsh systolic murmur radiating to the neck, and no orthostatic symptoms. What diagnosis is most concerning, what competing causes of syncope remain possible, and what testing should be prioritized?",
+    "intent": "Use history and examination to prioritize a structural cardiac cause of syncope.",
+    "domain": "Cardiology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "diagnostic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A 35-year-old has sharp chest pain that is worse when supine, improved by leaning forward, and follows a viral illness. ECG shows diffuse ST elevation without reciprocal depression. Explain why acute pericarditis is more likely than focal coronary occlusion while noting features that would still require urgent reassessment.",
+    "intent": "Differentiate pericarditis from myocardial infarction while preserving safety-netting.",
+    "domain": "Cardiology",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "ECG_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A patient has blood pressure 220/124 mmHg, confusion, retinal hemorrhages, and rising creatinine. Explain why this represents more than severe asymptomatic hypertension and how evidence of acute target-organ injury changes management urgency.",
+    "intent": "Distinguish hypertensive emergency from asymptomatic severe hypertension.",
+    "domain": "Cardiology / Internal Medicine",
+    "acuity": "emergency",
+    "difficulty": 3,
+    "style": "triage",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A 46-year-old with pleuritic chest pain, tachycardia, and unilateral leg swelling had major surgery 2 weeks ago. Oxygen saturation is 92% on room air and blood pressure is stable. Explain the pretest-probability reasoning for pulmonary embolism and why a low-sensitivity rule-out strategy may be inappropriate in a high-risk presentation.",
+    "intent": "Reason from risk factors and presentation to testing strategy for suspected pulmonary embolism.",
+    "domain": "Pulmonology / Cardiology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "risk_assessment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A 69-year-old with COPD has increased dyspnea and sputum purulence. Oxygen saturation is 88%, respiratory rate 24/min, and they are alert. Explain how to assess severity, what alternative diagnoses should remain in the differential, and what findings would require escalation.",
+    "intent": "Assess COPD exacerbation severity and avoid premature diagnostic closure.",
+    "domain": "Pulmonology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "treatment_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A 23-year-old with asthma is unable to speak full sentences, has a nearly silent chest, oxygen saturation 86%, and appears exhausted. What are the immediate priorities, and why is reduced wheezing in this context not reassuring?",
+    "intent": "Recognize life-threatening asthma and prioritize oxygenation, ventilation, and escalation.",
+    "domain": "Pulmonology / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 4,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A tall 27-year-old develops sudden pleuritic chest pain and severe dyspnea. Breath sounds are absent on the right, the trachea is displaced leftward, blood pressure is 78/46 mmHg, and neck veins are distended. What should happen before confirmatory chest imaging?",
+    "intent": "Recognize tension pneumothorax and prioritize immediate decompression before imaging.",
+    "domain": "Pulmonology / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 3,
+    "style": "clinical_prioritization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "Spirometry shows FEV1 1.8 L (60% predicted), FVC 3.6 L (92% predicted), and FEV1/FVC 0.50. After bronchodilator, FEV1 increases by 18% and 350 mL. Interpret the ventilatory pattern and explain what the bronchodilator response does and does not establish.",
+    "intent": "Interpret obstructive spirometry and limits of bronchodilator response.",
+    "domain": "Pulmonology / Diagnostic Testing",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "lab_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A 58-year-old with fever, productive cough, pleuritic pain, and focal crackles has a new lobar opacity on chest radiograph. Heart rate is 112/min and oxygen saturation is 90%. Explain why pneumonia is likely, what alternative diagnoses still deserve consideration, and how severity affects disposition.",
+    "intent": "Integrate clinical and imaging findings in pneumonia while assessing severity.",
+    "domain": "Pulmonology / Infectious Diseases",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "imaging_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A patient with obesity hypoventilation and COPD becomes somnolent after receiving sedatives. ABG: pH 7.20, PaCO2 78 mmHg, HCO3- 30 mmol/L, PaO2 58 mmHg. Explain the acute and chronic components, distinguish oxygenation from ventilation failure, and identify immediate management priorities.",
+    "intent": "Interpret acute-on-chronic hypercapnic respiratory failure and sedative contribution.",
+    "domain": "Pulmonology / Pharmacology / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 5,
+    "style": "acid_base",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A 61-year-old has black stools, lightheadedness, heart rate 108/min, blood pressure 104/66 mmHg, and hemoglobin 8.1 g/dL. Explain the immediate assessment, why a single hemoglobin value may underestimate early blood loss, and what findings would increase the urgency of intervention.",
+    "intent": "Assess upper GI bleeding severity and interpret early laboratory data in context.",
+    "domain": "Gastroenterology / Emergency Medicine",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A patient has severe epigastric pain radiating to the back, vomiting, and lipase more than three times the laboratory upper limit of normal. Explain the likely diagnosis, what common etiologies should be sought, and which clinical features determine severity rather than relying on lipase magnitude.",
+    "intent": "Diagnose pancreatitis and separate etiologic workup from severity assessment.",
+    "domain": "Gastroenterology / Hepatology",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "diagnostic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "Laboratory tests show alkaline phosphatase 420 U/L (ULN 120), ALT 95 U/L (ULN 40), total bilirubin 4.2 mg/dL, and dark urine. Explain whether the pattern is more cholestatic or hepatocellular and what imaging question should be addressed first.",
+    "intent": "Interpret liver-test pattern and choose initial imaging for possible biliary obstruction.",
+    "domain": "Gastroenterology / Hepatology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "lab_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A patient with cirrhosis and ascites develops fever, abdominal pain, and worsening confusion. Blood pressure is 96/58 mmHg. Explain why diagnostic paracentesis and prompt infection assessment are important, how hepatic encephalopathy may fit, and what would make the situation emergent.",
+    "intent": "Recognize possible spontaneous bacterial peritonitis with encephalopathy and evolving instability.",
+    "domain": "Gastroenterology / Hepatology / Infectious Diseases",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "clinical_prioritization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A 66-year-old with prior abdominal surgery has crampy abdominal pain, vomiting, distension, and no passage of stool or flatus. CT shows dilated small-bowel loops with a transition point and no free air. Explain the leading diagnosis, immediate management priorities, and findings that would suggest strangulation or perforation.",
+    "intent": "Recognize small-bowel obstruction and identify indications for urgent surgical escalation.",
+    "domain": "Surgery / Gastroenterology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A 64-year-old has progressive difficulty swallowing solids and then liquids with 7 kg weight loss over 3 months. Explain why this pattern is a red flag, the major categories of cause, and the next diagnostic step.",
+    "intent": "Prioritize structural causes of progressive dysphagia and urgent diagnostic evaluation.",
+    "domain": "Gastroenterology / Oncology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "diagnostic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A patient with chronic kidney disease has potassium 7.1 mmol/L, weakness, and ECG showing widened QRS complexes. Explain the immediate priorities, including which treatment goal is cardiac membrane stabilization versus shifting potassium versus removing potassium from the body.",
+    "intent": "Recognize life-threatening hyperkalemia and separate immediate treatment mechanisms.",
+    "domain": "Nephrology / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 4,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A patient with chronic severe hyponatremia has sodium 112 mmol/L and no seizure. After treatment, sodium rises to 124 mmol/L in 8 hours. Explain why this change is concerning even though the number is closer to normal and what the next safety priority is.",
+    "intent": "Recognize dangerous overcorrection of chronic hyponatremia and prioritize prevention of neurologic injury.",
+    "domain": "Nephrology / Patient Safety",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "medication_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A patient has edema, urine protein 5 g/day, serum albumin 2.3 g/dL, and hyperlipidemia but only 5 red cells per high-power field. Contrast the nephrotic pattern with a nephritic pattern and explain which additional findings would shift concern toward glomerular inflammation.",
+    "intent": "Differentiate nephrotic from nephritic renal syndromes conceptually.",
+    "domain": "Nephrology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "lab_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A 24-year-old with type 1 diabetes has glucose 420 mg/dL, Na 134 mmol/L, Cl 98 mmol/L, HCO3- 10 mmol/L, positive serum ketones, and pH 7.18. Calculate the anion gap and explain how the result supports the diagnosis while identifying the immediate treatment priorities.",
+    "intent": "Calculate anion gap and integrate it into diabetic ketoacidosis management.",
+    "domain": "Endocrinology / Nephrology / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 4,
+    "style": "clinical_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A patient with estimated GFR 22 mL/min is prescribed a renally cleared sedating medication at the usual adult dose and develops new somnolence after several days. Explain the medication-safety problem and what information is needed before choosing a revised dose or interval.",
+    "intent": "Recognize drug accumulation in renal impairment and avoid inventing a dose without required details.",
+    "domain": "Pharmacology / Nephrology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "medication_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A patient with diabetic ketoacidosis has glucose 510 mg/dL, pH 7.12, HCO3- 8 mmol/L, and serum potassium 4.6 mmol/L before insulin. Explain why total-body potassium can be depleted despite a normal serum value, how insulin and correction of acidosis can change serum potassium, and what monitoring logic follows.",
+    "intent": "Reason through potassium physiology and treatment effects in DKA.",
+    "domain": "Endocrinology / Nephrology / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 5,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A patient using insulin is sweaty and confused. Capillary glucose is 2.3 mmol/L (41 mg/dL). Explain the immediate treatment goal, how route depends on the patient's ability to swallow safely, and what should be investigated after stabilization.",
+    "intent": "Treat symptomatic hypoglycemia safely and identify contributing causes.",
+    "domain": "Endocrinology / Pharmacology",
+    "acuity": "emergency",
+    "difficulty": 2,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A patient has fatigue, cold intolerance, low free T4, and markedly elevated TSH. Another patient has low free T4 with an inappropriately low-normal TSH. Explain how the feedback loop distinguishes primary from central hypothyroidism.",
+    "intent": "Interpret thyroid feedback patterns and distinguish primary from secondary dysfunction.",
+    "domain": "Endocrinology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A patient with long-term glucocorticoid use abruptly stopped medication and now has vomiting, hypotension, sodium 126 mmol/L, potassium 5.8 mmol/L, and hypoglycemia. Explain the endocrine emergency, why treatment should not wait for perfect diagnostic certainty, and what immediate physiologic problems must be addressed.",
+    "intent": "Recognize adrenal crisis and prioritize empiric stabilization.",
+    "domain": "Endocrinology / Emergency Medicine / Pharmacology",
+    "acuity": "emergency",
+    "difficulty": 4,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A patient with malignancy has corrected calcium 3.35 mmol/L, dehydration, constipation, and confusion. Explain why symptoms and volume status matter more than the abnormal number alone, and outline the immediate management priorities conceptually.",
+    "intent": "Assess symptomatic severe hypercalcemia in context and prioritize supportive management.",
+    "domain": "Endocrinology / Oncology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "clinical_prioritization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A hospitalized patient with fever, hypotension, rising lactate, acute kidney injury, and no obvious source has blood cultures drawn. Broad empiric antibiotics are started. Explain the next several hours of management, including source search, source control, reassessment, culture interpretation, and when de-escalation becomes appropriate.",
+    "intent": "Manage sepsis under diagnostic uncertainty while planning source control and antimicrobial de-escalation.",
+    "domain": "Infectious Diseases / Emergency Medicine / Internal Medicine",
+    "acuity": "emergency",
+    "difficulty": 5,
+    "style": "treatment_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "An older long-term-care resident has a urine culture growing E. coli but no dysuria, urgency, suprapubic pain, flank pain, fever, or hemodynamic instability. Explain why bacteriuria alone does not establish symptomatic urinary infection and what should determine whether treatment is needed.",
+    "intent": "Distinguish colonization/asymptomatic bacteriuria from clinical infection.",
+    "domain": "Infectious Diseases / Diagnostic Testing",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "One of two blood-culture sets grows a common skin commensal after 48 hours in a clinically stable patient with no intravascular device and no focal infection. Explain what features support contamination versus true bacteremia and what further information is needed before treating.",
+    "intent": "Interpret a possibly contaminated blood culture using clinical context.",
+    "domain": "Infectious Diseases / Laboratory Medicine",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A patient receiving cytotoxic chemotherapy has temperature 38.6 C and an absolute neutrophil count of 0.3 x 10^9/L. Blood pressure is 102/64 mmHg. Explain why this is time-sensitive even without a localizing symptom and what should happen promptly.",
+    "intent": "Recognize neutropenic fever as an oncologic emergency and prioritize empiric treatment and cultures.",
+    "domain": "Hematology / Oncology / Infectious Diseases",
+    "acuity": "emergency",
+    "difficulty": 3,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A patient has a warm erythematous lower leg with tenderness and fever, but also marked unilateral swelling after recent immobilization. Explain why cellulitis and deep-vein thrombosis can overlap clinically and what features or tests help distinguish them.",
+    "intent": "Build a focused differential for unilateral leg inflammation and swelling.",
+    "domain": "Dermatology / Vascular Medicine / Infectious Diseases",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "differential_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "Hemoglobin is 8.9 g/dL, MCV 70 fL, ferritin 8 ng/mL, transferrin saturation low, and reticulocyte count low-normal. Explain the anemia pattern, the meaning of the reticulocyte response, and what clinical causes should be investigated.",
+    "intent": "Interpret microcytic anemia using iron studies and marrow response.",
+    "domain": "Hematology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "lab_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A patient has anemia, elevated LDH, low haptoglobin, indirect hyperbilirubinemia, and reticulocytosis. Explain why this pattern suggests hemolysis and which additional data would help distinguish immune from nonimmune causes.",
+    "intent": "Recognize laboratory evidence of hemolysis and plan discriminating tests.",
+    "domain": "Hematology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "diagnostic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A patient has platelets 18 x 10^9/L, new petechiae, and gum bleeding. Hemoglobin is stable and there is no major hemorrhage. Explain the immediate safety concerns, the key questions that distinguish decreased production from destruction or consumption, and what would require emergency escalation.",
+    "intent": "Assess severe thrombocytopenia with minor bleeding and prioritize dangerous etiologies.",
+    "domain": "Hematology",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "clinical_prioritization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A patient with high-burden lymphoma begins therapy and 24 hours later has potassium 6.3 mmol/L, phosphate elevated, calcium low, uric acid elevated, and rising creatinine. Explain the syndrome, the pathophysiology linking the abnormalities, and the immediate risks.",
+    "intent": "Recognize tumor lysis syndrome and connect laboratory changes to renal and cardiac risk.",
+    "domain": "Oncology / Nephrology",
+    "acuity": "emergency",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A patient asks whether a high-grade cancer is necessarily the same as stage IV cancer. Explain the difference between tumor grade and stage and why each can influence prognosis and treatment in different ways.",
+    "intent": "Distinguish cancer grade from stage conceptually.",
+    "domain": "Oncology / Patient Communication",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "patient_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A 71-year-old develops sudden right facial droop, right arm weakness, and aphasia 45 minutes ago. Glucose is normal. Explain the immediate priorities, the key imaging question, and why a complete diagnostic workup should not delay time-sensitive stroke evaluation.",
+    "intent": "Recognize acute focal neurologic deficit as stroke until proven otherwise and prioritize urgent pathway.",
+    "domain": "Neurology / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 3,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A patient had 15 minutes of unilateral arm weakness and speech difficulty that fully resolved before arrival. Explain why symptom resolution does not make the event benign and what urgent evaluation should address.",
+    "intent": "Recognize transient focal neurologic symptoms as possible TIA and assess short-term risk.",
+    "domain": "Neurology",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "triage",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A person briefly loses consciousness while standing in a hot room, has a few brief jerking movements, and rapidly returns to baseline without confusion. Explain what features favor syncope over generalized seizure and what history would still be needed.",
+    "intent": "Differentiate convulsive syncope from seizure using time course and recovery.",
+    "domain": "Neurology / Cardiology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "differential_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A 42-year-old has fever, severe headache, neck stiffness, confusion, and a new focal neurologic deficit. Explain the immediate stabilization priorities, why CNS infection remains a major concern, and how the focal deficit affects the sequencing of imaging, lumbar puncture, and empiric treatment.",
+    "intent": "Manage suspected CNS infection with neurologic red flags without delaying life-saving therapy.",
+    "domain": "Neurology / Infectious Diseases / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 5,
+    "style": "clinical_prioritization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A patient has progressive bilateral leg weakness, a sensory level at the umbilicus, brisk reflexes, and urinary retention. Localize the lesion and explain why this is more consistent with spinal cord disease than a peripheral neuropathy.",
+    "intent": "Use neurologic examination to localize a central myelopathic process.",
+    "domain": "Neurology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "diagnostic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A patient has sudden vertigo, vomiting, severe gait ataxia, and new diplopia. Hearing is unchanged. Explain why a central cause must be considered and which associated neurologic findings increase concern for posterior circulation ischemia.",
+    "intent": "Distinguish central from peripheral vertigo using associated neurologic signs.",
+    "domain": "Neurology / Emergency Medicine",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "triage",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A hospitalized patient with pneumonia becomes acutely agitated, visually hallucinating, and inattentive with fluctuating symptoms over hours. Explain why delirium is more likely than a new primary psychotic disorder and what medical causes should be addressed first.",
+    "intent": "Differentiate delirium from psychosis and prioritize underlying medical causes.",
+    "domain": "Psychiatry / Internal Medicine",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "diagnostic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A patient with depression says, 'I plan to take all of my pills tonight,' has gathered the medication, and cannot identify a reason to stay safe. What is the immediate clinical priority, and which elements of risk and protective factors should be assessed without delaying safety measures?",
+    "intent": "Recognize acute suicide risk and prioritize immediate safety and emergency evaluation.",
+    "domain": "Psychiatry / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 3,
+    "style": "risk_assessment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A patient has decreased need for sleep, pressured speech, weight loss, tremor, and new atrial fibrillation. Explain why a medical mimic such as thyrotoxicosis must be considered before assuming a primary manic episode.",
+    "intent": "Distinguish psychiatric syndrome from endocrine mimic using systemic clues.",
+    "domain": "Psychiatry / Endocrinology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "differential_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A person with heavy daily alcohol use stopped drinking 24 hours ago and now has tremor, diaphoresis, tachycardia, agitation, and visual hallucinations. Explain the likely process, what makes it dangerous, and what monitoring priorities follow.",
+    "intent": "Recognize alcohol withdrawal and identify risk of progression to severe withdrawal.",
+    "domain": "Psychiatry / Emergency Medicine",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "treatment_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A 2-year-old with gastroenteritis has dry mucous membranes, reduced tears, capillary refill 3 seconds, tachycardia, and fewer wet diapers but is alert and drinking small amounts. Explain how to assess dehydration severity and what findings would make oral rehydration insufficient.",
+    "intent": "Apply age-aware dehydration assessment and choose route of rehydration.",
+    "domain": "Pediatrics",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "treatment_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A 6-week-old infant has a rectal temperature of 38.3 C and is feeding less than usual. Explain why age changes the risk assessment and why this presentation warrants urgent medical evaluation even without a focal symptom.",
+    "intent": "Recognize fever in a young infant as high-risk and triage appropriately.",
+    "domain": "Pediatrics / Infectious Diseases",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "triage",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "An 8-month-old has cough, wheeze, diffuse crackles, feeding difficulty, and mild subcostal retractions. Oxygen saturation is 94%. Explain the likely syndrome, what features determine severity, and why routine antibiotics are not automatically indicated.",
+    "intent": "Reason through bronchiolitis severity and avoid unnecessary antibiotics.",
+    "domain": "Pediatrics / Pulmonology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "treatment_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A child weighs 18 kg. A medication is ordered at 10 mg/kg per dose. The liquid concentration is 50 mg/mL. Calculate the prescribed milligrams per dose and the corresponding volume, then state one safety check that should occur before administration.",
+    "intent": "Perform weight-based dose and concentration conversion with unit checking.",
+    "domain": "Pediatrics / Pharmacology / Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "clinical_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A 7-year-old has repeated bruises in different stages of healing, an explanation that changes between caregivers, and a delay in seeking care for a painful arm. Explain the clinical safeguarding concerns, the need for careful documentation, and why the clinician should avoid accusatory conclusions unsupported by evidence.",
+    "intent": "Recognize safeguarding red flags while maintaining objective, evidence-based assessment.",
+    "domain": "Pediatrics / Patient Safety",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A 29-year-old with 7 weeks of amenorrhea has unilateral pelvic pain, light vaginal bleeding, dizziness, and a positive pregnancy test. Blood pressure is 100/62 mmHg. Explain the most concerning diagnosis, what immediate assessment is needed, and why reassurance without confirming pregnancy location would be unsafe.",
+    "intent": "Recognize possible ectopic pregnancy and prioritize evaluation for rupture or instability.",
+    "domain": "Obstetrics & Gynecology / Emergency Medicine",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "triage",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A patient at 34 weeks' gestation has blood pressure 174/116 mmHg, severe headache, visual symptoms, and right upper-quadrant pain. Explain why this is an obstetric emergency and identify the immediate maternal and fetal priorities conceptually.",
+    "intent": "Recognize severe hypertensive disease of pregnancy and prioritize urgent stabilization.",
+    "domain": "Obstetrics & Gynecology / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 4,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "Ten minutes after vaginal delivery, a patient has heavy ongoing bleeding, heart rate 126/min, blood pressure 82/50 mmHg, and a boggy enlarged uterus. Explain the immediate priorities and why treatment of presumed uterine atony proceeds alongside resuscitation rather than after a complete workup.",
+    "intent": "Recognize postpartum hemorrhage with shock and prioritize simultaneous resuscitation and source treatment.",
+    "domain": "Obstetrics & Gynecology / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 4,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "Five days postpartum, a patient develops sudden dyspnea, pleuritic chest pain, tachycardia, and oxygen saturation 89%. Explain why postpartum physiology changes thromboembolic risk and why urgent evaluation for pulmonary embolism is required.",
+    "intent": "Recognize postpartum venous thromboembolism risk and triage suspected PE.",
+    "domain": "Obstetrics & Gynecology / Pulmonology",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "risk_assessment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A 46-year-old has increasingly heavy irregular uterine bleeding and fatigue. Pregnancy test is negative. Explain the major structural and nonstructural categories of abnormal uterine bleeding and which features would make endometrial evaluation important.",
+    "intent": "Structure the differential for abnormal uterine bleeding and identify red flags for endometrial pathology.",
+    "domain": "Obstetrics & Gynecology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "differential_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A 22-year-old has 18 hours of migratory periumbilical-to-right-lower-quadrant pain, anorexia, fever, and localized guarding. Explain why appendicitis is likely, what alternatives matter, and which findings would make perforation or generalized peritonitis more concerning.",
+    "intent": "Recognize appendicitis and identify signs requiring urgent surgical escalation.",
+    "domain": "Surgery / Emergency Medicine",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "diagnostic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "On postoperative day 1 after abdominal surgery, a patient has temperature 37.9 C, mild tachycardia, expected incisional pain, and clear lungs. Explain why this does not automatically indicate infection and what trend or additional findings would justify targeted evaluation.",
+    "intent": "Interpret early postoperative fever without overdiagnosing infection.",
+    "domain": "Surgery / Perioperative Care",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A postoperative patient develops abdominal distension, vomiting, no flatus, tachycardia, and increasing focal tenderness. Explain how ileus and mechanical obstruction differ and which features would prompt urgent imaging and surgical review.",
+    "intent": "Differentiate expected postoperative ileus from mechanical obstruction or evolving complication.",
+    "domain": "Surgery / Perioperative Care",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "differential_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A patient taking long-term anticoagulation is scheduled for major surgery with high bleeding risk. Explain the factors that determine whether anticoagulation is interrupted and whether bridging is considered, without assuming that every anticoagulated patient needs the same strategy.",
+    "intent": "Balance perioperative bleeding and thromboembolic risks in anticoagulation management.",
+    "domain": "Surgery / Pharmacology / Cardiology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "risk_benefit_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Five days after laparotomy, a patient feels a 'pop' while coughing and the wound opens with visible deeper tissue. Explain the immediate actions, what should be avoided, and why this is not managed as routine superficial wound care.",
+    "intent": "Recognize wound dehiscence and prioritize urgent surgical management.",
+    "domain": "Surgery / Emergency Medicine",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "triage",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "Minutes after receiving an antibiotic, a patient develops generalized hives, wheeze, stridor, and blood pressure 76/42 mmHg. Explain the first-line treatment priority and why antihistamines alone are inadequate.",
+    "intent": "Recognize anaphylaxis and prioritize immediate definitive treatment.",
+    "domain": "Emergency Medicine / Allergy / Pharmacology",
+    "acuity": "emergency",
+    "difficulty": 2,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "After a motor-vehicle collision, a patient is pale and confused with heart rate 132/min, blood pressure 78/44 mmHg, cool skin, and a distended tender abdomen. Explain the first trauma priorities and why normal initial hemoglobin would not exclude major hemorrhage.",
+    "intent": "Recognize hemorrhagic shock and prioritize ABC-based trauma resuscitation and bleeding control.",
+    "domain": "Emergency Medicine / Trauma",
+    "acuity": "emergency",
+    "difficulty": 4,
+    "style": "emergency_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A 70-kg adult is prescribed an intravenous drug at 0.1 mg/kg. The vial concentration is 5 mg/mL. Calculate the dose in mg and the volume in mL. Then explain why the route, indication, and maximum safe dose still require verification before administration.",
+    "intent": "Perform weight-based medication calculation and connect arithmetic to medication safety.",
+    "domain": "Pharmacology / Quantitative Reasoning / Patient Safety",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "clinical_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A patient with altered mental status is found to have capillary glucose 1.9 mmol/L (34 mg/dL). They cannot swallow safely. Explain the immediate treatment route principle and why neurologic imaging should not delay correction of this reversible life-threatening cause.",
+    "intent": "Prioritize immediate correction of severe hypoglycemia during altered mental status evaluation.",
+    "domain": "Emergency Medicine / Endocrinology",
+    "acuity": "emergency",
+    "difficulty": 2,
+    "style": "clinical_prioritization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A 58-year-old has sudden severe eye pain, headache, halos around lights, nausea, a fixed mid-dilated pupil, and reduced vision in one eye. Explain the likely emergency and why delayed ophthalmic treatment risks permanent harm.",
+    "intent": "Recognize acute angle-closure glaucoma and triage urgently.",
+    "domain": "Ophthalmology",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "triage",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A patient reports sudden painless flashes, floaters, and a curtain descending over one visual field. Explain the concerning diagnosis and why a painless presentation can still require same-day specialist assessment.",
+    "intent": "Recognize retinal detachment symptoms and urgency.",
+    "domain": "Ophthalmology",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "triage",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A patient with brisk posterior epistaxis is swallowing blood, becoming tachycardic, and has difficulty protecting the airway. Explain why airway and hemodynamic assessment take priority over detailed cause-finding.",
+    "intent": "Prioritize airway and circulation in severe epistaxis.",
+    "domain": "ENT / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 3,
+    "style": "clinical_prioritization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A 56-year-old has an acutely swollen, hot knee, fever, and severe pain with passive movement. Serum urate is elevated. Explain why gout cannot be assumed from the urate level and what diagnosis requires urgent exclusion.",
+    "intent": "Prioritize septic arthritis despite a plausible alternative and misleading test.",
+    "domain": "Rheumatology / Infectious Diseases",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "diagnostic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A 64-year-old with new severe low-back pain has bilateral leg weakness, saddle numbness, and urinary retention. Explain the urgent concern, what imaging is needed, and why conservative outpatient management would be unsafe.",
+    "intent": "Recognize cauda equina syndrome and prioritize emergency imaging and specialist care.",
+    "domain": "Musculoskeletal Medicine / Neurology",
+    "acuity": "emergency",
+    "difficulty": 3,
+    "style": "triage",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A 45-year-old has hand joint pain with morning stiffness lasting 90 minutes, symmetric MCP swelling, and improvement with activity. Contrast this with a typical mechanical pattern and explain what additional findings would support systemic inflammatory disease.",
+    "intent": "Differentiate inflammatory from mechanical arthritis and plan focused evaluation.",
+    "domain": "Rheumatology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "differential_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "An 84-year-old with recurrent falls takes a benzodiazepine, an antihypertensive, and a sedating antihistamine. Orthostatic blood pressure falls from 138/74 supine to 108/62 standing with dizziness. Explain how medication review, orthostasis, gait, vision, and home hazards should be integrated rather than attributing the falls to age alone.",
+    "intent": "Integrate multifactorial fall risk and medication-related harm in geriatrics.",
+    "domain": "Geriatrics / Pharmacology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "multimorbidity",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "An 88-year-old with advanced heart failure, stage 4 chronic kidney disease, frailty, repeated hospitalizations, and severe treatment burden says the main goal is to remain at home and avoid invasive care. Explain how prognosis, symptom benefit, treatment burden, and patient goals should shape medication and hospitalization decisions without equating comfort-focused care with no care.",
+    "intent": "Integrate multimorbidity, goals of care, prognosis, and treatment burden.",
+    "domain": "Geriatrics / Ethics / Patient-Centered Care",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "risk_benefit_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A malnourished patient with minimal intake for 10 days begins aggressive nutrition and then develops weakness, edema, low phosphate, low magnesium, and low potassium. Explain the syndrome and why nutrition should be advanced with electrolyte monitoring rather than treating each laboratory value in isolation.",
+    "intent": "Recognize refeeding syndrome and integrate nutritional and electrolyte management.",
+    "domain": "Nutrition / Internal Medicine",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A patient taking a QT-prolonging antiarrhythmic is prescribed a second QT-prolonging medication and then develops palpitations. Potassium is 3.0 mmol/L. Explain the interaction among the medications, electrolyte abnormality, and arrhythmia risk, and identify the immediate medication-safety priorities.",
+    "intent": "Recognize additive QT risk and modifiable electrolyte contribution.",
+    "domain": "Pharmacology / Cardiology / Medication Safety",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "medication_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "At hospital admission, a patient's home medication list includes two drugs from the same class prescribed by different clinicians, one of which was intended to be stopped months ago. Explain how medication reconciliation should determine which drug is actually being taken, why duplicate therapy matters, and how the discrepancy should be resolved safely.",
+    "intent": "Apply medication reconciliation to duplicate therapy and communication errors.",
+    "domain": "Pharmacology / Patient Safety",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "medication_safety",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A diagnostic test is evaluated in 1,000 people: 100 truly have disease. The test is positive in 90 of those 100 and in 180 of the 900 without disease. Calculate sensitivity and specificity, then explain why these values alone do not tell a patient the probability they have disease after a positive result.",
+    "intent": "Calculate sensitivity and specificity and distinguish them from predictive value.",
+    "domain": "Diagnostic Testing / Evidence-Based Medicine / Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "In a screened population of 10,000 people, disease prevalence is 1%. A test has 90% sensitivity and 90% specificity. Estimate the positive predictive value using a 2 x 2 table and explain why many positive results can be false positives when prevalence is low.",
+    "intent": "Calculate PPV and connect it to pretest probability.",
+    "domain": "Diagnostic Testing / Screening / Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A randomized trial reports an event rate of 10% with usual care and 8% with treatment over 5 years. Calculate the absolute risk reduction, relative risk reduction, and number needed to treat. Then explain why the absolute effect may matter more to a patient than the relative effect alone.",
+    "intent": "Calculate and interpret absolute and relative treatment effects.",
+    "domain": "Evidence-Based Medicine / Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "evidence_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "An observational study finds that coffee drinkers have fewer cardiovascular events than non-drinkers, but coffee drinkers also exercise more and smoke less. Explain how confounding limits causal inference and what design features would better address the treatment-effect question.",
+    "intent": "Distinguish association from causation and explain confounding.",
+    "domain": "Evidence-Based Medicine / Public Health",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "evidence_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A new cancer-screening program detects more early-stage tumors and increases 5-year survival after diagnosis, but overall disease-specific mortality is unchanged. Explain how lead-time bias and overdiagnosis could produce this pattern and why survival after diagnosis is not sufficient evidence of screening benefit.",
+    "intent": "Interpret screening outcomes and recognize lead-time bias and overdiagnosis.",
+    "domain": "Prevention / Screening / Evidence-Based Medicine",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "evidence_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A CT performed for kidney stones incidentally shows a small adrenal nodule. The patient has no symptoms of hormone excess. Explain why an incidental imaging finding is not automatically a diagnosis requiring treatment and what broad questions guide further evaluation.",
+    "intent": "Integrate incidental imaging findings with clinical context and avoid overtreatment.",
+    "domain": "Imaging / Endocrinology / Diagnostic Testing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "imaging_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A patient with nonspecific abdominal discomfort has normal vital signs and reassuring initial tests, but no definitive diagnosis. Write the key elements of a safe explanation: what is known, what remains uncertain, what symptoms should trigger urgent reassessment, and how follow-up should be framed.",
+    "intent": "Communicate diagnostic uncertainty and provide safety-netting without false reassurance.",
+    "domain": "Communication / Follow-Up / Core Clinical Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "patient_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A clinic receives a critical potassium result on a patient who has already gone home. The result is not seen until the next morning because it was routed to an unmonitored inbox. Analyze the patient-safety failure as a systems problem and identify process changes that reduce recurrence rather than focusing only on individual blame.",
+    "intent": "Apply root-cause and systems reasoning to delayed abnormal-result follow-up.",
+    "domain": "Patient Safety / Quality of Care",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "At a dinner event, 120 people attended and 36 developed gastroenteritis within 24 hours. Of 40 people who ate egg salad, 28 became ill; of 80 who did not, 8 became ill. Calculate the attack rates in exposed and unexposed groups and the risk ratio, then interpret what this does and does not establish about causation.",
+    "intent": "Perform outbreak risk calculations and distinguish association from proof of causation.",
+    "domain": "Public Health / Epidemiology / Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A 72-year-old with heart failure, chronic kidney disease, diabetes, and atrial fibrillation presents after 3 days of fever and poor intake with dyspnea, confusion, crackles, cool extremities, creatinine rising from 1.6 to 2.8 mg/dL, potassium 5.7 mmol/L, lactate 4.5 mmol/L, and blood pressure 84/52 mmHg. They take a loop diuretic, ACE inhibitor, metformin, and anticoagulant. Explain the immediate priorities, competing causes of shock and renal injury, medication decisions that may change now, tests that can reduce uncertainty without delaying stabilization, and how reassessment should guide the next stage of treatment.",
+    "intent": "Integrate severe infection, heart failure, renal dysfunction, hyperkalemia, polypharmacy, and shock under uncertainty.",
+    "domain": "Multi-Step Clinical Reasoning / Multimorbidity / Emergency Medicine",
+    "acuity": "emergency",
+    "difficulty": 5,
+    "style": "multimorbidity",
+    "jurisdiction_required": false
+  }
+]

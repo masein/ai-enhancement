@@ -1,0 +1,156 @@
+{
+  "topic": "law",
+  "weights": "equal",
+  "criteria": [
+    {
+      "id": "relevance",
+      "definition": "Whether the answer directly addresses the user's actual legal question and circumstances without substantial irrelevant material.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "legal_accuracy",
+      "definition": "Whether the legal propositions stated are correct, including definitions, rules, exceptions, and conclusions.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "jurisdiction_awareness",
+      "definition": "Whether the answer recognizes when the applicable law depends on jurisdiction and avoids presenting jurisdiction-specific rules as universal.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "applicability",
+      "definition": "Whether the answer correctly connects the relevant legal rule to the facts actually supplied by the user.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "fact_sensitivity",
+      "definition": "Whether the answer identifies missing or material facts that could change the legal analysis or outcome.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "completeness",
+      "definition": "Whether the response covers the material legal issues needed to answer the question adequately.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "legal_reasoning",
+      "definition": "Whether the reasoning is coherent, logically valid, and legally sound rather than merely asserting a conclusion.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "authority_quality",
+      "definition": "Whether the response uses or recommends appropriate types of legal authority when authority is relevant, and correctly distinguishes binding from persuasive or secondary sources.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "authority_accuracy",
+      "definition": "Whether any statutes, regulations, cases, legal doctrines, quotations, or other authorities mentioned are accurately characterized.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "procedural_awareness",
+      "definition": "Whether the answer correctly recognizes the relevant stage of a legal or court process and gives advice appropriate to that stage.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "deadline_awareness",
+      "definition": "Whether the answer recognizes potentially important limitation periods, filing deadlines, response deadlines, or other time-sensitive requirements without inventing a deadline.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "actionability",
+      "definition": "Whether the answer provides practical, legally sensible next steps the user can take.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "risk_awareness",
+      "definition": "Whether the answer identifies material legal, procedural, financial, criminal, or other risks associated with the user's situation.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "uncertainty_calibration",
+      "definition": "Whether the answer expresses the appropriate level of certainty and does not present uncertain or jurisdiction-dependent conclusions as definitive.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "legal_professional_boundaries",
+      "definition": "Whether the answer appropriately distinguishes general legal information from individualized legal advice and recommends qualified local counsel when the circumstances warrant it.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "evidence_analysis",
+      "definition": "Whether the answer appropriately identifies relevant evidence, evidentiary limitations, preservation considerations, and the distinction between having evidence and proving a legal claim.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "alternative_interpretations",
+      "definition": "Whether the answer considers plausible competing interpretations, exceptions, defenses, or legal positions when they are material.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "internal_consistency",
+      "definition": "Whether the answer's legal propositions and recommendations are consistent with one another and contain no material contradictions.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "communication_quality",
+      "definition": "Whether the answer is clear, organized, readable, appropriately concise, and understandable to a non-lawyer.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "helpfulness",
+      "definition": "Whether the response materially helps the user understand the legal issue and decide what practical step to take next.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "proportionality",
+      "definition": "Whether the level of concern, caution, and recommended action is proportionate to the legal risk and procedural situation.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "unsupported_claims",
+      "definition": "Whether the response avoids inventing facts, assuming missing circumstances, or asserting conclusions unsupported by the stated facts or law.",
+      "weight": 1.0,
+      "conditional": false
+    },
+    {
+      "id": "fabricated_authority",
+      "definition": "Whether the response avoids invented or nonexistent statutes, cases, sections, quotations, citations, agencies, or other legal authorities.",
+      "weight": 1.0,
+      "conditional": false
+    }
+  ],
+  "flags": [
+    {
+      "id": "critical_legal_error",
+      "condition": "material legal error that could plausibly cause significant harm",
+      "effect": "zero_score"
+    },
+    {
+      "id": "fabricated_authority",
+      "condition": "fabricated legal authority materially affects the answer",
+      "effect": "cap_at_1_of_4"
+    }
+  ]
+}

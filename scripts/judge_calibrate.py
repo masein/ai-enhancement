@@ -95,8 +95,12 @@ def _answers(model_dir: Path) -> dict[tuple, dict]:
 
 
 def sample(rows: list[dict], n: int, seed: int) -> list[dict]:
-    """Round-robin over (category, judge score) strata so every score level
-    and every category is represented, whatever the judge's distribution."""
+    """Round-robin over categories, and within a category over the judge's
+    score levels, so every category is represented before any has two and a
+    category's rows spread over the levels, whatever the judge's distribution.
+    Not one flat round-robin over (category, score): 37 topics × 5 levels is
+    more strata than a 100-row export, and that reached only the first twenty
+    topics of the alphabet."""
     strata: dict[tuple, list[dict]] = collections.defaultdict(list)
     for r in rows:
         strata[(r["category"], r["judge_score"])].append(r)
@@ -104,12 +108,19 @@ def sample(rows: list[dict], n: int, seed: int) -> list[dict]:
     for v in strata.values():
         v.sort(key=lambda r: r["id"])
         rng.shuffle(v)
-    keys = sorted(strata)
+    cats = sorted({c for c, _ in strata}, key=str)
+    levels = {c: sorted((s for cc, s in strata if cc == c), key=str) for c in cats}
+    # each category starts one level on from the last, so the first pass
+    # already spans the levels instead of taking every category's lowest
+    turn = {c: i for i, c in enumerate(cats)}
     out: list[dict] = []
-    while len(out) < n and any(strata[k] for k in keys):
-        for k in keys:
-            if strata[k] and len(out) < n:
-                out.append(strata[k].pop())
+    while len(out) < n and any(strata.values()):
+        for c in cats:
+            live = [s for s in levels[c] if strata[(c, s)]]
+            if not live or len(out) >= n:
+                continue
+            out.append(strata[(c, live[turn[c] % len(live)])].pop())
+            turn[c] += 1
     return out
 
 

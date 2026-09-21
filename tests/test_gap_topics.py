@@ -17,7 +17,7 @@ from conftest import make_service
 from service import llm, llm_poller
 from service import proposals as prop
 
-TOPIC = "economics"
+TOPIC = "Economics"
 TASK = "exam_economics"
 
 
@@ -130,7 +130,7 @@ def test_the_request_carries_the_rubric_and_no_answers(gap):
     body = next(q["system"] + "\n" + q["user"] for q in llm.client().recorded()
                 if q["custom_id"] == f"proposal:{pid}")
     # the topic's own rubric when it has one — economics does now
-    assert "# Economics Evaluation Rubric" in body and "Topic: economics" in body
+    assert "# Economics Evaluation Rubric" in body and "Topic: Economics" in body
     assert "scored 0 of 4" in body or "scored 1 of 4" in body or "scored 2 of 4" in body
     # the model's own answers are not in the request: the judge's reading of
     # them is what the proposal is built from

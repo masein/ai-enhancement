@@ -2,96 +2,245 @@
 
 ## Task
 
-Score ONE answer to ONE economics question from 0–4.
+Score **ONE answer to ONE Economics question from 0–4**.
 
-The reference/question metadata establishes what concepts, mechanisms, assumptions, distinctions, domain, intent, difficulty, and context matter.
+The question metadata establishes the relevant domain, intent, difficulty, institutional context, and expected reasoning style.
 
-Do not require a particular wording or structure.
+Accept different valid economic models, derivations, assumptions, and policy interpretations when they are internally coherent and consistent with the supplied evidence.
 
-Do not reward:
-- unnecessary length
-- jargon for its own sake
-- citations merely because they are present
-
-A short, precise answer can receive 4.
+Do not require a particular economic school, diagram, equation sequence, or wording unless the question specifies it. Do not reward unnecessary length, jargon, framework naming, or citations.
 
 ## Critical Error
 
-If `critical_economic_error` applies:
+If `critical_economics_error` applies:
 
 **score = 0**
 
-Otherwise evaluate the applicable criteria.
+A critical economics error is a materially false central microeconomic, macroeconomic, quantitative, econometric, international, or policy claim that fundamentally invalidates the answer or reverses the substantive conclusion.
 
-A critical economic error is a materially false central economic claim, calculation, or causal mechanism that fundamentally misleads the user. Examples include reversing a fundamental economic relationship, a major calculation error that changes the substantive conclusion, claiming correlation establishes causation when causality is central, or describing a policy mechanism in the fundamentally wrong direction.
+Examples include reversing a central supply-demand relationship; confusing a demand shift with a movement along demand in a way that changes the answer; fundamentally incorrect comparative-advantage, elasticity, marginal-cost, monopoly, Nash-equilibrium, tax-incidence, GDP, inflation, nominal/real, debt/deficit, monetary-transmission, exchange-rate, or causal-identification reasoning; treating statistical significance as proof of causality; treating instrument relevance as instrument validity; ignoring a clearly violated parallel-trends assumption; or making a major quantitative error that reverses the conclusion.
 
-Do **not** classify as critical:
-- minor imprecision
-- small arithmetic errors that do not change the conclusion
-- reasonable disagreement between economic schools when assumptions are explicitly stated
-- legitimate model simplifications
-- omissions that do not reverse the answer
+Do **not** classify as critical: minor arithmetic or terminology errors that do not change the conclusion, reasonable differences among economic models, legitimate disagreement about uncertain magnitudes, clearly stated reasonable simplifications, valid alternative causal interpretations under ambiguity, small omissions, minor graph-labeling errors without reasoning consequences, or reasonable approximations.
 
 ## Score Anchors
 
 ### 4
-The answer is substantively correct, directly answers the question, uses appropriate economic concepts and mechanisms, handles important assumptions and qualifications, and reaches a sound conclusion. It covers the material components needed for the question.
+
+The answer is economically accurate, directly addresses the question, applies an appropriate economic model, explains the relevant mechanism, performs calculations correctly where needed, identifies material assumptions, interprets evidence appropriately, and reaches a sound conclusion.
+
+For policy questions, it distinguishes efficiency, distribution, incidence, behavioral response, and uncertainty where relevant.
+
+For econometric questions, it distinguishes association from causality and identifies necessary assumptions.
+
+For macroeconomic questions, it correctly distinguishes nominal/real variables, levels/growth, and short-run/long-run mechanisms where relevant.
 
 ### 3
-The answer is substantially correct and useful but has one meaningful omission, minor imprecision, limited reasoning gap, or insufficient qualification.
+
+The answer is substantially correct and useful but contains one meaningful omission, minor economic imprecision, limited reasoning gap, non-central quantitative error, or insufficient qualification.
+
+The central conclusion remains economically sound.
 
 ### 2
-The answer is partly correct or directionally useful but leaves important concepts, mechanisms, assumptions, or implications missing or unclear.
+
+The answer is partly correct or directionally useful but has important omissions, incomplete economic reasoning, significant quantitative problems, weak assumptions, incorrect interpretation of some evidence, or incomplete mechanism analysis.
+
+Meaningful correction would be required.
 
 ### 1
-The answer contains a substantial misunderstanding, weak reasoning, or inappropriate model/framework, but does not meet the critical-error threshold.
+
+The answer contains a substantial economic misunderstanding, inappropriate model, major non-critical calculation error, poor causal reasoning, or badly incomplete analysis, but does not meet the critical-error threshold.
 
 ### 0
-Critical economic error, no answer, off-topic answer, unrelated fabrication, or equivalent fundamental failure.
 
-## Evaluation Guidance
+Critical economics error, no answer, off-topic answer, unrelated fabrication, or equivalent fundamental failure.
 
-- Do not require citations unless the question itself requires evidence.
-- Citations do not compensate for incorrect reasoning.
-- Policy questions do not require the evaluator to prefer a particular policy; evaluate the economic mechanisms, effects, assumptions, trade-offs, and distributional consequences.
-- Empirical questions should distinguish association from causal identification.
-- Do not penalize an answer simply because it does not use a particular economic model if another valid model is appropriately justified.
-- Do not reward verbosity.
-- Conditional criteria should be applied only when relevant to the question.
-- Evaluate answers against the question's difficulty and intended scope; a concise answer can score 4 if it covers the material components.
-- When multiple mechanisms are plausible, reward answers that distinguish them and state what assumptions determine which mechanism dominates.
+## Criterion Application
 
-## Criteria
+Evaluate only criteria relevant to the question.
 
-The benchmark contains 20 equally weighted criteria. Each criterion has weight 0.05. The platform scores each applicable criterion from 0–1 and converts the aggregate to the final 0–4 score.
+A consumer-theory question need not discuss macroeconomics. A monetary-policy question need not discuss game theory. A conceptual question need not contain quantitative calculations.
 
-| ID | Criterion | Conditional | What to look for |
-|---|---|---:|---|
-| relevance | Relevance | No | Directly answers the task and prioritizes material information. |
-| economic_accuracy | Economic Accuracy | No | Correct facts, relationships, calculations, and mechanisms. |
-| reasoning | Reasoning | No | Coherent reasoning from assumptions/evidence to conclusion. |
-| conceptual_precision | Conceptual Precision | No | Accurate distinctions and terminology. |
-| causal_identification | Causal Identification | Yes | Causal claims are identified rather than inferred from association alone. |
-| model_selection | Model Selection | Yes | Appropriate model/framework for the setting. |
-| assumptions | Assumptions | Yes | Material assumptions are recognized and used correctly. |
-| quantitative_correctness | Quantitative Correctness | Yes | Calculations and numerical interpretation are correct. |
-| equilibrium_and_dynamics | Equilibrium and Dynamics | Yes | Adjustment, timing, feedback, and short/long-run effects are handled correctly. |
-| welfare_analysis | Welfare Analysis | Yes | Efficiency, surplus, deadweight loss, distribution, and externalities are handled when relevant. |
-| policy_analysis | Policy Analysis | Yes | Policy mechanisms, incidence, trade-offs, and unintended effects are handled when relevant. |
-| empirical_interpretation | Empirical Interpretation | Yes | Estimates, uncertainty, and empirical evidence are interpreted appropriately. |
-| contextualisation | Contextualisation | No | Relevant market, institutional, behavioral, and temporal context is recognized. |
-| scope_and_qualifications | Scope and Qualifications | No | Important limits, exceptions, and boundary conditions are stated. |
-| uncertainty_calibration | Uncertainty Calibration | No | Certainty is proportional to the evidence and assumptions. |
-| alternative_explanations | Alternative Explanations | Yes | Plausible competing mechanisms are considered when needed. |
-| completeness | Completeness | No | Material requested components are covered. |
-| consistency | Consistency | No | Assumptions, calculations, terminology, and conclusions remain internally consistent. |
-| clarity | Clarity | No | Clear, understandable, appropriately structured presentation. |
-| actionability | Actionability | Yes | Practical implications or next steps are useful when the question calls for them. |
+Conditional criteria should not penalize an answer for omitting irrelevant material. However, when a conditional consideration is essential to solving the question correctly, failure on that issue should affect the score.
 
-## Final Scoring
+## Evaluation Criteria
 
-If the critical error flag applies, the final score is **0** regardless of other criteria.
+1. **Relevance** — Directly answers the question and uses the supplied facts and context.
+2. **Economic accuracy** — Gets the core economics right; central reversals are severe.
+3. **Conceptual precision** — Uses distinctions such as marginal/average, shift/movement, efficiency/equity, positive/normative correctly.
+4. **Microeconomic reasoning** *(conditional)* — Correctly analyzes agents, constraints, incentives, market structure, equilibrium, and welfare.
+5. **Macroeconomic reasoning** *(conditional)* — Correctly handles nominal/real, stocks/flows, shocks, expectations, policy transmission, and horizons.
+6. **International economic reasoning** *(conditional)* — Correctly handles comparative advantage, trade, exchange rates, capital flows, and distribution.
+7. **Public and welfare economic reasoning** *(conditional)* — Correctly handles externalities, public goods, surplus, efficiency, equity, and welfare assumptions.
+8. **Labor and development reasoning** *(conditional)* — Correctly handles labor markets, human capital, selection, institutions, poverty, and heterogeneous development effects.
+9. **Strategic and information reasoning** *(conditional)* — Correctly handles best responses, credibility, repeated interaction, hidden information/action, and contracts.
+10. **Quantitative correctness** *(conditional)* — Chooses the correct relationship, uses consistent units, calculates accurately, and interprets the number.
+11. **Econometric and causal reasoning** *(conditional)* — Distinguishes association from causality and states identifying assumptions and threats.
+12. **Data interpretation** *(conditional)* — Correctly interprets units, rates, levels, uncertainty, and what data can and cannot establish.
+13. **Comparative statics and equilibrium reasoning** *(conditional)* — Traces shifts and feedback and recognizes genuinely ambiguous effects.
+14. **Policy and incidence reasoning** *(conditional)* — Identifies objective, mechanism, incidence, behavior, distribution, dynamics, and uncertainty.
+15. **Assumptions and model selection** *(conditional)* — Uses a model appropriate to structure and context and states material assumptions.
+16. **Uncertainty and model limits** *(conditional)* — Recognizes model dependence, forecast conditionality, identification limits, and insufficient evidence.
+17. **Mechanism and trade-off reasoning** *(conditional)* — Explains the causal chain from incentives to behavior to equilibrium/outcome and trade-offs.
+18. **Completeness** — Covers the material parts of the task at the appropriate depth.
+19. **Consistency** — Keeps assumptions, equations, units, and conclusions internally consistent.
+20. **Clarity** — Communicates the economic reasoning clearly without unnecessary jargon or length.
 
-Otherwise, score each applicable criterion from 0 to 1, apply its 0.05 weight, and convert the aggregate to the platform's final 0–4 scale.
+Each criterion has weight **0.05**. Conditional criteria apply only when relevant.
 
-The evaluator should judge the answer itself, not whether it resembles a reference answer word-for-word.
+## Important Evaluation Principles
+
+### Incentives matter
+Strong economic answers should identify how incentives affect behavior.
+
+### Marginal reasoning matters
+Relevant economic choices are often determined by marginal rather than average quantities.
+
+### Equilibrium is not necessarily optimal
+A market equilibrium may be inefficient or distributionally undesirable.
+
+### Efficiency is not equity
+Do not treat a more efficient outcome as automatically more equitable or normatively preferable.
+
+### Correlation is not causation
+Observed economic relationships do not automatically establish causal effects.
+
+### Identification matters
+A causal estimate is only as credible as its identifying assumptions.
+
+### Statistical significance is not economic significance
+A precisely estimated tiny effect may be economically unimportant.
+
+### Statutory incidence is not economic incidence
+The legal payer of a tax need not bear its ultimate economic burden.
+
+### Comparative advantage is based on opportunity cost
+Absolute productivity advantage alone does not determine gains from specialization.
+
+### Nominal is not real
+Inflation-adjusted quantities must be distinguished from nominal values.
+
+### Inflation is not the price level
+High prices and high inflation are different concepts.
+
+### Debt is not deficit
+A deficit is a flow; debt is a stock.
+
+### GDP is not welfare
+GDP excludes or imperfectly captures many dimensions of welfare and distribution.
+
+### Models depend on assumptions
+Strong answers should recognize when conclusions depend materially on market structure, time horizon, information, expectations, price flexibility, openness, strategic interaction, and institutional context.
+
+### Partial and general equilibrium differ
+A policy affecting one market can generate feedback through other markets.
+
+### Short run and long run can differ
+Behavior, entry, investment, expectations, and prices may adjust over different horizons.
+
+### Behavioral response matters
+Policy effects should not be calculated as if behavior necessarily remains unchanged.
+
+### Forecasts are conditional
+Economic forecasts depend on models, data, and assumptions.
+
+### Positive and normative economics differ
+Predicted consequences and judgments about desirability should be distinguished.
+
+### Multiple valid models can exist
+Do not require one theoretical interpretation where evidence is compatible with several.
+
+### No framework worship
+Economic models are tools for reasoning, not answers by themselves.
+
+### No jargon worship
+Economic vocabulary without correct mechanisms should not receive high credit.
+
+### No citation worship
+Citations do not compensate for incorrect economic reasoning.
+
+## Microeconomic Answers
+
+Strong answers should, where appropriate:
+
+- identify agents
+- identify constraints
+- identify incentives
+- reason at the margin
+- identify equilibrium
+- distinguish shifts from movements
+- recognize market structure
+- identify welfare effects
+
+Do not require diagrams when equivalent verbal or mathematical reasoning is clear.
+
+## Macroeconomic Answers
+
+Strong answers should, where appropriate:
+
+- distinguish nominal and real quantities
+- distinguish stocks and flows
+- identify shocks
+- identify transmission mechanisms
+- consider expectations
+- distinguish short-run and long-run effects
+- recognize policy interactions
+
+Do not require one macroeconomic framework when several can explain the evidence.
+
+## Econometric Answers
+
+Strong answers should identify, where appropriate:
+
+- estimand
+- data structure
+- source of variation
+- confounders
+- identification assumption
+- statistical uncertainty
+- economic magnitude
+- external-validity limitations
+
+A statistically significant coefficient should not receive a causal interpretation without justification.
+
+## Policy Answers
+
+Strong policy answers should consider, where relevant:
+
+- objective
+- mechanism
+- incidence
+- behavioral responses
+- efficiency
+- distribution
+- implementation
+- dynamic effects
+- unintended consequences
+- uncertainty
+
+Do not require a normative yes/no conclusion where the answer depends on social preferences or distributional weights.
+
+## Quantitative Answers
+
+Strong quantitative answers should:
+
+- choose the appropriate economic relationship
+- use consistent units
+- calculate correctly
+- distinguish percentage from percentage-point changes
+- check plausibility
+- interpret the result economically
+
+Do not require every trivial arithmetic step.
+
+A correct number derived from invalid economic reasoning should not receive full credit.
+
+## Data-Interpretation Answers
+
+Strong answers should:
+
+- identify what the data show
+- identify what the data do not show
+- interpret scale and units
+- distinguish nominal/real or aggregate/per-capita measures where relevant
+- recognize uncertainty
+- avoid unsupported causal claims

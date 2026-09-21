@@ -65,10 +65,10 @@ def test_the_loop_board_is_one_models_and_says_which(svc):
             assert r["last_judged"]["model"] == j["model"]     # one column, one model
     j = client.get("/api/loop", params={"model": "fx/chance-160m"}).json()
     assert j["model"] == "fx/chance-160m"
-    law = next(r for r in j["topics"] if r["topic"] == "law")
+    law = next(r for r in j["topics"] if r["topic"] == "Law")
     assert law["last_judged"] is None                          # not sat, by this model
     assert law["next"]["step"] in ("sit", "review", "generate", "hand")
-    econ = next(r for r in j["topics"] if r["topic"] == "economics")
+    econ = next(r for r in j["topics"] if r["topic"] == "Economics")
     assert econ["last_judged"]["model"] == "fx/chance-160m"
     # an unknown model falls back to the default rather than an empty board
     assert client.get("/api/loop", params={"model": "org/nobody"}).json()["model"] == \
@@ -237,24 +237,24 @@ def test_read_the_results_lands_on_the_answers(live, page):
 @pytest.mark.dashboard
 def test_empty_topics_fold_and_import_carries_the_topic(live, page):
     base, root = live["base"], live["root"]
-    bank = eb.bank_dir(root / "exam") / "mathematics.jsonl"
+    bank = eb.bank_dir(root / "exam") / "mathematics_statistics.jsonl"
     kept = bank.read_bytes()
     bank.unlink()
     try:
         page.goto(base + "/#tab=loop")
         fold = page.locator("tr[data-empty-topics]")
         fold.wait_for()
-        assert "mathematics" in fold.text_content()
-        assert page.locator("tr[data-loop-row='mathematics']").count() == 0
+        assert "Mathematics & Statistics" in fold.text_content()
+        assert page.locator("tr[data-loop-row='mathematics_statistics']").count() == 0
         fold.locator("[data-show-empty]").click()
-        row = page.locator("tr[data-loop-row='mathematics']")
+        row = page.locator("tr[data-loop-row='mathematics_statistics']")
         row.wait_for()
         # Import a bank on the mathematics row: the import panel, mathematics
         # chosen, the file picker focused
         row.locator("button[data-step='import']").click()
         page.wait_for_selector("[data-panel='import']")
         assert page.locator("[data-panel='import'] select[aria-label='topic']").input_value() \
-            == "mathematics"
+            == "Mathematics & Statistics"
         page.wait_for_function("document.activeElement && document.activeElement.type === 'file'")
         assert page.errors == []
     finally:

@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS exam_curation (
 -- criteria file uploaded from the Exam tab. Who, when, what it replaced.
 CREATE TABLE IF NOT EXISTS rubric_changes (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  name        TEXT NOT NULL,                    -- the rubric slug, e.g. medicine_health
+  name        TEXT NOT NULL,                    -- the rubric slug, e.g. medicine_clinical_health
   kind        TEXT NOT NULL,                    -- rubric|criteria
   path        TEXT NOT NULL,                    -- where it was written
   sha256      TEXT NOT NULL,                    -- of the new file

@@ -1,0 +1,211 @@
+{
+  "task": "Score ONE answer to ONE Government & Public Policy question from 0–4.",
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Addresses the question actually asked, prioritizes the supplied facts and objectives, and avoids drifting into unrelated political commentary, civics trivia, or generic policy exposition.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "government_and_policy_accuracy",
+      "name": "Government and Policy Accuracy",
+      "definition": "Uses government and public-policy concepts correctly, including the distinction between intent and effect, adoption and implementation, authority and capacity, inputs/outputs/outcomes, and empirical versus normative claims. Central institutional or policy misstatements weigh more heavily than terminology imperfections.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "institutional_reasoning",
+      "name": "Institutional Reasoning",
+      "definition": "When institutions are material, correctly identifies relevant branches, levels, veto points, delegation relationships, oversight mechanisms, and interactions. Does not invent powers and distinguishes formal rules from actual implementation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "policy_problem_definition",
+      "name": "Policy Problem Definition",
+      "definition": "When problem definition is material, distinguishes the underlying problem from a preferred intervention, identifies affected populations, baseline conditions, causes versus symptoms, measurable objectives, scope, and time horizon.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "policy_design_reasoning",
+      "name": "Policy Design Reasoning",
+      "definition": "When design is material, connects objectives and causal mechanisms to appropriate instruments, eligibility, benefits or obligations, delivery channels, funding, enforcement, monitoring, incentives, appeals, and administrative burden. Gives full credit to defensible alternative designs rather than requiring one ideological instrument.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "implementation_reasoning",
+      "name": "Implementation Reasoning",
+      "definition": "When implementation is material, tests whether legal authority, responsible agencies, staffing, budget, technology, procurement, data, delivery channels, communication, coordination, timelines, enforcement, and monitoring are sufficient. Distinguishes implementation failure from failure of the underlying policy theory.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "public_administration_reasoning",
+      "name": "Public Administration Reasoning",
+      "definition": "When administrative organization is material, reasons correctly about hierarchy, specialization, discretion, frontline practice, civil-service expertise, continuity, incentives, coordination, administrative burden, and the difference between formal responsibility and operational capability.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "public_finance_and_budget_reasoning",
+      "name": "Public Finance and Budget Reasoning",
+      "definition": "When fiscal issues are material, distinguishes stocks from flows, recurring from one-time costs, annual from lifecycle cost, transfers from real resource costs where relevant, deficits from debt, and statutory from economic incidence. Recognizes opportunity cost, fiscal constraints, financing effects, and double-counting risks.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "regulatory_reasoning",
+      "name": "Regulatory Reasoning",
+      "definition": "When regulation is material, identifies the regulatory objective, baseline, affected entities, behavioral response, design type, monitoring requirements, enforcement capacity, compliance cost, incentives, competition or innovation effects, and realistic alternatives. Does not equate stricter rules or formal compliance with better outcomes.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When calculations or quantitative interpretations are required, uses correct arithmetic, units, denominators, percentage versus percentage-point changes, discounting, per-capita or per-outcome measures, and uncertainty. A small non-central slip is distinct from a major numerical error that reverses the substantive conclusion.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_causal_reasoning",
+      "name": "Evidence and Causal Reasoning",
+      "definition": "When empirical claims are material, distinguishes association from causation, identifies the relevant counterfactual, selection bias, confounding, reverse causality, statistical uncertainty, data-quality limits, and external validity. Does not treat before/after change or popularity as proof of effectiveness.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "program_evaluation_reasoning",
+      "name": "Program Evaluation Reasoning",
+      "definition": "When evaluation is material, distinguishes process, output, outcome, and impact evidence; assesses implementation fidelity, baseline and comparison-group quality, effect magnitude, subgroup heterogeneity, scalability, and whether observed improvement is plausibly attributable to the program.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "stakeholder_and_distributional_reasoning",
+      "name": "Stakeholder and Distributional Reasoning",
+      "definition": "When distribution is material, identifies beneficiaries, cost bearers, taxpayers, users and non-users, workers, firms, affected communities, geographic groups, and implementation actors. Recognizes that aggregate net benefit or average effects can conceal unequal burdens, access, or subgroup outcomes.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "legal_and_jurisdictional_context",
+      "name": "Legal and Jurisdictional Context",
+      "definition": "When authority or procedure depends on jurisdiction, applies only the rules supplied or otherwise established for that jurisdiction, makes reasonable qualifications where law is unspecified, and avoids unsupported assertions about constitutional, statutory, administrative, procurement, electoral, or emergency powers.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "risk_uncertainty_and_unintended_effects",
+      "name": "Risk, Uncertainty, and Unintended Effects",
+      "definition": "When risk or uncertainty is material, distinguishes hazard, likelihood, impact, mitigation, contingency, and residual risk; avoids false precision; considers behavioral responses, gaming, spillovers, displacement, irreversibility, scenario variation, and plausible unintended effects tied to concrete mechanisms.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "ethics_and_public_value_reasoning",
+      "name": "Ethics and Public Value Reasoning",
+      "definition": "When ethical or public-value issues are material, distinguishes legal compliance from ethical judgment, actual from apparent conflicts, transparency from accountability, technical effectiveness from legitimacy, and empirical evidence from value choices. Does not score partisan or ideological agreement.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_model_selection",
+      "name": "Assumptions and Model Selection",
+      "definition": "When analytical choices are material, states important assumptions, selects an appropriate institutional, fiscal, causal, regulatory, or decision framework, tests sensitivity to assumptions where useful, and avoids forcing a framework when the evidence does not support it.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the major considerations necessary for a sound answer at the question's stated difficulty, including material constraints, trade-offs, implementation dependencies, evidence limitations, and requested calculations, without penalizing omission of irrelevant conditional criteria.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent facts, assumptions, units, causal claims, institutional roles, and conclusions. Does not contradict supplied rules or use a premise in one part of the answer that is abandoned without explanation elsewhere.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the analysis in a clear, organized, proportionate way; separates facts, assumptions, empirical inferences, and normative judgments; explains mechanisms rather than relying on jargon; and makes calculations and trade-offs easy to follow.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_government_public_policy_error",
+    "condition": "A materially false central institutional, quantitative, causal, administrative, regulatory, public-finance, or policy claim fundamentally invalidates the answer or reverses its substantive conclusion. This includes central assertions that contradict rules explicitly supplied in the question, invented powers essential to the analysis, or reasoning failures that convert non-causal, output, or implementation evidence into an unsupported claim of policy success.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally misidentifying which institution has authority under rules explicitly supplied in the question.",
+      "Inventing a legal or constitutional power central to the answer.",
+      "Confusing legislation with administrative implementation in a way that invalidates the analysis.",
+      "Making a major budget calculation error that reverses the policy conclusion.",
+      "Double-counting major costs or benefits in a cost-benefit analysis.",
+      "Treating transfer payments as new social resource costs without justification when that distinction is central.",
+      "Treating correlation as proof of program impact.",
+      "Interpreting a before/after comparison as causal despite a clearly supplied confounder.",
+      "Ignoring a clearly invalid comparison group in a policy evaluation.",
+      "Claiming a policy achieved its objective solely because administrative outputs increased.",
+      "Confusing program participation with program effectiveness.",
+      "Recommending a policy design that cannot be implemented under explicitly supplied authority or administrative constraints.",
+      "Ignoring a central implementation dependency that makes the proposed plan infeasible.",
+      "Using fundamentally incorrect tax or subsidy incidence reasoning that reverses the distributional conclusion.",
+      "Claiming a policy has no trade-offs when supplied evidence clearly establishes major offsetting effects.",
+      "Fundamentally misinterpreting public-opinion, administrative, or program-evaluation data.",
+      "Treating a successful pilot as definitive proof of nationwide effectiveness despite explicitly supplied nonrepresentativeness.",
+      "Confusing formal eligibility with actual program access when administrative burden is central to the scenario.",
+      "Making a central claim about a jurisdiction's law or institutional procedure that contradicts rules explicitly supplied in the prompt.",
+      "Presenting an ideological preference as if it were an empirically established policy fact when the distinction determines the answer."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not alter the substantive conclusion.",
+      "Small terminology mistakes.",
+      "Reasonable differences in normative priorities.",
+      "Legitimate disagreement among plausible policy alternatives.",
+      "Reasonable institutional assumptions when clearly stated.",
+      "Minor omissions.",
+      "Appropriate uncertainty.",
+      "Valid alternative causal interpretations where evidence is ambiguous.",
+      "Different defensible implementation strategies.",
+      "Reasonable differences in weighting efficiency, equity, cost, or administrative simplicity."
+    ]
+  },
+  "evaluation_principles": [
+    "Policy intent is not policy effect: evaluate mechanism, implementation, and outcomes rather than stated objective alone.",
+    "Adoption is not implementation: a policy can be legally adopted yet poorly implemented.",
+    "Outputs are not outcomes: processing applications, spending budgets, or delivering services are not automatically the intended social outcome.",
+    "Correlation is not causation: causal claims require a credible counterfactual.",
+    "Evidence has scope: internally valid evidence may have limited external validity.",
+    "Institutions matter: policy effects depend on legal authority, administrative structure, implementation capacity, intergovernmental relationships, and enforcement.",
+    "Jurisdiction matters: governmental authority and procedure are not universal across countries or subnational systems.",
+    "Efficiency is not equity: aggregate gains can coexist with unequal distribution of costs and benefits.",
+    "Popularity is not effectiveness: public support does not establish that a policy achieves its objective.",
+    "Effectiveness is not legitimacy: technically effective interventions can still raise legal, ethical, procedural, or distributional questions.",
+    "Public budgets involve opportunity costs.",
+    "More spending is not automatically better performance.",
+    "More regulation is not automatically more effective regulation.",
+    "More decentralization is not automatically better governance.",
+    "More centralization is not automatically better governance.",
+    "Participation is not automatically representation.",
+    "Administrative burden matters: formal eligibility does not guarantee practical access.",
+    "Metrics affect behavior: agencies may optimize measured output rather than substantive outcomes.",
+    "Crisis decisions differ from routine policymaking: urgency can change sequencing and information needs but not erase oversight and recovery requirements.",
+    "Normative and empirical questions differ.",
+    "Multiple valid policy analyses can exist.",
+    "Political neutrality: evaluate analytical quality rather than support for or opposition to any political actor or ideology.",
+    "No framework worship: analytical frameworks are tools, not answers.",
+    "No jargon worship: vocabulary without valid reasoning should not receive high credit.",
+    "No citation worship: citations do not compensate for incorrect institutional, quantitative, causal, or policy reasoning."
+  ]
+}

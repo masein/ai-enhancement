@@ -1,0 +1,188 @@
+{
+  "benchmark": "Mathematics & Statistics",
+  "score_scale": {
+    "minimum": 0,
+    "maximum": 4
+  },
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Addresses the mathematical or statistical task actually asked, uses the supplied information, and avoids substituting a different problem.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "mathematical_accuracy",
+      "name": "Mathematical Accuracy",
+      "definition": "Uses mathematically valid definitions, transformations, identities, theorem conditions, and conclusions; respects domains, signs, units, and exact-versus-approximate distinctions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "statistical_accuracy",
+      "name": "Statistical Accuracy",
+      "definition": "When statistical claims, data, sampling, inference, or uncertainty are involved, states and interprets them correctly, including distinctions among parameters, statistics, estimators, standard deviations, and standard errors.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "logical_reasoning",
+      "name": "Logical Reasoning",
+      "definition": "The chain of reasoning validly supports the conclusion, with no circular step, quantifier error, unjustified implication, or necessary-condition/sufficient-condition confusion.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Uses the relevant concepts with sufficient precision to distinguish closely related ideas such as continuity versus differentiability, correlation versus causation, or rank versus matrix size.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "Calculations, algebraic values, probabilities, estimates, units, signs, and rounding are correct enough to support the conclusion; harmless rounding is accepted.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "algebraic_reasoning",
+      "name": "Algebraic Reasoning",
+      "definition": "When algebra is required, manipulations preserve equivalence or clearly track one-way implications, domain restrictions, zero divisors, inequality direction, and possible extraneous solutions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "proof_reasoning",
+      "name": "Proof Reasoning",
+      "definition": "When proof is required, the argument establishes the claim over the stated domain, explicitly uses needed assumptions, and treats examples as evidence rather than universal proof unless a counterexample is sufficient to refute.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "probability_reasoning",
+      "name": "Probability Reasoning",
+      "definition": "When probability is involved, events, conditioning, complements, dependence, independence, expectations, and distributions are handled according to the stated sample space and assumptions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "statistical_inference",
+      "name": "Statistical Inference",
+      "definition": "When inference is required, p-values, confidence intervals, power, errors, estimators, sampling distributions, and multiple-testing issues are interpreted consistently with the inferential framework and procedure assumptions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "modeling_and_translation",
+      "name": "Modeling and Translation",
+      "definition": "When a verbal or applied problem must be modeled, defines suitable quantities, translates relationships and constraints correctly, maintains dimensional consistency, and maps mathematical results back to context.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "method_selection",
+      "name": "Method Selection",
+      "definition": "When more than one technique is plausible, selects a method appropriate to the structure, assumptions, information available, and requested conclusion rather than mechanically applying a familiar formula.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions",
+      "name": "Assumptions",
+      "definition": "Identifies, respects, or challenges assumptions that materially affect validity; does not silently add assumptions to force a unique answer when the information is insufficient.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_and_interpretation",
+      "name": "Uncertainty and Interpretation",
+      "definition": "When uncertainty matters, characterizes sampling, parameter, predictive, numerical, or model uncertainty appropriately and avoids stronger certainty than the evidence supports.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "data_interpretation",
+      "name": "Data Interpretation",
+      "definition": "When data summaries, tables, plots, or regression outputs are involved, extracts the relevant numerical relationships and interprets them without being misled by outliers, aggregation, scales, or omitted context.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "error_analysis",
+      "name": "Error Analysis",
+      "definition": "When the task involves critique or approximation, identifies material mathematical, statistical, numerical, measurement, or reasoning errors and explains their effect on the result.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Provides the steps, cases, qualifications, checks, or conclusions needed to answer all material parts of the question without requiring unnecessary verbosity.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Intermediate results, notation, assumptions, signs, units, and final conclusions do not contradict one another.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Presents the reasoning in a readable order with notation and prose precise enough for an evaluator to follow and verify the argument.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "result_interpretation",
+      "name": "Result Interpretation",
+      "definition": "When interpretation is required, explains what the mathematical or statistical result means in the original context and states material limitations without overclaiming.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error": {
+    "id": "critical_mathematics_statistics_error",
+    "condition": "A materially false central mathematical, probabilistic, or statistical claim fundamentally invalidates the answer or reverses its substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally invalid algebra that determines the final answer.",
+      "Division by zero is treated as a valid step or value.",
+      "An extraneous solution is accepted as the central result.",
+      "A false mathematical theorem or identity is used as the decisive basis of the answer.",
+      "A proof contains a fatal logical step that invalidates the claimed result.",
+      "A fundamentally incorrect derivative or integral changes the conclusion.",
+      "Probability reasoning is fundamentally wrong in a way that changes the result.",
+      "Dependent events are treated as independent when that assumption determines the answer.",
+      "Conditional probabilities are reversed in a way that changes the conclusion.",
+      "A major calculation error changes the substantive answer.",
+      "A p-value is fundamentally interpreted as the probability that the null hypothesis is true.",
+      "Statistical significance is claimed to establish practical importance.",
+      "Correlation or a regression coefficient alone is claimed to establish causation.",
+      "Failure to reject a null hypothesis is claimed to prove the null true.",
+      "A fundamentally invalid estimator or inferential procedure determines the conclusion.",
+      "A confidence interval is given a fundamentally incorrect central interpretation.",
+      "A fundamentally incorrect regression interpretation changes the conclusion.",
+      "A stationary point is claimed to be a global optimum without adequate conditions.",
+      "Finite numerical evidence is claimed to prove a universal mathematical statement.",
+      "An exact conclusion is asserted when the supplied information is non-identifiable or underdetermined."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Harmless rounding differences.",
+      "Notation differences.",
+      "Minor terminology mistakes.",
+      "A small omitted justification when the reasoning is otherwise sound.",
+      "An alternative correct solution method.",
+      "A defensible alternative statistical procedure.",
+      "Reasonable approximations clearly identified as approximations.",
+      "Minor imprecision that does not materially alter the result.",
+      "Failure to simplify an otherwise correct expression."
+    ]
+  }
+}

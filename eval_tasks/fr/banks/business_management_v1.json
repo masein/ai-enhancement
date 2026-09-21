@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A regional services company says its strategy is “grow revenue by 15% next year.” Explain why this is an objective rather than a complete strategy, and state the additional choices management would need to make for it to become a strategy.",
+    "intent": "Distinguish strategic objectives from strategy and identify the choices that make a strategy coherent.",
+    "domain": "Strategy",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A commuter rail operator says ride-hailing apps are not competitors because they do not run trains. Analyze whether ride-hailing should still be treated as a competitive substitute and explain what evidence would matter.",
+    "intent": "Distinguish direct competitors from substitutes and connect substitution to customer need.",
+    "domain": "Competitive Analysis",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A specialty food producer is considering entering Market X. The market is growing 8% annually, but the two largest firms hold 70% share, retailer listing fees are high, and the producer has no local distributor. Its brand is strong with expatriate customers but unknown to mainstream buyers. The company can invest at most €4 million over two years. Analyze whether and how it should enter, including assumptions, capability gaps, alternatives, and staged options.",
+    "intent": "Evaluate market entry under growth, rivalry, channel constraints, capability gaps, and limited capital.",
+    "domain": "Market Entry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "strategy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A software firm owns a large proprietary dataset that competitors cannot legally access, but the data are poorly labeled and product teams rarely use them. Assess whether the dataset is currently a strategic advantage and what capabilities would be required for it to create defensible value.",
+    "intent": "Evaluate whether a resource creates value only when supported by usable organizational capabilities.",
+    "domain": "Internal Capabilities and Resources",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A mid-market furniture chain wants to pursue lower prices than premium boutiques while also offering extensive customization, white-glove delivery, and very small production batches. Identify the strategic tensions in this proposal and suggest coherent positioning choices.",
+    "intent": "Identify trade-offs among cost leadership, differentiation, and operating model choices.",
+    "domain": "Competitive Positioning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A profitable industrial-parts manufacturer is considering launching a consumer fitness-device business because the market is growing quickly. The company has strong precision manufacturing but no consumer brand, retail channel, or software capability. Analyze strategic fit, required capabilities, diversification risks, and plausible alternatives to full entry.",
+    "intent": "Assess diversification based on capability fit rather than market growth alone.",
+    "domain": "Corporate Strategy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "strategy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A meal-kit company charges a monthly subscription for rotating menus delivered to customers. Its managers call the subscription itself “the strategy.” Explain the difference between the company’s business model and its strategy, using this example.",
+    "intent": "Distinguish business model design from competitive strategy.",
+    "domain": "Business Models",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A premium coffee roaster currently buys beans through importers. Direct sourcing could lower long-run unit cost by 6% and improve traceability, but would require a €2.5 million sourcing organization, expose the firm to crop volatility, and distract management from store expansion. Evaluate vertical integration versus staying with specialist suppliers.",
+    "intent": "Assess vertical integration using economics, capability, risk, and focus trade-offs.",
+    "domain": "Vertical Integration",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A B2B analytics company has 22% market share, the highest in its category, but customers can switch within a week, product features are easy to copy, and the largest cloud platforms have begun bundling similar tools. Explain why high market share alone does not prove a sustainable competitive advantage.",
+    "intent": "Distinguish current market position from defensible advantage.",
+    "domain": "Competitive Advantage",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "Two small medical-device firms are considering a joint distribution partnership in Asia. One has strong hospital relationships and the other has complementary products, but they compete in Europe and worry about sharing customer data. Identify conditions under which partnering could create more value than competing independently, and the governance issues management should address.",
+    "intent": "Evaluate partnership value, complementarity, information risk, and governance.",
+    "domain": "Strategic Partnerships",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "stakeholder_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A consumer-electronics company has a legacy product line that contributes 7% of revenue, uses 18% of engineering capacity, has declining demand, and is important to a small group of long-standing distributors. Analyze whether management should harvest, redesign, sell, or discontinue the line, including stakeholder and capability implications.",
+    "intent": "Evaluate retrenchment alternatives using resource allocation and stakeholder trade-offs.",
+    "domain": "Retrenchment and Portfolio Strategy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A logistics company is evaluating entry into an adjacent same-day delivery market. Demand estimates range from €20–60 million annually; three incumbents already have dense courier networks; the company has strong enterprise sales but weak consumer technology; only €8 million is available for investment; and a major existing customer may become a competitor if the company enters. Design a decision approach that addresses market attractiveness, company fit, competitor response, capability build-versus-partner choices, staged investment, and exit triggers.",
+    "intent": "Synthesize market entry, capability, competitor, investment, and option-value reasoning under uncertainty.",
+    "domain": "Strategic Decision-Making",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "decision_under_uncertainty",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A manager assigns an analyst responsibility for a monthly performance report but refuses to give the analyst access to the necessary data or authority to obtain it. Explain the mismatch between responsibility and authority and how it should be corrected.",
+    "intent": "Distinguish responsibility from authority in a practical delegation setting.",
+    "domain": "Management Fundamentals",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A department head tells a team lead, “You own the client launch,” then stops attending risk reviews and refuses to resolve conflicts that require executive approval. Explain why this is abdication rather than effective delegation and describe what accountability should remain with the department head.",
+    "intent": "Distinguish delegation from abdication and preserve managerial accountability.",
+    "domain": "Delegation and Accountability",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "leadership_scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A call-center supervisor reviews every customer email before it is sent, even for trained agents handling standard cases. Error rates are low, but response time has doubled and agents escalate minor decisions. Explain how management can maintain control without micromanaging.",
+    "intent": "Distinguish effective control mechanisms from excessive direct supervision.",
+    "domain": "Management Control",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A product launch requires approval from product, sales, finance, legal, and regional management. Any function can block the launch, but no single role is accountable for the final decision. Releases are delayed by six weeks on average. Diagnose the decision-rights problem and propose a clearer governance design.",
+    "intent": "Diagnose duplicated authority and missing accountability in cross-functional decisions.",
+    "domain": "Decision Rights and Accountability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "organizational_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A global engineering firm uses a matrix in which engineers report to both functional heads and project leaders. Functional quality is high, but project priorities frequently conflict and employees receive inconsistent performance feedback. Analyze the coordination benefits and costs of the matrix and propose mechanisms to reduce ambiguity without eliminating functional expertise.",
+    "intent": "Evaluate matrix structure trade-offs and coordination mechanisms.",
+    "domain": "Organizational Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "organizational_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A retail group with 12 countries currently centralizes pricing, merchandising, procurement, and marketing. Central purchasing saves 9% on average, but local teams report missed seasonal trends, slow promotional approvals, and products poorly matched to local demand. Some countries are small and lack specialist talent. Redesign the decision model, specifying which decisions should remain centralized, which could be decentralized, and what information, guardrails, and accountability are required.",
+    "intent": "Balance efficiency, expertise, responsiveness, and accountability in centralization design.",
+    "domain": "Centralization and Decentralization",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "organizational_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A manager has 24 direct reports doing highly standardized work with clear procedures and strong peer support. Another manager has 7 direct reports doing ambiguous expert work requiring frequent coaching. Explain why the appropriate span of control may differ between the two teams.",
+    "intent": "Apply span-of-control reasoning to task complexity and support needs.",
+    "domain": "Spans of Control",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A company advertises “speak up and challenge assumptions” as a core value. In practice, leaders promote employees who avoid disagreement, meetings punish bad news, and bonuses depend on never missing forecasts. Analyze the actual culture and identify mechanisms reinforcing it.",
+    "intent": "Distinguish stated values from reinforced organizational norms.",
+    "domain": "Organizational Culture",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A senior vice president has formal authority over a transformation program, but a long-tenured operations manager with no executive title is the person employees consult before adopting new procedures. Explain the difference between formal authority and actual influence and how the program leader should respond.",
+    "intent": "Distinguish authority from influence and incorporate informal networks into execution.",
+    "domain": "Organizational Behavior",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A team has high psychological safety: members openly admit mistakes and challenge ideas. However, deadlines are repeatedly missed and poor follow-through is rarely addressed. Explain why psychological safety and accountability are not opposites and propose management practices that support both.",
+    "intent": "Integrate trust, openness, and performance accountability.",
+    "domain": "Team Dynamics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "team_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A newly appointed plant manager inherits an experienced team during a safety-critical equipment failure that must be stabilized within hours. Longer-term process redesign can wait. What leadership behavior is appropriate during the immediate response, and how should the leader's approach change once the crisis is contained?",
+    "intent": "Match leadership behavior to urgency, team capability, and task ambiguity.",
+    "domain": "Leadership",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "leadership_scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A sales organization introduces a bonus for number of customer meetings. Meetings increase 40%, but conversion falls and customers complain about low-value outreach. Analyze the incentive mechanism and propose a measurement approach that better aligns behavior with customer and business outcomes.",
+    "intent": "Diagnose incentive gaming and redesign metrics around outcomes.",
+    "domain": "Motivation and Incentives",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A cross-functional launch team has missed two milestones. Marketing says engineering changes scope too late; engineering says sales promises features before feasibility review; sales says no one owns trade-off decisions. Team members are working hard and morale is still reasonable. Diagnose the primary management problems and propose interventions that address roles, decision rights, information flow, and conflict.",
+    "intent": "Distinguish coordination and ownership failures from simple motivation problems.",
+    "domain": "Team Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "team_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A hiring manager prefers an applicant because they attended the same university and “seem like someone the team would enjoy.” Another applicant performs better on a job simulation and structured interview. Explain which evidence should carry more weight and why.",
+    "intent": "Prioritize job-relevant selection evidence over affinity and unstructured preference.",
+    "domain": "Recruitment and Selection",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "hr_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A fast-growing company loses many new hires during their first 90 days. Exit interviews mention unclear priorities, inconsistent manager support, and surprise workload expectations. Design an onboarding response that targets the likely causes rather than simply adding more orientation presentations.",
+    "intent": "Diagnose onboarding risk and design behaviorally relevant onboarding improvements.",
+    "domain": "Onboarding",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "hr_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A customer-success manager misses renewal targets, but their territory has 35% more at-risk accounts than peers and a system outage delayed all renewals for three weeks. Explain how performance management should separate individual contribution from system and portfolio constraints.",
+    "intent": "Distinguish individual performance from contextual constraints.",
+    "domain": "Performance Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "Warehouse teams receive bonuses for orders picked per hour. Pick rate rises 18%, while damage claims rise 30% and downstream packing rework increases 22%. Analyze why the incentive appears successful on one metric but harms total performance, and redesign the scorecard.",
+    "intent": "Connect metric design to gaming, quality, and downstream effects.",
+    "domain": "Performance Management and Incentives",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A company has €400,000 for development. It can train 80 frontline supervisors in coaching, fund advanced technical certification for 20 scarce specialists, or create a rotational program for 12 potential successors to critical roles. Explain how management should prioritize the investment using business risk, skill gaps, and expected transfer to performance.",
+    "intent": "Prioritize development investments rather than treating all training as equal.",
+    "domain": "Talent Development",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A regional director will retire in 12 months. Two internal candidates are plausible: one has excellent current results but limited cross-functional experience; the other has broader experience but inconsistent execution. Describe a succession plan that builds evidence and reduces transition risk without assuming promotion is guaranteed.",
+    "intent": "Design evidence-based succession and readiness development.",
+    "domain": "Succession Planning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "hr_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "Voluntary turnover among experienced engineers rises from 8% to 15% while pay remains at market median. Survey comments cite slow decisions, weak career paths, and frequent priority changes. Explain why a compensation-only response may fail and identify the evidence and interventions management should consider.",
+    "intent": "Interpret retention signals across compensation, career, and organizational factors.",
+    "domain": "Retention and Workforce Analytics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A manager says a candidate is a poor “culture fit” because they challenge established practices and have a different working style from the current team. Explain how selection should distinguish cultural contribution and job-relevant behavior from conformity.",
+    "intent": "Avoid using culture fit as a proxy for similarity and focus on job-relevant evidence.",
+    "domain": "Recruitment and Selection",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A claims-processing service has four steps with capacities of 90, 75, 40, and 80 cases per hour. Demand is 60 cases per hour. Managers want to speed up the first step because its staff appear busiest. Identify the system bottleneck and explain where improvement effort should focus.",
+    "intent": "Identify the true bottleneck and avoid optimizing a non-constraint.",
+    "domain": "Operations Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "operations_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A support center has average demand of 95 contacts per hour and staffed capacity of 100. Managers argue that 95% utilization is efficient, but waits become extreme whenever demand spikes. Explain why very high utilization can create long queues and what operational options management has.",
+    "intent": "Relate utilization, variability, queueing, and service levels.",
+    "domain": "Capacity and Resource Planning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "operations_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A clinic administration desk averages 480 registrations per day with capacity for 520, but 45% of arrivals occur in the two-hour morning peak. Patients wait over 40 minutes then, while staff are idle later. Analyze why average daily capacity is misleading and propose staffing or process responses.",
+    "intent": "Use peak-demand and variability reasoning in service capacity planning.",
+    "domain": "Service Operations",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "operations_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "An insurance approval process has seven handoffs, three duplicate data entries, and 12% of cases returned for missing information. Before purchasing automation software, what should managers investigate and redesign?",
+    "intent": "Identify waste, rework, and simplification opportunities before automation.",
+    "domain": "Process Improvement",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "operations_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A bank automates 80% of routine loan-document checks and reduces direct labor hours by 25%. However, exception cases now wait in a specialist queue for four days instead of one, customer complaints rise, and frontline staff no longer understand how to resolve unusual cases. Evaluate whether the automation improved system performance and propose a redesign covering exception handling, skills, metrics, and customer impact.",
+    "intent": "Evaluate automation using whole-system performance, not labor savings alone.",
+    "domain": "Business Process Automation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "Supplier A charges €9.50 per component with 2% defect rate and 12-day lead time. Supplier B charges €10.10 with 0.3% defects and 5-day lead time. A defect costs about €18 in rework, and stockouts are costly. Explain why purchase price alone is insufficient and what total-cost and risk factors should drive the sourcing decision.",
+    "intent": "Compare suppliers using total cost, quality, lead time, and risk.",
+    "domain": "Procurement and Supplier Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "operations_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A manufacturer sources a critical part from one supplier at €4.00 per unit. A second qualified supplier would charge €4.35 and require €120,000 annual minimum volume, but the current supplier has had two major disruptions in three years. Evaluate single sourcing versus dual sourcing, including resilience, bargaining power, inventory, and cost trade-offs.",
+    "intent": "Evaluate resilience rather than assuming diversification is automatically optimal.",
+    "domain": "Supply Chain Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A retailer cuts inventory by 30% to free working capital. Inventory turns improve, but stockouts on high-margin items double and expedited shipping costs rise 45%. Analyze whether the policy improved performance and identify the metrics needed to set a better inventory target.",
+    "intent": "Balance working capital, service level, and downstream cost.",
+    "domain": "Inventory and Demand Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A resort forecasts next quarter's staffing needs using the average of the last four quarters, despite strong seasonality and a major event scheduled this year. Explain why the method is weak and what assumptions or data should be incorporated.",
+    "intent": "Recognize seasonality and structural changes in operational forecasting.",
+    "domain": "Forecasting and Planning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "forecasting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A call center cuts average handling time from 7.0 to 5.5 minutes after agents are encouraged to end calls quickly. First-contact resolution falls from 78% to 65%, and repeat contacts rise. Determine whether the operation actually improved and propose a better service-performance scorecard.",
+    "intent": "Distinguish local speed from overall service effectiveness.",
+    "domain": "Service Operations",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A firm buys 70% of a key material from one low-cost supplier and 30% from three smaller suppliers. Management calls this “diversified sourcing.” Explain why concentration risk may still be high and what supplier-performance and dependency data should be reviewed.",
+    "intent": "Distinguish nominal supplier count from meaningful resilience.",
+    "domain": "Procurement and Supplier Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A company can outsource payroll administration for €1.1 million per year versus €1.3 million internal cost. The vendor offers strong automation, but switching later would be difficult and the internal team also provides workforce analytics used by managers. Evaluate make-versus-buy beyond the headline savings.",
+    "intent": "Assess outsourcing with capability, dependency, service, and total-value considerations.",
+    "domain": "Outsourcing and Partnerships",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A fulfillment center improves packing productivity by 20%, but total daily shipments do not increase because carrier pickup capacity is fixed. Explain why local efficiency did not improve system throughput and what management should do next.",
+    "intent": "Distinguish local productivity from system throughput and shifted bottlenecks.",
+    "domain": "Operations Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A company segments customers only into ages 18–34, 35–54, and 55+, but purchase frequency, use case, willingness to pay, and channel preference vary more within each age group than between them. Explain why these segments may be managerially weak and propose more useful segmentation bases.",
+    "intent": "Evaluate segmentation by behavioral and strategic usefulness.",
+    "domain": "Market Segmentation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "marketing_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A cybersecurity product is marketed with the message “256-bit encryption, AI anomaly detection, and 40 integrations.” The target customer is a small retailer worried about downtime and limited IT staff. Reframe the value proposition around customer benefits and proof rather than features alone.",
+    "intent": "Distinguish product features from customer benefits and positioning.",
+    "domain": "Positioning and Value Proposition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "marketing_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A subscription service has 100,000 customers paying €20 per month. Management considers a 10% price increase and expects customer count to fall by 6%. Ignoring other changes, calculate the direction and approximate size of the monthly revenue change, then explain why revenue alone is insufficient to decide whether to raise price.",
+    "intent": "Combine price-volume arithmetic with strategic pricing trade-offs.",
+    "domain": "Pricing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "pricing_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "An app doubles paid acquisition spend. New customers rise from 20,000 to 34,000 per month, CAC rises from €28 to €45, 90-day retention falls from 42% to 27%, support cost per new customer rises 35%, and first-year gross margin per retained customer is €120. Analyze whether growth improved and what actions or tests should follow.",
+    "intent": "Integrate acquisition, retention, unit economics, support, and growth quality.",
+    "domain": "Customer Acquisition and Retention",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "growth_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A trusted premium outdoor brand plans to license its name to low-cost disposable travel accessories sold through discount stores. Evaluate the brand-extension opportunity using fit, customer expectations, channel consistency, and potential long-term brand effects.",
+    "intent": "Assess brand extension against positioning and customer expectations.",
+    "domain": "Brand Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "marketing_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A sales team earns commission solely on signed contract value. Bookings rise 25%, but cancellations, discounting, and deals requiring costly customization also rise. Explain how the incentive can distort behavior and propose a more balanced sales-management approach.",
+    "intent": "Connect sales incentives to deal quality and sustainable customer value.",
+    "domain": "Sales Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "An e-commerce funnel shows 1,000,000 ad impressions, 40,000 site visits, 4,000 carts, and 1,200 purchases. After a campaign change, impressions rise 50% but purchases remain 1,200. Explain why awareness growth did not improve conversion and identify the funnel metrics management should inspect.",
+    "intent": "Interpret funnel stages and distinguish reach from business outcome.",
+    "domain": "Marketing Analytics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A consumer brand wants 30% growth by selling directly online, but 65% of current revenue comes from retailers that may reduce shelf space if undercut on price. The direct channel offers better customer data and margins, while fulfillment capacity is already near its peak. Design a growth approach that addresses channel conflict, pricing, capacity, and customer segmentation.",
+    "intent": "Design growth under channel conflict, capacity, and segment differences.",
+    "domain": "Channel Strategy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "growth_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A hotel receives 600 complaints in a quarter, up from 400, but occupied room-nights also rose from 20,000 to 36,000. Explain why the raw complaint count is not enough to diagnose customer experience and what additional measures should be reviewed.",
+    "intent": "Use appropriate denominators and distinguish isolated complaints from systemic experience issues.",
+    "domain": "Customer Experience Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "Customers who use a retailer's loyalty app spend 35% more than non-users. Management concludes the app causes higher spending and wants to shift most marketing budget to app adoption. Explain the causal inference problem and propose a stronger way to test the app's effect.",
+    "intent": "Distinguish correlation from causation in customer analytics.",
+    "domain": "Market Research and Experiments",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "experiment_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A SaaS company offers monthly plans at €30 and annual plans at €300. Annual customers churn less, but a large discount may attract buyers who would have paid monthly. Explain the pricing and retention trade-offs management should analyze before increasing the annual-plan discount.",
+    "intent": "Evaluate subscription pricing using willingness to pay, retention, and cannibalization.",
+    "domain": "Pricing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "pricing_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A product team can build only two of four items this quarter: a feature requested by the largest customer, reliability work expected to cut outages by 40%, a new onboarding flow expected to improve activation, and an internal reporting tool that saves support time. Describe how to prioritize using customer problem, business objective, evidence, dependencies, and measurable outcomes.",
+    "intent": "Prioritize product work under limited resources and competing objectives.",
+    "domain": "Product Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "product_strategy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A company has three products: A generates 60% of profit but is mature; B grows 35% annually but consumes most engineering capacity; C is strategically important for a future enterprise segment but currently loses money. A proposed B feature would cannibalize 20% of A's sales. Allocate product investment and explain how lifecycle, cannibalization, strategic role, and resource constraints should shape the portfolio.",
+    "intent": "Optimize a product portfolio rather than each product independently.",
+    "domain": "Product Portfolio Management",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "product_strategy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A team releases a new onboarding flow to 10% of users. Activation rises from 52% to 58%, but the test lasts only four days and the new flow removes a step that teaches an important safety feature. Explain what can and cannot yet be concluded and what follow-up metrics or tests are needed.",
+    "intent": "Interpret a product experiment with short-term gain and possible long-term downside.",
+    "domain": "Product Experimentation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "experiment_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A company has a successful pilot for a new service in one city. The pilot relied on unusually experienced staff and manual workarounds that will not scale. Explain what management must validate before expanding nationally.",
+    "intent": "Distinguish successful experimentation from scalable innovation.",
+    "domain": "Innovation Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Ten interviewees say they “love” a startup's prototype, but none agrees to pay a €50 deposit for early access. What should the founders infer, and what evidence would be stronger for validating demand?",
+    "intent": "Distinguish expressed enthusiasm from willingness to pay.",
+    "domain": "New Venture Validation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A bootstrapped professional-services startup is profitable with 15 employees. Investors encourage rapid expansion into five countries, but the founders value control and the current service model depends heavily on senior experts. Analyze why growth is a strategic choice rather than an automatic objective.",
+    "intent": "Evaluate growth against founder objectives, capability constraints, and business-model economics.",
+    "domain": "Entrepreneurship",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "strategy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A marketplace connects freelance translators with business clients and charges a transaction fee. More clients can attract more translators and vice versa, but poor-quality suppliers can reduce trust. Explain how network effects could help or hurt the business model and what management must govern.",
+    "intent": "Analyze platform network effects together with quality and trust.",
+    "domain": "Platform Business Models",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "business_model_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A product roadmap lists 27 features for the next six months but contains no target customer problems or outcome metrics. Explain why feature completion is not the same as product success and how the roadmap should be reframed.",
+    "intent": "Connect product choices to customer problems and measurable business outcomes.",
+    "domain": "Product Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "An industrial firm generates many employee ideas but few reach implementation because business units will not provide pilot staff, failed experiments hurt managers' bonuses, and procurement requires full-scale ROI before small tests. Diagnose the organizational barriers to innovation and propose changes that preserve discipline.",
+    "intent": "Distinguish idea generation from an operating system that supports experimentation and scaling.",
+    "domain": "Innovation Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "organizational_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A project has three paths: A→B takes 8 weeks, C→D→E takes 11 weeks, and F→G takes 7 weeks. Task D is delayed by 2 weeks while all other tasks remain on plan. Explain the likely effect on project completion and why “number of tasks completed” is not the right indicator.",
+    "intent": "Apply critical-path reasoning conceptually and distinguish activity from outcome.",
+    "domain": "Project Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "project_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A transformation project reports 95% of planned tasks completed, but users have not adopted the new process and customer cycle time is unchanged. Explain why task completion is not sufficient evidence of project success.",
+    "intent": "Distinguish project activity from benefits realization.",
+    "domain": "Project Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A company has five strategic projects that each show positive standalone value, but all require the same three data engineers during the same quarter. Analyze how portfolio management should prioritize or sequence the projects rather than declaring all five “high priority.”",
+    "intent": "Optimize a project portfolio under shared-resource constraints.",
+    "domain": "Program and Portfolio Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "project_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A company successfully installs a new CRM on time and on budget, but six months later only 35% of salespeople use it consistently. Managers kept old reporting spreadsheets, regional leaders were not involved in workflow design, training focused on software clicks rather than changed selling behavior, and bonuses still reward the old process. Diagnose why the transformation failed and design an adoption plan with behavioral, incentive, process, and measurement changes.",
+    "intent": "Diagnose technology adoption failure despite successful technical implementation.",
+    "domain": "Change Management",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "change_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A startup grows from 40 to 400 employees in 18 months. Founders still approve routine decisions, teams duplicate work, new managers lack clear authority, and employees complain that processes are either absent or overly bureaucratic. Propose how the operating model should evolve while preserving speed.",
+    "intent": "Redesign delegation, layers, systems, and coordination during rapid scaling.",
+    "domain": "Scaling Organizations",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "organizational_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A retailer replaces paper forms with tablets but keeps the same six approvals, duplicate fields, and weekly batch review. Management calls this a digital transformation. Explain the difference between digitizing an existing process and redesigning the operating model, and identify where value could actually come from.",
+    "intent": "Distinguish digitization from process and operating-model transformation.",
+    "domain": "Digital Transformation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "An expense process has 14 fields, four approvals, and 8% exception cases. One proposal is to automate the entire workflow immediately. Explain how management should decide what to eliminate, simplify, standardize, and only then automate.",
+    "intent": "Sequence process redesign before automation.",
+    "domain": "Business Process Automation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "operations_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A regional manager approves local promotions, finance approves discounts, and brand management can veto messaging. When a promotion underperforms, each function says another owned the result. Redesign the decision rights so advice, approval, execution, and accountability are clear.",
+    "intent": "Clarify cross-functional decision rights and outcome accountability.",
+    "domain": "Decision Rights and Accountability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "organizational_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A service business wants to improve customer retention. It tracks number of training sessions delivered to staff as its main KPI. Explain why this is a weak outcome measure and propose a small set of leading and lagging indicators tied to the objective.",
+    "intent": "Design KPIs that connect controllable actions to desired outcomes.",
+    "domain": "KPI Design",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A website reports that complaints fell from 500 to 450 while orders fell from 20,000 to 15,000. Management celebrates a 10% drop in complaints. Calculate the complaint rate before and after and explain the denominator problem.",
+    "intent": "Interpret rates rather than raw counts when scale changes.",
+    "domain": "Business Analytics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "Branches with higher employee engagement scores also have higher sales. The highest-engagement branches are mostly in wealthier markets and have more experienced managers. Explain why the data do not by themselves show that engagement causes sales growth and what additional evidence would help.",
+    "intent": "Recognize confounding in observational business data.",
+    "domain": "Data-Driven Decision-Making",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "An A/B test on 2 million users increases checkout conversion from 4.00% to 4.05% with strong statistical significance. The change costs €0.20 per transaction to operate and adds only €0.03 expected contribution per visitor. Explain why statistical significance is not sufficient for rollout and identify the commercial calculations needed.",
+    "intent": "Distinguish statistical significance from business significance.",
+    "domain": "Experiments and Business Testing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "experiment_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A company can invest €2 million now in a new facility with a 60% chance of generating €5 million in value and a 40% chance of generating €0, or spend €300,000 on a six-month pilot that would reveal much more about demand before the larger commitment. Explain how expected value, information value, downside, and reversibility should influence the decision.",
+    "intent": "Use expected-value and staged-investment reasoning without treating expected value as certainty.",
+    "domain": "Decision-Making Under Uncertainty",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "decision_under_uncertainty",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A five-year demand forecast extrapolates 12% annual growth from the last three years, but a major regulation will change customer behavior next year and a low-cost substitute is entering. Explain why forecast uncertainty is likely understated and how planning should respond.",
+    "intent": "Recognize structural breaks and scenario planning needs.",
+    "domain": "Forecasting and Planning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "forecasting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A risk register lists one event as “supplier failed yesterday” and another as “20% chance of a supplier failure next year causing a two-week outage.” Explain which is an issue and which is a risk, and how likelihood and impact should shape management response.",
+    "intent": "Distinguish current issues from uncertain future risks.",
+    "domain": "Risk Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A subscription business dashboard looks healthier: sign-ups are up 30%, support handle time is down 20%, and monthly releases doubled. Yet 90-day retention fell from 70% to 52%, refund rates doubled, support repeat contacts rose, and employee overtime increased sharply. Diagnose how the dashboard can show improvement while business outcomes deteriorate, including metric choice, incentives, and cross-functional feedback loops.",
+    "intent": "Integrate misleading KPIs, gaming, retention, support, and employee effects.",
+    "domain": "Business Analytics and KPI Design",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "Eight regional teams show large performance differences. The top teams have more experienced staff, easier territories, smaller account loads, and different definitions of “active customer.” Leadership wants to rank managers and copy the top manager's practices. Explain why the evidence is insufficient and design an analysis that separates management effects from staffing, market, workload, and measurement differences.",
+    "intent": "Diagnose confounding and measurement inconsistency in comparative performance data.",
+    "domain": "Data-Driven Decision-Making",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A company has already spent €6 million developing a product that still needs another €2 million to launch. Updated evidence suggests launch would generate only €1 million in expected future contribution. Explain why the €6 million already spent should not by itself justify continuing.",
+    "intent": "Apply sunk-cost and relevant-future-cost reasoning to a management decision.",
+    "domain": "Managerial Economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "Management is unsure whether a new category will become a €5 million, €20 million, or €60 million market. Building full capacity now is cheapest per unit but mostly irreversible; a modular option costs 15% more per unit but can be expanded later. Explain how scenario analysis, sensitivity, reversibility, and option value should influence capacity choice.",
+    "intent": "Evaluate capacity commitment under deep uncertainty and asymmetric reversibility.",
+    "domain": "Decision-Making Under Uncertainty",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A board begins approving individual marketing campaigns and negotiating supplier schedules. Explain why this blurs governance and management, and describe the board's more appropriate oversight role.",
+    "intent": "Distinguish board oversight from operational execution.",
+    "domain": "Corporate Governance",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A procurement director owns shares in a supplier competing for a major contract and does not disclose the interest because the supplier's bid is competitive. Analyze the ethical problem even if no law is broken and identify appropriate management controls.",
+    "intent": "Reason about conflicts of interest, transparency, and trust beyond legal compliance.",
+    "domain": "Business Ethics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "stakeholder_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A company must decide whether to close an underused plant. Keeping it open protects 300 local jobs but costs €12 million annually; closure would improve viability of the remaining business but hurt the community and a key supplier. Explain how management should identify stakeholder interests, constraints, alternatives, and mitigation without assuming all objectives can be maximized.",
+    "intent": "Analyze competing stakeholder interests in a difficult restructuring decision.",
+    "domain": "Stakeholder Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "stakeholder_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A manufacturer proposes a sustainability target to cut water use 25% in three years. One process change could achieve most of the reduction but raises energy use 12% and defect risk slightly. Explain how management should evaluate the initiative using outcomes, trade-offs, metrics, and total system impact.",
+    "intent": "Evaluate sustainability initiatives with measurable outcomes and cross-impact trade-offs.",
+    "domain": "Corporate Social Responsibility and Sustainability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A retailer operating in the European Union wants to use detailed customer purchase histories and browsing behavior to train a personalization system. From a management perspective, identify the governance questions that must be addressed under the EU GDPR before deployment, including purpose, data minimization, accountability, vendor access, human oversight, and customer rights. Do not provide jurisdiction-neutral legal conclusions.",
+    "intent": "Recognize jurisdiction-specific privacy governance obligations in an AI deployment decision.",
+    "domain": "Technology Governance and Privacy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "risk_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 91,
+    "prompt": "A food company discovers a possible contamination issue affecting an unknown subset of products. Social media rumors are spreading, facts are incomplete, and retailers want immediate guidance. Prioritize the first management actions across stabilization, stakeholder communication, continuity, investigation, and longer-term remediation.",
+    "intent": "Prioritize crisis-management actions under uncertainty.",
+    "domain": "Crisis Management and Business Continuity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "Executives receive bonuses based largely on annual revenue growth, while the board's stated objective is sustainable long-term value creation. Explain the agency and incentive risks and what governance mechanisms could improve alignment without assuming one perfect compensation formula.",
+    "intent": "Analyze governance incentives and agency problems.",
+    "domain": "Corporate Governance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "stakeholder_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A global consumer-goods company wants one standardized product and campaign worldwide to maximize scale. In one country, local usage patterns, package sizes, and retail channels differ materially from its home market. Analyze what should be standardized and what may need local adaptation.",
+    "intent": "Balance global integration with local responsiveness based on evidence.",
+    "domain": "International Business",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "strategy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A multinational team has recurring disagreement about meeting participation and decision speed. One manager attributes it entirely to national culture. Explain how cultural frameworks can be used as hypotheses without stereotyping, and what team-specific evidence should be gathered.",
+    "intent": "Use cross-cultural concepts without deterministic cultural assumptions.",
+    "domain": "Cross-Cultural Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A company plans to outsource a core customer-support function to a vendor that can reduce direct cost by 20%. The vendor would control most customer interaction data, the company has weak contract-management capability, and switching vendors could take 12 months. Evaluate the partnership using cost, capability, dependency, service quality, learning, and resilience.",
+    "intent": "Assess outsourcing beyond short-term savings and retain accountability.",
+    "domain": "Outsourcing and Partnerships",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A large software company acquires a smaller competitor for its fast innovation cycle, specialist engineers, and access to a new customer segment. The products overlap 40%; core systems are incompatible; the acquirer uses centralized approvals while the target relies on autonomous teams; and 30% of target engineers have retention offers elsewhere. Analyze whether the strategic logic can be realized, identifying integration choices, synergy risks, talent actions, customer risks, and measures of success.",
+    "intent": "Evaluate M&A strategic fit versus realizable integration under culture, systems, talent, and customer constraints.",
+    "domain": "Mergers and Acquisitions",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "After a merger, management wants all systems, processes, brands, and reporting lines unified within 90 days. Customer-facing operations are stable, but the acquired firm has a superior sales process and a distinct brand valued by its niche customers. Analyze the trade-offs in integration speed and identify what should be integrated immediately, later, or potentially not at all.",
+    "intent": "Design post-merger integration pace based on value, risk, and strategic differentiation.",
+    "domain": "Post-Merger Integration",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A business has revenue growth of 10% but operating margin fell from 14% to 4%. Customer churn rose from 8% to 18%, discounting increased, overtime is high, service defects doubled, and employee engagement fell sharply. Management proposes an across-the-board 15% cost cut. Diagnose the turnaround problem and propose priorities across customer economics, operations, cost structure, people, and strategic focus.",
+    "intent": "Synthesize commercial, operational, people, and cost evidence in a turnaround.",
+    "domain": "Turnaround and Restructuring",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "turnaround_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A company is growing 35% annually, but order lead time has doubled, new-hire productivity is falling, middle managers have 18–25 direct reports, and working-capital needs are rising faster than revenue. Explain why growth may be outrunning the operating model and propose how to sequence capacity, systems, management, and cash-discipline improvements.",
+    "intent": "Manage growth complexity across operations, organization, talent, and working capital.",
+    "domain": "Growth Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "growth_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A European B2B services company is choosing between Country A and Country B for expansion. A has a €250 million market growing 3%, low regulatory uncertainty, and strong incumbent relationships. B has a €90 million market growing 15%, fragmented competitors, more regulatory uncertainty, and greater need for local partnerships. The company has €6 million to invest and limited international management capacity. Compare the two entries using market attractiveness, company fit, capability requirements, risk, staged commitment, and learning value rather than simply choosing the faster-growing market.",
+    "intent": "Compare international entry options using fit, risk, capabilities, and staged investment.",
+    "domain": "International Market Entry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  }
+]

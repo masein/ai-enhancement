@@ -1,0 +1,183 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the manufacturing or applied-science task, uses the supplied production context, and avoids substituting unrelated theory, generic management language, or irrelevant framework names.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "manufacturing_accuracy",
+      "name": "Manufacturing Accuracy",
+      "definition": "Uses correct manufacturing concepts and distinctions, including capacity versus output, cycle time versus lead time, utilization versus throughput, rework versus scrap, inspection versus process control, and stable versus capable processes. Central process claims must be technically plausible for the stated equipment and production context.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "applied_science_accuracy",
+      "name": "Applied Science Accuracy",
+      "definition": "Applies physical, chemical, materials, thermal, fluid, electrical, and measurement principles correctly; preserves units and balances; distinguishes observation from inference; and does not make physically impossible or scientifically unsupported industrial claims.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "process_reasoning",
+      "name": "Process Reasoning",
+      "definition": "When process behavior is relevant, connects material, geometry, tooling/equipment, process parameters, production volume, cycle time, and downstream outcomes. A numerically correct result based on an inappropriate manufacturing process model should lose credit here.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "materials_and_processing_reasoning",
+      "name": "Materials and Processing Reasoning",
+      "definition": "When materials matter, correctly links manufacturing history and service conditions to machinability, formability, weldability, castability, microstructure, residual stress, hardness, toughness, fatigue, creep, wear, corrosion, thermal expansion, or dimensional stability without assuming the strongest or hardest material is automatically best.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When calculation is required, selects an appropriate equation/model, uses coherent units, computes correctly, checks physical plausibility, and interprets the number for the manufacturing decision. Minor arithmetic that does not change the conclusion is less serious than using the wrong industrial model or reversing feasibility.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "metrology_and_measurement_reasoning",
+      "name": "Metrology and Measurement Reasoning",
+      "definition": "When measurements are central, distinguishes accuracy, precision, resolution, calibration, bias, repeatability, reproducibility, traceability, uncertainty, environmental effects, operator effects, and sensor range. Recognizes when gauge variation can mimic or dominate actual process variation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quality_and_process_control",
+      "name": "Quality and Process Control",
+      "definition": "When quality data are involved, correctly distinguishes defects from defectives, detection from prevention, control limits from specifications, process stability from capability, and correction from corrective action. Capability claims should consider stability and measurement adequacy.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "tolerance_and_dimensional_reasoning",
+      "name": "Tolerance and Dimensional Reasoning",
+      "definition": "When dimensional function matters, reasons from actual limits and stack-ups rather than nominal values alone; correctly evaluates clearance/interference, accumulation of variation, datum/function relationships, thermal effects, and whether the proposed assembly or tolerance scheme is feasible.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "production_systems_reasoning",
+      "name": "Production Systems Reasoning",
+      "definition": "When factory flow matters, reasons at system level about bottlenecks, variability, queues, WIP, setup, downtime, yield, scheduling, routing, blocking/starvation, and capacity. Does not assume maximizing every resource's utilization maximizes throughput.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "automation_and_control_reasoning",
+      "name": "Automation and Control Reasoning",
+      "definition": "When automated equipment is involved, distinguishes sensor, actuator, wiring, logic, permissive, interlock, communication, and physical-process causes; interprets sequence state and actuator limits; and proposes recovery consistent with safe machine states.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "maintenance_and_reliability_reasoning",
+      "name": "Maintenance and Reliability Reasoning",
+      "definition": "When equipment health matters, distinguishes reliability from availability and maintainability, matches preventive/predictive/corrective strategies to failure behavior and consequence, interprets condition trends cautiously, and considers downtime, repair time, service constraints, and spares.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "failure_and_root_cause_analysis",
+      "name": "Failure and Root-Cause Analysis",
+      "definition": "When troubleshooting or failure analysis is required, separates symptom, observed damage, initiating mechanism, contributing conditions, and root cause; uses evidence to compare hypotheses; proposes discriminating tests; and distinguishes containment/correction from verified corrective action.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "experimental_and_data_reasoning",
+      "name": "Experimental and Data Reasoning",
+      "definition": "When production data or experiments are used, recognizes sampling limits, replication, randomization, blocking, interactions, confounding, distribution/tail behavior, uncertainty, and the difference between correlation and causation. Statistical significance alone does not establish industrial importance.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "safety_and_risk_reasoning",
+      "name": "Safety and Risk Reasoning",
+      "definition": "When hazards are present, identifies hazardous energy and credible failure modes, respects guards/interlocks/independent protection, prioritizes safe states, avoids bypass recommendations, and does not trade severe safety risk for production output or nominal product conformance.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_model_selection",
+      "name": "Assumptions and Model Selection",
+      "definition": "When assumptions materially affect the result, makes them explicit, chooses models appropriate to scale and context, checks model limitations, and identifies hidden invalid assumptions such as linear scale-up, reliable sensors, stable processes, independent failures, or causal interpretations unsupported by data.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "tradeoff_and_economic_reasoning",
+      "name": "Trade-Off and Economic Reasoning",
+      "definition": "When selecting among alternatives, weighs technical feasibility, quality, capacity, yield, maintenance, flexibility, safety, lead time, lifecycle cost, tooling/capital, and uncertainty. Recognizes valid alternative strategies and distinguishes relevant/avoidable costs from sunk or allocated costs.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the question and includes the measurements, mechanisms, calculations, constraints, or verification steps needed for a usable industrial answer without requiring irrelevant topics.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internal consistency among assumptions, units, calculations, process descriptions, and conclusions; does not contradict supplied evidence or recommend actions incompatible with its own diagnosis.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Explains the manufacturing logic in a clear, traceable way, distinguishes evidence from inference, states uncertainty where relevant, and communicates conclusions and verification steps without jargon substituting for reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_manufacturing_applied_sciences_error",
+    "condition": "A materially false central manufacturing, quantitative, process, measurement, quality, reliability, safety, or applied-science claim that fundamentally invalidates the answer or could create severe production, safety, or quality consequences.",
+    "effect": "score=0",
+    "examples": [
+      "A major unit or dimensional error that invalidates a process setting or engineering conclusion.",
+      "A fundamentally incorrect machining or process calculation that changes feasibility.",
+      "Claiming a statistically stable process is necessarily capable of meeting specifications.",
+      "Confusing control limits and specification limits in a central quality decision.",
+      "Treating a measurement system with dominant gauge error as reliable evidence of process variation.",
+      "A major tolerance-stack error that makes the proposed assembly infeasible.",
+      "Fundamentally incorrect heat-treatment reasoning that reverses the expected property outcome.",
+      "Misdiagnosing a safety-critical machine state and recommending continued operation.",
+      "Recommending bypass of a safety interlock as the primary production fix.",
+      "A fundamentally incorrect maintenance diagnosis that risks catastrophic equipment failure.",
+      "Treating high utilization as proof that system throughput is maximized despite blocking, queues, or bottlenecks.",
+      "Claiming redundancy guarantees reliability despite a stated common-cause failure.",
+      "A fundamentally incorrect mass, energy, or material balance in a production process.",
+      "Misinterpreting sensor failure as definitive process failure when supplied evidence contradicts that conclusion.",
+      "Recommending a process outside a supplied material or equipment safe operating limit.",
+      "Claiming one successful trial proves process capability or validation.",
+      "A fundamentally incorrect process-cost calculation that reverses the process-selection decision.",
+      "Attributing a defect to a cause directly contradicted by supplied evidence.",
+      "Recommending a material/process combination known from the supplied data to violate a critical requirement.",
+      "A fundamentally incorrect root-cause conclusion that would predictably worsen the production problem."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Minor terminology mistakes.",
+      "Reasonable alternative manufacturing processes.",
+      "Small omissions.",
+      "Reasonable measurement uncertainty.",
+      "Different valid maintenance strategies.",
+      "Minor differences in process settings where multiple values are defensible.",
+      "Legitimate disagreement about economic assumptions.",
+      "Reasonable approximations.",
+      "Different valid root-cause hypotheses when evidence remains incomplete."
+    ]
+  }
+}

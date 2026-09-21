@@ -1,0 +1,178 @@
+{
+  "benchmark": "Political Science & International Relations",
+  "score_range": {
+    "min": 0,
+    "max": 4
+  },
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Addresses the actual political-science or international-relations task, uses the supplied facts and institutional rules, and avoids drifting into unrelated history, law, economics, moral advocacy, or generic commentary.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "political_science_accuracy",
+      "name": "Political Science Accuracy",
+      "definition": "Uses core political-science distinctions correctly, including state versus government versus regime; authority versus influence; legality versus legitimacy; policy adoption versus implementation; votes versus seats; and institutional incentives versus deterministic outcomes.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "international_relations_accuracy",
+      "name": "International Relations Accuracy",
+      "definition": "Where IR is relevant, correctly distinguishes capabilities from intentions, deterrence from compellence, alliances from automatic action, norms from binding law, interdependence from equal dependence, and theory from established empirical fact.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Defines or applies key concepts with sufficient precision for the scenario and does not use labels such as legitimacy, authoritarianism, polarization, security dilemma, state capacity, or path dependence as substitutes for mechanism-based reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "institutional_reasoning",
+      "name": "Institutional Reasoning",
+      "definition": "Where institutions matter, identifies relevant formal and informal rules, veto points, delegation relationships, accountability channels, coordination problems, and incentive effects, while recognizing that institutions shape but do not mechanically determine behavior.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "comparative_reasoning",
+      "name": "Comparative Reasoning",
+      "definition": "Where cases or systems are compared, compares like with like where possible, identifies material institutional and contextual differences, avoids stereotypes, and states limits on transferring effects across cases.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "causal_reasoning",
+      "name": "Causal Reasoning",
+      "definition": "Where causal claims are at issue, distinguishes correlation from causation, identifies plausible mechanisms, considers confounding, selection, reverse causality, simultaneity, and counterfactuals, and calibrates causal confidence to the design and evidence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "political_behavior_and_electoral_reasoning",
+      "name": "Political Behavior and Electoral Reasoning",
+      "definition": "Where elections or political behavior are relevant, correctly applies the supplied electoral rules, distinguishes turnout, vote shares, seats, polls, and preferences, and analyzes strategic voting, mobilization, party competition, or public opinion without unsupported forecasting.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "political_economy_reasoning",
+      "name": "Political Economy Reasoning",
+      "definition": "Where political economy is relevant, identifies distributional winners and losers, collective-action incentives, institutions, credibility, taxation, regulation, trade, development, and organized interests without reducing the task to purely economic efficiency.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "strategic_and_ir_reasoning",
+      "name": "Strategic and IR Reasoning",
+      "definition": "Where strategic interaction or IR matters, identifies actors, preferences, outside options, information problems, commitment problems, signaling, bargaining leverage, relative versus absolute gains, institutions, and repeated interaction as appropriate.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_source_evaluation",
+      "name": "Evidence and Source Evaluation",
+      "definition": "Where evidence or sources are central, evaluates what the evidence actually establishes, distinguishes primary from secondary evidence, considers source incentives and methodology, and does not treat citations or institutional authority as substitutes for sound reasoning.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_and_data_interpretation",
+      "name": "Quantitative and Data Interpretation",
+      "definition": "Where numbers or data are supplied, uses the correct denominator, population, time period, electoral formula, or comparison; performs material calculations accurately; and states what the data do and do not establish.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "research_design_reasoning",
+      "name": "Research Design Reasoning",
+      "definition": "Where research design is relevant, correctly identifies hypotheses, variables, treatment or comparison logic, measurement choices, case selection, identifying assumptions, internal validity, and external validity at an appropriate political-science level.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "alternative_explanations",
+      "name": "Alternative Explanations",
+      "definition": "Where multiple explanations are plausible, identifies credible rivals, explains their distinct mechanisms, and states what observations or evidence would help discriminate among them rather than presenting one framework as automatically decisive.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_scope_conditions",
+      "name": "Assumptions and Scope Conditions",
+      "definition": "Where conclusions depend on assumptions, makes those assumptions explicit and states the conditions, populations, institutional settings, or time horizons under which the conclusion is expected to hold.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_and_neutrality",
+      "name": "Uncertainty and Neutrality",
+      "definition": "Where political contestation or uncertainty is material, separates facts from interpretations and values, acknowledges meaningful uncertainty, avoids unsupported motive claims, does not endorse candidates, parties, ideologies, movements, or ballot choices, and does not independently forecast election winners.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the prompt and includes the major actors, institutions, mechanisms, evidence, calculations, trade-offs, or caveats needed for the requested level of analysis without requiring unnecessary length.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent use of facts, rules, concepts, calculations, assumptions, and conclusions, with no contradictions that undermine the analysis.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Presents the reasoning in a coherent, readable way, distinguishes mechanisms and alternatives clearly, and avoids jargon that is not explained or applied to the specific political problem.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "practical_political_analysis",
+      "name": "Practical Political Analysis",
+      "definition": "Where the task is applied, translates concepts into the concrete institutional, electoral, policy, diplomatic, or strategic implications requested, while remaining descriptive and analytical rather than prescriptive about political choices.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error": {
+    "id": "critical_political_science_international_relations_error",
+    "condition": "A materially false central political-science, institutional, electoral, causal, quantitative, comparative, or international-relations claim that fundamentally invalidates or reverses the answer; a fabrication of material political facts or rules required for the answer; partisan endorsement or political recommendation in place of the requested neutral analysis; or an independent future-election prediction when the task calls for descriptive analysis.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally confusing state, government, and regime when the distinction determines the conclusion.",
+      "Materially misrepresenting an electoral rule supplied in the question.",
+      "A major vote-share, seat-share, coalition, or denominator error that reverses the analysis.",
+      "Claiming correlation alone proves a political causal relationship.",
+      "Treating a public-opinion poll as an election result.",
+      "Fundamentally misinterpreting the population measured by a survey.",
+      "Claiming an institutional arrangement necessarily produces an outcome despite explicit countervailing mechanisms.",
+      "Classifying a regime from one disliked institution without applying the supplied criteria.",
+      "Fundamentally misrepresenting a political-science or IR theory.",
+      "Claiming realism, liberalism, constructivism, or another framework is universally established as correct.",
+      "Fundamentally confusing deterrence and compellence.",
+      "Treating an alliance as proof that all members must take identical action in every contingency.",
+      "Fundamentally incorrect security-dilemma reasoning that treats defensive capability as proven offensive intent.",
+      "Claiming economic interdependence necessarily prevents conflict.",
+      "Attributing a political motive that the supplied evidence directly contradicts.",
+      "Ignoring an explicit institutional rule that reverses the political outcome.",
+      "Claiming a large sample eliminates selection, coverage, or nonresponse bias.",
+      "Drawing a central individual-level conclusion from aggregate data without recognizing ecological inference limits.",
+      "Fundamentally misinterpreting the identifying logic of a causal research design.",
+      "Fabricating election results, polling data, institutional rules, treaty provisions, positions, or historical facts required by the task.",
+      "Giving a partisan endorsement, voter recommendation, or ideological ranking instead of neutral analysis.",
+      "Independently predicting a future election winner when the benchmark asks for descriptive interpretation."
+    ]
+  }
+}

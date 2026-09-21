@@ -166,12 +166,12 @@ def test_every_reason_is_evaluated_and_sorted_into_judge_and_data(svc):
     client, appmod, _ = svc
     make_provisional()
     fresh(appmod)
-    med = loop_row(client, "medicine & health")               # under the floor in the fixture
+    med = loop_row(client, "Medicine & Clinical Health")   # under the floor in the fixture
     g = med["propose_by_model"][MODEL]
     assert any(PROVISIONAL in r for r in g["soft"])
     assert any("under the 30" in r for r in g["hard"])
     assert g["ok"] is False and g["overridable"] is False
-    econ = loop_row(client, "economics")["propose_by_model"][MODEL]
+    econ = loop_row(client, "Economics")["propose_by_model"][MODEL]
     assert econ["hard"] == [] and econ["soft"] and econ["overridable"] is True
     assert econ["provisional"] is True
     assert set(econ) >= {"ok", "overridable", "soft", "hard", "why", "short", "caution"}
@@ -181,7 +181,7 @@ def test_soft_reasons_alone_propose_with_the_override_and_carry_the_mark(svc):
     client, appmod, _ = svc
     make_provisional()
     fresh(appmod)
-    body = {"model": MODEL, "topic": "economics", "requested_by": "Omar"}
+    body = {"model": MODEL, "topic": "Economics", "requested_by": "Omar"}
     r = client.post("/api/proposals", json=body)
     assert r.status_code == 409 and PROVISIONAL in r.json()["detail"]      # as today
     r = client.post("/api/proposals", json={**body, "override_preliminary": True,
@@ -195,7 +195,7 @@ def test_soft_reasons_alone_propose_with_the_override_and_carry_the_mark(svc):
     assert over["by"] == "Omar" and over["at"] > 0
     assert any(PROVISIONAL in x for x in over["reasons"])
     # the Loop board's proposal carries it too
-    assert loop_row(client, "economics")["proposal"]["override"]["by"] == "Omar"
+    assert loop_row(client, "Economics")["proposal"]["override"]["by"] == "Omar"
     # and so does the dataset made from it: the provenance record, and the list
     llm_poller.tick()
     client.post(f"/api/proposals/{pid}/approve", json={"approver": "Omar"})
@@ -223,12 +223,13 @@ def test_a_data_reason_refuses_whatever_the_override_says(svc):
     client, appmod, _ = svc
     make_provisional()
     fresh(appmod)
-    r = client.post("/api/proposals", json={"model": MODEL, "topic": "medicine & health",
+    r = client.post("/api/proposals", json={"model": MODEL,
+                                            "topic": "Medicine & Clinical Health",
                                             "requested_by": "Omar",
                                             "override_preliminary": True})
     assert r.status_code == 409
     assert "under the 30" in r.json()["detail"]
-    assert r.json()["detail"] == loop_row(client, "medicine & health")[
+    assert r.json()["detail"] == loop_row(client, "Medicine & Clinical Health")[
         "propose_by_model"][MODEL]["why"]
 
 
@@ -239,14 +240,14 @@ def test_with_the_override_off_the_gate_is_what_it_was(svc, monkeypatch):
     monkeypatch.setattr(config, "ALLOW_PRELIMINARY_OVERRIDE", False)
     make_provisional()
     fresh(appmod)
-    g = loop_row(client, "economics")["propose_by_model"][MODEL]
+    g = loop_row(client, "Economics")["propose_by_model"][MODEL]
     assert g["overridable"] is False and g["ok"] is False
     # the old words, exactly: what topic_gate said before it knew about soft reasons
     row = next(m for m in client.get("/api/results").json()["models"] if m["id"] == MODEL)
     legacy = row["judge"]["tasks"]["exam_economics"]["propose"]
     assert g["why"] == legacy["why"] and legacy["why"].startswith(
         "the judged suite is preliminary, so no topic score is evidence yet")
-    r = client.post("/api/proposals", json={"model": MODEL, "topic": "economics",
+    r = client.post("/api/proposals", json={"model": MODEL, "topic": "Economics",
                                             "requested_by": "Omar",
                                             "override_preliminary": True})
     assert r.status_code == 409 and r.json()["detail"] == legacy["why"]

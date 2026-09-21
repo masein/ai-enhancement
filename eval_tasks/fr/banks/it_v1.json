@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A desktop powers on, its fans spin, and the monitor reports “no signal.” A known-good monitor and cable behave the same way, and the system never shows its firmware splash screen. What evidence would you gather next to distinguish a display-path problem from a broader hardware startup failure?",
+    "intent": "Diagnose a no-display startup problem using evidence rather than arbitrary part replacement.",
+    "domain": "Hardware & Endpoints",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A user says a laptop is “slow.” Task Manager on Windows 11 shows CPU 18%, memory 94%, disk active time 12%, and the slowdown becomes severe when several browser tabs and a spreadsheet are open. What is the most likely constrained resource, what additional check would confirm it, and what remedies are proportionate?",
+    "intent": "Distinguish memory pressure from CPU or storage bottlenecks and propose evidence-based remediation.",
+    "domain": "Hardware & Endpoints",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "capacity_planning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A small office keeps its only accounting file on a desktop with two drives mirrored in RAID 1. The owner says a separate backup is unnecessary because either drive can fail. Explain what RAID 1 protects against, what it does not protect against, and what additional recovery control is needed.",
+    "intent": "Distinguish storage redundancy from backup and recoverability.",
+    "domain": "IT Fundamentals",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "After a laptop firmware update, the machine intermittently freezes only when connected to a specific USB-C docking station. The same laptop is stable undocked, and another laptop also becomes unstable on that dock. What does this evidence suggest, and how would you narrow hardware, firmware, power, and peripheral causes safely?",
+    "intent": "Use comparative evidence to isolate a docking/peripheral instability issue.",
+    "domain": "Hardware & Endpoints",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A workstation shuts down under heavy rendering load. CPU temperature rises from 55°C idle to 100°C just before shutdown, while memory tests pass and storage health is normal. Explain the likely failure mode, the safest next checks, and why reinstalling the operating system is poorly justified.",
+    "intent": "Diagnose thermal shutdown from supplied telemetry.",
+    "domain": "Hardware & Endpoints",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "monitoring_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A new NVMe SSD is physically installed in a desktop, but the operating system does not see it. The motherboard documentation says one M.2 slot shares lanes with two SATA ports. What compatibility and firmware-level checks should be performed before concluding the SSD is defective?",
+    "intent": "Reason about component compatibility and shared hardware resources.",
+    "domain": "Hardware & Endpoints",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "configuration_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A battery-powered laptop runs normally on AC power but immediately shuts off when the charger is unplugged. The operating system reports 82% charge. What findings would distinguish a failed battery, battery communication problem, charger issue, or mainboard power fault?",
+    "intent": "Troubleshoot laptop power behavior using discriminating tests.",
+    "domain": "Hardware & Endpoints",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A printer is reachable by IP and its web status page is healthy, but one Windows 11 PC cannot print while other PCs can. The failing PC shows the print job stuck locally before it reaches the printer. Which failure domain should be investigated first, and what evidence would separate driver/spooler problems from network problems?",
+    "intent": "Distinguish endpoint print-stack failure from network or printer failure.",
+    "domain": "Hardware & Endpoints",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "user_support",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A nonprofit wants to replace 40 aging office PCs. Most workloads are browser, email, video meetings, and a light spreadsheet application; two users edit 4K video. Explain why one hardware specification for all 40 systems may be inefficient, and identify the workload evidence that should drive CPU, memory, storage, and graphics choices.",
+    "intent": "Match endpoint hardware to workload requirements and avoid unnecessary overprovisioning.",
+    "domain": "Hardware & Endpoints",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A server has redundant power supplies, dual network adapters, RAID storage, and two virtualization hosts, yet all services fail when one top-of-rack switch loses power. Identify the hidden single point of failure and explain why component redundancy did not create end-to-end service resilience.",
+    "intent": "Recognize an upstream single point of failure despite redundant components.",
+    "domain": "High Availability",
+    "acuity": "critical",
+    "difficulty": 4,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "On Windows Server 2022, a service is configured to start automatically but remains stopped after reboot. The application executable runs successfully when launched interactively by an administrator. Event logs show “logon failure” for the service account. What should be checked, and why is the successful interactive launch not proof that the service configuration is valid?",
+    "intent": "Diagnose a Windows service startup problem involving service identity and rights.",
+    "domain": "Windows Administration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "system_administration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A Windows domain user can open a shared folder from one PC but receives Access Denied from another. The user’s group memberships are identical in Active Directory, and the share is healthy. Explain how cached credentials, local versus domain identity, share permissions, and NTFS permissions could create different effective access.",
+    "intent": "Reason about effective Windows access across local/domain context and layered permissions.",
+    "domain": "Windows Administration",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "access_control",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A Group Policy change is intended to disable a setting for laptops in one organizational unit. Some laptops receive the policy and some do not. The affected devices are online, domain-joined, and in different child OUs. What inheritance, filtering, replication, and device-placement evidence should be checked before editing the policy again?",
+    "intent": "Troubleshoot inconsistent Windows policy application.",
+    "domain": "Windows Administration",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "configuration_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A Windows 11 PC crashes only when a particular USB network adapter is connected. Reliability history shows driver failures at each crash. The adapter works on another PC running an older driver. How would you distinguish defective hardware from a driver/compatibility problem while minimizing disruption?",
+    "intent": "Separate hardware failure from Windows driver incompatibility.",
+    "domain": "Windows Administration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "On Linux, a web service process is running and listening on TCP port 8443. A local curl to 127.0.0.1:8443 succeeds, but clients on another subnet time out. What should be checked next to separate service availability from host firewall, routing, interface binding, and upstream network policy?",
+    "intent": "Distinguish a healthy Linux service from network reachability failure.",
+    "domain": "Linux Administration",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "network_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A Linux server reports 20 GB free on a 100 GB filesystem, yet an application cannot create new files and logs “No space left on device.” What non-capacity resource could be exhausted, what evidence would confirm it, and what remediation should avoid deleting unrelated data blindly?",
+    "intent": "Recognize inode exhaustion or similar filesystem resource exhaustion despite free bytes.",
+    "domain": "Linux Administration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "system_administration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "On Linux, a scheduled backup job succeeds when run manually by an administrator but fails overnight with “permission denied” when invoked by the scheduler. Explain how execution identity, environment variables, file ownership/permissions, and noninteractive context should be investigated.",
+    "intent": "Troubleshoot scheduled Linux job behavior that differs from interactive execution.",
+    "domain": "Linux Administration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "system_administration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A Linux administrator changes a configuration file owned by root so that an application account can edit it directly. The service then fails a security baseline check. Explain the difference between ownership and permissions, and propose a least-privilege way to allow the required administration without broadly weakening the file.",
+    "intent": "Apply Linux ownership and permission concepts with least privilege.",
+    "domain": "Linux Administration",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "access_control",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "On macOS, one user account cannot launch an application while another account on the same Mac can. The system itself is stable. What user-specific versus system-wide configuration, permissions, profile, and application-state evidence would you inspect before reinstalling macOS?",
+    "intent": "Distinguish user-specific application failure from operating-system instability on macOS.",
+    "domain": "macOS Administration",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A Windows Server file host shows 95% memory use, but the top application process accounts for only 35%. File cache and several services consume the rest, and users are not reporting latency. Explain why high utilization alone does not prove harmful memory saturation and what measurements would justify intervention.",
+    "intent": "Interpret operating-system resource usage without equating utilization with saturation.",
+    "domain": "Windows Administration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "monitoring_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A user successfully signs in to the company portal with MFA but receives Access Denied when opening the finance application. Explain why this is primarily an authorization question rather than an authentication question, and identify the entitlement evidence to check.",
+    "intent": "Distinguish successful authentication from authorization to an application.",
+    "domain": "Identity & Access",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "access_control",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A new employee can sign in to cloud email but cannot access an on-premises file share. Identity synchronization shows the user object exists in both directories, but a required security group is present only in the cloud. Explain how synchronization scope, group membership, directory replication, and file authorization could produce this split behavior.",
+    "intent": "Troubleshoot hybrid identity and authorization inconsistency.",
+    "domain": "Directory Services",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "identity_troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "An administrator resets a user’s password after a phishing report and tells the user the incident is resolved. Sign-in logs show successful logins from an unfamiliar country using an existing session token after the password reset. What additional containment and investigation steps are required, and why may a password reset alone be insufficient?",
+    "intent": "Respond to suspected account compromise involving surviving sessions/tokens.",
+    "domain": "Authentication & Privileged Access",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "security_operations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A department grants access through nested groups: User A is in Group Sales-West, which is in Group Sales, which is assigned read access to a share. User A is denied while peers work. What evidence should be gathered about nested membership, token/effective permissions, replication, and explicit denies before changing the ACL?",
+    "intent": "Reason about nested groups and effective permissions without making broad access changes.",
+    "domain": "Directory Services",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "access_control",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A service account used by a legacy application has Domain Administrator privileges because “it always works that way.” The application only needs to read one directory container and write to one database. Explain how to redesign the account privileges while maintaining service continuity and rollback options.",
+    "intent": "Apply least privilege to a service account with excessive privileges.",
+    "domain": "Authentication & Privileged Access",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "The organization uses SSO for most applications. One application still prompts for a separate password even though the user has an active SSO session. List the identity and federation boundary checks that would determine whether the problem is application configuration, user assignment, token issuance, or a deliberately separate authentication domain.",
+    "intent": "Troubleshoot SSO behavior using federation and assignment evidence.",
+    "domain": "Identity & Access",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "identity_troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A privileged break-glass account is excluded from normal conditional-access requirements so administrators can recover during an identity outage. What controls should surround this account so that emergency availability does not create an unchecked everyday attack path?",
+    "intent": "Balance privileged recovery access with security controls.",
+    "domain": "Authentication & Privileged Access",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "Directory synchronization runs every 30 minutes. A manager removes an employee from a sensitive access group at 10:05, but the employee can still reach the cloud application at 10:12. What timing and session-state evidence should be checked before concluding the removal failed?",
+    "intent": "Recognize synchronization and session propagation delay in access revocation.",
+    "domain": "Directory Services",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A security key is required for privileged administrators, but one admin cannot authenticate after the key is lost. Explain a safe recovery path that preserves administrator separation, verifies identity, uses controlled temporary access if necessary, and avoids disabling MFA globally.",
+    "intent": "Recover privileged access without broadly weakening authentication controls.",
+    "domain": "Authentication & Privileged Access",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "security_operations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "An access-review audit finds 18 former contractors with active accounts even though the organization’s policy requires deprovisioning within 24 hours of contract end. None has recent sign-ins. Explain the difference between having a policy and having an effective control, what evidence should be reviewed, what risks should be prioritized, and how ownership and verification should be improved.",
+    "intent": "Evaluate control effectiveness and identity-lifecycle risk rather than treating policy existence as enforcement.",
+    "domain": "IT Governance & Risk",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A PC has IPv4 address 192.168.10.34/24, default gateway 192.168.10.1, and DNS server 192.168.10.53. It can ping 8.8.8.8 but cannot resolve example.com, while another PC on the same subnet resolves names normally. Which failure domains are most plausible and what should be checked first?",
+    "intent": "Distinguish DNS failure from general IP connectivity failure.",
+    "domain": "DNS & DHCP",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "network_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A /27 IPv4 subnet is assigned to a branch office. How many addresses are in the subnet, how many are normally usable for hosts, and what are the network and broadcast addresses for 10.20.30.64/27?",
+    "intent": "Perform a correct IPv4 subnet-size and range calculation.",
+    "domain": "IP Addressing & Subnetting",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A router has routes 10.0.0.0/8 via Gateway A and 10.20.0.0/16 via Gateway B. A packet is destined for 10.20.5.10. Which route should be selected conceptually, and why?",
+    "intent": "Apply longest-prefix route selection.",
+    "domain": "IP Addressing & Subnetting",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "Two sites are connected by VPN. Site A uses 192.168.1.0/24 and Site B also uses 192.168.1.0/24. Users can reach some remote services only intermittently depending on local routing state. Explain why overlapping subnets create ambiguity and identify design options that avoid treating DNS as the root cause.",
+    "intent": "Diagnose connectivity problems caused by overlapping private address space.",
+    "domain": "Firewalls & VPNs",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "network_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A DHCP scope for 10.5.8.0/24 is 98% leased. Thirty new laptops arrive tomorrow. The scope excludes .1-.30 and reserves 20 addresses inside the remaining range. Explain what capacity information is needed, estimate whether exhaustion is likely, and give safe ways to create headroom without causing address conflicts.",
+    "intent": "Reason quantitatively about DHCP address capacity and safe expansion.",
+    "domain": "DNS & DHCP",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "capacity_planning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Only clients on VLAN 30 cannot reach the Internet. They can reach each other, receive DHCP addresses in 10.30.0.0/24, and can ping their gateway 10.30.0.1. Other VLANs work. What checks best distinguish inter-VLAN routing, firewall/NAT, and upstream path problems?",
+    "intent": "Locate a VLAN-specific Internet failure after local switching and gateway reachability are confirmed.",
+    "domain": "Switching & Routing",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "network_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A switch access port is intended for VLAN 20, but the connected phone works while the attached PC receives an address from VLAN 10. Without assuming the switch is defective, explain what port, voice/data VLAN, tagging, and DHCP evidence should be checked.",
+    "intent": "Troubleshoot VLAN assignment on a converged phone/PC access port.",
+    "domain": "Switching & Routing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "configuration_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "Users complain that Wi-Fi is slow in a conference room. Signal strength is strong, but channel utilization is 90%, retransmissions are high, and performance improves when the room empties. Explain why adding transmit power is unlikely to solve the main problem and what capacity/interference actions are more appropriate.",
+    "intent": "Distinguish Wi-Fi coverage from congestion/capacity.",
+    "domain": "Wireless Networking",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "monitoring_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A laptop cannot join the corporate Wi-Fi but can join the guest SSID. Other users can join the corporate SSID from the same location. The laptop sees the SSID with strong signal and fails during authentication. Which evidence points away from RF coverage and toward identity, certificate, or device-configuration causes?",
+    "intent": "Separate wireless authentication failure from radio-frequency problems.",
+    "domain": "Wireless Networking",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "identity_troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A remote employee reports that corporate applications are slow over VPN, but ordinary Internet speed tests from the same home network are fast. Office users are unaffected; application servers show normal CPU and storage. Describe a test sequence to distinguish home Wi-Fi, ISP latency, VPN tunnel path, DNS, authentication delay, and application causes.",
+    "intent": "Perform layered remote-access troubleshooting across home, ISP, VPN, and application layers.",
+    "domain": "Remote Work & Branch IT",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A firewall rule is written as: source 10.10.20.0/24, destination 10.50.8.12, TCP 443, allow. A client at 10.10.30.25 cannot connect to 10.50.8.12:443. Explain why this rule does not apply to the client and what should be verified before broadening the source network.",
+    "intent": "Reason about firewall source, destination, protocol, and scope.",
+    "domain": "Firewalls & VPNs",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "network_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "An internal web application is reachable by hostname from office PCs but not from VPN clients. VPN clients can ping the server IP and can resolve public Internet names. Internal DNS returns the application name only to office resolvers. What architecture issue is most likely and what split-DNS or resolver-path checks should follow?",
+    "intent": "Diagnose VPN-only hostname failure caused by internal DNS visibility or resolver path.",
+    "domain": "DNS & DHCP",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "network_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A file transfer of 60 GB must cross a WAN link that can sustain 200 Mbit/s for this traffic. Ignoring protocol overhead, what is the minimum transfer time in minutes, and why should operational planning allow longer than the mathematical minimum?",
+    "intent": "Calculate network transfer time and discuss real-world overhead/headroom.",
+    "domain": "Capacity & Performance",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A branch router has a default route to the ISP and a more specific route for 10.40.0.0/16 through a site-to-site VPN. Traffic from the branch to 10.40.20.5 succeeds, but replies return through a different WAN path and are dropped by a stateful firewall. Explain how asymmetric routing can cause this partial failure and what evidence would confirm it.",
+    "intent": "Analyze asymmetric routing and stateful-firewall behavior.",
+    "domain": "Switching & Routing",
+    "acuity": "urgent",
+    "difficulty": 5,
+    "style": "network_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A DNS record for app.example.internal was changed from 10.1.1.20 to 10.1.1.40 with TTL 3600 seconds. Ten minutes later some clients still reach 10.1.1.20 while others reach the new address. Explain why this can be normal, what caches should be considered, and when the old endpoint can safely be retired.",
+    "intent": "Reason about DNS TTL, caching, and staged endpoint changes.",
+    "domain": "DNS & DHCP",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "change_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A virtualization host has 32 physical CPU cores. Eight VMs each have 8 vCPUs assigned, but average host CPU use is only 35%. Explain why 64 allocated vCPUs do not necessarily mean the host is overloaded and which contention metrics would show whether overcommitment is harmful.",
+    "intent": "Distinguish allocated virtual CPU from actual CPU saturation.",
+    "domain": "Virtualization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "virtualization_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A team takes a VM snapshot before every application upgrade and keeps snapshots for six months. They call this their backup strategy. Explain the operational risks of long-lived snapshots and why snapshots are not equivalent to independent backups.",
+    "intent": "Distinguish VM snapshots from backup and identify snapshot operational risks.",
+    "domain": "Virtualization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "backup_recovery",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "Several unrelated VMs become slow every morning from 02:00–03:00. Guest CPU is normal, host storage latency rises from 3 ms to 80 ms, and a storage-heavy backup job runs during the same hour. Diagnose the likely shared-resource bottleneck and propose safe remediation and verification steps.",
+    "intent": "Identify shared host-storage contention affecting multiple VMs.",
+    "domain": "Virtualization",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A container process is running and the orchestrator reports the container as 'up', but users receive HTTP 500 errors. Explain why process existence is not equivalent to application health and what health checks, logs, dependencies, and resource limits should be inspected.",
+    "intent": "Distinguish container process state from application health.",
+    "domain": "Containers",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "monitoring_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "An application stores uploaded files inside its container writable layer. After the container is replaced during maintenance, the uploads disappear. Explain the persistence mistake and how a volume or external storage design changes the recovery model.",
+    "intent": "Distinguish ephemeral container storage from persistent data storage.",
+    "domain": "Containers",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "configuration_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A company runs a managed database service in a public cloud. The provider manages the database engine patching, but the company configures identities, network access, data retention, and backups. Explain the shared-responsibility boundaries and why 'managed' does not mean 'no customer administration.'",
+    "intent": "Apply cloud shared-responsibility reasoning to a managed database service.",
+    "domain": "Cloud Computing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cloud_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A cloud application runs in two availability zones, but its database is a single instance in one zone and backups are stored in the same region. What failures does the design tolerate, what failures remain, and why is multi-zone compute alone not a complete disaster-recovery strategy?",
+    "intent": "Evaluate end-to-end cloud availability and disaster-recovery gaps.",
+    "domain": "Cloud Computing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "architecture_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A hybrid application uses on-premises identity, cloud compute, and an on-premises database over a private WAN. Cloud front-end health checks are green, yet users cannot sign in after the WAN circuit fails. Explain the hidden dependency chain and what design changes could improve resilience.",
+    "intent": "Identify a hybrid dependency that defeats apparent cloud availability.",
+    "domain": "Hybrid Infrastructure",
+    "acuity": "critical",
+    "difficulty": 5,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A company is considering moving a stable on-premises file workload to cloud object storage. Users require mapped-drive semantics, file locking, low-latency editing, and offline access. Explain why object storage may not be a drop-in replacement and what requirements should drive the storage architecture decision.",
+    "intent": "Compare storage models against operational requirements.",
+    "domain": "Cloud Computing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A storage array is 72% full but users report slow application response. Monitoring shows low throughput, very high I/O latency, and a long disk queue during peaks. Explain why adding capacity may not fix the performance issue and which storage metrics matter.",
+    "intent": "Distinguish storage capacity from performance saturation.",
+    "domain": "Storage & Filesystems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "capacity_planning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A file share grants a user read access at the share layer but modify access through NTFS permissions. The user cannot modify files. Explain how layered permissions combine and what effective-permission evidence is needed before changing either layer.",
+    "intent": "Reason about file-share versus filesystem permissions.",
+    "domain": "File Services",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "access_control",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A collaboration platform synchronizes files to laptops for offline use. Two users edit the same document offline and reconnect later. What conflict, versioning, and user-communication issues should the IT team plan for, and why does synchronization not guarantee a single conflict-free copy?",
+    "intent": "Reason about offline synchronization and file-version conflicts.",
+    "domain": "File Services",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A backup system performs a full backup every Sunday (2.0 TB) and incrementals averaging 180 GB each Monday–Saturday. Ignoring metadata and compression, how much new backup data is produced in one 4-week period, and what additional information is needed to calculate retained storage accurately?",
+    "intent": "Calculate backup data generation and recognize missing retention/deduplication inputs.",
+    "domain": "Backup & Recovery",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A database backup job reports success every night, but no restore test has been performed in a year. Explain why job success does not prove recoverability and what a meaningful restore test should verify.",
+    "intent": "Distinguish backup-job success from verified recovery.",
+    "domain": "Backup & Recovery",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "backup_recovery",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A business requires an RPO of 15 minutes and an RTO of 2 hours for its order system. Nightly backups are stored offsite, and restoring the latest backup takes 90 minutes. Explain which objective the current design fails, which it may meet, and what changes could close the gap.",
+    "intent": "Apply RPO and RTO correctly to a recovery design.",
+    "domain": "Disaster Recovery & Business Continuity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "disaster_recovery",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "After a site outage, authentication, internal DNS, storage, the database cluster, and three business applications are down. The applications depend on DNS, identity, storage, and the databases. Propose a recovery sequence, explain dependency checks between stages, and identify what can be restored in parallel.",
+    "intent": "Prioritize service recovery according to dependencies rather than application visibility.",
+    "domain": "Disaster Recovery & Business Continuity",
+    "acuity": "critical",
+    "difficulty": 5,
+    "style": "disaster_recovery",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Production data is synchronously replicated to a secondary site, but the application has never been started there and DNS failover procedures are undocumented. Explain why replication alone does not establish disaster-recovery readiness and what needs to be tested.",
+    "intent": "Distinguish replicated data from a tested recoverable service.",
+    "domain": "Disaster Recovery & Business Continuity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "An active-passive firewall pair shares one power distribution unit. Each firewall has dual power supplies connected to that same unit. Explain the hidden single point of failure and how redundancy should be evaluated end to end.",
+    "intent": "Identify power-path dependency in a nominally redundant design.",
+    "domain": "High Availability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A service advertises 99.9% monthly availability. For a 30-day month, approximately how many minutes of downtime does that permit? Explain why this number alone does not show whether a critical 43-minute outage at month-end is acceptable to the business.",
+    "intent": "Calculate availability budget and distinguish SLA arithmetic from business impact.",
+    "domain": "High Availability",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A managed laptop is marked noncompliant because disk encryption is disabled. The user is traveling and needs access to sensitive data. What checks and remediation sequence balance business continuity with device-compliance and data-protection requirements?",
+    "intent": "Handle a noncompliant endpoint without bypassing controls unnecessarily.",
+    "domain": "Endpoint Management",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A software deployment succeeds on 92% of 500 Windows 11 laptops and fails on the rest. All failures are on devices with an older prerequisite runtime. Explain how deployment targeting, prerequisite detection, logging, retry behavior, and rollback should be handled rather than repeatedly reinstalling the package.",
+    "intent": "Troubleshoot enterprise software deployment through prerequisite and targeting evidence.",
+    "domain": "Endpoint Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "configuration_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A severe vulnerability affects an Internet-facing server application. A vendor patch is available, but the application is business-critical and the last major update caused compatibility problems. Propose a staged emergency-patching plan that addresses exploit risk, testing, compensating controls, rollback, maintenance timing, and post-change verification.",
+    "intent": "Balance urgent security remediation with production stability and reversibility.",
+    "domain": "Patch & Configuration Management",
+    "acuity": "urgent",
+    "difficulty": 5,
+    "style": "change_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "After a routine configuration change, 30% of servers begin using an incorrect DNS resolver while others remain correct. The configuration platform reports the intended baseline everywhere. What evidence would reveal configuration drift, partial application, stale state, or a competing configuration source?",
+    "intent": "Diagnose configuration drift despite apparently successful centralized reporting.",
+    "domain": "Patch & Configuration Management",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "Internal email delivery works, but all outbound Internet mail is queued. The mail gateway can resolve public DNS, but logs show repeated TCP timeouts to remote mail servers on the expected outbound port. What should be checked across firewall policy, routing, provider filtering, and mail-gateway health before changing DNS records?",
+    "intent": "Troubleshoot outbound-only mail flow across network and service layers.",
+    "domain": "Email & Collaboration",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A user can access their mailbox in the web client but the desktop mail client repeatedly prompts for credentials. Other users on the same network are unaffected. What evidence would distinguish local client profile/token issues from account, identity-provider, or mail-service outage?",
+    "intent": "Narrow a single-client mailbox access issue without misclassifying it as a service outage.",
+    "domain": "Email & Collaboration",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "user_support",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "An enterprise application shows 'database unavailable' to users. The application servers are reachable, the database listener accepts connections, but database logs show all connection slots consumed by idle sessions from one application node. Explain the likely mechanism and the immediate and longer-term operational responses.",
+    "intent": "Diagnose an application outage caused by connection exhaustion rather than database CPU or network failure.",
+    "domain": "Database Operations",
+    "acuity": "critical",
+    "difficulty": 4,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A nightly enterprise job stopped running after its service account password was rotated. Interactive login with a different administrator account still works. Explain how scheduled-job identity, stored credentials, permissions, and secret-rotation processes should be investigated.",
+    "intent": "Troubleshoot an enterprise scheduled job broken by credential rotation.",
+    "domain": "Enterprise Applications",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "identity_troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A company has 240 active users, 15 shared kiosk devices, and a license model requiring one license per named user plus one per shared device. If 12 contractors leave and 18 employees join next month, how many licenses will be required assuming the kiosks remain unchanged and all new employees need access?",
+    "intent": "Calculate a simple licensing requirement from supplied assumptions.",
+    "domain": "Vendor Management",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "An endpoint security alert reports ransomware-like behavior on one laptop shortly after a privileged administrator signed in to it. The laptop is still connected to the network. What are the immediate containment priorities, what identity actions should be considered, and why is reimaging the laptop alone insufficient?",
+    "intent": "Coordinate endpoint containment with privileged-credential and broader incident considerations.",
+    "domain": "Security Operations",
+    "acuity": "critical",
+    "difficulty": 5,
+    "style": "security_operations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A vulnerability scanner reports a critical-severity issue on 300 assets. Only five are Internet-facing, 40 are production servers, and the rest are isolated lab systems behind compensating controls. Explain how exploitability, exposure, asset criticality, patch availability, and compensating controls should affect remediation priority.",
+    "intent": "Prioritize vulnerability remediation using contextual organizational risk rather than severity score alone.",
+    "domain": "Vulnerability Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A public cloud storage bucket was accidentally configured for anonymous read access for six hours. Access logs are available but have not yet been reviewed. Explain what can and cannot be concluded immediately, and outline containment, exposure assessment, credential/configuration review, and follow-up.",
+    "intent": "Respond to an exposed cloud-storage configuration without assuming confirmed data access.",
+    "domain": "Security Operations",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "incident_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A workstation’s anti-malware tool quarantines one suspicious file. No execution evidence is available yet, and there are no related alerts. Explain why this is not automatically proof of a full compromise and what triage evidence would justify escalating containment.",
+    "intent": "Distinguish a security detection from confirmed compromise.",
+    "domain": "Security Operations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A lost company laptop has full-disk encryption enabled and strong pre-boot authentication, but its user account remains active and browser sessions may still be valid. What actions address device loss, session risk, account risk, evidence/asset tracking, and recovery?",
+    "intent": "Handle a lost encrypted endpoint while recognizing credential/session exposure.",
+    "domain": "Endpoint Security",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "security_operations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A local administrator account is shared by 12 help-desk staff because it is convenient for support. Explain the operational and security problems this creates and propose a model that preserves support capability with attribution and least privilege.",
+    "intent": "Replace shared privileged access with accountable least-privilege administration.",
+    "domain": "Endpoint Security",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A TLS service presents a certificate whose subject names do not include the hostname users enter, but the certificate is otherwise valid and within its expiration period. Explain why clients can still reject it and what should be corrected.",
+    "intent": "Diagnose certificate hostname mismatch.",
+    "domain": "Certificates & PKI",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "After a certificate renewal, some clients trust the service while older managed devices do not. The server presents the new leaf certificate but omits an intermediate CA certificate that newer clients can fetch automatically. Explain the likely trust-chain problem and safe remediation.",
+    "intent": "Diagnose partial TLS trust failure due to an incomplete certificate chain.",
+    "domain": "Certificates & PKI",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A firewall administrator proposes temporarily allowing all inbound traffic to diagnose why one application cannot be reached from a partner network. Explain a safer troubleshooting approach using source, destination, protocol/port, logs, and staged narrow tests.",
+    "intent": "Troubleshoot connectivity without broadly disabling a security boundary.",
+    "domain": "Security Fundamentals",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A severe endpoint vulnerability has a patch, but 20% of devices are rarely online because users work remotely. Explain how inventory, exposure, maintenance windows, user communication, compliance reporting, and alternative mitigations should be managed until patch coverage is verified.",
+    "intent": "Plan vulnerability remediation for intermittently connected remote endpoints.",
+    "domain": "Vulnerability Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "configuration_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "An administrator receives a suspicious sign-in alert from a new country at 03:15. At 03:18, a valid MFA event occurs; at 03:22, a new mail-forwarding rule is created; at 03:30, cloud files are downloaded in bulk. Explain how these signals should be correlated, what immediate containment is justified, and what uncertainty remains.",
+    "intent": "Correlate identity and cloud activity into a defensible incident response without overclaiming certainty.",
+    "domain": "Security Operations",
+    "acuity": "critical",
+    "difficulty": 5,
+    "style": "incident_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A monitoring system alerts whenever CPU exceeds 70% for one minute. A batch server crosses 70% every night during a known two-minute job but has no user impact. Explain why the threshold may create alert fatigue and how baseline, duration, saturation, and service impact can produce a better alert.",
+    "intent": "Design meaningful operational alerting rather than reacting to raw utilization.",
+    "domain": "Monitoring & Observability",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "monitoring_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "Users report that an application is unavailable, yet all server health dashboards are green. A synthetic check from the Internet fails at the login step, while internal checks that bypass the identity provider succeed. What does this tell you about end-to-end availability and the next dependency to investigate?",
+    "intent": "Use synthetic monitoring to identify an identity dependency missed by component dashboards.",
+    "domain": "Monitoring & Observability",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A support queue receives 120 tickets per day. The team closes 105 per day on average, starting with a backlog of 300. If arrival and closure rates stay constant, what will the backlog be after 10 working days, and what operational conclusion follows?",
+    "intent": "Calculate ticket backlog growth and interpret sustainability.",
+    "domain": "IT Service Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A company’s storage consumption grows from 20 TB to 26 TB over six months. If the same linear growth continues, estimate the additional capacity needed for the next 12 months, then explain why procurement should include headroom and why linear extrapolation may be uncertain.",
+    "intent": "Forecast storage growth and recognize capacity-planning uncertainty.",
+    "domain": "Capacity & Performance",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A user reports “the network is down.” Their laptop cannot reach one internal application, but Internet browsing, DNS resolution, and other internal services work. What clarifying questions and low-disruption tests should a help-desk analyst use before escalating to the network team?",
+    "intent": "Demonstrate efficient help-desk scoping and layered troubleshooting.",
+    "domain": "Help Desk",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "user_support",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A major incident causes the customer portal to return errors. Restarting one application service restores access, but the service has now failed three times this week. Explain the difference between incident restoration, workaround, problem investigation, and permanent corrective action.",
+    "intent": "Distinguish service restoration from root-cause problem management.",
+    "domain": "Problem Management",
+    "acuity": "urgent",
+    "difficulty": 3,
+    "style": "service_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A proposed production change modifies routing on two core routers. The change is reversible, but the rollback itself requires remote access over the same network path being changed. What blast-radius and rollback-risk issue does this create, and how should the change plan be strengthened?",
+    "intent": "Identify a change-plan dependency that can make nominal rollback unavailable.",
+    "domain": "Change Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "change_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "An incident affects 200 users but has a simple technical workaround; a separate incident affects one executive and has no workaround. Explain how impact, urgency, business context, and service commitments should inform priority without equating priority to technical severity alone.",
+    "intent": "Reason about incident priority using impact and urgency rather than title or technical severity.",
+    "domain": "Incident Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "service_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A recurring outage is blamed on 'human error' because an operator selected the wrong deployment target twice. The interface lists production and test systems with nearly identical names, has no confirmation for production, and permissions allow all operators to deploy everywhere. Analyze trigger, contributing factors, and deeper root causes.",
+    "intent": "Perform system-oriented root-cause analysis instead of stopping at human error.",
+    "domain": "Problem Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "During a production outage, application latency rises sharply, database CPU is only 30%, database lock waits spike, network latency is normal, and application thread pools are saturated waiting on database calls. Explain how these apparently mixed signals can still indicate a database-concurrency bottleneck rather than CPU or network saturation.",
+    "intent": "Interpret contradictory monitoring signals across application and database layers.",
+    "domain": "Monitoring & Observability",
+    "acuity": "critical",
+    "difficulty": 5,
+    "style": "monitoring_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "An IT team wants a PowerShell automation that disables departed-user accounts, removes group memberships, and records the actions. What design properties should make the automation safe at scale: input validation, idempotency, least privilege, dry-run/testing, error handling, logging, and rollback/recovery?",
+    "intent": "Evaluate safety characteristics of administrative automation without testing syntax memorization.",
+    "domain": "Automation & Scripting",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A rack contains equipment drawing 3.6 kW at peak. The UPS can supply 6.0 kW and stores enough energy for 12 minutes at the current load. Explain what the power-headroom figure does and does not tell you, and why a 12-minute UPS runtime is not a long-term power-continuity strategy.",
+    "intent": "Interpret UPS capacity and runtime separately from long-duration continuity.",
+    "domain": "Physical Infrastructure",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "An asset inventory says a database server exists and lists its owner, serial number, and warranty, but no documentation shows which applications depend on it. Explain the difference between asset inventory and configuration/dependency management and why both matter during incidents and lifecycle changes.",
+    "intent": "Distinguish asset records from service-dependency/configuration records.",
+    "domain": "Asset & Configuration Management",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A company wants to migrate a legacy application to cloud IaaS. The application depends on on-premises Active Directory, an SMB file share, fixed IP allowlists at partners, nightly database backups, and latency-sensitive access from a factory. Explain the key identity, network, storage, backup, availability, migration, and vendor-risk questions that must be answered before selecting an architecture.",
+    "intent": "Evaluate a cloud migration with hidden hybrid dependencies and operational trade-offs.",
+    "domain": "Hybrid Infrastructure",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "architecture_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A vendor proposes replacing an on-premises service with SaaS at lower subscription cost. The proposal excludes data-export fees, identity integration work, migration downtime, retention requirements, and exit planning. Explain how total operational cost, interoperability, lock-in, support, recovery, and lifecycle risk should be evaluated before approval.",
+    "intent": "Assess vendor and lifecycle trade-offs beyond subscription price.",
+    "domain": "Vendor Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "An organization collects detailed device telemetry from employees to troubleshoot performance. The IT team proposes retaining all raw telemetry indefinitely 'in case it becomes useful.' Without relying on any jurisdiction-specific legal rule, explain the privacy and operational questions around purpose, data minimization, access, retention, security, and deletion.",
+    "intent": "Apply jurisdiction-neutral privacy and data-protection principles to IT telemetry.",
+    "domain": "Privacy & Data Protection",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  }
+]

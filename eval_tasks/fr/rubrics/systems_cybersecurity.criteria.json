@@ -1,0 +1,183 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the question asked, focuses on the stated system or security problem, and avoids tangents that do not help resolve the task.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "systems_accuracy",
+      "name": "Systems Accuracy",
+      "definition": "Uses materially correct systems concepts, including processes, memory, storage, concurrency, performance, operating systems, dependencies, and failure behavior when those concepts are relevant.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "cybersecurity_accuracy",
+      "name": "Cybersecurity Accuracy",
+      "definition": "Uses materially correct defensive-security concepts and does not confuse authentication, authorization, threats, vulnerabilities, risk, cryptographic functions, controls, alerts, incidents, or recovery concepts.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Makes distinctions that matter to the conclusion, uses terminology consistently, and explains mechanisms rather than substituting jargon for reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "systems_reasoning",
+      "name": "Systems Reasoning",
+      "definition": "Reasons across interacting components, dependencies, resource constraints, state, timing, and failure modes instead of analyzing components in isolation when system interactions matter.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When quantities are involved, selects the relevant metric, preserves units, performs calculations correctly, states assumptions, and interprets the result in context.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "network_reasoning",
+      "name": "Network Reasoning",
+      "definition": "When networking is relevant, correctly reasons about layers, routing, addressing, transport behavior, DNS, segmentation, latency, loss, stateful controls, and network paths without relying on irrelevant trivia.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "distributed_systems_reasoning",
+      "name": "Distributed Systems Reasoning",
+      "definition": "When distributed behavior is relevant, correctly handles partial failure, consistency, availability, retries, idempotency, replication, ordering, queues, partitions, quorums, and correlated dependencies.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "identity_and_access_reasoning",
+      "name": "Identity and Access Reasoning",
+      "definition": "When identity or access is relevant, correctly distinguishes authentication from authorization and applies least privilege, credential lifecycle, service identity, session, role, and deprovisioning concepts.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "security_architecture_reasoning",
+      "name": "Security Architecture Reasoning",
+      "definition": "When architecture is relevant, identifies trust boundaries, attack surfaces, layered controls, shared dependencies, fail-safe defaults, network paths, and recovery boundaries, and explains trade-offs among valid designs.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "threat_and_risk_reasoning",
+      "name": "Threat and Risk Reasoning",
+      "definition": "When risk is relevant, distinguishes threat, vulnerability, exposure, likelihood, impact, control, and residual risk, and prioritizes using context rather than severity labels alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "incident_and_detection_reasoning",
+      "name": "Incident and Detection Reasoning",
+      "definition": "When incidents or detections are relevant, distinguishes alerts from confirmed compromise, uses evidence for triage, balances containment and continuity, preserves evidence, and reasons through recovery and lessons learned.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "reliability_and_resilience_reasoning",
+      "name": "Reliability and Resilience Reasoning",
+      "definition": "When reliability is relevant, correctly reasons about availability, durability, independent redundancy, failover, graceful degradation, backups, RTO/RPO, recovery testing, dependencies, and correlated failure.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions",
+      "name": "Assumptions",
+      "definition": "Identifies material assumptions, avoids silently assuming independence, trust, perfect visibility, or guaranteed behavior, and explains how conclusions depend on uncertain or unstated conditions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_uncertainty",
+      "name": "Evidence and Uncertainty",
+      "definition": "Uses the evidence supplied, distinguishes facts from hypotheses, avoids fabricated certainty, recognizes incomplete or untrustworthy telemetry, and identifies what additional evidence would change confidence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "failure_analysis_and_debugging",
+      "name": "Failure Analysis and Debugging",
+      "definition": "When diagnosis is required, separates symptoms from causes, forms plausible hypotheses, prioritizes discriminating checks, avoids changing many variables at once, and accounts for dependencies and amplification mechanisms.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the task needed for a useful answer, including major constraints, mechanisms, risks, and requested calculations or recommendations without unnecessary expansion.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent claims, assumptions, units, threat models, architecture statements, and conclusions throughout the answer.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the reasoning in a structured and understandable way, makes causal relationships explicit, and avoids ambiguity that would change the technical interpretation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "practical_systems_security_judgment",
+      "name": "Practical Systems & Security Judgment",
+      "definition": "When a decision is required, balances security, reliability, performance, cost, usability, operational constraints, reversibility, evidence preservation, and recovery implications rather than applying controls mechanically.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_systems_cybersecurity_error",
+    "condition": "A materially false central systems, networking, security, cryptographic, reliability, quantitative, or incident-response claim that fundamentally invalidates the answer or creates a materially unsafe conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally confusing authentication and authorization in a way that changes the security conclusion.",
+      "Recommending blind retries of a non-idempotent operation where duplicate execution can cause material harm.",
+      "Claiming replication is equivalent to backup as the central recovery strategy.",
+      "Using fundamentally incorrect routing or networking reasoning that invalidates the diagnosis.",
+      "Claiming a digital signature provides confidentiality.",
+      "Treating hashing and reversible encryption as equivalent.",
+      "Claiming strong encryption makes access control unnecessary.",
+      "Claiming a firewall alone secures an application with a known authorization flaw.",
+      "Treating vulnerability severity as complete organizational risk while ignoring stated exposure or impact.",
+      "Making a major availability calculation error that reverses the architecture conclusion.",
+      "Recommending destruction of critical evidence during an active incident without justification.",
+      "Treating absence of alerts as proof that no compromise occurred.",
+      "Claiming MFA makes account compromise impossible.",
+      "Recommending one shared privileged credential as a secure architecture.",
+      "Fundamentally reversing RTO and RPO.",
+      "Treating a snapshot as a complete independently recoverable backup without qualification.",
+      "Ignoring a clearly stated correlated failure that invalidates redundancy assumptions.",
+      "Giving containment advice that materially worsens the incident because the reasoning is fundamentally incorrect.",
+      "Fabricating logs, system state, or security evidence required to reach the conclusion.",
+      "Giving an unsafe recommendation based on a materially invalid security assumption."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Harmless approximation differences.",
+      "Minor terminology mistakes.",
+      "Reasonable differences in architecture.",
+      "Defensible alternative controls.",
+      "Reasonable risk-prioritization differences.",
+      "Legitimate incident-response trade-offs.",
+      "Small omissions.",
+      "Reasonable uncertainty.",
+      "Minor imprecision that does not materially affect security or system reliability."
+    ]
+  }
+}

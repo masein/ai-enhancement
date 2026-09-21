@@ -17,9 +17,10 @@ import judge as jd
 from conftest import make_service
 
 REPO = Path(__file__).resolve().parents[1]
-TOPIC = "medicine & health"
-TASK = "exam_medicine_health"
+TOPIC = "Medicine & Clinical Health"
+TASK = "exam_medicine_clinical_health"
 LAW = "exam_law"
+HISTORY = "History & Archaeology"
 
 
 @pytest.fixture
@@ -42,26 +43,51 @@ def test_the_board_has_a_row_per_topic_with_its_bank_rubric_and_last_run(svc):
     j = client.get("/api/loop").json()
     assert len(j["topics"]) == len(eb.TOPICS)
     med = rows(client)[TOPIC]
-    assert med["task"] == TASK and med["slug"] == "medicine_health"
+    assert med["task"] == TASK and med["slug"] == "medicine_clinical_health"
     assert med["bank"]["accepted"] == med["bank"]["report"] + med["bank"]["diagnose"]
     assert med["bank"]["under_floor"] is True and med["bank"]["floor"] == 30
-    assert med["rubric"]["name"] == "medicine_health" and med["rubric"]["own"] is True
-    assert med["rubric"]["criteria_count"] == 15
+    assert med["rubric"]["name"] == "medicine_clinical_health" and med["rubric"]["own"] is True
+    assert med["rubric"]["criteria_count"] == 20
     last = med["last_judged"]
     assert last["model"] and last["score_report"] is not None
-    assert last["judge_id"] == "stub/overlap-v1" and last["draft_rubric"] is True
-    assert set(last["flags"]) == {"critical_safety_failure"}
+    # the delivered rubric's heading carries no DRAFT, so nothing stamps it one
+    assert last["judge_id"] == "stub/overlap-v1" and last["draft_rubric"] is False
+    assert set(last["flags"]) == {"critical_medicine_clinical_health_error"}
     # a topic with no rubric of its own says which one grades it instead
-    assert rows(client)["history"]["rubric"]["name"] == "exam"
+    assert rows(client)["Arts"]["rubric"]["name"] == "exam"
 
+
+
+def test_a_draft_rubric_is_stamped_on_the_topics_row(svc):
+    """No delivered rubric is a draft any more, so the stamp is exercised with
+    one: the topic's own rubric with DRAFT in its heading, where the page's
+    rubric upload would put it, and the topic re-judged over it."""
+    import conftest
+    from service import config
+    client, appmod, tree = svc
+    store = Path(config.BENCH_ROOT) / "rubrics"
+    store.mkdir(parents=True, exist_ok=True)
+    head, rest = (REPO / "eval_tasks" / "fr" / "rubrics" / "medicine_clinical_health.md"
+                  ).read_text(encoding="utf-8").split("\n", 1)
+    (store / "medicine_clinical_health.md").write_text(f"{head} (DRAFT)\n{rest}",
+                                                        encoding="utf-8")
+    assert jd.rubric_for(TASK).status == "draft"
+    model = client.get("/api/loop").json()["model"]
+    mdir = tree["models"][model]["dir"]
+    jd.write_judge(mdir, jd.merge_judged(mdir, jd.run_stub(mdir, tree["out_dir"], only=[TASK])))
+    conftest.fresh(appmod)
+    last = rows(client)[TOPIC]["last_judged"]
+    assert last["model"] == model and last["draft_rubric"] is True
+    # and only this topic: the others were graded by rubrics nobody marked
+    assert rows(client)["Law"]["last_judged"]["draft_rubric"] is False
 
 def test_the_next_step_walks_the_loop_in_order(svc, tmp_path, monkeypatch):
     client, appmod, _ = svc
     from service import config, db
     # a topic nobody has written questions for: the step is to get a bank
-    (eb.bank_dir(config.EXAM_DIR) / "geography_world_facts.jsonl").unlink()
+    (eb.bank_dir(config.EXAM_DIR) / "sociology.jsonl").unlink()
     empty = next(r for r in client.get("/api/loop").json()["topics"]
-                 if r["topic"] == "geography & world facts")
+                 if r["topic"] == "Sociology")
     assert empty["bank"]["accepted"] == 0
     assert empty["next"]["step"] == "import" and empty["next"]["ok"] is True
     # a bank with no judged run: sit the exam — and the reason it cannot be
@@ -79,11 +105,11 @@ def test_the_next_step_walks_the_loop_in_order(svc, tmp_path, monkeypatch):
         if not jf.exists():
             continue
         j = json.loads(jf.read_text(encoding="utf-8"))
-        j["tasks"].pop("exam_history", None)
+        j["tasks"].pop("exam_history_archaeology", None)
         jf.write_text(json.dumps(j), encoding="utf-8")
     appmod._cache.update(key=None, payload=None, at=0.0)
     fresh = next(r for r in client.get("/api/loop").json()["topics"]
-                 if r["topic"] == "history")
+                 if r["topic"] == HISTORY)
     assert fresh["bank"]["accepted"] and fresh["last_judged"] is None
     assert fresh["next"] == {"step": "sit", "label": "Sit the exam", "ok": False,
                              "why": blocked}
@@ -216,9 +242,9 @@ def test_the_answers_endpoint_refuses_what_it_cannot_show(svc):
     # a topic this model has not been judged on
     from service import config
     j = json.loads((config.OUT_DIR / "fx__good-750m" / "judge.json").read_text())
-    del j["tasks"]["exam_history"]
+    del j["tasks"]["exam_history_archaeology"]
     (config.OUT_DIR / "fx__good-750m" / "judge.json").write_text(json.dumps(j))
-    assert client.get("/api/answers", params={"model": "fx/good-750m", "topic": "history"}
+    assert client.get("/api/answers", params={"model": "fx/good-750m", "topic": HISTORY}
                       ).status_code == 404
 
 
@@ -242,30 +268,30 @@ def test_the_queue_row_carries_the_judge_batch(svc, monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_a_topic_without_its_own_rubric_is_graded_by_the_shared_one(svc):
-    """Thirteen of fifteen topics have no rubric file of their own. The
-    fallback is rubrics/exam.md, as P4a specified — not rubrics/<slug>.md,
-    which does not exist, and which took both of these endpoints down on the
-    live tree the moment anyone opened them."""
+    """Arts arrived with no rubric file of its own, as thirteen of the first
+    fifteen topics did. The fallback is rubrics/exam.md, as P4a specified —
+    not rubrics/<slug>.md, which does not exist, and which took both of these
+    endpoints down on the live tree the moment anyone opened them."""
     client, _, _ = svc
     rubrics = client.get("/api/exam/rubrics")
     assert rubrics.status_code == 200
     rows = {t["topic"]: t for t in rubrics.json()["topics"]}
-    hist = rows["history"]
-    assert hist["name"] == "exam" and hist["fallback"] is True and hist["own"] is False
-    assert hist["error"] == "" and hist["sha256"] and hist["path"].endswith("exam.md")
+    arts = rows["Arts"]
+    assert arts["name"] == "exam" and arts["fallback"] is True and arts["own"] is False
+    assert arts["error"] == "" and arts["sha256"] and arts["path"].endswith("exam.md")
     med = rows[TOPIC]
-    assert med["name"] == "medicine_health" and med["fallback"] is False
+    assert med["name"] == "medicine_clinical_health" and med["fallback"] is False
     # the loop board says the same thing, for every topic
     loop = client.get("/api/loop")
     assert loop.status_code == 200
     lrows = {t["topic"]: t for t in loop.json()["topics"]}
     assert len(lrows) == len(eb.TOPICS)
-    assert lrows["history"]["rubric"]["fallback"] is True
+    assert lrows["Arts"]["rubric"]["fallback"] is True
     assert lrows[TOPIC]["rubric"]["fallback"] is False
     assert all(not t["error"] for t in lrows.values())
     # and the judge reads the same file the page names
-    assert jd.rubric_for("exam_history").path == hist["path"]
-    assert jd.rubric_for("exam_history").name == "exam"
+    assert jd.rubric_for("exam_arts").path == arts["path"]
+    assert jd.rubric_for("exam_arts").name == "exam"
 
 
 def test_neither_board_dies_when_a_rubric_file_is_missing(svc, tmp_path, monkeypatch):
@@ -280,19 +306,19 @@ def test_neither_board_dies_when_a_rubric_file_is_missing(svc, tmp_path, monkeyp
     assert rubrics.status_code == 200
     rows = {t["topic"]: t for t in rubrics.json()["topics"]}
     assert len(rows) == len(eb.TOPICS)
-    hist = rows["history"]
-    assert "no rubric file for exam_history" in hist["error"]
-    assert "history.md" in hist["error"] and "exam.md" in hist["error"]
+    hist = rows[HISTORY]
+    assert "no rubric file for exam_history_archaeology" in hist["error"]
+    assert "history_archaeology.md" in hist["error"] and "exam.md" in hist["error"]
     assert hist["sha256"] == ""                        # nothing invented
     loop = client.get("/api/loop")
     assert loop.status_code == 200
     lrows = {t["topic"]: t for t in loop.json()["topics"]}
     assert len(lrows) == len(eb.TOPICS)
-    bad = lrows["history"]
-    assert "no rubric file for exam_history" in bad["error"]
+    bad = lrows[HISTORY]
+    assert "no rubric file for exam_history_archaeology" in bad["error"]
     # and the row offers no button that would fail later
     assert bad["next"]["ok"] is False and bad["next"]["why"] == bad["error"]
-    # every topic is in the same boat here, and all fifteen rows still render
+    # every topic is in the same boat here, and all thirty-seven rows still render
     assert all(t["error"] for t in lrows.values())
 
 
@@ -301,8 +327,8 @@ def test_the_missing_rubric_is_named_not_guessed(svc, tmp_path, monkeypatch):
     empty.mkdir()
     monkeypatch.setattr(jd, "RUBRIC_DIR", empty)
     with pytest.raises(jd.RubricMissing) as e:
-        jd.rubric_for("exam_history")
-    assert "history.md" in str(e.value) and "exam.md" in str(e.value)
+        jd.rubric_for("exam_history_archaeology")
+    assert "history_archaeology.md" in str(e.value) and "exam.md" in str(e.value)
     assert str(empty) in str(e.value)
 
 

@@ -241,8 +241,10 @@ BREAKDOWN_MIN_VALUES = 2
 BREAKDOWN_MAX_VALUES = 12
 BREAKDOWN_MIN_TABLES = 2
 BREAKDOWN_MAX_TABLES = 4
-# most severe first, so a table reads down from the questions that matter
-ACUITY_ORDER = ("emergency", "urgent", "moderate", "mild", "routine")
+# most severe first, so a table reads down from the questions that matter.
+# `critical` and `high` arrived with the 37-topic exam (engineering, IT, law,
+# security…); they sit where their words put them
+ACUITY_ORDER = ("emergency", "critical", "urgent", "high", "moderate", "mild", "routine")
 
 
 class CriteriaError(ValueError):
@@ -297,16 +299,37 @@ def check_effects(spec, path=None) -> None:
 
 
 # ---------------------------------------------------------------------------
-# One internal shape, however the file was written. Three deliveries have
-# arrived in three shapes — flags as a list, as `critical_flag`, as
-# `critical_error_flag`; the criterion slug in `id` or in `name`; effects
-# spelled `zero_score` or `score=0` — and the decision (2026-09-20) is that
-# the loader adapts, never the author's file. docs/CRITERIA-SCHEMA.md lists
-# every variant and what it maps onto.
+# One internal shape, however the file was written. Four deliveries have
+# arrived in five shapes — flags as a list (`flags`, `critical_flags`), or as
+# one object (`critical_flag`, `critical_error_flag`, `critical_error`); the
+# criterion slug in `id` or in `name`; effects spelled `zero_score` or
+# `score=0` — and the decision (2026-09-20) is that the loader adapts, never
+# the author's file. docs/CRITERIA-SCHEMA.md lists every variant and what it
+# maps onto. Top-level keys the loader has no use for (`benchmark`, `task`,
+# `scale`, `score_scale`, `score_range`) ride along untouched: informational,
+# and part of the file's sha like every other byte.
 # ---------------------------------------------------------------------------
 
-_FLAG_KEYS = ("flags", "critical_flag", "critical_error_flag")
+_FLAG_KEYS = ("flags", "critical_flags", "critical_flag", "critical_error_flag",
+              "critical_error")
 _NOT_CRITICAL_KEYS = ("not_critical", "do_not_classify_as_critical", "not_critical_examples")
+# the topic-wide principles, under the three names they arrived with; each is
+# a sentence or an object with a heading and a sentence
+_PRINCIPLE_KEYS = ("evaluation_principles", "important_evaluation_principles", "principles")
+_PRINCIPLE_HEAD = ("name", "title")
+_PRINCIPLE_TEXT = ("statement", "principle", "text", "description")
+
+
+def _principle_text(p) -> str:
+    """One principle as the prompt says it: the sentence, after its heading
+    when it has one."""
+    if not isinstance(p, dict):
+        return str(p).strip()
+    head = next((str(p[k]).strip() for k in _PRINCIPLE_HEAD if p.get(k)), "")
+    text = next((str(p[k]).strip() for k in _PRINCIPLE_TEXT if p.get(k)), "")
+    if head and text:
+        return f"{head}: {text}"
+    return head or text or json.dumps(p, ensure_ascii=False, sort_keys=True)
 
 
 def _slug_and_label(c: dict) -> tuple[str, str]:
@@ -350,7 +373,8 @@ def normalise_criteria(spec, path=None) -> dict:
                           "examples": list(f.get("examples") or []),
                           "not_critical": list(nots)})
     out["flags"] = flags
-    out["evaluation_principles"] = list(spec.get("evaluation_principles") or [])
+    raw = next((spec[k] for k in _PRINCIPLE_KEYS if isinstance(spec.get(k), list)), [])
+    out["evaluation_principles"] = [t for t in map(_principle_text, raw) if t]
     if path is not None:
         check_effects(out, path)
     return out
@@ -358,10 +382,15 @@ def normalise_criteria(spec, path=None) -> dict:
 
 def label_of(item: dict) -> str:
     """The author writes ids; the page and the demo show words. A file may
-    carry its own label, and when it does not the id is the label."""
+    carry its own label — as `label`, or as a `name` that is not the id
+    ("Risk-Benefit Reasoning", in his capitals) — and when it does not the
+    id is the label."""
     lab = str(item.get("label") or "").strip()
     if lab:
         return lab
+    name = str(item.get("name") or "").strip()
+    if name and name != str(item.get("id") or "").strip():
+        return name
     words = str(item.get("id") or "").replace("_", " ").strip()
     return words[:1].upper() + words[1:]
 

@@ -1,0 +1,182 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the technology question, its stated context, and the decision or explanation requested without substituting a different problem.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "technology_accuracy",
+      "name": "Technology Accuracy",
+      "definition": "Makes materially correct claims about technologies, components, system behavior, limitations, and mechanisms; avoids fabricated specifications or capabilities.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Correctly distinguishes concepts that are easy to conflate, such as RAM vs storage, bandwidth vs latency, Wi-Fi vs internet, cloud storage vs backup, automation vs AI, and compatibility vs interoperability.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "systems_understanding",
+      "name": "Systems Understanding",
+      "definition": "Identifies relevant components, layers, dependencies, interfaces, and interactions rather than treating a multi-component technology system as a single black box.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When quantities are relevant, uses the correct relationships, units, conversions, arithmetic, and interpretation, and states simplifying assumptions where needed.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "hardware_reasoning",
+      "name": "Hardware Reasoning",
+      "definition": "When hardware is relevant, reasons correctly about processors, memory, storage, accelerators, sensors, displays, power, thermals, interconnects, or physical constraints and their interactions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "software_and_platform_reasoning",
+      "name": "Software and Platform Reasoning",
+      "definition": "When software is relevant, reasons correctly about operating systems, applications, platforms, drivers, versions, dependencies, updates, files, APIs, or software lifecycle constraints.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "connectivity_and_network_reasoning",
+      "name": "Connectivity and Network Reasoning",
+      "definition": "When connectivity is relevant, correctly handles bandwidth, latency, packet loss, signal quality, congestion, coverage, local networks, internet paths, wireless links, or network dependencies.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "cloud_and_distributed_technology_reasoning",
+      "name": "Cloud and Distributed-Technology Reasoning",
+      "definition": "When cloud, edge, remote services, or distributed systems are relevant, distinguishes compute, storage, synchronization, replication, backup, scalability, locality, and service dependencies.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "compatibility_and_interoperability",
+      "name": "Compatibility and Interoperability",
+      "definition": "When integration matters, checks relevant physical, protocol, format, version, driver, API, identity, and semantic compatibility rather than assuming connection implies functional interoperability.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "performance_and_bottleneck_reasoning",
+      "name": "Performance and Bottleneck Reasoning",
+      "definition": "When performance matters, identifies the limiting resource or dependency, distinguishes peak specifications from workload performance, and avoids recommending upgrades to non-bottleneck components.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "reliability_and_lifecycle_reasoning",
+      "name": "Reliability and Lifecycle Reasoning",
+      "definition": "When applicable, considers failure modes, redundancy, degradation, maintainability, repairability, updates, support, migration, replacement, and end-of-life rather than acquisition alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "technology_selection_and_tradeoffs",
+      "name": "Technology Selection and Trade-offs",
+      "definition": "When a choice is requested, ties options to requirements and constraints, surfaces material advantages and disadvantages, and avoids treating one technology as universally best.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions",
+      "name": "Assumptions",
+      "definition": "Makes material assumptions explicit, avoids silently inventing missing specifications or operating conditions, and tests whether the conclusion changes under plausible alternatives.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_uncertainty",
+      "name": "Evidence and Uncertainty",
+      "definition": "When evidence is incomplete or claims are being evaluated, distinguishes observed facts, benchmark evidence, inference, and uncertainty; does not overgeneralize from limited tests or prototypes.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "troubleshooting_and_failure_analysis",
+      "name": "Troubleshooting and Failure Analysis",
+      "definition": "For diagnostic tasks, identifies plausible failure layers, prioritizes discriminating checks, uses evidence to narrow causes, and avoids random replacement or correlation-as-causation reasoning.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material requirements, constraints, mechanisms, and requested outputs needed for a useful answer while avoiding irrelevant specification dumping.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent terminology, assumptions, calculations, and conclusions; does not contradict itself across the response.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Explains the reasoning in a clear, readable way appropriate to the question's level, with enough mechanism to justify the conclusion and without jargon worship.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "practical_technology_judgment",
+      "name": "Practical Technology Judgment",
+      "definition": "When practical judgment is required, balances real-world performance, usability, maintainability, reliability, privacy/security, ecosystem fit, cost conceptually, and lifecycle instead of optimizing a single headline metric.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_technology_error",
+    "condition": "A materially false central technology, system, quantitative, compatibility, performance, reliability, or evidence claim fundamentally invalidates the response or reverses its substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally confusing RAM and persistent storage in a way that invalidates the recommendation.",
+      "Treating Wi-Fi connectivity and internet access as the same thing in the central diagnosis.",
+      "Confusing bandwidth and latency where the distinction determines the answer.",
+      "Making a major unit or throughput calculation error that reverses the technology conclusion.",
+      "Claiming cloud synchronization or storage automatically guarantees historical backup and recovery.",
+      "Claiming higher processor clock speed necessarily means better performance for every workload.",
+      "Claiming more CPU cores automatically produce proportional speedup.",
+      "Claiming more megapixels necessarily guarantee better image quality.",
+      "Claiming a wireless device necessarily has internet connectivity.",
+      "Using fundamentally incorrect battery power-versus-energy reasoning.",
+      "Recommending an incompatible technology because a central interface, version, format, or standard mismatch was ignored.",
+      "Claiming technical connectivity establishes full interoperability despite incompatible semantics or formats.",
+      "Claiming automation and artificial intelligence are synonymous.",
+      "Claiming a prototype demonstration establishes commercial scalability.",
+      "Using a fundamentally incorrect internet/web/cloud distinction that invalidates the answer.",
+      "Claiming a single benchmark establishes universal technology superiority.",
+      "Ignoring an explicit bottleneck and recommending an unrelated upgrade as the core solution.",
+      "Claiming replication or synchronization is equivalent to an independent backup.",
+      "Fabricating product capabilities or specifications required for the answer.",
+      "Asserting certainty when the supplied technological information is clearly insufficient."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Harmless rounding.",
+      "Minor terminology mistakes or small omissions.",
+      "Reasonable technology-selection disagreements or defensible architecture alternatives.",
+      "Reasonable performance approximations.",
+      "Minor specification imprecision.",
+      "Reasonable uncertainty.",
+      "Different valid lifecycle or migration strategies.",
+      "Minor errors that do not materially affect the conclusion."
+    ]
+  }
+}

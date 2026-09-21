@@ -65,7 +65,7 @@ scripts/
   run_benchmarks.sh   the same pipeline as a standalone CLI (lockfile, resume)
   report_lm_eval.py   results tree -> interactive dashboard (live or frozen single file)
   diagnose.py         per-item diagnosis from --log_samples (held-out split; DIAGNOSE.md)
-  categories.yaml     MMLU's 57 subjects -> fifteen human categories (+ categories.py)
+  categories.yaml     the 37 exam topics; MMLU's 57 subjects mapped onto 24 of them (+ categories.py)
 service/
   llm.py, proposals.py, contamination.py, llm_poller.py
                       find the gap: LLM proposals from the diagnosis half, human review,
@@ -73,7 +73,8 @@ service/
   make_ppl_task.py    any corpus -> pinned perplexity task (records a sha256)
 eval_tasks/
   mmlu_perm/          the permutation control: MMLU with the options rotated (suite=control)
-  fr/                 the exam: rubrics, the migrated skill items, AUTHORING.md (suite=judged)
+  fr/                 the exam: banks/ (36 topics x 100), rubrics/, retired/ (the old five),
+                      the migrated skill items, AUTHORING.md (suite=judged)
 scripts/
   demo_loop.py        the whole loop in one narrated command, against the local model (DEMO.md)
   exam_build.py       draft (LLM) -> curate (human, Exam tab) -> split by qid -> build harness tasks

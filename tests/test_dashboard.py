@@ -192,18 +192,20 @@ def test_categories_first_subjects_on_expand(surface, diag):
     expected = diag["fx/good-750m"]["tasks"]["mmlu"]["categories"]
     assert cats.count() == len(expected)
     # weakest first; among the categories above the noise floor the planted
-    # gap (econometrics) puts economics lowest — the greyed one-subject rows
+    # gap (econometrics) puts Economics lowest — the greyed one-subject rows
     # may land anywhere, which is exactly why they are greyed
     scores = [float(x.rstrip("%")) for x in cats.locator("> summary > .num").all_text_contents()]
     assert scores == sorted(scores)
     solid = mmlu.locator("details.dxcat:not(.dim) .dxcname").all_text_contents()
-    assert solid[0] == "economics"
+    assert solid[0] == "Economics"
     # the noise floor is visible: one-subject categories are greyed, two-subject ones are not
     dim = mmlu.locator("details.dxcat.dim .dxcname").all_text_contents()
-    assert "economics" not in dim and "medicine & health" not in dim and len(dim) == 4
+    # the fixture's four one-subject topics: Mathematics & Statistics, Law,
+    # Political Science & International Relations, Ethics & Religion
+    assert "Economics" not in dim and "Medicine & Clinical Health" not in dim and len(dim) == 4
     assert "under 30, noise" in mmlu.locator("details.dxcat.dim").first.text_content()
     # subjects live under the category, not beside it, until you open one
-    econ = mmlu.locator("details.dxcat[data-cat='economics']")
+    econ = mmlu.locator("details.dxcat[data-cat='Economics']")
     assert econ.locator("table.dxsub").is_hidden()
     econ.locator("summary").click()
     rows = econ.locator("tbody tr td:first-child").all_text_contents()
@@ -243,7 +245,7 @@ def test_leaderboard_by_category_view(surface, diag):
     pg.get_by_role("button", name="MMLU by category", exact=True).click()
     table = pg.locator("table.lbcats")
     heads = table.locator("thead th").all_text_contents()
-    assert any(h.startswith("economics") for h in heads) and any(h.startswith("mmlu") for h in heads)
+    assert any(h.startswith("Economics") for h in heads) and any(h.startswith("mmlu") for h in heads)
     assert table.locator("tbody tr").count() == len(diag)     # diagnosed models only
     assert "1 model without a diagnosis on file" in pg.locator("#view").text_content()
     assert table.locator("td.dim").count() > 0 and table.locator("td.num.best").count() > 0
@@ -283,16 +285,19 @@ def test_judged_section_and_the_control_sentence(surface, tree):
     m = re.search(r"of the (\d+) control items this model got wrong as multiple choice, it answered (\d+)", text)
     assert m and int(m.group(2)) / int(m.group(1)) >= 0.5
     assert "By topic (0–4), weakest first — report half" in text
-    assert "Score against answer length" in text and "economics" in text
+    assert "Score against answer length" in text and "Economics" in text
     # topics, score-vs-length, the control — plus one per-criterion table for
     # every topic graded criterion by criterion, and one breakdown table per
-    # metadata field those topics' banks carry
+    # metadata field those topics' banks carry. One topic's tables at a time
+    # (9c), and every topic but Arts is graded by criteria now: the medical
+    # one, whose imported questions carry the metadata
+    pick_topic(pg, "exam_medicine_clinical_health")
     crit = card.locator("table.jd[data-criteria-table]").count()
     breakdown = card.locator("table.jd[data-breakdown-table]").count()
     assert crit >= 1 and breakdown >= crit
     assert card.locator("table.jd[data-breakdown-table='acuity']").count() >= 1
     assert card.locator("table.jd").count() == 3 + crit + breakdown
-    assert card.locator("table.jd[data-criteria-table='medicine & health']").count() == 1
+    assert card.locator("table.jd[data-criteria-table='Medicine & Clinical Health']").count() == 1
     surface.open(model_link("fx/chance-160m"))
     card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
     assert "Didn't know it either way" in card.text_content()
@@ -308,7 +313,7 @@ def test_judged_columns_appear_once_calibrated(surface):
     heads = pg.locator("table.lb thead tr").first.locator("th").all_text_contents()
     judged = [h for h in heads if "κ" in h]
     assert len(judged) >= 4 and any(h.startswith("Judged avg") for h in judged)
-    assert any(h.startswith("economics") for h in judged)
+    assert any(h.startswith("Economics") for h in judged)
     assert not any(h.startswith(("fr_", "exam_")) for h in heads)   # never as a task column
     row = pg.locator("table.lb tbody tr", has_text="good-750m").first
     assert "/4" in row.text_content()
@@ -348,33 +353,64 @@ def test_what_the_training_taught(surface, tree):
     assert surface.errors == []
 
 
+# The five topics' files as first delivered, retired when the 37-topic exam
+# replaced them. Every rubric delivered with the 37 is signed off and has one
+# zeroing flag, so a page test about a DRAFT rubric's stamp, or about a file
+# whose flags do different things (law v2: one zeroes, one caps at 1 of 4),
+# grades that topic with the retired pair instead — installed in
+# $BENCH_ROOT/rubrics, where the page's rubric upload puts a file and where
+# the judge looks first.
+RETIRED_RUBRICS = Path(__file__).resolve().parents[1] / "eval_tasks" / "fr" / "retired" / "rubrics"
+
+
+def install_retired_rubrics(store: Path, pairs: dict[str, str]) -> None:
+    """pairs: the new topic's slug -> the retired file's name."""
+    store.mkdir(parents=True, exist_ok=True)
+    for slug, old in pairs.items():
+        for suffix in (".md", ".criteria.json"):
+            (store / f"{slug}{suffix}").write_bytes(
+                (RETIRED_RUBRICS / f"{old}{suffix}").read_bytes())
+
+
 @pytest.fixture(scope="module")
 def local_judged(tmp_path_factory) -> Path:
     """The fixture board with one model's exam graded by a local judge — the
-    judge.json scripts/judge.py writes for JUDGE_PROVIDER=local."""
+    judge.json scripts/judge.py writes for JUDGE_PROVIDER=local. Medicine and
+    law are graded by their retired pairs (see RETIRED_RUBRICS): both drafts,
+    and law's with a capping flag beside its zeroing one."""
     import judge as jd
     import make_fixture
+    from service import config
     root = tmp_path_factory.mktemp("local-judge")
-    tree = make_fixture.build(root)
-    d = tree["models"]["fx/good-750m"]["dir"]
-    reqs, plan = jd.plan_requests(d, "gemma")
-    results = jd.stub_results(reqs)
-    # plant one critical safety failure on a criteria-graded item, so the page
-    # has both wordings to show: the fixture's own answers trip none
-    med = [m for m in plan["tasks"]["exam_medicine_health"] if m["half"] == "diagnose"]
-    spec = jd.rubric_for("exam_medicine_health").criteria
-    results[med[0]["cid"]] = type(results[med[0]["cid"]])(text=json.dumps({
-        "flags": {fid: True for fid in jd.flag_ids(spec)},
-        "criteria": {cid: 1.0 for cid in jd.criteria_ids(spec)},
-        "justification": "told an emergency to wait until morning"}))
-    plan["provisional"] = {"provisional": True,
-                           "provisional_reason": "graded by a local model — not a pinned benchmark",
-                           "base_url": "http://localhost:8000/v1", "served_model": "chat",
-                           "weights": "google/gemma-4-E4B-it"}
-    ident = {"provider": "local", "model": "chat", "id": "local/chat", "family": "chat"}
-    jd.write_judge(d, jd.assemble(plan, results, ident, "local_0123456789ab",
-                                  tree["out_dir"], 0.5, False, record=False))
-    return make_fixture.frozen_report(root, root / "report.html")
+    install_retired_rubrics(root / "rubrics", {"medicine_clinical_health": "medicine_health",
+                                               "law": "law"})
+    saved = config.BENCH_ROOT
+    config.BENCH_ROOT = root
+    try:
+        tree = make_fixture.build(root)
+        d = tree["models"]["fx/good-750m"]["dir"]
+        reqs, plan = jd.plan_requests(d, "gemma")
+        results = jd.stub_results(reqs)
+        # plant one critical safety failure on a criteria-graded item, so the page
+        # has both wordings to show: the fixture's own answers trip none
+        med = [m for m in plan["tasks"]["exam_medicine_clinical_health"]
+               if m["half"] == "diagnose"]
+        spec = jd.rubric_for("exam_medicine_clinical_health").criteria
+        results[med[0]["cid"]] = type(results[med[0]["cid"]])(text=json.dumps({
+            "flags": {fid: True for fid in jd.flag_ids(spec)},
+            "criteria": {cid: 1.0 for cid in jd.criteria_ids(spec)},
+            "justification": "told an emergency to wait until morning"}))
+        plan["provisional"] = {"provisional": True,
+                               "provisional_reason": "graded by a local model — not a pinned "
+                                                     "benchmark",
+                               "base_url": "http://localhost:8000/v1", "served_model": "chat",
+                               "weights": "google/gemma-4-E4B-it"}
+        ident = {"provider": "local", "model": "chat", "id": "local/chat", "family": "chat"}
+        jd.write_judge(d, jd.assemble(plan, results, ident, "local_0123456789ab",
+                                      tree["out_dir"], 0.5, False, record=False))
+        return make_fixture.frozen_report(root, root / "report.html")
+    finally:
+        config.BENCH_ROOT = saved
 
 
 def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged):
@@ -391,11 +427,11 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
         assert "chat at http://localhost:8000/v1 (weights google/gemma-4-E4B-it)" in text
         assert "Preliminary." in card.text_content() and "Judged average" not in card.text_content()
         # the second stamp, independent of the judge: a rubric its author has
-        # not signed off. The fixture's medicine topic is graded by one.
+        # not signed off. This board's medicine topic is graded by one.
         draft = card.locator("[data-rubric='draft']")
         assert draft.count() == 1
-        assert "medicine & health is graded against a rubric its author has not signed off" \
-            in draft.text_content()
+        assert "Medicine & Clinical Health is graded against a rubric its author has not " \
+            "signed off" in draft.text_content()
         assert "changes its sha" in draft.text_content()
         # greyed: every topic row, in the muted colour rather than the text colour
         rows = card.locator("table.jd").first.locator("tbody tr")
@@ -427,11 +463,11 @@ def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browse
     try:
         pg = s.open(model_link("fx/good-750m"))
         card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
-        pick_topic(pg, "exam_medicine_health")          # one topic's tables at a time (9c)
-        head = card.locator("[data-criteria='medicine & health']")
+        pick_topic(pg, "exam_medicine_clinical_health")  # one topic's tables at a time (9c)
+        head = card.locator("[data-criteria='Medicine & Clinical Health']")
         assert head.count() == 1 and "by criterion (0–1), weakest first" in head.text_content()
         # every criterion in THIS topic's file has a row, weakest first
-        table = card.locator("table.jd[data-criteria-table='medicine & health']")
+        table = card.locator("table.jd[data-criteria-table='Medicine & Clinical Health']")
         rows = table.locator("tr[data-criterion]")
         assert rows.count() == 15                      # the author's own file, verbatim
         means = [float(rows.nth(i).locator("td").nth(1).inner_text())
@@ -439,7 +475,8 @@ def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browse
                  if rows.nth(i).locator("td").nth(1).inner_text() != "—"]
         assert means == sorted(means)
         # the flag is stated in words, not only coloured, and says what it did
-        flag = card.locator("[data-flag='critical_safety_failure'][data-flag-topic='medicine & health']")
+        flag = card.locator("[data-flag='critical_safety_failure']"
+                            "[data-flag-topic='Medicine & Clinical Health']")
         assert flag.count() == 1
         text = flag.text_content()
         assert text.startswith("Critical safety failure.")
@@ -447,12 +484,12 @@ def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browse
         assert "applied here and not by the judge" in text
         # law's two flags say different things, because its file does
         pick_topic(pg, "exam_law")
-        law = card.locator("[data-flag-topic='law']")
+        law = card.locator("[data-flag-topic='Law']")
         assert law.count() == 2
         assert "caps the whole score at 1 of 4" in law.nth(1).text_content()
-        pick_topic(pg, "exam_medicine_health")
+        pick_topic(pg, "exam_medicine_clinical_health")
         # a table per metadata field, acuity first, with a column per flag
-        fields = card.locator("table.jd[data-breakdown-topic='medicine & health']")
+        fields = card.locator("table.jd[data-breakdown-topic='Medicine & Clinical Health']")
         assert [fields.nth(i).get_attribute("data-breakdown-table")
                 for i in range(fields.count())] == ["acuity", "difficulty", "intent"]
         acuity = fields.nth(0).locator("tr[data-value]")
@@ -472,7 +509,10 @@ def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browse
 @pytest.fixture(scope="module")
 def demo_report(tmp_path_factory) -> Path:
     """A real demo run's own page, built by the demo itself — the medicine
-    bank, so the judged section has criteria to show."""
+    bank, so the judged section has criteria to show. The retired medicine &
+    health bank and its DRAFT rubric pair (see RETIRED_RUBRICS), so the page
+    has both a draft stamp and five acuities to show; installed in the demo's
+    own $BENCH_ROOT/rubrics, which is $BENCH_ROOT/demo/rubrics."""
     import os
     import subprocess
     import sys
@@ -484,9 +524,12 @@ def demo_report(tmp_path_factory) -> Path:
     for k in ("LLM_API_KEY", "EXAM_API_KEY", "JUDGE_API_KEY"):
         env.pop(k, None)
     repo = Path(__file__).resolve().parents[1]
+    install_retired_rubrics(root / "demo" / "rubrics",
+                            {"medicine_clinical_health": "medicine_health"})
     r = subprocess.run(
-        [sys.executable, str(repo / "scripts" / "demo_loop.py"), "--topic", "medicine & health",
-         "--import", str(repo / "eval_tasks" / "fr" / "medicine_v2.json"),
+        [sys.executable, str(repo / "scripts" / "demo_loop.py"),
+         "--topic", "Medicine & Clinical Health",
+         "--import", str(repo / "eval_tasks" / "fr" / "retired" / "medicine_v2.json"),
          "--approver", "Dr. Hossein", "--sit", "stub", "--count", "4", "--keep"],
         capture_output=True, text=True, timeout=300, env=env, cwd=repo)
     assert r.returncode == 0, r.stdout + r.stderr
@@ -514,11 +557,12 @@ def test_the_demo_page_says_what_it_is_and_shows_the_criteria(browser, demo_repo
         # the two stamps, in words
         assert "Provisional." not in text                 # the fake judge is not local…
         assert "Draft rubric." in text                    # …but the rubric is still a draft
-        assert "medicine & health is graded against a rubric its author has not signed off" in text
+        assert "Medicine & Clinical Health is graded against a rubric its author has not " \
+            "signed off" in text
         # the criteria row, the flag in words, the tables by acuity and by
         # difficulty — the author's own file decides all three
-        med = card.locator("table.jd[data-criteria-table='medicine & health']")
-        assert card.locator("[data-criteria='medicine & health']").count() == 1
+        med = card.locator("table.jd[data-criteria-table='Medicine & Clinical Health']")
+        assert card.locator("[data-criteria='Medicine & Clinical Health']").count() == 1
         assert med.locator("tr[data-criterion]").count() == 15
         assert card.locator("[data-flag='critical_safety_failure']").count() == 1
         assert "critical safety failure" in text.lower()
@@ -530,7 +574,7 @@ def test_the_demo_page_says_what_it_is_and_shows_the_criteria(browser, demo_repo
         #30-item floor, so the row is no longer greyed for being thin — the
         # whole suite is still preliminary, because nothing is calibrated
         assert "Preliminary." in text and "never ranked, never averaged" in text
-        row = card.locator("tr[data-topic='medicine & health']")
+        row = card.locator("tr[data-topic='Medicine & Clinical Health']")
         assert row.count() == 1 and "dim" not in (row.get_attribute("class") or "")
         assert "· under 30" not in row.text_content()
         SCREENS.mkdir(exist_ok=True)
@@ -682,7 +726,7 @@ def zero_criterion(tmp_path_factory) -> Path:
     tree = make_fixture.build(root)
     d = tree["models"]["fx/good-750m"]["dir"]
     j = json.loads((d / "judge.json").read_text(encoding="utf-8"))
-    task = "exam_medicine_health"
+    task = "exam_medicine_clinical_health"
     spec = jd.rubric_for(task).criteria
     zero = jd.criteria_ids(spec)[0]
     t = j["tasks"][task]
@@ -701,8 +745,8 @@ def test_a_criterion_that_scored_zero_says_zero(browser, zero_criterion):
     s = Surface(ctx.new_page(), zero_criterion.as_uri())
     try:
         pg = s.open(model_link("fx/good-750m"))
-        pick_topic(pg, "exam_medicine_health")
-        table = pg.locator("table.jd[data-criteria-table='medicine & health']")
+        pick_topic(pg, "exam_medicine_clinical_health")
+        table = pg.locator("table.jd[data-criteria-table='Medicine & Clinical Health']")
         first = table.locator("tr[data-criterion]").first
         mean = first.locator("td").nth(1)
         assert mean.inner_text().strip() == "0.00"        # not "", not "0"

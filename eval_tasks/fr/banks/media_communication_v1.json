@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A city library sends an email saying, 'The east entrance will be closed Monday; use the west entrance.' Many patrons still arrive at the east entrance, and several say they never saw the email. Distinguish the message sent, the intended meaning, the likely communication failure points, and the feedback the library should use before changing the wording.",
+    "intent": "Distinguish sender intention, reception, channel reach, and feedback.",
+    "domain": "Communication Foundations — Sender, Receiver, Feedback",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A manager says in a team meeting, 'We should move faster,' intending to encourage shorter review cycles. Some employees interpret it as permission to skip quality checks. Explain why intended meaning and interpreted meaning differ here, and identify what context or follow-up could reduce the ambiguity.",
+    "intent": "Analyze encoding, decoding, context, and clarification.",
+    "domain": "Communication Foundations — Encoding & Decoding",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "message_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "Compare what a one-way transmission model and a transactional model would each illuminate in a live customer-support chat where the agent's wording changes in response to the customer's tone and questions. Do not name theorists; focus on the mechanisms each model captures or misses.",
+    "intent": "Compare communication models by explanatory value.",
+    "domain": "Communication Foundations — Communication Models",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "During a noisy factory briefing, a supervisor gives a technically accurate safety instruction over a weak loudspeaker while workers are wearing hearing protection. Explain how physical noise, channel constraints, redundancy, and feedback affect whether the instruction is actually understood.",
+    "intent": "Analyze noise, medium, redundancy, and feedback.",
+    "domain": "Communication Foundations — Channel & Noise",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A museum wants to announce a new late-night opening. Visitor research identifies three groups: regular members who read email newsletters, tourists who search maps on the same day, and nearby students who mainly discover events through friends. Propose only the audience segments that justify meaningfully different communication strategies, and explain why.",
+    "intent": "Assess evidence-based audience segmentation.",
+    "domain": "Communication Foundations — Audience Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "audience_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A public-service notice explains a benefits application using six paragraphs of legalistic text. The audience includes fluent readers, people with limited literacy, and users of screen readers. Identify changes that improve accessibility without removing essential eligibility conditions.",
+    "intent": "Balance accessibility, plain language, and essential meaning.",
+    "domain": "Communication Foundations — Accessibility",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "strategy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "In a project meeting, one colleague says 'That is fine' while avoiding eye contact, pausing for several seconds, and later sending objections by email. Analyze how verbal, nonverbal, relational, and power cues could produce miscommunication without assuming the person's private motives.",
+    "intent": "Analyze interpersonal communication signals and uncertainty.",
+    "domain": "Communication Foundations — Interpersonal Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A committee doubles its weekly meeting time, but decisions become slower because the same three people dominate and key technical information arrives late. Explain why communication quantity is not the same as communication quality, and identify changes to participation, turn-taking, and information sharing that address the mechanism.",
+    "intent": "Distinguish communication volume from coordination quality.",
+    "domain": "Communication Foundations — Group Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A hospital administration sends policy updates downward through department heads, but frontline staff report that practical problems rarely travel upward. Explain how organizational structure, upward communication, silos, and informal channels could shape what leadership learns.",
+    "intent": "Analyze organizational information flow.",
+    "domain": "Communication Foundations — Organizational Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A company announces a major software change in one all-staff email and then interprets low complaint volume as employee acceptance. Distinguish informing, understanding, consulting, and adoption, and propose evidence that would show whether the change communication actually worked.",
+    "intent": "Evaluate internal change communication and feedback.",
+    "domain": "Communication Foundations — Internal Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A multinational team notices that some members prefer direct disagreement in meetings while others raise concerns privately afterward. Explain how cultural communication frameworks can generate hypotheses about the pattern while avoiding the conclusion that nationality determines each individual's behavior.",
+    "intent": "Reason about cross-cultural patterns without stereotyping.",
+    "domain": "Communication Foundations — Cross-Cultural Communication",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "cross_cultural_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "An environmental poster shows a melting ice sculpture beside the line 'Time is running out.' One audience reads it as a call for urgent personal action; another reads it as criticism of institutions. Explain how symbols, prior beliefs, context, and negotiated readings allow multiple interpretations without assuming the producer's intention fixes meaning.",
+    "intent": "Analyze reception and co-construction of meaning.",
+    "domain": "Communication Foundations — Reception & Interpretation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "audience_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A fundraising speech combines a respected scientist's testimony, a story about one affected family, and statistics from a national survey. Explain the distinct rhetorical functions of credibility, emotion, and evidence, and assess why persuasive effect and factual support are not the same thing.",
+    "intent": "Explain rhetorical mechanisms and evidentiary strength.",
+    "domain": "Rhetoric & Persuasion — Rhetoric",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "rhetoric_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "Claim: 'The city should extend library hours because evening attendance rose 30% after a three-month pilot.' Identify the claim, reason, evidence, and unstated warrant. Then explain one plausible counterargument that would challenge the warrant without denying the attendance data.",
+    "intent": "Analyze argument structure and counterargument.",
+    "domain": "Rhetoric & Persuasion — Argumentation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "rhetoric_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "Two accurate headlines describe the same budget: A) 'City boosts transit spending by 12%'; B) 'Transit still receives less than one-tenth of total spending.' Explain how each frame changes salience while remaining factually compatible, and identify what additional context a reader needs to compare them fairly.",
+    "intent": "Compare framing without equating framing with falsehood.",
+    "domain": "Rhetoric & Persuasion — Framing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "message_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "For six weeks, local news outlets dramatically increase coverage of water shortages. Surveys show residents now name water as a top local issue, but their preferred policy responses remain unchanged. Explain why this pattern is more consistent with issue-salience effects than with direct persuasion.",
+    "intent": "Distinguish agenda setting from persuasion.",
+    "domain": "Rhetoric & Persuasion — Agenda Setting",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "media_effects",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "Participants randomly assigned to read three stories about hospital waiting times later place more weight on waiting times when rating a fictional health agency, even though their overall health-policy attitudes do not change. Explain the mechanism this result could support, what random assignment adds, and one alternative explanation a manipulation check should examine.",
+    "intent": "Distinguish priming from persuasion and assess evidence.",
+    "domain": "Rhetoric & Persuasion — Priming",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "media_effects",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "An online video is viewed by 500,000 people. A post-view survey of 2,000 viewers finds 62% remember the slogan, while a randomized experiment finds no detectable difference in attitude between viewers and a control group. Explain why exposure, recall, and persuasion are distinct outcomes.",
+    "intent": "Distinguish exposure, memory, and persuasion.",
+    "domain": "Rhetoric & Persuasion — Persuasion",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A cross-sectional survey finds that people who watch partisan commentary at least four times a week hold more polarized attitudes than those who do not. Explain how prior attitudes, selective exposure, social networks, and reverse causality limit a claim that the commentary caused polarization.",
+    "intent": "Analyze selection and causal limits in media effects.",
+    "domain": "Rhetoric & Persuasion — Selective Exposure",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A researcher argues that years of repeated exposure to crime-heavy entertainment may be associated with viewers perceiving the world as more dangerous. Explain why this is a long-term cumulative hypothesis rather than evidence that one episode immediately changes beliefs, and identify a key selection problem.",
+    "intent": "Interpret long-term exposure claims cautiously.",
+    "domain": "Rhetoric & Persuasion — Long-Term Media Effects",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "media_effects",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "Interviewees say they use the same messaging app for news updates, humor, maintaining friendships, work coordination, and habit. Explain what an audience-motivation approach reveals that a passive-exposure model would miss.",
+    "intent": "Analyze active audience motives for media use.",
+    "domain": "Rhetoric & Persuasion — Uses & Gratifications",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "An editor has three verified developments: a minor celebrity dispute with high search interest, a local bridge closure affecting 80,000 commuters tomorrow, and a distant novelty event with striking video. Explain which considerations of consequence, proximity, timeliness, and audience interest should shape the lead story without assuming the most dramatic item is the most important.",
+    "intent": "Apply news values and news judgment.",
+    "domain": "Journalism — News Values & Judgment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "journalism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "Breaking-news scenario: several social posts claim an explosion occurred at a train station. Police confirm an emergency response but do not confirm an explosion; one shaky video is geolocated to the station but its timestamp is unknown. State what a newsroom can responsibly report now, what remains unverified, and the next verification steps.",
+    "intent": "Preserve uncertainty during breaking-news verification.",
+    "domain": "Journalism — Breaking News Verification",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "source_verification",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A reporter has an anonymous employee who directly witnessed a safety failure and provides internal emails that match parts of the account. The source fears retaliation but also has a dispute with management. Evaluate the source's value by separating anonymity, access, motive, corroboration, and evidentiary strength.",
+    "intent": "Evaluate anonymous sources without equating anonymity with unreliability.",
+    "domain": "Journalism — Anonymous Sources",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "source_verification",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "Five websites report the same claim, but all cite one original local blog that cites an unnamed witness. Explain why five repetitions do not equal five independent confirmations, and identify what evidence would count as genuinely independent corroboration.",
+    "intent": "Detect source dependence and false corroboration.",
+    "domain": "Journalism — Source Evaluation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_verification",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "Study result: neighborhoods with more trees have lower summer temperatures, but the study is observational. Evaluate the headline 'Planting trees cuts neighborhood heat' for causality and uncertainty, and write a more accurate headline concept without turning it into clickbait.",
+    "intent": "Assess headline proportionality and causal language.",
+    "domain": "Journalism — Headline Writing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "journalism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A feature story opens with a resident's vivid account of a flood, while the most consequential verified fact is that a newly released engineering report found a failed drainage gate. Explain when a narrative lead is defensible and how quickly the report finding should appear for relevance and context.",
+    "intent": "Reason about leads, narrative, and prioritization.",
+    "domain": "Journalism — Leads & Story Structure",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "journalism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "An investigative team has: leaked procurement spreadsheets showing unusual payments; an executive whistleblower with direct access but a strong personal conflict with the CEO; two contractors who confirm parts of the timeline; and a company denial that provides no supporting documents. Design a lawful verification plan, explain how source incentives change—not eliminate—the value of the whistleblower, and state what would justify publication versus further delay.",
+    "intent": "Synthesize documents, source conflicts, corroboration, and publication judgment.",
+    "domain": "Journalism — Investigative Journalism",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "source_verification",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A city's raw crime count rises from 900 to 990 while its population rises from 90,000 to 110,000. Explain why both counts and rates matter, calculate the rates per 100,000, and identify what additional methodological context a data journalist should seek before claiming crime increased.",
+    "intent": "Interpret counts, rates, denominators, and uncertainty.",
+    "domain": "Journalism — Data Journalism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A news photo shows a dense crowd in front of a government building. A tight crop removes large empty areas visible in the original frame. Explain how cropping can change perceived crowd size, what a caption can and cannot establish, and what evidence would be needed to estimate attendance.",
+    "intent": "Analyze visual selection and evidentiary limits.",
+    "domain": "Journalism — Visual Journalism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "visual_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "Editors have a graphic photograph from a disaster scene that documents the scale of harm but clearly identifies victims. Discuss the competing public-interest, dignity, consent, accuracy, and harm considerations, and explain why either publication or non-publication can be defensible depending on context and presentation.",
+    "intent": "Balance competing photojournalism ethics.",
+    "domain": "Journalism — Photojournalism Ethics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "ethics_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A television reporter is live during a fast-moving wildfire. Officials confirm evacuations in two districts; viewers are circulating an unverified map claiming four additional districts are under evacuation. Explain what the reporter should say on air, how visuals should be labeled, and how to avoid turning uncertainty into false reassurance or panic.",
+    "intent": "Handle live broadcast uncertainty and public-safety information.",
+    "domain": "Journalism — Broadcast Journalism",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A podcast episode uses interview clips, archival audio, narration, and music to reconstruct a labor dispute. Explain how editing and sound design can create a coherent narrative while still requiring the producer to distinguish documentary evidence from interpretive construction.",
+    "intent": "Distinguish audio evidence from narrative construction.",
+    "domain": "Journalism — Audio Journalism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "journalism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A news site first reports that a council vote was 8–3. It later learns the vote was 7–4, while the policy outcome is unchanged. Explain whether the site needs a correction, clarification, update, or retraction, and how prominence should relate to the error's severity.",
+    "intent": "Distinguish correction types and proportionality.",
+    "domain": "Journalism — Corrections & Retractions",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "journalism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "An advertiser threatens to withdraw a large contract unless a newspaper softens a verified investigation. Explain the editorial-independence problem, the relevant conflict of interest, and governance practices that can reduce advertiser influence without assuming that advertising revenue automatically determines coverage.",
+    "intent": "Analyze institutional pressures on editorial judgment.",
+    "domain": "Journalism — Editorial Independence",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "ethics_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A page contains: (1) a reported fact that the mayor introduced a transport proposal, (2) an analysis explaining likely budget trade-offs using public documents, (3) an editorial arguing the proposal should pass, and (4) a review recommending a documentary. Classify the communicative function of each and explain why analysis is not automatically the same as opinion.",
+    "intent": "Distinguish reporting, analysis, opinion, and recommendation.",
+    "domain": "Journalism — Opinion vs News",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "Jurisdiction: England and Wales. Assume for this benchmark that a defamation claimant must show a published statement caused or is likely to cause serious reputational harm, and that substantial truth is a defense. A newsroom has documents showing that one part of a corruption allegation is true but cannot verify a broader accusation in the draft headline. Analyze the publication-risk problem using only these supplied rules and journalistic verification principles.",
+    "intent": "Apply supplied legal context while separating law from journalistic ethics.",
+    "domain": "Journalism — Media Law Concepts",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 38,
+    "prompt": "A company gets extensive news coverage after donating equipment to schools. Explain why the coverage is publicity, while the organization's longer-term work with schools, employees, journalists, and community groups is better understood as public relations.",
+    "intent": "Distinguish PR from publicity and journalism.",
+    "domain": "Public Relations — Foundations",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A nonprofit wants to increase completed applications for a housing-assistance program, not merely awareness. Its research shows eligible tenants trust local advice centers more than national social accounts. Build an objective → audience → message → channel → metric chain and explain why 'post more on social media' is insufficient.",
+    "intent": "Align PR strategy to objectives and stakeholder behavior.",
+    "domain": "Public Relations — Strategy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "strategy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A spokesperson sends a clear press release but complains that journalists emphasize different angles than the organization intended. Explain what media relations can influence—such as access, responsiveness, evidence, and clarity—and what it cannot fully control in independent coverage.",
+    "intent": "Distinguish information provision from control of coverage.",
+    "domain": "Public Relations — Media Relations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "public_relations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A food manufacturer discovers a packaging defect that may affect a small batch, but testing is incomplete. Retailers need immediate guidance. Draft the structure—not final copy—of the first crisis update using confirmed facts, unknowns, immediate action, the next update point, and responsibility/remediation.",
+    "intent": "Prioritize crisis information under uncertainty.",
+    "domain": "Public Relations — Crisis Communication",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "crisis_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "During a chemical odor incident near a school, an unverified rumor says the air is 'toxic everywhere.' Officials confirm an odor and are testing air quality but have not established concentrations. Explain how communicators should correct the rumor while still giving actionable safety guidance before every fact is known.",
+    "intent": "Balance rumor correction, uncertainty, and public safety.",
+    "domain": "Public Relations — Crisis Communication Under Uncertainty",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "crisis_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A company apologizes within one hour of a service outage, but outages continue for two days because no operational fix is implemented. Explain why reputation repair cannot rely on messaging alone, and identify communication evidence that would show whether trust begins to recover after corrective action.",
+    "intent": "Distinguish communication repair from substantive remediation.",
+    "domain": "Public Relations — Reputation Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "public_relations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A university wants to reduce confusion about a new enrollment system. Students need step-by-step guidance, faculty need exception rules, and administrators need implementation status. Explain how one strategic narrative can remain consistent while messages, channels, and detail vary by stakeholder.",
+    "intent": "Align stakeholder communication within a broader strategy.",
+    "domain": "Public Relations — Strategic Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "strategy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A public agency must communicate a 2% annual flood probability to residents who often interpret '2%' as 'almost impossible.' Compare two ways to express the risk numerically and visually without exaggeration, and explain how uncertainty and recommended action should be separated.",
+    "intent": "Communicate numerical risk clearly without sensationalism.",
+    "domain": "Public Relations — Risk Communication",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "visual_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A research institute announces an early study showing a 15% relative reduction in a laboratory outcome, with wide confidence intervals and no direct evidence yet of real-world benefit. Explain how a science communicator can simplify the finding without turning uncertainty into ignorance or overstating practical impact.",
+    "intent": "Translate scientific uncertainty accurately.",
+    "domain": "Public Relations — Science Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "message_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A transit agency faces a safety incident with injuries. Facts are incomplete; a legal team warns against speculating about fault; passengers need immediate route and safety information; and social accounts are spreading a false death toll. Prioritize the first hour of communication, separating safety guidance, verified facts, unknowns, rumor correction, legal caution, empathy, and the next update.",
+    "intent": "Resolve competing crisis objectives under uncertainty and reputational pressure.",
+    "domain": "Public Relations — High-Stakes Crisis Communication",
+    "acuity": "urgent",
+    "difficulty": 5,
+    "style": "crisis_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A campaign delivers 1,200,000 impressions to 400,000 unique people. Calculate average frequency and explain why neither impressions nor frequency alone tells you whether the audience understood or acted on the message.",
+    "intent": "Interpret reach, impressions, frequency, and outcome limits.",
+    "domain": "Advertising & Campaigns — Metrics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "Ad A gets 20,000 clicks from 1,000,000 impressions and 500 purchases. Ad B gets 8,000 clicks from 300,000 impressions and 600 purchases. Compare click-through and click-to-purchase conversion, then explain why cost data are still required before concluding which ad is more efficient.",
+    "intent": "Distinguish engagement, conversion, and cost efficiency.",
+    "domain": "Advertising & Campaigns — Advertising Metrics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A brand intends to be perceived as 'simple and dependable,' but audience interviews repeatedly describe it as 'feature-rich but confusing.' Explain the difference between intended identity and actual perception, and identify evidence that should guide repositioning.",
+    "intent": "Analyze brand identity-perception gaps.",
+    "domain": "Advertising & Campaigns — Branding",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "audience_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A retailer's paid ads emphasize low prices, its PR campaign emphasizes durable quality, and its email campaign emphasizes luxury exclusivity. Analyze whether the channels reinforce or contradict one another, and propose how integrated communication should resolve the inconsistency.",
+    "intent": "Evaluate cross-channel message coherence.",
+    "domain": "Advertising & Campaigns — Integrated Marketing Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "campaign_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A campaign targets people who previously visited a product page. Click-through rises after personalization, but complaints about intrusive targeting also rise. Evaluate the communication trade-off among relevance, consent expectations, trust, and short-term performance without assuming higher CTR means a better overall outcome.",
+    "intent": "Balance personalization metrics with privacy and trust.",
+    "domain": "Advertising & Campaigns — Targeting & Privacy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "ethics_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "Pretest results for two ads: Ad X is liked by 74% of respondents but understood correctly by only 48%; Ad Y is liked by 55% but understood correctly by 82%. The campaign objective is correct comprehension of a safety feature. Explain which metric should dominate the decision and why liking, comprehension, and persuasion are distinct.",
+    "intent": "Choose metrics that match communication objectives.",
+    "domain": "Advertising & Campaigns — Message Testing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "Jurisdiction: United States. Assume for this benchmark that a paid influencer endorsement must clearly disclose a material commercial relationship in a way ordinary viewers are likely to notice. An influencer praises a product in a video but places '#partner' only after a long block of unrelated text below the fold. Analyze the communication and disclosure problem using the supplied rule, without assessing any other law.",
+    "intent": "Evaluate sponsorship transparency under supplied legal context.",
+    "domain": "Advertising & Campaigns — Influencer Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ethics_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 55,
+    "prompt": "A cross-platform launch reports 600,000 reached on video ads, 450,000 reached on social ads, and 300,000 reached by email. The platforms cannot identify all overlap; a brand-lift survey samples only people reachable by email; influencers were also paid separately. Explain why summing reach would overstate unique exposure, how attribution is limited, and what evidence would support a stronger campaign-effect estimate.",
+    "intent": "Analyze overlap, attribution, sampling, and paid amplification.",
+    "domain": "Advertising & Campaigns — Cross-Platform Attribution",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "campaign_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "Two hypothetical candidates discuss the same housing shortage. Candidate A frames it as a supply problem; Candidate B frames it as an affordability problem. Describe how the frames emphasize different causes and solutions without judging which candidate is better or predicting electoral effects.",
+    "intent": "Analyze political framing neutrally.",
+    "domain": "Political & Public Communication — Campaign Framing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "political_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A political ad uses ominous music, a verified statistic about tax increases, and footage unrelated to the policy discussed. Separate the ad's factual claim, emotional strategy, visual framing, and evidentiary limitations. Do not evaluate the ideology or tell voters what conclusion to reach.",
+    "intent": "Separate political-ad strategy from factual validity.",
+    "domain": "Political & Public Communication — Political Advertising",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "political_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "In a debate, Speaker A repeatedly returns to healthcare; Speaker B redirects questions to inflation; both rebut each other's statistics with different time periods. Analyze agenda control, rebuttal, evidence, and framing without declaring a debate winner.",
+    "intent": "Analyze debate communication without ranking political actors.",
+    "domain": "Political & Public Communication — Debates & Speech",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "political_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "An emergency agency sends a mobile alert: 'Hazardous conditions possible. Exercise caution.' The actual needed action is to avoid a specific bridge for the next two hours. Diagnose the clarity and actionability problem and propose what information the alert must prioritize.",
+    "intent": "Evaluate emergency public information for actionability.",
+    "domain": "Political & Public Communication — Public Communication",
+    "acuity": "urgent",
+    "difficulty": 2,
+    "style": "message_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A municipality asks residents to 'have your say' on a park plan but offers only a one-way web form after key design choices are already fixed. Distinguish informing, consulting, and engaging, and explain what evidence would show whether residents' input could actually influence the decision.",
+    "intent": "Analyze public consultation as a communication process.",
+    "domain": "Political & Public Communication — Public Consultation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A public-information campaign says a risk is '1 in 1,000 per year.' Survey respondents overestimate it as roughly 1 in 100. Explain how denominator choice, frequency format, comparison risks, and visual design might improve comprehension without minimizing the hazard.",
+    "intent": "Analyze numerical risk communication and comprehension.",
+    "domain": "Political & Public Communication — Risk Communication",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A study of political media use finds: people choose outlets aligned with prior views; aligned exposure predicts later attitude strength; a small randomized exposure experiment produces a short-term attitude shift; and the observational effect is much larger than the experimental effect. Explain how self-selection, causal exposure, audience heterogeneity, and measurement differences complicate interpretation.",
+    "intent": "Integrate observational and experimental political-communication evidence neutrally.",
+    "domain": "Political & Public Communication — Media Effects",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "Jurisdiction: United States federal campaign communication. Assume for this benchmark that the supplied rule requires a clearly readable sponsor disclaimer on a paid campaign video. A hypothetical campaign video contains the disclaimer for 0.5 seconds in tiny text. Analyze only whether the communication appears consistent with the supplied rule and what evidence about readability would matter; do not evaluate the candidate.",
+    "intent": "Apply a supplied campaign-communication rule neutrally.",
+    "domain": "Political & Public Communication — Campaign Communication Rules",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "political_communication",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 64,
+    "prompt": "A post receives 2 million views and 300,000 shares. Explain why the data establish visibility and sharing behavior but not credibility, accuracy, persuasion, or social importance.",
+    "intent": "Distinguish virality from truth and impact.",
+    "domain": "Digital & Social Media — Virality",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "social_media_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Two posts each receive 10,000 comments. Post A's comments are mostly supportive; Post B's are mostly complaints and corrections. Explain why comment count is an engagement measure, not a sentiment measure, and identify evidence needed to compare audience response.",
+    "intent": "Interpret engagement metrics without inferring sentiment.",
+    "domain": "Digital & Social Media — Engagement Metrics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "Users who watch cooking videos are shown more cooking videos over time. Explain three possible contributors—user choice, recommendation ranking, and content availability—and identify evidence needed before claiming the algorithm caused the entire pattern.",
+    "intent": "Separate algorithmic selection from user preference and supply.",
+    "domain": "Digital & Social Media — Algorithmic Recommendation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "platform_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "An online community becomes hostile after moderators stop enforcing a rule against personal attacks. Participation rises briefly, then new-member retention falls. Analyze how norms, enforcement, participation quantity, and community governance could interact without assuming the moderation change is the only cause.",
+    "intent": "Analyze community norms and governance dynamics.",
+    "domain": "Digital & Social Media — Online Communities",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "platform_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A professional uses a formal identity on a workplace network, a pseudonym in a hobby forum, and a private account for family. Explain how audience management, context collapse, anonymity, and self-presentation help analyze these choices without treating any one profile as the person's 'true' identity.",
+    "intent": "Analyze context-dependent digital identity.",
+    "domain": "Digital & Social Media — Digital Identity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A creator is trusted by followers for product advice because of a long history of personal storytelling. A sponsored review is factually accurate but the commercial relationship is not obvious. Explain how parasocial trust, perceived authenticity, sponsorship, and factual credibility are related but distinct.",
+    "intent": "Distinguish authenticity, sponsorship, and credibility.",
+    "domain": "Digital & Social Media — Influencer Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "social_media_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A platform rule prohibits graphic violence but allows documentary exceptions. At scale, automated systems remove many newsworthy clips while missing some harmful uploads; appeals restore some context-dependent posts days later. Analyze the trade-offs among consistency, context, scale, appeals, and transparency without prescribing an ideological outcome.",
+    "intent": "Analyze platform moderation governance trade-offs.",
+    "domain": "Digital & Social Media — Moderation & Governance",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "platform_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A news site adopts more emotionally charged headlines. Monthly visits rise 80%, average pages per visit rises 20%, subscription conversion falls from 2.0% to 1.2%, and trust scores decline. Explain why traffic alone is an inadequate success metric and identify both business and communication outcomes needed to evaluate the strategy.",
+    "intent": "Diagnose attention-economy incentives and metric conflict.",
+    "domain": "Digital & Social Media — Attention Economy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A social campaign reports 900,000 organic impressions and 500,000 paid impressions. Some users see both; the same users may generate repeated impressions. Explain why impressions cannot be added to obtain unique reach and what platform or panel data would be needed to estimate deduplicated exposure.",
+    "intent": "Interpret organic/paid exposure and audience overlap.",
+    "domain": "Digital & Social Media — Reach & Frequency",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A hashtag campaign becomes viral after a celebrity mention, paid creator posts, coordinated brand accounts, and recommendation-system amplification all occur within six hours. Explain how timing, network structure, paid activity, organic sharing, and ranking feedback loops interact, and what evidence would be needed to attribute the surge among these mechanisms.",
+    "intent": "Analyze interacting drivers of virality and attribution.",
+    "domain": "Digital & Social Media — Multi-Factor Virality",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "platform_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "Classify each item and justify the classification: (a) a parody article clearly labeled satire; (b) a false rumor shared by someone who believes it is true; (c) a fabricated quote knowingly posted to deceive; (d) a real photo from 2018 presented as if it were taken today. Distinguish satire, misinformation, disinformation, and misleading context.",
+    "intent": "Differentiate misinformation categories by intent and context.",
+    "domain": "Misinformation & Verification — Foundations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "misinformation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Claim: 'The school district banned all novels published before 2000.' Evidence supplied: the district removed six books from one optional reading list but kept older books elsewhere. State the exact checkable claim, what the evidence establishes, and why the broad claim is unsupported by the supplied evidence. Explain why unsupported or unverified is not automatically the same as proven false in every possible interpretation.",
+    "intent": "Define a checkable claim and assess evidence scope.",
+    "domain": "Misinformation & Verification — Fact-Checking",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "fact_checking",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A rumor that tap water is unsafe is shared 40,000 times. A survey finds only 18% of exposed respondents believe it, while 52% say they shared it 'just in case.' Explain why rumor spread and rumor belief are different outcomes and what this means for correction strategy.",
+    "intent": "Distinguish transmission from belief.",
+    "domain": "Misinformation & Verification — Rumor Dynamics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A false claim reaches 1,000,000 users. A correction reaches 220,000 users, but only 60,000 can be confidently matched as having seen the original. The correction improves factual accuracy among matched users by 12 percentage points. Explain what the study can and cannot say about population-level correction effectiveness, including reach mismatch and selection.",
+    "intent": "Interpret correction reach, treatment overlap, and causal limits.",
+    "domain": "Misinformation & Verification — Corrections & Debunking",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A viral photograph shows a politician beside a controversial banner. Reverse-search results find the same base photo from years earlier without the banner; the viral file's provenance is unknown. Explain what is verified, what is strongly suggested, and what remains uncertain before labeling the image manipulated.",
+    "intent": "Use provenance and contextual evidence without overclaiming.",
+    "domain": "Misinformation & Verification — Manipulated Media",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "source_verification",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A synthetic-looking audio clip appears online. The uploader says it is authentic; file metadata show it was exported yesterday; an independent witness says the speaker did make a similar statement; and acoustic analysis is inconclusive. Explain how to weigh provenance, testimony, technical evidence, and content consistency without declaring certainty prematurely.",
+    "intent": "Assess conflicting evidence about synthetic media authenticity.",
+    "domain": "Misinformation & Verification — Synthetic Media",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A newsroom evaluating a suspicious video has access to the earliest known upload, a later repost with a new caption, approximate shadows, a visible storefront sign, and a claimed timestamp. Describe a non-invasive verification sequence using provenance, contextual clues, geolocation concepts, and timestamp checks, without offering operational intrusion techniques.",
+    "intent": "Apply media-forensics concepts to verification.",
+    "domain": "Misinformation & Verification — Media Forensics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "source_verification",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "Researchers find 300 newly created accounts posting identical misleading captions within minutes of one another, all linking to the same site. Explain what this pattern may indicate about coordinated amplification while distinguishing evidence of coordination from proof of who organized it or why.",
+    "intent": "Analyze coordinated behavior without unsupported attribution.",
+    "domain": "Misinformation & Verification — Disinformation Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "misinformation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "An official agency denies that a database was breached, but independently authenticated internal emails show staff discussing unauthorized access. Explain why the official denial is relevant but not definitive, and what additional evidence a journalist or fact-checker should seek.",
+    "intent": "Evaluate official statements against contradictory evidence.",
+    "domain": "Misinformation & Verification — Official Sources",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "fact_checking",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "An online article cites a newspaper, which cites a trade newsletter, which cites a company press release containing the original statistic. Explain why tracing the citation chain to the primary source changes how authority, independence, and conflicts of interest should be evaluated.",
+    "intent": "Trace provenance through a citation chain.",
+    "domain": "Misinformation & Verification — Information Literacy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_verification",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A single company buys four regional newspapers. Afterward, all adopt the same subscription system, but their political endorsements and local investigative priorities still differ. Explain how ownership concentration can shape resources and incentives without proving deterministic editorial control.",
+    "intent": "Analyze ownership influence without determinism.",
+    "domain": "Media Systems & Representation — Media Ownership",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_media",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A digital news outlet shifts from advertising toward subscriptions. Page views fall, subscriber retention rises, and editors publish fewer high-volume celebrity stories. Explain plausible communication consequences of the revenue-model change without assuming the business model alone determines editorial content.",
+    "intent": "Connect media economics to content incentives cautiously.",
+    "domain": "Media Systems & Representation — Media Economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A publicly funded broadcaster has a legal charter requiring editorial independence and universal service. Critics claim public funding necessarily makes its journalism government-controlled. Explain why funding source, governance safeguards, appointment procedures, and observed editorial behavior must be analyzed separately.",
+    "intent": "Analyze public-service media independence conceptually.",
+    "domain": "Media Systems & Representation — Public Service Media",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_media",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A global streaming format is adapted in three countries with different hosts, humor, pacing, and examples while retaining the same basic structure. Explain the difference between global distribution and local interpretation/adaptation, avoiding claims of automatic cultural homogenization.",
+    "intent": "Analyze localization in global media.",
+    "domain": "Media Systems & Representation — Global Media",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cross_cultural_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A content study finds that in 200 prime-time episodes, members of a social group appear in 8% of speaking roles but 35% of criminal roles. Explain what this pattern can support about representation and stereotyping, what it cannot establish about producer intent, and what additional coding context matters.",
+    "intent": "Interpret representation patterns without inferring intent.",
+    "domain": "Media Systems & Representation — Representation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A single comedy episode depicts a wealthy character as arrogant. Explain why one portrayal is insufficient to establish a systematic media stereotype, and identify the repeated-pattern, comparison, and contextual evidence a stronger claim would require.",
+    "intent": "Distinguish isolated portrayal from systematic stereotype.",
+    "domain": "Media Systems & Representation — Stereotyping",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "An infographic shows unemployment falling from 6.2% to 5.8% using a vertical axis that starts at 5.7%, making the decline look dramatic. Explain how the scale changes visual interpretation, what labeling could mitigate the problem, and why the underlying numeric change remains real even if the design exaggerates it.",
+    "intent": "Detect misleading data visualization without denying valid data.",
+    "domain": "Media Systems & Representation — Infographics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "visual_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A documentary presents verified interviews and documents but also uses ominous music, selective editing, narration, and a non-random set of participants. An experiment finds viewers become more supportive of the documentary's thesis, especially those already sympathetic to it. Explain how evidence, production choices, prior beliefs, and selection of material complicate claims about why the documentary persuaded viewers.",
+    "intent": "Synthesize content evidence, production, and audience heterogeneity.",
+    "domain": "Media Systems & Representation — Film & Television Analysis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "media_effects",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A researcher wants to know why young adults stop listening to a public-radio program after the first five minutes. Compare what audience analytics, interviews, and an experiment changing the opening segment could each reveal, and recommend how the methods could complement rather than substitute for one another.",
+    "intent": "Select methods suited to descriptive, interpretive, and causal questions.",
+    "domain": "Research & Evaluation — Media Research Methods",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "research_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "Two coders classify 500 news stories as 'economic', 'health', 'security', or 'other.' They agree on 92% of cases, but many stories contain multiple topics and the coding rules do not specify a primary-topic rule. Explain why high agreement alone does not guarantee valid measurement and how the coding scheme should be improved.",
+    "intent": "Distinguish reliability from validity in content analysis.",
+    "domain": "Research & Evaluation — Content Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "research_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A survey asks, 'How many minutes did you spend on news across all apps last Tuesday?' Respondents answer from memory. Explain likely recall and self-report problems, why the measure is not identical to actual exposure or attention, and one way to validate it.",
+    "intent": "Evaluate self-reported media exposure measurement.",
+    "domain": "Research & Evaluation — Survey Research",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "research_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "In an experiment, participants are randomly assigned to see either a neutral article or a fear-framed article. Some participants discuss the article with friends in the other condition before the outcome survey. Explain how random assignment helps causal inference, how spillovers threaten the treatment contrast, and what a manipulation check should test.",
+    "intent": "Analyze randomization, spillovers, and manipulation checks.",
+    "domain": "Research & Evaluation — Media Experiments",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A video channel reports: 100,000 unique viewers, 260,000 total views, median watch time 42 seconds on a 3-minute video, and 4,000 link clicks. Interpret reach, repeated viewing, retention, and click behavior, and explain which additional measure is needed to assess attitude change.",
+    "intent": "Interpret audience analytics without inferring persuasion.",
+    "domain": "Research & Evaluation — Audience Analytics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A campaign defines 'trust' as the percentage of people who click 'learn more.' Explain why click behavior is at best an imperfect operational measure of trust, and propose a multi-measure approach that distinguishes attention, credibility judgments, and behavior.",
+    "intent": "Distinguish constructs from operational measures.",
+    "domain": "Research & Evaluation — Measurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "research_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "An observational study finds heavy platform users become more polarized over two years. A randomized one-week reduction in platform use slightly reduces exposure to partisan content but does not measurably change polarization. Explain how self-selection, time scale, measurement error, reciprocal effects, and treatment intensity affect causal interpretation of the two findings.",
+    "intent": "Integrate longitudinal and experimental evidence with causal limits.",
+    "domain": "Research & Evaluation — Causal Inference",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A campaign increases awareness of a recycling rule from 54% to 82%, but correct sorting behavior rises only from 51% to 55%. Explain why awareness, comprehension, intention, and behavior are different outcomes, and identify non-communication barriers that should be investigated before redesigning the message.",
+    "intent": "Distinguish communication outcomes from behavior and structural constraints.",
+    "domain": "Research & Evaluation — Communication Evaluation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "campaign_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A multi-channel campaign rewards teams for 'engagement.' One team buys cheap video views, another prompts employees to repeatedly click posts, and a third reaches fewer people but produces the highest verified sign-up rate. Audiences overlap across channels and cost data differ. Diagnose metric gaming, choose objective-aligned metrics, explain deduplication and attribution limits, and state what evidence is needed before claiming causal impact.",
+    "intent": "Evaluate metric gaming, attribution, overlap, cost, and causal claims.",
+    "domain": "Research & Evaluation — Multi-Step Campaign Evaluation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  }
+]

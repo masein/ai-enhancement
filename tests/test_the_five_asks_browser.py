@@ -115,7 +115,7 @@ def test_submit_has_the_same_search(live, page):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("width", [1280, 1512])
-@pytest.mark.parametrize("slug,criteria", [("medicine_health", 15), ("law", 23)])
+@pytest.mark.parametrize("slug,criteria", [("medicine_clinical_health", 20), ("law", 20)])
 def test_the_answers_never_scroll_sideways(live, browser, width, slug, criteria):
     ctx = browser.new_context(viewport={"width": width, "height": 900})
     pg = ctx.new_page()
@@ -277,7 +277,7 @@ def test_propose_over_a_provisional_judge_asks_first_and_marks_it(live, page):
     import urllib.request
     with urllib.request.urlopen(base + "/api/proposals") as r:
         props = json.loads(r.read())
-    p = next(x for x in props if x["model"] == MODEL and x["category"] == "economics")
+    p = next(x for x in props if x["model"] == MODEL and x["category"] == "Economics")
     assert p["override"]["by"] == "Omar"
     # the topic page's proposal line carries the mark
     page.wait_for_selector("[data-panel='output'] [data-over-provisional]", timeout=20000)
@@ -288,7 +288,7 @@ def test_a_data_reason_is_a_disabled_button_and_no_dialog(live, page):
     from service import app
     make_provisional()
     app._cache.update(key=None, payload=None, at=0.0)
-    btn = open_topic_for(page, live["base"], "medicine_health")
+    btn = open_topic_for(page, live["base"], "medicine_clinical_health")
     assert btn.get_attribute("data-gate") == "hard"
     assert btn.is_disabled()
     why = page.locator("[data-topic-page] [data-why='propose']").first.text_content()

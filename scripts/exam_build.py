@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 """The exam: draft it, curate it, split it, build it for the harness.
 
-    python scripts/exam_build.py migrate  --root $BENCH_ROOT/exam            # once: the 40 skill items
-    python scripts/exam_build.py draft    --root $BENCH_ROOT/exam --per-topic 8 [--topic economics …]
-    python scripts/exam_build.py fetch    --root $BENCH_ROOT/exam <batch_id>  # after draft --no-wait
-    python scripts/exam_build.py summary  --root $BENCH_ROOT/exam
-    python scripts/exam_build.py build    results/full --root $BENCH_ROOT/exam
+    python scripts/exam_build.py --root $BENCH_ROOT/exam migrate      # once: the 40 skill items
+    python scripts/exam_build.py --root $BENCH_ROOT/exam draft --per-topic 8 [--topic Economics …]
+    python scripts/exam_build.py --root $BENCH_ROOT/exam fetch <batch_id>   # after draft --no-wait
+    python scripts/exam_build.py --root $BENCH_ROOT/exam import-dir eval_tasks/fr/banks --approver masein
+    python scripts/exam_build.py --root $BENCH_ROOT/exam retire --topic law --reason "replaced …"
+    python scripts/exam_build.py --root $BENCH_ROOT/exam summary
+    python scripts/exam_build.py --root $BENCH_ROOT/exam build results/full
 
-The exam is the instrument. Its questions span the TOPICS in
-scripts/categories.yaml — economics, law, medicine & health, … — because
-"which topic are we weak in" is the question the loop exists to answer. An
-LLM (EXAM_PROVIDER/EXAM_MODEL, a separate identity from the generator and the
-judge) drafts candidates; a person accepts, edits or rejects each one on the
-dashboard's Exam tab; accepted questions land in the bank with who accepted
-them and when. Nothing an LLM writes reaches the bank unread.
+(`--root` belongs to the command, not the subcommand: it goes first.)
+
+The exam is the instrument. Its questions span the 37 TOPICS in
+scripts/categories.yaml — Agriculture, AI & Machine Learning, … Technology —
+because "which topic are we weak in" is the question the loop exists to
+answer. An LLM (EXAM_PROVIDER/EXAM_MODEL, a separate identity from the
+generator and the judge) drafts candidates; a person accepts, edits or rejects
+each one on the dashboard's Exam tab; accepted questions land in the bank with
+who accepted them and when. Nothing an LLM writes reaches the bank unread.
 
 THE SPLIT, AND WHY IT IS THE MOST IMPORTANT LINE HERE
 -----------------------------------------------------
@@ -28,8 +32,18 @@ train on its own test with no outside benchmark to catch it.
 Layout under --root (default $BENCH_ROOT/exam):
     candidates/<topic>.jsonl   drafts awaiting a decision (status candidate|accepted|rejected)
     bank/<topic>.jsonl         accepted questions: qid, prompt, reference, accepted_by, accepted_at
+                               (+ retired_at, retired_reason on a retired topic's rows)
     tasks/exam_<topic>.jsonl   what the harness runs (built from the bank), + .yaml + manifest.json
     tasks/fr_control_mmlu.*    diagnose-half MMLU re-asked open-ended — unchanged from phase 5
+
+ONE FILE, TWO TOPICS
+--------------------
+A bank file is named by the topic's slug, and a row belongs to the topic its
+own `topic` field names — exactly, case and all. The retired `law` and the
+new `Law` share `bank/law.jsonl`; reading by slug would hand the new topic 100
+questions it was never given. So every read here filters on the stored topic
+string, and a row with `retired_at` is history: kept, never built, counted,
+imported against or shown.
 """
 
 from __future__ import annotations
@@ -134,8 +148,22 @@ def _write(p: Path, rows: list[dict]) -> None:
                  encoding="utf-8")
 
 
+def _live(row: dict, topic: str) -> bool:
+    """This row is a current question of this topic: its own topic field says
+    so, exactly, and nobody has retired it."""
+    return row.get("topic") == topic and not row.get("retired_at")
+
+
 def load_bank(root: Path) -> dict[str, list[dict]]:
-    return {t: _read(bank_dir(root) / f"{_categories.topic_slug(t)}.jsonl") for t in TOPICS}
+    return {t: [r for r in _read(bank_dir(root) / f"{_categories.topic_slug(t)}.jsonl")
+                if _live(r, t)]
+            for t in TOPICS}
+
+
+def all_bank_rows(root: Path) -> list[dict]:
+    """Every row on disk, retired and legacy topics included — for the two
+    things that must see history: retiring, and not migrating twice."""
+    return [r for p in sorted(bank_dir(root).glob("*.jsonl")) for r in _read(p)]
 
 
 def bank_qids(root: Path) -> set[str]:
@@ -145,7 +173,7 @@ def bank_qids(root: Path) -> set[str]:
 def append_bank(root: Path, rec: dict) -> None:
     p = bank_dir(root) / f"{_categories.topic_slug(rec['topic'])}.jsonl"
     rows = _read(p)
-    if any(r["qid"] == rec["qid"] for r in rows):
+    if any(r["qid"] == rec["qid"] and _live(r, rec["topic"]) for r in rows):
         return
     rows.append(rec)
     _write(p, rows)
@@ -159,7 +187,7 @@ def update_bank(root: Path, rec: dict) -> bool:
     p = bank_dir(root) / f"{_categories.topic_slug(rec['topic'])}.jsonl"
     rows = _read(p)
     for i, r in enumerate(rows):
-        if r["qid"] == rec["qid"]:
+        if r["qid"] == rec["qid"] and _live(r, rec["topic"]):
             rows[i] = rec
             _write(p, rows)
             return True
@@ -171,13 +199,19 @@ def load_candidates(root: Path, topic: str | None = None, status: str | None = N
     out = []
     for t in topics:
         for r in _read(candidates_dir(root) / f"{_categories.topic_slug(t)}.jsonl"):
+            if r.get("topic", t) != t:        # a retired topic's drafts, sharing the slug
+                continue
             if status is None or r.get("status") == status:
                 out.append(r)
     return out
 
 
 def _save_candidates(root: Path, topic: str, rows: list[dict]) -> None:
-    _write(candidates_dir(root) / f"{_categories.topic_slug(topic)}.jsonl", rows)
+    """This topic's candidates, written back beside any other topic's that
+    share the file — which stay exactly as they were."""
+    p = candidates_dir(root) / f"{_categories.topic_slug(topic)}.jsonl"
+    others = [r for r in _read(p) if r.get("topic", topic) != topic]
+    _write(p, others + rows)
 
 
 # ---------------------------------------------------------------------------
@@ -197,22 +231,61 @@ DRAFT_SYSTEM = (
     "<one line for the curator: what it tests, what a 2 looks like>} and nothing else.")
 
 TOPIC_BRIEFS = {
-    "economics": "micro and macro fundamentals: incentives, markets, prices, trade, policy effects",
-    "law": "legal reasoning and concepts: liability, contract, jurisdiction, rights, procedure — "
+    "Agriculture": "crops, soils, livestock, water and farm economics; mechanisms before names",
+    "AI & Machine Learning": "learning, generalisation, evaluation and failure modes; no framework "
+                             "trivia",
+    "Anthropology & Human Geography": "cultures, settlement, migration and the evidence for "
+                                      "claims about them",
+    "Architecture & Built Environment": "structure, climate, codes and how buildings are used; "
+                                        "safety where it matters",
+    "Arts": "works, movements and techniques, and how to read them",
+    "Biology & Life Sciences": "molecular to ecological mechanisms; cause before name",
+    "Business & Management": "how organisations decide, compete, organise and fail",
+    "Chemistry & Materials Science": "structure, reactions and properties; quantities and units "
+                                     "matter",
+    "Computer Science": "algorithms, data structures, complexity and systems concepts; "
+                        "language-agnostic",
+    "Data & Information Science": "data quality, modelling, retrieval and inference from data",
+    "Design": "purpose, constraints, users and trade-offs, stated and argued",
+    "Earth & Environmental Sciences": "Earth systems, climate, hazards and resources; evidence "
+                                      "and scale",
+    "Economics": "micro and macro fundamentals: incentives, markets, prices, trade, policy effects",
+    "Education": "learning, teaching, assessment and the evidence behind practice",
+    "Engineering": "mechanisms and estimates in built systems; units, safety margins and "
+                   "failure",
+    "Ethics & Religion": "arguments, distinctions and traditions, stated fairly",
+    "Finance & Accounting": "how money, risk and value are measured, reported and managed",
+    "Food & Veterinary Sciences": "food safety, nutrition and animal health; no treatment "
+                                  "dosing",
+    "General & Multidisciplinary": "cross-topic questions that fit no single heading",
+    "Government & Public Policy": "institutions, processes, incentives and what policies "
+                                  "actually do",
+    "History & Archaeology": "causes, consequences and evidence, dated and placed",
+    "IT": "networks, operations, support and administration; what breaks and why",
+    "Language & Literature": "language structure and use, and reading texts closely",
+    "Law": "legal reasoning and concepts: liability, contract, jurisdiction, rights, procedure — "
            "jurisdiction-neutral or stated",
-    "medicine & health": "physiology, disease mechanisms, nutrition, public health — no dosing advice",
-    "mathematics": "reasoning about quantities, structures, proofs and estimation; answers in prose",
-    "computer science": "algorithms, data, systems, security concepts; language-agnostic",
-    "physics & engineering": "mechanisms and estimates in the physical world; units matter",
-    "chemistry & biology": "molecular and organismal mechanisms; cause before name",
-    "history": "causes, consequences and evidence, dated and placed",
-    "philosophy & religion": "arguments, distinctions and traditions, stated fairly",
-    "politics & government": "institutions, processes and incentives; comparative where possible",
-    "psychology & sociology": "findings, methods and their limits; distinguish claim from evidence",
-    "business & accounting": "how organisations decide, account and fail",
-    "geography & world facts": "places, processes and the reasons behind patterns",
-    "language & logic": "structure of arguments and of language; fallacies, inference, form",
-    "other": "cross-topic questions that fit no single heading",
+    "Manufacturing & Applied Sciences": "processes, quality, tolerances and production safety",
+    "Mathematics & Statistics": "reasoning about quantities, structures, proofs, estimation and "
+                                "uncertainty; answers in prose",
+    "Media & Communication": "how messages are made, carried and received; evidence over "
+                             "assertion",
+    "Medicine & Clinical Health": "physiology, disease mechanisms, diagnosis and triage — no "
+                                  "dosing advice",
+    "Philosophy": "arguments, distinctions, logic and fallacies, stated fairly",
+    "Physics & Astronomy": "mechanisms and estimates in the physical world; units matter",
+    "Political Science & International Relations": "institutions, power, conflict and "
+                                                   "cooperation; comparative where possible",
+    "Psychology & Cognitive Sciences": "findings, methods and their limits; distinguish claim "
+                                       "from evidence",
+    "Public Health & Wellness": "populations, prevention, risk and wellbeing; evidence and its "
+                                "limits",
+    "Sociology": "social structures, groups and change; methods and their limits",
+    "Software Engineering & Programming": "design, correctness, testing and maintenance of "
+                                          "programs; language-agnostic where possible",
+    "Systems & Cybersecurity": "threats, defences and system design; concepts, never attack "
+                               "recipes",
+    "Technology": "how technologies work, are adopted and fail",
 }
 
 
@@ -669,7 +742,11 @@ def set_provenance(root: Path, topic: str, source: str = "", approver: str = "",
     # set of questions. Two fields change; nothing else is touched.
     qids_before = [r["qid"] for r in rows]
     changed = 0
+    mine = 0
     for r in rows:
+        if not _live(r, topic):           # a retired topic sharing the file is history
+            continue
+        mine += 1
         if only_source and r.get("source") != only_source:
             continue
         before = (r.get("source"), r.get("accepted_by"))
@@ -683,15 +760,93 @@ def set_provenance(root: Path, topic: str, source: str = "", approver: str = "",
                            "every judged score of this topic hang on it")
     if changed:
         _write(p, rows)
-    return {"topic": topic, "rows": len(rows), "changed": changed,
+    return {"topic": topic, "rows": mine, "changed": changed,
             "source": source or None, "approver": approver or None}
 
 
+def retire(root: Path, topic: str, reason: str) -> dict:
+    """Mark every row of one topic as retired: `retired_at`, `retired_reason`.
+    Nothing is deleted and nothing is re-split — the qids, the halves and the
+    judged scores made on them stay exactly as they were, as history.
+
+    The topic is matched by the string stored on each row, never by slug:
+    the retired `law` and the new `Law` share bank/law.jsonl, and a slug
+    match would retire both. A name no row carries is refused, with the
+    names the bank does hold. Retiring again changes nothing."""
+    topic, reason = (topic or "").strip(), (reason or "").strip()
+    if not reason:
+        raise ValueError("retiring a topic needs a reason — it is kept on every row")
+    held: collections.Counter = collections.Counter()
+    out = {"topic": topic, "reason": reason, "rows": 0, "changed": 0, "files": []}
+    now = time.time()
+    for p in sorted(bank_dir(root).glob("*.jsonl")):
+        rows = _read(p)
+        qids_before = [r["qid"] for r in rows]
+        dirty = 0
+        for r in rows:
+            held[r.get("topic")] += 1
+            if r.get("topic") != topic:
+                continue
+            out["rows"] += 1
+            if r.get("retired_at"):
+                continue
+            r["retired_at"], r["retired_reason"] = now, reason
+            dirty += 1
+        if not dirty:
+            continue
+        if [r["qid"] for r in rows] != qids_before:      # cannot happen; proves it did not
+            raise RuntimeError("retire changed a qid — refusing to write")
+        _write(p, rows)
+        out["changed"] += dirty
+        out["files"].append(p.name)
+    if not out["rows"]:
+        names = ", ".join(repr(t) for t in sorted(held, key=str)) or "nothing"
+        raise ValueError(f"no question in the bank has the topic {topic!r} — the name must match "
+                         f"the rows exactly, case included. The bank holds: {names}")
+    return out
+
+
+# `<slug>_v1.json`: the name a delivered bank has in eval_tasks/fr/banks
+BANK_FILE = re.compile(r"^(?P<slug>[a-z0-9_]+?)_v\d+$")
+
+
+def import_dir(root: Path, folder: Path, approver: str, imported_by: str = "") -> list[dict]:
+    """Every `<slug>_v<n>.json` in a folder, into the topic with that slug —
+    source the file's stem, written by `approver`. Checked whole before one
+    row is written: a file no topic owns is refused by name, and so are two
+    files for one topic, because which of them is the bank is a person's
+    call. Idempotent, like `import`."""
+    folder = Path(folder)
+    files = sorted(folder.glob("*.json"))
+    if not files:
+        raise ValueError(f"{folder}: no .json files to import")
+    by_slug = {_categories.topic_slug(t): t for t in TOPICS}
+    plan, unknown, seen = [], [], collections.defaultdict(list)
+    for f in files:
+        m = BANK_FILE.match(f.stem)
+        topic = by_slug.get(m.group("slug")) if m else None
+        if topic is None:
+            unknown.append(f.name)
+            continue
+        seen[topic].append(f.name)
+        plan.append((f, topic))
+    if unknown:
+        raise ValueError(f"no exam topic matches {', '.join(unknown)} — a bank file is named "
+                         f"<topic slug>_v<n>.json; nothing was imported")
+    twice = {t: names for t, names in seen.items() if len(names) > 1}
+    if twice:
+        raise ValueError("two files for one topic: " + "; ".join(
+            f"{t}: {', '.join(n)}" for t, n in sorted(twice.items())) + " — nothing was imported")
+    return [import_bank(root, f, topic, approver, source=f.stem, imported_by=imported_by)
+            for f, topic in plan]
+
+
 def migrate_seeds(root: Path, seed_dir: Path = SEED_DIR, approver: str = "migration") -> int:
-    """The four skill suites' items, as they are, into the bank under `other`
-    with their skill kept on the record. Nothing is thrown away; nothing is
-    reworded. Idempotent."""
-    have = bank_qids(root)
+    """The four skill suites' items, as they are, into the bank under
+    MIGRATED_TOPIC with their skill kept on the record. Nothing is thrown
+    away; nothing is reworded. Idempotent — against every row on disk, so a
+    bank that migrated them under the old `other` does not get them twice."""
+    have = {r["qid"] for r in all_bank_rows(root)}
     n = 0
     for skill in SKILL_SUITES:
         for it in _read(seed_dir / f"fr_{skill}.jsonl"):
@@ -839,12 +994,34 @@ def build(results_root: Path, root: Path, per_category: int = CONTROL_PER_CATEGO
     for task in written_tasks:
         yaml = template.replace("__ITEMS_PATH__", str((out / f"{task}.jsonl").resolve()))
         (out / f"{task}.yaml").write_text(f"task: {task}\n" + yaml, encoding="utf-8")
+    # a task this build did not write is not part of the exam any more — a
+    # retired topic's, or one that no longer exists. suite=judged runs every
+    # yaml in this directory, so leaving it would keep sitting it
+    keep = {f"{t}{ext}" for t in written_tasks for ext in (".jsonl", ".yaml")}
+    removed = sorted({p.stem for p in out.glob(f"{TASK_PREFIX}*")
+                      if p.suffix in (".jsonl", ".yaml") and p.name not in keep})
+    for task in removed:
+        for ext in (".jsonl", ".yaml"):
+            (out / f"{task}{ext}").unlink(missing_ok=True)
+    manifest["removed"] = removed
     for r in sorted(RUBRIC_DIR.glob("*.md")):
         manifest["rubrics"][r.stem] = sha256_file(r)
     manifest["built_at"] = time.time()
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True),
                                        encoding="utf-8")
     return manifest
+
+
+def results_path(p: Path) -> Path:
+    """`results/full` as the docs write it. Relative to where the command
+    runs when it is there; otherwise relative to BENCH_ROOT — inside the
+    container the working directory is the image's /app, and the results
+    live on the BENCH_ROOT mount."""
+    p = Path(p)
+    if p.is_absolute() or p.is_dir():
+        return p
+    alt = Path(os.environ.get("BENCH_ROOT", ".")) / p
+    return alt if alt.is_dir() else p
 
 
 def _backend():
@@ -875,7 +1052,8 @@ def parser() -> argparse.ArgumentParser:
     d.add_argument("--no-wait", action="store_true", help="submit and print the batch id")
     f = sub.add_parser("fetch", help="collect a batch submitted with --no-wait")
     f.add_argument("batch_id")
-    sub.add_parser("migrate", help="the four skill suites' 40 items into the bank, under 'other'")
+    sub.add_parser("migrate", help=f"the four skill suites' 40 items into the bank, under "
+                                   f"{MIGRATED_TOPIC!r}")
     i = sub.add_parser("import", help="a human-written bank (JSON array) straight into the bank")
     i.add_argument("path", type=Path, help="JSON array of objects with at least a prompt")
     i.add_argument("--topic", required=True, help="the exam topic these belong to")
@@ -884,6 +1062,18 @@ def parser() -> argparse.ArgumentParser:
                                                 "defaults to the file's own name, never the topic")
     i.add_argument("--imported-by", default="", help="who ran the import, when that is not "
                                                      "the person who wrote the questions")
+    idr = sub.add_parser("import-dir", help="every <slug>_v<n>.json in a folder into the topic "
+                                            "with that slug (eval_tasks/fr/banks)")
+    idr.add_argument("folder", type=Path)
+    idr.add_argument("--approver", required=True, help="who wrote the questions — recorded per "
+                                                       "item")
+    idr.add_argument("--imported-by", default="", help="who ran the import, when that is not "
+                                                       "the person who wrote the questions")
+    rt = sub.add_parser("retire", help="mark every row of one topic as retired — kept as history, "
+                                       "out of the built exam, the board and the counts")
+    rt.add_argument("--topic", required=True, help="the topic exactly as the rows store it "
+                                                   "('law' is not 'Law')")
+    rt.add_argument("--reason", required=True, help="kept on every row")
     sp = sub.add_parser("set-source", help="correct a bank's provenance in place — a re-import "
                                            "cannot, because a matching qid is skipped")
     sp.add_argument("--topic", required=True)
@@ -921,6 +1111,42 @@ def main() -> int:
         print(f"they are in the bank ({bank_dir(root)}); rebuild the tasks with "
               f"exam_build.py build <results> --root {root}")
         return 0
+    if a.cmd == "import-dir":
+        try:
+            done = import_dir(root, a.folder, a.approver, imported_by=a.imported_by)
+        except (ValueError, OSError, json.JSONDecodeError) as e:
+            print(e, file=sys.stderr)
+            return 2
+        width = max(len(r["topic"]) for r in done)
+        for r in done:
+            print(f"{r['topic']:{width}}  imported {r['imported']:3}  "
+                  + (f"updated {r['updated']:3}  " if r["updated"] else "")
+                  + f"skipped {r['skipped']:3}"
+                  + (f"  invalid {r['invalid']}" if r["invalid"] else "")
+                  + (f"  (report {r['report']} / diagnose {r['diagnose']})"
+                     if r["imported"] or r["updated"] else "")
+                  + f"  source {r['source']}")
+        tot = {k: sum(r[k] for r in done)
+               for k in ("imported", "updated", "skipped", "invalid", "report", "diagnose")}
+        print(f"total: {len(done)} topics, imported {tot['imported']}"
+              + (f", updated {tot['updated']}" if tot["updated"] else "")
+              + f", skipped {tot['skipped']} already in the bank"
+              + (f", {tot['invalid']} without a usable prompt" if tot["invalid"] else "")
+              + f" — report {tot['report']} / diagnose {tot['diagnose']} · written by {a.approver}")
+        print(f"rebuild the tasks with exam_build.py --root {root} build <results>")
+        return 0
+    if a.cmd == "retire":
+        try:
+            r = retire(root, a.topic, a.reason)
+        except (ValueError, OSError) as e:
+            print(e, file=sys.stderr)
+            return 2
+        print(f"{r['topic']}: retired {r['changed']} of {r['rows']} rows"
+              + (f" ({r['rows'] - r['changed']} already retired)"
+                 if r["rows"] != r["changed"] else "")
+              + (f" in {', '.join(r['files'])}" if r["files"] else "")
+              + f" · reason: {r['reason']}")
+        return 0
     if a.cmd == "set-source":
         if not a.source and not a.approver:
             print("nothing to set: give --source, --approver or both", file=sys.stderr)
@@ -935,15 +1161,35 @@ def main() -> int:
               + (f" · written by {r['approver']}" if r["approver"] else ""))
         return 0
     if a.cmd == "summary":
-        for t, s in summary(root).items():
-            print(f"{t:26} accepted {s['accepted']:3} (report {s['report']:3} / diagnose "
+        rows = summary(root)
+        width = max(map(len, rows))
+        for t, s in rows.items():
+            print(f"{t:{width}}  accepted {s['accepted']:3} (report {s['report']:3} / diagnose "
                   f"{s['diagnose']:3})  pending {s['pending']:3}  target {s['target']}")
         return 0
     if a.cmd == "build":
-        m = build(a.results, root, a.per_category)
+        results = results_path(a.results)
+        if not results.is_dir():
+            print(f"{a.results}: no such results directory (looked here and under BENCH_ROOT) — "
+                  f"the MMLU control set is built from the MMLU runs in it", file=sys.stderr)
+            return 2
+        m = build(results, root, a.per_category)
+        width = max(map(len, m["tasks"]))
         for t, v in m["tasks"].items():
-            print(f"{t:36} {v['items']:4} items  (report {v['report']}, diagnose {v['diagnose']})")
-        print(f"\nwrote {tasks_dir(root)} — suite=judged runs these")
+            print(f"{t:{width}}  {v['items']:4} items  (report {v['report']}, "
+                  f"diagnose {v['diagnose']})")
+        ctl = m["tasks"][CONTROL_TASK]
+        topics = _categories.with_subjects()
+        empty = [t for t in TOPICS if topic_task(t) not in m["tasks"]]
+        print(f"\n{len(m['tasks']) - 1} exam topics built"
+              + (f"; no questions yet, so no task: {', '.join(empty)}" if empty else ""))
+        print(f"MMLU control set: {ctl['items']} items — up to {a.per_category} from each of the "
+              f"{len(topics)} topics with MMLU subjects (the old 15-category exam built 150); "
+              f"the other {len(TOPICS) - len(topics)} topics have no MMLU subjects")
+        if m.get("removed"):
+            print(f"removed {len(m['removed'])} task(s) no longer in the exam: "
+                  + ", ".join(m["removed"]))
+        print(f"wrote {tasks_dir(root)} — suite=judged runs these")
         return 0
     backend, _ = _backend()
     if a.cmd == "fetch":

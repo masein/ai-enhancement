@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A factory that employed much of a region closes. Within a year, thousands of residents experience unstable employment, while a few quickly find comparable jobs. Explain why a purely individual explanation of the employment instability is incomplete.",
+    "intent": "Test sociological imagination by linking biography, regional economic restructuring, institutions, and agency.",
+    "domain": "Sociological Imagination",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "sociological_imagination",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A student says, “If one person from a disadvantaged neighborhood becomes a physician, neighborhood disadvantage cannot matter very much.” Evaluate this reasoning sociologically.",
+    "intent": "Distinguish individual exceptions from population-level social patterns without denying agency.",
+    "domain": "Social Patterns and Individual Outcomes",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "At a dinner, a guest follows an unfamiliar seating custom after noticing others do so and fearing social disapproval. Identify the micro-level mechanism, then name one meso- or macro-level process that could help sustain the custom over time.",
+    "intent": "Connect interpersonal norm enforcement to broader group or institutional reproduction.",
+    "domain": "Levels of Analysis",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "micro_macro_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "Two employees have the same formal job title. One has much greater freedom because their supervisor trusts them, while both remain subject to the same company rules. Explain how structure and agency jointly shape their behavior.",
+    "intent": "Analyze structural constraints, informal discretion, and individual action together.",
+    "domain": "Structure and Agency",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "structure_agency",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A long-standing school ceremony has no obvious effect on test scores, yet students say it strengthens belonging while some students feel excluded by it. Analyze the ceremony using functional reasoning without assuming that persistence proves benefit.",
+    "intent": "Apply manifest/latent function and dysfunction reasoning while separating explanation from justification.",
+    "domain": "Functionalist Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "theory_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A city introduces a prestigious permit required to operate in a lucrative occupation. Existing practitioners helped design the rules, and entry becomes more difficult for newcomers. Give a conflict-oriented explanation and one alternative explanation that should also be investigated.",
+    "intent": "Apply power/resource competition while avoiding reduction of all outcomes to domination.",
+    "domain": "Conflict Perspectives",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "theory_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "In one workplace, being called a “team player” comes to mean volunteering for extra tasks. Employees begin changing how they present themselves to earn that label. Explain the process using interaction and meaning rather than personality traits.",
+    "intent": "Apply symbolic interaction and labeling to identity performance in a workplace.",
+    "domain": "Symbolic Interactionism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "theory_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A category used by schools to classify students changes across decades, but placement in that category still affects access to advanced courses. Explain why saying the category is socially constructed does not mean it is unreal or inconsequential.",
+    "intent": "Distinguish social construction from unreality and identify institutional consequences.",
+    "domain": "Social Construction",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "Society A and Society B have similar unemployment rates, but in Society A employment is mainly organized through long-term firms while in Society B short contracts are common. Why might the same individual characteristics produce different employment trajectories across the two societies?",
+    "intent": "Use comparative institutional reasoning to explain context-dependent outcomes.",
+    "domain": "Comparative Institutional Context",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_sociology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A researcher finds that younger adults participate less in neighborhood associations than older adults. Ten years later, the same birth cohort still participates less, while newly young adults look similar to the previous young cohort. Give a careful explanation that distinguishes age, period, and cohort possibilities and states what additional evidence would help.",
+    "intent": "Synthesize temporal reasoning and competing explanations rather than attributing differences to aging alone.",
+    "domain": "Historical Context and Cohorts",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A community says it values equality, yet informal expectations give senior members the first chance to speak at meetings. Distinguish the value from the norm in this example.",
+    "intent": "Distinguish abstract cultural values from behavioral expectations.",
+    "domain": "Values and Norms",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A practice that seems strange to an outside observer is understood locally as a sign of respect. Explain how a sociologist can interpret the practice in context without implying moral endorsement.",
+    "intent": "Apply cultural relativism while separating explanation from moral evaluation.",
+    "domain": "Cultural Relativism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "culture_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A person learns basic turn-taking and manners in childhood, then later learns profession-specific conduct after joining a hospital staff. Explain the difference between the two socialization processes.",
+    "intent": "Differentiate primary from later institutional socialization.",
+    "domain": "Socialization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A teacher is expected to grade fairly, mentor struggling students, publish research, and serve on committees. The demands compete for time. Is this primarily role conflict or role strain, and why?",
+    "intent": "Distinguish incompatible demands within one role from conflict between separate roles.",
+    "domain": "Social Roles",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A person is a parent, engineer, volunteer, and tenant. During a housing dispute, others treat the person mainly as a tenant. Explain what this illustrates about status sets and context without claiming one status fully determines identity.",
+    "intent": "Analyze multiple statuses and context-dependent social recognition.",
+    "domain": "Status and Identity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A tightly knit group publicly praises members who follow an unwritten dress code and quietly excludes repeated violators. There is no formal rule. Explain how the norm can persist.",
+    "intent": "Explain informal norm enforcement through sanctions, cohesion, and status.",
+    "domain": "Norm Enforcement",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "culture_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A volunteer organization grows from 8 members to 80. Members report less intimacy, more subgroups, and more written procedures. Explain why group size could contribute to these changes without claiming size mechanically determines them.",
+    "intent": "Analyze group size, coordination, formalization, and contingent processes.",
+    "domain": "Group Size and Social Relations",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "group_network_and_organizational_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "Two neighborhoods use the same word for “community,” but interviews show that one group means close kin ties while the other means participation in local organizations. What does this imply for cross-cultural survey measurement?",
+    "intent": "Recognize measurement-equivalence problems when identical terms carry different meanings.",
+    "domain": "Cross-Cultural Measurement",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_sociology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "At a busy train station, people form orderly queues even though no official enforcer is present. When one person cuts in line, several strangers object. Analyze the interaction using norms, informal sanctions, role expectations, and public-space behavior.",
+    "intent": "Apply micro-sociological reasoning to everyday coordination.",
+    "domain": "Everyday Interaction",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A workplace introduces a diversity slogan, but employees from different teams interpret it differently, managers reward different behaviors, and informal peer networks shape who feels included. Explain why culture should not be treated as a single homogeneous force and identify evidence that could distinguish competing explanations.",
+    "intent": "Synthesize cultural variation, organizational context, networks, and evidence needs.",
+    "domain": "Culture and Organizations",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A recent graduate hears about a job opening from a former classmate they rarely contact, while close friends mainly provide emotional support. What does this illustrate about strong and weak ties?",
+    "intent": "Distinguish support benefits of strong ties from information advantages that weak ties can sometimes provide.",
+    "domain": "Strong and Weak Ties",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "network_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "In a professional network, one person connects two teams that otherwise rarely communicate. Explain how this network position could create influence or opportunity without guaranteeing success.",
+    "intent": "Apply brokerage and network-position reasoning without determinism.",
+    "domain": "Network Position",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "network_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A neighborhood has strong internal trust and mutual aid, but residents have few ties to employers, universities, or organizations outside the area. Explain how the same social capital can provide support while limiting access to outside opportunities.",
+    "intent": "Distinguish bonding and bridging social capital and their context-dependent consequences.",
+    "domain": "Social Capital",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "network_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "An agency has a formal rule that all requests must pass through three offices. Staff create an unofficial messaging group that resolves routine issues faster. Analyze the formal and informal organization.",
+    "intent": "Distinguish official hierarchy from informal communication and influence.",
+    "domain": "Formal and Informal Organization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "organizational_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A hospital uses standardized forms, specialized roles, written records, and impersonal procedures. Explain one coordination advantage and one possible dysfunction of this bureaucratic arrangement.",
+    "intent": "Assess bureaucracy as a source of predictability and potential rigidity rather than inherently efficient or inefficient.",
+    "domain": "Bureaucracy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "organizational_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A hiring practice began decades ago for one purpose, but employees now regard it as simply “how professional organizations operate,” even though no one can show it improves performance. What would an institutional explanation emphasize?",
+    "intent": "Explain institutionalization, legitimacy, and taken-for-granted persistence without equating persistence with efficiency.",
+    "domain": "Institutionalization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "Employees in the same firm have equal formal rank, but one cluster receives information earlier because its members socialize with senior staff. Explain how informal networks can generate organizational inequality.",
+    "intent": "Connect network structure and informal access to unequal workplace opportunities.",
+    "domain": "Organizations and Inequality",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "organizational_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "Friends who exercise regularly are more likely to be connected to other friends who exercise regularly. Explain why this pattern alone cannot tell us whether exercise spread through the network.",
+    "intent": "Distinguish social influence from homophily and shared environmental exposure.",
+    "domain": "Social Contagion vs Homophily",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "Two organizations adopt the same new reporting practice. One copies a prestigious competitor; the other adopts it because a funder requires it. Identify the distinct diffusion mechanisms and explain why identical outcomes need not imply identical causes.",
+    "intent": "Differentiate imitation from coercive institutional diffusion.",
+    "domain": "Diffusion Through Organizations",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A community program tries to improve employment by strengthening neighborhood ties. After two years, participants report more support, but job access does not improve and contacts outside the neighborhood decline. Propose at least three plausible mechanisms and a study design that could distinguish them.",
+    "intent": "Integrate social capital, network closure, opportunity access, selection, and research design.",
+    "domain": "Networks, Social Capital, and Opportunity",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "Household A earns 60,000 units per year and owns a debt-free home worth 300,000 units. Household B earns 60,000 units per year, rents, and has 5,000 units in savings. Explain why equal income does not imply equal economic position.",
+    "intent": "Distinguish income as a flow from wealth as a stock.",
+    "domain": "Income and Wealth",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "stratification_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "Two workers have similar pay, but one occupation has much higher prestige and authority. What does this show about social stratification?",
+    "intent": "Recognize income, prestige, and power as distinct dimensions of stratification.",
+    "domain": "Dimensions of Stratification",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A country’s average living standard rises for every income group, but the top group’s income grows much faster than the bottom group’s. Explain how absolute improvement can coexist with increasing relative inequality.",
+    "intent": "Distinguish absolute living conditions from relative social position.",
+    "domain": "Absolute and Relative Position",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "In a hypothetical survey, 20% of households own 70% of total wealth, while the remaining 80% own 30%. What is the wealth-share ratio of the top fifth to the rest, and what does this ratio tell us—and not tell us—about inequality?",
+    "intent": "Compute an accessible inequality comparison and qualify its interpretation.",
+    "domain": "Inequality Measurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A mobility table shows that 40 of 100 children from the lowest parental-status group reach the middle or top group, while 60 remain in the lowest group. Does this establish high relative mobility? Explain what additional comparisons are needed.",
+    "intent": "Interpret intergenerational mobility while distinguishing a subgroup transition rate from broader relative mobility.",
+    "domain": "Intergenerational Mobility",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A school rewards familiarity with a particular style of speaking and extracurricular experience. Students from families already familiar with those practices navigate selection more easily. Explain the mechanism without equating cultural familiarity with intelligence.",
+    "intent": "Apply cultural-capital and social-reproduction reasoning without essentialism.",
+    "domain": "Cultural Resources and Social Reproduction",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "inequality_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "In a hiring audit, equally qualified fictional applicants receive different callback rates by assigned group label. What kind of discrimination evidence does this provide, and what does it still not establish about all organizations or all individuals?",
+    "intent": "Interpret evidence of differential treatment while respecting scope and generalizability.",
+    "domain": "Discrimination Evidence",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "An organization introduces a formally neutral requirement that applicants must have completed an unpaid internship. One social group is much less likely to meet the requirement because of unequal access to unpaid work. Explain how unequal outcomes can arise without assuming either neutral effects or discriminatory intent.",
+    "intent": "Separate observed disparity, institutional mechanism, intent, and causal evidence.",
+    "domain": "Institutional Rules and Unequal Outcomes",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "Two families have similar current incomes. Family X owns housing, has relatives in professional occupations, and lives near high-resource schools; Family Y has debt, few professional contacts, and unstable housing. Explain how these differences could shape intergenerational mobility through multiple interacting mechanisms.",
+    "intent": "Integrate wealth, networks, neighborhoods, education, and cumulative advantage.",
+    "domain": "Family and Intergenerational Transmission",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "stratification_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A dataset shows a persistent earnings gap between two social groups. The gap shrinks after controlling for occupation and hours worked, but those variables may themselves be shaped by hiring, caregiving, education pathways, and discrimination. Explain why the adjusted gap does not by itself identify the full causal mechanism, and describe evidence that would help distinguish composition, selection, institutional sorting, and direct treatment.",
+    "intent": "Evaluate a complex group disparity without treating controls as automatically resolving causality.",
+    "domain": "Complex Inequality Mechanisms",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "Three unrelated students share an apartment, while one student’s parents and siblings live elsewhere. Explain why “household” and “family” are not interchangeable concepts.",
+    "intent": "Distinguish co-residence from kinship/family relationships.",
+    "domain": "Family and Household",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "In a dual-earner household, both adults work the same paid hours, but one performs most caregiving and housework. Give two sociological mechanisms that could help explain the pattern without making a moral judgment about the individuals.",
+    "intent": "Apply norms and bargaining/resource explanations to household labor.",
+    "domain": "Division of Household Labor",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "family_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "Two students have equal test scores, but one is placed in an advanced track and the other in a standard track because of different school recommendations. Why should later differences in outcomes not be treated as pure evidence of initial ability?",
+    "intent": "Analyze institutional placement, expectations, and cumulative opportunity.",
+    "domain": "Schools as Organizations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "education_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A credential is legally required to enter an occupation even though some experienced workers without it can perform the tasks well. Explain how skills, signaling, professionalization, and occupational closure are different possible elements of the credential’s role.",
+    "intent": "Distinguish skills from credentials and analyze closure mechanisms.",
+    "domain": "Credentials and Professions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "work_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "Workers with similar skills receive different wages, benefits, and promotion prospects because one group is employed in stable internal career ladders while the other is hired through short-term subcontractors. What sociological explanation fits this pattern?",
+    "intent": "Apply labor-market segmentation and organizational structure.",
+    "domain": "Labor-Market Segmentation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "work_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "Religious participation falls, but private belief remains stable and religious organizations still influence family rituals. Why would it be too simple to describe this as a single uniform process of secularization?",
+    "intent": "Distinguish participation, belief, institutional differentiation, and privatization.",
+    "domain": "Religion and Secularization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "Residents of a low-income area have higher rates of a chronic illness than residents of a high-income area. List several social mechanisms that could contribute and explain why the disparity alone does not identify which mechanism is causal.",
+    "intent": "Connect health inequality to housing, work, education, access, environment, and discrimination while preserving causal caution.",
+    "domain": "Health Inequalities",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A behavior once treated mainly as a moral failing is increasingly classified and managed through healthcare institutions. Analyze the process of medicalization, including possible benefits and possible social consequences, without assuming the change is inherently good or bad.",
+    "intent": "Apply medicalization to classification, professional authority, and social consequences.",
+    "domain": "Medicalization",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A streaming platform recommends different content to users based on prior viewing, creating partially separate audience clusters. Explain two sociological consequences this could have for cultural exposure or group boundaries, and state what evidence would be needed before claiming strong causal effects.",
+    "intent": "Analyze media institutions, audience segmentation, networks, and evidence limits.",
+    "domain": "Media Sociology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "media_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "Two regions introduce the same school funding increase. Region A has integrated schools and stable housing; Region B has strong residential segregation, frequent student mobility, and unequal extracurricular access. Explain why the same policy input could produce different educational outcomes and how a mixed-method study could investigate the difference.",
+    "intent": "Integrate institutions, neighborhoods, mobility, inequality, and mixed methods.",
+    "domain": "Education, Neighborhoods, and Institutional Context",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A teenager violates an informal dress norm but breaks no law. Why is this behavior potentially deviant without necessarily being criminal?",
+    "intent": "Distinguish norm violation from crime.",
+    "domain": "Deviance and Crime",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A workplace labels one employee “unreliable” after repeated lateness. Supervisors then monitor that employee more closely than others. Explain how labeling could affect later opportunities without assuming the label determines future behavior.",
+    "intent": "Apply labeling to surveillance, opportunity, and social reaction.",
+    "domain": "Labeling",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "deviance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "Parents, peers, schools, employers, and online communities all influence behavior through approval, exclusion, rules, and monitoring. Explain why social control is broader than criminal punishment.",
+    "intent": "Identify formal and informal social-control mechanisms across institutions.",
+    "domain": "Social Control",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A city reports 1,000 thefts in one year and 1,200 the next. Give at least three reasons the recorded increase may not equal a 20% increase in actual theft prevalence.",
+    "intent": "Distinguish underlying behavior from reporting, recording, enforcement, and population change.",
+    "domain": "Crime Statistics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "City A records 2,000 assaults among 1,000,000 residents; City B records 1,200 among 300,000 residents. Calculate the recorded assault rate per 100,000 residents for each city and explain why counts alone are misleading.",
+    "intent": "Use correct denominators and distinguish rates from counts.",
+    "domain": "Rates and Counts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "People with a stigmatized attribute report hiding it in some settings but disclosing it in supportive groups. Explain how stigma is about social response and context rather than an attribute being inherently negative.",
+    "intent": "Analyze identity management and context-dependent social labeling.",
+    "domain": "Stigma",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "deviance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "Neighborhoods with more university graduates have lower recorded crime rates. Can we conclude from this aggregate pattern that individual graduates are less likely to offend? Explain.",
+    "intent": "Explicitly test the ecological fallacy.",
+    "domain": "Ecological Fallacy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "In individual-level data, people with stronger local friendships report feeling safer. Does that establish that neighborhoods with denser friendship networks necessarily have lower crime? Explain the level-of-analysis problem.",
+    "intent": "Test the individualistic fallacy and cross-level inference.",
+    "domain": "Individualistic Fallacy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "micro_macro_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "Police intensify patrols in one district, recorded drug offenses rise there, and officials conclude underlying drug use must have increased. Identify the measurement and enforcement issues that make this inference uncertain.",
+    "intent": "Analyze how surveillance and enforcement affect recorded crime statistics.",
+    "domain": "Enforcement and Measurement",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "Two neighborhoods have similar poverty rates but different levels of recorded violence. One has dense civic organizations and stable local institutions; the other has high residential turnover and weak organizational ties. Construct a sociological explanation that integrates social organization, networks, opportunity, reporting, and selection, and state what evidence could falsify it.",
+    "intent": "Synthesize neighborhood, network, institutional, and measurement mechanisms with falsifiable alternatives.",
+    "domain": "Crime and Social Organization",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A town has 10,000 residents at the start of a year, 120 births, 80 deaths, 300 in-migrants, and 250 out-migrants. Ignoring other changes, what is the town’s net population change?",
+    "intent": "Use basic demographic components of change.",
+    "domain": "Demographic Change",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A population has 2,000 people under age 15, 5,000 people ages 15–64, and 3,000 people age 65 or older. Using dependents = under 15 plus 65+, calculate the dependency ratio per 100 working-age people and explain what it does not directly measure.",
+    "intent": "Compute and interpret a supplied dependency-ratio definition.",
+    "domain": "Population Aging",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "Region A has 50 births per 1,000 women ages 20–39, while Region B has 40 per 1,000. Why is this rate more informative than comparing raw birth counts if the two regions have different numbers of women in that age range?",
+    "intent": "Distinguish rates from counts using the relevant denominator.",
+    "domain": "Fertility Measurement",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "demographic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A rural county loses young adults after a major employer closes. The average age rises, school enrollment falls, and demand for elder services increases. Explain how migration can change age structure even if fertility and mortality rates do not initially change.",
+    "intent": "Connect migration, population composition, institutions, and service demand.",
+    "domain": "Rural Sociology and Demography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "demographic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "People who migrated to a city earlier provide housing leads, job contacts, and practical information to later migrants. Explain how migration networks can reduce costs and uncertainty without treating networks as the only cause of migration.",
+    "intent": "Apply network mechanisms to migration while preserving multiple causation.",
+    "domain": "Migration Networks",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "migration_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A survey finds that immigrants who arrived 20 years ago have higher average earnings than recent arrivals. Why can this cross-sectional difference not by itself be interpreted as the causal effect of 20 years of residence?",
+    "intent": "Distinguish duration, cohort, selection, and period explanations.",
+    "domain": "Migration and Cohorts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "After a new rail station opens, neighborhood rents rise and higher-income residents move in. A survey also finds some long-term renters leave. What evidence would be needed to distinguish investment, demographic turnover, direct displacement, and indirect displacement pressure?",
+    "intent": "Analyze gentrification mechanisms rather than equating all neighborhood change with displacement.",
+    "domain": "Gentrification",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "urban_sociology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "Residents of high-resource neighborhoods have better health than residents of low-resource neighborhoods. Explain how residential self-selection could confound a neighborhood-effect interpretation and name one design that could strengthen causal inference.",
+    "intent": "Distinguish contextual effects from selection into neighborhoods.",
+    "domain": "Neighborhood Effects",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "Two societies use different ethnic categories in their censuses, and a category present in one has no close equivalent in the other. How should a comparative sociologist handle a cross-society claim about ethnic inequality?",
+    "intent": "Address category construction, measurement equivalence, historical context, and within-group heterogeneity.",
+    "domain": "Comparative Sociology of Categories",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_sociology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "Over 30 years, a region becomes older. During the same period, retirement timing changes, a new migration stream adds many working-age adults, and family caregiving norms shift. Explain why a single “population aging” label is insufficient to predict labor supply, households, healthcare demand, and intergenerational relations.",
+    "intent": "Integrate age structure, migration, institutions, family, and changing norms.",
+    "domain": "Population Aging and Social Institutions",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "demographic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A new communication technology becomes common first among affluent urban households and later among lower-income rural households. Name two sociological reasons adoption might diffuse unevenly.",
+    "intent": "Explain unequal technological adoption through access, networks, skills, institutions, or cost.",
+    "domain": "Technology and Society",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "social_change",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "Two households both have internet access, but one has only a shared low-quality device and limited digital skills. Why is internet access alone an incomplete measure of the digital divide?",
+    "intent": "Recognize multiple dimensions of access, device quality, skills, usage, and outcomes.",
+    "domain": "Digital Divide",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "inequality_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A migrant sends money home, participates in community groups in two countries, and makes family decisions across borders. Explain why migration need not end social relationships with the place of origin.",
+    "intent": "Apply transnationalism to family, community, identity, and economic ties.",
+    "domain": "Transnationalism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "migration_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A global firm uses the same production standard in several countries, but labor outcomes differ because unions, credential systems, and subcontracting arrangements differ. What does this show about globalization and institutional context?",
+    "intent": "Explain integration alongside uneven institutional consequences.",
+    "domain": "Globalization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_sociology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Low-income neighborhoods experience more summer heat because they have fewer trees and more heat-retaining surfaces. Explain what this demonstrates about environmental inequality and why it does not by itself prove intentional discrimination.",
+    "intent": "Separate unequal environmental exposure from claims about intent while considering institutional processes.",
+    "domain": "Environmental Inequality",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "inequality_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "During a public disruption, people in a crowd quickly develop an informal rule to leave one pathway open for emergency access. Why does this case challenge the assumption that crowds are inherently irrational?",
+    "intent": "Apply emergent-norm and collective-coordination reasoning.",
+    "domain": "Collective Behavior",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A neighborhood recycling initiative struggles because everyone benefits if the area is clean, but each household can avoid the effort. Explain two mechanisms that could improve collective action without assuming formal law is required.",
+    "intent": "Apply free-riding, selective incentives, identity, monitoring, and networks.",
+    "domain": "Collective Action",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A hypothetical social movement grows after local associations begin sharing meeting space, mailing lists, and volunteers. Explain how resources, networks, framing, and collective identity could contribute without endorsing the movement’s goals.",
+    "intent": "Analyze movement mobilization neutrally through social mechanisms.",
+    "domain": "Social Movements",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "social_change",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "In a fictional state, civic organizations that once mediated between residents and government weaken, while a few professional associations gain privileged access to decision makers. Analyze the change sociologically in terms of state–society relations, networks, legitimacy, and unequal access without evaluating which political outcome is preferable.",
+    "intent": "Apply political sociology descriptively and neutrally.",
+    "domain": "Political Sociology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A society experiences automation, rural-to-urban migration, expansion of higher education, and changing family norms over two decades. Employment patterns and household formation also change. Develop a multi-level explanation that identifies possible feedbacks and path-dependent mechanisms, and state what evidence would distinguish institutional, cultural, demographic, and technological explanations.",
+    "intent": "Synthesize social change across institutions, technology, demography, culture, and path dependence.",
+    "domain": "Social Change and Path Dependence",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "social_change",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A researcher wants to estimate how common food insecurity is among students at a university. Which is generally better suited to that aim: a carefully sampled survey or ten in-depth interviews, and why?",
+    "intent": "Match method to a prevalence research question without devaluing qualitative research.",
+    "domain": "Quantitative vs Qualitative Methods",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A researcher wants to understand how newly hired workers interpret unwritten workplace rules during their first month. Which method would likely provide richer evidence: a one-item survey or repeated interviews and observation? Explain the tradeoff.",
+    "intent": "Match qualitative methods to meanings and processes while noting scope limits.",
+    "domain": "Qualitative Methods",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "qualitative_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "An online poll about community trust receives 50,000 responses from visitors to one news website. Why does the large sample size not guarantee representativeness?",
+    "intent": "Distinguish sample size from selection and sampling bias.",
+    "domain": "Sampling Bias",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "survey_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A survey asks, “Responsible citizens always help their neighbors, don’t they?” What measurement problems could this wording create?",
+    "intent": "Identify leading wording and social-desirability effects.",
+    "domain": "Survey Measurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "survey_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A scale gives nearly the same score each time it is administered, but it measures number of social-media contacts as a proxy for social support. Explain how the measure could be reliable but have weak validity.",
+    "intent": "Explicitly distinguish reliability from construct validity.",
+    "domain": "Reliability and Validity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "An ethnographer spends a year in one warehouse documenting how workers negotiate informal production targets. A critic says the study is worthless because the sample is only one workplace. Evaluate the criticism.",
+    "intent": "Assess qualitative depth, contextual generalization, reflexivity, and limits without dismissing small-N evidence.",
+    "domain": "Ethnography and Generalizability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "qualitative_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A panel study surveys the same 2,000 people every year, but participants with unstable housing are increasingly likely to drop out. How could attrition bias conclusions about housing instability?",
+    "intent": "Analyze nonrandom panel attrition and its effects on longitudinal inference.",
+    "domain": "Panel Data and Attrition",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A study finds that neighborhoods with more parks report better health. Give at least three plausible confounders and explain why temporal order would still matter even after measuring them.",
+    "intent": "Identify confounding and temporal-order issues in causal inference.",
+    "domain": "Confounding",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A city changes school assignment rules in some districts but not others because of an administrative boundary. A researcher calls this a natural experiment. What assumptions should be examined before treating the policy difference as causal evidence?",
+    "intent": "Evaluate selection, comparability, spillovers, timing, and concurrent changes in a quasi-experimental design.",
+    "domain": "Natural Experiments",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A survey finds that workers in temporary jobs report lower trust in employers. Interviews suggest some workers choose temporary jobs precisely because they already distrust long-term employers, while records show temporary workers also receive fewer benefits. Design a mixed-method strategy to distinguish selection, job conditions, and interpretation of employment insecurity.",
+    "intent": "Integrate survey, qualitative, and administrative evidence to adjudicate competing causal explanations.",
+    "domain": "Mixed Methods and Causal Inference",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "research_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "In one university, 60% of students in Department A and 40% in Department B use public transit. Enrollment shifts from mostly Department B to mostly Department A, while the within-department transit-use rates remain unchanged. Explain how the overall transit-use rate can rise without any within-department behavioral change.",
+    "intent": "Identify a composition effect in aggregate change.",
+    "domain": "Composition Effects",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A study reports a statistically detectable 0.5-point difference on a 100-point social-trust scale between two large groups. What should a sociologist consider before calling the difference socially important?",
+    "intent": "Distinguish statistical detectability from substantive sociological significance.",
+    "domain": "Quantitative and Substantive Significance",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "Overall, Organization X appears to promote a higher share of employees than Organization Y. But within both junior and senior job levels, Organization Y promotes a higher share. What should you examine before interpreting the aggregate difference?",
+    "intent": "Recognize aggregation reversal and the role of subgroup composition without requiring a technical label.",
+    "domain": "Aggregation and Subgroups",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "Survey respondents say neighborhood meetings are inclusive, but ethnographic observation shows a small set of long-term residents dominates discussion. How should a sociologist handle the apparent conflict between the two forms of evidence?",
+    "intent": "Evaluate divergent survey and ethnographic evidence through measurement, meaning, sampling, and context.",
+    "domain": "Triangulation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A measure of “social integration” counts only membership in formal associations. Give two reasons this operationalization may miss important forms of integration and explain how the measurement choice could affect group comparisons.",
+    "intent": "Evaluate construct validity and category coverage in social measurement.",
+    "domain": "Operationalization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A researcher claims that using a productivity app causes social isolation because heavy users report fewer in-person interactions. Give at least three alternative explanations involving reverse causality, selection, or common causes, and identify one design improvement.",
+    "intent": "Apply causal reasoning to a technology-and-society claim.",
+    "domain": "Technology and Causal Inference",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "Two societies have similar household incomes, but in one society elder care is mainly provided by extended family and in the other by formal services. Explain how identical income measures can correspond to different lived resources, obligations, and family strategies.",
+    "intent": "Use comparative institutional and family reasoning to interpret seemingly equivalent economic indicators.",
+    "domain": "Comparative Social Institutions",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_sociology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A school district’s achievement gap narrows after a tutoring program begins. At the same time, the district changes tracking rules, housing turnover alters student composition, and survey response rates fall. Explain how you would separate plausible program effects from institutional change, composition, and measurement artifacts.",
+    "intent": "Synthesize causal inference, institutional change, composition, and measurement in educational inequality.",
+    "domain": "Educational Inequality and Evidence",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A network study finds that obesity-related behaviors cluster among friends over five years. Friends also tend to share neighborhoods, socioeconomic conditions, and pre-existing habits, and people sometimes drop or form ties during the study. Explain why influence, homophily, shared environment, and network selection are difficult to disentangle and what evidence would strengthen each explanation.",
+    "intent": "Evaluate apparent social contagion under dynamic network selection and confounding.",
+    "domain": "Network Causality",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A multi-city study finds that young adults from lower-income families attain fewer high-status jobs. Surveys suggest weaker professional networks; interviews describe unfamiliarity with recruitment norms; administrative data show school and neighborhood differences; employers vary in credential requirements. Build a sociological explanation that integrates class, institutions, networks, culture, selection, and cumulative advantage, then specify evidence that could distinguish the major mechanisms.",
+    "intent": "Test high-level synthesis across stratification, organizations, networks, culture, education, and causal evidence.",
+    "domain": "Competing Explanations and Social Mechanisms",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "competing_explanations",
+    "jurisdiction_required": false
+  }
+]

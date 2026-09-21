@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A copy editor objects to the sentence \"Who did you speak to after the meeting?\" and replaces it with \"To whom did you speak after the meeting?\"\nExplain whether the original is ungrammatical in contemporary English or instead differs mainly in formality/style. Distinguish grammaticality from prescriptive preference and explain what changes between the two versions.",
+    "intent": "Distinguish grammaticality from stylistic convention using structural evidence.",
+    "domain": "Grammar — grammaticality vs style",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "grammar_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "Analyze the sentence: \"Mira said that the committee would reconsider the proposal.\"\nIdentify the matrix clause, the embedded clause, the subject and predicate of each clause, and explain the grammatical role of \"that.\" Do not treat punctuation as the main evidence.",
+    "intent": "Identify clause structure and grammatical relations.",
+    "domain": "Grammar — clause structure",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "grammar_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "Sentence: \"I photographed the cyclist with the red scarf.\"\nGive two structurally distinct readings, identify which constituent \"with the red scarf\" can modify in each reading, and rewrite the sentence twice so that each reading is made unambiguous.",
+    "intent": "Explain attachment ambiguity and preserve meaning in disambiguating rewrites.",
+    "domain": "Syntax — attachment ambiguity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "syntax_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "Compare:\nA. \"The list of revisions is on the desk.\"\nB. \"The list of revisions are on the desk.\"\nIn a standard written-English context, explain which agreement pattern is expected and why. Identify the grammatical head of the subject phrase, while noting that variation in actual usage should not be confused with absence of grammar.",
+    "intent": "Reason about agreement and head-dependent structure.",
+    "domain": "Grammar — agreement",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "grammar_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "Compare:\nA. \"Leila wrote three pages.\"\nB. \"Leila was writing three pages when the lights failed.\"\nC. \"Leila has written three pages.\"\nExplain how tense/aspect choices change the temporal viewpoint or completion implications. Do not simply label the verb forms.",
+    "intent": "Explain tense and aspect as meaning-bearing grammatical choices.",
+    "domain": "Grammar — tense and aspect",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "semantic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "Compare:\nA. \"The laboratory misplaced the samples.\"\nB. \"The samples were misplaced.\"\nExplain how the passive changes information structure and the explicit representation of agency. State what can and cannot be inferred about who misplaced the samples from sentence B alone.",
+    "intent": "Analyze passive voice, agency, and information structure.",
+    "domain": "Syntax — passive constructions",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "syntax_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "Sentence: \"No editor reviewed every chapter.\"\nIdentify the two main scope readings available in ordinary semantic analysis. Paraphrase each reading and explain why the sentence alone may not determine which scope is intended.",
+    "intent": "Analyze quantifier and negation scope ambiguity.",
+    "domain": "Semantics — scope and negation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "ambiguity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A learner writes: \"She didn't hardly sleep.\"\nIn some English varieties, multiple negative elements can form a systematic negative-concord construction; in many standard written varieties, the same sequence is conventionally avoided or interpreted differently.\nExplain why evaluating this sentence requires specifying the variety and intended grammar rather than declaring it universally \"illogical.\"",
+    "intent": "Distinguish dialect grammar from standard-language prescription.",
+    "domain": "Grammar — negation and variation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "sociolinguistic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "Sentence: \"The remarkably calm pilot opened the side door.\"\nUsing at least two constituency diagnostics conceptually (for example, substitution, movement, or coordination), explain why \"the remarkably calm pilot\" behaves as a constituent. You need not use a particular syntactic theory.",
+    "intent": "Reason from constituency evidence rather than terminology alone.",
+    "domain": "Syntax — constituent structure",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "syntax_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "Compare:\nA. \"Nora devoured the sandwich.\"\nB. \"Nora slept the sandwich.\"\nC. \"Nora slept beside the sandwich.\"\nExplain why B is anomalous in ordinary English while A and C are structurally well formed. Discuss the verb's argument structure and the role of the prepositional phrase in C.",
+    "intent": "Use argument structure to distinguish complements from incompatible arguments.",
+    "domain": "Syntax — argument structure",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "syntax_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "Sentence: \"The curator interviewed the assistant of the painter who had recently returned from Lisbon.\"\nIdentify the referential/structural ambiguity of \"who had recently returned from Lisbon.\" Give the two plausible antecedents and name one contextual fact that would resolve the ambiguity.",
+    "intent": "Analyze relative-clause attachment and referential ambiguity.",
+    "domain": "Syntax — relative clauses",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ambiguity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "Consider the English forms: \"kind,\" \"unkind,\" \"unkindness,\" \"kinder.\"\nSegment each into relevant morphemes and explain which processes are derivational and which are inflectional. Also explain why the number of morphemes need not equal the number of syllables.",
+    "intent": "Distinguish derivation, inflection, and morphemes from syllables.",
+    "domain": "Morphology — derivation and inflection",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "grammar_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A fictional language has these forms:\ntal = \"stone\"\ntali = \"stones\"\nmep = \"tree\"\nmepi = \"trees\"\nsor = \"river\"\nPredict the most plausible plural of sor from the supplied pattern, state the inferred plural morpheme, and explain why this is a morphological generalization rather than a claim about the words' lexical meanings.",
+    "intent": "Infer a productive morphological pattern from unfamiliar data.",
+    "domain": "Morphology — productivity",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "model_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "In a language, [p] and [b] distinguish words in the pair [pa] \"leaf\" and [ba] \"path.\" In another environment, speakers pronounce a single /p/-like category with a more aspirated sound at the beginning of a stressed syllable and an unaspirated sound elsewhere, without changing word meaning.\nExplain which evidence concerns phonemic contrast and which concerns allophonic variation. Do not rely on spelling.",
+    "intent": "Distinguish phonemes, allophones, and physical sound realizations.",
+    "domain": "Phonology — phonemes and allophones",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A speaker carefully says \"green beans\" with a clear final /n/ in \"green,\" but in rapid speech the nasal is produced farther forward or backward to resemble the following consonant.\nExplain this as a possible assimilation process: what is changing, what conditions the change, and why the spelling need not change.",
+    "intent": "Explain a phonological pattern without inferring pronunciation from orthography.",
+    "domain": "Phonology — assimilation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "Evaluate the relation between:\nA. \"Every violinist arrived.\"\nB. \"Some violinist arrived.\"\nAssuming the ordinary meanings of \"every\" and \"some\" and that at least one violinist exists, does A entail B? Explain the role of the existence assumption and distinguish entailment from merely likely inference.",
+    "intent": "Analyze semantic entailment with explicit assumptions.",
+    "domain": "Semantics — entailment",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "semantic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "Utterance: \"Ravi stopped taking the early train.\"\nWhat proposition is typically presupposed, and what is directly asserted? Then explain why a context in which Ravi never took the early train creates a presupposition problem rather than a simple contradiction of the asserted content.",
+    "intent": "Distinguish assertion from presupposition.",
+    "domain": "Semantics — presupposition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "semantic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "Sentence: \"The bank is near the port.\"\nWithout further context, identify at least two plausible lexical meanings of \"bank\" and explain why this is lexical ambiguity rather than syntactic ambiguity. Give one sentence of context that would select each reading.",
+    "intent": "Identify lexical ambiguity and contextual resolution.",
+    "domain": "Semantics — lexical ambiguity",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "ambiguity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "At dinner, one guest says, \"It's chilly in here,\" while looking toward an open window. The literal content describes temperature.\nExplain a plausible indirect-request interpretation, what contextual evidence supports it, and why that request is not part of the sentence's literal semantics.",
+    "intent": "Distinguish literal meaning from pragmatic speech-act inference.",
+    "domain": "Pragmatics — indirect requests",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "pragmatic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "Two people read the note \"Meet me here tomorrow.\"\nPerson A reads it in Vienna on 5 May; Person B finds a photo of the note months later in Graz.\nExplain why \"me,\" \"here,\" and \"tomorrow\" cannot be fully interpreted without information about the original utterance context.",
+    "intent": "Analyze person, place, and time deixis.",
+    "domain": "Pragmatics — deixis",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "pragmatic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "Mini-discourse:\n\"Amal submitted the draft on Tuesday. The document still contained three placeholders. Nevertheless, the committee approved it for circulation.\"\nExplain how \"the document\" and \"nevertheless\" contribute to cohesion and coherence. What contrast does the discourse marker instruct the reader to construct?",
+    "intent": "Analyze reference and discourse-marker relations across sentences.",
+    "domain": "Discourse — cohesion and coherence",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "discourse_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "Dialogue:\nA: \"Did the report settle the dispute?\"\nB: \"It settled the budget question.\"\nExplain what B literally states and what a listener may pragmatically infer about the parts of the dispute not mentioned. Why should that inference remain defeasible?",
+    "intent": "Distinguish stated content from conversational implicature.",
+    "domain": "Discourse — conversational inference",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "discourse_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A regional variety consistently uses \"The car needs washed\" where another variety uses \"The car needs to be washed.\"\nExplain why the first pattern should not be labeled grammatically defective merely because it is nonstandard in some regions. Distinguish structural pattern, social prestige, and appropriateness in a formal setting governed by a particular style guide.",
+    "intent": "Analyze a dialect construction without linguistic stigma.",
+    "domain": "Sociolinguistics — dialect grammar",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "sociolinguistic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A bilingual speaker uses Language A with grandparents, mostly Language B at university, and switches briefly to Language A when quoting a family saying among friends.\nGive at least two plausible discourse or identity functions of the switch, and explain why this single behavior cannot prove a fixed ethnic, social, or political identity.",
+    "intent": "Reason about code switching without deterministic identity inference.",
+    "domain": "Language & Identity — code switching",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "sociolinguistic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A scientist says to colleagues, \"The assay failed to converge,\" but tells a public audience, \"The test never settled on a stable result.\"\nAnalyze this as register/style shifting. What is preserved, what changes, and why does changing register not necessarily change the speaker's underlying claim?",
+    "intent": "Analyze register adaptation across audiences.",
+    "domain": "Sociolinguistics — register and style",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "rhetorical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "Historical evidence supplied:\nIn an older stage of a language, the word \"silly\" commonly had meanings closer to \"blessed\" or \"innocent\"; in later English it developed meanings associated with foolishness.\nA poem from the older period calls a child \"silly.\"\nExplain why importing only the modern meaning could distort interpretation, and state what additional contextual evidence you would inspect before translating the word.",
+    "intent": "Use supplied historical semantics to avoid anachronistic interpretation.",
+    "domain": "Historical Linguistics — semantic change",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "philological_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "Language X and Language Y both use a word pronounced roughly /mako/ for \"boat.\" Records show intense recent maritime trade between their speakers, while their basic vocabulary and sound correspondences otherwise show little evidence of common descent.\nWhich hypotheses—borrowing, inheritance, or chance resemblance—are supported or weakened by the evidence? Explain what further evidence would help.",
+    "intent": "Distinguish borrowing, inheritance, and chance resemblance.",
+    "domain": "Historical Linguistics — borrowing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "In a documented language history, a verb meaning \"to go\" begins to appear before another verb to mark future time, first in motion contexts and later in contexts with no physical movement.\nExplain conceptually how this could illustrate grammaticalization. What evidence would distinguish a grammatical change from merely frequent use of the original motion meaning?",
+    "intent": "Reason about grammaticalization from distributional change.",
+    "domain": "Language Change — grammaticalization",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "Readers see: \"While the reporter interviewed the senator smiled.\"\nMany initially parse \"the senator\" as the object of \"interviewed\" and then must revise when they reach \"smiled.\"\nExplain the temporary parse and why the later verb forces reanalysis. What punctuation or rewrite could reduce the garden-path effect?",
+    "intent": "Analyze incremental parsing and reanalysis.",
+    "domain": "Psycholinguistics — sentence processing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "syntax_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "The word \"pitch\" appears in:\n1. \"The singer adjusted the pitch.\"\n2. \"The entrepreneur refined the pitch.\"\n3. \"The groundskeeper inspected the pitch.\"\nExplain how context supports different lexical interpretations. Then distinguish context-driven lexical access from a claim that the word has one vague meaning covering all three cases.",
+    "intent": "Analyze contextual resolution of lexical ambiguity.",
+    "domain": "Psycholinguistics — lexical access",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "semantic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "Benchmark-authored passage:\n\"We can replace the bridge now for twelve million, or we can keep patching it for two million each year and still face replacement later. Last winter's closure delayed ambulances twice. The cheaper-looking choice is not necessarily the cheaper choice.\"\nIdentify the main claim, at least two kinds of support, and the role of the final framing contrast. Distinguish persuasive force from deductive proof.",
+    "intent": "Analyze claim, evidence, framing, and rhetorical effect.",
+    "domain": "Rhetoric — evidence and framing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "rhetorical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "Argument:\n\"Public libraries should extend weekend hours because local survey data show that 38% of respondents who cannot visit on weekdays would use Saturday evening access.\"\nIdentify the claim, evidence, and an unstated warrant needed for the evidence to support the claim. Then name one relevant counterargument the passage would need to address.",
+    "intent": "Analyze argument structure beyond device labels.",
+    "domain": "Argumentation — claim evidence warrant",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "Benchmark-authored sentence:\n\"By noon the rumor had grown legs and was running faster than anyone could correct it.\"\nIdentify the figurative construction and explain how the motion imagery shapes the reader's understanding of rumor transmission. Why would merely naming \"personification\" be an incomplete analysis?",
+    "intent": "Connect figurative language to meaning and effect.",
+    "domain": "Figurative Language — metaphor/personification",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "close_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "Dialogue:\nManager: \"Wonderful. Another server outage.\"\nThe outage is clearly harmful, and the manager's flat delivery follows a night of repeated failures.\nExplain why the utterance is plausibly verbal irony, what evidence establishes the mismatch between literal wording and intended evaluation, and why contradiction alone would not always prove irony.",
+    "intent": "Analyze verbal irony from contextual and tonal evidence.",
+    "domain": "Irony — verbal irony",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "pragmatic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "Benchmark-authored prose:\n\"At first the room hummed: cups clicked, chairs scraped, voices overlapped. Then the verdict arrived. One spoon touched a saucer. Nothing else moved.\"\nAnalyze how sentence length, sound imagery, and contrast create a tonal shift. Ground each claim in a specific feature rather than saying only that the diction is \"strong.\"",
+    "intent": "Connect stylistic features to a tonal change.",
+    "domain": "Style and Tone — syntax and sound",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "close_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Benchmark-authored passage:\n\"The town clock had stopped at 4:17, but everyone still glanced up when crossing the square. Even children who had never heard it ring tilted their heads beneath it.\"\nOffer a close reading of the stopped clock as image or possible symbol. Explain what the repeated looking suggests, while acknowledging at least one plausible alternative to a single fixed symbolic meaning.",
+    "intent": "Perform evidence-based close reading with calibrated symbolic interpretation.",
+    "domain": "Literary Analysis — symbol and ambiguity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "close_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "Benchmark-authored passage:\n\"Jonah folded the letter once, then again, until the paper was a white square small enough to hide under his watch. 'I haven't decided,' he said, though the train ticket was already in his pocket.\"\nDevelop two plausible readings of Jonah's hesitation. For each, cite a textual detail and explain how it supports the reading. Do not claim the passage proves a psychological motive it does not state.",
+    "intent": "Compare interpretations under character-motive ambiguity.",
+    "domain": "Literary Analysis — evidence and overinterpretation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "interpretation_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "Benchmark-authored passage:\n\"Every spring Mara repainted the front door blue. The year her sister left, she chose gray. By midsummer, a thin blue line showed where the new paint had cracked.\"\nDistinguish image, recurring motif, possible symbol, and theme. Formulate a thematic claim more specific than a one-word topic such as \"loss.\"",
+    "intent": "Distinguish motif, symbol, and thematic development.",
+    "domain": "Literary Analysis — motif and theme",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "close_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "Benchmark-authored passage:\n\"The apartment's windows faced a brick wall close enough for Anika to read the old mortar lines. At dinner she described the sea from memory, placing her glass where the horizon should be.\"\nExplain how physical setting interacts with characterization and a possible theme of confinement or imaginative freedom. Include one alternative reading that the supplied details could also support.",
+    "intent": "Connect setting to character and theme without treating it as background.",
+    "domain": "Literary Analysis — setting",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "close_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "Benchmark-authored passage:\n\"When the café closed, I stacked the chairs myself. Naturally, I was the only one responsible enough to remember. Later, Priya showed me the closing checklist with her initials beside every task except mine.\"\nAnalyze the narrator's self-characterization and what the checklist contributes. Is unreliability established, suggested, or still uncertain? Explain the degree of confidence justified by the text.",
+    "intent": "Evaluate characterization and reliability from conflicting evidence.",
+    "domain": "Narrative — unreliable first-person narration",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "narrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A first-person narrator says, \"Cities are machines that grind kindness into dust.\"\nExplain why this sentence is evidence about the narrator's voice or worldview, not automatically a statement of the historical author's belief. What additional evidence would be needed before making an authorial claim?",
+    "intent": "Distinguish author from narrator.",
+    "domain": "Narrative — author/narrator distinction",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "narrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "Benchmark-authored passage:\n\"From the doorway, Mateo saw the unopened suitcase and the two cups on the table. He could not hear the whisper from the kitchen, and the narration does not reveal its words. In the next paragraph, the reader follows Mateo as he guesses what was said.\"\nIdentify the focalizing perspective and explain how the restriction of knowledge shapes reader uncertainty.",
+    "intent": "Reason from textual limits to focalization and reader knowledge.",
+    "domain": "Narrative — focalization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "narrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "Benchmark-authored passage:\n\"I never touched the missing ledger. I should mention, only for completeness, that I moved it from the safe to my desk the night before it disappeared. That hardly counts as touching it.\"\nIdentify the contradiction or self-serving qualification that may make the narrator unreliable. Explain why unreliability here arises from evidence in the narration, not simply from disliking the narrator.",
+    "intent": "Identify textual evidence for unreliable narration.",
+    "domain": "Narrative — reliability",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "narrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "Benchmark-authored narrative sequence:\nParagraph 1: A woman waits outside a courthouse at age forty.\nParagraph 2: The narration moves to the morning, twenty years earlier, when she first met the lawyer now inside.\nParagraph 3: It returns to the courthouse and slows to describe ten seconds as she reaches for the door.\nExplain the changes in temporal order and duration and how they can shape emphasis.",
+    "intent": "Analyze flashback and pacing as narrative form.",
+    "domain": "Narrative — time and duration",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "narrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "Benchmark-authored passage:\nElena watched the guests praise the speech. Brilliant, they thought. So measured. So generous. She folded the printed apology into quarters beneath the table.\nThe narration is in third person and gives no quotation marks around \"Brilliant...So generous.\"\nExplain why the middle phrases may be read as free indirect discourse or as narratorial irony. Compare the evidence for both readings rather than forcing one.",
+    "intent": "Compare competing analyses of voice and represented thought.",
+    "domain": "Narrative — free indirect discourse",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "interpretation_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "Benchmark-authored passage:\n\"The story begins with a detective promising to explain every clue. Halfway through, the narrator admits that three chapters were fabricated to make the case seem solvable.\"\nExplain how the text invokes and then subverts a detective-story genre expectation. How does the disclosure change the reader's interpretation of earlier evidence?",
+    "intent": "Analyze genre expectations and retrospective reinterpretation.",
+    "domain": "Narrative — genre subversion",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "genre_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "Benchmark-authored passage:\n\"A character opens a sealed box in chapter one. The contents are withheld from the reader until chapter six, although later scenes show the character acting on what she learned.\"\nDistinguish the character's knowledge from the reader's knowledge and explain how discourse order creates suspense without requiring the story events themselves to be out of chronological order.",
+    "intent": "Distinguish story chronology from disclosure order.",
+    "domain": "Narrative — story/discourse distinction",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "narrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "Benchmark-authored passage:\n\"On three separate nights the narrator tells the same accident: first as a witness, then through a copied police statement, then through a child's retelling.\"\nExplain how narrative frequency and embedded accounts can complicate reliability. What would you compare across the three versions before deciding whether one is authoritative?",
+    "intent": "Integrate narrative level, repetition, and reliability.",
+    "domain": "Narrative — embedded narratives",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "narrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "Benchmark-authored poem:\nI borrow morning from the glass,\na square of gold upon the floor;\nby noon the light has crossed the room,\nand leaves me owing more.\nIdentify the speaker as a textual voice rather than assuming the poet is speaking autobiographically. Analyze how the borrowing/debt metaphor develops across the stanza.",
+    "intent": "Distinguish poetic speaker from poet and analyze extended metaphor.",
+    "domain": "Poetry — speaker and metaphor",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "poetry_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "Benchmark-authored poem:\nThe train keeps time: da-DUM, da-DUM,\nthrough fields I said I'd never leave—\nthen breaks its beat beside the town,\none wheel of silence under eve.\nAssume the first two lines establish a regular alternating stress pattern and the third disrupts it.\nExplain how the metrical disruption could interact with the speaker's return. Give at least one interpretation without claiming meter determines meaning by itself.",
+    "intent": "Connect metrical variation to interpretive effect.",
+    "domain": "Poetry — meter and rhythm",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "poetry_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "Benchmark-authored lines:\nCold stones crowd the closing road;\nslow smoke slips through sleeping pines.\nIdentify the most salient repeated sound patterns and explain how they contribute to pacing or atmosphere. Do not give full credit to a device label without an account of effect.",
+    "intent": "Analyze sound pattern in relation to structure and atmosphere.",
+    "domain": "Poetry — rhyme and sound",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "poetry_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "Benchmark-authored poem:\nI meant to say the river ends\nwhere maps run out, but\nwater keeps the sentence moving\npast the margin.\nAnalyze how enjambment between lines 2 and 3 contributes to the poem's meaning. Discuss the interaction of syntax, line break, and the image of continuation.",
+    "intent": "Explain how lineation and syntax create meaning.",
+    "domain": "Poetry — enjambment",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "poetry_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "Benchmark-authored poem:\nUnder the orchard's patient snow\nI hear the roots rehearse July.\nNo leaf remembers being green,\nyet every branch leans toward the sky.\n\nThe syntax personifies roots, leaves, and branches, while the seasonal imagery points both backward and forward.\nDevelop two plausible interpretations of memory and renewal. Explain how imagery and personification support each, and identify what remains ambiguous.",
+    "intent": "Synthesize syntax, imagery, and figurative language across competing readings.",
+    "domain": "Poetry — ambiguity and form",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "poetry_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "Benchmark-authored poem:\nDoor after door, the hallway bends.\nNo rhyme returns to close the sound.\nAt every threshold, one line ends\nbefore the foot can touch the ground.\nDescribe the stanza's observable rhyme pattern and line-end structure, then explain how partial formal regularity may reinforce or complicate the imagery of interrupted passage.",
+    "intent": "Integrate rhyme/form with semantic interpretation.",
+    "domain": "Poetry — poetic form",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "poetry_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Benchmark-authored dramatic excerpt:\nNIA: You kept the key.\nOMAR: I kept a key.\n[He places three identical keys on the table.]\nNIA: That's not what I asked.\nExplain how the stage direction changes the audience's interpretation of Omar's reply. Distinguish spoken dialogue from performance information.",
+    "intent": "Analyze dialogue and stage direction jointly.",
+    "domain": "Drama — stage directions and ambiguity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "drama_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "Benchmark-authored stage direction:\n[After the accusation, Lina laughs. The script does not specify whether the laugh is nervous, mocking, relieved, or disbelieving.]\nPropose two defensible performance choices for the laugh. For each, explain how delivery and gesture would alter the scene's meaning while remaining compatible with the text.",
+    "intent": "Recognize multiple valid staging interpretations.",
+    "domain": "Drama — performance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "drama_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "Benchmark-authored scene:\nThe audience sees a character hide a letter beneath the floorboard. In the next scene another character says, \"There is nothing hidden in this house,\" while the first character silently watches.\nExplain how dramatic irony arises from the difference between audience knowledge and character knowledge. Why is the line not necessarily verbal irony for the speaker?",
+    "intent": "Distinguish dramatic irony from verbal irony.",
+    "domain": "Drama — dramatic irony",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "drama_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A production moves a benchmark-authored play's final reconciliation scene from a bright public square to a nearly dark, empty station, without changing the dialogue.\nAnalyze two ways this design choice could reframe the resolution. Explain why performance can create meaning without changing the written words.",
+    "intent": "Analyze staging as interpretation in drama.",
+    "domain": "Drama — adaptation in performance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "drama_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "Benchmark-authored nonfiction passage:\n\"I remember the factory whistle as louder than it could possibly have been; in memory it fills the whole street.\"\nExplain how this sentence can be both a factual claim about remembered experience and a rhetorical construction of memory. Why should memoir be treated as neither pure fiction nor a perfectly transparent record?",
+    "intent": "Analyze retrospective narration and self-conscious memory.",
+    "domain": "Nonfiction — memoir",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "close_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "Benchmark-authored polemical passage:\n\"They call the new gate 'access control.' Residents call it the wall that added twenty minutes to every walk to school.\"\nAnalyze how naming and framing shape the argument. What factual questions remain open even if the rhetorical contrast is effective?",
+    "intent": "Separate rhetorical framing from unresolved factual support.",
+    "domain": "Nonfiction — polemic and framing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "rhetorical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A benchmark-authored quest story set in a fictional Southeast Asian port city begins as a formal quest: a traveler receives a map, a warning, and three tasks. At the end, the traveler discovers the map was drawn by the supposed monster, who wanted visitors to avoid the village rather than reach a treasure.\nExplain how the ending revises genre expectations and the moral alignment implied earlier. Do not infer regional cultural meanings that the supplied text does not establish.",
+    "intent": "Analyze genre convention and subversion.",
+    "domain": "World Literature / Genre — Southeast Asia and quest revision",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "genre_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Benchmark-authored North American comic scene:\nTwo municipal officials spend ten minutes arguing over who has authority to sign a blank form while a queue grows outside.\nExplain whether the scene's humor alone is enough to call it satire. Identify the likely target of critique and the textual features that would strengthen a satirical reading. Do not generalize the scene into a claim about an entire society.",
+    "intent": "Distinguish humor, comedy, and satire.",
+    "domain": "World Literature / Comedy and Satire — North America",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "genre_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "Benchmark-authored allegorical scenario:\nA city requires citizens to carry mirrors that display only their job titles. One resident covers her mirror and is treated as if she has disappeared.\nExplain what would make this a sustained allegorical structure rather than an isolated symbol. Offer one plausible social interpretation and identify textual evidence that would be needed to support it.",
+    "intent": "Distinguish allegory from isolated symbolism.",
+    "domain": "Allegory — sustained figurative structure",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "interpretation_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "Source text summary supplied in the prompt: In an older tale, a hero defeats a sea creature and is celebrated for restoring a kingdom's trade.\nBenchmark-authored adaptation: The sea creature narrates that the \"restored\" trade means fleets now enter breeding waters that had been protected for generations.\nExplain how changing focalization reverses or complicates the ideological implications of the source. Do not judge the adaptation only by fidelity.",
+    "intent": "Analyze intertextual adaptation through changed perspective.",
+    "domain": "Adaptation — ideological reframing",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "comparative_literature",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Two benchmark-authored lyric fragments use the image of a returning bird.\nText A, set in a coastal West African city, links the bird's return to a grandmother's repeated migration stories.\nText B, set in a Northern European farming village, links the bird to the seasonal reopening of communal fields.\nCompare the motif's function in the two texts without assuming that the shared image has an identical symbolic meaning.",
+    "intent": "Compare a shared motif across distinct cultural contexts.",
+    "domain": "Comparative Literature — motif across contexts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_literature",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "Benchmark-authored East Asian short-poem translation:\n\"Temple bell after rain—\none drop stays on the bronze\nafter the sound is gone.\"\nAnalyze how sound, image, and temporal sequence interact. The source language is not supplied, so confine claims to the translated text rather than inventing features of the original.",
+    "intent": "Perform close reading of translated world literature with evidentiary limits.",
+    "domain": "World Literature — East Asia",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "poetry_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "Benchmark-authored South Asian story fragment:\nAt a family wedding, the narrator shifts between the language used with elders and the language used with cousins. The narration translates neither switch but describes who smiles at each change.\nExplain how code switching can function as characterization and social positioning without treating either language as inherently more authentic.",
+    "intent": "Integrate literary characterization with multilingual social context.",
+    "domain": "World Literature — South Asia",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "sociolinguistic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "Benchmark-authored Middle East/North Africa prose fragment:\n\"The old courtyard well had been sealed for years, yet every argument ended beside it.\"\nAnalyze how a repeated setting can become a motif organizing family conflict. Offer at least two plausible functions for the well without assuming a universal symbolic meaning.",
+    "intent": "Analyze motif and setting in a world-literature context.",
+    "domain": "World Literature — Middle East / North Africa",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "close_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "Benchmark-authored Latin American/Caribbean prose fragment:\n\"At dawn the market reopened exactly where the storm had carried away the roofs. Vendors marked stall boundaries with chalk on wet pavement.\"\nAnalyze how the scene can support a reading about continuity and precarity at the same time. Use specific textual evidence and avoid reducing the passage to a single regional stereotype.",
+    "intent": "Develop a dual evidence-based reading from a world-literature passage.",
+    "domain": "World Literature — Latin America / Caribbean",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "close_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "An oral narrative from a Pacific community is recorded in three performances. One version gives the youngest sibling two extra trials; another adds a sung refrain; a third changes the ending for a school audience.\nExplain why variation does not by itself show that two versions are corrupt. What performance, audience, and transmission evidence would matter when comparing them?",
+    "intent": "Analyze legitimate variation in oral literature.",
+    "domain": "Oral Literature — performance and transmission",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_literature",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A folktale is told during a harvest gathering and later printed in a children's anthology. In performance, listeners interrupt with a repeated response; the printed version omits those exchanges.\nExplain how the change in medium may alter social function and narrative form. Do not assume the printed text is automatically the authoritative version.",
+    "intent": "Compare oral and print forms of folklore.",
+    "domain": "Folklore — transmission and audience",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_literature",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A creation narrative is analyzed in a literature course for its sequence of transformations, repeated formulas, and account of social order.\nExplain why calling it a \"myth\" in this academic context need not mean \"false story.\" Keep literary/cultural analysis separate from adjudicating religious truth.",
+    "intent": "Distinguish scholarly genre analysis from truth-value judgment.",
+    "domain": "Myth — literary and cultural category",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "Spanish source: \"¿Me echas una mano?\"\nTranslation A: \"Will you throw me a hand?\"\nTranslation B: \"Can you give me a hand?\"\nAssuming the source is an ordinary request for help, compare the translations in literal lexical correspondence, idiomatic function, and register. Explain why the less word-for-word version can be more accurate in context.",
+    "intent": "Evaluate literal versus functional translation.",
+    "domain": "Translation — idiom and equivalence",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "translation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "French source: \"Il faut partir.\"\nPossible translations include \"We must leave,\" \"One must leave,\" \"It is necessary to leave,\" and, in some contexts, \"You have to go.\"\nExplain what information the French expression leaves underspecified and how context, register, and viewpoint could justify different English choices.",
+    "intent": "Analyze cross-linguistic underspecification and translation alternatives.",
+    "domain": "Translation — grammatical ambiguity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "translation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Benchmark-authored source-language line and gloss:\nSource: \"Nara vel su.\"\nGloss: Nara POSSIBLY return.\nContext: The narrator is uncertain whether Nara will return, and the word \"vel\" is intentionally ambiguous between weak possibility and hesitant hope.\nTranslation A: \"Nara may return.\"\nTranslation B: \"Perhaps Nara will come back.\"\nTranslation C: \"Nara will probably return.\"\nCompare how each translation handles modality, tone, and ambiguity. Identify any translation that overstates certainty.",
+    "intent": "Evaluate semantic and tonal trade-offs in literary translation.",
+    "domain": "Literary Translation — modality and voice",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "translation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "Benchmark-authored poem source and two translations:\nSource meaning supplied: a single compact phrase means both \"homeward tide\" and \"tide toward the house.\"\nTranslation A: \"the homeward tide\"\nTranslation B: \"the tide turning toward the house\"\nExplain what each version preserves or loses in compactness, ambiguity, image, and rhythm. A strong answer may prefer different versions for different goals.",
+    "intent": "Compare defensible literary translations without assuming one unique wording.",
+    "domain": "Literary Translation — ambiguity trade-offs",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "translation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A machine translation renders a narrator's repeated honorific form of address simply as \"you\" in every instance. Denotational reference is mostly correct, but the source alternates between intimate and deferential forms to mark a changing relationship.\nExplain what the machine translation preserves and what it loses. How might the loss affect characterization or narrative voice?",
+    "intent": "Identify register loss despite preserved denotation.",
+    "domain": "Translation — register and narrative voice",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "translation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "Source sentence in a fictional language:\n\"Ke tora mi-len.\"\nSupplied grammar: ke = only; tora = teacher; mi = see; -len = past; word order allows \"only\" to scope over either the teacher or the seeing event.\nTwo translations are proposed:\nA. \"Only the teacher saw it.\"\nB. \"The teacher only saw it.\"\nExplain the distinct scope readings, note any ambiguity in English B, and propose translations or context that would make each intended reading clearer.",
+    "intent": "Resolve syntactic, semantic, and translation ambiguity jointly.",
+    "domain": "Translation — scope ambiguity",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "ambiguity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "Benchmark-authored passage:\n\"Every object in the room is named by color except the locked cabinet, which is described only by its weight.\"\nGive a formalist analysis focused on pattern, omission, and structure. Then state one contextual question a formalist reading alone would not answer.",
+    "intent": "Apply formalist close reading while recognizing limits.",
+    "domain": "Literary Theory — formalism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "literary_theory",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "Benchmark-authored story repeatedly pairs inside/outside, speech/silence, and debt/gift. A structuralist reading proposes that the story organizes conflict through binary oppositions.\nEvaluate that proposal: what textual pattern supports it, and what kind of evidence would show that the binaries are unstable or insufficient?",
+    "intent": "Use structuralist reasoning as a testable interpretive lens.",
+    "domain": "Literary Theory — structuralism",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "literary_theory",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A story never states why a character leaves home. Some readers interpret the gap as liberation; others as exile.\nUsing a reader-response approach, explain how reader expectations can shape the difference while still showing why not every imaginable interpretation is equally supported by the text.",
+    "intent": "Balance reader-response plurality with textual constraints.",
+    "domain": "Literary Theory — reader response",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "literary_theory",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "Benchmark-authored passage:\n\"The law names sons as heirs, but the estate survives because daughters perform the unpaid work that keeps it productive.\"\nDevelop a feminist literary reading grounded in the supplied sentence. Identify the institutional and representational issues it highlights, while noting at least one other dimension—such as class or genre—that could also matter.",
+    "intent": "Apply feminist criticism without making it the only possible lens.",
+    "domain": "Literary Theory — feminist criticism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "literary_theory",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "Benchmark-authored passage:\n\"At the banquet, servants carry silver dishes through a room where the guests debate whether poverty reflects bad character.\"\nGive a materialist or Marxist reading of the relationship between labor, wealth, and ideology. Then identify what this lens might miss if applied mechanically to every feature of the passage.",
+    "intent": "Apply materialist analysis with textual grounding and limits.",
+    "domain": "Literary Theory — materialist criticism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "literary_theory",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A psychoanalytic critic argues that every closed door in a story proves repressed desire, and that every open door also proves repressed desire because it represents failed repression.\nExplain why this interpretation risks becoming unfalsifiable. What additional textual pattern or competing evidence would be needed to make the reading analytically useful?",
+    "intent": "Identify theoretical overreach and unfalsifiable interpretation.",
+    "domain": "Literary Theory — psychoanalytic criticism",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "Benchmark-authored colonial-era passage:\nAn administrator calls a local multilingual market \"confused speech\"; the narration later reproduces the market's negotiations in precise, patterned exchanges and shows the administrator repeatedly misunderstanding them.\nCompare a postcolonial reading, a formalist reading, and a materialist reading. For each, identify what textual evidence it emphasizes, what it can explain, and one question it may leave open.",
+    "intent": "Compare theoretical lenses without substituting theory for close reading.",
+    "domain": "Literary Theory — comparative lenses",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "interpretation_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "Variant readings of a benchmark-authored poem:\nManuscript A (c. 1700): \"the dark sea\"\nManuscript B (c. 1720): \"the deep sea\"\nManuscript C (c. 1730): \"the deep sea\"\nEvidence: B and C may descend from an independent lost exemplar; A is the oldest surviving copy; \"deep sea\" better fits a repeated sound pattern elsewhere, while \"dark sea\" could be the harder reading a scribe might simplify.\nExplain what evidence matters before choosing a reading. Do not assume the oldest manuscript is automatically correct.",
+    "intent": "Evaluate competing manuscript readings using external and internal evidence.",
+    "domain": "Textual Criticism — variant readings",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "textual_criticism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "Transmission scenario:\nCopy X omits a line that appears in copies Y and Z. X and Y share three unusual errors elsewhere; Z lacks those errors. A marginal note in Y resembles the disputed line.\nGive at least two plausible transmission histories and explain what evidence would help distinguish accidental omission from later interpolation.",
+    "intent": "Reason about copying relationships, omission, and interpolation.",
+    "domain": "Manuscript History — transmission",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "textual_criticism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "Historical-language evidence supplied:\nIn the period of the text, \"meat\" could refer broadly to food, not only animal flesh. A character says, \"We stored bread, apples, and other meats for winter.\"\nExplain how philological evidence changes the interpretation of \"meats.\" Why would translating it simply as \"animal flesh\" be misleading here?",
+    "intent": "Integrate historical word meaning with textual context.",
+    "domain": "Philology — historical semantics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "philological_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "Authorship evidence:\nText P and confirmed works by Author A share unusually high rates of three function-word sequences. However, P is a courtroom speech while the confirmed works are private letters, and P survives only in an edition modernized by a later editor.\nExplain why the evidence may be consistent with A's authorship but not definitive proof. Identify the genre and editorial confounds.",
+    "intent": "Evaluate stylometric evidence with confounds.",
+    "domain": "Authorship — stylometry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "corpus_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "Two candidate authors are proposed for an anonymous text.\nEvidence for Author A: a 19th-century catalog attribution and strong stylistic similarity.\nEvidence for Author B: a contemporary letter saying B was revising \"the anonymous dialogue,\" plus some vocabulary overlap.\nExplain how internal evidence, external testimony, provenance, and alternative explanations should be weighed. Do not convert compatibility into certainty.",
+    "intent": "Integrate internal and external authorship evidence.",
+    "domain": "Authorship — attribution",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "Corpus A contains 50 uses of \"however\" in 100,000 words. Corpus B contains 90 uses in 300,000 words.\nCalculate the normalized rate per 10,000 words for each corpus, state which is higher, and explain why raw counts alone would mislead.",
+    "intent": "Combine normalization with interpretation of corpus frequency.",
+    "domain": "Corpus Linguistics — normalized frequency",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "Two corpora show similar frequencies of the adjective \"bright.\" A concordance reveals that Corpus A mostly pairs it with colors and light, while Corpus B often pairs it with students and ideas.\nExplain why similar raw frequencies do not establish semantic equivalence. What does collocational context add?",
+    "intent": "Interpret frequency through collocation and context.",
+    "domain": "Corpus Linguistics — collocation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "corpus_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A stylometric classifier assigns an anonymous novel a 0.72 probability of Author Q based on sentence length and function-word frequencies. The training data contain mostly Q's short essays and mostly other authors' long novels.\nExplain why the genre imbalance can inflate confidence. What comparison or resampling would make the authorship claim more credible?",
+    "intent": "Evaluate probabilistic authorship classification under genre confounding.",
+    "domain": "Stylometry — classification confounds",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "corpus_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A digital-humanities project topic-models 10,000 OCR-scanned newspaper pages and finds a topic dominated by the tokens \"rn,\" \"cl,\" and \"ii.\"\nExplain why OCR error is a plausible data-quality explanation and how close inspection of source pages could complement the large-scale model before interpretation.",
+    "intent": "Recognize data-quality limitations in text mining.",
+    "domain": "Digital Humanities — OCR and topic models",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "corpus_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A researcher claims that dialogue becomes \"more fragmented\" across a 20-year series because average sentence length falls from 14.2 to 10.1 words. Later volumes contain far more text-message dialogue than earlier volumes.\nExplain why the quantitative trend is not self-explanatory. Identify the genre/register confound and propose at least one additional measure or close-reading check.",
+    "intent": "Interpret quantitative textual patterns with confounds.",
+    "domain": "Quantitative Literary Analysis — sentence length",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "Close reading suggests a novelist repeatedly uses commercial words such as \"price,\" \"debt,\" and \"profit\" in scenes of friendship. A corpus check finds 40 such words in friendship scenes and 60 elsewhere, but friendship scenes make up only 10% of the novel's words.\nExplain what normalization is needed and what result would actually support the close-reading claim. Also identify why frequency alone would not prove a particular theme.",
+    "intent": "Test a close-reading claim with appropriately normalized corpus evidence.",
+    "domain": "Close vs Distant Reading — corpus validation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "corpus_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "Literary-history scenario:\nA poem circulates first in handwritten copies among a small patronage network, then appears decades later in a cheap printed anthology for a much broader readership. The later edition regularizes spelling and removes two politically risky lines.\nExplain how publication system, audience, editing, and censorship can affect interpretation while keeping the wording of each textual state as evidence.",
+    "intent": "Integrate literary form with material publication history.",
+    "domain": "Literary History — print, patronage, censorship",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "Benchmark-authored postcolonial/migration passage:\nThe narrator calls the colonial language \"the key to every office\" and the home language \"the key that fits no government door, but opens every room in my mother's house.\"\nAnalyze the parallel metaphor, the institutional context, and the emotional contrast. Then explain why the passage should not be reduced to a simple claim that one language is oppressive and the other authentic.",
+    "intent": "Integrate form, colonial context, identity, and linguistic nuance.",
+    "domain": "Postcolonial & Diaspora Literature — language and belonging",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "close_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "Benchmark-authored ecocritical passage:\n\"The dam gives the valley light at night. By morning, the old orchard stands under twenty meters of water.\"\nDevelop two textually supported readings of the juxtaposition—one emphasizing collective benefit and one emphasizing loss or displacement. Explain how the passage's compressed contrast resists a single uncomplicated moral conclusion.",
+    "intent": "Compare environmental readings grounded in textual form.",
+    "domain": "Ecocriticism — environment and trade-offs",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "interpretation_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "Multi-layer benchmark scenario:\nA 1905 story contains the sentence, \"She was awful glad to hear the factory whistle.\" Supplied historical evidence says that in this regional variety \"awful\" could productively function as an intensifier; the narrator uses similar nonstandard forms consistently in dialogue. A 2026 machine translation into another language renders the phrase with a word meaning \"terribly frightening,\" making the character sound afraid. A critic then argues that the character fears industrial labor and cites the translation as proof.\nEvaluate the chain of reasoning. Distinguish dialect grammar from stigma, historical/variety-specific meaning from modern standard assumptions, translation error from interpretation, and what textual evidence would be required to support a fear-of-labor reading.",
+    "intent": "Synthesize dialect, historical semantics, translation, and evidence-based interpretation.",
+    "domain": "Cross-disciplinary — linguistic variation and translation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  }
+]

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The whole loop against the local model, narrated — one command, nine steps.
 
-    python scripts/demo_loop.py --topics economics,law --model EleutherAI/pythia-160m
+    python scripts/demo_loop.py --topics Economics,Law --model EleutherAI/pythia-160m
 
 The point is comprehension, not coverage. Each step says what it is about to
 do, what came back, and where it landed, so a person can watch the loop turn
@@ -837,8 +837,8 @@ def summary(a, ctx) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--topics", "--topic", dest="topics", default="economics",
-                    help="comma-separated, from scripts/categories.yaml (default: economics)")
+    ap.add_argument("--topics", "--topic", dest="topics", default="Economics",
+                    help="comma-separated, from scripts/categories.yaml (default: Economics)")
     ap.add_argument("--import", dest="import_path", type=Path, default=None,
                     help="a human-written bank (JSON array) to import instead of drafting and "
                          "curating — one topic, and --approver names its author")

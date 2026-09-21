@@ -67,40 +67,41 @@ def test_the_rule_no_report_half_question_in_any_request(tree):
         for ex in q["meta"].get("example_qids", []):
             assert dx.split_of(ex) == "diagnose"
         quoted += sum(1 for p in diagnose if p in body)
-    # the 'other' topic had migrated questions when drafting ran, so examples were used
+    # General & Multidisciplinary had the migrated questions when drafting ran,
+    # so examples were used
     assert quoted > 0
 
 
 def test_examples_for_drafting_come_from_the_diagnose_half(tmp_path):
     root = tmp_path / "exam"
     eb.migrate_seeds(root)
-    ex = eb.diagnose_half_examples(root, "other", k=50)
-    other = eb.load_bank(root)["other"]
+    ex = eb.diagnose_half_examples(root, categories.OTHER, k=50)
+    other = eb.load_bank(root)[categories.OTHER]
     assert ex and all(eb.half_of(eb.qid_of(p)) == "diagnose" for p in ex)
     assert len(ex) == sum(1 for r in other if eb.half_of(r["qid"]) == "diagnose")
-    assert eb.diagnose_half_examples(root, "law") == []
-    reqs = eb.draft_requests(root, "other", 9, per_request=4)
+    assert eb.diagnose_half_examples(root, "Law") == []
+    reqs = eb.draft_requests(root, categories.OTHER, 9, per_request=4)
     assert [r.meta["count"] for r in reqs] == [4, 4, 1]
-    assert all("Topic: other" in r.user and "Rubric" in r.user for r in reqs)
+    assert all(f"Topic: {categories.OTHER}" in r.user and "Rubric" in r.user for r in reqs)
     assert all(eb.qid_of(e) for e in ex) and "do not copy" in reqs[0].user
 
 
 def test_a_candidate_never_reaches_the_bank_without_a_name(tmp_path):
     root = tmp_path / "exam"
     fake = llm.FakeBatches("fake-exam", tmp_path)
-    out = eb.draft(root, fake, ["law"], per_topic=3, wait=True, poll_s=0)
-    assert out["written"] == {"law": 3}
-    cands = eb.load_candidates(root, "law", "candidate")
+    out = eb.draft(root, fake, ["Law"], per_topic=3, wait=True, poll_s=0)
+    assert out["written"] == {"Law": 3}
+    cands = eb.load_candidates(root, "Law", "candidate")
     assert len(cands) == 3 and all(c["drafted_by"] == "fake/fake-exam" for c in cands)
-    assert eb.load_bank(root)["law"] == []                              # drafts are not the bank
+    assert eb.load_bank(root)["Law"] == []                              # drafts are not the bank
     with pytest.raises(ValueError, match="needs a name"):
         eb.accept(root, cands[0]["cid"], approver="  ")
     with pytest.raises(ValueError, match="needs a name"):
         eb.reject(root, cands[0]["cid"], approver="")
-    assert eb.load_bank(root)["law"] == []
+    assert eb.load_bank(root)["Law"] == []
     rec = eb.accept(root, cands[0]["cid"], approver="Omar")
     assert rec["accepted_by"] == "Omar" and rec["edited"] is False and rec["source"] == "llm-draft"
-    assert eb.load_bank(root)["law"][0]["qid"] == rec["qid"]
+    assert eb.load_bank(root)["Law"][0]["qid"] == rec["qid"]
     # an edit is a new question: the accepted text is what gets hashed
     rec2 = eb.accept(root, cands[1]["cid"], approver="Omar",
                      prompt=cands[1]["prompt"] + " Give one counterexample.")
@@ -110,15 +111,15 @@ def test_a_candidate_never_reaches_the_bank_without_a_name(tmp_path):
         eb.accept(root, cands[0]["cid"], approver="Omar")
     r = eb.reject(root, cands[2]["cid"], approver="Omar", reason="recall, not understanding")
     assert r["status"] == "rejected" and r["reason"] == "recall, not understanding"
-    assert eb.load_candidates(root, "law", "candidate") == []
-    assert eb.summary(root)["law"]["accepted"] == 2 and eb.summary(root)["law"]["rejected"] == 1
+    assert eb.load_candidates(root, "Law", "candidate") == []
+    assert eb.summary(root)["Law"]["accepted"] == 2 and eb.summary(root)["Law"]["rejected"] == 1
     # fetching the same batch twice writes nothing twice; a re-draft continues
     # past what the topic already has and never re-offers a bank question
     assert eb.fetch(root, fake, out["batch_id"])["written"] == {}
-    out2 = eb.draft(root, fake, ["law"], per_topic=3, wait=True, poll_s=0)
-    assert out2["written"] == {"law": 3}
-    bank_q = {r["qid"] for r in eb.load_bank(root)["law"]}
-    new = eb.load_candidates(root, "law", "candidate")
+    out2 = eb.draft(root, fake, ["Law"], per_topic=3, wait=True, poll_s=0)
+    assert out2["written"] == {"Law": 3}
+    bank_q = {r["qid"] for r in eb.load_bank(root)["Law"]}
+    new = eb.load_candidates(root, "Law", "candidate")
     assert len(new) == 3 and not any(c["qid"] in bank_q for c in new)
     assert {c["qid"] for c in new}.isdisjoint({c["qid"] for c in cands})
 
@@ -148,9 +149,9 @@ def test_manifest_hashes_match_the_files(tree):
 
 def test_build_skips_empty_topics_and_removes_their_stale_files(tree, tmp_path):
     root = tmp_path / "exam"
-    eb.migrate_seeds(root)                                               # only 'other' has questions
+    eb.migrate_seeds(root)                  # only General & Multidisciplinary has questions
     m = eb.build(tree["out_dir"], root)
-    assert set(m["tasks"]) == {"exam_other", "fr_control_mmlu"}
+    assert set(m["tasks"]) == {"exam_general_multidisciplinary", "fr_control_mmlu"}
     assert not (eb.tasks_dir(root) / "exam_law.jsonl").exists()
     (eb.tasks_dir(root) / "exam_law.jsonl").write_text("stale\n")
     (eb.tasks_dir(root) / "exam_law.yaml").write_text("stale\n")
@@ -167,8 +168,8 @@ def test_public_bank_withholds_report_half_text(tree):
             assert r["prompt"] is None and r["reference"] is None and "withheld" in r
         else:
             assert r["prompt"] and r["reference"]
-    law = eb.public_bank(root, "law")
-    assert law and all(r["topic"] == "law" for r in law)
+    law = eb.public_bank(root, "Law")
+    assert law and all(r["topic"] == "Law" for r in law)
 
 
 def test_curation_through_the_service(tmp_path, monkeypatch):
@@ -177,13 +178,16 @@ def test_curation_through_the_service(tmp_path, monkeypatch):
         st = client.get("/api/exam").json()
         assert st["configured"] and st["provider"] == "fake"
         assert set(st["summary"]) == set(categories.category_order())
-        assert st["summary"]["other"]["accepted"] >= 40 and st["tasks_built"]
+        assert st["summary"][categories.OTHER]["accepted"] >= 40 and st["tasks_built"]
         assert "report half" in st["note"]
         # draft more into this service's exam root, then curate over the API
         root = tree["judged"]["exam_root"]
-        out = eb.draft(root, llm.client("exam"), ["history"], per_topic=2, wait=True, poll_s=0)
-        assert out["written"] == {"history": 2}
-        cands = client.get("/api/exam/candidates?topic=history").json()
+        # the topic name carries '&' and spaces, so it goes in the query encoded
+        topic = {"topic": "History & Archaeology"}
+        out = eb.draft(root, llm.client("exam"), [topic["topic"]], per_topic=2, wait=True,
+                       poll_s=0)
+        assert out["written"] == {"History & Archaeology": 2}
+        cands = client.get("/api/exam/candidates", params=topic).json()
         assert len(cands) == 2 and all(c["status"] == "candidate" for c in cands)
         cid = cands[0]["cid"]
         r = client.post(f"/api/exam/candidates/{cid}/accept", json={"approver": ""})
@@ -196,19 +200,20 @@ def test_curation_through_the_service(tmp_path, monkeypatch):
         r = client.post(f"/api/exam/candidates/{cands[1]['cid']}/reject",
                         json={"approver": "Omar", "reason": "too vague"})
         assert r.status_code == 200
-        assert client.get("/api/exam/candidates?topic=history").json() == []
+        assert client.get("/api/exam/candidates", params=topic).json() == []
         from service import db
         cur = db.curation_list()
         assert [c["decision"] for c in cur] == ["rejected", "accepted"]
         assert all(c["approver"] == "Omar" for c in cur) and cur[1]["edited"] == 1
         assert cur[1]["qid"] == r.json().get("qid", cur[1]["qid"])
         # the bank over the API never shows a report-half question
-        bank = client.get("/api/exam/bank?topic=history").json()
+        bank = client.get("/api/exam/bank", params=topic).json()
         assert bank and all((b["prompt"] is None) == (b["half"] == "report") for b in bank)
         # rebuilding the tasks picks the new question up
         built = client.post("/api/exam/build").json()
-        assert built["tasks"]["exam_history"]["items"] == eb.summary(root)["history"]["accepted"]
-        assert "exam_history" in client.get("/api/judge").json()["tasks"]
+        assert built["tasks"]["exam_history_archaeology"]["items"] == \
+            eb.summary(root)["History & Archaeology"]["accepted"]
+        assert "exam_history_archaeology" in client.get("/api/judge").json()["tasks"]
     finally:
         client.__exit__(None, None, None)
 

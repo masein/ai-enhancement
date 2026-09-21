@@ -370,17 +370,22 @@ re-run `suite=judged` for that topic.
 
 ```bash
 # --root goes BEFORE the subcommand: it belongs to exam_build.py, not to
-# migrate/draft/build/import, and the parser rejects it anywhere else
-# once: the four skill suites' items into the bank, under 'other'
-sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam migrate
+# import-dir/retire/draft/build/import, and the parser rejects it anywhere else
+# the 37-topic exam: the delivered folder, one bank per topic, written by masein
+sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam import-dir eval_tasks/fr/banks --approver masein
+# a topic that is no longer part of the exam: kept as history, matched by the
+# name stored on its rows exactly ('law' is the retired one, 'Law' the new one)
+sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam retire --topic law --reason "replaced by the 37-topic exam (2026-09-21)"
 # each round: draft candidates (needs EXAM_*), curate them on the Exam tab, then build
 sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam draft --per-topic 8
+# results/full is found under BENCH_ROOT when it is not under the working
+# directory (in the container that is the image's /app)
 sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam build results/full
 #   (an import or an accepted question on the Exam tab does the last step itself)
-# a bank someone wrote by hand — or the Exam tab's "Import a bank" panel,
+# one bank someone wrote by hand — or the Exam tab's "Import a bank" panel,
 # which runs this same code path, previews it first and records the name
 sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam \
-    import eval_tasks/fr/medicine_v2.json --topic 'medicine & health' --approver 'Dr. Hossein'
+    import eval_tasks/fr/banks/law_v1.json --topic Law --approver masein
 # then per model:
 python clients/bench_client.py --base http://<ip>:8899 submit <model> --suite judged --submitter you
 ```

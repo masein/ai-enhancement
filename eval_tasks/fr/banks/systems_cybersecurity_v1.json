@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A server application uses four worker threads inside one process. One thread dereferences invalid memory and the process terminates. Explain why the other threads are affected, and contrast this with four workers running as separate processes.",
+    "intent": "Assess process-versus-thread isolation and the operational consequences of shared address space.",
+    "domain": "Processes and Threads",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A CPU-bound service shows 95% CPU utilization, frequent context switches, and lower throughput after its worker count is doubled. Give the most plausible systems explanation and identify one measurement that would help distinguish scheduler overhead from useful parallel work.",
+    "intent": "Reason about scheduling, context switching, and the difference between utilization and throughput.",
+    "domain": "Operating Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A host has enough free disk space, but applications become extremely slow while memory pressure rises and the system performs heavy paging. Explain why adding disk capacity alone does not solve the problem and what evidence would support a virtual-memory diagnosis.",
+    "intent": "Diagnose memory pressure and distinguish storage capacity from memory availability.",
+    "domain": "Memory and Resource Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A user can read a file but cannot create a new file in the same directory. Without relying on operating-system-specific commands, explain how file permissions and directory permissions can produce this result.",
+    "intent": "Test conceptual understanding of file and directory permission semantics.",
+    "domain": "Filesystems and Permissions",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "Two threads each hold one lock and wait forever for the lock held by the other thread. A separate bug causes two threads to update the same counter and occasionally lose increments. Explain why the first problem is a deadlock and the second is a race condition, and why their remedies differ.",
+    "intent": "Distinguish deadlock from race conditions and connect each to an appropriate class of mitigation.",
+    "domain": "Concurrency",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A shared account balance is updated by reading the current value, adding a deposit, and writing the result. Two threads perform this sequence concurrently and one deposit is lost. Explain why the overall update is not atomic even if each individual read and write is atomic.",
+    "intent": "Assess atomicity and multi-step shared-state updates.",
+    "domain": "Concurrency",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A service's memory usage grows for several hours and then drops sharply after a restart. The team says this proves a memory leak. Explain why that conclusion is plausible but not certain, and name evidence that could distinguish a leak from an intentionally growing cache.",
+    "intent": "Evaluate competing explanations for growing memory use and demand evidence before concluding root cause.",
+    "domain": "Memory and Resource Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A service processes 1,200 requests per second. After a change, throughput remains 1,200 requests per second but median latency rises from 40 ms to 140 ms. Explain why these metrics are not contradictory and give one queueing or scheduling mechanism that could produce this pattern.",
+    "intent": "Distinguish latency from throughput and reason about queueing effects.",
+    "domain": "Performance and Capacity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "An application needs to read a file from storage. Explain conceptually why it cannot safely access the device directly from ordinary user space and how a system-call boundary supports protection and resource sharing.",
+    "intent": "Reason about kernel responsibilities, user space, and system-call boundaries.",
+    "domain": "Operating Systems",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "An API server has low CPU utilization but high request latency. Disk I/O wait is high and database query time has increased. Explain why CPU utilization alone is insufficient for diagnosis and identify the likely bottleneck path.",
+    "intent": "Diagnose a non-CPU bottleneck from multi-component evidence.",
+    "domain": "Systems Troubleshooting",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A cache serves 80% of requests in 5 ms; cache misses take 105 ms including the cache lookup. Ignoring concurrency effects, what is the average response time? Explain why this average still may not describe tail latency experienced by users.",
+    "intent": "Perform a cache-latency calculation and interpret its limitations.",
+    "domain": "Caching",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A storage system keeps three synchronized replicas. An operator accidentally deletes a critical dataset and the deletion immediately propagates to all replicas. Explain why the system was redundant but still lacked a sufficient backup strategy.",
+    "intent": "Distinguish redundancy and replication from historical recovery.",
+    "domain": "Filesystems and Storage",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "After a power loss, a journaled filesystem returns to a consistent metadata state, but the latest application data is still missing. Explain why journaling can improve filesystem consistency without guaranteeing that every recent application write survives.",
+    "intent": "Reason about journaling, durability, and the boundary between filesystem recovery and application durability.",
+    "domain": "Filesystems and Storage",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "One node in a five-node service becomes unreachable, but the other four continue handling most requests while a subset of users sees errors. Explain why this is a partial failure rather than a complete system failure and why diagnosis must consider dependency paths.",
+    "intent": "Recognize partial failure and system-level dependency behavior.",
+    "domain": "Distributed Failure Concepts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A containerized process is terminated after exceeding a configured memory limit even though the physical host still has free memory. Explain why this can happen and what it shows about resource isolation.",
+    "intent": "Reason about logical resource limits versus physical host capacity.",
+    "domain": "Resource Isolation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A DNS record was changed 10 minutes ago. Some users reach the new server, while others still reach the old server. Network connectivity to both servers is healthy. Explain the most likely cause and what evidence would confirm that caching and TTL behavior are responsible.",
+    "intent": "Diagnose stale DNS answers without confusing name resolution with service reachability.",
+    "domain": "DNS",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "network_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A real-time voice application can tolerate an occasional lost packet but is highly sensitive to delay caused by retransmission. Compare TCP and UDP for this requirement and explain what reliability functions the application may need to provide itself if it chooses UDP.",
+    "intent": "Select a transport approach based on latency and reliability trade-offs.",
+    "domain": "TCP and UDP",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "Clients in subnet A can initiate connections to a service in subnet B, but return traffic sometimes takes a different path through a stateful firewall and the connections fail intermittently. Explain the likely networking mechanism and why asymmetric routing can matter.",
+    "intent": "Diagnose stateful filtering problems caused by asymmetric network paths.",
+    "domain": "Routing and Segmentation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "network_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A hostname resolves to the expected IP address, a TCP connection to the service succeeds, but the application returns an authorization error. Identify which layers appear healthy and explain why continuing to debug DNS would be low priority.",
+    "intent": "Locate a failure at the appropriate layer and avoid conflating connectivity with application authorization.",
+    "domain": "Network Layering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "network_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A 10-gigabyte file must cross a link that sustains 200 megabits per second of application payload. Ignoring protocol overhead, estimate the minimum transfer time in seconds and explain one reason the real transfer could take longer.",
+    "intent": "Calculate bandwidth-limited transfer time with correct units and interpret practical overheads.",
+    "domain": "Network Performance",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A TCP-based service experiences 1% packet loss on a high-latency path and its throughput falls sharply even though the nominal link bandwidth is unchanged. Explain why packet loss can reduce effective throughput in a reliable transport.",
+    "intent": "Reason about retransmission, congestion behavior, and effective throughput.",
+    "domain": "TCP and UDP",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "network_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A request experiences 18 ms client-to-gateway latency, 22 ms gateway-to-service latency, 35 ms service processing time, and the same network delays on the return path. Estimate the end-to-end latency and state the assumption you are making about overlap.",
+    "intent": "Perform an end-to-end latency calculation and state timing assumptions.",
+    "domain": "Network Performance",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A team assumes that placing an internal service behind NAT makes it secure from all unauthorized access. Explain why address translation is not equivalent to authentication, authorization, or a complete firewall policy.",
+    "intent": "Identify a common networking-security reasoning error.",
+    "domain": "Network Security Foundations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "An organization separates user workstations, production servers, and backup infrastructure into different network zones with tightly controlled paths between them. Explain how this can reduce blast radius even though segmentation does not prevent every initial compromise.",
+    "intent": "Reason about segmentation as containment rather than absolute prevention.",
+    "domain": "Routing and Segmentation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A replicated service can still serve reads from two sites during a network partition, but writes requiring cross-site coordination are rejected. Explain the consistency and availability trade-off being made without relying on theorem names.",
+    "intent": "Reason about serving, rejecting, or delaying operations during a partition.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "distributed_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A product catalog uses eventual consistency. A user updates a price and then immediately reads the old value from a replica. Explain how replication lag can cause this without database corruption, and identify when this behavior would or would not be acceptable.",
+    "intent": "Interpret stale reads and connect consistency choices to application requirements.",
+    "domain": "Consistency and Availability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "distributed_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A three-replica service requires any two replicas to acknowledge a write. During an incident, two replicas are reachable but both depend on the same failed storage controller, while the third replica is healthy but isolated by a network fault. Explain why counting replicas alone gives a misleading view of availability and what failure-domain information is needed before concluding the write path is resilient.",
+    "intent": "Analyze quorum behavior under correlated dependencies and partial network failure.",
+    "domain": "Distributed Systems",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A payment API times out after the server may already have charged the customer. Explain why automatically retrying the request can be dangerous and what idempotency mechanism or request design would make retries safer.",
+    "intent": "Recognize duplicate side effects and the need for idempotent retry design.",
+    "domain": "Retries and Idempotency",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A dependency becomes slow, so 50 application instances each retry failed calls immediately and repeatedly. The dependency becomes even more overloaded. Explain the feedback loop and how backoff, retry limits, and load shedding could reduce amplification.",
+    "intent": "Diagnose a retry storm and propose reliability controls.",
+    "domain": "Retries and Idempotency",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "failure_analysis_and_debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A queue delivers a message to a consumer, the consumer commits the database update, and then crashes before acknowledging the message. Explain why the same message may be delivered again and how consumer design can prevent duplicate business effects.",
+    "intent": "Reason about at-least-once delivery, acknowledgments, and idempotent consumers.",
+    "domain": "Queues and Messaging",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "distributed_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A team says containers are as isolated as separate physical machines because each application runs in its own container. Explain the key isolation difference between containers and virtual machines and why a shared host kernel matters to security and fault containment.",
+    "intent": "Compare container and VM isolation boundaries.",
+    "domain": "Virtualization and Containers",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A service is unavailable for 43 minutes during a 30-day month. Estimate its monthly availability percentage and explain why this number alone does not show whether the failures were concentrated in one severe incident or many short incidents.",
+    "intent": "Calculate availability and interpret what aggregate availability hides.",
+    "domain": "Reliability Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "Two application instances run in different racks but share the same top-of-rack switch and the same database. Explain which failures this design can tolerate and which correlated failures remain.",
+    "intent": "Identify hidden shared dependencies in an apparently redundant design.",
+    "domain": "High Availability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A business states an RPO of 15 minutes and an RTO of 2 hours. A disaster occurs at 14:00, the last recoverable copy is from 13:50, and service is restored at 15:20. Determine whether the RPO and RTO objectives were met and explain each calculation.",
+    "intent": "Distinguish and calculate recovery point and recovery time objectives.",
+    "domain": "Business Continuity and Disaster Recovery",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A virtual machine snapshot is stored on the same underlying storage system as the running VM. Explain why the snapshot can be useful for short-term rollback but should not automatically be treated as an independent disaster-recovery backup.",
+    "intent": "Distinguish snapshots from independent backups.",
+    "domain": "Backup and Recovery",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A 6-terabyte dataset is stored with three full replicas. Ignoring metadata and compression, how much raw storage is required? Then explain why the three replicas do not necessarily provide three independent failure domains.",
+    "intent": "Calculate replication overhead and reason about independence assumptions.",
+    "domain": "Storage Reliability",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A load balancer sends the same number of requests to two servers, but one server is saturated while the other is lightly loaded because some requests are much more expensive. Explain why equal request counts can still produce poor load distribution and name a better signal for balancing or capacity planning.",
+    "intent": "Reason about load balancing when request cost is heterogeneous.",
+    "domain": "Load Balancing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A service can process 1,000 requests per second at stable latency. Arrival rate increases from 700 to 980 requests per second and tail latency rises sharply before throughput reaches 1,000. Explain why saturation and queueing can appear before the nominal throughput ceiling is fully reached.",
+    "intent": "Interpret utilization, saturation, and queueing effects near capacity.",
+    "domain": "Performance and Capacity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "Users report intermittent 5-second delays. Aggregate CPU and memory metrics look normal. Explain how traces, request-scoped logs, and dependency metrics provide different evidence for locating the delay.",
+    "intent": "Choose complementary observability evidence for a distributed latency problem.",
+    "domain": "Observability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "monitoring_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A nightly batch job normally drives CPU to 90%, while daytime interactive load normally stays below 50%. A fixed alert at 70% produces noise every night. Explain why a static threshold is poorly matched to this system and propose a baseline-aware alternative.",
+    "intent": "Reason about alert baselines, false positives, and operational context.",
+    "domain": "Monitoring and Alerting",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "monitoring_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A highly available application spans three compute zones, but all instances depend on one identity service, one configuration store, and one backup credential set. During a control-plane incident, compute remains healthy but the application cannot authenticate users or load configuration, and recovery operators cannot access backups. Analyze the hidden single points of failure and propose a more independent resilience design.",
+    "intent": "Synthesize dependency, identity, control-plane, and recovery failure domains.",
+    "domain": "High Availability",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "architecture_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A request path requires service A to be available with probability 0.999 and independent service B with probability 0.995. If both are required, estimate the path availability by multiplying the probabilities. Then explain why the calculation would be misleading if A and B share a common dependency.",
+    "intent": "Calculate series availability and test the independence assumption.",
+    "domain": "Reliability Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A recommendation engine fails, but the storefront can still serve product pages without personalized recommendations. Explain why graceful degradation may be preferable to failing the entire request and identify one risk of degraded-mode logic.",
+    "intent": "Reason about fault isolation and graceful degradation.",
+    "domain": "Reliability Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "An organization has daily backups but has never performed a full restore test. Explain why backup success logs alone are insufficient evidence of recoverability and what a restore test should validate.",
+    "intent": "Assess recovery readiness and evidence quality.",
+    "domain": "Backup and Recovery",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "Only users in one geographic region report slow application responses. CPU is normal in all regions, DNS resolves correctly, and database health checks are green. Traces show long waits on a regional object-storage dependency and retries from the application. Build a prioritized diagnosis that separates symptom, likely cause, amplifying mechanism, and next evidence to collect.",
+    "intent": "Perform structured multi-layer troubleshooting using evidence rather than random changes.",
+    "domain": "Systems Troubleshooting",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A server has a severe software vulnerability but is not reachable from untrusted networks, is accessible only through a tightly controlled administrative path, and has compensating monitoring. Explain why the technical severity still matters but does not by itself determine organizational risk.",
+    "intent": "Distinguish vulnerability severity from contextual risk.",
+    "domain": "Threat, Vulnerability, and Risk",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "For a public web service, distinguish the threat, vulnerability, exposure, control, and risk in this scenario: an attacker may send untrusted input, the application fails to validate one input field, the service is internet-accessible, a filtering control blocks some malformed requests, and successful abuse could alter customer records.",
+    "intent": "Apply core security-risk concepts to a concrete scenario.",
+    "domain": "Cybersecurity Foundations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A company integrates an external billing provider that can call an internal payment API. Identify the main asset, entry point, trust boundary, important assumptions, and at least two defensive controls that should be considered in the threat model.",
+    "intent": "Perform framework-agnostic threat modeling around a third-party integration.",
+    "domain": "Threat Modeling",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "threat_modeling",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "An administrative interface is no longer used but remains reachable from the corporate network and still accepts privileged logins. Explain how disabling the interface reduces attack surface and why this does not make the remaining system risk-free.",
+    "intent": "Reason about attack-surface reduction and residual risk.",
+    "domain": "Attack Surface",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A system requires long passwords but has no multi-factor authentication, no login-rate controls, and no monitoring for suspicious sign-ins. Explain what security gaps remain and why strong passwords are only one layer of defense.",
+    "intent": "Assess defense-in-depth limits of a single authentication control.",
+    "domain": "Defense in Depth",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A user logs in successfully and then accesses a report that should be restricted to managers. Explain why this is primarily an authorization failure rather than an authentication failure.",
+    "intent": "Distinguish authentication from authorization.",
+    "domain": "Authentication and Authorization",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "An account uses multi-factor authentication, yet an attacker who obtains an already authenticated session token can still act as the user until the session is revoked. Explain why MFA does not eliminate all account-compromise paths and what additional controls matter.",
+    "intent": "Reason about authentication, session security, and layered controls.",
+    "domain": "Authentication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A support role needs to view customer profiles but should not be able to change billing settings. Design the authorization boundary using least privilege and explain why hiding the billing button in the user interface is insufficient.",
+    "intent": "Apply least privilege and server-side authorization.",
+    "domain": "Authorization and Access Control",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "identity_access_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A former contractor's account remains active three months after the contract ended and still belongs to a privileged group. Explain the IAM failures involved and the controls that should exist around deprovisioning and stale permissions.",
+    "intent": "Diagnose identity lifecycle and orphaned-account risk.",
+    "domain": "Identity and Access Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "identity_access_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A security team estimates a 10% annual chance of an incident causing about $500,000 in loss before controls. A proposed control is expected to reduce the likelihood to 4% but costs $20,000 per year. Using expected annual loss only as a simplified model, compare the expected loss before and after the control and explain what this model leaves out.",
+    "intent": "Perform a simple risk calculation and discuss uncertainty and non-financial factors.",
+    "domain": "Security Risk Assessment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A system must encrypt a large data stream and also establish keys with a remote party that did not previously share a secret. Explain why a hybrid design commonly uses asymmetric cryptography for key establishment or authentication and symmetric cryptography for bulk data.",
+    "intent": "Select cryptographic approaches by function rather than treating them as substitutes.",
+    "domain": "Cryptography Foundations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cryptography_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A developer proposes encrypting user passwords so they can be decrypted during login checks. Explain why password verification normally uses a salted, one-way password-hashing approach instead, and distinguish hashing from reversible encryption.",
+    "intent": "Distinguish password hashing from encryption and explain the defensive rationale.",
+    "domain": "Hashing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cryptography_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A signed software update can be verified as coming from the holder of a signing key and as unchanged since signing, but anyone can still read the update package. Explain why this is consistent with what digital signatures provide.",
+    "intent": "Distinguish authenticity and integrity from confidentiality.",
+    "domain": "Digital Signatures",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "cryptography_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A company uses a strong encryption algorithm but stores the private decryption key in the same broadly readable location as the encrypted data, rarely rotates it, and has no revocation process. Analyze why cryptographic strength alone does not make the system secure and prioritize the key-management failures.",
+    "intent": "Evaluate the security impact of key lifecycle and access-control failures.",
+    "domain": "Key Management",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A client establishes a correctly validated TLS connection to a server, but the server itself is compromised and returns malicious data. Explain what TLS protects on the network path and what it does not guarantee about endpoint behavior.",
+    "intent": "Distinguish secure transport from endpoint security.",
+    "domain": "TLS and Secure Communication",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cryptography_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A firewall allows traffic from the application tier to the database tier. An authenticated application user can nevertheless request another user's records because the application fails to enforce object-level authorization. Explain why the firewall does not fix this flaw.",
+    "intent": "Distinguish network access controls from application authorization.",
+    "domain": "Application Security",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A new internal service is deployed with an allow-all network policy because engineers plan to tighten it later. Compare this with a default-deny approach and explain the operational trade-off involved in making secure defaults usable.",
+    "intent": "Reason about fail-safe defaults and staged deployment constraints.",
+    "domain": "Secure Configuration and Hardening",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "An employee is on the corporate network, but access to a sensitive application still requires verified identity, device context, and a narrowly scoped authorization decision. Explain how this reflects zero-trust concepts without claiming that no trust relationships exist.",
+    "intent": "Explain explicit verification and constrained trust decisions.",
+    "domain": "Zero Trust Concepts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "An internet-facing server has several hardening opportunities: an unused administrative service is exposed, local administrator rights are broadly granted, logging is disabled, and one low-risk optional feature is still enabled. Prioritize the first three actions you would take and justify the order.",
+    "intent": "Prioritize hardening actions by exposure, privilege, and detectability.",
+    "domain": "Secure Configuration and Hardening",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Four vulnerabilities are found: (A) critical severity on an isolated test host with no sensitive data; (B) high severity on an internet-facing identity service with public exploitability details; (C) medium severity on a payment database reachable only from one application tier; and (D) high severity on a production host protected by a strong compensating control that blocks the vulnerable path. Build a defensible remediation priority using exposure, asset criticality, exploitability, and compensating controls, and state what additional facts could change the order.",
+    "intent": "Prioritize vulnerabilities using contextual risk rather than raw severity.",
+    "domain": "Patch and Vulnerability Management",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "vulnerability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "An unauthenticated vulnerability scan reports that 400 servers may be missing a patch, while an authenticated sample shows many of those detections are false positives. Explain why scanner output is not ground truth and how inventory, authenticated coverage, and validation should affect remediation planning.",
+    "intent": "Assess scan evidence, coverage, and false positives.",
+    "domain": "Vulnerability Scanning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "vulnerability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A web application constructs a database query by concatenating untrusted user input into the query text. Explain the root cause of the injection risk and why parameterized queries reduce it, without providing an exploit payload.",
+    "intent": "Identify the cause and mitigation of injection vulnerabilities defensively.",
+    "domain": "Application Security",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A site displays user-supplied profile text in several HTML contexts. Explain why output handling must be context-sensitive and how output encoding and a restrictive content-security policy can reduce cross-site scripting risk.",
+    "intent": "Reason about untrusted browser content and layered XSS defenses.",
+    "domain": "Application Security",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A mobile app hides the 'admin' button for ordinary users, but the backend API accepts an object identifier and returns any matching record without checking ownership or role. Explain the access-control failure and where authorization must be enforced.",
+    "intent": "Recognize server-side authorization as necessary despite UI restrictions.",
+    "domain": "Web and API Security",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "identity_access_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A team performs a security review only after release. Explain how adding security requirements, threat modeling, code review, dependency checks, testing, and release controls earlier in the lifecycle can prevent defects that are expensive to fix later.",
+    "intent": "Reason about secure software development as a lifecycle process.",
+    "domain": "Secure Software Development",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A build pipeline verifies that release artifacts are correctly signed. An upstream dependency maintainer's legitimate signing key is compromised, so a malicious but validly signed dependency enters the build. Explain why signature verification alone does not establish trustworthiness and design additional provenance, review, isolation, and monitoring controls around this supply-chain risk.",
+    "intent": "Analyze a trusted-upstream compromise that defeats a single integrity assumption.",
+    "domain": "Dependency and Supply-Chain Security",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "architecture_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "An organization generates a complete software bill of materials for every release. Explain how this helps vulnerability response and dependency inventory, and why the SBOM does not prove that the software is secure or that every listed component is trustworthy.",
+    "intent": "Assess the value and limits of SBOMs.",
+    "domain": "Software Bills of Materials",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A CI/CD system uses one long-lived privileged credential for source access, artifact publishing, and production deployment. Explain the trust-boundary and blast-radius problems, and propose a least-privilege design using separate or short-lived identities.",
+    "intent": "Apply least privilege and service identity design to build pipelines.",
+    "domain": "Secure CI/CD",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "identity_access_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "An internal API has no graphical user interface and is therefore assumed to be low risk. It can create refunds, change account limits, and retrieve sensitive records. Explain why the absence of a UI does not reduce the need for strong authentication, authorization, validation, rate limits, and audit logging.",
+    "intent": "Assess sensitive API functionality independently of user-interface exposure.",
+    "domain": "Web and API Security",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A user clicks logout, but a stolen session token remains valid for another eight hours. Explain the difference between client-side logout and server-side session invalidation, and discuss expiration, rotation, and revocation.",
+    "intent": "Reason about session lifecycle and revocation.",
+    "domain": "Session Security",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "Authentication logs record only 'login failed' with no user identifier, source, timestamp precision, or correlation ID. Explain why these logs may be insufficient for investigation and which contextual fields would most improve evidentiary value.",
+    "intent": "Evaluate log usefulness for security investigation.",
+    "domain": "Security Logging and Detection",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "monitoring_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A detection rule flags every login from a new IP address. It catches some real account takeovers but creates thousands of alerts for traveling users. Explain the false-positive trade-off and how context and baseline behavior could improve the detection without assuming maximal sensitivity is always best.",
+    "intent": "Reason about detection tuning and alert fatigue.",
+    "domain": "Detection Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "monitoring_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "An endpoint alert reports a suspicious process name, but there is no corroborating network activity, privilege change, persistence evidence, or user complaint. Explain why this is an alert rather than confirmed compromise and outline the next evidence you would seek.",
+    "intent": "Distinguish suspicious evidence from confirmed compromise.",
+    "domain": "Incident Triage",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "During an active incident, one production host is communicating with an unusual external destination and is processing time-critical transactions. Explain how you would decide between immediate isolation, restricted containment, or continued observation while preserving evidence and business continuity.",
+    "intent": "Balance containment, evidence preservation, and operational impact during an active incident.",
+    "domain": "Incident Response",
+    "acuity": "high",
+    "difficulty": 4,
+    "style": "incident_response",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A detection system generates 2,000 alerts per day. Investigation finds 120 are true positives. Calculate the observed positive predictive value and false-positive proportion among alerts, then explain why these two numbers alone do not measure missed attacks.",
+    "intent": "Calculate alert quality metrics and distinguish false positives from false negatives.",
+    "domain": "Security Metrics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "Investigators may need both volatile memory evidence and a disk image from a compromised system. Explain why evidence-preservation order can matter and why integrity verification and chain-of-custody records improve confidence in later analysis.",
+    "intent": "Reason about defensive forensic evidence quality without providing evasion details.",
+    "domain": "Digital Forensics Concepts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "forensic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "An incident has incomplete and partially conflicting evidence: identity logs show a successful login from a new location, application logs show privileged actions, endpoint logs are missing for 20 minutes, and network logs show no obvious data transfer. Construct the strongest conclusions that are justified, distinguish confirmed facts from hypotheses, and identify the next evidence that would most reduce uncertainty.",
+    "intent": "Reconstruct an incident from incomplete evidence without fabricating certainty.",
+    "domain": "Incident Response",
+    "acuity": "high",
+    "difficulty": 5,
+    "style": "forensic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "After a breach, the team identifies a reused password as the initial access path, excessive permissions as enabling broader access, and disabled logging as delaying detection. Explain why root-cause analysis should distinguish initial access, control failures, detection failures, and business impact instead of naming only one 'root cause.'",
+    "intent": "Analyze layered causal factors after an incident.",
+    "domain": "Root-Cause Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A low-likelihood but high-impact risk can be reduced only through an expensive redesign. Explain how mitigation, transfer, avoidance, acceptance, and monitoring could each be defensible depending on cost, impact, constraints, and risk appetite.",
+    "intent": "Evaluate multiple risk-treatment options without assuming one universal answer.",
+    "domain": "Risk Treatment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A disaster-recovery plan restores application servers successfully, but recovery still fails because the identity service and DNS configuration were not included in dependency planning. Explain what this reveals about recovery design and how dependency mapping should change the plan.",
+    "intent": "Identify omitted dependencies in disaster recovery.",
+    "domain": "Business Continuity and Disaster Recovery",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "An organization takes immutable backups every 6 hours and can restore the core service in 3 hours after backups are accessible. If ransomware begins encrypting production at 11:50 and the last clean backup completed at 06:00, estimate the worst-case data-loss window from that backup and the minimum service-restoration time after recovery begins. Then explain why backup isolation, credential separation, and restore testing still matter.",
+    "intent": "Combine RPO/RTO-style reasoning with ransomware-resilience controls.",
+    "domain": "Ransomware Resilience",
+    "acuity": "high",
+    "difficulty": 4,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "An employee receives a message requesting an urgent bank-account change from a familiar executive name. Explain a defense-oriented verification process using reporting, out-of-band confirmation, process controls, and phishing-resistant authentication, without drafting a phishing message.",
+    "intent": "Apply organizational controls to social-engineering defense.",
+    "domain": "Phishing and Social Engineering Defense",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A privileged employee downloads an unusually large set of files before leaving the company. Explain why this evidence could reflect malicious intent, negligence, or legitimate work, and identify additional evidence needed before classifying the event.",
+    "intent": "Assess insider-risk evidence without assuming intent.",
+    "domain": "Insider Risk",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A company laptop containing sensitive data is lost during travel. Explain how full-disk encryption, strong device authentication, remote-management capability, and rapid credential revocation reduce different parts of the risk.",
+    "intent": "Connect physical loss to layered cybersecurity controls.",
+    "domain": "Physical Security Interfaces",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "security_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A cloud provider secures the physical data-center infrastructure, while the customer configures identities, application permissions, network exposure, and data access. Explain the shared-responsibility boundary and why using managed infrastructure does not outsource all security decisions.",
+    "intent": "Reason about cloud shared responsibility.",
+    "domain": "Cloud Security",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cloud_security",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "Ten internal services all use the same long-lived API key to call one another. Explain the attribution, rotation, blast-radius, and least-privilege problems this creates, and design a safer machine-to-machine identity approach.",
+    "intent": "Redesign shared service credentials using scoped and preferably short-lived identities.",
+    "domain": "Machine-to-Machine Identity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "identity_access_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "Design a defensive architecture for an internet-facing application with a public web tier, internal services, a sensitive database, administrator access, an external payment provider, centralized logging, and backups. Identify major trust boundaries, service identities, network paths, least-privilege controls, monitoring points, and recovery protections, and explain the main trade-offs rather than naming products.",
+    "intent": "Synthesize secure architecture across identity, network, application, monitoring, external integration, and recovery boundaries.",
+    "domain": "Security Architecture",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "system_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A control reduces the annual likelihood of a security incident from 8% to 3% but does not change the estimated $2 million impact if the incident occurs. Calculate the expected annual loss before and after the control under this simplified model, and explain whether the control primarily changes likelihood, impact, exposure, or detectability.",
+    "intent": "Combine quantitative risk reasoning with control-effect classification.",
+    "domain": "Security Risk Assessment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "An authorization service becomes unavailable. One application is configured to allow all requests when authorization cannot be checked; another denies privileged actions but permits a limited public read-only mode. Compare the fail-open and fail-safe behaviors and discuss availability versus security trade-offs.",
+    "intent": "Reason about secure defaults under dependency failure.",
+    "domain": "Secure Defaults and Fail-Safe Behavior",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A company stores personal data with strong encryption, strict access controls, and detailed auditing, but collects far more data than needed and uses it for unrelated purposes. Explain how the system can be secure against unauthorized access yet still raise privacy concerns.",
+    "intent": "Distinguish security controls from data-minimization and purpose-limitation concerns.",
+    "domain": "Privacy and Security Distinction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A software vendor provides signed updates, an SBOM, and reproducible build metadata. A trusted upstream library is later discovered to have been maliciously modified before the vendor built and signed the release. Explain which controls still help investigation, which trust assumption failed, and what additional supply-chain controls could reduce future risk.",
+    "intent": "Analyze a supply-chain incident across integrity, provenance, dependency trust, and response.",
+    "domain": "Supply-Chain Security",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A distributed order service depends on a payment service and a database. The payment service becomes slow, order workers retry immediately, the queue backlog grows, database connection pools fill, and health checks begin failing even on otherwise healthy workers. Diagnose the causal chain, separate the initiating fault from amplifying mechanisms, and propose controls for retries, backpressure, isolation, and observability.",
+    "intent": "Diagnose a cascading distributed outage and propose resilience controls.",
+    "domain": "Systems-Security Integration",
+    "acuity": "high",
+    "difficulty": 5,
+    "style": "failure_analysis_and_debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A service runs in two data centers and each data center is advertised as 99.9% available. Both, however, depend on the same external identity provider and the same network carrier. Explain why multiplying independent-failure probabilities would overstate resilience, identify the correlated failure domains, and describe what additional independence would be needed for a stronger availability claim.",
+    "intent": "Evaluate correlated failures in a nominally redundant design.",
+    "domain": "Reliability and Resilience",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A sudden spike in failed logins, higher API latency, and packet loss begins at the same time. Some traffic comes from unfamiliar addresses, but a network device was also reconfigured minutes earlier. Build a diagnosis that tests both malicious-activity and misconfiguration hypotheses, states what evidence would discriminate them, and avoids treating correlation as proof.",
+    "intent": "Differentiate attack indicators from operational faults using competing hypotheses.",
+    "domain": "Defensive Troubleshooting",
+    "acuity": "high",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "During a ransomware incident, production credentials and the credentials normally used to access backups are both suspected compromised. Backups are immutable but the recovery environment depends on the same identity system as production. Design a recovery approach that restores trustworthy administrative access, protects evidence, validates backup integrity, limits lateral movement, and avoids reintroducing compromised identities.",
+    "intent": "Synthesize identity, backup, containment, evidence, and recovery reasoning under a shared-credential failure.",
+    "domain": "Recovery and Resilience",
+    "acuity": "high",
+    "difficulty": 5,
+    "style": "incident_response",
+    "jurisdiction_required": false
+  }
+]

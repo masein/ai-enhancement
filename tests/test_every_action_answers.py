@@ -80,7 +80,7 @@ def test_an_import_makes_its_questions_sittable_by_itself(svc):
     client, _, _ = svc
     from service import config
     import exam_build as eb
-    body = {"topic": "law", "approver": "Dr. Hossein", "imported_by": "Omar",
+    body = {"topic": "Law", "approver": "Dr. Hossein", "imported_by": "Omar",
             "filename": "extra.json",
             "items": [{"prompt": f"A fresh law question number {i} about the doctrine of "
                                  f"estoppel in contract formation?",
@@ -98,7 +98,7 @@ def test_it_waits_while_a_judged_run_is_sitting_the_exam(svc):
     from service import db
     sid = db.add(MODEL, "auto", "judged", "omar", "")
     db.update(sid, status="running")
-    body = {"topic": "law", "approver": "Dr. Hossein", "imported_by": "Omar",
+    body = {"topic": "Law", "approver": "Dr. Hossein", "imported_by": "Omar",
             "items": [{"prompt": "What does consideration mean in the formation of a "
                                  "contract, and why does it matter?",
                        "reference": "Something of value exchanged."}]}
@@ -199,7 +199,9 @@ def test_a_judged_submit_chooses_its_topics(live, page, monkeypatch):
 def test_the_import_panel_labels_its_fields_and_says_when_nothing_is_new(live, page):
     from conftest import ROOT as REPO
     base = live["base"]
-    raw = (REPO / "eval_tasks" / "fr" / "law_v2.json").read_text(encoding="utf-8")
+    # law as first delivered, retired with the 37-topic exam: this is about the
+    # panel, and any file of law questions will do
+    raw = (REPO / "eval_tasks" / "fr" / "retired" / "law_v2.json").read_text(encoding="utf-8")
     page.goto(base + "/#tab=exam")
     panel = page.locator("[data-panel='import']")
     panel.wait_for()
@@ -215,7 +217,7 @@ def test_the_import_panel_labels_its_fields_and_says_when_nothing_is_new(live, p
                     "buffer": json.dumps(content).encode()}])
         page.wait_for_selector("[data-source='law_v2']")
     upload(items)
-    panel.get_by_label("topic").select_option("law")
+    panel.get_by_label("topic").select_option("Law")
     panel.get_by_role("button", name="Preview").click()
     page.wait_for_selector("[data-panel='import'] [data-commit='import']")
     btn = panel.locator("[data-commit='import']")

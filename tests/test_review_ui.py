@@ -3,6 +3,7 @@ fake LLM: the LIVE dashboard fetches, so this needs a real HTTP server."""
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import time
@@ -44,19 +45,19 @@ def test_propose_buttons_carry_their_reasons(live, page):
     one entry point — and keeps the reason in words beside the link."""
     base = live["base"]
     card = open_topics(page, base, "fx/good-750m")
-    econ = card.locator("tr[data-topic='economics']")
+    econ = card.locator("tr[data-topic='Economics']")
     assert econ.locator("a.propose").count() == 1
     assert econ.locator(".propwhy").count() == 0
-    law = card.locator("tr[data-topic='law']")
+    law = card.locator("tr[data-topic='Law']")
     assert "under the 30" in law.locator(".propwhy").first.text_content()
     assert "no proposal" in law.locator(".propwhy").first.text_content()
     # a model that wrote the same sentence every time has revealed no topic gap
     card = open_topics(page, base, "fx/chance-160m")
-    econ = card.locator("tr[data-topic='economics']")
+    econ = card.locator("tr[data-topic='Economics']")
     assert "same answer on nearly every question" in econ.locator(".propwhy").first.text_content()
     # MMLU's finding for the same category rides along as a caution, not a gate
     card = open_topics(page, base, "fx/skewed-360m")
-    econ = card.locator("tr[data-topic='economics']")
+    econ = card.locator("tr[data-topic='Economics']")
     assert econ.locator("a.propose").count() == 1
     assert "caution — MMLU for this category" in econ.text_content()
     assert "answer positions" in econ.locator(".propwhy").first.text_content()
@@ -76,9 +77,9 @@ def test_exam_curation_in_the_browser(live, page):
     import exam_build as eb
     from service import llm
     base, root = live["base"], live["root"]
-    out = eb.draft(root / "exam", llm.FakeBatches("fake-exam", root), ["law", "history"],
-                   per_topic=2, wait=True, poll_s=0)
-    assert out["written"] == {"law": 2, "history": 2}
+    out = eb.draft(root / "exam", llm.FakeBatches("fake-exam", root),
+                   ["Law", "History & Archaeology"], per_topic=2, wait=True, poll_s=0)
+    assert out["written"] == {"Law": 2, "History & Archaeology": 2}
     page.goto(base + "/#tab=exam")
     page.wait_for_selector(".card h2:has-text('Exam')")
     page.wait_for_selector(".rv[data-candidate]", timeout=15000)
@@ -88,11 +89,13 @@ def test_exam_curation_in_the_browser(live, page):
     # has its row there, and clicking the topic filters the list below
     page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
     rows = page.locator("[data-panel='rubrics'] tr[data-rubric-row]")
-    assert rows.count() == 15                                      # one per topic in categories.yaml
-    assert "other" in text and "economics" in text
+    # one per topic in categories.yaml that has questions: all 37 but Arts,
+    # delivered empty, which folds into the one row that names it (9b-7)
+    assert rows.count() == len(eb.TOPICS) - 1 == 36
+    assert "General & Multidisciplinary" in text and "Economics" in text
     # filter to one topic by clicking it
-    page.locator("[data-panel='rubrics'] a[data-filter-topic='law']").click()
-    page.wait_for_selector(".card h2:has-text('Awaiting curation — law')")
+    page.locator("[data-panel='rubrics'] a[data-filter-topic='Law']").click()
+    page.wait_for_selector(".card h2:has-text('Awaiting curation — Law')")
     # the list is dropped with the filter and re-fetched, so wait for it to
     # land rather than counting whatever is on screen this frame
     page.wait_for_function("document.querySelectorAll('.rv[data-candidate]').length === 2")
@@ -106,10 +109,10 @@ def test_exam_curation_in_the_browser(live, page):
     card = page.locator(f".rv[data-candidate='{cid}']")
     card.get_by_role("button", name="Accept into the bank").click()
     page.wait_for_selector("[data-toast='curate']")                 # a toast says so (9c-1)
-    assert "Accepted into law" in page.locator("[data-toast='curate']").first.text_content()
+    assert "Accepted into Law" in page.locator("[data-toast='curate']").first.text_content()
     # the toast lands before the list is fetched again: wait for the card to go
     page.wait_for_selector(f".rv[data-candidate='{cid}']", state="detached")
-    bank = eb.load_bank(root / "exam")["law"]
+    bank = eb.load_bank(root / "exam")["Law"]
     # the law bank also holds imported items, which carry no candidate id
     assert any(r.get("cid") == cid and r["edited"] and r["accepted_by"] == "Omar"
                for r in bank)
@@ -122,13 +125,13 @@ def test_exam_curation_in_the_browser(live, page):
     # 9c-4: accepting made the question sittable by itself — the harness task
     # holds it, and there is no rebuild step left for a person to know about
     assert (root / "exam" / "tasks" / "exam_law.yaml").exists()
-    accepted = next(r for r in eb.load_bank(root / "exam")["law"] if r.get("cid") == cid)
+    accepted = next(r for r in eb.load_bank(root / "exam")["Law"] if r.get("cid") == cid)
     tasks = (root / "exam" / "tasks" / "exam_law.jsonl").read_text(encoding="utf-8")
     assert accepted["qid"] in tasks or accepted["prompt"][:40] in tasks
     assert page.locator("[data-action='exbuild']").count() == 0
     # screenshots: the Exam tab, light and dark, desktop and phone
     SCREENS.mkdir(exist_ok=True)
-    eb.draft(root / "exam", llm.FakeBatches("fake-exam", root), ["economics"], per_topic=2,
+    eb.draft(root / "exam", llm.FakeBatches("fake-exam", root), ["Economics"], per_topic=2,
              wait=True, poll_s=0)
     for scheme in ("light", "dark"):
         page.emulate_media(color_scheme=scheme)
@@ -155,10 +158,10 @@ def test_the_review_tab_starts_from_a_topic(live, page):
     scores = [float(x.split("/")[0]) for x in
               picker.locator("tbody tr td:nth-child(3)").all_text_contents()]
     assert scores == sorted(scores)
-    econ = picker.locator("tr[data-pick='economics']")
+    econ = picker.locator("tr[data-pick='Economics']")
     assert econ.locator("a.mlink").count() == 1
     econ.get_by_role("button", name="choose").click()
-    detail = page.locator("[data-topic-detail='economics']")
+    detail = page.locator("[data-topic-detail='Economics']")
     detail.wait_for()
     assert "across the board" in detail.text_content()
     assert detail.locator("[data-topic-model]").count() >= 3
@@ -196,7 +199,7 @@ def test_review_flow_in_the_browser(live, page):
 
     # the model page sends you to the topic page, and Propose is there
     card = open_topics(page, base, "fx/good-750m")
-    card.locator("tr[data-topic='economics'] a.propose").click()
+    card.locator("tr[data-topic='Economics'] a.propose").click()
     btn = page.locator("[data-propose='economics'][data-propose-model='fx/good-750m']")
     btn.wait_for()
     assert btn.get_attribute("data-gate") == "ok"          # a calibrated judge: no warning
@@ -212,13 +215,15 @@ def test_review_flow_in_the_browser(live, page):
     card = page.locator(".rv[data-proposal]").first
     card.locator("textarea").wait_for(timeout=E2E_MS)         # the poller and the 5 s poll
     text = card.text_content()
-    assert "introductory economics" in text
+    assert "introductory Economics" in text                      # the topic as stored
     assert "judge assessments the LLM saw" in text and "question text removed" in text
     assert "report-half questions" in text and "fell short" in text
-    assert "fx/good-750m · exam_economics · economics" in text
+    assert "fx/good-750m · exam_economics · Economics" in text
     assert "judge stub/overlap-v1" in text
     card.locator("details summary").first.click()
-    assert card.locator(".ex").count() == 8
+    # every one it saw, up to the eight shown: graded by Economics' own
+    # criteria now, 6 of good-750m's 39 diagnosis-half answers fell short
+    assert card.locator(".ex").count() == 6
     assert "scored" in card.locator(".ex").first.text_content()
     # approve, edited
     ta = card.locator("textarea")
@@ -256,15 +261,15 @@ def test_review_flow_in_the_browser(live, page):
     page.wait_for_selector("table.lb")
     row = page.locator("table.lb tbody tr",
                        has=page.locator("a.mname", has_text=re.compile(r"^good-750m$"))).first
-    assert "trained on economics diagnostics" in row.locator(".badge.taint").text_content()
+    assert "trained on Economics diagnostics" in row.locator(".badge.taint").text_content()
     page.goto(model_url(base, "fx/good-750m"))
     page.wait_for_selector(".backlink")
     head = page.locator("#view .card").first.text_content()
-    assert "derived from economics diagnostics" in head and "never ranked" in head
+    assert "derived from Economics diagnostics" in head and "never ranked" in head
     # the topic itself is badged on the Judged card and drops out of the judged average
-    econ = page.locator("tr[data-topic='economics']")
+    econ = page.locator("tr[data-topic='Economics']")
     assert "trained on it" in econ.locator(".badge.taint").text_content()
-    assert "excluding economics" in page.locator("#view").text_content()
+    assert "excluding Economics" in page.locator("#view").text_content()
     # screenshots for the PR: the Review tab, light and dark, desktop and phone
     SCREENS.mkdir(exist_ok=True)
     for scheme in ("light", "dark"):
@@ -274,9 +279,9 @@ def test_review_flow_in_the_browser(live, page):
             page.goto(base + "/#tab=review")
             page.wait_for_selector(".rv[data-dataset]")
             # the button toggles, so only choose when it is not already chosen
-            if page.locator("[data-topic-detail='economics']").count() == 0:
-                page.locator("tr[data-pick='economics'] button").click()
-            page.wait_for_selector("[data-topic-detail='economics']")
+            if page.locator("[data-topic-detail='Economics']").count() == 0:
+                page.locator("tr[data-pick='Economics'] button").click()
+            page.wait_for_selector("[data-topic-detail='Economics']")
             if page.locator("[data-topic-model] details.dxex[open]").count() == 0:
                 page.locator("[data-topic-model] details.dxex summary").first.click()
                 page.wait_for_selector("[data-topic-model] details.dxex li", timeout=15000)
@@ -293,7 +298,11 @@ def test_review_flow_in_the_browser(live, page):
 
 
 REPO = Path(__file__).resolve().parents[1]
-MEDICINE = REPO / "eval_tasks" / "fr" / "medicine_v2.json"
+# the files the first five topics were delivered as, kept byte-identical when
+# the 37-topic exam replaced them: these tests are about the import machinery
+# and its numbers (100 questions, wrapped or bare), not about today's banks
+RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+MEDICINE = RETIRED / "medicine_v2.json"
 
 
 def upload(pg, label, name, mime, text):
@@ -307,7 +316,7 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     becomes the published score is never printed back to him."""
     import exam_build as eb
     base, root = live["base"], live["root"]
-    topic, raw = "medicine & health", MEDICINE.read_text(encoding="utf-8")
+    topic, raw = "Medicine & Clinical Health", MEDICINE.read_text(encoding="utf-8")
     items = json.loads(raw)
     page.goto(base + "/#tab=exam")
     page.wait_for_selector("[data-panel='import']")
@@ -355,94 +364,151 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
     after the page has said the sha it is recorded under changes."""
     import judge as jd
     base, root = live["base"], live["root"]
-    page.goto(base + "/#tab=exam")
-    page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
-    panel = page.locator("[data-panel='rubrics']")
-    row = panel.locator("tr[data-rubric-row='medicine & health']")
-    assert "medicine_health.md v2" in row.text_content()
-    assert "15 criteria" in row.text_content()
-    # the prose rubric is a draft; the criteria file is the author's own and
-    # carries no status at all, so nothing claims it is one
-    assert row.locator(".badge.taint", has_text="DRAFT").count() == 1
-    # a topic without a rubric of its own says which one grades it instead —
-    # once, in words; the file's name and sha in the tooltip (phase 9b-9)
-    hist = panel.locator("tr[data-rubric-row='history'] [data-fallback]")
-    assert hist.text_content().strip() == "shared rubric"
-    assert "exam.md" in hist.get_attribute("title")
-    # a criteria file the judge would refuse never gets a commit button
-    row.get_by_role("link", name="replace").click()
-    page.wait_for_selector("[data-upload='medicine_health']")
-    up = page.locator("[data-upload='medicine_health']")
-    up.get_by_label("which file").select_option("criteria")
-    spec = json.loads(jd.rubric_path("medicine_health", ".criteria.json").read_text("utf-8"))
-    spec["flags"][0]["effect"] = "melt_the_score"
-    spec["criteria"][0]["id"] = "Relevance"
-    upload(page, "new file", "medicine_health.criteria.json", "application/json",
-           json.dumps(spec))
-    set_name(page, "Dr. Hossein")
-    up.get_by_role("button", name="Check it").click()
-    page.wait_for_selector("[data-problems]")
-    problems = up.locator("[data-problems]").text_content()
-    assert "effect 'melt_the_score' is not one this judge can apply" in problems
-    assert "an id is lower-case letters" in problems
-    assert up.locator("button[data-commit='rubric']").count() == 0
-    # the prose rubric, signed off: valid, changed, and the page says the cost
-    up.get_by_label("which file").select_option("rubric")
-    text = jd.rubric_path("medicine_health").read_text(encoding="utf-8")
-    signed = text.split(", DRAFT")[0] + ")" + text.split(")", 1)[1]
-    assert signed != text and "DRAFT" not in signed.split("\n", 1)[0]
-    upload(page, "new file", "medicine_health.md", "text/markdown", signed)
-    up.get_by_label("note").fill("signed off in the meeting")
-    up.get_by_role("button", name="Check it").click()
-    page.wait_for_selector("[data-sha-warning]")
-    assert "not comparable" in up.locator("[data-sha-warning]").text_content()
-    assert up.locator("[data-problems]").count() == 0
-    up.locator("button[data-commit='rubric']").click()
-    page.wait_for_selector("[data-action-ok='exrubric']", timeout=30000)
-    said = page.locator("[data-action-ok='exrubric']").text_content()
-    assert "Written to" in said and "re-run suite=judged" in said
-    # written outside the checkout, read by the judge, and on the record
-    written = root / "rubrics" / "medicine_health.md"
-    assert written.read_text(encoding="utf-8") == signed
-    assert jd.rubric_for("exam_medicine_health").status == ""
-    assert (REPO / "eval_tasks" / "fr" / "rubrics" / "medicine_health.md"
-            ).read_text(encoding="utf-8") == text
-    from service import db
-    change = db.rubric_changes(1)[0]
-    assert change["approver"] == "Dr. Hossein" and change["kind"] == "rubric"
-    assert change["note"] == "signed off in the meeting"
-    # and the table it came from now shows the new sha, with the rubric's own
-    # DRAFT gone and the criteria file's still there
-    sha = jd.rubric_for("exam_medicine_health").sha256[:10]
-    # the table is dropped and re-fetched after a commit, so for a tick there
-    # is no row at all — waiting on its text must tolerate that, not throw
-    page.wait_for_function(
-        "sha => { const r = document.querySelector(\"tr[data-rubric-row='medicine & health']\");"
-        "  return !!r && r.innerHTML.includes(sha); }", arg=sha)   # in the tooltip (9b-9)
-    assert row.locator(".badge.taint", has_text="DRAFT").count() == 0
-    assert page.errors == []
+    # every rubric delivered with the 37 topics is signed off, and signing one
+    # off is what this test does — so the medicine topic is graded, for this
+    # test, by the retired medicine & health pair (a DRAFT prose rubric, v2,
+    # and its 15-criterion file), installed where the page's upload puts a
+    # rubric. Removed again at the end, so the rest of the module reads the
+    # repo's own.
+    slug = "medicine_clinical_health"
+    store = root / "rubrics"
+    store.mkdir(exist_ok=True)
+    for suffix in (".md", ".criteria.json"):
+        (store / f"{slug}{suffix}").write_bytes(
+            (RETIRED / "rubrics" / f"medicine_health{suffix}").read_bytes())
+    repo_md = REPO / "eval_tasks" / "fr" / "rubrics" / f"{slug}.md"
+    repo_text = repo_md.read_text(encoding="utf-8")
+    try:
+        page.goto(base + "/#tab=exam")
+        page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
+        panel = page.locator("[data-panel='rubrics']")
+        row = panel.locator("tr[data-rubric-row='Medicine & Clinical Health']")
+        assert f"{slug}.md v2" in row.text_content()
+        assert "15 criteria" in row.text_content()
+        # the prose rubric is a draft; the criteria file is the author's own and
+        # carries no status at all, so nothing claims it is one
+        assert row.locator(".badge.taint", has_text="DRAFT").count() == 1
+        # a topic without a rubric of its own says which one grades it instead —
+        # once, in words; the file's name and sha in the tooltip (phase 9b-9).
+        # Arts is the one topic delivered without its files, and without
+        # questions, so its row is behind the empty-topics fold
+        panel.locator("tr[data-empty-topics] [data-show-empty]").click()
+        arts = panel.locator("tr[data-rubric-row='Arts'] [data-fallback]")
+        arts.wait_for()
+        assert arts.text_content().strip() == "shared rubric"
+        assert "exam.md" in arts.get_attribute("title")
+        # a criteria file the judge would refuse never gets a commit button
+        row.get_by_role("link", name="replace").click()
+        page.wait_for_selector(f"[data-upload='{slug}']")
+        up = page.locator(f"[data-upload='{slug}']")
+        up.get_by_label("which file").select_option("criteria")
+        spec = json.loads(jd.rubric_path(slug, ".criteria.json").read_text("utf-8"))
+        spec["flags"][0]["effect"] = "melt_the_score"
+        spec["criteria"][0]["id"] = "Relevance"
+        upload(page, "new file", f"{slug}.criteria.json", "application/json",
+               json.dumps(spec))
+        set_name(page, "Dr. Hossein")
+        up.get_by_role("button", name="Check it").click()
+        page.wait_for_selector("[data-problems]")
+        problems = up.locator("[data-problems]").text_content()
+        assert "effect 'melt_the_score' is not one this judge can apply" in problems
+        assert "an id is lower-case letters" in problems
+        assert up.locator("button[data-commit='rubric']").count() == 0
+        # the prose rubric, signed off: valid, changed, and the page says the cost
+        up.get_by_label("which file").select_option("rubric")
+        text = jd.rubric_path(slug).read_text(encoding="utf-8")
+        signed = text.split(", DRAFT")[0] + ")" + text.split(")", 1)[1]
+        assert signed != text and "DRAFT" not in signed.split("\n", 1)[0]
+        upload(page, "new file", f"{slug}.md", "text/markdown", signed)
+        up.get_by_label("note").fill("signed off in the meeting")
+        up.get_by_role("button", name="Check it").click()
+        page.wait_for_selector("[data-sha-warning]")
+        assert "not comparable" in up.locator("[data-sha-warning]").text_content()
+        assert up.locator("[data-problems]").count() == 0
+        up.locator("button[data-commit='rubric']").click()
+        page.wait_for_selector("[data-action-ok='exrubric']", timeout=30000)
+        said = page.locator("[data-action-ok='exrubric']").text_content()
+        assert "Written to" in said and "re-run suite=judged" in said
+        # written outside the checkout, read by the judge, and on the record
+        written = store / f"{slug}.md"
+        assert written.read_text(encoding="utf-8") == signed
+        assert jd.rubric_for("exam_medicine_clinical_health").status == ""
+        assert repo_md.read_text(encoding="utf-8") == repo_text
+        from service import db
+        change = db.rubric_changes(1)[0]
+        assert change["approver"] == "Dr. Hossein" and change["kind"] == "rubric"
+        assert change["note"] == "signed off in the meeting"
+        # and the table it came from now shows the new sha, with the rubric's own
+        # DRAFT gone and the criteria file's still there
+        sha = jd.rubric_for("exam_medicine_clinical_health").sha256[:10]
+        # the table is dropped and re-fetched after a commit, so for a tick there
+        # is no row at all — waiting on its text must tolerate that, not throw
+        page.wait_for_function(
+            "sha => { const r = document.querySelector("
+            "\"tr[data-rubric-row='Medicine & Clinical Health']\");"
+            "  return !!r && r.innerHTML.includes(sha); }", arg=sha)   # in the tooltip (9b-9)
+        assert row.locator(".badge.taint", has_text="DRAFT").count() == 0
+        assert page.errors == []
+    finally:
+        for suffix in (".md", ".criteria.json"):
+            (store / f"{slug}{suffix}").unlink(missing_ok=True)
+
+
+@contextlib.contextmanager
+def law_under_its_draft_rubric(live):
+    """Law graded, for the Loop board's model, by the retired law v2 pair —
+    a DRAFT prose rubric and its criteria file — as it was before the 37-topic
+    exam: every rubric delivered with the 37 is signed off, and a draft's
+    stamp needs one that is not. The pair goes where the page's rubric upload
+    puts a file ($BENCH_ROOT/rubrics, which the judge reads first), and that
+    model's law answers are graded again under it, as a judged run would —
+    which is what records the draft in its judge.json. Put back on the way
+    out. Yields the model."""
+    import judge as jd
+    from service import app, config
+    store = live["root"] / "rubrics"
+    store.mkdir(exist_ok=True)
+    for suffix in (".md", ".criteria.json"):
+        (store / f"law{suffix}").write_bytes((RETIRED / "rubrics" / f"law{suffix}").read_bytes())
+    with urllib.request.urlopen(live["base"] + "/api/loop") as r:
+        model = json.loads(r.read())["model"]
+    d = config.OUT_DIR / model.replace("/", "__")
+    kept = (d / "judge.json").read_bytes()
+    try:
+        jd.write_judge(d, jd.merge_judged(d, jd.run_stub(d, config.OUT_DIR, only=["exam_law"])))
+        app._cache.update(key=None, payload=None, at=0.0)
+        yield model
+    finally:
+        (d / "judge.json").write_bytes(kept)
+        for suffix in (".md", ".criteria.json"):
+            (store / f"law{suffix}").unlink(missing_ok=True)
+        app._cache.update(key=None, payload=None, at=0.0)
 
 
 def test_the_loop_tab_is_one_row_per_topic_with_the_next_step(live, page):
     """Phase 8e P6a: the loop, as a board. Every row says where the topic
     stands and the one thing to do next — and a refusal says why in words."""
     base = live["base"]
-    page.goto(base + "/#tab=loop")
-    page.wait_for_selector("table.jd[data-loop-table] tbody tr")
-    rows = page.locator("table.jd[data-loop-table] tbody tr")
-    assert rows.count() == 15                              # every topic in categories.yaml
-    med = page.locator("tr[data-loop-row='medicine_health']")
-    assert "medicine_health.md" in med.text_content()
-    assert "15 criteria" in med.text_content()
-    assert "/ 4" in med.text_content()                     # the last judged score
-    # a rubric its author has not signed off is stamped on the row that uses it
-    law = page.locator("tr[data-loop-row='law']")
-    assert "law.md" in law.text_content() and "DRAFT" in law.text_content()
-    # and its judged run is named once, above the board, not as a badge per row
-    # (9d: at most one warning badge on a row)
-    caveats = page.locator("[data-loop-caveats]").text_content()
-    assert "draft rubric" in caveats and "law" in caveats
-    assert "draft rubric" not in law.text_content()
+    with law_under_its_draft_rubric(live):
+        page.goto(base + "/#tab=loop")
+        page.wait_for_selector("table.jd[data-loop-table] tbody tr")
+        # every topic in categories.yaml: a row for each of the 36 with
+        # questions, and Arts, delivered empty, named in the one folded row
+        assert page.locator("table.jd[data-loop-table] tbody tr[data-loop-row]").count() == 36
+        fold = page.locator("table.jd[data-loop-table] tbody tr[data-empty-topics]")
+        assert fold.count() == 1 and "Arts" in fold.text_content()
+        med = page.locator("tr[data-loop-row='medicine_clinical_health']")
+        assert "medicine_clinical_health.md" in med.text_content()
+        assert "20 criteria" in med.text_content()
+        assert "/ 4" in med.text_content()                     # the last judged score
+        # a rubric its author has not signed off is stamped on the row that uses it
+        law = page.locator("tr[data-loop-row='law']")
+        assert "law.md" in law.text_content() and "DRAFT" in law.text_content()
+        # and its judged run is named once, above the board, not as a badge per row
+        # (9d: at most one warning badge on a row)
+        caveats = page.locator("[data-loop-caveats]").text_content()
+        assert "draft rubric" in caveats and "Law" in caveats
+        assert "draft rubric" not in law.text_content()
     # no judge is configured in this fixture, so a topic nobody has sat says
     # so on the button rather than offering it
     assert page.locator("[data-loop-blocked]").count() == 1
@@ -454,13 +520,13 @@ def test_the_loop_tab_is_one_row_per_topic_with_the_next_step(live, page):
     btn = med.locator("button[data-step]")
     assert btn.get_attribute("data-step") == "propose"
     med.locator("a[data-read]").click()
-    page.wait_for_selector("[data-topic-page='medicine_health']")
-    assert "#topic=medicine_health" in page.url
+    page.wait_for_selector("[data-topic-page='medicine_clinical_health']")
+    assert "#topic=medicine_clinical_health" in page.url
     SCREENS.mkdir(exist_ok=True)
     page.goto(base + "/#tab=loop")
     page.wait_for_selector("table.jd[data-loop-table] tbody tr")
     page.screenshot(path=SCREENS / "loop-board.png", full_page=True)
-    page.goto(base + "/#topic=medicine_health")
+    page.goto(base + "/#topic=medicine_clinical_health")
     page.wait_for_selector("[data-panel='answers'] [data-answers-table] [data-answer]")
     page.screenshot(path=SCREENS / "loop-topic.png", full_page=True)
     assert page.errors == []
@@ -471,7 +537,7 @@ def test_the_topic_page_shows_the_answers_and_never_the_report_half(live, page):
     in full, the report half as one line and not one row."""
     import exam_build as eb
     base, root = live["base"], live["root"]
-    page.goto(base + "/#topic=medicine_health")            # deep link, cold
+    page.goto(base + "/#topic=medicine_clinical_health")   # deep link, cold
     page.wait_for_selector("[data-panel='answers'] [data-answers-table] [data-answer]")
     rows = page.locator("[data-answers-table] [data-answer]")
     assert rows.count() > 0
@@ -480,7 +546,7 @@ def test_the_topic_page_shows_the_answers_and_never_the_report_half(live, page):
     line = page.locator("[data-report-half]").first.text_content()
     assert "The report half." in line and "published score" in line
     # and no report-half question is anywhere in the document
-    bank = eb.load_bank(root / "exam")["medicine & health"]
+    bank = eb.load_bank(root / "exam")["Medicine & Clinical Health"]
     report = [b for b in bank if eb.half_of(b["qid"]) == "report"]
     assert report
     html = page.content()
@@ -490,7 +556,7 @@ def test_the_topic_page_shows_the_answers_and_never_the_report_half(live, page):
     # judge's words — and a cell per criterion
     first = rows.first
     assert first.locator("[data-answer-text]").count() == 1
-    assert first.locator("[data-criterion]").count() == 15
+    assert first.locator("[data-criterion]").count() == 20
     assert "/ 4" in first.text_content() or "unreadable" in first.text_content()
     # filters narrow it without a reload
     before = int(page.locator("[data-answer-count]").first.get_attribute("data-answer-count"))
@@ -588,19 +654,27 @@ def test_the_loop_tab_says_what_failed_instead_of_loading_forever(live, page):
 
 
 def test_a_topic_on_the_shared_rubric_says_so_on_both_boards(live, page):
-    """Thirteen topics have no rubric of their own, and the page says which
-    file grades them rather than implying each has one."""
+    """Thirteen topics had no rubric of their own; of the 37, Arts has none,
+    and the page says which file grades it rather than implying each has one.
+    Arts was delivered without questions too, so on both boards its row is
+    behind the empty-topics fold."""
     base = live["base"]
     page.goto(base + "/#tab=loop")
     page.wait_for_selector("table.jd[data-loop-table] tbody tr")
-    hist = page.locator("tr[data-loop-row='history']")
-    assert hist.locator("[data-fallback]").count() == 1
-    assert "shared rubric" in hist.text_content()
-    assert "exam.md" in hist.locator("[data-fallback]").get_attribute("title")
+    page.locator("tr[data-empty-topics] [data-show-empty]").click()
+    arts = page.locator("tr[data-loop-row='arts']")
+    arts.wait_for()
+    assert arts.locator("[data-fallback]").count() == 1
+    assert "shared rubric" in arts.text_content()
+    assert "exam.md" in arts.locator("[data-fallback]").get_attribute("title")
     assert page.locator("tr[data-loop-row='law'] [data-fallback]").count() == 0
+    # every other topic is graded by its own
+    assert page.locator("tr[data-loop-row] [data-fallback]").count() == 1
     page.goto(base + "/#tab=exam")
     page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
-    row = page.locator("tr[data-rubric-row='history']")
+    page.locator("[data-panel='rubrics'] tr[data-empty-topics] [data-show-empty]").click()
+    row = page.locator("tr[data-rubric-row='Arts']")
+    row.wait_for()
     assert "shared rubric" in row.text_content()
     assert "exam.md" in row.locator("[data-fallback]").get_attribute("title")
     assert "(fallback)" not in row.text_content()            # said once, in words
@@ -739,7 +813,10 @@ def test_the_queue_row_counts_the_judge_batch_up(live, page):
     assert page.errors == []
 
 
-PHYSICS_FILE = REPO / "eval_tasks" / "fr" / "physics_engineering_v1.json"
+# the retired physics & engineering file: still the one delivered wrapped in
+# {"questions": [...]}, which is what this test is about (the new banks are
+# bare arrays); its classical mechanics goes into Physics & Astronomy
+PHYSICS_FILE = RETIRED / "physics_engineering_v1.json"
 
 
 def test_a_refusal_replaces_the_last_success_rather_than_sitting_under_it(live, page):
@@ -754,8 +831,8 @@ def test_a_refusal_replaces_the_last_success_rather_than_sitting_under_it(live, 
     panel.get_by_label("written by").fill("Dr. Hossein")
     # a good import first
     upload(page, "questions file", "computer_science_v1.json", "application/json",
-           (REPO / "eval_tasks" / "fr" / "computer_science_v1.json").read_text(encoding="utf-8"))
-    panel.get_by_label("topic").select_option("computer science")
+           (RETIRED / "computer_science_v1.json").read_text(encoding="utf-8"))
+    panel.get_by_label("topic").select_option("Computer Science")
     panel.get_by_role("button", name="Preview").click()
     page.wait_for_selector("[data-action-ok='eximport']", timeout=30000)
     panel.locator("button[data-commit='import']").click()
@@ -792,7 +869,7 @@ def test_the_page_imports_the_wrapped_file_the_author_sent(live, page):
     panel.get_by_label("written by").fill("Dr. Hossein")
     upload(page, "questions file", "physics_engineering_v1.json", "application/json",
            PHYSICS_FILE.read_text(encoding="utf-8"))
-    panel.get_by_label("topic").select_option("physics & engineering")
+    panel.get_by_label("topic").select_option("Physics & Astronomy")
     # the file's own name is the source already — nothing to type
     assert panel.locator("[data-source]").get_attribute("data-source") == "physics_engineering_v1"
     panel.get_by_role("button", name="Preview").click()
@@ -802,7 +879,7 @@ def test_the_page_imports_the_wrapped_file_the_author_sent(live, page):
     panel.locator("button[data-commit='import']").click()
     page.wait_for_selector("[data-toast='import']", timeout=30000)
     assert "Imported 100 questions" in page.locator("[data-toast='import']").text_content()
-    mine = [r for r in eb.load_bank(root / "exam")["physics & engineering"]
+    mine = [r for r in eb.load_bank(root / "exam")["Physics & Astronomy"]
             if r.get("source") == "physics_engineering_v1"]
     assert len(mine) == 100
     assert page.errors == []
@@ -815,23 +892,24 @@ def test_the_rubrics_table_says_whether_a_topic_has_questions(live, page):
     import exam_build as eb
     base, root = live["base"], live["root"]
     # a topic with the files and no questions: exactly the case that misled
-    bank = eb.bank_dir(root / "exam") / "geography_world_facts.jsonl"
+    # (Arts is empty already, but it has no rubric files of its own)
+    bank = eb.bank_dir(root / "exam") / "sociology.jsonl"
     kept = bank.read_bytes()
     bank.unlink()
     try:
         page.goto(base + "/#tab=exam")
         page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
         panel = page.locator("[data-panel='rubrics']")
-        med = panel.locator("tr[data-rubric-row='medicine & health']")
+        med = panel.locator("tr[data-rubric-row='Medicine & Clinical Health']")
         assert med.locator("[data-bank]").first.get_attribute("data-bank") != "0"
         assert "report" in med.text_content() and "diagnose" in med.text_content()
         # a topic without questions folds into one row that names it (9b-7) …
         fold = panel.locator("tr[data-empty-topics]")
-        assert fold.count() == 1 and "geography & world facts" in fold.text_content()
-        assert panel.locator("tr[data-rubric-row='geography & world facts']").count() == 0
+        assert fold.count() == 1 and "Sociology" in fold.text_content()
+        assert panel.locator("tr[data-rubric-row='Sociology']").count() == 0
         # … and opens to its own row, which still says it has no questions
         fold.locator("[data-show-empty]").click()
-        empty = panel.locator("tr[data-rubric-row='geography & world facts'] [data-bank='0']")
+        empty = panel.locator("tr[data-rubric-row='Sociology'] [data-bank='0']")
         empty.wait_for()
         assert empty.text_content() == "no questions yet"
         # and an unversioned heading is not printed as an error

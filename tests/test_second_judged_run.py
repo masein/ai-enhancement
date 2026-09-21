@@ -22,7 +22,8 @@ from conftest import fresh, make_service
 
 REPO = Path(__file__).resolve().parents[1]
 MODEL = "fx/good-750m"
-ECON, LAW, MED = "exam_economics", "exam_law", "exam_medicine_health"
+ECON, LAW, MED = "exam_economics", "exam_law", "exam_medicine_clinical_health"
+PHYS = "exam_physics_astronomy"
 
 
 @pytest.fixture
@@ -149,7 +150,7 @@ def test_a_one_topic_run_says_which_topic_it_judged(svc, monkeypatch):
     run_judged(monkeypatch, sid)
     assert llm_poller.tick() == 1
     row = rows(client)[sid]
-    assert re.fullmatch(r"judged: economics, judge.json written \d\d:\d\d", row["progress"]), \
+    assert re.fullmatch(r"judged: Economics, judge.json written \d\d:\d\d", row["progress"]), \
         row["progress"]
     assert row["judge"]["status"] == "done"
 
@@ -159,12 +160,11 @@ def test_the_finished_line_names_up_to_three_topics_then_counts():
 
     def run(*tasks):
         return {"plan": json.dumps({"tasks": {t: {} for t in tasks}})}
-    assert judged_what(run(ECON)) == "economics"
-    assert judged_what(run(LAW, MED)) == "law and medicine & health"
+    assert judged_what(run(ECON)) == "Economics"                  # the topic as stored
+    assert judged_what(run(LAW, MED)) == "Law and Medicine & Clinical Health"
     assert judged_what(run(LAW, MED, ECON, jd.CONTROL_TASK)) == \
-        "law, medicine & health and economics"                      # the control is not a topic
-    assert judged_what(run(LAW, MED, ECON, "exam_computer_science",
-                           "exam_physics_engineering")) == "5 topics"
+        "Law, Medicine & Clinical Health and Economics"             # the control is not a topic
+    assert judged_what(run(LAW, MED, ECON, "exam_computer_science", PHYS)) == "5 topics"
     assert judged_what({"plan": "not json"}) == ""
 
 
@@ -196,7 +196,7 @@ def test_a_one_topic_merge_keeps_the_other_topics_times(svc, monkeypatch):
     llm_poller.tick()
     after = json.loads((model_dir / "judge.json").read_text(encoding="utf-8"))
     assert after["tasks"][ECON]["judged_at"] >= int(before) - 1       # this run's topic: now
-    for task in (LAW, MED, "exam_computer_science", "exam_physics_engineering"):
+    for task in (LAW, MED, "exam_computer_science", PHYS):
         assert after["tasks"][task]["judged_at"] == last_night, task  # the rest: untouched
     fresh(appmod)
     loop = {r["slug"]: r for r in client.get("/api/loop").json()["topics"]}
@@ -227,7 +227,7 @@ def test_startup_puts_back_the_times_an_old_merge_overwrote(svc):
     from service import config, db, llm_poller
     model_dir = config.OUT_DIR / "fx__good-750m"
     j = json.loads((model_dir / "judge.json").read_text(encoding="utf-8"))
-    five = [ECON, LAW, MED, "exam_computer_science", "exam_physics_engineering"]
+    five = [ECON, LAW, MED, "exam_computer_science", PHYS]
     j["tasks"] = {t: {k: v for k, v in j["tasks"][t].items() if k != "judged_at"} for t in five}
     j["judge"]["batch_id"] = "b47"
     jd.write_judge(model_dir, j)
@@ -380,7 +380,9 @@ def test_a_page_open_through_a_whole_judged_run_shows_the_judged_scores(svc, mon
             ".querySelectorAll('td')[5].querySelector('span[title]') || {}).title", timeout=40000)
         assert s.failed, "the failed fetch never happened — the retry was not exercised"
         assert judged.text_content().strip().startswith("1")     # one topic judged
-        assert re.fullmatch(r"economics \d\.\d\d",
+        # two decimals at most, trailing zeros dropped: under its own criteria
+        # economics can grade to a round 3
+        assert re.fullmatch(r"Economics \d(\.\d\d?)?",
                             judged.locator("span[title]").first.get_attribute("title"))
         assert len(s.loads) == 1                           # without a reload
         assert s.errors == []
@@ -407,7 +409,8 @@ def test_an_open_topic_page_lists_a_model_judged_while_it_was_open(svc, monkeypa
         sel = pg.locator("[data-panel='answers'] select[aria-label='model']")
         sel.wait_for(timeout=20000)
         assert [o.get_attribute("value") for o in sel.locator("option").all()] == [MODEL]
-        assert re.search(r"good-750m — \d\.\d\d / 4", sel.locator("option").first.text_content())
+        assert re.search(r"good-750m — \d(\.\d\d?)? / 4",
+                         sel.locator("option").first.text_content())
         sid = client.post("/api/submissions", json={"hf_id": other, "suite": "judged",
                                                     "tasks": [ECON]}).json()["id"]
         run_judged(monkeypatch, sid)
@@ -468,7 +471,7 @@ def test_rows_whose_batch_finished_under_older_code_read_as_finished(tmp_path, m
         db.update(sid, status=status, judge_batch=bid, progress=progress or (
             f"done · judge batch {bid} submitted ({n} answers); judge.json lands when it completes"))
         return sid
-    five = [ECON, LAW, MED, "exam_computer_science", "exam_physics_engineering"]
+    five = [ECON, LAW, MED, "exam_computer_science", PHYS]
     t45, t46 = time.mktime((2026, 9, 20, 21, 22, 0, 0, 0, -1)), time.mktime(
         (2026, 9, 20, 23, 5, 0, 0, 0, -1))
     s45 = row([ECON], "b45", 130, "62/130 done", t45, [ECON])
@@ -482,10 +485,10 @@ def test_rows_whose_batch_finished_under_older_code_read_as_finished(tmp_path, m
     c = _start(appmod)                                    # the deploy
     got = rows(c)
     assert got[s45]["judge"]["progress"] == "130/130 done"
-    assert got[s45]["progress"] == "judged: economics, judge.json written 21:22"
+    assert got[s45]["progress"] == "judged: Economics, judge.json written 21:22"
     assert got[s46]["judge"]["progress"] == "680/680 done"
     assert got[s46]["progress"] == "judged: 5 topics, judge.json written 23:05"
-    assert got[s47]["progress"] == "judged: economics, judge.json written " + \
+    assert got[s47]["progress"] == "judged: Economics, judge.json written " + \
         time.strftime("%H:%M", time.localtime(t46 + 36000))
     # a batch still out, or one that failed, says what it said
     assert got[out]["judge"]["progress"] == "18/42 done"

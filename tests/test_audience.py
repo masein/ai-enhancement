@@ -20,8 +20,14 @@ from conftest import make_service
 from service import proposals as prop
 
 REPO = Path(__file__).resolve().parents[1]
-LAW = REPO / "eval_tasks" / "fr" / "law_v2.json"
-TOPIC = "medicine & health"
+# the author's revised bank of the old exam, kept for what it proves about
+# the import: v1's hundred prompts re-delivered with new metadata. Nothing
+# reads eval_tasks/fr/retired/ at run time; the test imports it into the
+# current topic by hand.
+LAW_V2 = REPO / "eval_tasks" / "fr" / "retired" / "law_v2.json"
+# the Law bank the current exam is built from
+LAW = REPO / "eval_tasks" / "fr" / "banks" / "law_v1.json"
+TOPIC = "Medicine & Clinical Health"
 
 
 @pytest.fixture
@@ -63,9 +69,9 @@ def test_a_topic_whose_bank_says_nothing_about_its_reader_gets_no_line(svc, tmp_
     from service import config
     root = tmp_path / "bare-exam"
     eb.import_bank(root, [{"prompt": "A question with no metadata at all, long enough."}],
-                   "other", "someone", "t")
+                   "General & Multidisciplinary", "someone", "t")
     monkeypatch.setattr(config, "EXAM_DIR", root)
-    assert prop.audience_for("other") == ""
+    assert prop.audience_for("General & Multidisciplinary") == ""
     # and the fixture's own legacy topic, for the same reason
     monkeypatch.setattr(config, "EXAM_DIR", Path(config.BENCH_ROOT) / "exam")
 
@@ -78,7 +84,7 @@ def test_the_author_may_write_the_register_sentence_herself(svc, tmp_path, monke
     (tmp_path / "rubrics" / "law.md").write_text(jd.rubric_for("exam_law").text, encoding="utf-8")
     (tmp_path / "rubrics" / "law.criteria.json").write_text(json.dumps(spec), encoding="utf-8")
     monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)
-    line = prop.audience_for("law")
+    line = prop.audience_for("Law")
     assert "plain-language guidance for a tenant or an employee" in line
     assert "not clinical notes" not in line          # the default is replaced, not appended
     assert line.startswith("Audience: ")             # the counts are still the bank's
@@ -112,7 +118,7 @@ def test_the_audience_reaches_both_requests_and_nothing_else_does(svc):
 
 
 def test_the_generation_prompt_asks_for_something_a_person_would_read():
-    reqs = prop.generation_requests(1, "spec", "law", 1, "doc", 3, audience="Audience: X\nY")
+    reqs = prop.generation_requests(1, "spec", "Law", 1, "doc", 3, audience="Audience: X\nY")
     body = reqs[0].user
     assert "Audience: X" in body
     assert "what a person with that question would be helped by reading" in body
@@ -183,17 +189,17 @@ def test_the_revised_law_bank_updates_metadata_in_place(tmp_path):
     jurisdiction flag. The prompt is the identity: the qids and the halves do
     not move, and the records are revised rather than skipped."""
     root = tmp_path / "exam"
-    v2 = json.loads(LAW.read_text(encoding="utf-8"))
+    v2 = json.loads(LAW_V2.read_text(encoding="utf-8"))
     v1 = [{k: v for k, v in it.items() if k != "jurisdiction_required"} for it in v2]
     for it in v1:                       # the id-range mapping v1 carried
         i = it["id"]
         it["difficulty"] = 1 if i <= 20 else 2 if i <= 45 else 3 if i <= 65 else 4 if i <= 85 else 5
-    first = eb.import_bank(root, v1, "law", "Dr. Hossein", "medicine_v1")
+    first = eb.import_bank(root, v1, "Law", "Dr. Hossein", "medicine_v1")
     assert (first["imported"], first["updated"], first["skipped"]) == (100, 0, 0)
-    halves = {r["qid"]: eb.half_of(r["qid"]) for r in eb.load_bank(root)["law"]}
-    second = eb.import_bank(root, LAW, "law", "Dr. Hossein", "law_v2")
+    halves = {r["qid"]: eb.half_of(r["qid"]) for r in eb.load_bank(root)["Law"]}
+    second = eb.import_bank(root, LAW_V2, "Law", "Dr. Hossein", "law_v2")
     assert (second["imported"], second["updated"], second["skipped"]) == (0, 100, 0)
-    rows = eb.load_bank(root)["law"]
+    rows = eb.load_bank(root)["Law"]
     assert len(rows) == 100
     assert {r["source"] for r in rows} == {"law_v2"}
     assert {r["accepted_by"] for r in rows} == {"Dr. Hossein"}
@@ -202,7 +208,7 @@ def test_the_revised_law_bank_updates_metadata_in_place(tmp_path):
     assert sum(1 for r in rows if r["meta"]["jurisdiction_required"]) == 85
     assert sum(1 for r in rows if r["meta"]["difficulty"] == 2) == 33
     # and a third import of the same file changes nothing
-    again = eb.import_bank(root, LAW, "law", "Dr. Hossein", "law_v2")
+    again = eb.import_bank(root, LAW_V2, "Law", "Dr. Hossein", "law_v2")
     assert (again["imported"], again["updated"], again["skipped"]) == (0, 0, 100)
 
 
@@ -216,13 +222,13 @@ def test_the_judge_reads_the_jurisdiction_flag(tmp_path):
     assert "Jurisdiction required: no." in eb.metadata_reference(no)
     # the criterion that reads it is the author's own
     spec = jd.rubric_for("exam_law").criteria
-    assert "jurisdiction_awareness" in jd.criteria_ids(spec)
+    assert "jurisdiction_and_authority" in jd.criteria_ids(spec)
 
 
 def test_law_is_tabulated_by_jurisdiction_and_medicine_is_not(tmp_path):
     spec = jd.rubric_for("exam_law").criteria
     law_items = [{"cid": f"c{i}", "qid": f"{i:064d}", "half": "diagnose", "doc_hash": str(i),
-                  "id": i, "category": "law", "answer_words": 10, "score": 2, "graded": True,
+                  "id": i, "category": "Law", "answer_words": 10, "score": 2, "graded": True,
                   "criteria": {c: 0.5 for c in jd.criteria_ids(spec)},
                   "flags": {f: False for f in jd.flag_ids(spec)},
                   "meta": {"acuity": "routine" if i % 2 else "urgent",
@@ -235,13 +241,16 @@ def test_law_is_tabulated_by_jurisdiction_and_medicine_is_not(tmp_path):
     assert blocks["breakdowns"]["jurisdiction_required"]["True"]["n"] == 2
     # the order a person reads them in, for the fields that split this bank
     assert list(blocks["breakdowns"]) == ["acuity", "difficulty", "jurisdiction_required"]
-    # medicine's items carry no such field, so no such table
-    med_spec = jd.rubric_for("exam_medicine_health").criteria
+    # medicine's items carry the field but it is never set — every item of
+    # the delivered bank says no — so no such table
+    med_spec = jd.rubric_for("exam_medicine_clinical_health").criteria
     med_items = [{**law_items[0], "criteria": {c: 0.5 for c in jd.criteria_ids(med_spec)},
                   "flags": {f: False for f in jd.flag_ids(med_spec)},
-                  "meta": {"acuity": "mild", "difficulty": 1}}]
+                  "meta": {"acuity": "routine", "difficulty": 1,
+                           "jurisdiction_required": False}}]
     med = jd._criteria_blocks(med_items, med_spec)
     # one item carries one value of everything, so nothing splits it: no
     # tables at all, and the constant fields are named instead
     assert "breakdowns" not in med
-    assert set(med["breakdowns_constant"]) == {"acuity", "difficulty"}
+    assert set(med["breakdowns_constant"]) == {"acuity", "difficulty", "jurisdiction_required"}
+    assert med["breakdowns_constant"]["jurisdiction_required"] == "False"

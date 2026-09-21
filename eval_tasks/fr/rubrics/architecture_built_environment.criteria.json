@@ -1,0 +1,171 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Addresses the actual prompt, stated scenario, users, objectives, constraints, and requested output without drifting into unrelated architectural commentary.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "architectural_accuracy",
+      "name": "Architectural accuracy",
+      "definition": "Uses correct architectural concepts and relationships, including plan/section/elevation, gross versus net area, program, circulation, spatial organization, and building-scale implications.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "built_environment_accuracy",
+      "name": "Built-environment accuracy",
+      "definition": "Correctly reasons about sites, streets, blocks, public realm, density, connectivity, land-use relationships, urban climate, infrastructure context, and relevant spatial/temporal scales.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "spatial_reasoning",
+      "name": "Spatial reasoning",
+      "definition": "Accurately infers, compares, or proposes spatial relationships, routes, adjacencies, separations, sequences, orientations, and vertical/horizontal organization from the information given.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual precision",
+      "definition": "Keeps distinct concepts distinct—for example daylight vs direct sun, insulation vs thermal mass, airtightness vs ventilation, gravity load path vs lateral stability, density vs height, and intent vs measured performance.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative correctness",
+      "definition": "When quantities are required, selects the correct denominator and units, performs calculations accurately, states assumptions, and interprets the result without overclaiming.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "program_and_circulation_reasoning",
+      "name": "Program and circulation reasoning",
+      "definition": "When relevant, translates users, activities, capacity, privacy, servicing, accessibility, public/staff/service flows, and emergency movement into coherent spatial relationships.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "site_and_context_reasoning",
+      "name": "Site and context reasoning",
+      "definition": "When relevant, integrates orientation, climate, topography, access, noise, views, drainage, vegetation, neighboring uses, hazards, infrastructure, and future change into the design reasoning.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "environmental_performance_reasoning",
+      "name": "Environmental performance reasoning",
+      "definition": "When relevant, correctly explains daylight, solar gain, shading, ventilation, thermal comfort, passive design, microclimate, energy, and their climate- and use-dependent trade-offs.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "structural_and_material_reasoning",
+      "name": "Structural and material reasoning",
+      "definition": "When relevant, maintains coherent load paths and stability concepts and evaluates material behavior, span, weight, moisture, fire, durability, constructability, maintenance, and embodied effects at an architectural level.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "building_systems_and_envelope_reasoning",
+      "name": "Building systems and envelope reasoning",
+      "definition": "When relevant, integrates services with architecture and correctly reasons about heat, air, water, vapor, insulation continuity, airtightness, thermal bridges, drainage, maintainability, and service zones.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "accessibility_and_life_safety",
+      "name": "Accessibility and life safety",
+      "definition": "When relevant, prioritizes inclusive primary routes and usable spaces and applies sound conceptual reasoning about egress, redundancy, compartmentation, smoke/fire separation, and safety without inventing code requirements.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "construction_and_constructability",
+      "name": "Construction and constructability",
+      "definition": "When relevant, identifies sequencing, logistics, tolerances, interfaces, movement, waterproofing, maintenance access, temporary dependencies, prefabrication constraints, and realistic buildability.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "urban_and_public_realm_reasoning",
+      "name": "Urban and public-realm reasoning",
+      "definition": "When relevant, evaluates how buildings and sites shape streets, frontages, public space, movement, permeability, microclimate, mixed use, density, and neighboring conditions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "sustainability_and_lifecycle_reasoning",
+      "name": "Sustainability and lifecycle reasoning",
+      "definition": "When relevant, distinguishes operational and embodied effects and considers durability, adaptability, water, ecology, transport context, maintenance, replacement, reuse, resilience, and end-of-life boundaries.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_tradeoffs",
+      "name": "Assumptions and trade-offs",
+      "definition": "When the problem is underdetermined or multi-objective, states material assumptions, identifies missing information, compares consequences, and avoids asserting a unique optimum without support.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the major mechanisms and constraints needed to answer the question; omissions are judged by their effect on the conclusion rather than by checklist length.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "The reasoning, calculations, spatial relationships, and conclusions do not contradict one another or the supplied scenario.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Explains the mechanism and conclusion in a legible, precise way, using architectural vocabulary only where it adds meaning rather than as a substitute for reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "practical_design_judgment",
+      "name": "Practical design judgment",
+      "definition": "When a design decision is requested, proposes workable options that respect users, site, technical systems, safety, construction, maintenance, lifecycle, uncertainty, and legitimate alternative solutions.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error": {
+    "id": "critical_architecture_built_environment_error",
+    "condition": "A materially false central architectural, building-science, structural, construction, accessibility, life-safety, quantitative, or urban-design claim that fundamentally invalidates the answer or creates a materially unsafe conclusion. Apply only when the error is central and consequential, not for minor arithmetic, terminology, omissions, legitimate design alternatives, or clearly stated reasonable assumptions.",
+    "effect": "score=0",
+    "examples": [
+      "Proposing removal of a clearly identified load-bearing element without addressing structural support or a replacement load path.",
+      "Fundamentally incorrect gravity-load-path reasoning that leaves loads with no credible path to the ground.",
+      "Treating a clearly blocked or unusable emergency exit route as acceptable.",
+      "Recommending an inaccessible primary route as an adequate inclusive-access solution for the stated users.",
+      "Concluding that deliberate ventilation is unnecessary because a building is airtight.",
+      "Recommending an envelope arrangement that predictably traps bulk water or creates severe condensation because key drainage/drying mechanisms are fundamentally misunderstood.",
+      "Treating insulation and thermal mass as interchangeable mechanisms.",
+      "Making a major area, slope, FAR, or density calculation error that reverses the design conclusion.",
+      "Claiming every wall in a building is structurally load-bearing.",
+      "Recommending glazing changes that ignore an explicitly stated severe overheating constraint and reverse the intended environmental outcome.",
+      "Claiming fire compartmentation remains effective despite unprotected openings that clearly defeat the separation.",
+      "Giving accessibility reasoning whose central proposal excludes the stated user group.",
+      "Claiming replication of an existing unsafe detail makes that detail acceptable.",
+      "Using a structural-grid assumption that makes the stated program physically impossible while presenting it as feasible.",
+      "Claiming a coordinated or high-performance BIM model proves the constructed building will achieve the modeled performance.",
+      "Materially misreading a stated site or floor-plan relationship so that the proposed solution addresses the opposite condition.",
+      "Claiming sustainability from one isolated metric while ignoring an explicitly stated dominant lifecycle impact.",
+      "Recommending a central construction sequence that depends on permanent supporting elements not yet installed and providing no temporary-support strategy.",
+      "Fabricating code requirements, site conditions, structural properties, or performance data needed to justify the conclusion.",
+      "Insisting on a unique design solution where the supplied constraints clearly permit materially different valid approaches."
+    ]
+  }
+}

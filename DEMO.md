@@ -6,7 +6,7 @@ training documents — and narrates every step, printing what it is about to
 do, what came back, and where it landed.
 
 ```bash
-python3 scripts/demo_loop.py --topics economics --model EleutherAI/pythia-160m
+python3 scripts/demo_loop.py --topics Economics --model EleutherAI/pythia-160m
 ```
 
 It is for comprehension. Nothing it writes goes near the live board: it works
@@ -87,71 +87,53 @@ Useful flags: `--dry-run` prints the plan and calls nothing; `--keep` leaves
 the tree; `--count` sets how many documents; `--no-auto-accept` stops after
 drafting so you can curate on the Exam tab; `--sit stub` skips the GPU.
 
-### The two human-written banks
+### A human-written bank
 
-Dr. Hossein's own questions, graded against his own criteria files. Medicine
-is 100 questions and 15 criteria with one flag; law is 100 questions and 23
-criteria with two flags, one of which caps the score rather than zeroing it.
-Law's items also carry `jurisdiction_required`, which the reference line says
-in words and the page tabulates — the direct test of whether the model asks
-where the user is. Each is one run:
+The 37-topic exam (phase 10) is 36 human-written banks of 100 questions, each
+with its own criteria file and prose rubric, in `eval_tasks/fr/banks/` and
+`eval_tasks/fr/rubrics/`; Arts arrived empty. Any of them is one run — the
+author is recorded on every item:
 
 ```bash
-python3 scripts/demo_loop.py --topic "medicine & health" \
-    --import eval_tasks/fr/medicine_v2.json --approver "Dr. Hossein" \
-    --source medicine_v2 \
+python3 scripts/demo_loop.py --topic "Medicine & Clinical Health" \
+    --import eval_tasks/fr/banks/medicine_clinical_health_v1.json --approver masein \
+    --source medicine_clinical_health_v1 \
     --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
 ```
 
 ```bash
-python3 scripts/demo_loop.py --topic law \
-    --import eval_tasks/fr/law_v2.json --approver "Dr. Hossein" \
-    --source law_v2 \
+python3 scripts/demo_loop.py --topic Law \
+    --import eval_tasks/fr/banks/law_v1.json --approver masein \
+    --source law_v1 \
     --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
 ```
 
-`--import` replaces steps 2 and 3 with one import step: his name is the
-approver on every item, the metadata is the reference (acuity first,
+The topic name is the folder's, exactly — `Law`, not `law`. The file is
+`banks/<slug>_v1.json`, where the slug is the name in lower case with every
+run of other characters turned into `_` (`Medicine & Clinical Health` →
+`medicine_clinical_health`).
+
+`--import` replaces steps 2 and 3 with one import step: the author's name is
+the approver on every item, the metadata is the reference (acuity first,
 difficulty beside it), and the step prints the report/diagnose split, the
 per-acuity counts and where the topic stands against the 30-question floor.
-Both banks clear it — about 50 report-half questions each — so the step says
+Every bank clears it — about 50 report-half questions each — so the step says
 so rather than asking for more. The run needs **no exam writer** configured
 — nobody is drafting anything.
 
-And the three topics delivered in the same round — computer science,
-economics, physics & engineering — each with the author's own prose rubric
-and his own 0–4 anchors:
+Step 6 differs by topic, because the criteria file does: a topic whose items
+carry several acuities is tabled by acuity (emergency → critical → urgent →
+high → moderate → mild → routine), Law adds jurisdiction, and a topic whose
+acuity is `routine` on every item is read by difficulty and domain instead —
+the page says the constant in a sentence rather than drawing a table with one
+row. The flag lines say what each flag did to the score. None of it is
+special-cased in the code; it all comes from what the author wrote and what
+the questions carry.
 
-```bash
-python3 scripts/demo_loop.py --topic "computer science" \
-    --import eval_tasks/fr/computer_science_v1.json --approver "Dr. Hossein" \
-    --source computer_science_v1 \
-    --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
-```
-
-```bash
-python3 scripts/demo_loop.py --topic economics \
-    --import eval_tasks/fr/economics_v1.json --approver "Dr. Hossein" \
-    --source economics_v1 \
-    --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
-```
-
-```bash
-python3 scripts/demo_loop.py --topic "physics & engineering" \
-    --import eval_tasks/fr/physics_engineering_v1.json --approver "Dr. Hossein" \
-    --source physics_engineering_v1 \
-    --model HuggingFaceTB/SmolLM2-360M-Instruct --keep
-```
-
-All five banks are 100 questions and clear the 30-question floor.
-
-Step 6 differs by topic, because the criteria file does: medicine's tables are
-by acuity, difficulty and intent, law's add jurisdiction, and the three
-technical topics are read by difficulty and domain — their acuity is
-`routine` on every item, which the page says in a sentence instead of drawing
-a table with one row. The flag lines say what each flag did to the score.
-None of it is special-cased in the code; it all comes from what the author
-wrote and what his questions carry.
+The five banks the exam had before — medicine & health, law, economics,
+computer science, physics & engineering — are retired. Their files are in
+`eval_tasks/fr/retired/`, kept as the record of what their judged runs were
+graded on; nothing the service or the demo reads points there.
 
 Use an **instruct** model for this topic. A base model answers a triage
 question with word salad and scores 0 on everything, which teaches nothing;
@@ -215,22 +197,19 @@ In detail, a green demo says nothing about:
   4B model's grades are not evidence about a model's ability.
 - Question quality. `--auto-accept` accepts whatever was drafted; a real bank
   is read question by question by a person whose name is recorded.
-- **The medicine and law rubrics are drafts**, pending Dr. Hossein's review
-  of their 0–4 anchors. The criteria files beside them are his own and need
-  no sign-off. The rubrics grade, and they are marked DRAFT on the page and
-  in every `judge.json` until he signs them off by removing the word — which
-  changes their sha, so scores from before and after do not compare.
+- **A rubric whose heading says DRAFT is marked so** on the page and in
+  every `judge.json` until its author signs it off by removing the word —
+  which changes its sha, so scores from before and after do not compare.
 - **The 0–4 for a criteria topic is a deterministic fold of that topic's
-  criteria** — 15 for medicine, 23 for law, with the flags and their effects
-  in `rubrics/<slug>.criteria.json` — not a number the judge chose.
+  criteria** — 20 per topic in the 37-topic exam, with the flag and its
+  effect in `rubrics/<slug>.criteria.json` — not a number the judge chose.
   Per-criterion agreement with a human has **not** been measured yet:
   `judge_calibrate.py` exports the columns for it and reports the
   differences, but nothing gates on them, and κ is still computed on the
   folded score alone.
-- **The medicine scores from before 2026-09-20 do not compare to the ones
-  after it.** That run was graded against a draft criteria file this repo no
-  longer holds; the author's own file replaced it, which changed the sha
-  recorded in every `judge.json` — the rule applying to itself.
+- **Scores on the five retired topics do not compare to the new ones**,
+  even where the task name is the same (`exam_law`, `exam_economics`,
+  `exam_computer_science`): the questions and the criteria both changed.
 
 So: a green demo is not a green production path.
 

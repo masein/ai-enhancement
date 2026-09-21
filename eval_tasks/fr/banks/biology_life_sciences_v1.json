@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A spherical cell is moved from an isotonic solution into a solution with a lower solute concentration outside the cell. Assuming the membrane is permeable to water but not to the major solutes, predict the direction of net water movement and the most likely change in cell volume. Explain the mechanism.",
+    "intent": "Explain osmosis and membrane-volume consequences.",
+    "domain": "Cell Biology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "cell_biology_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A membrane transporter normally exports H+ from a cell using ATP. The transporter is acutely inhibited while other transport processes remain unchanged. Predict the immediate effects on intracellular pH and the transmembrane proton electrochemical gradient, and explain why the effects need not be identical in magnitude.",
+    "intent": "Reason from active transport inhibition to intracellular homeostasis.",
+    "domain": "Cell Biology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "Two otherwise identical cells express equal numbers of a receptor. In cell A, ligand binding occurs normally but a downstream G protein is inactive. In cell B, the receptor cannot bind ligand, but the downstream G protein is constitutively active. Compare the expected downstream signaling in the two cells and explain what this shows about receptor activation versus downstream pathway state.",
+    "intent": "Distinguish receptor occupancy from downstream signal transduction.",
+    "domain": "Cell Signaling",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A drug disrupts microtubule polymerization without directly damaging actin filaments. A secretory cell then accumulates vesicles near the Golgi and releases less protein at the plasma membrane. Give a mechanistic explanation for this phenotype and identify one observation that would help distinguish impaired long-range vesicle transport from impaired vesicle fusion.",
+    "intent": "Connect cytoskeletal disruption to vesicle trafficking and discriminate mechanisms.",
+    "domain": "Cell Biology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A diploid cell has completed DNA replication but fails the spindle-assembly checkpoint and enters anaphase with one chromosome pair improperly attached. What type of chromosomal segregation error can result, and why can the two daughter cells receive unequal chromosome numbers?",
+    "intent": "Reason about checkpoint failure and chromosome segregation.",
+    "domain": "Cell Cycle",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A signaling pathway raises a second messenger from 1 micromolar to 8 micromolar for 30 seconds. A mutant degrades that messenger more slowly, so the peak is still 8 micromolar but remains elevated for 5 minutes. Explain why equal peak concentration does not imply equal cellular response.",
+    "intent": "Interpret signal duration versus signal amplitude.",
+    "domain": "Cell Signaling",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "Cells lacking a major adhesion protein still attach normally to a culture dish coated with extracellular-matrix protein, but they fail to maintain strong cell-cell contacts. What does this phenotype support about the disrupted protein's role, and what does it not establish by itself?",
+    "intent": "Infer function cautiously from adhesion phenotype.",
+    "domain": "Cell Junctions and ECM",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A cell line shows increased autophagosome abundance after nutrient deprivation. Explain why this observation alone cannot distinguish increased autophagy initiation from blocked autophagosome turnover, and propose one type of measurement that would discriminate the two.",
+    "intent": "Recognize non-unique interpretation of pathway intermediate accumulation.",
+    "domain": "Cell Biology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A gene's DNA coding sequence is unchanged between two cell types, but its mRNA abundance is 20-fold higher in one cell type. Give at least two regulatory mechanisms that could explain the difference without changing the coding sequence.",
+    "intent": "Distinguish DNA sequence from gene-expression regulation.",
+    "domain": "Molecular Biology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "molecular_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A point mutation changes a promoter so that a transcription factor binds less strongly, while the encoded protein sequence remains unchanged. Predict the most direct effect on transcription and explain why protein abundance might change even though the protein sequence does not.",
+    "intent": "Reason about regulatory versus coding mutations.",
+    "domain": "Gene Regulation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A pre-mRNA contains exons 1, 2, 3, and 4. In tissue X, the mature mRNA contains exons 1-2-4; in tissue Y it contains 1-3-4. The DNA sequence of the gene is identical in both tissues. What biological process best explains the difference, and what can be inferred about the encoded products?",
+    "intent": "Interpret alternative RNA processing without assuming one gene-one protein.",
+    "domain": "Molecular Biology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A DNA lesion is detected in a somatic cell and repaired before the next round of replication. Explain why DNA damage is not automatically a heritable mutation.",
+    "intent": "Distinguish DNA damage from mutation.",
+    "domain": "DNA Repair",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A gene's mRNA level is unchanged after treatment, but its protein level falls by 70% within two hours. Name two mechanistic classes of explanation consistent with these measurements and explain why transcript abundance alone cannot identify which is correct.",
+    "intent": "Integrate transcriptional, translational, and protein-turnover evidence.",
+    "domain": "Gene Expression",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "An enhancer 30 kb from a gene is deleted. The gene's coding sequence and promoter are intact, yet transcription in one tissue falls sharply while transcription in another tissue is unchanged. Explain how this can occur and what it implies about enhancer action.",
+    "intent": "Reason about tissue-specific regulatory elements.",
+    "domain": "Gene Regulation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "molecular_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A mutation in a tRNA anticodon allows it to pair with a different codon than before. Explain two possible consequences for translation fidelity and why the phenotype depends on which codons the altered tRNA now recognizes.",
+    "intent": "Connect anticodon specificity to decoding outcomes.",
+    "domain": "Translation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "In a mutant, chromatin at a gene becomes more accessible and RNA polymerase occupancy increases, but steady-state mRNA abundance is unchanged. Give at least two explanations consistent with these data and identify an additional measurement that would help distinguish them.",
+    "intent": "Reconcile chromatin, transcription, and RNA-stability evidence.",
+    "domain": "Gene Regulation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "Two heterozygous parents Aa × Aa have a child. If A is completely dominant and there is full penetrance, what is the probability the child has the recessive phenotype? Show the genotype reasoning.",
+    "intent": "Solve straightforward Mendelian inheritance.",
+    "domain": "Genetics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "genetics_problem",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "An autosomal dominant allele has 60% penetrance. A heterozygous parent and a homozygous noncarrier parent have a child. What is the probability that the child both inherits the allele and expresses the associated phenotype?",
+    "intent": "Combine inheritance probability with penetrance.",
+    "domain": "Genetics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "Two loci are 12 map units apart. In a testcross, what fraction of offspring is expected to be recombinant under the standard interpretation of map distance, and why does this not mean that 12% of gametes experienced exactly one crossover event between the loci?",
+    "intent": "Interpret recombination frequency cautiously.",
+    "domain": "Genetics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "genetics_problem",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A trait is highly heritable in a population raised under a narrow range of environments. Explain why this does not imply that environmental changes cannot alter the trait mean.",
+    "intent": "Distinguish heritability from genetic determinism.",
+    "domain": "Quantitative Genetics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A genetic variant is associated with higher expression of gene X and with a quantitative phenotype. The variant lies near gene X. Explain why these observations do not by themselves prove that altered expression of gene X causes the phenotype.",
+    "intent": "Distinguish association, linkage disequilibrium, expression, and causality.",
+    "domain": "Genomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "In a pedigree, two unaffected parents have an affected son and an affected daughter. The trait is rare, fully penetrant, and caused by a single locus. Which inheritance pattern is most simply consistent with the observation: autosomal dominant, autosomal recessive, or X-linked recessive? Explain.",
+    "intent": "Use pedigree evidence to compare inheritance models.",
+    "domain": "Genetics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "pedigree_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A loss-of-function mutation in gene A causes no phenotype alone, and a loss-of-function mutation in gene B causes a mild phenotype alone, but the double mutant has a severe phenotype. What does this suggest about the relationship between the genes, and what does it not prove?",
+    "intent": "Interpret genetic interaction without overclaiming direct molecular interaction.",
+    "domain": "Genetics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "Genes A and B are linked 10 cM apart. A dominant phenotype depends on allele A, but its penetrance is 80%. A second locus B is epistatic: individuals with genotype bb never show the A-dependent phenotype. A heterozygous parent in coupling phase AB/ab is testcrossed to ab/ab. Assuming recombination fraction 0.10 and no viability differences, calculate the probability that an offspring shows the A-dependent phenotype.",
+    "intent": "Integrate linkage, recombination, penetrance, and epistasis.",
+    "domain": "Genetics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "genetics_problem",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "An enzyme-catalyzed reaction is measured at saturating substrate. Doubling enzyme concentration doubles the initial reaction rate. Explain why this result is expected and why it does not imply a change in the enzyme's substrate affinity.",
+    "intent": "Distinguish enzyme concentration from affinity.",
+    "domain": "Biochemistry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "An inhibitor increases the apparent Km of an enzyme but leaves Vmax unchanged. Under the simplest Michaelis-Menten interpretation, what type of inhibition is most consistent with this pattern, and how would increasing substrate concentration affect inhibition?",
+    "intent": "Interpret standard enzyme-kinetic parameters.",
+    "domain": "Biochemistry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A reaction has a negative standard free-energy change, yet flux through the pathway is very low in a cell. Give two reasons why thermodynamic favorability does not guarantee high pathway flux.",
+    "intent": "Distinguish thermodynamics from metabolic regulation.",
+    "domain": "Metabolism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A metabolic intermediate rises threefold after an enzyme is inhibited. Explain why this alone does not reveal whether total pathway flux increased or decreased.",
+    "intent": "Distinguish metabolite concentration from flux.",
+    "domain": "Metabolism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A pathway converts S → A → B → P. The final product P allosterically inhibits the enzyme catalyzing S → A. If P is suddenly depleted, predict the short-term effect on pathway entry and explain the logic of feedback inhibition.",
+    "intent": "Reason about metabolic feedback.",
+    "domain": "Metabolism",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "pathway_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A mutation lowers an enzyme's kcat by 50% but also causes a 3-fold increase in enzyme abundance. The enzyme lies in a branched metabolic network with feedback regulation and an alternative pathway that can bypass it. Explain why the organismal phenotype cannot be predicted from kcat alone and identify the additional information most relevant to estimating impact.",
+    "intent": "Integrate enzyme kinetics, abundance, pathway regulation, and compensation.",
+    "domain": "Biochemistry and Metabolism",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "multi_scale_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A population of insects contains heritable variation in color. After a habitat change, dark individuals leave more offspring on average than light individuals. Over generations, dark-color alleles increase in frequency. Explain why this is natural selection and not individual acclimation.",
+    "intent": "Explain population-level selection from heritable variation.",
+    "domain": "Evolutionary Biology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "evolutionary_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A rare neutral allele reaches high frequency after a severe population bottleneck. Which evolutionary process most directly explains this change, and why is the change not evidence that the allele is adaptive?",
+    "intent": "Distinguish drift from selection.",
+    "domain": "Evolutionary Biology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A bird species develops thicker feathers during winter, but the change is not inherited by its offspring. Is this best described as adaptation or acclimation? Explain.",
+    "intent": "Distinguish adaptation from acclimation.",
+    "domain": "Evolutionary Biology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "In one environment, allele A increases survival but reduces mating success; allele a has the opposite effects. Explain why the allele with the highest survival need not have the highest evolutionary fitness.",
+    "intent": "Reason about fitness as total reproductive success.",
+    "domain": "Evolutionary Biology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "evolutionary_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "Two unrelated lineages evolve similar streamlined body shapes in similar aquatic environments. What evidence would support convergent evolution rather than close common ancestry as the explanation for the similar trait?",
+    "intent": "Distinguish analogy from homology using phylogenetic evidence.",
+    "domain": "Evolutionary Biology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "An allele enters a small island population through migration, is mildly favored by selection, and is initially present in only two copies. Explain how migration, selection, and drift can all affect its fate, and why the direction of selection alone does not determine the outcome.",
+    "intent": "Integrate migration, selection, and drift.",
+    "domain": "Evolutionary Biology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evolutionary_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "In a diploid population, the frequency of allele A is 0.7 and allele a is 0.3. Under Hardy-Weinberg equilibrium, calculate the expected frequencies of AA, Aa, and aa.",
+    "intent": "Apply Hardy-Weinberg genotype-frequency calculations.",
+    "domain": "Population Genetics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A population has genotype frequencies AA=0.50, Aa=0.20, aa=0.30. Calculate the frequency of allele A.",
+    "intent": "Calculate allele frequency from genotype frequencies.",
+    "domain": "Population Genetics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A population shows a large deficit of heterozygotes compared with Hardy-Weinberg expectations. Name two distinct biological processes that could produce this pattern and explain why the pattern alone does not identify which process occurred.",
+    "intent": "Interpret departure from Hardy-Weinberg equilibrium.",
+    "domain": "Population Genetics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A very small population experiences random year-to-year changes in allele frequencies even though the measured phenotypes have equal reproductive success. What process is most consistent with the changes, and why is small effective population size relevant?",
+    "intent": "Explain genetic drift and effective population size.",
+    "domain": "Population Genetics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "After a bottleneck, a population returns to its former census size but has lower heterozygosity than before. Explain why rapid recovery of population size does not instantly restore lost genetic diversity.",
+    "intent": "Reason about bottlenecks and diversity recovery.",
+    "domain": "Population Genetics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "evolutionary_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A population is analyzed with a Hardy-Weinberg model, but 25% of individuals are recent migrants from a genetically differentiated population and mating is assortative by origin. Identify the violated assumptions and explain why Hardy-Weinberg genotype expectations may be misleading here.",
+    "intent": "Detect invalid model assumptions.",
+    "domain": "Population Genetics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A population grows from 100 to 200 individuals in one time interval and from 200 to 400 in the next under constant conditions. Which simple growth model best describes these data: exponential or logistic? Explain.",
+    "intent": "Select a population-growth model from data.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "model_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A population near carrying capacity experiences a temporary reduction after a storm, then returns toward its previous size. Explain how density dependence can produce this pattern without implying that the ecosystem has a fixed perfect balance.",
+    "intent": "Reason about logistic recovery and dynamic equilibrium.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "ecological_scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "After predator P is removed, herbivore H increases and plant biomass falls. Give the simplest trophic explanation and one alternative mechanism that should be considered before claiming a direct trophic cascade.",
+    "intent": "Reason about direct and indirect ecological effects.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "Species X and Y are positively correlated in abundance across 30 sites. Explain why this does not prove mutualism and give two alternative explanations for the correlation.",
+    "intent": "Distinguish ecological association from direct interaction.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A lake receives a pulse of limiting nutrient, primary production rises, and dissolved oxygen later declines at night. Explain a biologically plausible chain of events connecting these observations.",
+    "intent": "Integrate nutrient limitation, productivity, respiration, and oxygen dynamics.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "multi_scale_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A prey population declines after a new predator arrives, but at the same time a drought reduces plant food. Design an observational or manipulative comparison that could help distinguish predation from resource limitation as the main driver.",
+    "intent": "Discriminate competing ecological causes.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A three-species community contains a plant, an herbivore, and a predator. After predator removal, herbivores initially increase, plants decline, and then herbivores later decline. Give at least two mechanisms consistent with the delayed herbivore decline and identify evidence that would distinguish them.",
+    "intent": "Interpret multi-species dynamics with non-unique causal mechanisms.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "Two habitat fragments each support 40 individuals of a species. A corridor increases migration between them. Explain one way connectivity can reduce extinction risk and one way it can create a biological trade-off.",
+    "intent": "Reason about connectivity, rescue effects, and trade-offs.",
+    "domain": "Conservation Biology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A reintroduced population grows rapidly for five years but descends from only six founders. Explain why demographic growth alone does not show that long-term genetic risk has been resolved.",
+    "intent": "Connect founder effects to conservation genetics.",
+    "domain": "Conservation Genetics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A threatened species occupies high-quality habitat in one large patch and lower-quality habitat in several small patches. Explain why choosing where to focus conservation cannot be based on patch area alone.",
+    "intent": "Integrate habitat quality, population size, connectivity, and uncertainty.",
+    "domain": "Conservation Biology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ecological_scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A restoration project increases native plant cover but bird diversity does not change over three years. Give several biologically plausible interpretations and explain what additional monitoring would help evaluate them.",
+    "intent": "Interpret restoration outcomes without assuming one metric captures recovery.",
+    "domain": "Restoration Ecology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A bacterial culture's optical density doubles, but microscopy shows the average cell size also doubled. Explain why optical density alone cannot establish that cell number doubled.",
+    "intent": "Distinguish biomass/turbidity from cell number.",
+    "domain": "Microbiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A bacterial population becomes enriched for a pre-existing antibiotic-resistance allele during exposure to an antibiotic. Explain why this is evolution by selection rather than individual cells adapting because they need resistance.",
+    "intent": "Explain resistance evolution non-teleologically.",
+    "domain": "Microbiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "evolutionary_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A recipient bacterial strain acquires a plasmid only when mixed with live donor cells that carry the plasmid; cell-free donor filtrate does not transfer it. Which horizontal gene-transfer mechanism is most consistent with this pattern, and what additional control would strengthen the inference?",
+    "intent": "Interpret evidence for conjugation conceptually.",
+    "domain": "Microbiology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "Microbial DNA from taxon X is detected in soil, but RNA markers of active metabolism are not detected and cell counts do not increase. Explain why DNA detection alone is insufficient evidence of active growth.",
+    "intent": "Distinguish presence of DNA from microbial activity.",
+    "domain": "Microbial Ecology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "Two microbial communities have the same total cell density, but one has a biofilm architecture that creates steep oxygen gradients. Explain how spatial structure can generate different metabolic niches despite equal total abundance.",
+    "intent": "Connect biofilm structure to microenvironmental metabolism.",
+    "domain": "Microbial Ecology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "multi_scale_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A virus particle contains a genome and capsid but no machinery for independent metabolism or ribosome-based protein synthesis. Explain why viral replication depends on host cells.",
+    "intent": "Explain host dependence of viral replication.",
+    "domain": "Virology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "Two segmented viruses co-infect the same cell and progeny contain new combinations of genome segments from the two parental strains. What evolutionary process does this describe conceptually, and how does it differ from point mutation?",
+    "intent": "Distinguish reassortment from mutation.",
+    "domain": "Virology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A viral variant binds a receptor efficiently in cultured cells but still replicates poorly in that cell type. Explain why receptor binding alone does not establish productive tropism.",
+    "intent": "Distinguish entry compatibility from full replication competence.",
+    "domain": "Virology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "An antiviral-resistant viral genotype is initially rare. Treatment strongly suppresses susceptible variants but has little effect on the resistant variant, which then rises in frequency. Explain the evolutionary logic without implying that treatment caused the specific resistance mutation to appear because it was needed.",
+    "intent": "Explain antiviral resistance as selection on variation.",
+    "domain": "Virology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evolutionary_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A physical epithelial barrier prevents many microbes from entering tissue. Is this primarily innate or adaptive immunity, and why?",
+    "intent": "Classify barrier defense as innate immunity.",
+    "domain": "Immunology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "After a first exposure to an antigen, antigen-specific lymphocyte clones expand. On a later exposure, the response is faster and larger. Explain how clonal selection and immune memory account for this pattern.",
+    "intent": "Explain adaptive immune memory.",
+    "domain": "Immunology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A person has a high concentration of antibody that binds an antigen in vitro. Explain why this measurement alone does not prove complete protection from infection.",
+    "intent": "Distinguish antibody abundance from overall protection.",
+    "domain": "Immunology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "An antigen-presenting cell activates a T-cell response after exposure to a protein antigen. Explain why antigen recognition and pathogen destruction are distinct steps, and identify one additional process required between them conceptually.",
+    "intent": "Distinguish immune recognition from effector outcome.",
+    "domain": "Immunology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A diffusible morphogen forms a high-to-low concentration gradient across a tissue, and cells adopt different fates at different concentration thresholds. Predict how uniformly increasing morphogen concentration could shift fate boundaries.",
+    "intent": "Reason from signaling gradients to pattern formation.",
+    "domain": "Developmental Biology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "Cells transplanted from region A to region B adopt the fate typical of region B rather than their original region. What does this suggest about cell fate at the time of transplantation, and what alternative interpretation should still be considered?",
+    "intent": "Interpret transplantation evidence about specification and induction.",
+    "domain": "Developmental Biology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A lineage-tracing label marks a population of embryonic cells, and labeled descendants later appear in two tissues. Explain what lineage tracing establishes and why it does not by itself prove that the labeled progenitor population was sufficient to instruct both tissue identities.",
+    "intent": "Distinguish lineage history from causal sufficiency.",
+    "domain": "Developmental Biology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A regulatory factor is removed only during an early developmental window. A later signaling gradient remains normal, but an organ fails to form. The same factor removed after the window has little effect. Explain how timing, competence, and gene-regulatory state can account for the result.",
+    "intent": "Integrate developmental timing, regulation, and signaling.",
+    "domain": "Developmental Biology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "multi_scale_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A plant closes its stomata during a dry afternoon. Predict the immediate effects on water loss and CO2 entry, and explain the trade-off for photosynthesis.",
+    "intent": "Explain carbon-water trade-off in stomatal regulation.",
+    "domain": "Plant Biology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "physiological_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A root cell has a water potential of -0.6 MPa and the surrounding soil solution is -0.2 MPa. Ignoring pressure changes during the initial moment, predict the direction of net water movement.",
+    "intent": "Apply water-potential reasoning.",
+    "domain": "Plant Physiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "Leaves on a shaded branch export less sugar than sun-exposed leaves, while a growing fruit on the same plant imports sugar. Explain the source-sink relationship and why phloem transport need not follow gravity.",
+    "intent": "Reason about source-sink transport.",
+    "domain": "Plant Physiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A drought-tolerant genotype has reduced stomatal opening compared with another genotype. Explain possible consequences from guard-cell behavior through photosynthetic carbon gain, growth, water-use efficiency, and competitive performance under wet versus dry environments.",
+    "intent": "Integrate plant physiology and ecological context across scales.",
+    "domain": "Plant Biology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "multi_scale_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Body temperature rises above a regulated set point and triggers responses that increase heat loss. Is this negative or positive feedback, and why?",
+    "intent": "Distinguish negative from positive feedback.",
+    "domain": "Animal Physiology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "physiological_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "An animal increases ventilation rate during exercise. Explain why ventilation is not the same process as cellular respiration even though both are involved in meeting metabolic demand.",
+    "intent": "Distinguish gas exchange from cellular energy metabolism.",
+    "domain": "Animal Physiology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "Oxygen diffuses from a respiratory surface into blood, and blood flow then carries oxygen to tissues. Distinguish the roles of diffusion and bulk flow in this transport sequence.",
+    "intent": "Distinguish diffusion gradients from circulation.",
+    "domain": "Animal Physiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A hormone's plasma concentration is unchanged, but a target tissue becomes less responsive because receptor abundance falls by half. Explain why hormone concentration alone does not determine the physiological response.",
+    "intent": "Distinguish signal concentration from tissue responsiveness.",
+    "domain": "Endocrine Physiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "Two closely related animal populations live at different temperatures. One population shows an inherited difference in membrane lipid composition; individuals from both populations also adjust membrane composition after short-term temperature exposure. Distinguish evolutionary adaptation from physiological acclimation in this case.",
+    "intent": "Separate inherited adaptation from reversible acclimation.",
+    "domain": "Comparative Physiology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evolutionary_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A neuron's resting membrane potential becomes less negative, but no action potential occurs. Explain why membrane depolarization and an action potential are not synonymous.",
+    "intent": "Distinguish membrane potential changes from action potentials.",
+    "domain": "Neuroscience",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "At a chemical synapse, presynaptic depolarization leads to neurotransmitter release, which changes postsynaptic ion conductance. Identify the electrical and chemical steps in the sequence.",
+    "intent": "Distinguish electrical and chemical signaling at synapses.",
+    "domain": "Neuroscience",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "Activity in brain region R correlates with a learned behavior, but temporary disruption of R leaves behavior unchanged. What does this imply about the original correlation and possible neural circuit organization?",
+    "intent": "Distinguish neural correlation from causal necessity.",
+    "domain": "Neuroscience",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A bird's foraging strategy changes after experience, and the new behavior increases food intake in the current environment. Give a proximate explanation and an ultimate evolutionary explanation, and explain why the two are not alternatives.",
+    "intent": "Distinguish proximate and ultimate explanations of behavior.",
+    "domain": "Behavioral Ecology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "On a rooted tree, taxa A and B share a more recent common ancestor with each other than either shares with C. If the A and B branches are rotated around their shared node, do the relationships change? Explain.",
+    "intent": "Read tree topology independently of visual rotation.",
+    "domain": "Phylogenetics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "phylogenetic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A tree shows extant species X and Y as sister taxa. Does this mean X is the direct ancestor of Y? Explain what the tree actually supports.",
+    "intent": "Avoid interpreting extant sister taxa as ancestor-descendant.",
+    "domain": "Phylogenetics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A character matrix shows taxa A and B share a derived state absent from the outgroup and taxon C, while A and C share only an ancestral state. Which pair is more strongly supported as a clade by these characters, and why?",
+    "intent": "Use shared derived characters in phylogenetic inference.",
+    "domain": "Systematics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "phylogenetic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "Gene trees for three loci disagree: two loci support species topology ((A,B),C), while one supports ((A,C),B). Give two biological or analytical reasons why gene-tree discordance can occur and explain why one discordant locus does not automatically overturn the species-tree hypothesis.",
+    "intent": "Interpret conflicting phylogenetic evidence cautiously.",
+    "domain": "Phylogenomics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "Two proteins from different species are 92% identical in sequence. What can reasonably be inferred about possible common ancestry, and what cannot be concluded about identical function from this information alone?",
+    "intent": "Make cautious inferences from sequence similarity.",
+    "domain": "Molecular Evolution",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "sequence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A duplicated gene produces two copies that accumulate different mutations over time. One copy retains the ancestral function and the other acquires altered expression and a modified function. Explain how gene duplication can enable functional divergence.",
+    "intent": "Explain paralog evolution and divergence.",
+    "domain": "Molecular Evolution",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "evolutionary_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "Two lineages show the same amino-acid change in a protein associated with similar environments. A phylogeny indicates the change arose independently. What additional evidence would strengthen a claim of convergent molecular adaptation rather than coincidence or weak constraint?",
+    "intent": "Evaluate evidence for convergent molecular evolution.",
+    "domain": "Molecular Evolution",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "RNA-seq sample A has twice as many total reads as sample B. Gene X has 200 reads in A and 150 in B. Explain why raw read count alone is insufficient to conclude that gene X is more highly expressed in A.",
+    "intent": "Distinguish raw counts from normalized expression.",
+    "domain": "Bioinformatics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A study has three technical replicates from one biological specimen and treats them as n=3 independent biological replicates. Explain the problem and how it affects inference about biological variability.",
+    "intent": "Recognize pseudoreplication and replicate types.",
+    "domain": "Biological Data Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A clustering algorithm separates 100 samples into two groups, and the groups correspond partly to tissue type but also perfectly to sequencing batch. Explain why the clusters do not prove two biological subtypes and identify a next analytical step.",
+    "intent": "Recognize batch effects and limits of clustering.",
+    "domain": "Bioinformatics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A transcript increases 4-fold with adjusted p=0.001, but the protein changes by only 5% and the phenotype is unchanged. Explain why statistical significance and differential expression do not by themselves establish biological importance or causal function.",
+    "intent": "Integrate transcriptomic, proteomic, and phenotypic evidence.",
+    "domain": "Biological Data Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "An experiment compares treated cells on one plate with control cells on a second plate, with 20 wells per plate. All 20 wells are analyzed as independent biological replicates. Identify the pseudoreplication problem and propose a design that better separates treatment effects from plate effects.",
+    "intent": "Diagnose pseudoreplication and confounding.",
+    "domain": "Experimental Biology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A fluorescent reporter signal falls by 40% after treatment. The reporter is assumed to reflect promoter activity, but treatment also slows protein degradation. Explain why fluorescence alone may not equal transcription rate and name one control or complementary measurement that would help.",
+    "intent": "Distinguish indirect measurement from underlying biological process.",
+    "domain": "Biological Measurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A qPCR assay reports a 2-cycle lower threshold for gene X in treated samples than controls, while a reference gene is unchanged. Under the idealized assumption of perfect doubling per cycle, estimate the fold difference in starting template and state one reason this estimate could be misleading biologically.",
+    "intent": "Interpret qPCR fold change with assumptions.",
+    "domain": "Biological Measurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A cell population grows from 1.0×10^5 to 8.0×10^5 cells in 9 hours under conditions consistent with exponential growth. Estimate the doubling time, then explain one observation that would indicate exponential growth is no longer an adequate model.",
+    "intent": "Combine quantitative growth calculation with model checking.",
+    "domain": "Quantitative Biology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "Knocking out gene A eliminates expression of gene B. Re-expressing A restores B expression. Protein A also co-immunoprecipitates with a transcription factor known to bind the B promoter, but direct binding of A to DNA has not been shown. Evaluate what is supported about A's role, what remains uncertain, and describe evidence that would distinguish direct from indirect regulation.",
+    "intent": "Distinguish necessity, rescue, physical association, and direct regulation.",
+    "domain": "Experimental Biology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A small isolated population has lost genetic diversity over 20 generations. During the same period, mean body size declined, the climate became drier, and juvenile survival fell. Genomic data show increased inbreeding, but a common-garden experiment finds that offspring from recent generations still grow smaller than ancestral stored lines under identical conditions. Construct a multi-scale explanation that separates effects of drift/inbreeding, heritable evolution, developmental plasticity, and environmental filtering. State what conclusions are supported and what additional evidence would discriminate among remaining alternatives.",
+    "intent": "Integrate population genetics, phenotype, environment, and causal evidence across scales.",
+    "domain": "Multi-Scale Biology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "multi_scale_reasoning",
+    "jurisdiction_required": false
+  }
+]

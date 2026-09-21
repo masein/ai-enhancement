@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A lab finds that participants who report sleeping less also make more errors on a sustained-attention task. Explain what is directly observed, what psychological construct is being inferred, and why the data do not by themselves establish the mechanism linking sleep and attention.",
+    "intent": "Distinguish observation, construct, mechanism, and causal inference.",
+    "domain": "Foundations of Psychological Science",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A researcher defines 'cognitive flexibility' as the reaction-time cost of switching between two classification rules. Explain why the switch cost is an operational measure rather than the construct itself, and name one way the measure could be contaminated by another process.",
+    "intent": "Distinguish construct from operationalization and identify task impurity.",
+    "domain": "Foundations of Psychological Science",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "measurement_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A symbolic rule model and a connectionist model both fit the average accuracy in a categorization task. The symbolic model predicts abrupt transfer after learning one rule; the connectionist model predicts graded transfer based on feature similarity. What new test would best discriminate the models, and why is current fit insufficient?",
+    "intent": "Compare cognitive models using discriminating predictions.",
+    "domain": "Cognitive Science Foundations",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "model_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A navigation error can be described as choosing the wrong turn, using an incorrect spatial representation, or arising from altered activity in a navigation network. Explain how these descriptions occupy different levels of explanation and why none is automatically a substitute for the others.",
+    "intent": "Distinguish behavioral, process-level, and implementation-level explanations.",
+    "domain": "Cognitive Science Foundations",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "multi_level_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "In a detection task, a participant says 'signal present' on 80% of signal trials and 30% of noise-only trials. Without computing d-prime exactly, explain how you would separate sensitivity from response criterion and why the hit rate alone is not enough.",
+    "intent": "Apply signal-detection reasoning to sensitivity and criterion.",
+    "domain": "Sensation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A person can just notice a 2-gram difference when comparing 20-gram weights, but needs roughly a 10-gram difference when comparing 100-gram weights. What principle of proportional sensitivity is illustrated, and what does it imply about absolute versus relative stimulus differences?",
+    "intent": "Reason about psychophysical discrimination and proportional sensitivity.",
+    "domain": "Sensation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "After several minutes in a room with a constant odor, the odor seems weaker even though the chemical concentration is unchanged. Distinguish physical stimulus magnitude, sensory adaptation, and perceptual judgment.",
+    "intent": "Explain adaptation without conflating stimulus and perception.",
+    "domain": "Sensation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "perception_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "Two identical gray patches look different in lightness because one is surrounded by darker tones and the other by lighter tones. Explain how contextual processing can alter perception even when local sensory input is the same.",
+    "intent": "Explain perceptual context effects rather than passive recording.",
+    "domain": "Perception",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "perception_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A moving object projects different retinal sizes as it approaches, yet observers usually perceive its physical size as stable. Explain the role of distance information and perceptual constancy in this judgment.",
+    "intent": "Apply constancy and cue integration to perception.",
+    "domain": "Perception",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cognitive_mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "In a visual-search task, reaction time rises by about 8 ms per distractor when the target differs from distractors by one salient feature, but by 38 ms per distractor when the target is defined by a conjunction of features. Accuracy stays near 95% in both tasks. What do the slopes suggest about processing demands, and what should not be inferred about a unique neural mechanism?",
+    "intent": "Interpret search slopes while limiting mechanistic overreach.",
+    "domain": "Visual Cognition",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "reaction_time_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "Participants view a scene, a brief blank occurs, and then the scene returns with one object changed. Many fail to report the change unless attention was directed to that object. What does this pattern suggest about visual representation and attention?",
+    "intent": "Reason about change detection and visual representation.",
+    "domain": "Visual Cognition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "attention_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A spoken syllable is acoustically ambiguous between two phonemes. When embedded in words, listeners tend to hear the phoneme that creates a familiar word. Distinguish the acoustic signal, the perceptual interpretation, and the lexical context effect.",
+    "intent": "Explain top-down influence in speech perception.",
+    "domain": "Auditory Cognition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "language_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A listener identifies a tone more accurately when it is presented alone than when it is embedded among competing sounds with overlapping frequencies. Explain how auditory scene analysis and masking could contribute without assuming the ear received no information about the tone.",
+    "intent": "Differentiate acoustic availability from perceptual segregation.",
+    "domain": "Auditory Cognition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "perception_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "Participants monitor a rapid stream for a target letter while also responding to an occasional tone. Tone responses are 120 ms slower during target detection than during baseline trials, with no accuracy change. Give two plausible explanations for the interference and one additional manipulation that could distinguish them.",
+    "intent": "Analyze dual-task interference and discriminating evidence.",
+    "domain": "Attention",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "alternative_explanations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A driver can report seeing a billboard but later cannot remember its content. Explain why awareness of a stimulus, selective attention to its details, and later memory should not be treated as the same process.",
+    "intent": "Distinguish awareness, attention, and memory.",
+    "domain": "Attention",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "In a task-switching study, mean reaction time is 690 ms on switch trials and 610 ms on repeat trials; accuracy is 92% versus 93%. What is the switch cost, and why does it not prove that the mind uses one literal central resource for all tasks?",
+    "intent": "Quantify and interpret task-switching cost.",
+    "domain": "Attention",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "reaction_time_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A masked visual stimulus is reported as unseen, yet choices are above chance when participants guess which of two categories it belonged to. What can this behavioral dissociation support, and what claims about subjective awareness or a settled theory of consciousness would go beyond the data?",
+    "intent": "Evaluate unconscious-processing evidence cautiously.",
+    "domain": "Consciousness and Awareness",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "multi_level_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A neural signal correlates with trials on which participants report awareness. Explain why correlation with report is not enough to establish that the signal is the causal mechanism of conscious experience.",
+    "intent": "Distinguish neural correlate, report, and causal mechanism.",
+    "domain": "Consciousness and Awareness",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "neuroscience_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "Participants remember 7 digits well when repeating them silently, but performance drops when they must continuously say an irrelevant word during retention. What mechanism is this manipulation testing, and why is the result not evidence for a universal fixed capacity of seven items?",
+    "intent": "Reason about rehearsal, interference, and capacity.",
+    "domain": "Working Memory",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "memory_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "In a working-memory task, accuracy falls from 93% at load 2 to 76% at load 6. A second group receives a 500-ms longer response deadline and improves only at load 6. Explain how load and response demands could jointly affect performance.",
+    "intent": "Integrate load, timing, and task demands.",
+    "domain": "Working Memory",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A complex-span task predicts reasoning scores at r = 0.42, but the working-memory task itself has reliability 0.70. Explain why the observed correlation may underestimate the relation between latent constructs, yet still does not prove a causal role for working memory.",
+    "intent": "Integrate reliability, correlation, and causal limits.",
+    "domain": "Working Memory",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "psychometric_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "After learning 40 word pairs, a participant recalls 18 without cues but recognizes 34 in a four-choice test. Give an interpretation that distinguishes weak retrieval support from complete failure to encode the pairs.",
+    "intent": "Distinguish recall, recognition, encoding, and retrieval.",
+    "domain": "Long-Term Memory",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "memory_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "Participants study two similar lists on successive days. Recall for the first list declines after learning the second, but recognition with strong cues is relatively preserved. Explain how interference and retrieval support could jointly account for the pattern.",
+    "intent": "Analyze interference and retrieval support.",
+    "domain": "Long-Term Memory",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "memory_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A memory-training group improves from 52% to 72% on a practiced word-list task immediately after training, but scores 55% one month later and shows no gain on prose recall. What conclusions are justified about temporary performance, retention, and transfer?",
+    "intent": "Distinguish immediate gains, durable learning, and transfer.",
+    "domain": "Long-Term Memory",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "learning_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A study combines free recall, recognition, confidence, delayed testing, and cueing. Group A shows low free recall, high recognition, high cue benefit, and little decline across 48 hours; Group B shows low recall, low recognition, low cue benefit, and marked decline. Compare the evidence for retrieval versus storage problems in the two groups and state what further data would strengthen the inference.",
+    "intent": "Synthesize converging evidence on encoding, storage, and retrieval.",
+    "domain": "Long-Term Memory",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "multi_level_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "Eyewitnesses hear a misleading post-event description and later choose the suggested detail more often. Confidence is equally high for accurate and suggested memories. Explain why confidence does not establish accuracy and how source-monitoring errors could contribute.",
+    "intent": "Analyze misinformation, source monitoring, and confidence.",
+    "domain": "Memory Distortions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "memory_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "Participants later remember having predicted an outcome as more likely than they actually rated it before learning what happened. What kind of reconstructive process could produce this shift, and what record would be needed to distinguish memory distortion from genuine prior belief?",
+    "intent": "Reason about reconstructive memory using prospective records.",
+    "domain": "Memory Distortions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A loud tone is repeatedly followed by an air puff. Eventually the tone alone elicits blinking. Later, the tone is presented repeatedly without the air puff and blinking declines. Explain why this decline should not be assumed to mean the original association was erased.",
+    "intent": "Reason about acquisition and extinction without erasure claims.",
+    "domain": "Learning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "learning_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A student studies because submitting practice quizzes removes an annoying reminder notification. Identify the behavioral contingency and explain why this is negative reinforcement rather than punishment.",
+    "intent": "Distinguish reinforcement from punishment functionally.",
+    "domain": "Learning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "An animal learns that one light predicts food in one room but not in another. When tested in a new room, responding is intermediate. Explain how stimulus generalization and contextual control could both contribute.",
+    "intent": "Integrate generalization and context in associative learning.",
+    "domain": "Learning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "learning_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "During training, a learner's performance improves when feedback is given after every trial, but retention a week later is better in a group that received less frequent feedback. What does this show about performance during practice versus durable learning?",
+    "intent": "Distinguish practice performance from retention.",
+    "domain": "Learning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "In a two-choice task, reward probabilities drift over time. Model A updates only the chosen action value from reward prediction errors. Model B also uses an internal transition model to plan after rule changes. After an unexpected reversal, which trial-by-trial pattern would help distinguish the models?",
+    "intent": "Compare model-free and model-based learning predictions.",
+    "domain": "Reinforcement Learning and Decision Learning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "computational_model",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "Participants choose a familiar option 90% of the time even when a novel option could be better. Explain the exploration-exploitation trade-off and why repeated choice alone does not prove a habit.",
+    "intent": "Differentiate exploitation from habitual control.",
+    "domain": "Reinforcement Learning and Decision Learning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A fitted reinforcement-learning model assigns Participant X a larger learning-rate parameter than Participant Y. Explain why this parameter is an estimate under a model, not a directly observed neural or psychological quantity.",
+    "intent": "Interpret model parameters cautiously.",
+    "domain": "Reinforcement Learning and Decision Learning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "computational_model",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "After practice, responses become 100 ms faster but errors increase from 4% to 12%. Why is it premature to conclude that processing became more efficient, and what additional evidence would help?",
+    "intent": "Detect a speed-accuracy trade-off in skill learning.",
+    "domain": "Skill Learning and Automaticity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "reaction_time_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "The sentence 'While the man hunted the deer ran into the woods' initially encourages one interpretation and then forces revision. Explain how incremental sentence processing and temporary structural ambiguity can produce slowed reading at the disambiguating region.",
+    "intent": "Analyze temporary ambiguity and reanalysis.",
+    "domain": "Language and Psycholinguistics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "language_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A speaker says 'Can you open the window?' and the listener treats it as a request rather than a question about physical ability. Explain the contribution of semantics versus pragmatics.",
+    "intent": "Distinguish literal meaning from pragmatic inference.",
+    "domain": "Language and Psycholinguistics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "Toddlers hear syllable sequences in which some syllable pairs occur with high transitional probability. Later they distinguish familiar pairings from rearranged ones. Explain how this could support statistical learning while not proving that one mechanism alone explains grammar acquisition.",
+    "intent": "Interpret distributional learning in language development.",
+    "domain": "Language Acquisition",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "developmental_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A bilingual child knows 400 words in Language A and 350 in Language B, with 150 translation equivalents. Why can vocabulary in either language alone underestimate total lexical knowledge, and why should performance be interpreted relative to exposure and proficiency?",
+    "intent": "Reason about bilingual lexical measurement.",
+    "domain": "Language Acquisition",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "measurement_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "In a bilingual switching task, switch costs are smaller in a highly practiced bilingual group, but the groups differ in age, education, and overall response speed. Explain why this result cannot establish a general executive-control advantage and identify a better comparison.",
+    "intent": "Evaluate bilingual-control claims with confounds.",
+    "domain": "Bilingualism and Multilingual Cognition",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "All blue cards are square. This card is blue. Therefore this card is square. Explain why the argument is deductively valid even if, in the real world, the premise about blue cards happens to be false.",
+    "intent": "Distinguish logical validity from truth.",
+    "domain": "Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "reasoning_problem",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A logically valid syllogism has an unbelievable conclusion, while an invalid syllogism has a believable conclusion. Participants accept the believable conclusion more often. What does this suggest about belief influence on formal reasoning?",
+    "intent": "Analyze conflict between belief and validity.",
+    "domain": "Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "reasoning_problem",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A team solves a new mechanical problem faster after seeing a superficially different problem with the same relational structure. What evidence would show analogical transfer rather than simple surface similarity?",
+    "intent": "Reason about relational analogy and transfer.",
+    "domain": "Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "cognitive_mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "Option A gives a sure gain of $40. Option B gives a 50% chance of $100 and a 50% chance of $0. Compute expected monetary value for each and explain why choosing A is not automatically irrational.",
+    "intent": "Separate expected value from utility and risk preference.",
+    "domain": "Judgment and Decision-Making",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "The same medical outcome is described as '90% survive' to one group and '10% die' to another, and choices differ. What does this show about framing, and why does it not reveal a fixed trait of irrationality in each participant?",
+    "intent": "Analyze framing effects and contextual variability.",
+    "domain": "Judgment and Decision-Making",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A diagnostic test has 90% sensitivity and 95% specificity in a population where prevalence is 1%. In 10,000 people, about how many true positives and false positives should be expected, and why is P(positive|disease) not the same as P(disease|positive)?",
+    "intent": "Apply base-rate and conditional-probability reasoning.",
+    "domain": "Probabilistic Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A vivid rare event comes readily to mind, so a person judges it as common. Explain how retrieval fluency can influence frequency judgment and why a memorable example is not itself evidence of high base rate.",
+    "intent": "Explain availability-like reasoning without label dependence.",
+    "domain": "Probabilistic Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cognitive_mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A school introduces a new study program only for students who scored unusually low on a pretest. Their scores rise substantially on retest. Explain how regression to the mean can mimic improvement and what comparison is needed to estimate the program's effect.",
+    "intent": "Separate causal improvement from regression to the mean.",
+    "domain": "Causal Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "In observational data, variable X predicts Y, and Y predicts Z. A mediation model shows a significant indirect path X→Y→Z. Explain why this statistical pattern does not by itself prove that Y is the causal psychological mechanism.",
+    "intent": "Distinguish statistical mediation from causal mechanism.",
+    "domain": "Causal Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A person repeatedly tries to use a box only as a container and fails to notice it can serve as a platform. Explain how the current representation of the object's function can constrain problem solving and how a prompt to list alternative uses could help.",
+    "intent": "Explain representation constraints in problem solving.",
+    "domain": "Problem Solving",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cognitive_mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A cognitive-ability test has a standard error of measurement of 4 points. One person scores 104 on one occasion and 109 on another. Explain why the five-point difference should not automatically be interpreted as a real change in general ability.",
+    "intent": "Interpret test-score change under measurement error.",
+    "domain": "Intelligence and Cognitive Ability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "psychometric_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A questionnaire has test-retest reliability of 0.92 but correlates only 0.08 with behavioral indicators of the construct it claims to measure and correlates 0.70 with social desirability. Evaluate its reliability and construct validity.",
+    "intent": "Distinguish reliability from validity using convergent and contaminant evidence.",
+    "domain": "Psychometrics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "psychometric_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A selection test predicts job performance at r = 0.25 in employees, but only applicants with high test scores were hired. Explain how range restriction can reduce the observed correlation and why correction would not prove causality.",
+    "intent": "Analyze range restriction and predictive validity.",
+    "domain": "Psychometrics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "psychometric_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A memory scale produces scores from 0 to 20, and 60% of participants score 20 after training. Explain how a ceiling effect limits conclusions about individual differences and further improvement.",
+    "intent": "Identify ceiling effects and measurement limits.",
+    "domain": "Measurement Theory",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "measurement_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A scale is translated into two languages. Mean scores differ, but several items show different relationships to the latent factor across language groups. Why is it unsafe to interpret the raw mean difference as a pure group difference in the construct?",
+    "intent": "Recognize measurement non-equivalence in group comparison.",
+    "domain": "Measurement Theory",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "psychometric_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A person is quiet in one unfamiliar meeting but talkative with close friends. Explain why one behavior is insufficient to infer a stable personality trait, a diagnosis, or moral character.",
+    "intent": "Distinguish trait tendency from situation-specific behavior.",
+    "domain": "Personality Science",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "Two people report the same unpleasant valence, but one shows high physiological arousal and the other low arousal. What does this illustrate about the multi-component nature of emotion and why one physiological measure cannot uniquely identify an emotion?",
+    "intent": "Reason about valence, arousal, and physiological ambiguity.",
+    "domain": "Emotion",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A student performs poorly on a difficult task despite reporting high interest and effort. Explain why poor performance alone does not demonstrate low motivation and name two non-motivational factors that could limit performance.",
+    "intent": "Separate motivation from performance.",
+    "domain": "Motivation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "Group A is 80% accurate with mean confidence 80%; Group B is also 80% accurate but mean confidence 95%. Which group is better calibrated on average, and why does high confidence not equal high metacognitive quality?",
+    "intent": "Evaluate confidence calibration quantitatively.",
+    "domain": "Metacognition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "An observer sees a colleague arrive late once and concludes the colleague is careless, despite learning that the train was canceled. Explain how situational information should affect attribution and why one event does not identify a stable trait.",
+    "intent": "Analyze person-versus-situation attribution.",
+    "domain": "Social Cognition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "social_cognition",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A child watches an agent place a toy in Box A and leave. The toy is then moved to Box B without the agent seeing. The child is asked where the agent will first look. Explain what a correct answer requires about representing another person's belief, and why an incorrect answer could also reflect language or inhibitory-control demands.",
+    "intent": "Analyze false-belief reasoning and task demands.",
+    "domain": "Theory of Mind and Social Understanding",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "developmental_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Three-year-olds fail a rule-switching task more often than five-year-olds. The younger children can state the new rule correctly but keep responding by the old rule. What role might inhibitory control or goal maintenance play, and why is it too simple to say they 'do not understand the rule'?",
+    "intent": "Interpret developmental performance using executive demands.",
+    "domain": "Cognitive Development",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "developmental_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "Infants look longer at an unexpected event than an expected event. What inference can this support about discrimination or expectation, and why is longer looking not direct proof that infants possess the adult concept under study?",
+    "intent": "Interpret looking-time evidence cautiously.",
+    "domain": "Developmental Methods",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "developmental_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "Older adults are slower on a complex working-memory task but match younger adults on a simple recognition task. Explain how processing speed, executive demand, strategy, and task sensitivity could contribute without inferring pathology.",
+    "intent": "Integrate normal aging and task demands.",
+    "domain": "Lifespan Cognitive Development",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "multi_level_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A 70-year-old scores lower than a 25-year-old on a timed reasoning test but higher on a vocabulary test. Explain why this pattern is compatible with different age trajectories for processing speed and accumulated knowledge.",
+    "intent": "Reason about heterogeneous age-related cognitive change.",
+    "domain": "Cognitive Aging",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "In a conflict task, incongruent trials average 720 ms and 88% accuracy; congruent trials average 610 ms and 96% accuracy. After participants are told to respond faster, incongruent trials drop to 650 ms but accuracy falls to 73%. Explain why the second result cannot be interpreted as improved cognitive control.",
+    "intent": "Integrate conflict cost with speed-accuracy trade-off.",
+    "domain": "Cognitive Control",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "reaction_time_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A planning task, an inhibition task, and an updating task correlate modestly with one another. Explain why this pattern is compatible with both shared executive demands and task-specific processes, and why no single task should be treated as process-pure.",
+    "intent": "Reason about unity and diversity of executive functions.",
+    "domain": "Executive Functions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "fMRI shows greater activation in a frontal region during difficult than easy trials, and difficult trials also have slower reaction times. Explain at least three interpretations of the activation difference and why the result does not establish that the region specifically implements cognitive control.",
+    "intent": "Evaluate reverse inference, difficulty confounds, and neural correlation.",
+    "domain": "Brain Imaging",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "neuroscience_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "An EEG component differs between remembered and forgotten items 300 ms after stimulus onset. What does the timing tell you, what does scalp recording not tell you precisely, and why the component should not be treated as a one-to-one marker of successful memory encoding?",
+    "intent": "Interpret ERP timing and source limitations.",
+    "domain": "EEG, ERP, and Electrophysiology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "neuroscience_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "Patient group A has impaired object recognition but relatively preserved word reading; patient group B shows the reverse pattern. Explain how this double dissociation strengthens a claim of partially separable processes, while noting why lesion evidence still requires caution about network reorganization and lesion extent.",
+    "intent": "Reason from double dissociation without over-localizing.",
+    "domain": "Neuropsychology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "neuroscience_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A lesion to a network node reduces performance on a task, while fMRI in healthy participants shows that the same node is active during the task. What additional causal claim is supported by the lesion evidence relative to imaging, and what does neither result prove about sufficiency or exclusive localization?",
+    "intent": "Distinguish correlation, necessity, sufficiency, and localization.",
+    "domain": "Cognitive Neuroscience Foundations",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "multi_level_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "Noninvasive stimulation over a cortical site changes task performance, but the stimulation also causes scalp sensation and may influence connected regions. Explain why sham control and network-level interpretation matter for causal claims.",
+    "intent": "Analyze intervention evidence with off-target and expectancy effects.",
+    "domain": "Neural Causality Methods",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "Model A and Model B have nearly identical average accuracy. Model A predicts that errors should follow long runs of conflicting evidence; Model B predicts errors mainly on low-evidence trials regardless of run length. What analysis would best discriminate the models?",
+    "intent": "Use trial-level qualitative predictions to compare models.",
+    "domain": "Cognitive Models",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "model_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A drift-diffusion-type model fits two conditions by estimating a lower response threshold in Condition B, which also has faster reaction times and more errors. Explain why the parameter is a model-based interpretation of the speed-accuracy trade-off rather than a directly observed cognitive process.",
+    "intent": "Connect model parameters to observed RT and accuracy cautiously.",
+    "domain": "Computational Cognitive Science",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "computational_model",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Two computational models fit the training data equally well. Model 1 has more parameters and slightly better in-sample fit; Model 2 is simpler and predicts held-out trials better. Which evidence is more relevant to generalization, and why does descriptive fit alone not settle psychological plausibility?",
+    "intent": "Evaluate complexity, overfitting, and predictive validation.",
+    "domain": "Model Comparison",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "model_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "Three models produce indistinguishable average choices but imply different latent parameters that are strongly correlated in the fitting procedure. Explain how parameter non-identifiability limits psychological interpretation and propose one kind of new data that could help.",
+    "intent": "Recognize non-identifiability and seek discriminating data.",
+    "domain": "Computational Cognitive Science",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "computational_model",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A within-subject experiment always presents Condition A before Condition B. Participants are slower in B. Identify the hidden confound and the smallest design change that would improve causal interpretation.",
+    "intent": "Detect order effects and propose counterbalancing.",
+    "domain": "Experimental Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A study compares memory after caffeine versus placebo, but participants can easily tell which drink contains caffeine and the experimenter knows the condition. Explain how expectancy and experimenter effects could bias results and what blinding would address.",
+    "intent": "Analyze expectancy and blinding in experimental design.",
+    "domain": "Experimental Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A cross-sectional study finds that 20-year-olds outperform 70-year-olds on a processing-speed task. Explain why this age difference does not by itself establish within-person cognitive decline over 50 years.",
+    "intent": "Distinguish cross-sectional age differences from longitudinal change.",
+    "domain": "Observational Research",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "An original experiment reported d = 0.45 with N = 40. A replication with N = 30 finds d = 0.20 with a wide confidence interval spanning zero, using a somewhat different stimulus set. Explain why the replication neither definitively disproves the original effect nor confirms it, and identify the roles of power, measurement variation, and procedure.",
+    "intent": "Interpret replication under uncertainty and design differences.",
+    "domain": "Replication and Reproducibility",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "replication_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A study tests 20 independent outcomes at alpha = .05 and highlights the one significant result, which has p = .03 and a small effect. Explain how multiple comparisons and selective reporting weaken the evidence even though the p-value is below .05.",
+    "intent": "Interpret multiplicity and evidential strength.",
+    "domain": "Multiple Comparisons and Researcher Flexibility",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "statistical_and_data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A training study reports p = .004 for a mean improvement of 1.5 points on a 100-point scale in N = 2,000. Explain why statistical significance, effect size, theoretical importance, and practical importance must be evaluated separately.",
+    "intent": "Separate significance from magnitude and importance.",
+    "domain": "Effect Sizes",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "statistical_and_data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A monitoring system is 98% accurate, but its rare errors are concentrated in situations where operators are most likely to defer to it. Explain why system accuracy, user trust, and appropriate reliance are different variables, and suggest one design feature that could improve calibrated reliance.",
+    "intent": "Reason about automation bias and calibrated trust.",
+    "domain": "Human-Automation Interaction",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "human_factors",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A lab memory task predicts real-world medication adherence only weakly. Explain why low ecological correspondence may limit generalization, while also explaining why tightly controlled lab evidence can still be informative about a cognitive mechanism.",
+    "intent": "Balance experimental control and ecological validity.",
+    "domain": "Ecological Validity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "Two species solve the same detour problem, but one species has much better visual acuity and more prior experience with transparent barriers. Why is it premature to attribute the performance difference to a general difference in 'reasoning ability'?",
+    "intent": "Avoid anthropomorphic overreach and identify comparative confounds.",
+    "domain": "Comparative Cognition",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "alternative_explanations",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A cognitive claim is supported by a behavioral effect, an fMRI correlation, a lesion deficit, and a computational model that predicts trial-level errors. The behavioral and lesion evidence agree, but the imaging location differs from what the model-inspired hypothesis predicted. Explain which forms of evidence address correlation, necessity, prediction, and mechanism, how the conflict should be interpreted, and what conclusion remains warranted.",
+    "intent": "Integrate behavioral, neural, lesion, and computational evidence across levels.",
+    "domain": "Evidence Integration",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "multi_level_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "Participants classify manipulable objects faster when their response movement is compatible with the object's usual action direction. An abstract semantic model and an embodied account can both explain part of the result. State what each account predicts and identify a manipulation that could discriminate between motor compatibility and learned semantic association.",
+    "intent": "Compare embodied and abstract representational explanations.",
+    "domain": "Embodied and Situated Cognition",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "model_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "During a 3-hour monitoring task, detection accuracy declines from 96% to 84% while false alarms rise from 3% to 9%. Explain how vigilance decrement, fatigue, response criterion, and workload could contribute, and why the data do not isolate one cause.",
+    "intent": "Integrate human-performance limits using both hits and false alarms.",
+    "domain": "Human Performance",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "An alarm system produces many low-priority alerts, so operators begin dismissing alerts rapidly and occasionally miss a rare critical one. Explain how alarm frequency and signal quality can shape attention and trust, and propose one cognitive-ergonomic design change that addresses the system rather than blaming the operator.",
+    "intent": "Apply human-factors reasoning to alarm design and human error.",
+    "domain": "Human Factors and Cognitive Ergonomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "human_factors",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "Two samples from different cultural settings show different average performance on a context-sensitive visual task, but the samples also differ in education, urbanization, and familiarity with the stimuli. Explain why the result may motivate a cultural-cognition hypothesis while not supporting deterministic claims about individuals or culture alone.",
+    "intent": "Interpret cultural group differences with confounds and within-group variability.",
+    "domain": "Cultural Cognition",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A researcher proposes that rapid detection of a certain class of threat reflects an evolved adaptation. What evidence would be needed to distinguish an evolutionary functional hypothesis from a learned, developmental, or current-environment explanation, and why a plausible adaptive story is not sufficient by itself?",
+    "intent": "Distinguish evolutionary function from proximate and developmental explanations.",
+    "domain": "Evolutionary Approaches to Cognition",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "Students study the same material either by rereading it four times in one session or by retrieving it across four spaced sessions. The rereading group performs better immediately, but the spaced-retrieval group performs better one week later and on new examples. Explain the difference between immediate performance, long-term retention, and transfer.",
+    "intent": "Apply spacing and retrieval-practice principles without treating one method as universally optimal.",
+    "domain": "Learning and Education Applications",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "learning_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A deception study temporarily gives participants false feedback about their performance to test self-evaluation. The procedure poses minimal risk, participants may withdraw at any time, and a full debriefing is planned. Identify the central ethical trade-off and explain why scientific value alone would not justify deception if risks or participant autonomy were inadequately addressed.",
+    "intent": "Reason about consent, deception, debriefing, risk, and withdrawal.",
+    "domain": "Ethics in Psychological Research",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A preregistered study follows its primary analysis exactly and obtains a significant result. Explain what preregistration strengthens, what it does not guarantee, and how transparent reporting of exploratory analyses should differ from pretending they were confirmatory.",
+    "intent": "Evaluate the scope and limits of open-science practices.",
+    "domain": "Open Science and Research Practice",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "replication_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "Adults compare pairs of dot arrays without counting. Accuracy is 92% for 10 versus 20 dots, 78% for 10 versus 13, and 61% for 10 versus 11, with total area approximately controlled. What does the ratio-dependent pattern suggest about approximate magnitude representation, and what perceptual confounds would still need checking?",
+    "intent": "Interpret ratio effects in approximate numerical cognition.",
+    "domain": "Numerical Cognition",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "After learning a route through a virtual town, participants can point accurately to landmarks from familiar positions but perform poorly when starting from a novel location. Explain how egocentric route knowledge and allocentric map-like knowledge make different predictions for this transfer test.",
+    "intent": "Distinguish spatial reference frames using transfer evidence.",
+    "domain": "Spatial Cognition",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "cognitive_mechanism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A reaching movement is initially biased when visual feedback is rotated 20 degrees, then gradually corrects across trials. When normal feedback returns, movements briefly err in the opposite direction. Explain how prediction, sensory error, adaptation, and aftereffects support motor learning rather than simple conscious correction alone.",
+    "intent": "Reason about sensorimotor adaptation and internal prediction.",
+    "domain": "Motor Cognition",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "learning_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "Participants prospectively judge a 30-second interval as longer during a high-arousal task than during a low-arousal task, although clock time is identical. Explain why subjective duration can vary with attention and arousal without implying that physical time changed.",
+    "intent": "Distinguish subjective timing from physical duration.",
+    "domain": "Time Perception",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A psychological assessment includes a self-report questionnaire, an informant report, a structured interview, and a cognitive task. The self-report indicates substantial difficulty, but the informant report and task performance show little impairment. Explain how a strong assessment should handle the discrepancy rather than treating any single measure as definitive.",
+    "intent": "Integrate multi-method assessment, response bias, reliability, and functional evidence.",
+    "domain": "Psychological Assessment",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "psychometric_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A study with N = 18 reports no significant difference between two memory conditions and a very wide confidence interval compatible with both a modest benefit and a modest cost. Explain why low power and imprecision prevent the conclusion that the true effect is zero, and state what a larger sample would primarily improve.",
+    "intent": "Distinguish nonsignificance, low power, and estimation precision.",
+    "domain": "Statistical Power",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "statistical_and_data_interpretation",
+    "jurisdiction_required": false
+  }
+]

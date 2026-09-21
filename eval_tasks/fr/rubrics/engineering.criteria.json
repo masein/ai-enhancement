@@ -1,0 +1,205 @@
+{
+  "task": "Score one answer to one Engineering question from 0 to 4.",
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Addresses the engineering question actually asked, prioritizes supplied requirements and evidence, and avoids unrelated theory, jargon, or generic advice. A technically correct discussion that solves a different problem should score poorly.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "engineering_accuracy",
+      "name": "Engineering Accuracy",
+      "definition": "Uses sound engineering principles and preserves the central physical, design, safety, reliability, and systems relationships. It distinguishes quantities such as load versus stress, strength versus stiffness, pressure versus force, power versus energy, and reliability versus availability.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "physical_and_mathematical_correctness",
+      "name": "Physical and Mathematical Correctness",
+      "definition": "Respects conservation laws, signs, directions, dimensions, physical limits, and mathematically valid reasoning. A numerically plausible result based on invalid physics, impossible efficiency, or incompatible units is not correct.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When calculation is required, selects correct quantities and units, performs arithmetic and algebra correctly, applies conversions consistently, and interprets magnitude and sign. Minor arithmetic slips that do not change the engineering conclusion are less serious than model or physics errors.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "model_selection",
+      "name": "Model Selection",
+      "definition": "Chooses a governing model appropriate to the regime, purpose, and available data, and recognizes when common models such as Bernoulli, Euler buckling, ideal circuits, linear elasticity, lumped capacitance, or linear control assumptions are invalid or incomplete.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_boundary_conditions",
+      "name": "Assumptions and Boundary Conditions",
+      "definition": "States material assumptions, selects defensible system boundaries, and applies correct constraints, supports, inlet/outlet conditions, initial conditions, and operating limits. Reasonable approximations are acceptable when justified; invented facts or a wrong governing boundary condition are not.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "mechanics_and_structural_reasoning",
+      "name": "Mechanics and Structural Reasoning",
+      "definition": "When relevant, correctly handles free-body diagrams, forces, moments, stress, strain, deformation, stiffness, stability, load paths, fatigue, fracture, buckling, and serviceability, including the governing failure mode rather than only nominal stress.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "thermal_fluid_reasoning",
+      "name": "Thermal-Fluid Reasoning",
+      "definition": "When relevant, correctly uses fluid, thermodynamic, and heat-transfer principles, including continuity, pressure/head distinctions, losses, pumps, energy balances, state/property logic, thermal resistance, and physical performance limits.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "electrical_and_control_reasoning",
+      "name": "Electrical and Control Reasoning",
+      "definition": "When relevant, correctly reasons about voltage, current, power, impedance, circuit laws, transients, electronics, sampling, feedback, stability, sensors, actuators, saturation, protection, and timing rather than relying on symbol or terminology recall.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "process_and_mass_energy_reasoning",
+      "name": "Process and Mass-Energy Reasoning",
+      "definition": "When relevant, preserves total and component mass balances, energy balances, accumulation, recycle/purge logic, reaction and separation distinctions, residence time, process dynamics, and the difference between steady state and equilibrium.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "design_reasoning",
+      "name": "Design Reasoning",
+      "definition": "When relevant, identifies requirements, constraints, loads, operating conditions, material/component limits, manufacturability, maintenance, safety, reliability, and verification needs. Valid alternative designs receive full credit when technically justified and compliant with requirements.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "failure_and_root_cause_reasoning",
+      "name": "Failure and Root-Cause Reasoning",
+      "definition": "When relevant, separates symptoms, failed parts, contributing factors, initiating events, and underlying causes; identifies plausible mechanisms; seeks discriminating evidence; and proposes corrective action that prevents recurrence rather than random part replacement.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "safety_and_risk_reasoning",
+      "name": "Safety and Risk Reasoning",
+      "definition": "When relevant, identifies hazards, consequences, critical limits, safeguards, safe states, human factors, and failure of safeguards. It prioritizes prevention and does not assume that a safety factor, redundancy, alarm, or interlock alone guarantees safety.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "reliability_and_maintainability",
+      "name": "Reliability and Maintainability",
+      "definition": "When relevant, distinguishes reliability, availability, maintainability, MTBF, MTTR, preventive maintenance, and condition-based maintenance; models series/parallel behavior correctly; and recognizes dependence and common-cause failure in redundant systems.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "systems_and_interface_reasoning",
+      "name": "Systems and Interface Reasoning",
+      "definition": "When relevant, identifies subsystem interfaces, shared resources, dependencies, integration constraints, emergent behavior, failure propagation, verification/validation boundaries, and cases where local component optimization degrades overall system performance.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "experimental_and_measurement_reasoning",
+      "name": "Experimental and Measurement Reasoning",
+      "definition": "When relevant, distinguishes accuracy, precision, resolution, bias, drift, noise, calibration, uncertainty, sampling, repeatability, and representativeness. It does not treat a saturated, uncalibrated, or out-of-envelope measurement or simulation as definitive truth.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "tradeoff_and_optimization_reasoning",
+      "name": "Trade-Off and Optimization Reasoning",
+      "definition": "When relevant, distinguishes feasibility, optimality, robustness, and safety; recognizes competing objectives and uncertainty; and explains why a mathematically optimal component or nominal design may be impractical or inferior at system level.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material steps needed to support the conclusion, including important constraints, assumptions, checks, failure modes, or evidence requested by the prompt, without requiring irrelevant exhaustive treatment.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent assumptions, conventions, units, signs, numerical values, and conclusions throughout the answer. A stated convention may differ from another valid convention if it is applied consistently.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the engineering reasoning in a precise, organized, and auditable way so that equations, assumptions, intermediate logic, and conclusions can be followed. Unnecessary length, equation dumping, software names, jargon, or citations do not increase credit.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_engineering_error",
+    "condition": "A materially false central physical, mathematical, design, safety, reliability, measurement, or systems claim that fundamentally invalidates the answer or creates a severe risk of engineering failure.",
+    "effect": "score=0",
+    "examples": [
+      "Violating conservation of mass, energy, momentum, or charge in the central analysis.",
+      "A major dimensional inconsistency that invalidates the conclusion.",
+      "A fundamentally incorrect force or moment balance.",
+      "Reversing a major stress, load, or structural relationship.",
+      "Ignoring buckling where it is clearly the governing failure mode.",
+      "Treating stiffness and strength as interchangeable in a central design decision.",
+      "Calculating an efficiency above a stated or physical theoretical limit without explanation.",
+      "Fundamentally incorrect thermodynamic reasoning that reverses system performance.",
+      "Using Bernoulli's equation outside its assumptions in a way that changes the conclusion.",
+      "Fundamentally incorrect electrical reasoning that creates unsafe current, voltage, or power conclusions.",
+      "Proposing unstable control behavior as a valid corrective action.",
+      "Violating mass balance in a central process calculation.",
+      "Ignoring a supplied safety-critical failure mode.",
+      "Claiming redundancy guarantees safety despite a stated common-cause failure.",
+      "Selecting a material or component that clearly violates a critical supplied requirement.",
+      "Recommending a design with an obviously inadequate load path.",
+      "A major tolerance-stack error that makes assembly infeasible.",
+      "A fundamentally incorrect reliability calculation that reverses the design decision.",
+      "Treating an uncalibrated, saturated, or clearly faulty sensor reading as definitive physical truth when the conclusion depends on it.",
+      "Recommending operation outside a clearly supplied safe limit.",
+      "A major engineering-economic calculation error that changes the selected alternative."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the engineering conclusion.",
+      "Small rounding differences.",
+      "Minor notation differences.",
+      "Reasonable alternative modeling assumptions.",
+      "Legitimate alternative engineering designs.",
+      "Reasonable safety-factor differences where not code-mandated.",
+      "Small omissions or minor terminology mistakes.",
+      "Reasonable approximations.",
+      "Differences in engineering convention stated and applied consistently."
+    ]
+  },
+  "principles": [
+    "Physics constrains engineering: answers must respect relevant physical laws.",
+    "Units matter: quantitative results must be dimensionally consistent.",
+    "Model validity matters: a mathematically correct calculation can still be wrong if the model is inappropriate.",
+    "Boundary conditions matter: incorrect constraints or boundary conditions can invalidate otherwise correct calculations.",
+    "Strength is not stiffness: these properties must not be treated as interchangeable.",
+    "Power is not energy: engineering answers must preserve this distinction.",
+    "Reliability is not availability: reliability, maintainability, and availability measure different aspects of system performance.",
+    "Redundancy does not guarantee safety: redundant components may share common failure causes.",
+    "Nominal performance is not robust performance: strong designs account for relevant variation and uncertainty.",
+    "Failure modes matter: the governing failure mode may not be the most obvious one.",
+    "Safety precedes optimization: performance optimization cannot violate critical safety constraints.",
+    "Test data have limits: validation applies only within the justified operating envelope.",
+    "Simulation is not reality: FEA, CFD, circuit, process, and other simulations depend on assumptions, inputs, boundary conditions, resolution, constitutive models, and validation.",
+    "System optimization differs from component optimization: improving one component can worsen overall system behavior.",
+    "Engineering decisions involve trade-offs among performance, cost, weight, efficiency, safety, maintainability, reliability, environmental impact, and schedule.",
+    "Multiple valid designs exist when more than one solution satisfies the requirements.",
+    "Uncertainty should be recognized when material without adding irrelevant caveats.",
+    "No jargon worship: engineering terminology does not compensate for incorrect reasoning.",
+    "No citation worship: citations do not compensate for incorrect physics, calculations, or design reasoning."
+  ]
+}

@@ -1,0 +1,176 @@
+{
+  "task": "Evaluate one answer to one Biology & Life Sciences question on a 0-4 scale.",
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the biological question asked, prioritizes information that bears on the requested conclusion, and avoids digressions that do not help solve the task.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "biological_accuracy",
+      "name": "Biological Accuracy",
+      "definition": "Uses correct biological concepts and relationships. Major errors about DNA/RNA/protein processes, inheritance, physiology, ecology, evolution, or experimental interpretation materially reduce credit even if the final conclusion happens to be correct.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "molecular_and_cellular_accuracy",
+      "name": "Molecular and Cellular Accuracy",
+      "definition": "When applicable, accurately distinguishes DNA sequence, transcription, RNA processing, translation, protein abundance, signaling, membrane transport, organelle function, cytoskeletal processes, cell-cycle control, and related cellular mechanisms.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "genetic_reasoning",
+      "name": "Genetic Reasoning",
+      "definition": "When applicable, correctly reasons about segregation, dominance, linkage, recombination, penetrance, expressivity, epistasis, polygenic traits, heritability, genomic variation, and genotype-versus-phenotype relationships.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "biochemical_and_metabolic_reasoning",
+      "name": "Biochemical and Metabolic Reasoning",
+      "definition": "When applicable, correctly reasons about enzyme kinetics, affinity versus catalytic rate, inhibition, thermodynamics, pathway flux, redox/energy coupling, allostery, and metabolic regulation without equating intermediate concentration with pathway flux.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evolutionary_reasoning",
+      "name": "Evolutionary Reasoning",
+      "definition": "When applicable, explains evolution as population-level change across generations; distinguishes selection, drift, mutation, migration, and recombination; treats fitness as context-dependent reproductive success; and avoids teleological explanations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "ecological_reasoning",
+      "name": "Ecological Reasoning",
+      "definition": "When applicable, correctly analyzes population, community, and ecosystem processes, including direct and indirect interactions, density dependence, resource limitation, trophic effects, scale, temporal dynamics, resilience, and non-equilibrium behavior.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "physiological_reasoning",
+      "name": "Physiological Reasoning",
+      "definition": "When applicable, correctly explains homeostasis, feedback, signaling, transport, respiration, osmoregulation, endocrine effects, nervous-system function, plant physiology, or comparative physiological responses, distinguishing acclimation from adaptation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When applicable, chooses the appropriate relationship, calculates accurately, uses units and probabilities correctly, interprets the biological meaning of the result, and checks plausibility. A minor arithmetic slip is less serious than using a biologically invalid model.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "mechanistic_reasoning",
+      "name": "Mechanistic Reasoning",
+      "definition": "Explains how the relevant biological entities and processes produce the observed outcome, including direction of effects, material intermediate steps, regulation, and interactions. Merely naming a pathway, gene, process, or concept is insufficient.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "causal_inference",
+      "name": "Causal Inference",
+      "definition": "When applicable, distinguishes correlation from causation, necessity from sufficiency, direct from indirect effects, upstream from downstream consequences, and association from demonstrated function. It avoids causal claims that the design or evidence cannot support.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "experimental_design",
+      "name": "Experimental Design",
+      "definition": "When applicable, identifies suitable hypotheses, manipulations, positive/negative controls, randomization or blinding where relevant, biological replication, confounders, rescue logic, and what conclusions the design can and cannot establish.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "data_interpretation",
+      "name": "Data Interpretation",
+      "definition": "When applicable, accurately distinguishes measurements from inferences, handles normalization and replicate structure appropriately, considers detection limits and batch effects, and avoids treating statistical significance or a single readout as definitive biological proof.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "model_selection_and_assumptions",
+      "name": "Model Selection and Assumptions",
+      "definition": "When applicable, selects an appropriate biological model, states or recognizes its important assumptions, identifies violations, and does not continue using a simplified model when supplied evidence clearly invalidates its assumptions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "scale_and_systems_reasoning",
+      "name": "Scale and Systems Reasoning",
+      "definition": "When applicable, connects mechanisms across molecular, cellular, tissue, organismal, population, community, or ecosystem levels without assuming that an effect at one level automatically determines outcomes at another.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_and_variability",
+      "name": "Uncertainty and Variability",
+      "definition": "When applicable, recognizes genetic, environmental, developmental, temporal, stochastic, population, species, measurement, and sampling variation; qualifies generalizations; and treats ambiguous or noisy evidence with appropriate caution.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_model_limits",
+      "name": "Evidence and Model Limits",
+      "definition": "When applicable, states what the supplied evidence supports, what remains underdetermined, what assumptions connect observation to inference, and which alternative mechanisms or follow-up evidence could discriminate among explanations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the task, including required calculations, mechanisms, comparisons, assumptions, controls, caveats, or interpretations, without requiring unnecessary detail unrelated to the prompt.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally compatible claims, calculations, biological assumptions, and conclusions. It should not contradict earlier statements or switch biological models without explanation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the reasoning in a precise, understandable way with correct use of biological terminology. Clear explanation is valued over jargon, excessive length, or citation density.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_flags": [
+    {
+      "id": "critical_biology_life_sciences_error",
+      "condition": "A materially false central biological, genetic, biochemical, evolutionary, ecological, physiological, quantitative, or experimental claim that fundamentally invalidates the answer or reverses the substantive conclusion.",
+      "effect": "score=0",
+      "examples": [
+        "Fundamentally incorrect DNA replication, transcription, RNA processing, or translation reasoning central to the answer, including claiming that transcription directly produces protein.",
+        "A major Mendelian, linkage, recombination, penetrance, or allele-frequency error that changes the inheritance or population-genetic conclusion.",
+        "Treating dominance as meaning that an allele is more common in a population.",
+        "Claiming organisms generate adaptive mutations because they need them, or fundamentally confusing natural selection with individual acclimation.",
+        "Treating evolutionary fitness simply as physical strength, health, or lifespan.",
+        "A fundamentally incorrect phylogenetic interpretation, including claiming one extant species is necessarily the direct ancestor of another solely from tree position.",
+        "A fundamentally incorrect enzyme or metabolic claim that changes the conclusion, including claiming an enzyme changes thermodynamic equilibrium merely by accelerating a reaction.",
+        "Reversing a central ecological causal relationship without support, or treating ecological correlation as definitive proof of direct interaction when this is central to the task.",
+        "Fundamentally incorrect physiological feedback reasoning that reverses the predicted outcome.",
+        "Treating a missing control as if it proves causality, or treating technical replicates as independent biological replicates in a way that invalidates the evidence.",
+        "Claiming gene-expression correlation proves a gene directly causes a phenotype.",
+        "Claiming a sequence match uniquely establishes biological function when the evidence does not support that inference.",
+        "A major quantitative error that changes the biological conclusion.",
+        "Asserting a biological mechanism that directly contradicts the supplied experimental evidence."
+      ],
+      "not_critical_examples": [
+        "Minor arithmetic errors that do not alter the biological conclusion.",
+        "Minor terminology mistakes or small omissions.",
+        "Reasonable differences in model assumptions or reasonable approximations.",
+        "Legitimate alternative mechanisms consistent with the data.",
+        "Minor taxonomic imprecision or uncertainty about a non-central pathway detail.",
+        "Appropriately cautious interpretation of ambiguous evidence."
+      ]
+    }
+  ]
+}

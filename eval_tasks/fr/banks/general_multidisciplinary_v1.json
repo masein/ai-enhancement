@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A household has a fixed weekly grocery budget. One staple rises 25% in price, but the household can substitute a cheaper alternative for half of its usual quantity. Explain what information is needed to determine whether total grocery spending must rise, and why the price increase alone is insufficient.",
+    "intent": "Test price-change reasoning, substitution, and recognition of missing information.",
+    "domain": "Everyday Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "insufficient_information",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A recipe for 6 people uses 450 g of rice. You need to serve 14 people, but expect about 10% of the cooked food to remain uneaten. Estimate how much dry rice to prepare and state your assumptions.",
+    "intent": "Apply proportions while distinguishing portions prepared from portions consumed.",
+    "domain": "Everyday Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A train leaves at 23:40 and the scheduled journey lasts 2 hours 35 minutes. It crosses no time-zone boundary. What is the scheduled arrival time, and what common calendar mistake should be avoided?",
+    "intent": "Test time arithmetic across midnight and calendar reasoning.",
+    "domain": "Everyday Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "Four tasks must be done in this order: data collection before analysis; analysis before drafting; legal review after drafting; final approval after both drafting and legal review. Give one valid sequence and explain which constraints force it.",
+    "intent": "Test sequencing and constraint satisfaction rather than recall.",
+    "domain": "Everyday Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A storage box is labeled 'maximum load 20 kg' and already contains 13 kg. You want to add six identical 1.4 kg items. Determine whether the limit is exceeded and explain whether the number of items or their total mass is the relevant constraint.",
+    "intent": "Apply arithmetic and interpret a practical constraint correctly.",
+    "domain": "Everyday Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "practical_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A café advertises 'buy two drinks and get the cheaper one 50% off.' One drink costs €4 and another €6. What is the total price before tax, and why would averaging the two prices first give the wrong answer?",
+    "intent": "Test conditional discount reasoning and identify an inappropriate calculation.",
+    "domain": "Everyday Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A manager says, 'Every project that missed its deadline had at least one late supplier, so late suppliers are sufficient to cause deadline misses.' Explain the logical error and identify what evidence would be needed to support a causal claim.",
+    "intent": "Distinguish observed association from sufficiency and causation.",
+    "domain": "Logic / Argumentation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "argument_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A sign says, 'Visitors may enter the archive only with staff permission.' Is staff permission a necessary condition, a sufficient condition, or both? Explain.",
+    "intent": "Distinguish necessary from sufficient conditions in ordinary language.",
+    "domain": "Logic / Argumentation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A sealed plastic bottle partly filled with air is taken from sea level to a much higher elevation where outside air pressure is lower. Predict what tends to happen to the bottle's shape if the cap remains sealed, and explain the mechanism without using equations.",
+    "intent": "Apply basic gas-pressure reasoning to an everyday situation.",
+    "domain": "Natural Sciences",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "scientific_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "Two identical dark surfaces and two identical light surfaces are placed in sunlight. One pair is insulated from below and the other is in good thermal contact with metal plates. Explain why surface color alone may not determine which objects reach the highest temperature.",
+    "intent": "Reason about interacting heat-transfer mechanisms and experimental controls.",
+    "domain": "Natural Sciences",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "scientific_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A plant is kept under brighter light and grows faster for several weeks. Give at least two reasons this does not by itself prove that light intensity was the cause, and describe a stronger test.",
+    "intent": "Distinguish observation from causal evidence and propose a better experiment.",
+    "domain": "Scientific Method",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "scientific_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A lake receives more nutrient runoff while average water temperature rises. Explain two mechanisms that could lower dissolved oxygen and identify measurements that would help distinguish their contributions.",
+    "intent": "Synthesize ecology, chemistry, and measurement to evaluate competing mechanisms.",
+    "domain": "Environment",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "Researchers find that people who sleep longer report fewer colds. Explain why the finding does not by itself establish that extra sleep prevents colds, and name two plausible confounders or reverse-causation pathways.",
+    "intent": "Assess causation in an observational health finding without giving clinical advice.",
+    "domain": "Health / Risk Literacy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A treatment reduces an event rate from 2 in 10,000 to 1 in 10,000. Explain the relative risk reduction, the absolute risk reduction, and why both are relevant to communication.",
+    "intent": "Distinguish relative from absolute risk in a general-literacy context.",
+    "domain": "Health / Risk Literacy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "An experiment measures a chemical concentration five times and gets slightly different values. Explain how random measurement variation differs from a systematic calibration error, and how replication can help with one more than the other.",
+    "intent": "Differentiate random error, systematic error, and replication.",
+    "domain": "Scientific Method",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A new telescope detects a periodic dimming of a star. Explain why that observation may be consistent with an orbiting planet but does not uniquely prove one, and name alternative explanations or follow-up evidence.",
+    "intent": "Reason from observation to competing hypotheses and discriminating evidence.",
+    "domain": "Natural Sciences",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "scientific_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A mountain town and a coastal town lie at similar latitude, but the mountain town has colder average temperatures. Explain how elevation and nearby ocean influence can produce this difference.",
+    "intent": "Connect physical geography with basic climate mechanisms.",
+    "domain": "Geography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "geographic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A claim says, 'Because carbon dioxide is a small fraction of the atmosphere, it cannot materially affect climate.' Explain why concentration alone is not enough to judge influence, and identify the relevant kind of mechanism.",
+    "intent": "Evaluate a misleading inference about small concentration and physical effect.",
+    "domain": "Environment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A city replaces some diesel buses with electric buses. Identify at least four factors needed to compare lifecycle environmental impact rather than only tailpipe emissions.",
+    "intent": "Apply lifecycle reasoning across energy, manufacturing, and operations.",
+    "domain": "Environment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "multidisciplinary_synthesis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "In a field study, a wildlife population rises after a protected area is created. What kinds of comparison or additional evidence would increase confidence that the protection caused the rise rather than weather, migration, or measurement changes?",
+    "intent": "Evaluate causal attribution in an observational environmental setting.",
+    "domain": "Scientific Method",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A laboratory result is statistically unusual but comes from a very small sample and was not pre-registered. Explain why the result may still be interesting while confidence should remain limited, and identify useful next steps.",
+    "intent": "Evaluate evidence strength, sample size, researcher flexibility, and replication.",
+    "domain": "Scientific Method",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "evidence_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A historian has factory payroll records, workers' letters, and a later government report about an industrial city. Explain how each source could illuminate different aspects of working conditions and why none should automatically be treated as definitive.",
+    "intent": "Evaluate historical sources by provenance, perspective, and purpose.",
+    "domain": "History",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "An empire builds railways primarily to connect inland extraction zones to ports. Explain how that transport pattern could affect later settlement, trade, and regional inequality even after colonial rule ends.",
+    "intent": "Connect historical infrastructure, geography, and path dependence.",
+    "domain": "History",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "historical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "Two revolutions occur in different centuries. One follows fiscal crisis and elite conflict; the other follows food shortages, war, and mass mobilization. Explain how to compare them without assuming that sharing the label 'revolution' means they had the same causes.",
+    "intent": "Compare historical events while preserving contextual differences.",
+    "domain": "History",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A historical source written during wartime describes the enemy as uniformly cruel. How should a historian use the document without either accepting it literally or discarding it entirely?",
+    "intent": "Apply source criticism to a potentially propagandistic primary source.",
+    "domain": "History",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_criticism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A river valley has fertile floodplains but recurrent flooding. Explain why such areas have often attracted settlement despite hazard, and identify infrastructure or land-use choices that can reduce but not eliminate risk.",
+    "intent": "Connect physical geography, settlement incentives, and hazard management.",
+    "domain": "Geography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "geographic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A landlocked country has high transport costs for bulk exports. Explain how terrain, border procedures, rail or road connectivity, and access to neighboring ports can affect trade costs.",
+    "intent": "Analyze several geographic and institutional determinants of transport cost.",
+    "domain": "Geography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "multidisciplinary_synthesis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "Two cities are 500 km apart in a straight line, but the fastest overland route is 800 km. Give plausible geographic reasons and explain why straight-line distance alone can mislead transport planning.",
+    "intent": "Distinguish geometric distance from practical accessibility.",
+    "domain": "Geography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "geographic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A coastal city expands onto low-lying land because it is close to jobs and ports. Explain the tension between agglomeration benefits and exposure to flooding or sea-level rise.",
+    "intent": "Connect urban geography, economics, and environmental risk.",
+    "domain": "Geography",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "multidisciplinary_synthesis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A map uses a projection that enlarges high-latitude areas. Explain why a reader comparing country sizes should be cautious, and what alternative representation or information would help.",
+    "intent": "Interpret map distortion and its effect on visual comparison.",
+    "domain": "Geography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A municipality is considering a fee on household waste disposal while keeping recycling free. Identify the intended incentive, two possible unintended responses, and information needed to judge whether the policy works.",
+    "intent": "Analyze incentives, behavioral responses, and evaluation evidence without prescribing a policy.",
+    "domain": "Economics / Society",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A city park is crowded on weekends but no visitor can easily exclude others from enjoying much of it. Explain which features resemble a public good and which resemble a congestible common resource.",
+    "intent": "Apply economic concepts carefully rather than forcing a single category.",
+    "domain": "Economics / Society",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "classification",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A government agency is assigned a broad goal but given ambiguous performance measures. Explain how poorly chosen metrics can distort behavior even when employees are acting rationally.",
+    "intent": "Analyze institutional incentives and metric gaming.",
+    "domain": "Institutions / Civics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "In a system with separate legislative, executive, and judicial institutions, explain one reason separation of powers can limit concentrated authority and one reason it can slow decision-making.",
+    "intent": "Explain institutional trade-offs neutrally.",
+    "domain": "Institutions / Civics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A public consultation receives mostly responses from people with unusually strong views. Explain why the responses may still be informative but should not automatically be treated as representative of the whole population.",
+    "intent": "Identify self-selection and distinguish qualitative input from representative measurement.",
+    "domain": "Institutions / Civics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A city subsidizes public transit fares. Identify possible effects on riders, taxpayers, congestion, operators, and people who do not use transit. Explain why distributional effects may differ from total social effects.",
+    "intent": "Identify stakeholders, externalities, and distributional consequences.",
+    "domain": "Economics / Society",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "multidisciplinary_synthesis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A country experiences a sustained decline in birth rates while life expectancy remains high. Explain two likely pressures this can create for labor markets or public finances, while noting why outcomes depend on productivity, migration, participation, and policy.",
+    "intent": "Reason about demographic change with multiple interacting adjustments.",
+    "domain": "Economics / Society",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "Two neighboring communities share a groundwater source. Each benefits privately from pumping, while depletion costs are shared. Explain the collective-action problem and describe kinds of institutional arrangements that might address it without assuming a single best design.",
+    "intent": "Analyze a common-resource problem and institutional trade-offs.",
+    "domain": "Economics / Society",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "Two speeches make the same factual claim. One uses vivid personal anecdotes; the other uses aggregated statistics. Compare how the rhetorical strategies may affect audience response and what each can and cannot establish.",
+    "intent": "Compare rhetorical force with evidentiary force.",
+    "domain": "Language / Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "The sentence 'Jordan told Casey that they had won the award' is ambiguous. Identify at least two readings and rewrite it to remove the ambiguity.",
+    "intent": "Detect pronoun ambiguity and improve precision.",
+    "domain": "Language / Communication",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "ambiguity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "An advertisement says, 'Nine out of ten users preferred Brand A.' List the key missing details needed to evaluate how informative that statement is.",
+    "intent": "Identify sampling, comparison, and measurement details hidden by persuasive wording.",
+    "domain": "Language / Communication",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A museum label presents an artifact only as 'evidence of progress.' Explain why that framing may embed a value judgment, and suggest a more neutral way to describe historical change.",
+    "intent": "Detect loaded framing and separate description from evaluation.",
+    "domain": "Culture / Literature / Arts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "argument_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A public message aimed at experts uses dense technical terminology; the same message aimed at the general public removes the jargon but adds analogies. Explain the trade-off between precision and accessibility and how to avoid misleading simplification.",
+    "intent": "Assess audience adaptation in communication.",
+    "domain": "Language / Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "practical_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "Someone says, 'The policy is unpopular, therefore it is ineffective.' Explain why popularity and effectiveness are different properties and what evidence would bear on effectiveness.",
+    "intent": "Identify a category error and specify relevant evidence.",
+    "domain": "Language / Communication",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "argument_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A headline reads, 'Scientists prove coffee makes people live longer,' while the article describes an observational association. Rewrite the claim more accurately and explain what causal language overstates.",
+    "intent": "Correct misleading causal wording and calibrate a media claim.",
+    "domain": "Language / Communication",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "Two critics disagree about whether a painting is 'realistic.' One means photographic resemblance; the other means accurate portrayal of social conditions. Explain how different definitions can create apparent disagreement and how to clarify it.",
+    "intent": "Recognize definitional disagreement and equivocation.",
+    "domain": "Culture / Literature / Arts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ambiguity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A town's population grows from 40,000 to 46,000. Calculate the percentage increase and explain why saying it grew by 6,000% would be a denominator error.",
+    "intent": "Apply percentage change and identify denominator misuse.",
+    "domain": "Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A survey reports support rising from 48% to 54%. Explain the change in percentage points and the relative percentage increase, and why the two should not be conflated.",
+    "intent": "Distinguish percentage points from relative percentage change.",
+    "domain": "Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A factory reports fewer injuries this year, but total hours worked also fell substantially. What rate should be compared before concluding workplace safety improved?",
+    "intent": "Choose an appropriate denominator and distinguish counts from rates.",
+    "domain": "Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "method_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A class has ten students with a mean score of 80. One score is corrected upward by 20 points. What is the new mean, and why is the median not determined from this information alone?",
+    "intent": "Apply mean adjustment and recognize missing distributional information.",
+    "domain": "Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A chart starts its vertical axis at 98 instead of 0, making a change from 100 to 102 look dramatic. Explain what is mathematically true, what visual impression may be misleading, and when a truncated axis can still be legitimate.",
+    "intent": "Evaluate graphical framing without assuming every truncated axis is deceptive.",
+    "domain": "Data Interpretation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "Region A has 200 cases in a population of 100,000; Region B has 300 cases in a population of 300,000. Compare the rates and explain why the larger case count does not imply the higher per-capita rate.",
+    "intent": "Compare rates using consistent denominators.",
+    "domain": "Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A product's defect rate falls from 4% to 3% while production doubles. Can the total number of defective units rise? Show with a simple numerical example.",
+    "intent": "Combine rates and volumes to test an apparently paradoxical claim.",
+    "domain": "Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "factual_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A school reports that average test scores increased after a tutoring program, but the group tested after the program had a different mix of grade levels. Explain why the average comparison may be misleading and how to improve it.",
+    "intent": "Identify composition effects and confounding in aggregate data.",
+    "domain": "Data Interpretation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "An online poll with 50,000 voluntary responses differs from a probability sample of 1,000 respondents. Explain why the larger poll can still be less representative.",
+    "intent": "Distinguish sample size from sampling quality and selection bias.",
+    "domain": "Data Interpretation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A report says household income is 'higher on average' in City A than City B. List at least three different summary statistics or distribution features that could matter before concluding a typical household is better off.",
+    "intent": "Reason beyond a single average and identify distributional ambiguity.",
+    "domain": "Data Interpretation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "insufficient_information",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "Explain why the internet and the World Wide Web are related but not identical, using one example of an internet service that is not simply a webpage.",
+    "intent": "Test broad digital-literacy concepts.",
+    "domain": "Technology / Society",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A file is deleted from a laptop that synchronizes with a cloud service. Explain why the data may still exist elsewhere and what factors determine whether deletion propagates.",
+    "intent": "Reason about local storage, synchronization, backups, and deletion semantics.",
+    "domain": "Technology / Society",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "factual_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A messaging app says messages are end-to-end encrypted. Explain what this protects in principle and name at least three other ways information could still be exposed.",
+    "intent": "Distinguish cryptographic protection from endpoint, metadata, and account risks.",
+    "domain": "Technology / Society",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A machine-learning system predicts loan default accurately on historical data. Explain why high predictive accuracy does not by itself show that each input feature causes default.",
+    "intent": "Separate prediction from causal inference in AI systems.",
+    "domain": "Technology / Society",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A company migrates an application to cloud infrastructure. Explain why 'the cloud' still depends on physical computers, networks, power, and data centers, and identify one reliability trade-off.",
+    "intent": "Correct a common abstraction misconception and reason about infrastructure.",
+    "domain": "Technology / Society",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Source A is a company's press release about its product, Source B is a peer-reviewed trial with 40 participants, and Source C is a large independent observational study. Explain what each source can contribute, its major limitations, and why no single label such as 'peer reviewed' automatically settles the question.",
+    "intent": "Compare source quality using relevance, methods, independence, and study design.",
+    "domain": "Information Literacy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A news article cites a study correctly but reports only the subgroup with the largest effect and omits the overall result. Explain why this can mislead even if the quoted number is accurate.",
+    "intent": "Identify selective reporting and subgroup cherry-picking.",
+    "domain": "Media / Claim Evaluation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A company advertises that users 'improved performance by 30%.' Explain the questions you would ask about baseline, measurement, comparison group, sample, time window, and who was excluded.",
+    "intent": "Unpack hidden assumptions in a quantitative product claim.",
+    "domain": "Media / Claim Evaluation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Two reputable sources give different unemployment estimates for the same place and month. Before deciding one is wrong, identify methodological differences that could legitimately produce different numbers.",
+    "intent": "Distinguish measurement-definition differences from factual contradiction.",
+    "domain": "Information Literacy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A social-media post shows a dramatic image claimed to be from a recent disaster, but the image has no visible date or location. Explain what can and cannot be concluded from the image alone and how contextual verification should proceed.",
+    "intent": "Evaluate image evidence, provenance, and uncertainty.",
+    "domain": "Information Literacy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_criticism",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A study finds no statistically clear effect. Explain why 'no clear evidence of an effect' is not always the same as 'evidence that the effect is zero,' especially with a small sample.",
+    "intent": "Distinguish absence of evidence from evidence of absence.",
+    "domain": "Information Literacy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A poll reports 52% for Option A and 48% for Option B with a stated sampling uncertainty of about ±3 percentage points. Explain what this does and does not justify saying about the population.",
+    "intent": "Interpret polling uncertainty without converting a close estimate into certainty.",
+    "domain": "Media / Claim Evaluation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_calibration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "You must choose one of two commuting options. Option A is usually 25 minutes but occasionally 70; Option B is usually 35 minutes with little variation. Explain how the preferred choice depends on the cost of lateness, reliability, and schedule flexibility rather than average time alone.",
+    "intent": "Evaluate a practical choice under risk and differing objectives.",
+    "domain": "Practical Decision-Making",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "practical_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A small organization can fund either two large projects or six small pilot projects. Identify decision criteria that could favor each strategy, including diversification, learning value, fixed costs, and impact scale.",
+    "intent": "Compare resource-allocation strategies without imposing one preferred answer.",
+    "domain": "Practical Decision-Making",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A home internet connection becomes slow every evening. Give a troubleshooting sequence that separates local Wi-Fi congestion, device-specific problems, and upstream network congestion before replacing equipment.",
+    "intent": "Test structured troubleshooting and hypothesis discrimination.",
+    "domain": "Practical Decision-Making",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "Estimate how many disposable cups a 200-person office might use in a working year. Break the estimate into assumptions, give an order-of-magnitude answer, and identify which assumption most affects the result.",
+    "intent": "Test Fermi decomposition and sensitivity to assumptions.",
+    "domain": "Estimation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "estimation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A stadium claims that replacing 10,000 single-use bottles per event will 'save millions of bottles per year.' Without external data, show how to test whether the claim is plausible using event-frequency assumptions.",
+    "intent": "Use order-of-magnitude reasoning to evaluate a public claim.",
+    "domain": "Estimation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "estimation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "Estimate the mass of water used by one person for 8 minutes of showering if the flow rate is somewhere between 6 and 12 liters per minute. Give a range and explain why 1 liter of water is approximately 1 kilogram is a useful approximation here.",
+    "intent": "Apply dimensional reasoning and uncertainty ranges.",
+    "domain": "Estimation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "estimation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A city observes that traffic speeds improved after a new road opened, then worsened again two years later. Give several plausible mechanisms, including induced demand, population change, land-use change, and unrelated trends, and describe evidence that would help separate them.",
+    "intent": "Analyze dynamic transport feedbacks and competing explanations.",
+    "domain": "Systems Reasoning",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A business says productivity rose after switching to remote work, but it also changed software, staffing, and performance metrics at the same time. Explain why the available evidence is underdetermined and propose a design for learning more.",
+    "intent": "Recognize simultaneous changes, confounding, and measurement shifts.",
+    "domain": "Ambiguity / Insufficient Information",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "insufficient_information",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A report states that 'most residents support the proposal,' but gives neither the sample method nor the wording of the question. Explain exactly what information is missing before representativeness and interpretation can be judged.",
+    "intent": "Identify underdetermination caused by missing survey methodology.",
+    "domain": "Ambiguity / Insufficient Information",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A warehouse has enough staff to complete either 120 standard orders or 60 complex orders per shift, but today's mix is unknown. Can you determine total orders that can be completed? State the constraint and what additional information is required.",
+    "intent": "Recognize a capacity problem that cannot be solved uniquely without the work mix.",
+    "domain": "Ambiguity / Insufficient Information",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "insufficient_information",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A city proposes replacing one car lane in each direction with dedicated bus lanes. Identify transportation, economic, environmental, behavioral, and equity mechanisms that should be evaluated, including possible short-run and long-run responses. Explain what evidence would distinguish success from mere displacement of congestion.",
+    "intent": "Synthesize transport, economics, environment, behavior, equity, and evaluation design.",
+    "domain": "Multidisciplinary Synthesis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "multidisciplinary_synthesis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A coastal region plans a large desalination plant to improve water security. Analyze benefits and trade-offs involving energy demand, electricity source, brine disposal, drought resilience, capital cost, and effects on alternative conservation investments.",
+    "intent": "Integrate water, energy, environment, economics, and resilience.",
+    "domain": "Multidisciplinary Synthesis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A country encourages domestic production of a product previously imported. Explain possible effects on prices, employment, supply resilience, input costs, trade relationships, and consumers, distinguishing short-run adjustment from long-run adaptation.",
+    "intent": "Synthesize economic, institutional, and supply-chain mechanisms without prescribing policy.",
+    "domain": "Multidisciplinary Synthesis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "multidisciplinary_synthesis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A school district introduces laptops for every student and later sees improved assignment completion but unchanged exam scores. Develop several explanations spanning access, teaching practice, distraction, assessment design, and selection effects, and propose evidence to discriminate among them.",
+    "intent": "Combine technology, education, measurement, and causal inference.",
+    "domain": "Multidisciplinary Synthesis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A region wants to reduce wildfire losses. Compare how forest management, building codes, settlement patterns, emergency planning, insurance incentives, and climate conditions interact. Explain why reducing one hazard metric may not guarantee lower total losses.",
+    "intent": "Integrate environmental science, geography, institutions, incentives, and risk.",
+    "domain": "Multidisciplinary Synthesis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A historian and an economist disagree about why a port city grew rapidly in the nineteenth century. The historian emphasizes imperial institutions and migration networks; the economist emphasizes falling shipping costs and market access. Explain how both accounts could be complementary, what evidence would support each, and what would count as genuine conflict between them.",
+    "intent": "Reconcile disciplinary explanations and specify discriminating evidence.",
+    "domain": "Multidisciplinary Synthesis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "historical_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A health campaign reports that a screening program 'saved many lives' because five-year survival after diagnosis rose sharply. Explain how lead-time bias, overdiagnosis, treatment improvement, and mortality rates should be considered before accepting the causal claim.",
+    "intent": "Evaluate screening evidence using statistics, health literacy, and causal reasoning.",
+    "domain": "Multidisciplinary Synthesis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A city neighborhood gains a new rail station and property prices rise. Explain why this pattern is consistent with improved accessibility but does not by itself prove the station caused the entire increase. Include land-use changes, anticipation effects, broader market trends, and displacement concerns.",
+    "intent": "Integrate geography, economics, causal inference, and distributional effects.",
+    "domain": "Multidisciplinary Synthesis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "Two regions experience the same drought. One has severe food shortages while the other does not. Build a causal explanation that considers rainfall, crop mix, irrigation, storage, trade, household income, institutions, and conflict without assuming climate alone determines the outcome.",
+    "intent": "Synthesize environmental, economic, institutional, and social mechanisms.",
+    "domain": "Multidisciplinary Synthesis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "multidisciplinary_synthesis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A town is deciding whether to build a flood wall, restore wetlands, or combine both. Compare the mechanisms, time horizons, maintenance needs, co-benefits, failure modes, and uncertainty that should inform the decision without selecting a universal winner.",
+    "intent": "Integrate engineering concepts, ecology, economics, and practical risk management.",
+    "domain": "Multidisciplinary Synthesis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "practical_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A library has 30% more visitors this year but only 10% more total opening hours. Assuming visitor demand is spread across opening hours in the same way, estimate the percentage change in visitors per opening hour.",
+    "intent": "Combine percentage changes into a rate comparison.",
+    "domain": "Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A medicine-related news story says an exposure 'doubles risk' from 1 in 1,000,000 to 2 in 1,000,000. Explain why the relative change is large while the absolute change is small, and why neither number alone tells an individual what action to take.",
+    "intent": "Interpret relative and absolute risk while separating population evidence from individual decisions.",
+    "domain": "Health / Risk Literacy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A city survey asks residents to rate parks from 1 to 5, and the average rises from 3.8 to 4.0. Explain why that small numerical change could still be meaningful or trivial depending on sample composition, response rate, variability, and question consistency.",
+    "intent": "Interpret a change in a bounded rating with attention to measurement quality.",
+    "domain": "Data Interpretation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A website displays only five-star reviews from customers who received a discount for posting. Explain the selection and incentive problems, and what additional review information would make the evidence more informative.",
+    "intent": "Evaluate biased evidence and conflicts of interest.",
+    "domain": "Information Literacy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A scientific model accurately predicts tides at one coast but performs poorly in a narrow estuary. Explain why a model can be useful within a domain while failing when important local mechanisms or boundary conditions differ.",
+    "intent": "Reason about model scope, assumptions, and extrapolation.",
+    "domain": "Scientific Method",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "scientific_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A museum receives two dates for the same artifact: a laboratory measurement gives a range, while a historical record gives a single calendar year. Explain why the results might not truly conflict and how uncertainty and provenance should be compared.",
+    "intent": "Reconcile different evidence types and uncertainty representations.",
+    "domain": "History",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A mayoral office publishes a before-and-after graph showing a large fall in litter after a campaign, but the measurement method changed midway. Explain why the graph alone cannot isolate the campaign effect and what a comparable measurement design would require.",
+    "intent": "Identify measurement change as a threat to causal interpretation of institutional data.",
+    "domain": "Media / Claim Evaluation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "An automated system rejects more applications from one neighborhood than another. List nonexclusive explanations involving applicant characteristics, historical data, measurement choices, proxy variables, and model design, and explain what evidence would be needed before attributing the disparity to any one cause.",
+    "intent": "Analyze algorithmic disparities without jumping from outcome difference to a single causal explanation.",
+    "domain": "Technology / Society",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A headline says 'Local food always has a smaller carbon footprint.' Explain why transport distance matters but may be outweighed by production method, storage, seasonality, spoilage, and yield.",
+    "intent": "Evaluate a simple environmental claim using lifecycle mechanisms.",
+    "domain": "Environment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A school wants to shorten lunch lines. Explain how arrival patterns, number of service stations, service-time variability, menu complexity, and payment method could create a bottleneck, and suggest what measurements to collect before changing staffing.",
+    "intent": "Apply systems and queueing intuition to a practical problem without specialist formulas.",
+    "domain": "Systems Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A person estimates that a city has 50 million daily bicycle trips because 'about half the population cycles and each cyclist makes ten trips.' Show how to sanity-check this by decomposing population, participation rate, trips per cyclist, and day-to-day frequency, and explain which assumptions look most sensitive.",
+    "intent": "Test Fermi reasoning and plausibility checking of an exaggerated estimate.",
+    "domain": "Estimation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "estimation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A company reports that a new process cuts energy use per unit by 20%, while total output rises 40%. Determine the direction of change in total energy use and calculate it relative to the original level.",
+    "intent": "Combine intensity reduction with scale growth and identify rebound-like arithmetic.",
+    "domain": "Quantitative Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  }
+]

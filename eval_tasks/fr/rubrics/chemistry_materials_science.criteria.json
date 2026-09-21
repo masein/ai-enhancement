@@ -1,0 +1,181 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the question asked, prioritizes the requested chemical/materials reasoning, and avoids substituting unrelated background for the needed analysis.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "chemical_accuracy",
+      "name": "Chemical Accuracy",
+      "definition": "Uses chemically valid species, reactions, bonding, charge accounting, acid-base/redox logic, terminology, and physical chemistry. Central chemistry must conserve atoms and charge and must not confuse concentration, amount, activity, equilibrium position, or reaction rate.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "materials_accuracy",
+      "name": "Materials Accuracy",
+      "definition": "Correctly distinguishes structure, microstructure, phases, properties, processing, and performance; does not conflate stiffness, strength, hardness, toughness, ductility, equilibrium phases, metastable microstructures, or geometry-dependent component behavior.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Uses concepts with the correct scope and distinctions, including thermodynamics versus kinetics, strong versus concentrated, formal charge versus oxidation state, intermolecular versus intramolecular interactions, and direct observation versus inference.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "Selects appropriate numerical relationships, substitutes values correctly, handles signs and significant figures sensibly, and reaches numerically consistent results. Minor arithmetic errors are distinguished from invalid underlying chemistry or physics.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "stoichiometric_and_mass_balance_reasoning",
+      "name": "Stoichiometric and Mass-Balance Reasoning",
+      "definition": "Uses balanced chemical relationships, correct stoichiometric coefficients, limiting reagents, yields, species balances, and conservation of matter and charge. A numerically plausible answer from an invalid mass/charge balance should not receive full credit.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "thermodynamic_reasoning",
+      "name": "Thermodynamic Reasoning",
+      "definition": "Correctly applies heat, work, internal energy, enthalpy, entropy, Gibbs free energy, chemical potential, spontaneity, phase stability, and standard versus actual conditions, without equating thermodynamic favorability with rapid kinetics.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "kinetic_and_mechanistic_reasoning",
+      "name": "Kinetic and Mechanistic Reasoning",
+      "definition": "Correctly interprets rate laws, activation barriers, elementary steps, catalysts, intermediates, competing pathways, diffusion/transport limitations, and mechanism evidence. Proposed mechanisms should match stoichiometry, rate/evidence constraints, and conservation laws.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "equilibrium_and_solution_reasoning",
+      "name": "Equilibrium and Solution Reasoning",
+      "definition": "Constructs and interprets equilibrium expressions, Q versus K, acid-base, solubility, complexation, buffer, and solution behavior correctly, and justifies dilute/ideal/activity approximations when material.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "structure_and_bonding_reasoning",
+      "name": "Structure and Bonding Reasoning",
+      "definition": "Correctly uses Lewis, resonance, geometry, polarity, MO/valence-bond, ligand-field, crystal, and electronic-structure models while recognizing when simplified bonding descriptions are approximations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "structure_property_reasoning",
+      "name": "Structure–Property Reasoning",
+      "definition": "Explains how electronic, molecular, crystalline, defect, interfacial, or microstructural features cause observed chemical or material properties, rather than merely naming a relationship.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "processing_microstructure_reasoning",
+      "name": "Processing–Microstructure Reasoning",
+      "definition": "When relevant, correctly traces processing history to structural/microstructural change and then to property/performance consequences, including trade-offs, metastability, and non-equilibrium effects.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "experimental_and_analytical_reasoning",
+      "name": "Experimental and Analytical Reasoning",
+      "definition": "Chooses suitable measurements, controls, calibration strategies, and experimental variables; identifies contamination, matrix effects, confounding, sampling, repeatability/reproducibility, and what a method can actually establish.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "data_and_spectra_interpretation",
+      "name": "Data and Spectra Interpretation",
+      "definition": "Interprets trends, graphs, diffraction, spectroscopy, electrochemical, mechanical, thermal, or analytical data without overclaiming uniqueness; distinguishes peak position, intensity, integration, splitting, resolution, and model-dependent inference as appropriate.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_model_selection",
+      "name": "Assumptions and Model Selection",
+      "definition": "Chooses a physically and chemically appropriate model, states material assumptions when needed, tests whether approximations such as ideality, dilution, steady state, linear elasticity, equilibrium, or rule-of-mixtures behavior are justified, and recognizes breakdown conditions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "units_dimensions_and_scale",
+      "name": "Units, Dimensions, and Scale",
+      "definition": "Uses consistent units and dimensions, converts quantities correctly, checks signs/order of magnitude, and rejects results that are grossly inconsistent with plausible chemical or materials scales.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_uncertainty_and_model_limits",
+      "name": "Evidence, Uncertainty, and Model Limits",
+      "definition": "Separates direct observation from model-derived quantities and proposed mechanisms; recognizes meaningful experimental/model uncertainty, unresolved alternatives, and underdetermination without demanding irrelevant caveats for straightforward problems.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Addresses all materially requested parts, including calculations, explanations, assumptions, comparisons, or follow-up evidence when these are central to the task.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent equations, signs, terminology, assumptions, units, oxidation/charge assignments, and causal claims throughout the answer.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Presents reasoning in a readable and logically ordered way, with enough explanation to verify the science, without rewarding unnecessary length, jargon, equation dumping, or citations.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_chemistry_materials_error",
+    "condition": "A materially false central chemical, quantitative, mechanistic, thermodynamic, structural, electrochemical, analytical, or materials-science claim fundamentally invalidates the answer or reverses its substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Failing to conserve atoms or charge in central reaction reasoning.",
+      "Fundamentally incorrect stoichiometry or limiting-reagent logic that changes the conclusion.",
+      "Treating a thermodynamically favorable reaction as necessarily fast.",
+      "Claiming a catalyst changes the equilibrium constant for the same reaction at the same temperature.",
+      "Fundamentally incorrect equilibrium, acid-base, redox, or electrochemical reasoning that reverses the conclusion.",
+      "Reversing oxidation and reduction in the central analysis.",
+      "Using spectroscopy or diffraction to claim an impossible or uniquely proven structure when the supplied evidence is plainly non-unique.",
+      "Proposing a central reaction mechanism that violates supplied kinetic/product evidence or conservation requirements.",
+      "A major dimensional inconsistency that invalidates a quantitative result.",
+      "Confusing strength and stiffness in a way that reverses a material-selection conclusion.",
+      "Confusing equilibrium phases with non-equilibrium microstructure in a way that invalidates the analysis.",
+      "Fundamentally incorrect phase-diagram interpretation.",
+      "Claiming dislocations generally make crystalline solids unable to deform plastically.",
+      "Reversing a major diffusion-temperature relationship.",
+      "A fundamentally incorrect corrosion or electrochemical degradation mechanism.",
+      "Treating correlation between processing and property as proof of a unique microstructural mechanism when discrimination is required.",
+      "Recommending a material or process based on a fundamentally invalid property calculation."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Small rounding differences.",
+      "Minor nomenclature mistakes.",
+      "Reasonable alternative mechanisms consistent with the evidence.",
+      "Reasonable approximation differences.",
+      "Small omissions.",
+      "Legitimate sign-convention differences used consistently.",
+      "Minor spectral-assignment uncertainty.",
+      "Reasonable alternative material choices satisfying stated constraints.",
+      "Physically reasonable assumptions clearly stated.",
+      "Use of a standard simplified model where its limitations are immaterial."
+    ]
+  }
+}

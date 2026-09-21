@@ -1,13 +1,19 @@
 # The exam — how it is written, curated and split
 
-The exam is the instrument. One question bank across the **topics in
-`scripts/categories.yaml`** — economics, law, medicine & health, mathematics,
-computer science, physics & engineering, chemistry & biology, history,
-philosophy & religion, politics & government, psychology & sociology, business
-& accounting, geography & world facts, language & logic, other — because
-"which topic are we weak in" is the question the loop exists to answer. Each
-checkpoint sits the whole exam; a judge grades every answer 0–4 against
-`rubrics/exam.md`; the per-topic score is what picks the next thing to train.
+The exam is the instrument. One question bank across the **37 topics in
+`scripts/categories.yaml`** — Agriculture, AI & Machine Learning, … Technology,
+the folder names of the phase-10 delivery exactly as written — because "which
+topic are we weak in" is the question the loop exists to answer. Each
+checkpoint sits the whole exam; a judge grades every answer 0–4 against the
+topic's own rubric (`rubrics/<slug>.md`, or `rubrics/exam.md` for a topic
+without one); the per-topic score is what picks the next thing to train.
+
+36 of the topics arrived with 100 questions each (`banks/<slug>_v1.json`),
+written by masein, and a criteria file and rubric each. Arts arrived empty.
+The five topics the exam had before — medicine & health, law, economics,
+computer science, physics & engineering — are **retired**: their files are in
+`retired/`, their rows stay in the bank marked `retired_at`, and their judged
+runs are history.
 
 ## Who writes it
 
@@ -24,9 +30,11 @@ topic. Do not accept in bulk without reading: a bank of unread LLM questions
 is a benchmark of nothing.
 
 The four original skill suites (`fr_instruction_following.jsonl` and friends
-in this directory, ten items each) are migrated into the bank under `other`,
-as they are, with their skill on the record. Nothing was thrown away; they
-are simply not topics.
+in this directory, ten items each) were migrated into the bank under `other`,
+as they are, with their skill on the record. `other` is not a topic any more
+— General & Multidisciplinary took its place as the fallback — so those rows
+are kept but no longer read; `migrate` on a fresh bank puts them under
+General & Multidisciplinary, and never twice.
 
 ## The split — the most important line in this file
 
@@ -65,8 +73,17 @@ read each question, and here the author already has:
 
 ```bash
 python3 scripts/exam_build.py --root $BENCH_ROOT/exam import \
-    eval_tasks/fr/medicine_v2.json \
-    --topic "medicine & health" --approver "Dr. Hossein" --source medicine_v2
+    eval_tasks/fr/banks/medicine_clinical_health_v1.json \
+    --topic "Medicine & Clinical Health" --approver masein
+```
+
+A folder of them — every `<slug>_v<n>.json` into the topic with that slug,
+source the file's stem — is one command, and prints a line per topic and a
+total. A file whose slug is no topic's is refused by name, before anything is
+written:
+
+```bash
+python3 scripts/exam_build.py --root $BENCH_ROOT/exam import-dir eval_tasks/fr/banks --approver masein
 ```
 
 The file is a JSON array of objects with at least a `prompt` — or an object
@@ -83,12 +100,30 @@ qid is skipped, which is exactly what the qid is for — so there is a command
 for that:
 
 ```bash
-python3 scripts/exam_build.py --root $BENCH_ROOT/exam set-source     --topic economics --source economics_v1 --approver "Dr. Hossein"
+python3 scripts/exam_build.py --root $BENCH_ROOT/exam set-source     --topic Economics --source economics_v1 --approver masein
 ```
 
 It rewrites `source` and `accepted_by` in place and touches nothing else: the
 qid is the question's identity *and* its half, so moving one would re-roll
-the split and quietly change what every judged score of that topic is about. The command is idempotent on `qid`, so
+the split and quietly change what every judged score of that topic is about.
+
+## Retiring a topic
+
+```bash
+python3 scripts/exam_build.py --root $BENCH_ROOT/exam retire --topic law --reason "replaced by the 37-topic exam (2026-09-21)"
+```
+
+marks every row of that topic `retired_at` / `retired_reason`. Nothing is
+deleted or re-split. A retired row is left out of the built tasks, the Loop
+board, the counts and imports — a retired question may be imported again
+under a new topic, where it is new. **The topic is matched by the name stored
+on each row, exactly**: the retired `law` and the new `Law` share
+`bank/law.jsonl`, and a slug match would retire both. A name no row carries is
+refused, with the names the bank does hold.
+
+## Re-importing
+
+The import is idempotent on `qid`, so
 re-running it after the author sends more items adds only the new ones, and
 prints what it imported, what it skipped and the report/diagnose split.
 
@@ -126,7 +161,8 @@ a request except the judge's.
 ## A rubric per topic, and criteria files
 
 `rubrics/<slug>.md` grades the topic whose task name carries that slug
-(`medicine & health` → `exam_medicine_health` → `rubrics/medicine_health.md`);
+(`Medicine & Clinical Health` → `exam_medicine_clinical_health` →
+`rubrics/medicine_clinical_health.md`);
 a topic without one is graded by `rubrics/exam.md`. The control set keeps
 `factual_accuracy.md`. Which rubric graded a task, with its sha and version,
 is recorded per task in every `judge.json`.

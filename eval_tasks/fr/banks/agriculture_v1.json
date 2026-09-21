@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A seed lot has 92% laboratory germination and 96% physical purity. A farmer wants 180 viable seeds/m². Assuming field emergence is 85% of viable pure seed and thousand-seed mass is 38 g, calculate the approximate seeding rate in kg/ha and state one reason the final plant population could still differ.",
+    "intent": "Calculate a seeding rate while distinguishing laboratory quality from field establishment.",
+    "domain": "Agronomy & Crop Production",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "Two fields of the same crop are planted at equal seed rates. Field A is planted 2 cm deep into moist fine-textured soil; Field B is planted 7 cm deep into a crust-prone soil after heavy rain. Explain how planting depth and soil physical conditions could change emergence speed, stand uniformity, and early competition.",
+    "intent": "Reason from planting depth and seedbed conditions to establishment outcomes.",
+    "domain": "Agronomy & Crop Production",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "agronomic_scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A cereal crop has 500 heads/m², 32 grains/head, and mean grain mass of 42 mg. Estimate grain yield in t/ha. If total aboveground dry matter at maturity is 15 t/ha, estimate harvest index and explain why increasing vegetative biomass would not necessarily raise grain yield.",
+    "intent": "Calculate yield components and harvest index, then interpret source allocation.",
+    "domain": "Agronomy & Crop Production",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A farm is considering replacing continuous cereal with a cereal-legume-cover-crop rotation. The legume can reduce purchased nitrogen, the cover crop lowers erosion but uses spring soil water, and the rotation adds management complexity. Explain the likely effects on nutrient cycling, pest pressure, soil cover, water availability, and production risk, and identify information needed before recommending the change.",
+    "intent": "Evaluate a rotation as a multi-objective management decision rather than a universal improvement.",
+    "domain": "Agronomy & Crop Production",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A soil has bulk density 1.35 Mg/m³ and particle density 2.65 Mg/m³. Estimate total porosity. Explain why two soils with the same total porosity can still have very different infiltration and permeability.",
+    "intent": "Calculate porosity and distinguish pore quantity from pore-size connectivity.",
+    "domain": "Soil Science",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "soil_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "Soil A is a well-aggregated clay loam; Soil B is a compacted sandy loam. Without assuming texture alone determines behavior, compare their likely infiltration, aeration, water-holding capacity, and root penetration, and explain which properties are structural versus textural.",
+    "intent": "Distinguish soil texture from structure and infer functional consequences.",
+    "domain": "Soil Science",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A 0-60 cm root zone has volumetric water content 0.30 at field capacity and 0.14 at permanent wilting point. Current water content is 0.20 throughout the profile. Estimate total plant-available water at field capacity and the remaining plant-available water, in mm, assuming the full 0.60 m is effectively rooted.",
+    "intent": "Use a root-zone water balance while distinguishing water content from plant-available water.",
+    "domain": "Soil Science",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A field has electrical conductivity indicating high salinity, exchangeable sodium indicating sodicity, slow infiltration, and shallow groundwater. Explain why salinity and sodicity require different interpretations, how they can interact with drainage, and what additional soil and irrigation-water measurements are needed before selecting a reclamation strategy.",
+    "intent": "Diagnose interacting salinity, sodicity, and drainage constraints without collapsing them into one problem.",
+    "domain": "Soil Science",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A fertilizer labeled 18-46-0 is applied at 120 kg/ha. Calculate the kg/ha of N and P2O5 applied. If only 70% of the applied N is expected to become crop-available during the season, estimate the seasonally available fertilizer N and explain why this is not the same as crop N uptake.",
+    "intent": "Calculate fertilizer nutrients and distinguish applied, available, and taken-up nutrient.",
+    "domain": "Soil Fertility & Plant Nutrition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "nutrient_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A soil test reports high total phosphorus but low extractable plant-available phosphorus at pH 8.2. Explain how both results can be true and why simply citing total soil phosphorus is insufficient for a fertilizer decision.",
+    "intent": "Distinguish total nutrient reserves from immediately plant-available supply.",
+    "domain": "Soil Fertility & Plant Nutrition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A 6 t/ha grain crop removes 22 kg N, 4 kg P, and 6 kg K per tonne of grain. Residue is returned to the field. Estimate nutrient removal in harvested grain. Then explain why replacing exactly those amounts with fertilizer does not guarantee a balanced long-term nutrient budget.",
+    "intent": "Calculate harvest removal and reason about nutrient balances and losses.",
+    "domain": "Soil Fertility & Plant Nutrition",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A farmer tested N rates of 0, 60, 120, and 180 kg N/ha. Yields were 5.2, 6.5, 7.1, and 7.2 t/ha. Grain is worth 220 currency units/t, fertilizer N costs 1.25 units/kg N, and there may be 35 kg/ha residual mineral N after the 180-N treatment. Analyze the biological and economic response, residual-N risk, and uncertainty. Do not assume the yield-maximizing rate is economically or environmentally optimal.",
+    "intent": "Integrate diminishing yield response, marginal economics, carryover, and environmental risk.",
+    "domain": "Soil Fertility & Plant Nutrition",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "farm_economics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A crop closes stomata during a hot, dry afternoon. Explain the immediate effects on transpiration, leaf temperature, CO2 entry, and photosynthesis, including why stomatal closure can conserve water yet increase heat stress.",
+    "intent": "Connect stomatal regulation to coupled carbon-water-energy effects.",
+    "domain": "Crop Physiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "crop_physiology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "Two canopies have the same leaf area index, but one has mostly horizontal upper leaves while the other has a more erect leaf arrangement. Explain how canopy architecture can alter light distribution, radiation interception within the canopy, and potentially whole-canopy photosynthesis.",
+    "intent": "Reason from canopy architecture to radiation distribution and photosynthesis.",
+    "domain": "Crop Physiology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "crop_physiology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A grain crop retains green leaf area after flowering, yet grain filling is poor. Identify at least three plausible explanations involving source capacity, sink formation, temperature or water stress, and assimilate partitioning. State observations that would help distinguish among them.",
+    "intent": "Diagnose poor grain filling despite apparently adequate green leaf area.",
+    "domain": "Crop Physiology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A short-day crop is grown under long days and adequate temperature, while a vernalization-requiring cultivar of another crop receives insufficient cold exposure. Compare how photoperiod and vernalization can delay reproductive development without necessarily reducing vegetative growth immediately.",
+    "intent": "Distinguish environmental controls of phenology from vegetative biomass accumulation.",
+    "domain": "Crop Physiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A trait has broad-sense heritability of 0.70 in one test population and environment. Explain what this does and does not imply about genetic determination of individual phenotypes and about performance in a different environment.",
+    "intent": "Interpret heritability without equating it with genetic determinism.",
+    "domain": "Crop Genetics & Plant Breeding",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "Hybrid A outyields both parents in the F1 generation. Explain heterosis and why saving seed from the F1 does not guarantee that the same performance will be fixed in later segregating generations.",
+    "intent": "Distinguish F1 hybrid vigor from stable inheritance.",
+    "domain": "Crop Genetics & Plant Breeding",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "Three genotypes yield as follows across environments: G1 = 7.0, 7.2, 4.8 t/ha; G2 = 6.4, 6.5, 6.3; G3 = 5.9, 7.4, 7.0. Explain the evidence for genotype-by-environment interaction and how a breeder might choose between broad adaptation and environment-specific selection.",
+    "intent": "Interpret crossover performance and breeding objectives across environments.",
+    "domain": "Crop Genetics & Plant Breeding",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A DNA marker is strongly associated with drought yield in a breeding population. Explain why the association does not prove the marker itself causes drought tolerance and compare how marker-assisted and genomic selection could use such information.",
+    "intent": "Distinguish predictive association from causality in breeding tools.",
+    "domain": "Crop Genetics & Plant Breeding",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_and_mechanistic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "Plants in low areas of a field show yellowing and root browning after prolonged rain. Similar symptoms could arise from a root pathogen, oxygen deficiency, or nutrient uptake problems. Explain why symptoms alone are insufficient for diagnosis and identify observations that would discriminate among these causes.",
+    "intent": "Handle diagnostic uncertainty among biotic and abiotic causes.",
+    "domain": "Plant Pathology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "disease_diagnosis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "Explain the disease triangle using a susceptible host, a virulent pathogen, and a conducive environment. Then explain why pathogen presence can occur without severe disease if one side of the triangle is limiting.",
+    "intent": "Apply the disease triangle to distinguish pathogen detection from disease severity.",
+    "domain": "Plant Pathology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A crop variety described as resistant develops some disease symptoms during an unusually humid season. Explain why resistance is not the same as immunity and how inoculum pressure and environment can alter observed disease.",
+    "intent": "Interpret resistance as context-dependent suppression rather than absolute immunity.",
+    "domain": "Plant Pathology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "agronomic_scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A field shows patchy stunting. Laboratory tests detect a pathogen in some symptomatic and some asymptomatic plants; the field also has salinity gradients and prior herbicide carryover risk. Design a non-destructive diagnostic reasoning plan that separates association from causation and avoids assuming the detected pathogen is the sole cause.",
+    "intent": "Integrate disease diagnostics, abiotic stress, and causal inference without harmful pathogen procedures.",
+    "domain": "Plant Pathology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A scouting program finds 2 caterpillars per plant, but the economic threshold is 4 per plant at the current crop stage. Natural-enemy abundance is high and crop damage is minor. Explain why immediate insecticide treatment is not automatically justified.",
+    "intent": "Use thresholds and natural enemies to distinguish pest presence from economic damage.",
+    "domain": "Entomology & Arthropod Pest Management",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "pest_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A pest has egg, larval, pupal, and adult stages, and most feeding damage occurs in the larval stage. Explain how complete metamorphosis affects the timing and interpretation of crop scouting.",
+    "intent": "Relate insect life stage to observed damage and monitoring.",
+    "domain": "Entomology & Arthropod Pest Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "After repeated use of one insecticide mode of action, a pest population is harder to control across several seasons. Explain the evidence that would support evolved resistance rather than temporary avoidance, application failure, or weather effects.",
+    "intent": "Differentiate resistance evolution from other reasons for reduced control.",
+    "domain": "Entomology & Arthropod Pest Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A pest population is near the economic threshold. A broad-spectrum treatment is expected to reduce the pest quickly but also suppress predators; a slower biological control option preserves predators; crop value is high but harvest is near. Analyze the trade-offs and the additional information needed before choosing an intervention.",
+    "intent": "Evaluate pest management under threshold, natural-enemy, timing, and economic trade-offs.",
+    "domain": "Entomology & Arthropod Pest Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "Why can a small number of weeds emerging with the crop cause more yield loss than a larger number emerging after the crop canopy is established?",
+    "intent": "Explain timing-dependent crop-weed competition.",
+    "domain": "Weed Science",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A field has a perennial weed that regrows from underground organs. Compare the likely limitations of one shallow cultivation pass with a longer-term integrated strategy involving crop competition, repeated suppression, and prevention of seed production.",
+    "intent": "Distinguish short-term top growth removal from long-term perennial weed management.",
+    "domain": "Weed Science",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A grower reduces current-season weed biomass by 90%, but surviving weeds produce 50,000 viable seeds/ha. Explain why good short-term suppression may still fail to reduce the seed bank and describe the mechanisms that determine long-term weed population change.",
+    "intent": "Reason from current control to future seed-bank dynamics.",
+    "domain": "Weed Science",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A no-till system has rising pressure from one herbicide-resistant annual weed. The farmer can adjust crop rotation, planting density, cover crops, mechanical tactics where feasible, and herbicide diversity. Explain how combining tactics can reduce selection pressure and weed reproduction without assuming eradication is necessary.",
+    "intent": "Design integrated weed management around resistance evolution and seed return.",
+    "domain": "Weed Science",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A 12-ha field needs a net irrigation depth of 35 mm. Application efficiency is 70%. Calculate the gross depth that must be applied and the gross water volume in m³.",
+    "intent": "Calculate irrigation requirement with an efficiency adjustment.",
+    "domain": "Irrigation & Agricultural Water Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "irrigation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A pump delivers 55 L/s to an irrigation system. Ignoring downtime, how many hours are required to apply 40 mm of gross irrigation to 5 ha? Show the unit logic.",
+    "intent": "Convert flow, area, and depth into irrigation time.",
+    "domain": "Irrigation & Agricultural Water Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A crop has effective root depth 0.8 m. Field capacity is 0.31 m³/m³, current root-zone water content is 0.22, and allowable depletion is 50% of total available water. Permanent wilting point is 0.15. Determine whether irrigation is already due and estimate the net refill depth to field capacity.",
+    "intent": "Apply allowable depletion and root-zone water balance rather than using water content alone.",
+    "domain": "Irrigation & Agricultural Water Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "irrigation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Water is limited to 3,600 m³ for two 6-ha crops. Crop A is entering flowering and has a high value per unit yield; Crop B is still vegetative and is moderately drought tolerant. Both could use up to 45 mm now, but Crop A is much more yield-sensitive at its current stage. Explain an allocation framework, calculate the water needed to give either crop the full 45 mm, and discuss why proportional allocation may not be optimal.",
+    "intent": "Allocate scarce irrigation using stage sensitivity, value, and opportunity cost.",
+    "domain": "Irrigation & Agricultural Water Management",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "Daily mean temperature is 18°C and a crop base temperature is 8°C. Calculate growing degree days for the day using the simple mean-temperature method. State one limitation of this calculation under extreme temperatures.",
+    "intent": "Calculate and qualify a simple thermal-time measure.",
+    "domain": "Agricultural Meteorology & Climate",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A region receives its normal annual rainfall total, but most rain falls early in the season and little falls during flowering and grain filling. Explain why the annual total can coexist with severe crop drought stress.",
+    "intent": "Distinguish seasonal rainfall totals from timing, storage, rooting, and evapotranspiration.",
+    "domain": "Agricultural Meteorology & Climate",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "agronomic_scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A 30-year climate record shows unchanged mean seasonal rainfall but substantially greater year-to-year variability and more frequent 10-day dry spells. Explain why average rainfall alone is inadequate for crop-risk assessment.",
+    "intent": "Interpret climate variability separately from the mean.",
+    "domain": "Agricultural Meteorology & Climate",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A late frost is forecast during flowering. One field is in a low-lying hollow and another is on a gentle slope. Explain how topography, cold-air drainage, wind, humidity, and canopy microclimate can alter frost exposure, without assuming the forecast temperature will be identical at both fields.",
+    "intent": "Reason from regional weather to field-scale frost microclimate.",
+    "domain": "Agricultural Meteorology & Climate",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "Two groups of growing animals gain 1.0 kg/day. Group A consumes 7 kg dry matter/day and Group B consumes 8.5 kg dry matter/day. Compare their feed conversion on a dry-matter basis and explain why equal growth rate does not imply equal feed efficiency.",
+    "intent": "Calculate and distinguish growth performance from feed efficiency.",
+    "domain": "Animal Science & Livestock Production",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A high-producing herd shows falling reproduction during a heat wave even though feed offered is unchanged. Explain how thermal stress can alter intake, maintenance energy needs, behavior, and reproductive performance.",
+    "intent": "Connect heat stress to biological and management constraints.",
+    "domain": "Animal Science & Livestock Production",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "livestock_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A farm increases stocking density in a housing unit and total output per building rises, but injuries, competition at feeders, and behavioral disturbance also increase. Explain why productivity per building alone is not a sufficient welfare or biological-efficiency indicator.",
+    "intent": "Evaluate production intensity using welfare and resource constraints.",
+    "domain": "Animal Science & Livestock Production",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "sustainability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A genetically high-potential herd underperforms relative to expected growth. Forage quality is variable, heat load is high, and disease status is uncertain. Explain why observed performance cannot be attributed to genetics alone and what measurements would separate genetic, nutritional, environmental, and health constraints.",
+    "intent": "Distinguish genetic potential from realized performance under multiple constraints.",
+    "domain": "Animal Science & Livestock Production",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A forage is 35% dry matter and contains 14% crude protein on a dry-matter basis. An animal eats 20 kg as-fed forage per day. Calculate dry-matter intake and crude-protein intake.",
+    "intent": "Convert as-fed intake to dry matter and nutrient intake.",
+    "domain": "Animal Nutrition & Feed Science",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "feed_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "Ration A is 90% dry matter with 10 MJ metabolizable energy/kg DM. Ration B is 40% dry matter with 11 MJ/kg DM. Explain why comparing energy per kilogram as-fed without correcting for water content can be misleading.",
+    "intent": "Distinguish as-fed mass from dry-matter nutrient density.",
+    "domain": "Animal Nutrition & Feed Science",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A 600-kg animal requires 8 kg DM/day for maintenance and production combined. Available forage supplies 9 MJ/kg DM and a concentrate supplies 13 MJ/kg DM. The daily energy requirement is 82 MJ. If at least 5 kg DM/day must come from forage, determine one ration that meets the energy requirement and total DM limit, then discuss why cost and other nutrients could change the final formulation.",
+    "intent": "Solve a simple constrained ration and recognize omitted constraints.",
+    "domain": "Animal Nutrition & Feed Science",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "feed_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A farm is short of winter feed. Silage quantity is adequate on an as-fed basis, but laboratory results show lower dry matter and lower digestibility than last year. Explain how these changes affect usable nutrient supply, likely intake, supplementation needs, and the risk of overestimating feed inventory.",
+    "intent": "Integrate feed inventory, dry matter, digestibility, and nutrient supply.",
+    "domain": "Animal Nutrition & Feed Science",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "livestock_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A 40-ha pasture supports 80 animals for 120 days. Each animal is assumed to consume 10 kg forage DM/day, and only 50% of standing forage is considered safely utilizable. Estimate the total usable forage demand and the standing forage DM that would be needed at the start if there were no regrowth.",
+    "intent": "Calculate forage demand and utilization-adjusted forage requirement.",
+    "domain": "Pasture, Forage & Grazing Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "Explain the difference between stocking rate and stocking density using a rotational grazing example in which the same number of animals are concentrated briefly on a small paddock.",
+    "intent": "Distinguish long-term animals-per-area from short-term grazing concentration.",
+    "domain": "Pasture, Forage & Grazing Management",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A pasture manager repeatedly grazes to a very low residual because short-term animal intake is high. Explain how low residual leaf area can affect regrowth, root reserves, species composition, soil cover, and long-term carrying capacity.",
+    "intent": "Analyze the conflict between immediate utilization and pasture persistence.",
+    "domain": "Pasture, Forage & Grazing Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A farm raises stocking rate after two unusually wet years with exceptional pasture growth. Rainfall history shows large interannual variability and forage reserves are small. Explain why using the two recent years to estimate sustainable carrying capacity is risky and propose a more robust assessment framework.",
+    "intent": "Evaluate carrying capacity under climate variability and downside risk.",
+    "domain": "Pasture, Forage & Grazing Management",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A fruit tree carries 1,200 young fruits. After thinning it carries 800, and total carbohydrate supply later in the season is similar. Explain why average fruit size may increase after thinning and why total harvested mass may or may not increase.",
+    "intent": "Reason from sink number to fruit size and total yield.",
+    "domain": "Horticulture & Specialty Crop Production",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "crop_physiology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A dense vegetable canopy produces high total leaf area but poor air movement and heavy shading of lower leaves. Explain trade-offs among light interception, photosynthesis, disease-conducive humidity, and harvest quality.",
+    "intent": "Analyze canopy-density trade-offs in horticultural production.",
+    "domain": "Horticulture & Specialty Crop Production",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A greenhouse crop receives nutrient solution through fertigation. Electrical conductivity rises while plants wilt at midday even though the substrate appears wet. Explain why high root-zone salinity can reduce water uptake and identify measurements needed before increasing irrigation or fertilizer.",
+    "intent": "Diagnose osmotic stress without equating wet substrate with available water.",
+    "domain": "Horticulture & Specialty Crop Production",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "Fruit harvested at an earlier commercial maturity stores for 5 weeks but develops less flavor; fruit harvested later has better flavor but only 2 weeks of shelf life and more transport damage. Explain how biological maturity, market quality, storage life, and supply-chain distance affect harvest timing.",
+    "intent": "Evaluate harvest maturity as a quality-logistics trade-off.",
+    "domain": "Horticulture & Specialty Crop Production",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A 6-m implement travels at 8 km/h. Calculate theoretical field capacity in ha/h using width × speed / 10. If field efficiency is 75%, calculate effective field capacity.",
+    "intent": "Calculate theoretical and effective field capacity.",
+    "domain": "Agricultural Engineering & Machinery",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "machinery_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A farm has 240 ha to plant in a 6-day optimum window with 10 workable hours/day. What minimum effective field capacity is required? If a planter has theoretical capacity 5.0 ha/h and expected field efficiency 70%, determine whether it is large enough.",
+    "intent": "Match machinery capacity to a timeliness constraint.",
+    "domain": "Agricultural Engineering & Machinery",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "machinery_calculation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A heavier tractor improves traction for a draft-intensive operation but increases axle load and soil compaction risk. Explain how soil moisture, tire contact area, ballast, and controlled traffic affect the trade-off.",
+    "intent": "Reason about traction and compaction rather than maximizing machine mass.",
+    "domain": "Agricultural Engineering & Machinery",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "agricultural_engineering_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A farm can buy a high-capacity harvester or contract harvest. The owned machine has high fixed cost but can begin immediately; the contractor is cheaper in average years but may arrive 3-5 days late during regional peak harvest, when field losses can rise rapidly after maturity. Develop a decision framework using expected area, timeliness losses, utilization, fixed and variable cost, and weather risk. Explain why the largest machine is not automatically optimal.",
+    "intent": "Integrate machinery sizing, ownership economics, timeliness, and uncertainty.",
+    "domain": "Agricultural Engineering & Machinery",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "farm_economics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A vegetation-index map shows a low-value zone. Explain why the map alone cannot determine whether the cause is nutrient deficiency, water stress, pest damage, poor emergence, or soil background effects.",
+    "intent": "Distinguish sensor signal from biological diagnosis.",
+    "domain": "Precision Agriculture & Agricultural Technology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A yield monitor records 6.0 t/ha in one pass and 4.5 t/ha in the adjacent pass. Before interpreting this as true spatial yield variability, identify at least four possible measurement or geolocation issues that should be checked.",
+    "intent": "Evaluate data quality before acting on high-resolution yield data.",
+    "domain": "Precision Agriculture & Agricultural Technology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A field has 10-m satellite imagery and 1-m drone imagery. Explain why finer spatial resolution does not necessarily mean greater measurement accuracy or a better management recommendation.",
+    "intent": "Distinguish spatial resolution from accuracy and decision usefulness.",
+    "domain": "Precision Agriculture & Agricultural Technology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A stable low-yield zone appears in three years of yield maps. Soil tests show adequate nutrients, an EC sensor suggests variability, and ground observations show ponding after rain. Build a diagnostic sequence that could separate drainage, compaction, salinity, topography, and measurement artifacts before using variable-rate inputs.",
+    "intent": "Integrate spatial data and ground truth to diagnose a persistent low-yield zone.",
+    "domain": "Precision Agriculture & Agricultural Technology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A crop sells for 250 currency units/t. Variable production cost excluding harvest is 900 units/ha, and harvest cost is 40 units/t. Calculate the break-even yield per hectare ignoring fixed costs.",
+    "intent": "Calculate a break-even yield with output-dependent harvest cost.",
+    "domain": "Agricultural Economics & Farm Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "farm_economics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A proposed input raises expected yield from 6.0 to 6.4 t/ha. Crop price is 210 units/t and the input costs 70 units/ha. Calculate the expected change in gross margin before considering risk, and identify one reason the farm may still decline the input.",
+    "intent": "Use partial-budget logic and recognize non-price constraints.",
+    "domain": "Agricultural Economics & Farm Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "farm_economics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A higher fertilizer rate gives the highest biological yield but a smaller marginal yield response per additional unit of nutrient. Explain how marginal revenue and marginal cost determine an economic optimum and why it can occur below the yield-maximizing rate.",
+    "intent": "Distinguish biological maximum from economic optimum using marginal analysis.",
+    "domain": "Agricultural Economics & Farm Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "Enterprise A has expected gross margin 900 units/ha with a standard deviation of 350; Enterprise B has expected gross margin 820 with a standard deviation of 140. The farm faces debt-service obligations and limited cash reserves. Explain why expected margin alone is insufficient and how downside risk, diversification, liquidity, and the farmer's constraints affect the choice.",
+    "intent": "Evaluate farm enterprise choices under return-risk trade-offs.",
+    "domain": "Agricultural Economics & Farm Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "Crop residues can either be retained on the soil surface or fed to livestock. Explain the opportunity costs and system effects involving feed supply, soil cover, erosion, organic matter inputs, manure return, and labor.",
+    "intent": "Analyze residue allocation across crop and livestock enterprises.",
+    "domain": "Agricultural Systems & Integrated Farm Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A mixed farm produces manure containing an estimated 4,000 kg total N per year. Only 45% is expected to be crop-available in the first season. Calculate first-season available N and explain why field allocation should also consider phosphorus, transport cost, timing, and loss risk.",
+    "intent": "Calculate manure N supply and integrate multi-nutrient allocation constraints.",
+    "domain": "Agricultural Systems & Integrated Farm Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "nutrient_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "Two crops have overlapping harvest windows and both require the same labor crew and transport equipment. Explain how a whole-farm plan should value timeliness losses, temporary labor, contracting, storage capacity, and the opportunity cost of delaying one crop.",
+    "intent": "Reason about cross-enterprise labor and machinery bottlenecks.",
+    "domain": "Agricultural Systems & Integrated Farm Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A drought reduces grain yield by 30%, leaving less crop residue for livestock feed. Feed prices rise 25%, manure availability is expected to fall because animal numbers may be reduced, and next season's soil cover could decline if residues are removed. Trace the likely effects across crop income, feed costs, livestock output, nutrient cycling, soil protection, and cash flow, and identify adaptation options with their trade-offs.",
+    "intent": "Trace a climate shock through interacting crop-livestock-financial subsystems.",
+    "domain": "Agricultural Systems & Integrated Farm Management",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A cover crop reduces winter erosion and nitrate leaching but can deplete soil water before a dry spring cash crop if terminated late. Explain why its sustainability effect is context-dependent and which measurements would reveal the net benefit.",
+    "intent": "Evaluate a conservation practice across competing soil, nutrient, and water objectives.",
+    "domain": "Sustainable Agriculture & Agroecology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "sustainability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "Reduced tillage lowers fuel use and erosion on a sloping field but leaves cooler spring soil and increases early weed pressure. Explain the mechanisms and management trade-offs without labeling the system uniformly better or worse.",
+    "intent": "Evaluate reduced tillage through mechanisms and trade-offs.",
+    "domain": "Sustainable Agriculture & Agroecology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Farm X has lower greenhouse-gas emissions per hectare but lower yield; Farm Y has higher emissions per hectare but much higher yield. Explain why both area-based and product-based metrics may be relevant and why neither alone captures sustainability.",
+    "intent": "Interpret environmental efficiency using alternative system boundaries and denominators.",
+    "domain": "Sustainable Agriculture & Agroecology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A proposed 'regenerative' system increases crop diversity, keeps soil covered longer, and reduces tillage, but requires more labor and has uncertain yields during transition. Explain how to evaluate it using measurable outcomes rather than the label, including productivity, soil condition, water, nutrient loss, biodiversity, economics, and risk.",
+    "intent": "Assess a sustainability claim using multidimensional evidence rather than terminology.",
+    "domain": "Sustainable Agriculture & Agroecology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "sustainability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A shelterbelt reduces wind speed across a field. Explain potential benefits for erosion, evapotranspiration, and crop lodging, and potential costs from shading, root competition, and land occupied by trees.",
+    "intent": "Evaluate windbreak benefits and competition mechanisms.",
+    "domain": "Agroforestry & Land Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "In an alley-cropping system, tree roots access deeper water while the annual crop uses mostly shallow soil water, but both depend on upper-soil nutrients. Explain how complementary and competitive resource use can occur at the same time.",
+    "intent": "Reason about niche complementarity and competition in tree-crop systems.",
+    "domain": "Agroforestry & Land Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_and_mechanistic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A steep field is losing topsoil through runoff. Compare contour-aligned vegetation strips, residue retention, reduced tillage, and tree-based barriers in terms of runoff velocity, soil cover, root reinforcement, operational constraints, and time to benefit.",
+    "intent": "Compare land-management mechanisms for erosion control.",
+    "domain": "Agroforestry & Land Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A silvopasture has lower midday heat load for animals under trees but less forage growth in heavily shaded zones. Explain how tree density, seasonal climate, forage shade tolerance, animal distribution, and soil moisture determine whether the system raises or lowers total farm performance.",
+    "intent": "Evaluate tree-livestock interactions as context-dependent.",
+    "domain": "Agroforestry & Land Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A field margin contains many insect species. Explain why high species count alone does not prove improved pest control or pollination services.",
+    "intent": "Distinguish biodiversity metrics from demonstrated ecosystem function.",
+    "domain": "Agricultural Ecology & Biodiversity",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "Predatory insects are abundant in one field and pest density is lower there than in neighboring fields. Give at least two causal explanations and two confounding explanations for the association, and describe evidence that would strengthen a claim of biological control.",
+    "intent": "Separate ecological association from causal pest suppression.",
+    "domain": "Agricultural Ecology & Biodiversity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_and_mechanistic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A pollinator habitat strip occupies 3% of field area and reduces cropped area, but fruit set near the strip increases. Explain how the net production effect depends on pollination limitation, spatial reach, displaced yield, and habitat management.",
+    "intent": "Analyze an ecosystem-service trade-off at field scale.",
+    "domain": "Agricultural Ecology & Biodiversity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A landscape-level study finds farms surrounded by more semi-natural habitat have more beneficial insects, but field-level pesticide use and crop diversity also differ. Explain why landscape and field-scale effects must be separated before attributing the insect response to habitat alone.",
+    "intent": "Identify scale dependence and confounding in agroecological data.",
+    "domain": "Agricultural Ecology & Biodiversity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "experimental_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A grain lot weighs 20 t at 18% moisture content on a wet basis. Assuming only water is removed, estimate the final mass after drying to 13% moisture. Show the dry-matter basis of the calculation.",
+    "intent": "Use dry-matter conservation in a grain-drying calculation.",
+    "domain": "Postharvest Biology & Crop Quality",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "Fresh produce stored at a lower non-chilling temperature generally respires more slowly than at a warmer temperature. Explain how this can extend shelf life and why excessively low temperature can still reduce quality for chilling-sensitive produce.",
+    "intent": "Reason from respiration and chilling injury to storage quality.",
+    "domain": "Postharvest Biology & Crop Quality",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "Two grain bins have the same average moisture content, but one contains pockets of wetter grain. Explain why average moisture can hide spoilage risk and how temperature gradients, local water activity, and aeration interact.",
+    "intent": "Interpret spatial heterogeneity in storage risk.",
+    "domain": "Postharvest Biology & Crop Quality",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A fruit supply chain can harvest later for better flavor but expects 8% more field loss, 5% more transport damage, and a 30% shorter shelf life. Earlier harvest reduces flavor scores but lowers losses. Develop a decision framework that incorporates market segment, cold-chain reliability, expected price premiums, and loss risk rather than maximizing one quality attribute.",
+    "intent": "Optimize harvest maturity across quality, loss, logistics, and economics.",
+    "domain": "Postharvest Biology & Crop Quality",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "management_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "Strategy A yields 8 t/ha in a normal year and 3 t/ha in drought; Strategy B yields 7 t/ha in a normal year and 5.5 t/ha in drought. If drought probability is 25%, calculate expected yield for each and explain why a farmer might still value Strategy B even if its expected yield is lower.",
+    "intent": "Combine expected value with downside-risk reasoning.",
+    "domain": "Agricultural Risk & Resilience",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A farmer spreads planting over three dates instead of planting the whole area on one day. Explain how this can reduce exposure to a single frost or drought window while potentially increasing operational complexity and lowering average yield if some dates are suboptimal.",
+    "intent": "Evaluate planting-date diversification as risk management.",
+    "domain": "Agricultural Risk & Resilience",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A farm stores grain after harvest to avoid selling at a seasonally low price. Explain the competing effects of expected price increase, storage cost, interest on tied-up capital, quantity/quality loss, and price uncertainty.",
+    "intent": "Analyze storage as a price-risk and cash-flow decision.",
+    "domain": "Agricultural Risk & Resilience",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "farm_economics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A resilience plan adds an irrigation backup, diversified crop mix, and larger forage reserve. Each lowers exposure to a different shock but carries cost in normal years. Explain why resilience should be evaluated against severe downside outcomes and recovery capacity rather than maximum average production alone.",
+    "intent": "Distinguish resilience from maximum expected productivity.",
+    "domain": "Agricultural Risk & Resilience",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A researcher applies Treatment A to the eastern half of one field and Treatment B to the western half, then compares yield. Explain why field position is confounded with treatment and why many yield samples within each half do not create true treatment replication.",
+    "intent": "Identify confounding and pseudoreplication in a split-field comparison.",
+    "domain": "Agricultural Experimentation & Field Trials",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A randomized complete block experiment has four fertilizer treatments and five blocks across a fertility gradient. Explain the purpose of blocking, identify the experimental unit, and distinguish plot replication from multiple plant measurements within a plot.",
+    "intent": "Interpret blocking, experimental units, and subsampling.",
+    "domain": "Agricultural Experimentation & Field Trials",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "experimental_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A two-factor trial tests irrigation (full vs deficit) and nitrogen (low vs high). Under full irrigation, high N raises yield by 1.2 t/ha; under deficit irrigation, high N raises yield by only 0.1 t/ha. Explain the interaction and why reporting only the average N effect can be misleading.",
+    "intent": "Interpret a biologically meaningful treatment interaction.",
+    "domain": "Agricultural Experimentation & Field Trials",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A cultivar trial spans three locations for two years, but one location is missing in year 2 and replication is incomplete at another. Genotype rankings change across environments. Explain what can and cannot be concluded about broad adaptation, genotype-environment interaction, and uncertainty, and identify analysis assumptions that require caution.",
+    "intent": "Reason from an incomplete multi-environment trial without overstating precision.",
+    "domain": "Agricultural Experimentation & Field Trials",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A farm record shows fields receiving more nitrogen also had higher yields. Those fields were also more irrigated and had deeper soils. Explain why the record supports association but not a causal nitrogen effect, and propose a design or analysis that would better separate the influences.",
+    "intent": "Identify confounding in observational farm data and improve causal inference.",
+    "domain": "Agricultural Data Interpretation & Cross-disciplinary Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A fertilizer trial reports mean yields of 7.10 and 7.18 t/ha for two treatments, with a statistically significant difference due to very low experimental error. Explain why the 0.08 t/ha difference may still be agronomically or economically unimportant.",
+    "intent": "Distinguish statistical significance from practical importance.",
+    "domain": "Agricultural Data Interpretation & Cross-disciplinary Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A farm's yield fell from 7.5 to 5.6 t/ha in a season with 20% less rainfall. Soil tests also show lower available N, a compacted headland expanded into cropped area, and pest counts rose after flowering. Construct a causal diagnosis that ranks what evidence is needed next, identifies possible interactions, and avoids attributing the entire loss to rainfall alone.",
+    "intent": "Diagnose a multi-factor yield decline under confounding and interacting limitations.",
+    "domain": "Agricultural Data Interpretation & Cross-disciplinary Reasoning",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A decision model recommends increasing irrigation because each additional 10 mm is assumed to add 0.25 t/ha yield at a constant rate. Explain when this linear assumption might be reasonable, when it is likely to break down, and what data would be needed to test diminishing returns, waterlogging risk, stage sensitivity, and price effects.",
+    "intent": "Evaluate the assumptions and validity range of a simple crop-response model.",
+    "domain": "Agricultural Data Interpretation & Cross-disciplinary Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "model_selection",
+    "jurisdiction_required": false
+  }
+]

@@ -1,0 +1,183 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the question asked, the supplied scope, and the operational objective. Does not substitute generic IT advice for the actual failure mode or decision.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "technical_accuracy",
+      "name": "Technical Accuracy",
+      "definition": "Uses correct IT concepts and mechanisms. Central claims about systems, networks, identity, security, storage, cloud, recovery, or operations must be technically sound; major errors weigh far more than minor terminology slips.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "troubleshooting_reasoning",
+      "name": "Troubleshooting Reasoning",
+      "definition": "When troubleshooting is required, establishes scope, uses evidence, forms plausible hypotheses, chooses discriminating and low-disruption tests, avoids random rebooting or broad configuration changes, and verifies restoration.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "systems_administration_reasoning",
+      "name": "Systems Administration Reasoning",
+      "definition": "Correctly reasons about operating-system state, services/processes, users/groups, permissions, filesystems, startup, logs, updates, drivers, resource use, and local versus system-wide configuration when relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "networking_reasoning",
+      "name": "Networking Reasoning",
+      "definition": "Correctly reasons about source/destination, addressing, subnet boundaries, gateways, routing, switching, DNS, DHCP, transport, VLANs, firewalls, VPNs, directionality, and where connectivity fails. Major subnetting or routing reversals are severe.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "identity_and_access_reasoning",
+      "name": "Identity and Access Reasoning",
+      "definition": "Correctly separates identity, authentication, authorization, effective permissions, roles/groups, synchronization/replication, account state, and device state; applies least privilege and does not treat successful login as universal entitlement.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "cloud_and_virtualization_reasoning",
+      "name": "Cloud and Virtualization Reasoning",
+      "definition": "Correctly reasons about VMs, hosts, overcommitment, snapshots, containers, cloud service models, zones/regions, scaling, managed services, hybrid dependencies, and shared responsibility without assuming cloud or virtualization automatically provides backup or disaster recovery.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "security_reasoning",
+      "name": "Security Reasoning",
+      "definition": "Identifies the actual security risk, distinguishes detection from confirmed compromise, contains active harm proportionately, protects identities and trust boundaries, preserves relevant evidence where appropriate, and avoids weakening controls as a routine fix.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "backup_recovery_and_continuity",
+      "name": "Backup, Recovery, and Continuity",
+      "definition": "Correctly distinguishes backup, replication, snapshots, high availability, RPO, RTO, restore testing, copy independence, dependency-aware recovery sequencing, retention, and business continuity.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "monitoring_and_incident_reasoning",
+      "name": "Monitoring and Incident Reasoning",
+      "definition": "Interprets alerts, logs, metrics, baselines, thresholds, health checks, and incident evidence as signals rather than automatic root causes; separates immediate mitigation/service restoration from later root-cause work.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "configuration_and_change_reasoning",
+      "name": "Configuration and Change Reasoning",
+      "definition": "When configuration or change is relevant, considers intended versus effective state, drift, blast radius, testing, maintenance timing, dependencies, reversibility, rollback feasibility, and post-change validation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "Calculations use correct units, assumptions, magnitude, and interpretation. Small arithmetic slips that do not change the conclusion are minor; major subnet, capacity, availability, backup, licensing, or timing errors that invalidate the design are severe.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "root_cause_and_dependency_analysis",
+      "name": "Root Cause and Dependency Analysis",
+      "definition": "Distinguishes symptoms, triggers, contributing factors, shared upstream dependencies, workarounds, and root causes. A correct-looking fix based on an unsupported diagnosis should not receive full credit.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "risk_and_business_impact",
+      "name": "Risk and Business Impact",
+      "definition": "Recognizes user/business impact, criticality, operational burden, security exposure, downtime, lifecycle or vendor risk, and residual risk; does not equate technical severity with business priority.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "solution_safety_and_reversibility",
+      "name": "Solution Safety and Reversibility",
+      "definition": "Proposed actions minimize avoidable outage, data loss, privilege expansion, or security weakening; preserve recovery options; and include rollback or staged implementation when material production changes are involved.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_uncertainty",
+      "name": "Assumptions and Uncertainty",
+      "definition": "Separates observed facts from hypotheses, identifies missing information that materially affects the answer, avoids speculative certainty, and appropriately recognizes when more evidence is needed.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "architecture_and_tradeoff_reasoning",
+      "name": "Architecture and Trade-off Reasoning",
+      "definition": "For design decisions, connects requirements and constraints to availability, performance, identity, security, recovery, maintainability, cost where supplied, migration risk, and operational complexity; accepts multiple defensible architectures.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts needed to answer the question safely and usefully without requiring irrelevant domain discussion. Important omissions affecting correctness, verification, dependencies, or recovery reduce the score.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "The answer's claims, calculations, diagnosis, and proposed actions do not contradict each other or the supplied logs, configuration, topology, or timeline.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Explains reasoning and actions in a clear, operationally usable way. Jargon, command dumping, or citations do not substitute for an intelligible explanation of mechanism, evidence, dependencies, and trade-offs.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_it_error",
+    "condition": "A materially false central technical, operational, security, networking, recovery, access-control, or quantitative claim that fundamentally invalidates the answer or would create severe operational, security, availability, or data-loss risk.",
+    "effect": "score=0",
+    "examples": [
+      "Recommending deletion, destructive reconfiguration, or overwrite of the only viable production copy of data.",
+      "Treating RAID, synchronous replication, or a VM snapshot as a complete substitute for independent backup.",
+      "Claiming an untested backup job guarantees recoverability.",
+      "Fundamentally incorrect RPO/RTO reasoning that invalidates a recovery design.",
+      "Recommending broad and indefinite disabling of a major security control as the principal fix.",
+      "Granting excessive administrative access as the solution to a routine permission problem.",
+      "Confusing authentication and authorization in a central access-control conclusion.",
+      "Fundamentally incorrect subnetting or routing reasoning that reverses the diagnosis.",
+      "Recommending a network change that clearly creates an addressing conflict or routing loop.",
+      "Ignoring a compromised privileged account during a security incident.",
+      "Treating an actively compromised endpoint as safe solely because visible malware files were deleted.",
+      "Materially incorrect firewall reasoning that exposes protected services.",
+      "Recommending an immediately deployed, high-risk, untested production change with no viable rollback where failure would be severe.",
+      "Fundamentally misunderstanding cloud shared responsibility in a way that leaves critical customer responsibilities unaddressed.",
+      "Asserting that redundancy eliminates the need for backup or disaster recovery.",
+      "Recommending a recovery order that cannot work because required upstream dependencies remain unavailable.",
+      "A major capacity calculation error that makes the proposed infrastructure design infeasible.",
+      "Asserting that service is restored without any verification of user-facing functionality when verification is central to the task.",
+      "Treating repeated rebooting as proof of root cause.",
+      "Making a central technical claim directly contradicted by the supplied logs, configuration, topology, or timeline."
+    ],
+    "not_critical_examples": [
+      "Minor command-syntax errors.",
+      "Small arithmetic errors that do not change the conclusion.",
+      "Minor terminology mistakes.",
+      "Reasonable alternative troubleshooting sequences.",
+      "Different valid infrastructure designs that satisfy requirements.",
+      "Minor documentation omissions.",
+      "Reasonable vendor-specific differences.",
+      "Small performance inefficiencies.",
+      "Cautious uncertainty.",
+      "Non-central assumptions that are clearly stated."
+    ]
+  }
+}

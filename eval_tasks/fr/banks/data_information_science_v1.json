@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A hospital exports a column containing values such as 37.2, 38.5, and 36.9, but provides no column label, unit, patient context, or collection time. Explain why the values are data but are not yet sufficient information for a clinician, and identify the minimum contextual metadata needed to make them interpretable.",
+    "intent": "Distinguish raw data from information and identify contextual metadata needed for interpretation.",
+    "domain": "Data Foundations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A table definition says each row contains customer_id, signup_date, and status, while one actual row is {C104, 2026-05-03, active}. Distinguish the schema from the instance and explain why changing the row does not by itself change the schema.",
+    "intent": "Reason about schema versus data instances.",
+    "domain": "Data Foundations",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "schema_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A dataset stores postal codes as five-digit strings and an analyst proposes averaging them to compare regions. Explain why this is invalid even though every postal code contains only digits, and describe a more appropriate representation.",
+    "intent": "Distinguish numeric-looking identifiers from quantitative measurements.",
+    "domain": "Data Representation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "Customer satisfaction is recorded as 'poor', 'fair', 'good', 'very good', and 'excellent'. What properties of these values justify treating them as ordinal rather than nominal or interval data, and what calculation would be questionable because equal spacing is not guaranteed?",
+    "intent": "Interpret ordinal scales and limits on arithmetic operations.",
+    "domain": "Data Representation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A university uses number of library logins as its only measure of 'student engagement'. Explain why logins are a proxy rather than the construct itself, and give two reasons this operationalization could have weak validity.",
+    "intent": "Evaluate proxy variables and construct validity.",
+    "domain": "Measurement",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "Two annual datasets both contain a variable named 'active_customer'. In 2025 it meant at least one purchase in the prior 90 days; in 2026 it means at least one login in the prior 30 days. Explain why a year-over-year trend in active customers is not directly comparable and what documentation or transformation would be needed before comparison.",
+    "intent": "Detect semantic drift in operational definitions across time.",
+    "domain": "Measurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A factory replaces manual temperature readings with automated sensors and the new system produces ten times as many observations. Why does the larger automated dataset not by itself prove that measurement accuracy improved? Identify checks that would support that conclusion.",
+    "intent": "Separate collection automation and volume from measurement accuracy.",
+    "domain": "Data Collection",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_quality",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "An app surveys 200,000 users who voluntarily clicked a feedback banner. The product has 8 million users, including many who rarely open the app. Explain why the survey can still be badly biased despite its size, and identify the relevant target-population and coverage problem.",
+    "intent": "Reason about selection bias, target population, and coverage.",
+    "domain": "Sampling and Coverage",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A city wants neighborhood-level service feedback, but a simple random sample produces very few responses from two small neighborhoods. Explain when stratified sampling by neighborhood could improve coverage for the intended analysis, without claiming it automatically removes all bias.",
+    "intent": "Apply stratified sampling conceptually to a coverage problem.",
+    "domain": "Sampling and Coverage",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "Dataset A contains 100% of customer records but was last refreshed 18 months ago. Dataset B was refreshed yesterday but is missing 15% of customers. Compare the relevant quality dimensions and explain why neither dataset can be called universally 'higher quality' without knowing the use case.",
+    "intent": "Treat data quality as multidimensional and use-case dependent.",
+    "domain": "Data Quality",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_quality",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A historical customer table accepts any value matching YYYY-MM-DD in birth_date. One row contains 2095-04-17. Explain the difference between format validity, semantic plausibility, and factual correctness in this example, and propose validation layers for each.",
+    "intent": "Distinguish syntactic validation, plausibility, and truth.",
+    "domain": "Data Validation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_quality",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A survey field 'number_of_children' contains values 0, blank, and 'N/A'. Explain why replacing both blank and N/A with 0 can corrupt the data, and state what each state could mean.",
+    "intent": "Distinguish zero, missing, and not applicable.",
+    "domain": "Missing Data",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "data_cleaning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "In a loan application dataset, income is missing much more often for self-employed applicants than for salaried applicants. Why might the missingness itself be informative, and what risk arises if all rows with missing income are simply deleted?",
+    "intent": "Recognize informative missingness and deletion bias.",
+    "domain": "Missing Data",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A merged laboratory dataset contains weights recorded in kilograms, pounds, and an unlabeled unit. Design a safe cleaning strategy that standardizes values while preserving uncertainty and provenance for records whose unit cannot be confidently inferred.",
+    "intent": "Design conservative data cleaning that preserves units and provenance.",
+    "domain": "Data Cleaning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_cleaning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A customer database contains 'Alex Kim, 14 Oak St' and 'Alex Kim, 14 Oak Street', plus another 'Alex Kim' at a different address. Explain why exact matching misses some duplicates while name-only fuzzy matching risks false merges. Propose evidence that should contribute to entity resolution.",
+    "intent": "Reason about false merges and missed matches in entity resolution.",
+    "domain": "Entity Resolution",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A transaction table has one row per sale. An analyst replaces it with monthly totals before an investigation of unusually large individual transactions. What information has been lost through aggregation, and why can the monthly table no longer answer the original question?",
+    "intent": "Recognize information loss from aggregation and grain change.",
+    "domain": "Data Transformation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "Two datasets both contain a field named revenue. One source defines it as gross sales before refunds; the other defines it as net sales after refunds. Explain why matching the column names and data types is insufficient for integration and what semantic checks are required.",
+    "intent": "Detect semantic incompatibility despite technical compatibility.",
+    "domain": "Data Integration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "Table Customers contains IDs {1,2,3}. Table Orders contains customer IDs {1,1,3}. If Customers is left-joined to Orders on customer_id, how many result rows are produced, which customer is unmatched, and why?",
+    "intent": "Predict left-join row counts and unmatched records.",
+    "domain": "Join Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "join_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A customer table has 1,000 rows, one per customer. An order table has 4,000 rows, one per order. Every order belongs to exactly one customer, and every customer has at least one order. After joining customers to orders, approximately what determines the result row count, and why is 1,000 not the correct expectation?",
+    "intent": "Reason about one-to-many join multiplicity and grain.",
+    "domain": "Join Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A sales fact table has one row per order item. A promotions table has one row per order per promotion, and some orders used two promotions. An analyst joins them on order_id, then sums item_revenue and reports a 14% revenue increase versus the unjoined table. Diagnose how a many-to-many relationship can inflate the metric, describe checks that would confirm the mechanism, and propose at least two structurally sound fixes depending on the reporting goal.",
+    "intent": "Diagnose metric inflation from many-to-many joins and propose grain-aware fixes.",
+    "domain": "Join Reasoning",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "An employee table currently has unique email addresses, so a team proposes using email as the primary key. Explain why observed uniqueness in today's sample is different from guaranteed stable uniqueness by design, and identify risks if addresses can change or be reused.",
+    "intent": "Distinguish current uniqueness from key suitability and stability.",
+    "domain": "Keys and Identifiers",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "database_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "An order table repeats customer_name and customer_address in every order row. Describe update, insertion, or deletion anomalies this design can create and explain a normalized restructuring that reduces those risks. Also state one reason an analytical system might intentionally keep some denormalized data.",
+    "intent": "Apply normalization concepts while recognizing denormalization trade-offs.",
+    "domain": "Relational Databases",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_modeling",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A product's vendor_code is meaningful but can change when suppliers merge. Compare using vendor_code as a natural key with introducing a stable surrogate product_id. What problems does the surrogate key solve, and what business meaning must still be preserved?",
+    "intent": "Compare natural and surrogate identifiers under changing business keys.",
+    "domain": "Keys and Identifiers",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "An online purchase records a payment successfully, but the process crashes before reducing inventory. Explain why treating the operation as a transaction matters and which integrity property is violated if the system permanently keeps only the payment update.",
+    "intent": "Apply transaction atomicity to a partial-failure scenario.",
+    "domain": "Transactions and Integrity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "database_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "Two users attempt to reserve the final seat at nearly the same time. Each reads '1 seat available' before either update is visible. Explain the concurrency problem and what outcome a correctly isolated transaction mechanism should prevent.",
+    "intent": "Reason about concurrent updates and isolation conceptually.",
+    "domain": "Transactions and Integrity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A content system stores articles whose fields vary by article type, and each article contains nested author, section, and attachment information. Compare a flexible document-oriented representation with a highly normalized relational representation for this use case. Identify trade-offs rather than declaring one universally superior.",
+    "intent": "Choose between relational and document representations based on structure and requirements.",
+    "domain": "Non-Relational Models",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "An investigation repeatedly asks questions such as 'Which suppliers are connected to this company through shared directors within three relationship steps?' Explain why a graph representation may simplify this type of relationship-heavy analysis, while noting that the same facts could still be stored relationally.",
+    "intent": "Identify when graph structures improve relationship-centric querying.",
+    "domain": "Graph Data",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_modeling",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "Application logs contain nested events, optional fields, and arrays whose structure changes gradually as features are added. Explain why forcing every event immediately into one rigid flat table can be problematic, and identify controls needed if a semi-structured representation is used.",
+    "intent": "Reason about semi-structured data and schema evolution.",
+    "domain": "Semi-Structured Data",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "schema_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A table contains one row per order with customer_id, order_date, and amount. Describe the data operation needed to return each customer's total spend in 2026, sorted from highest to lowest, without requiring exact SQL syntax.",
+    "intent": "Express filtering, grouping, aggregation, projection, and ordering conceptually.",
+    "domain": "Query Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "query_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "Store A has 10 transactions averaging EUR 100; Store B has 90 transactions averaging EUR 20. What is the combined average transaction value, and why is simply averaging EUR 100 and EUR 20 incorrect?",
+    "intent": "Calculate and interpret a weighted average using correct denominators.",
+    "domain": "Aggregation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A customer table contains one row per customer and a derived field lifetime_revenue. It is joined to an order table with one row per order, then lifetime_revenue is summed across the joined result. Explain why the total is inflated and identify the grain-safe way to calculate total customer lifetime revenue.",
+    "intent": "Detect duplicated customer-level measures after a one-to-many join.",
+    "domain": "Granularity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A global platform stores event timestamps without time-zone information. Teams in Vienna and New York group events by calendar day and obtain different daily totals. Explain the temporal ambiguity and what timestamp representation and reporting rule would make the aggregation reproducible.",
+    "intent": "Reason about time zones and calendar-day aggregation.",
+    "domain": "Temporal Data",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A dataset for predicting whether a subscription will cancel next month includes a feature 'final_account_status' that is populated only after the month ends. Explain why using it creates future leakage and how to define a feature cutoff that preserves temporal validity.",
+    "intent": "Detect future leakage and enforce event-time cutoffs.",
+    "domain": "Temporal Data",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A point representing a house is geographically closest to a hospital in a neighboring administrative region. A report instead needs the hospital located in the same region as the house. Explain why nearest-neighbor distance and a spatial containment or region-based join answer different questions.",
+    "intent": "Distinguish proximity from administrative containment in spatial reasoning.",
+    "domain": "Geographic Data",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A customer moved from Region A to Region B in July. A year-end report needs January sales attributed to the customer's January region, but the dimension table stores only the current region. Explain the historical-data problem and what kind of versioned attribute design would preserve correct past analysis.",
+    "intent": "Reason about historically changing attributes and temporal dimensions.",
+    "domain": "Temporal Data",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_modeling",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "An ingestion job receives 10,000 records, of which 40 are malformed. Compare rejecting the entire batch, silently dropping the 40 records, and quarantining them while loading valid records. What validation, logging, and downstream communication are needed for a defensible ETL design?",
+    "intent": "Evaluate ETL error-handling strategies and transparency.",
+    "domain": "ETL and ELT",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "pipeline_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "One organization transforms data before loading it into an analytical store, while another loads source-shaped data first and performs transformations inside the analytical environment. Explain the conceptual difference between ETL and ELT and identify requirements that could make either approach reasonable.",
+    "intent": "Compare ETL and ELT based on operational requirements rather than buzzwords.",
+    "domain": "ETL and ELT",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A dashboard is stale. The source system is current, ingestion completed, but the transformation job failed before the reporting table was refreshed. Classify the failure point and explain how lineage and pipeline monitoring help distinguish it from an upstream source failure or a dashboard-query bug.",
+    "intent": "Diagnose pipeline stage failures using dependencies and lineage.",
+    "domain": "Data Pipelines",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A streaming order pipeline writes events to storage, then updates daily aggregates. A worker crashes after writing an event but before recording completion, so the event is retried. Late events can also arrive after the daily aggregate first closes. Explain how retries, duplicate processing, and late arrival can interact to corrupt totals, and design an idempotent, auditable approach for correct reprocessing.",
+    "intent": "Synthesize idempotency, late data, retries, auditing, and aggregate correctness.",
+    "domain": "Data Pipelines",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "system_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A compliance report is produced once each night and can tolerate data that are up to 12 hours old. Compare batch and streaming approaches for this requirement in terms of latency, complexity, recoverability, and cost. Explain why streaming is not automatically preferable.",
+    "intent": "Evaluate batch versus streaming based on latency and operational trade-offs.",
+    "domain": "Batch and Streaming",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A real-time dashboard counts events in hourly windows. Some mobile devices upload events several hours late. Explain how late-arriving data can make an hour appear complete when it is not, and describe at least two policies for handling late events and their effect on reported totals.",
+    "intent": "Reason about late-arriving events, windows, and revision policies.",
+    "domain": "Batch and Streaming",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A retail system must process individual purchases quickly while analysts need multi-year trend queries across billions of rows. Explain why the operational workload and analytical workload may benefit from different data structures or systems, without assuming any particular vendor.",
+    "intent": "Contrast transactional and analytical workload requirements.",
+    "domain": "Data Warehousing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "system_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A sales fact table is intended to have one row per order, but it is populated with one row per order item while order_total is copied onto every item row. What happens when order_total is summed, and how should the fact grain and measures be redesigned?",
+    "intent": "Detect double counting caused by incorrect fact-table grain.",
+    "domain": "Fact and Dimension Modeling",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_modeling",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "An organization has stored petabytes of raw files in a central data lake, but analysts cannot identify trustworthy tables, field meanings, or data owners. Explain why centralized raw storage alone does not create usable information and what curation, metadata, quality, and governance capabilities are missing.",
+    "intent": "Evaluate why raw centralized storage is insufficient for analytical usability.",
+    "domain": "Data Lakes",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "system_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "An upstream source changes customer_id from an integer to a prefixed string and adds a new nullable field. Explain which aspects may be backward-compatible and which may break downstream consumers. What should a producer-consumer contract specify to manage such schema evolution?",
+    "intent": "Reason about schema changes, contracts, and compatibility.",
+    "domain": "Schema Evolution",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "schema_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A dataset is discoverable by title, but its fields have names such as x1, x2, and flag3 with no definitions, units, allowed values, or source descriptions. Explain why discoverability is not the same as understandability and identify metadata needed for safe reuse.",
+    "intent": "Distinguish finding a dataset from understanding it.",
+    "domain": "Metadata",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "metadata_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "Team A defines active_user as any login in 30 days; Team B defines it as any purchase in 90 days. Both expose a field called active_user. Specify what a data dictionary should record so consumers can detect the difference and avoid invalid comparisons.",
+    "intent": "Use data dictionaries to prevent semantic ambiguity.",
+    "domain": "Data Dictionaries",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "metadata_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A source system changes the meaning of status_code='C' from 'closed' to 'cancelled'. Describe how data lineage can be used to identify affected transformations, metrics, reports, and downstream consumers before the change is released.",
+    "intent": "Apply lineage to downstream impact analysis.",
+    "domain": "Data Lineage",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "provenance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A dataset has excellent provenance: its owner, collection method, timestamps, and transformation history are fully documented. It nevertheless contains systematically miscalibrated sensor readings. Explain why provenance improves traceability but does not prove correctness or source reliability.",
+    "intent": "Distinguish provenance from correctness and reliability.",
+    "domain": "Data Provenance",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "provenance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A data catalog indexes 20,000 datasets, but users still search for 'customer retention' and cannot identify the authoritative source because titles are inconsistent, descriptions are sparse, and ownership is missing. Explain why this is not merely a search-engine performance problem and propose metadata and information-architecture improvements.",
+    "intent": "Connect catalog discoverability, metadata quality, and information architecture.",
+    "domain": "Data Catalogs",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "information_architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "Three systems contain different names and addresses for the same supplier. Explain the master-data problem, the role of canonical identifiers and survivorship rules, and why choosing a 'source of truth' still requires explicit conflict-resolution policy.",
+    "intent": "Reason about master data reconciliation across conflicting systems.",
+    "domain": "Master Data",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A status code 'A' meant 'active' before 2024 but was repurposed to mean 'approved' afterward. Why is storing only the code without the reference-data version dangerous for historical interpretation, and how should versioned mappings be managed?",
+    "intent": "Reason about reference data, code meaning, and versioning.",
+    "domain": "Reference Data",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "metadata_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A research portal organizes every document into exactly one subject folder, but users often need to browse by subject, geography, document type, and time period simultaneously. Explain why a faceted classification may fit the information need better than a single hierarchy.",
+    "intent": "Choose information organization that supports multiple user perspectives.",
+    "domain": "Information Architecture",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "information_architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A document legitimately concerns both Climate and Agriculture, but the current taxonomy requires every item to have exactly one parent category. Explain what this reveals about the limitations of a strict tree and describe options such as cross-references, facets, or polyhierarchy.",
+    "intent": "Handle overlapping categories in taxonomy design.",
+    "domain": "Taxonomies",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "information_organization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A team says an ontology is just 'a bigger taxonomy' and therefore interchangeable with a database schema. Explain the differences among a taxonomy, an ontology, and a database schema in terms of hierarchical organization, semantic relationships, constraints, and storage structure.",
+    "intent": "Distinguish taxonomies, ontologies, and database schemas.",
+    "domain": "Ontologies",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A document collection uses 'heart attack', 'myocardial infarction', and 'MI' inconsistently. Explain how a controlled vocabulary or thesaurus with preferred terms, synonyms, and related-term links can improve retrieval without requiring the original documents to use identical wording.",
+    "intent": "Apply controlled vocabularies to synonymy and retrieval consistency.",
+    "domain": "Controlled Vocabularies",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "information_retrieval",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A community archive allows free user tagging. Over time, useful new terms emerge, but the same concept also receives variants such as 'sci-fi', 'science fiction', and 'SF'. Compare the flexibility and inconsistency of free tagging with a controlled vocabulary and propose a hybrid approach.",
+    "intent": "Evaluate folksonomy and controlled-vocabulary trade-offs.",
+    "domain": "Tagging and Folksonomies",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "For a query, a search system returns 20 documents. Twelve are relevant. The collection contains 30 relevant documents in total. Compute precision and recall, and explain which metric would matter more if missing any relevant safety notice were costly.",
+    "intent": "Calculate precision and recall and interpret the trade-off by use case.",
+    "domain": "Information Retrieval",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "Search System A retrieves 90 of 100 relevant documents but places many irrelevant items near the top. System B retrieves 65 of 100 relevant documents but its top 10 results are almost always relevant. A legal-research team first needs fast screening for a few strong precedents, then exhaustive review for disclosure. Compare the systems across recall, top-ranked precision, ranking quality, and changing user intent; explain why a single overall winner is not justified.",
+    "intent": "Evaluate retrieval systems under conflicting precision, recall, ranking, and task goals.",
+    "domain": "Search Evaluation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "information_retrieval",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A document repository becomes much faster to search after an index is built, even though no document text is changed. Explain conceptually how an index can accelerate retrieval, and identify the trade-off involving storage or update cost.",
+    "intent": "Explain indexing benefits and operational trade-offs.",
+    "domain": "Indexing",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "Users search for exact product code ZX-4812 and also for natural-language concepts such as 'devices that reduce indoor humidity'. Compare keyword and semantic retrieval for these two cases, including why semantic similarity can sometimes return conceptually related but wrong results.",
+    "intent": "Choose lexical versus semantic retrieval based on query type and ambiguity.",
+    "domain": "Search",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A search result about 'jaguar speed' is topically related to the word 'jaguar', but the user is shopping for a car and the result describes the animal. Explain why relevance depends on the user's information need rather than topical word overlap alone.",
+    "intent": "Distinguish topical overlap from contextual and task relevance.",
+    "domain": "Relevance and Information Need",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "information_retrieval",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A user repeatedly reformulates a query from 'energy data' to 'household electricity use by month' and then browses a category page. What does this behavior suggest about information seeking, and how could the system support users whose needs become clearer during search?",
+    "intent": "Apply information-seeking concepts to query reformulation and browsing.",
+    "domain": "Information Behavior",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "Two datasets disagree on the same indicator. One is recent but has an undocumented collection method; the other is older but independently audited with a clear methodology. Describe how authority, timeliness, methodology, independence, completeness, and corroboration should be weighed rather than assuming one metadata signal decides reliability.",
+    "intent": "Evaluate sources contextually across multiple quality dimensions.",
+    "domain": "Source Evaluation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A dataset is accurate, complete, and internally consistent, but it reaches decision makers three weeks after a crisis response has ended. Explain why raw data quality can be high while the information quality for that decision is poor.",
+    "intent": "Distinguish data quality from decision-relevant information quality.",
+    "domain": "Information Quality",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A company has recurring disputes over who may change the official definition of 'customer', who monitors duplicate customer records, and who operates the database. Explain how ownership, stewardship, and technical custody can be separated, while noting that organizations may assign these roles differently.",
+    "intent": "Reason about governance responsibilities without assuming one universal model.",
+    "domain": "Data Governance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "governance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "An analyst has permission to query a personnel database but needs only department-level headcounts. Explain why technical permission does not automatically establish a legitimate need for record-level salary data, and apply least-privilege reasoning.",
+    "intent": "Distinguish access capability from justified analytical need.",
+    "domain": "Access Control",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "governance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A public dataset removes names and email addresses but retains exact birth date, small-area postal code, employer, and rare job title. Explain why it may still permit re-identification and distinguish direct identifiers from quasi-identifiers.",
+    "intent": "Reason about re-identification risk after direct identifiers are removed.",
+    "domain": "Privacy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "privacy_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A fitness app needs age range and activity level to personalize a training plan, but proposes also collecting political preference, full contact list, and exact home address 'in case they are useful later'. Apply data-minimization reasoning to the proposal.",
+    "intent": "Evaluate necessity and proportionality of data collection.",
+    "domain": "Data Minimization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "privacy_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A dataset is encrypted and tightly access-controlled but has no tested backups, so a storage failure could destroy it. Which information-protection objective is still weak, and how do backups complement confidentiality and integrity controls?",
+    "intent": "Apply confidentiality, integrity, and availability concepts to data protection.",
+    "domain": "Security and Information Protection",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A retention policy says raw application records should be deleted after two years, but the same personal fields have been copied into backups and derived analytical tables. Explain why deleting only the source rows may not fulfill the intended lifecycle policy and what lineage information is needed.",
+    "intent": "Reason about retention, deletion, backups, and derived copies.",
+    "domain": "Data Lifecycle",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "governance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "An analyst shares a final CSV but not the source version, transformation logic, parameter values, or data dictionary. Explain which documentation elements another analyst would need to interpret and reproduce the result.",
+    "intent": "Identify documentation needed for reproducibility and interpretation.",
+    "domain": "Data Documentation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "metadata_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A pipeline always produces exactly the same report when rerun, but a transformation accidentally converts centimeters to meters by dividing by 10 instead of 100. Explain why reproducibility does not imply correctness or validity.",
+    "intent": "Distinguish repeatability from analytical correctness.",
+    "domain": "Reproducibility",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "Two teams publish different quarterly churn rates from what appears to be the same data. Investigation shows they used different customer snapshots, different definitions of 'active', and different treatment of reopened accounts. Design a versioning and provenance investigation that can reconcile the reports and determine whether the disagreement is a data-version issue, a metric-definition issue, or both.",
+    "intent": "Reconcile conflicting reports using versioning, provenance, and operational definitions.",
+    "domain": "Versioning and Provenance",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A field in a customer record changed from 'gold' to 'silver', but no one knows when or why. Explain how record history, change logs, actor identity, and transformation logs support auditability and diagnosis.",
+    "intent": "Use audit trails to trace data changes.",
+    "domain": "Data Auditing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "provenance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "You need to show the distribution of delivery times for 50,000 orders and reveal skew and long tails. Compare a histogram, bar chart of categories, line chart over row order, and a summary table. Which representation best supports the stated question and why?",
+    "intent": "Select a visualization appropriate to a distributional question.",
+    "domain": "Data Visualization",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "visualization_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A bar chart shows approval rates of 49% and 51%, but the y-axis begins at 48.5%, making one bar appear several times taller. The plotted values are correct. Explain why the visual can still mislead and what design changes would present the difference more proportionately.",
+    "intent": "Detect misleading visual scaling despite correct values.",
+    "domain": "Visualization Integrity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "visualization_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "Executives need a daily operational dashboard, while analysts need record-level drill-down for investigations. Explain how audience, decision purpose, update frequency, filters, context, and information density should affect dashboard design.",
+    "intent": "Design dashboards around decision context and audience needs.",
+    "domain": "Dashboards",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "system_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "Two teams both report 'conversion rate'. Team A divides purchasers by website visitors; Team B divides purchasers by users who reached checkout. Why can both calculations be internally correct yet not comparable, and what metric metadata must be specified?",
+    "intent": "Reason about metric definitions, denominators, and comparability.",
+    "domain": "Metrics and KPIs",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A support team is evaluated only on tickets closed per hour. Agents begin closing unresolved tickets so the metric improves while customer outcomes worsen. Explain the metric-validity problem and propose a measurement set better aligned with the intended outcome.",
+    "intent": "Identify proxy gaming and improve construct alignment.",
+    "domain": "Metric Validity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "Order values are EUR 10, 10, 11, 12, and 500. Compute the mean and median, then explain which better represents a typical order in this tiny dataset and why the answer depends on the reporting purpose.",
+    "intent": "Calculate descriptive measures and interpret skew.",
+    "domain": "Descriptive Analytics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "After a website redesign, conversion falls. A diagnostic analysis finds the decline is concentrated on mobile devices and began on the release date. Explain why this evidence supports a plausible hypothesis but does not by itself prove that the redesign caused the decline.",
+    "intent": "Distinguish diagnostic patterns from causal evidence.",
+    "domain": "Diagnostic Analytics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "Overall retention rose from 60% to 65%, but each age cohort's retention stayed roughly unchanged. The newer period contains many more users from the historically high-retention cohort. Explain how changing composition can raise the aggregate even without within-cohort improvement.",
+    "intent": "Recognize cohort composition effects in aggregate metrics.",
+    "domain": "Cohorts and Segmentation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A dashboard says '20% complaint rate' based on 200 complaints. One manager assumes the denominator is 1,000 orders; another says it is 1,000 customers, some of whom placed multiple orders. Explain why the metric cannot be interpreted until the denominator and unit of analysis are specified.",
+    "intent": "Identify denominator and unit-of-analysis ambiguity.",
+    "domain": "Data Interpretation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "People who use a budgeting app more often also tend to save more money. State what this observational pattern supports and what it does not support about the app's causal effect, and name plausible alternative explanations.",
+    "intent": "Separate association from causation in observational data.",
+    "domain": "Causal Limitations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A five-year trend shows incidents falling 30%, but midway through the period the reporting system changed from voluntary reporting to automatic capture and the incident definition narrowed. Explain why the series may not be directly comparable and how to document or adjust the analysis.",
+    "intent": "Evaluate historical comparability under changing collection methods and definitions.",
+    "domain": "Data Comparability",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A dashboard shows an overall service-success rate rising from 72% to 76%. Yet success fell within each of three major regions. During the same period, the share of cases shifted sharply toward the region with the highest baseline success rate. Explain how both statements can be true, show what decomposition or reweighting would test the explanation, and state what conclusion should not be drawn from the aggregate alone.",
+    "intent": "Diagnose aggregate reversal caused by subgroup composition and propose validation.",
+    "domain": "Aggregation Effects",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A report links customer records across two systems using probabilistic matching and labels the resulting customer count as exactly 1,248,317 with no caveat. Explain why false matches and missed matches create uncertainty and how the report should distinguish observed records, inferred links, and estimated totals.",
+    "intent": "Represent uncertainty from entity matching without false precision.",
+    "domain": "Uncertainty",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A nonprofit collected detailed location data to deliver emergency aid. Years later, a researcher proposes using the same data to publish neighborhood-level behavior profiles. Identify the factual data-governance questions and the separate normative or ethical considerations that should be evaluated before secondary use.",
+    "intent": "Separate factual governance constraints from ethical judgments in secondary use.",
+    "domain": "Data Ethics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "governance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A performance dataset includes only employees who remained at the company for at least three years. High-turnover employees are absent. Explain the mechanism by which this selection can bias conclusions about early-career performance.",
+    "intent": "Explain survivorship bias mechanism rather than merely naming it.",
+    "domain": "Data Bias",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A service-quality dataset has 95% record completeness overall but only 60% completeness for a small rural subgroup. Explain why the aggregate completeness rate can hide representation problems and what subgroup diagnostics are needed before using the data for comparative decisions.",
+    "intent": "Assess differential data quality and subgroup representation.",
+    "domain": "Fairness and Representation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_quality",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A dataset is freely downloadable from a public website. Explain why open availability does not by itself establish that every reuse is responsible or appropriate, and identify roles for documentation, privacy review, licensing information, and provenance.",
+    "intent": "Evaluate responsible reuse of openly available data.",
+    "domain": "Open Data and Sharing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "governance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "System A sends a field called customer_status to System B without errors. In A, 'active' means a purchase within 90 days; in B, it means a login within 30 days. Explain why the systems are syntactically interoperable but not semantically interoperable.",
+    "intent": "Distinguish technical exchange from shared meaning.",
+    "domain": "Interoperability",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_integration",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "An industry adopts a shared field naming convention and common file format, but organizations still calculate 'net revenue' differently. Explain what standardization has solved, what it has not solved, and what governance or semantic agreements are still needed.",
+    "intent": "Identify benefits and limits of data standards.",
+    "domain": "Data Standards",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "An upstream team changes order_total from tax-exclusive to tax-inclusive without changing the field name or type. Downstream revenue dashboards continue to run successfully but jump by 8%. Trace how a technically non-breaking schema change can silently corrupt calculations, and design contract, metadata, lineage, validation, and rollout controls that would detect or prevent the problem.",
+    "intent": "Diagnose semantic breaking changes that evade structural validation.",
+    "domain": "Data Contracts and Schema Evolution",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A daily pipeline normally produces 5 million rows with 2% nulls in customer_region. Today it produces 5.1 million rows with 38% nulls, and the schema is unchanged. Which observability signals indicate a likely data problem, and what comparisons would help locate the cause?",
+    "intent": "Use volume and distribution monitoring to detect data-system issues.",
+    "domain": "Data Observability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A source usually sends 100,000 records per hour. After a deployment it sends 200,000, duplicate-key rates rise from 0.2% to 48%, and downstream totals nearly double. Explain why this pattern points to a duplicate-ingestion problem rather than genuine business growth and list validation checks to confirm it.",
+    "intent": "Diagnose operational anomalies using volume and duplicate-rate evidence.",
+    "domain": "Anomaly Detection",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A warehouse manager needs an alert within five minutes when stock reaches zero, while finance needs audited monthly inventory valuation. Explain why the two decisions require different latency, granularity, validation, and presentation choices even if they derive from related source data.",
+    "intent": "Match information-system design to decision timing and level of detail.",
+    "domain": "Decision Support",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "system_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A stakeholder asks for 'a real-time data platform' before describing the decision to support. List the requirements that should be clarified first, including users, use cases, data sources, acceptable latency, quality, privacy, ownership, scale, and downstream actions, and explain why technology selection should follow those requirements.",
+    "intent": "Elicit data-system requirements before choosing architecture.",
+    "domain": "Requirements and Stakeholders",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "system_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "An organization plans to publish a cross-agency dataset and search portal. The sources use different person identifiers, geographic boundaries, units, date conventions, and definitions of 'case'; one source is refreshed daily and another quarterly. The portal must support exact case-number lookup, concept search, trend analysis, and public reuse, while reducing re-identification risk. Design a defensible integration and information architecture: specify grain, identifier and entity-resolution strategy, semantic mappings, unit and temporal alignment, metadata and provenance, retrieval approach, quality checks, privacy controls, versioning, and how unresolved uncertainty should be communicated.",
+    "intent": "Synthesize data integration, information retrieval, provenance, privacy, quality, and system constraints.",
+    "domain": "Cross-Disciplinary Data Systems",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  }
+]

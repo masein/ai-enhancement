@@ -1,0 +1,183 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly answers the question asked, focuses on the stated sociological problem, population, time frame, and assumptions, and avoids tangents that do not help resolve the task.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "sociological_accuracy",
+      "name": "Sociological Accuracy",
+      "definition": "Uses sociological concepts, mechanisms, institutions, population reasoning, and methodological claims accurately; does not substitute stereotypes, unsupported group claims, or individual psychology for sociological explanation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Correctly distinguishes concepts that materially differ, including individual versus aggregate evidence, norms versus values, status versus role, household versus family, income versus wealth, deviance versus crime, disparity versus discrimination, and association versus causation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "micro_meso_macro_reasoning",
+      "name": "Micro–Meso–Macro Reasoning",
+      "definition": "When relevant, identifies the level at which an explanation operates and explains cross-level links without treating individual, group, organizational, institutional, and societal processes as interchangeable.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "structure_and_agency_reasoning",
+      "name": "Structure and Agency Reasoning",
+      "definition": "When relevant, explains how institutional rules, resources, norms, opportunities, and constraints interact with individual or collective choices, avoiding both structural determinism and unrestricted-choice explanations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "institutional_reasoning",
+      "name": "Institutional Reasoning",
+      "definition": "When relevant, analyzes how formal rules, informal practices, organizations, legitimacy, path dependence, and interactions among institutions shape behavior and distribute resources or opportunities.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "inequality_and_stratification_reasoning",
+      "name": "Inequality and Stratification Reasoning",
+      "definition": "When relevant, distinguishes dimensions such as income, wealth, status, power, occupation, education, opportunity, and mobility; identifies plausible mechanisms without treating disparity as automatic proof for or against discrimination.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "culture_and_socialization_reasoning",
+      "name": "Culture and Socialization Reasoning",
+      "definition": "When relevant, explains norms, values, symbols, socialization, meaning, identity, sanctions, and cultural variation while recognizing internal diversity, historical change, and the difference between explanation and moral endorsement.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "group_network_and_organizational_reasoning",
+      "name": "Group, Network, and Organizational Reasoning",
+      "definition": "When relevant, correctly reasons about groups, strong and weak ties, brokerage, homophily, social capital, hierarchy, bureaucracy, informal organization, diffusion, and organizational inequality without assuming network position or group membership mechanically determines outcomes.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "demographic_and_life_course_reasoning",
+      "name": "Demographic and Life-Course Reasoning",
+      "definition": "When relevant, correctly interprets fertility, mortality, migration, age structure, cohorts, transitions, linked lives, and cumulative processes, distinguishing cohort, age, and period explanations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "comparative_and_contextual_reasoning",
+      "name": "Comparative and Contextual Reasoning",
+      "definition": "When relevant, accounts for differences across societies, regions, institutions, historical periods, and category systems; checks measurement equivalence and avoids stereotypes or unjustified transfer of one context's categories to another.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "causal_reasoning",
+      "name": "Causal Reasoning",
+      "definition": "When relevant, distinguishes association from causation; considers temporal ordering, confounding, selection, reverse causality, mediation, moderation/context, mechanisms, and credible alternative explanations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "research_design_and_methods",
+      "name": "Research Design and Methods",
+      "definition": "When relevant, matches method to research question and evaluates surveys, interviews, ethnography, observation, experiments, natural experiments, administrative data, content analysis, comparative designs, longitudinal designs, and mixed methods in terms of what they can and cannot establish.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_and_data_interpretation",
+      "name": "Quantitative and Data Interpretation",
+      "definition": "When relevant, uses correct denominators, units of analysis, populations, rates, proportions, subgroup comparisons, mobility patterns, and supplied quantitative definitions; interprets numerical differences at an appropriate substantive level.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_source_evaluation",
+      "name": "Evidence and Source Evaluation",
+      "definition": "When relevant, evaluates evidence by design, sampling, measurement, reliability, validity, generalizability, triangulation, and fit to the claim rather than by source prestige, sample size, citation count, or method label alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_uncertainty",
+      "name": "Assumptions and Uncertainty",
+      "definition": "When relevant, makes material assumptions explicit, identifies underdetermination or scope conditions, avoids fabricated certainty, and states what additional evidence would change confidence among competing explanations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Addresses the major parts of the prompt and includes the key mechanisms, distinctions, calculations, comparisons, or limitations needed for a substantively adequate answer, while not requiring exhaustive length.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent claims, units, definitions, assumptions, and conclusions; later statements do not materially contradict earlier sociological or quantitative reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the reasoning in a clear, interpretable way, distinguishes evidence from inference and normative claims from empirical claims, and uses sociological terminology only when it improves precision.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "practical_sociological_judgment",
+      "name": "Practical Sociological Judgment",
+      "definition": "When relevant, reaches a proportionate, evidence-sensitive conclusion that reflects multiple plausible mechanisms, contextual variation, heterogeneous groups, and the limits of what the evidence supports.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_sociology_error",
+    "condition": "A materially false central sociological, methodological, quantitative, demographic, causal, or group-level claim fundamentally invalidates or reverses the answer.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally confuses individual-level and population-level evidence in a way that changes the conclusion.",
+      "Claims an aggregate relationship proves the same relationship at the individual level.",
+      "Claims one anecdotal individual case disproves a population-level social pattern.",
+      "Treats correlation as proof of causation when causality is central to the question.",
+      "Fundamentally misidentifies the unit of analysis.",
+      "Makes a major denominator or rate error that reverses the social comparison.",
+      "Claims a very large convenience sample is necessarily representative.",
+      "Fundamentally confuses reliability with validity.",
+      "Treats social construction as meaning a phenomenon is imaginary or has no real consequences.",
+      "Treats income and wealth as interchangeable where the distinction controls the conclusion.",
+      "Treats deviance and crime as identical.",
+      "Treats recorded crime counts as direct measures of total offending without qualification.",
+      "Treats a disparity as proof of discrimination when the evidence only establishes disparity and unresolved alternatives remain.",
+      "Claims demographic-group membership mechanically determines an individual's behavior.",
+      "Makes a biologically deterministic claim about a socially defined group without evidence.",
+      "Fundamentally misinterprets social mobility.",
+      "Confuses cohort change with individual aging where the distinction controls the explanation.",
+      "Claims network similarity proves social contagion while ignoring stated homophily, shared-environment, or selection alternatives.",
+      "Invents survey results, demographic data, institutional facts, or study findings required for the conclusion.",
+      "Presents a political or moral preference as though it were an empirical sociological finding."
+    ],
+    "not_critical_examples": [
+      "Minor terminology mistakes.",
+      "Harmless arithmetic errors that do not alter the conclusion.",
+      "Reasonable theoretical disagreements.",
+      "Different defensible sociological interpretations.",
+      "Small omissions.",
+      "Cautious uncertainty.",
+      "Reasonable differences in operationalization.",
+      "Alternative qualitative interpretations supported by evidence.",
+      "Differences in emphasis among plausible mechanisms.",
+      "Minor imprecision that does not materially change the conclusion."
+    ]
+  }
+}

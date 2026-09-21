@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A student says, “People in Country X share one culture because they share a nationality.” Explain why nationality and culture are not equivalent, and identify two kinds of within-country variation that would need evidence before making cultural claims.",
+    "intent": "Distinguish culture from nationality and avoid cultural essentialism.",
+    "domain": "Anthropology Foundations",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A warehouse is located at 48.2°N, 16.4°E and is 12 minutes by rail from a major freight terminal but 28 km away by road. Distinguish absolute location, relative location, and accessibility in this case.",
+    "intent": "Differentiate core human-geographic location concepts.",
+    "domain": "Human Geography Foundations",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "In a neighborhood survey, 78% of respondents say greeting elders first is considered polite, yet observations show many young adults sometimes do not do so when rushing to work. Explain why this does not show that the norm is absent.",
+    "intent": "Distinguish norms from individual behavior and situational variation.",
+    "domain": "Culture and Meaning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cultural_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A researcher wants to understand how market vendors negotiate prices, build trust, and resolve disputes over several months. Compare participant observation with a one-time structured survey for this objective and explain what each can and cannot establish.",
+    "intent": "Select field methods based on the research objective.",
+    "domain": "Ethnography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "field_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "Residents describe a yearly river-cleaning ceremony as “showing respect to the river,” while an external analyst codes it as a form of collective action that also maintains irrigation channels. Distinguish the emic and etic interpretations and explain why they can coexist.",
+    "intent": "Distinguish local meaning from external analytical categories.",
+    "domain": "Cultural Relativism and Comparison",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cultural_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "During interviews about policing, a university researcher notices that younger participants speak freely in private but become guarded when a local official sits nearby. Explain how researcher position, setting, and local power relations could affect disclosure, and name one way to improve the study design.",
+    "intent": "Reason about reflexivity, access, trust, and power in fieldwork.",
+    "domain": "Reflexivity and Positionality",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ethnographic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "Three siblings live in different dwellings, pool income to support an elderly parent, and rotate childcare weekly. Explain why “household,” “family,” and “dwelling” should not be treated as identical categories in analyzing this arrangement.",
+    "intent": "Distinguish kinship and domestic-organization units.",
+    "domain": "Kinship and Social Organization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "kinship_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "In a fishing community, households regularly give part of a catch to relatives without immediate repayment, but expect help during illness or boat repair. Explain why this exchange is neither a simple market transaction nor evidence that no obligation exists.",
+    "intent": "Analyze reciprocity, obligation, and social value.",
+    "domain": "Exchange, Reciprocity, and Value",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A village council has formal authority over land disputes, but a respected trader often brokers agreements because both sides trust her. Distinguish formal authority from informal influence and explain how both can shape governance.",
+    "intent": "Differentiate formal authority and informal power.",
+    "domain": "Political Anthropology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A pilgrimage site is used by some visitors for religious devotion, by nearby businesses for income, and by local activists as a symbol of heritage. Explain why a single universal interpretation of the ritual landscape would be inadequate.",
+    "intent": "Interpret religion and ritual as socially variable and multi-meaning.",
+    "domain": "Religion and Ritual",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cultural_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "Bilingual shopkeepers use one language with older relatives, another with tourists, and mix both when joking with coworkers. What does this pattern suggest about code switching, audience, and social meaning? Avoid claiming that one language reflects a fixed identity.",
+    "intent": "Interpret code switching in social context.",
+    "domain": "Language and Culture",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "linguistic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A dataset groups residents into socially defined racial categories, while a genetics study of the same region finds gradual variation across neighboring populations. Explain why the two classification systems should not be treated as equivalent biological partitions.",
+    "intent": "Distinguish social racial categories from biological population variation.",
+    "domain": "Race and Ethnicity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "Field notes show that women do most unpaid elder care in one town, while paid care work is more evenly distributed by gender. Give two institutional or historical explanations that should be investigated before attributing the pattern to fixed biological roles.",
+    "intent": "Analyze gendered labor without biological determinism.",
+    "domain": "Gender and Anthropology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "Clinic staff record the same biomedical diagnosis for two patients, but interviews show that one describes the condition as temporary stress while the other sees it as a chronic threat to family responsibilities. Distinguish disease classification from lived illness experience and explanatory models.",
+    "intent": "Differentiate biomedical categories from illness experience.",
+    "domain": "Medical Anthropology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "ethnographic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "After migrants return from a city, a village festival menu includes both older ceremonial dishes and newly popular packaged foods. Explain how migration, markets, status, and continuity could all contribute to this dietary change without assuming tradition has disappeared.",
+    "intent": "Connect food practices to migration, markets, identity, and change.",
+    "domain": "Anthropology of Food",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A public-health team finds low attendance at a maternal-health program. Interviews cite clinic hours, transport costs, distrust from prior encounters, and childcare obligations. Recommend two program changes grounded in the evidence and explain why a single “cultural belief” explanation would be too narrow.",
+    "intent": "Translate anthropological evidence into context-sensitive recommendations.",
+    "domain": "Applied Anthropology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "development_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A development project reports a 20% rise in cash income after introducing a road, but ethnographic interviews report heavier unpaid care burdens and loss of access to communal grazing land for some households. Explain how to evaluate whether the project improved local wellbeing.",
+    "intent": "Compare externally measured development outcomes with heterogeneous local effects.",
+    "domain": "Development Anthropology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mixed_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "Two high-altitude populations show similar average oxygen-use traits, but one also shows evidence of recent migration from lower elevations. Explain why the observed difference cannot be attributed to genetic adaptation alone, and identify cultural or physiological alternatives.",
+    "intent": "Distinguish biological adaptation, acclimatization, migration, and cultural adaptation.",
+    "domain": "Biological Anthropology Foundations",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "biological_anthropology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A fossil assemblage suggests efficient bipedal walking before a large increase in brain size. What does this imply about mosaic evolution, and why would it be misleading to describe human evolution as a single linear progression of traits?",
+    "intent": "Reason about mosaic evolution from supplied evidence.",
+    "domain": "Human Evolution",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "biological_anthropology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "Two primate groups of the same species differ in feeding competition and grooming networks because one habitat has clustered fruit patches while the other has dispersed foods. Explain why ecology should be considered before treating their social behavior as a fixed species-wide pattern.",
+    "intent": "Use comparative reasoning in primatology without simplistic projection.",
+    "domain": "Primatology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "An archaeologist finds a pottery fragment beside a hearth in an intact floor layer, while an identical fragment is found in loose backfill from an old trench. Explain why the first find has greater interpretive value even though the artifacts are similar.",
+    "intent": "Explain archaeological context, association, and provenance.",
+    "domain": "Archaeology Foundations",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "archaeological_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A charcoal sample from a sealed layer is radiometrically dated to 2400–2200 years ago, but the decorated object in the same layer could have been curated for decades before deposition. Distinguish the date of the sample, the date of deposition, and the possible date of object manufacture.",
+    "intent": "Distinguish archaeological dates and uncertainty.",
+    "domain": "Archaeological Dating",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "archaeological_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "At one site, fish bones, net weights, and hearths cluster near a shoreline. At another, fish bones occur in redeposited fill with no fishing gear. Compare the strength of inference that fishing was a local activity at the two sites and identify an alternative explanation for the second site.",
+    "intent": "Infer activity from material evidence while considering alternatives.",
+    "domain": "Archaeological Inference",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "archaeological_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A museum plans to relocate objects from a sacred landscape to a new visitor center. Elders, tourism operators, archaeologists, and nearby residents disagree about access, preservation, and display. Explain how a heritage assessment should represent the stakeholders and why archaeological significance alone is not sufficient.",
+    "intent": "Evaluate heritage as a multi-stakeholder social process.",
+    "domain": "Heritage and Cultural Resources",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "Region A has 1.2 million people on 60,000 km²; Region B has 900,000 people on 15,000 km². Calculate population density for each and explain why the more populous region is not necessarily the more densely populated one.",
+    "intent": "Calculate and interpret population density.",
+    "domain": "Population Geography",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A region begins the year with 500,000 residents. During the year it has 7,500 births, 5,000 deaths, 12,000 in-migrants, and 16,000 out-migrants. Calculate natural increase, net migration, and approximate total population change, then explain why migration and natural increase must be separated.",
+    "intent": "Distinguish demographic components of population change.",
+    "domain": "Demography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A country has 18 million people aged 0–14, 52 million aged 15–64, and 10 million aged 65+. Using (0–14 plus 65+) divided by 15–64, calculate the dependency ratio per 100 working-age people. State one limitation of interpreting this as an exact measure of economic dependency.",
+    "intent": "Use a demographic ratio and interpret its limits.",
+    "domain": "Demography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A population pyramid has a narrow base, a large middle-aged cohort, and a growing share above age 70. Give two demographic processes consistent with this shape and explain why the pyramid alone cannot identify one unique cause.",
+    "intent": "Interpret age structure with calibrated uncertainty.",
+    "domain": "Population Pyramids",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "demographic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "At the end of 2025, Country A contains 2 million foreign-born residents. During 2025, 180,000 people immigrated and 130,000 emigrated. Distinguish migrant stock, immigration flow, emigration flow, and net migration using these figures.",
+    "intent": "Distinguish migration stock from flows and net migration.",
+    "domain": "Migration",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "migration_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "Workers from Village R increasingly move to City S even though wages are only slightly higher there than in City T. Interviews show relatives in S provide job leads and temporary housing. Explain how migration networks can produce cumulative destination choice beyond wage differences alone.",
+    "intent": "Explain chain migration and network effects.",
+    "domain": "Migration Networks",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "migration_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "Flooding displaces 20,000 people from rural districts. Six months later, some return, some remain in nearby towns, and others move seasonally between both locations for work. Explain why displacement, return, and mobility should be tracked separately rather than collapsed into one migration category.",
+    "intent": "Differentiate forms of forced displacement and subsequent mobility.",
+    "domain": "Forced Migration and Displacement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "migration_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A nurse lives in one municipality, commutes daily to another, spends two months each year caring for relatives elsewhere, and has not changed legal residence. Which movements count as daily mobility, temporary mobility, and residential migration? Explain.",
+    "intent": "Distinguish migration from circulation and commuting.",
+    "domain": "Mobility",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A new rail station is followed by more apartments, offices, and shops within a 10-minute walk, while heavy industry remains near the freight corridor. Give two plausible mechanisms linking transport accessibility to this land-use pattern, and distinguish observed use from planning designation.",
+    "intent": "Analyze urban land use through accessibility and land value.",
+    "domain": "Urban Land Use",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "urban_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "Median rent rises 18% in a district while median renter income rises 4%. A new transit line improves access to jobs, but the number of low-cost units falls. Explain how affordability, accessibility, demand, and housing supply could interact, and identify evidence needed before claiming displacement.",
+    "intent": "Analyze housing affordability and displacement mechanisms.",
+    "domain": "Housing Geography",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "urban_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A neighborhood gains renovated housing, cafés, and higher-income newcomers, but a longitudinal panel shows most original renters still live there after five years. Explain why neighborhood upgrading and demographic change do not by themselves prove direct displacement, and name evidence for indirect displacement pressures.",
+    "intent": "Distinguish gentrification components and forms of displacement.",
+    "domain": "Neighborhood Change and Gentrification",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "urban_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Districts with higher average household income also have higher public-transit use. Within each district, no individual-level travel data are available. Explain the ecological fallacy that would occur if one concluded that higher-income individuals are the transit users, and propose one data design that could test the individual-level relationship.",
+    "intent": "Recognize ecological fallacy in segregation and mobility analysis.",
+    "domain": "Segregation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "Two rural counties have the same population density. County A has residents concentrated in three towns along a highway; County B has dispersed settlement. Explain why equal density does not imply equal service accessibility for schools or clinics.",
+    "intent": "Reason about rural settlement pattern and service access.",
+    "domain": "Rural Geography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "rural_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "Farmers near a city shift from low-value staple crops to perishable vegetables after a refrigerated road link opens. Explain how market access, transport time, land value, and labor demand could influence the change without assuming climate changed.",
+    "intent": "Analyze agricultural geography through spatial-economic organization.",
+    "domain": "Agricultural Geography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "economic_geography",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A manufacturer can choose Site A near suppliers with expensive land and high wages, or Site B with cheaper land and labor but longer delivery times and weaker infrastructure. Identify at least three location trade-offs and explain why minimizing transport cost alone may not yield the best choice.",
+    "intent": "Evaluate industrial location trade-offs.",
+    "domain": "Industrial Location",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "economic_geography",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A software cluster offers a deep labor pool and frequent knowledge exchange but also high rents and worker turnover. Explain how the same agglomeration can create both productivity benefits and costs, and why effects may differ by industry.",
+    "intent": "Analyze benefits and costs of agglomeration.",
+    "domain": "Agglomeration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "economic_geography",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A lead firm designs products in City A, contracts components to suppliers in Regions B and C, assembles in Region D, and ships through Port E. Explain how this is a global production network rather than simply “trade,” and identify two ways power or standards could shape suppliers.",
+    "intent": "Interpret global production networks and inter-place linkages.",
+    "domain": "Global Production Networks",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "Province X reports 6% annual GDP growth, yet child-school completion and rural clinic access improve little and income inequality rises. Explain why economic growth, human development, distribution, and local wellbeing should be evaluated separately.",
+    "intent": "Differentiate development indicators and distribution.",
+    "domain": "Development Geography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "development_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "Region North has better rail access, older industrial institutions, and denser supplier networks than Region South. North also received more public investment for decades. Design a multi-causal explanation for the present income gap that includes infrastructure, institutions, historical path dependence, and possible confounding rather than treating one factor as decisive.",
+    "intent": "Explain uneven development with interacting mechanisms and historical path dependence.",
+    "domain": "Uneven Development",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A global music style is adopted in several cities, but performers blend it with local languages, instruments, and political themes. Explain why this pattern is evidence of global integration without necessarily implying cultural homogenization.",
+    "intent": "Distinguish globalization from homogenization and identify hybridization.",
+    "domain": "Globalization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cultural_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A state border cuts across a long-standing language region. Residents continue cross-border family visits and trade through legal checkpoints. Distinguish the legal territorial boundary, the cultural region, and the functional cross-border network.",
+    "intent": "Differentiate political, cultural, and functional boundaries.",
+    "domain": "States, Territory, and Borders",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "political_geography",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "In an election, District A gives 62% of votes to Party P and District B gives 38%. Census data show District A also has a larger renter population. Explain why these district-level percentages cannot establish how individual renters voted, and identify one individual-level dataset that would be needed.",
+    "intent": "Analyze electoral geography without ecological inference.",
+    "domain": "Electoral Geography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "political_geography",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A narrow mountain pass contains a railway, power line, and the only year-round road between two regions. Explain why this location may matter strategically while avoiding the claim that geography mechanically determines state behavior.",
+    "intent": "Reason about strategic location without geographic determinism.",
+    "domain": "Geopolitics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "political_geography",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A former factory district has preserved smokestacks, new apartments, murals about labor history, and contested redevelopment plans. Explain how the landscape can be both material and symbolic, and why different groups may assign different meanings to it.",
+    "intent": "Interpret landscape as physically situated and socially produced.",
+    "domain": "Landscape",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "cultural_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "After residents are relocated from a river valley, some maintain strong attachment through annual visits, stories, and online groups, while younger family members identify more with the new settlement. Explain how place attachment can persist, change, and vary within the same community.",
+    "intent": "Analyze place attachment, memory, mobility, and generational variation.",
+    "domain": "Place and Place Attachment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "cultural_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "Two neighborhoods are both 3 km from a hospital. One has direct bus service every 10 minutes; the other requires two transfers and 55 minutes. Explain why straight-line distance is an incomplete measure of healthcare accessibility.",
+    "intent": "Distinguish distance from network-based accessibility.",
+    "domain": "Social Geography",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "spatial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "Asthma hospitalization rates are higher in districts near major roads, but these districts also have lower incomes and older housing. Explain why the map shows spatial correlation, not by itself a causal effect of road proximity, and identify two confounders or mechanisms to investigate.",
+    "intent": "Distinguish spatial correlation from causal exposure.",
+    "domain": "Geography of Health",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A school catchment has equal nominal enrollment rights across its area, yet students on the outer edge face a 70-minute bus trip while central students walk 10 minutes. Explain how institutional allocation and transport can create spatial inequality even without different admission rules.",
+    "intent": "Analyze education access through spatial and institutional mechanisms.",
+    "domain": "Geography of Education",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "spatial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A city cuts average bus travel time by 20%, but service on low-frequency suburban routes is reduced. Explain how mobility can improve on average while accessibility worsens for some residents.",
+    "intent": "Distinguish network speed from equitable accessibility.",
+    "domain": "Transportation Geography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "spatial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "Two workers live equally far from a training center. Worker A has flexible hours; Worker B must pick up a child at 16:00 and the last compatible bus leaves the center at 15:20. Explain how time-space constraints create unequal practical access despite equal distance.",
+    "intent": "Connect temporal constraints with spatial opportunity.",
+    "domain": "Time-Space Geography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Two coastal towns face the same storm surge height. Town A has elevated shelters, insurance, and evacuation transport; Town B has informal housing on low land and limited vehicles. Distinguish hazard, exposure, vulnerability, and adaptive capacity in explaining likely outcomes.",
+    "intent": "Differentiate components of disaster risk.",
+    "domain": "Hazards, Vulnerability, and Resilience",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "human_environment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A protected forest improves wildlife indicators but restricts customary grazing. Tourism revenue rises, yet most jobs go to outside firms. Local households differ: some benefit from tourism, some lose pasture, and some value stricter conservation. Analyze the conflict using resource access, power, livelihoods, institutions, and ecological goals without assuming one homogeneous “community interest.”",
+    "intent": "Analyze political ecology with heterogeneous stakeholders and competing goals.",
+    "domain": "Political Ecology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "human_environment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "An earthquake of similar magnitude causes far more deaths in City X than City Y. City X has weaker buildings, denser informal settlements, and slower emergency access. Explain why calling the outcome purely a “natural disaster” would miss key social causes.",
+    "intent": "Relate hazard to vulnerability and disaster outcomes.",
+    "domain": "Hazards, Vulnerability, and Resilience",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "human_environment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "Farm households respond to repeated drought by changing planting dates, taking seasonal jobs, drilling wells where affordable, and in some cases sending a family member to the city. Explain why climate pressure can lead to multiple adaptation strategies rather than a single migration response.",
+    "intent": "Analyze climate-society adaptation and livelihood diversification.",
+    "domain": "Climate and Society",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "human_environment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A mining region exports large quantities of copper but nearby settlements experience unreliable water access and damaged roads. Explain how resource geography should examine distribution, infrastructure, control, and environmental impacts rather than equating extraction value with local benefit.",
+    "intent": "Analyze resource distribution and uneven local effects.",
+    "domain": "Resource Geography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "human_environment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A marine protected area permits tourism but restricts fishing in nursery zones. Some fishers support the rule after catches improve outside the zone; others lack boats capable of reaching those areas. Explain why conservation outcomes should be evaluated across both ecological and livelihood dimensions.",
+    "intent": "Evaluate conservation and community outcomes without assuming uniform compatibility.",
+    "domain": "Conservation and Communities",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "human_environment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "In Canada, assume for this question that a provincial planning statute requires consultation when a proposed road may affect a formally recognized Indigenous land-use area. A project map shows the road crossing one such area, while seasonal-use interviews indicate hunting routes extend beyond the mapped polygon. Explain why legal consultation boundaries and lived territorial use should both be considered, and identify what evidence should not be inferred from the map alone.",
+    "intent": "Integrate jurisdiction-specific Indigenous planning status with cultural geography.",
+    "domain": "Indigenous Peoples and Geography",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 62,
+    "prompt": "A railway built during a colonial extraction economy still structures freight routes and city growth a century later, although new highways and policies have altered trade. Explain path dependence without claiming that colonial infrastructure fully determines present outcomes.",
+    "intent": "Analyze colonial historical geography without determinism.",
+    "domain": "Colonialism and Postcolonial Geographies",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "Historical maps show a town expanding first along a river port, later along a railway, and most recently around highway junctions. Explain how changing transport technologies can reshape settlement while older spatial patterns may persist.",
+    "intent": "Integrate historical evidence with spatial interpretation.",
+    "domain": "Historical Geography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "An agricultural technique appears first in one valley, then in connected towns, and later in nearby rural areas. No evidence suggests independent invention elsewhere. Which diffusion processes are plausible, and what additional evidence would distinguish relocation from expansion through communication networks?",
+    "intent": "Distinguish diffusion mechanisms and independent emergence.",
+    "domain": "Diffusion",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "spatial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Town A has 50,000 residents and Town B 200,000. Both are 100 km from City C. If a simple interaction index is proportional to population product divided by distance squared, which town would have the larger predicted interaction with C, and by what factor, all else equal? Explain one reason actual flows could differ.",
+    "intent": "Apply a gravity-model concept and discuss limitations.",
+    "domain": "Spatial Interaction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "National data show poverty and pollution exposure are weakly correlated, but neighborhood-level data within three industrial cities show a strong positive correlation. Explain how scale and aggregation could produce this difference, and why neither pattern alone identifies the causal mechanism.",
+    "intent": "Analyze scale effects and aggregation in spatial relationships.",
+    "domain": "Scale",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "spatial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A study maps wells as points, rivers as lines, administrative districts as polygons, and satellite temperature as a continuous grid. Match each phenomenon to vector or raster representation and explain why changing spatial resolution can affect analysis.",
+    "intent": "Interpret basic spatial-data structures and resolution.",
+    "domain": "Spatial Data",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "gis_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "Researchers want to identify households within a 15-minute walk along the street network from three clinics and then summarize the population characteristics of those households. Which spatial operations are conceptually appropriate, and why is a simple circular buffer potentially misleading?",
+    "intent": "Choose GIS concepts for network accessibility analysis.",
+    "domain": "GIS Concepts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "gis_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A map shades districts darker when they contain more total burglary incidents. The largest districts also contain the most residents. Explain why mapping raw counts may mislead if the goal is to compare burglary risk, and state an appropriate normalization.",
+    "intent": "Identify misleading thematic mapping based on raw counts.",
+    "domain": "Cartography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "map_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A global map is intended to compare country areas accurately rather than preserve local shape. What distortion property should guide projection choice, and why can no flat world map preserve area, shape, distance, and direction everywhere at once?",
+    "intent": "Select projection properties based on map purpose.",
+    "domain": "Map Projections",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "map_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "Two counties each report 500 new disease cases. County A has 50,000 residents; County B has 250,000. Calculate cases per 100,000 residents and explain why a choropleth of the raw count would obscure the difference in rates.",
+    "intent": "Normalize counts to rates for thematic mapping.",
+    "domain": "Choropleth and Thematic Mapping",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "High rents cluster spatially across adjacent neighborhoods. Explain what positive spatial autocorrelation would mean here and why the clustering does not by itself establish whether the cause is zoning, transit access, school reputation, or another mechanism.",
+    "intent": "Interpret spatial autocorrelation without causal overreach.",
+    "domain": "Spatial Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "spatial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "Using census tracts, a city shows a strong positive correlation between immigrant share and bus use. When the same data are aggregated to five large planning zones, the correlation nearly disappears. Explain the modifiable areal unit problem and why neither result should be treated as the uniquely correct individual-level relationship.",
+    "intent": "Recognize MAUP and ecological inference limits.",
+    "domain": "Modifiable Areal Unit Problem",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "spatial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A census reports rising neighborhood incomes, while interviews with long-term renters describe worsening housing insecurity. Mobility records show many lower-income households moved to peripheral districts. Reconcile these findings and explain how each evidence source captures a different part of neighborhood change.",
+    "intent": "Integrate qualitative, census, and mobility evidence.",
+    "domain": "Qualitative and Spatial Evidence Integration",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mixed_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Neighborhoods that receive new parks later show higher property values. The parks were preferentially built in areas already attracting private investment. Explain the selection problem and propose one comparison or longitudinal strategy that would strengthen causal inference.",
+    "intent": "Identify confounding and selection in causal geographic claims.",
+    "domain": "Causal Reasoning in Anthropology and Geography",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "Community A and Community B both increased participation in local councils after decentralization, but A had long-standing neighborhood associations while B received new NGO facilitation. Explain how a comparative analysis should separate a common institutional change from different local mechanisms and confounders.",
+    "intent": "Conduct context-sensitive comparative reasoning.",
+    "domain": "Comparative Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A researcher has geotagged interviews about an illegal livelihood in a small village. Removing names would still leave only a few possible households at each location. Explain the spatial-privacy risk and propose a safer publication strategy.",
+    "intent": "Apply research ethics to sensitive spatial data.",
+    "domain": "Ethics in Anthropology and Geography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "field_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A report quotes community leaders extensively but contains almost no material from migrant women who use the same public space at different times of day. Explain how representation and field access may shape whose “community voice” appears, and how the research design could broaden participation.",
+    "intent": "Assess representation, voice, authorship, and exclusion.",
+    "domain": "Representation and Voice",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ethnographic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A dwelling contains a married couple, one lodger, and a cousin who stays only during harvest season. The couple shares food expenses with the cousin but not with the lodger. Explain why household membership may depend on the research question and should not be inferred from co-residence alone.",
+    "intent": "Distinguish household, family, dwelling, and economic unit.",
+    "domain": "Household and Domestic Organization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "kinship_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "Two consumers with similar incomes buy different clothing brands. Interviews show one uses clothing to signal professional identity while the other prioritizes durability because local stores have limited stock. Explain why consumption should be analyzed through meaning, availability, institutions, and income rather than individual preference alone.",
+    "intent": "Analyze consumption as socially and materially structured.",
+    "domain": "Anthropology of Consumption",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A street-food seller works 50 hours a week, pays no payroll tax because the business is unregistered, and relies on unpaid family help. Classify the paid, unpaid, and informal components of this work and explain why “informal” does not mean economically insignificant.",
+    "intent": "Distinguish informal, paid, and unpaid labor.",
+    "domain": "Anthropology of Work",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "An archaeological site attracts tourists, supports local guides, and is also used for annual ceremonies by descendants of nearby communities. A proposed visitor center would protect fragile remains but block ceremonial access to one area. Identify at least three stakeholder values that a heritage plan must balance.",
+    "intent": "Analyze heritage, tourism, preservation, and living cultural meaning.",
+    "domain": "Heritage and Cultural Resources",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "After moving from sea level to high altitude, newcomers show higher red-blood-cell counts within months, while a resident population has long-term inherited traits affecting oxygen use. Distinguish acclimatization from genetic adaptation and explain where cultural adaptation could also enter the analysis.",
+    "intent": "Differentiate short-term physiological change, genetic adaptation, and culture.",
+    "domain": "Human Biological Variation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "biological_anthropology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "Skin pigmentation varies gradually with latitude across neighboring populations, with no sharp breaks at national borders. Explain how this illustrates clinal variation and why social racial categories need not match the biological pattern.",
+    "intent": "Interpret continuous biological variation without racial typology.",
+    "domain": "Human Biological Variation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "biological_anthropology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "At a site, fragile plant remains preserve only in waterlogged pits, while stone tools survive across the whole settlement. Explain how differential preservation could bias reconstruction of activities if archaeologists compare artifact counts without considering taphonomy.",
+    "intent": "Recognize preservation bias in archaeological inference.",
+    "domain": "Archaeological Context",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "archaeological_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A city of 2,000,000 residents receives 80,000 in-migrants and loses 50,000 out-migrants in one year. Calculate net migration and net migration per 1,000 residents using the starting population. Then explain why 80,000 should not be reported as the net migration rate numerator.",
+    "intent": "Calculate and interpret net migration with the correct denominator.",
+    "domain": "Migration",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "In one year, 3,600 births occur among 90,000 women aged 15–49, while the total population is 500,000. Calculate the general fertility rate per 1,000 women aged 15–49 and explain why total population is not the appropriate denominator for that measure.",
+    "intent": "Choose the correct fertility denominator.",
+    "domain": "Demography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "Region A and Region B have the same crude death rate, but A has a much older age structure. Explain why equal crude death rates do not imply equal age-specific mortality conditions or equal life expectancy.",
+    "intent": "Interpret mortality measures in light of age structure.",
+    "domain": "Demography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "demographic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A country’s urban population grows from 30 million to 36 million while total population grows from 60 million to 75 million. Calculate the urban share before and after and state whether the country became more urbanized by share, even though the urban population increased.",
+    "intent": "Distinguish absolute urban growth from change in urbanization share.",
+    "domain": "Urban Geography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A commuter rail line carries 60,000 daily trips into the central city and 20,000 outward trips. A new job center in the suburbs adds 15,000 outward trips without changing inward trips. Calculate the new directional shares and explain why total ridership alone would miss the changing spatial pattern.",
+    "intent": "Interpret commuting flows and directionality.",
+    "domain": "Transportation Geography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A survey of market traders finds 70% prefer cashless payment, but the sample was collected only from stalls near the main entrance where younger vendors are concentrated. Explain the sampling limitation and why a precise percentage does not guarantee population representativeness.",
+    "intent": "Assess survey representativeness and sampling bias.",
+    "domain": "Anthropological Field Methods",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "field_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "Census data show that a coastal town’s average household size fell from 5.1 to 3.8 over ten years. Ethnographic fieldwork, however, finds dense inter-household childcare, remittance sharing, and rotating residence among relatives. Explain how both findings can be true, what each measures, and why concluding that kinship obligations weakened would be premature.",
+    "intent": "Integrate census and ethnographic evidence that appear to conflict.",
+    "domain": "Ethnographic Evidence and Generalization",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "mixed_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "Migration from Region A to City B accelerates after a factory expansion. Wages rise, earlier migrants provide housing and job referrals, a recruitment agency subsidizes travel, households send one member to diversify income, and an old transport corridor lowers travel costs. Build a multi-factor explanation and identify evidence that would distinguish the relative importance of these mechanisms.",
+    "intent": "Explain migration using labor markets, networks, institutions, household strategy, and history.",
+    "domain": "Migration",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "Three urban districts show different segregation patterns. District 1 has high ethnic concentration but equal school funding; District 2 has moderate concentration but sharply unequal transit access; District 3 is mixed overall but internally divided by a highway. Compare spatial separation, resource inequality, and scale, and explain why individual prejudice cannot be inferred from the aggregate patterns alone.",
+    "intent": "Analyze segregation while avoiding ecological fallacy and single-metric reasoning.",
+    "domain": "Segregation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A proposed conservation zone overlaps customary grazing routes and a habitat corridor. The state expects tourism revenue, an Indigenous council claims decision-making authority based on long-standing territorial use, younger residents are divided over tourism jobs, and ecological monitoring shows declining wildlife. Analyze the conflict across livelihoods, governance, identity, ecological goals, power, and internal community heterogeneity; state what additional evidence would be needed before recommending an institutional arrangement.",
+    "intent": "Integrate conservation, Indigenous territorial claims, livelihoods, and governance.",
+    "domain": "Conservation and Communities",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A rural electrification program reports 92% village-level connection, but satellite night-light data show weak change in remote hamlets and interviews reveal connection fees exclude many low-income households. Administrative records show businesses gained service first. Evaluate program success using administrative, spatial, and ethnographic evidence, and explain how aggregate coverage could mask unequal access.",
+    "intent": "Evaluate a development intervention with mixed evidence and aggregation effects.",
+    "domain": "Development Geography",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "mixed_methods",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A colonial-era rail line still concentrates industry along one corridor. After independence, governments built new roads elsewhere, but firms continued to cluster near old suppliers and skilled labor. Explain how infrastructure legacy, agglomeration, institutions, and later policy interact without making historical path dependence deterministic.",
+    "intent": "Explain contemporary economic geography through non-deterministic path dependence.",
+    "domain": "Colonialism and Postcolonial Geographies",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "Among residents born locally, younger speakers use more of Language B than older speakers. Recent migrants also use Language B frequently, while the same young speakers switch back to Language A with grandparents. Explain how cohort change, migration composition, and situational code switching could each contribute, and what longitudinal evidence would help separate them.",
+    "intent": "Interpret linguistic change while separating cohort, migration, and situational effects.",
+    "domain": "Linguistic Anthropology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "linguistic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "At the national scale, poverty and industrial air exposure have almost no correlation. At the metropolitan scale, poorer neighborhoods within the largest cities have substantially higher exposure, while small rural areas show the opposite pattern because of agricultural burning. Explain how scale, composition, industry location, and aggregation create these apparently contradictory results, and why a single national coefficient is inadequate.",
+    "intent": "Analyze multi-scale environmental inequality and aggregation.",
+    "domain": "Scale",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "spatial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "An archaeological mound contains mixed ceramics, animal bone, hearth debris, and human burials. Looting pits cut through several layers, acidic soil destroys most plant remains, and later rebuilding moved some artifacts. Compare at least three possible interpretations of site activity, identify how disturbance and preservation bias affect each, and specify what evidence would be needed before inferring social status, ethnicity, or ritual practice.",
+    "intent": "Interpret complex archaeological evidence under disturbance, preservation bias, and competing explanations.",
+    "domain": "Archaeological Inference",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "archaeological_inference",
+    "jurisdiction_required": false
+  }
+]

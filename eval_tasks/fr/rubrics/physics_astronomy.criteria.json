@@ -1,0 +1,187 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Addresses the actual question, requested quantities, and stated physical or astronomical context without substituting a different problem. Irrelevant equations, facts, or citations do not compensate for failure to answer the requested task.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "physical_accuracy",
+      "name": "Physical Accuracy",
+      "definition": "Uses physical laws correctly, respects their domains of validity, and reaches conclusions consistent with established physics. Distinguishes forces, energies, fields, state variables, frame-dependent quantities, and other physically different concepts. A correct number produced from invalid central physics is not fully correct.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "astronomical_accuracy",
+      "name": "Astronomical Accuracy",
+      "definition": "For astronomy-related tasks, correctly distinguishes luminosity from flux, angular from physical quantities, observed from inferred properties, local/peculiar effects from cosmological effects, and empirical evidence from model-dependent interpretation. Does not rely on invented catalog facts.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Uses the right concepts with their proper meanings and relationships. Penalize conflations such as heat with temperature, force with energy, probability amplitude with probability, precision with accuracy, or expectation value with a guaranteed measurement outcome.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When a numerical or symbolic calculation is required, obtains the correct result to appropriate precision from a valid method. Distinguish a minor arithmetic slip from a result based on the wrong physical model or governing equation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "mathematical_reasoning",
+      "name": "Mathematical Reasoning",
+      "definition": "Carries out algebra, vector operations, calculus, probability, scaling, or differential-equation reasoning correctly and in a way that follows from the stated physical setup. A mathematically neat derivation does not receive full credit if its premises are physically invalid.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "dimensional_consistency",
+      "name": "Dimensional Consistency",
+      "definition": "Keeps equations and reported quantities dimensionally consistent and includes units when meaningful. A major units or dimensions mismatch that invalidates the conclusion is serious even if the numerical magnitude looks plausible.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "model_selection",
+      "name": "Model Selection",
+      "definition": "Chooses a physical or astronomical model appropriate to the regime and available evidence, and does not apply a familiar formula where its assumptions fail. Alternative models can receive full credit when clearly stated, physically justified, and sufficient for the requested inference.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_approximations",
+      "name": "Assumptions and Approximations",
+      "definition": "States materially important assumptions or approximations, explains why they are reasonable, and recognizes when they break down. Distinguishes exact relationships from limiting forms such as nonrelativistic, weak-field, ideal-gas, small-angle, geometric-optics, or inviscid approximations.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "conservation_and_symmetry_reasoning",
+      "name": "Conservation and Symmetry Reasoning",
+      "definition": "Invokes conservation laws or symmetry only when the relevant conditions hold, correctly defines the system, and tracks external interactions. Uses symmetry to simplify field or dynamics problems only when the geometry and boundary conditions justify it.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "causal_mechanistic_reasoning",
+      "name": "Causal and Mechanistic Reasoning",
+      "definition": "Explains the mechanism connecting causes, interactions, and observed effects rather than merely naming a law or restating the phenomenon. Distinguishes correlation or fitted association from evidence establishing a physical causal mechanism.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "experimental_reasoning",
+      "name": "Experimental Reasoning",
+      "definition": "For experiment-design or measurement tasks, identifies what is actually being tested or measured, relevant controls, calibration, confounders, instrumental limitations, and what outcome would support or disfavor the competing hypotheses.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "data_and_graph_interpretation",
+      "name": "Data and Graph Interpretation",
+      "definition": "Reads trends, slopes, scales, uncertainty information, and relationships from supplied data or graphs without inventing unsupported structure. Separates the measured pattern from the physical interpretation placed on it.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_and_error_analysis",
+      "name": "Uncertainty and Error Analysis",
+      "definition": "Correctly distinguishes statistical/random uncertainty, systematic bias, calibration error, precision, and accuracy; propagates uncertainty when required; and does not claim a detection or model discrimination stronger than the uncertainty budget supports.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "scale_and_order_of_magnitude",
+      "name": "Scale and Order of Magnitude",
+      "definition": "Recognizes physically plausible scales, performs order-of-magnitude or scaling reasoning when relevant, and flags results grossly inconsistent with known constraints or with the setup. Small rounding differences should not be over-penalized.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "boundary_and_limiting_cases",
+      "name": "Boundary and Limiting Cases",
+      "definition": "Checks or interprets useful limits, boundary conditions, and edge cases where they materially test the solution. Results should reduce sensibly in limits such as zero friction, weak field, v/c → 0, small amplitude, large distance, or vanishing coupling.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_model_limits",
+      "name": "Evidence and Model Limits",
+      "definition": "States what the evidence directly establishes, what is inferred only through a model, and what remains underdetermined or degenerate. Does not turn an upper bound into a detection, a correlation into a causal proof, or evidence for extra gravitating mass into a unique microscopic dark-matter identification.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the essential requested parts, including material qualifications, directions, units, assumptions, or interpretation when they are necessary to solve the problem correctly. Small nonessential omissions should be distinguished from missing a required central step.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent symbols, sign conventions, coordinate choices, assumptions, numerical values, and conclusions. Does not contradict its own earlier reasoning or use mutually incompatible models without explanation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Presents reasoning so the governing mechanism, method, and conclusion can be followed. Concision is acceptable; unnecessary jargon, equation dumping, or excessive length does not improve the score. Alternative valid notation or solution order should not be penalized.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_physics_astronomy_error",
+    "condition": "A materially false central physical, mathematical, observational, or astronomical claim fundamentally invalidates the answer or reverses the substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally violates conservation of energy or momentum in the central reasoning without justification.",
+      "Reverses the direction of a central force or field in a way that changes the answer.",
+      "Uses a physically inapplicable equation as the basis of the conclusion.",
+      "Claims an object moving at constant velocity must have a net force acting in the direction of motion.",
+      "Confuses energy with force in a way central to the solution.",
+      "Treats heat and temperature as interchangeable in a thermodynamic conclusion.",
+      "Claims a cyclic heat engine interacting only with stated reservoirs can exceed the relevant Carnot efficiency without additional physics.",
+      "Fundamentally misapplies the second law of thermodynamics.",
+      "Contains a major dimensional inconsistency that invalidates the quantitative conclusion.",
+      "Contains a calculation error large enough to reverse the physical interpretation.",
+      "Claims ordinary massive matter can be accelerated through the speed of light under special relativity.",
+      "Fundamentally misunderstands time dilation, simultaneity, or reference frames in a way that reverses the answer.",
+      "Treats quantum uncertainty as merely faulty instrumentation when intrinsic uncertainty is central to the question.",
+      "Assigns probabilities from a wavefunction incorrectly in a way that changes the central result.",
+      "Claims a non-conserved quantity is conserved when the entire solution depends on that claim.",
+      "Uses fundamentally incorrect orbital mechanics that reverses the predicted orbit.",
+      "Confuses luminosity and apparent brightness in a way that invalidates an astronomical inference.",
+      "Claims an observed redshift uniquely proves one mechanism when the supplied evidence does not distinguish alternatives.",
+      "Makes a fundamentally incorrect inference from stellar, galactic, exoplanet, or cosmological data.",
+      "Treats an observational upper bound as a detection.",
+      "Claims correlation alone establishes a physical causal mechanism when that inference is central to the question.",
+      "Ignores a clearly dominant uncertainty or instrumental limitation in a way that invalidates the conclusion."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the physical conclusion.",
+      "Small rounding differences.",
+      "Minor algebraic slips followed by otherwise correct reasoning.",
+      "Notation differences.",
+      "Reasonable sign conventions stated consistently.",
+      "Reasonable alternative derivations.",
+      "Reasonable approximation differences.",
+      "Small omissions.",
+      "Legitimate interpretation differences where the physics is empirically equivalent.",
+      "Differing but defensible modeling assumptions that are clearly stated.",
+      "Use of a standard approximation where its limitations are immaterial.",
+      "A slightly imprecise numerical constant that does not affect the conclusion."
+    ]
+  }
+}

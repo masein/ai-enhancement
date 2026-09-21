@@ -1,0 +1,184 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly answers the question asked, addresses the supplied scenario or passage, and prioritizes considerations that materially bear on the requested ethical or religious analysis.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "ethical_accuracy",
+      "name": "Ethical accuracy",
+      "definition": "Represents ethical concepts, distinctions, and frameworks accurately; does not derive ought from is without a normative bridge, confuse permission with obligation, or collapse causal into moral responsibility.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "religious_accuracy",
+      "name": "Religious accuracy",
+      "definition": "Represents religious traditions, doctrines, practices, institutions, and secular worldviews accurately; avoids unsupported universal claims and recognizes internal diversity where relevant.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual precision",
+      "definition": "Uses key distinctions correctly, such as descriptive versus normative, duty versus consequence, autonomy versus preference, consent versus mere agreement, doctrine versus practice, text versus interpretation, and analogous versus identical concepts.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "ethical_reasoning",
+      "name": "Ethical reasoning",
+      "definition": "Identifies morally relevant facts and stakeholders, gives reasons for normative conclusions, and connects principles to the specific case rather than merely naming ethical vocabulary.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "normative_framework_reasoning",
+      "name": "Normative framework reasoning",
+      "definition": "When a framework is relevant, applies consequentialist, deontological, virtue, care, rights-based, justice-based, religious, or other normative reasoning faithfully and explains how the framework supports or limits the conclusion.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "rights_duties_and_responsibility",
+      "name": "Rights, duties, and responsibility",
+      "definition": "When relevant, analyzes the scope and conflict of rights and duties and distinguishes control, causation, intention, knowledge, negligence, coercion, excuse, and moral responsibility.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "applied_ethics_reasoning",
+      "name": "Applied ethics reasoning",
+      "definition": "In applied cases, integrates the domain facts supplied with ethical principles, competing values, harms, benefits, institutional roles, consent, fairness, and uncertainty without substituting domain law or technical detail for ethical analysis.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "metaethical_reasoning",
+      "name": "Metaethical reasoning",
+      "definition": "When relevant, distinguishes moral realism, relativism, subjectivism, objectivity, moral knowledge, disagreement, and uncertainty; does not infer relativism merely from diversity or disagreement.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "religious_tradition_reasoning",
+      "name": "Religious tradition reasoning",
+      "definition": "When a tradition is specified, reasons within or about that tradition using the stated sources, concepts, practices, and interpretive structures while acknowledging meaningful intra-traditional variation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "comparative_religion_reasoning",
+      "name": "Comparative religion reasoning",
+      "definition": "When comparing traditions or worldviews, uses a clear common dimension, represents each on its own terms, identifies both similarities and differences, and avoids false equivalence or one-tradition-as-default framing.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "religious_text_and_authority_reasoning",
+      "name": "Religious text and authority reasoning",
+      "definition": "When texts or authority matter, distinguishes explicit text from translation, genre, historical context, commentary, tradition, institutional teaching, later doctrine, and lived practice; does not fabricate omitted material.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "theological_and_philosophy_of_religion_reasoning",
+      "name": "Theological and philosophy-of-religion reasoning",
+      "definition": "When relevant, reconstructs theological or philosophy-of-religion arguments charitably, preserves the requested internal or external standpoint, considers objections and alternatives, and avoids presupposing belief or nonbelief.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "interpretive_context",
+      "name": "Interpretive context",
+      "definition": "When interpretation is central, uses the supplied literary, historical, ritual, communal, doctrinal, or social context and states when multiple reasonable interpretations remain available.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "alternative_positions_and_objections",
+      "name": "Alternative positions and objections",
+      "definition": "When the issue is contestable, presents materially relevant alternative arguments or objections in a fair form and explains their implications rather than using straw men.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_uncertainty",
+      "name": "Assumptions and uncertainty",
+      "definition": "When facts, frameworks, doctrines, or interpretations are uncertain, identifies key assumptions, states what further evidence would matter, and calibrates confidence rather than fabricating certainty.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the major considerations required by the prompt and does not omit a central stakeholder, distinction, argument, interpretive issue, or competing value needed for a defensible answer.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally coherent definitions, principles, and conclusions; does not apply materially different standards to analogous parts of the same problem without explanation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Explains reasoning in precise, readable language with enough structure to make the argumentative path understandable; jargon, names, or quotations are not substitutes for explanation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "ethical_and_interreligious_judgment",
+      "name": "Ethical and interreligious judgment",
+      "definition": "When a case spans ethical and religious viewpoints, balances principled criticism with accurate and respectful representation, distinguishes disagreement from disrespect, recognizes pluralism and third-party interests, and reaches only the level of conclusion supported by the evidence.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_ethics_religion_error",
+    "condition": "A materially false central ethical, religious, comparative, textual, theological, or argumentative claim that fundamentally invalidates the answer or reverses its substantive conclusion. This includes central misrepresentation of an ethical framework or religious tradition, fabricated doctrine or text needed for the conclusion, denial of an indispensable normative bridge while deriving an ought from purely descriptive premises, or similarly outcome-determinative errors. Reasonable ethical disagreement, defensible alternative interpretations, legitimate denominational differences, cautious uncertainty, and minor imprecision are not critical.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally misrepresenting the ethical theory on which the conclusion depends.",
+      "Deriving a normative conclusion from purely descriptive premises while denying any normative bridge assumption.",
+      "Treating consent as valid despite an explicit absence of voluntariness where consent is central.",
+      "Fundamentally confusing causal responsibility and moral responsibility.",
+      "Treating moral disagreement as logical proof of relativism.",
+      "Claiming legality automatically establishes moral rightness.",
+      "Treating one denomination's belief as universally held by an entire religion when that distinction determines the answer.",
+      "Materially misrepresenting a major religious doctrine supplied in the question.",
+      "Treating scripture and later interpretation as identical when the distinction is central.",
+      "Fabricating a scriptural teaching, doctrine, religious rule, or historical claim needed for the conclusion.",
+      "Treating all religions as teaching exactly the same doctrine.",
+      "Asserting that a whole religious group necessarily behaves in a specified way because of its identity.",
+      "Claiming atheism necessarily entails nihilism or immorality.",
+      "Claiming agnosticism and atheism are identical.",
+      "Fundamentally misrepresenting dharma, karma, nirvana, salvation, covenant, revelation, or another central concept in a way that reverses the analysis.",
+      "Attributing a doctrine to the wrong religion and basing the conclusion on that error.",
+      "Claiming religion is inherently peaceful or inherently violent as a universal causal explanation.",
+      "Interpreting one religious text passage as representing all members of a tradition despite explicit evidence of internal disagreement.",
+      "Replacing requested neutral analysis with theological advocacy, proselytizing, or anti-religious advocacy.",
+      "Fabricating scholarly consensus about a contested ethical or religious question.",
+      "Treating a contested philosophical argument for or against God as conclusively settled without justification."
+    ],
+    "not_critical_examples": [
+      "Minor terminology mistakes that do not affect the conclusion.",
+      "Reasonable ethical disagreement.",
+      "Defensible alternative interpretations.",
+      "Legitimate denominational or school-level differences.",
+      "Differences in ritual practice.",
+      "Small omissions.",
+      "Cautious uncertainty.",
+      "Reasonable theological disagreement.",
+      "Different plausible applications of an ethical framework.",
+      "Minor historical imprecision that does not affect the conclusion."
+    ]
+  }
+}

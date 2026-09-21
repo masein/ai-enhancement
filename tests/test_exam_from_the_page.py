@@ -3,7 +3,12 @@ from the page.
 
 Dr. Hossein is writing about 100 questions per topic with a criteria file
 each. Until now the questions went in by CLI and the rubrics by git commit,
-and he has neither a shell on the box nor a checkout."""
+and he has neither a shell on the box nor a checkout.
+
+The bank here is his medicine bank of phase 8, retired with its topic in
+phase 10 and kept byte for byte in eval_tasks/fr/retired/: these tests are
+about the import door and know its numbers, so it goes in under the topic
+that replaced "medicine & health"."""
 
 from __future__ import annotations
 
@@ -17,8 +22,11 @@ import judge as jd
 from conftest import make_service
 
 REPO = Path(__file__).resolve().parents[1]
-MEDICINE = REPO / "eval_tasks" / "fr" / "medicine_v2.json"
-TOPIC = "medicine & health"
+RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+MEDICINE = RETIRED / "medicine_v2.json"
+TOPIC = "Medicine & Clinical Health"
+TASK = "exam_medicine_clinical_health"
+SLUG = "medicine_clinical_health"
 ITEMS = json.loads(MEDICINE.read_text(encoding="utf-8"))
 
 
@@ -142,33 +150,41 @@ def test_the_page_says_which_rubric_grades_each_topic(svc):
     r = client.get("/api/exam/rubrics").json()
     rows = {t["topic"]: t for t in r["topics"]}
     med = rows[TOPIC]
-    assert med["name"] == "medicine_health" and med["own"] is True
-    assert med["status"] == "draft" and med["scoring"] == "criteria"
-    assert med["criteria_count"] == 15 and len(med["criteria_sha256"]) == 64
-    assert rows["law"]["name"] == "law" and rows["law"]["criteria_count"] == 23
-    assert rows["history"]["name"] == "exam" and rows["history"]["own"] is False
-    assert rows["history"]["scoring"] == "single"
+    assert med["name"] == SLUG and med["own"] is True
+    # the author wrote these anchors himself: no DRAFT stamp to show
+    assert med["status"] == "" and med["scoring"] == "criteria"
+    assert med["criteria_count"] == 20 and len(med["criteria_sha256"]) == 64
+    assert rows["Law"]["name"] == "law" and rows["Law"]["criteria_count"] == 20
+    # Arts arrived with no files: the one topic the shared rubric grades
+    assert rows["Arts"]["name"] == "exam" and rows["Arts"]["own"] is False
+    assert rows["Arts"]["scoring"] == "single"
     assert r["store"] and isinstance(r["in_repo"], bool)
     # and both files come back whole
-    md = client.get("/api/exam/rubrics/medicine_health")
-    assert md.status_code == 200 and md.text.startswith("# Rubric — medicine & health")
-    spec = client.get("/api/exam/rubrics/medicine_health?kind=criteria")
-    assert json.loads(spec.text)["topic"] and len(json.loads(spec.text)["criteria"]) == 15
+    rubrics = REPO / "eval_tasks" / "fr" / "rubrics"
+    md = client.get(f"/api/exam/rubrics/{SLUG}")
+    assert md.status_code == 200 and md.text.startswith("# Medicine & Clinical Health")
+    assert md.text == (rubrics / f"{SLUG}.md").read_text(encoding="utf-8")
+    spec = client.get(f"/api/exam/rubrics/{SLUG}?kind=criteria")
+    assert spec.text == (rubrics / f"{SLUG}.criteria.json").read_text(encoding="utf-8")
+    assert len(json.loads(spec.text)["criteria"]) == 20
     assert client.get("/api/exam/rubrics/nothing_here").status_code == 404
 
 
 def test_a_criteria_upload_is_checked_before_it_can_be_saved(svc):
     client, _ = svc
-    good = json.loads(jd.rubric_path("medicine_health", ".criteria.json").read_text())
+    good = json.loads(jd.rubric_path(SLUG, ".criteria.json").read_text())
+    # the delivered file, broken in its own layout: its one flag is an object
+    # under `critical_error_flag`
+    flag = good["critical_error_flag"]
     bad = {**good,
            "weights": "softmax",
            "criteria": [
                {"id": "Relevance", "definition": "", "weight": 0},
-               {"id": "triage", "definition": "d", "weight": 1},
-               {"id": "triage", "definition": "d", "weight": "heavy"}],
-           "flags": [{"id": "critical_safety_failure", "condition": "", "effect": "melt"}],
+               {"id": "triage_and_urgency", "definition": "d", "weight": 1},
+               {"id": "triage_and_urgency", "definition": "d", "weight": "heavy"}],
+           "critical_error_flag": {**flag, "condition": "", "effect": "melt"},
            "breakdowns": "acuity"}
-    r = post(client, "/api/exam/rubrics/preview", name="medicine_health", kind="criteria",
+    r = post(client, "/api/exam/rubrics/preview", name=SLUG, kind="criteria",
              content=json.dumps(bad), approver="Dr. Hossein").json()
     joined = " | ".join(r["problems"])
     assert r["ok"] is False
@@ -176,49 +192,73 @@ def test_a_criteria_upload_is_checked_before_it_can_be_saved(svc):
     assert "an id is lower-case letters" in joined and "duplicate id" in joined
     assert "has no definition" in joined and "weight must be greater than 0" in joined
     assert "weight is not a number" in joined
-    assert "flag critical_safety_failure has no condition" in joined
+    assert f"flag {flag['id']} has no condition" in joined
     assert "effect 'melt' is not one this judge can apply" in joined
     assert "'breakdowns' is a list of metadata field names" in joined
     # and the commit refuses too — the preview is not the only gate
-    assert post(client, "/api/exam/rubrics", name="medicine_health", kind="criteria",
+    assert post(client, "/api/exam/rubrics", name=SLUG, kind="criteria",
                 content=json.dumps(bad), approver="Dr. Hossein").status_code == 422
-    assert post(client, "/api/exam/rubrics/preview", name="medicine_health", kind="criteria",
+    assert post(client, "/api/exam/rubrics/preview", name=SLUG, kind="criteria",
                 content="{not json", approver="Dr. Hossein").json()["problems"][0].startswith(
         "not valid JSON")
+    # the file as delivered passes the same check
+    assert post(client, "/api/exam/rubrics/preview", name=SLUG, kind="criteria",
+                content=json.dumps(good), approver="Dr. Hossein").json()["ok"] is True
 
 
 def test_a_rubric_upload_wants_a_heading_and_five_anchors(svc):
     client, _ = svc
-    r = post(client, "/api/exam/rubrics/preview", name="medicine_health", kind="rubric",
+    r = post(client, "/api/exam/rubrics/preview", name=SLUG, kind="rubric",
              content="Just some prose.", approver="Dr. Hossein").json()
     assert r["ok"] is False
-    assert any("# Rubric" in p for p in r["problems"])
+    assert any("'# <title>' heading" in p for p in r["problems"])
     assert sum("no anchor for" in p for p in r["problems"]) == 5
+
+
+def test_every_delivered_rubric_passes_the_upload_check_as_written(svc):
+    """The 36 rubrics of the 37-topic exam open with '# Law Evaluation
+    Criteria' and anchor with '### 4 — Strong', not our '# Rubric — law
+    (version N)' and '**4**'. They grade; the author must be able to send a
+    revised one through the page in the same shape."""
+    client, _ = svc
+    delivered = sorted((REPO / "eval_tasks" / "fr" / "rubrics").glob("*.md"))
+    assert len(delivered) >= 36
+    for p in delivered:
+        r = post(client, "/api/exam/rubrics/preview", name=p.stem, kind="rubric",
+                 content=p.read_text(encoding="utf-8"), approver="masein").json()
+        assert r["ok"] is True, (p.name, r["problems"])
 
 
 def test_committing_a_rubric_changes_what_the_judge_reads_and_is_recorded(svc):
     client, appmod = svc
     from service import config, db
-    before = jd.rubric_for("exam_medicine_health")
-    text = jd.rubric_path("medicine_health").read_text(encoding="utf-8")
+    # no rubric in the 37-topic delivery is a draft; the medicine & health one
+    # was, and it goes in through this same door under the slug of the topic
+    # that replaced it, so there is a draft to sign off
+    text = (RETIRED / "rubrics" / "medicine_health.md").read_text(encoding="utf-8")
+    assert post(client, "/api/exam/rubrics", name=SLUG, kind="rubric", content=text,
+                approver="Dr. Hossein").status_code == 200
+    before = jd.rubric_for(TASK)
+    assert before.status == "draft"
     signed_off = text.split(", DRAFT")[0] + ")" + text.split(")", 1)[1]
-    pre = post(client, "/api/exam/rubrics/preview", name="medicine_health", kind="rubric",
+    pre = post(client, "/api/exam/rubrics/preview", name=SLUG, kind="rubric",
                content=signed_off, approver="Dr. Hossein").json()
     assert pre["ok"] and pre["changed"] and pre["existed"]
     assert pre["was_sha256"] == before.sha256 and pre["sha256"] != before.sha256
     assert any(line.startswith("-# Rubric") for line in pre["diff"])
     assert "not comparable" in pre["warning"]
-    r = post(client, "/api/exam/rubrics", name="medicine_health", kind="rubric",
+    r = post(client, "/api/exam/rubrics", name=SLUG, kind="rubric",
              content=signed_off, approver="Dr. Hossein", note="signed off in the meeting")
     assert r.status_code == 200, r.text
     written = Path(r.json()["written"])
     assert written.is_file() and written.read_text(encoding="utf-8") == signed_off
     # the judge reads the new one, and the draft stamp is gone
-    after = jd.rubric_for("exam_medicine_health")
+    after = jd.rubric_for(TASK)
     assert after.sha256 == pre["sha256"] and after.status == ""
     assert after.criteria is not None                     # the criteria file is untouched
+    assert after.criteria_sha256 == before.criteria_sha256
     row = db.rubric_changes(1)[0]
-    assert row["name"] == "medicine_health" and row["kind"] == "rubric"
+    assert row["name"] == SLUG and row["kind"] == "rubric"
     assert row["approver"] == "Dr. Hossein" and row["note"] == "signed off in the meeting"
     assert row["sha256"] == after.sha256 and row["was_sha256"] == before.sha256
     assert client.get("/api/exam/rubrics").json()["changes"][0]["id"] == row["id"]
@@ -244,17 +284,18 @@ def test_an_uploaded_rubric_beats_the_repo_copy(svc):
     the judge reads it without the checkout being touched."""
     client, _ = svc
     from service import config
-    body = "# Rubric — history (version 9)\n" + "".join(
+    assert jd.rubric_name("exam_arts") == "exam"
+    body = "# Rubric — Arts (version 9)\n" + "".join(
         f"- **{i}** — anchor {i}\n" for i in range(5)) + "\nLength: short.\n"
-    r = post(client, "/api/exam/rubrics", name="history", kind="rubric", content=body,
+    r = post(client, "/api/exam/rubrics", name="arts", kind="rubric", content=body,
              approver="Dr. Hossein")
     assert r.status_code == 200, r.text
     assert str(config.BENCH_ROOT) in r.json()["written"]
-    # history had no rubric of its own; now it does, from outside the repo
-    assert jd.rubric_name("exam_history") == "history"
-    got = jd.rubric_for("exam_history")
+    # Arts had no rubric of its own; now it does, from outside the repo
+    assert jd.rubric_name("exam_arts") == "arts"
+    got = jd.rubric_for("exam_arts")
     assert got.version == "9" and got.text == body
-    assert (REPO / "eval_tasks" / "fr" / "rubrics" / "history.md").exists() is False
+    assert (REPO / "eval_tasks" / "fr" / "rubrics" / "arts.md").exists() is False
 
 
 def test_a_page_imported_report_half_question_never_leaves_the_bank(svc, tmp_path):
@@ -269,7 +310,7 @@ def test_a_page_imported_report_half_question_never_leaves_the_bank(svc, tmp_pat
     assert report, "the split put nothing in the report half"
     fake = llm.FakeBatches("fake-exam", tmp_path)
     fake.submit(eb.draft_requests(config.EXAM_DIR, TOPIC, 2))
-    fake.submit([prop.proposal_request(1, "m", "exam_medicine_health", TOPIC,
+    fake.submit([prop.proposal_request(1, "m", TASK, TOPIC,
                                        [{"qid": "q", "score": 1,
                                          "justification": "vague on escalation"}],
                                        {"diagnose_items": 1, "diagnose_weak": 1}, "rubric")])
@@ -277,6 +318,11 @@ def test_a_page_imported_report_half_question_never_leaves_the_bank(svc, tmp_pat
     for r in report:
         assert r["prompt"] not in sent and r["prompt"][:60] not in sent
     # what the page itself serves for this topic is withheld the same way
-    body = client.get(f"/api/exam/bank?topic={TOPIC}").text
+    # the topic name carries "&", so it goes in the query string encoded — and
+    # the check below means something only if the whole topic came back
+    served = client.get("/api/exam/bank", params={"topic": TOPIC})
+    assert served.status_code == 200 and len(served.json()) == len(rows)
+    assert {x["topic"] for x in served.json()} == {TOPIC}
+    body = served.text
     for r in report:
         assert r["prompt"][:60] not in body

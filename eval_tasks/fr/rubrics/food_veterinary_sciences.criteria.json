@@ -1,0 +1,256 @@
+{
+  "benchmark": "Food & Veterinary Sciences",
+  "score_range": [
+    0,
+    4
+  ],
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the question asked, prioritizes information that affects the requested conclusion, and avoids tangents that do not help resolve the food, veterinary, population, or One Health problem.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "food_science_accuracy",
+      "name": "Food-science accuracy",
+      "definition": "When food science is relevant, states food chemistry, microbiology, processing, preservation, quality, nutrition, and food-safety principles correctly, including distinctions such as water activity vs moisture, quality vs safety, pasteurization vs sterilization, and hazard vs risk.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "veterinary_accuracy",
+      "name": "Veterinary accuracy",
+      "definition": "When veterinary content is relevant, states species-appropriate anatomy, physiology, pathology, infectious-disease, nutrition, pharmacology, toxicology, reproduction, welfare, and production principles correctly without importing unsupported human assumptions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "clinical_reasoning",
+      "name": "Clinical reasoning",
+      "definition": "For clinical scenarios, builds an appropriate problem representation, identifies urgent threats, develops plausible differentials, avoids premature closure, and links findings to the next diagnostic or management step.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual precision",
+      "definition": "Uses key concepts with their correct meaning and keeps important distinctions clear, including sign vs diagnosis, exposure vs disease, prevalence vs incidence, concentration vs dose, detection vs absence, and association vs causation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative correctness",
+      "definition": "When calculation is required, chooses the correct quantities and denominator, preserves units and dimensions, performs arithmetic correctly, rounds reasonably, and interprets the result in context.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "diagnostic_reasoning",
+      "name": "Diagnostic reasoning",
+      "definition": "When tests or diagnostic evidence are involved, interprets them in context of sensitivity, specificity, prevalence, pre-test probability, false positives/negatives, sampling, and the distinction between screening and confirmation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "food_safety_reasoning",
+      "name": "Food-safety reasoning",
+      "definition": "When food safety is involved, correctly identifies the relevant hazard, exposure pathway, susceptible population where relevant, control measure, residual risk, and distinction between prevention, detection, and post-process contamination.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "epidemiologic_reasoning",
+      "name": "Epidemiologic reasoning",
+      "definition": "When population data are involved, uses correct epidemiologic measures, denominators, comparison groups, time frames, and causal caution, while considering bias, confounding, clustering, surveillance, and sampling as relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "mechanistic_explanation",
+      "name": "Mechanistic explanation",
+      "definition": "When mechanism is requested or material, explains how and why the relevant chemical, microbial, physiologic, toxicologic, pharmacologic, behavioral, or transmission process leads to the observed outcome rather than merely naming a term.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "risk_analysis",
+      "name": "Risk analysis",
+      "definition": "When risk is central, separates hazard from risk and evaluates exposure, dose, probability, severity, susceptibility, uncertainty, and risk-reduction options in a logically coherent way.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "species_and_context_awareness",
+      "name": "Species and context awareness",
+      "definition": "Recognizes when species, life stage, production system, food matrix, route, environment, or management context materially changes interpretation, and avoids unsupported transfer across species or settings.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions",
+      "name": "Assumptions",
+      "definition": "Makes necessary assumptions explicit, keeps them consistent with supplied facts, and does not invent missing clinical, laboratory, process, regulatory, or exposure details required to force a conclusion.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_uncertainty",
+      "name": "Evidence and uncertainty",
+      "definition": "Matches confidence to evidence quality, acknowledges conflicting or incomplete data, identifies what information would change the conclusion, and distinguishes established findings from plausible inferences.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "population_health_reasoning",
+      "name": "Population-health reasoning",
+      "definition": "When herd, flock, farm, food-lot, or population questions are involved, reasons at the correct unit of analysis, uses appropriate denominators and comparison groups, and considers transmission, prevention, management, and population consequences.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "one_health_reasoning",
+      "name": "One Health reasoning",
+      "definition": "When applicable, explains concrete pathways linking animal, human, food, and environmental health, including zoonotic transmission, antimicrobial resistance, food-chain exposure, reservoirs, vectors, or environmental pathways rather than merely invoking the label.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the task at the level needed for a defensible answer, including requested calculations, comparisons, caveats, alternatives, or decision factors without requiring unnecessary length.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent facts, calculations, assumptions, terminology, and conclusions; later claims do not contradict earlier reasoning or supplied evidence.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the reasoning in a clear, organized, and unambiguous way appropriate to the question, with enough explanation that the evaluator can follow how the conclusion was reached.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "practical_decision_reasoning",
+      "name": "Practical decision reasoning",
+      "definition": "For action-oriented questions, identifies objectives, urgency, evidence, feasible options, likely mechanisms, risks, trade-offs, constraints, information gaps, and follow-up or verification needs without pretending that one strategy is uniquely correct when several are defensible.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_food_veterinary_sciences_error",
+    "condition": "A materially false central food-science, food-safety, veterinary, epidemiologic, diagnostic, toxicologic, quantitative, or One Health claim that fundamentally invalidates the answer or creates a materially unsafe or misleading conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Claims that food which looks, smells, or tastes normal is necessarily microbiologically safe.",
+      "Confuses foodborne infection with intoxication in a way that changes the required control strategy.",
+      "Treats pasteurization as sterilization when that error is central to the safety conclusion.",
+      "Makes a major thermal-processing or log-reduction calculation error that reverses the safety conclusion.",
+      "Fundamentally confuses hazard with risk and therefore reaches a materially wrong safety conclusion.",
+      "Recommends a clearly unsafe food-handling practice as the central answer.",
+      "Makes a veterinary diagnosis that directly contradicts defining evidence supplied in the question.",
+      "Fundamentally misinterprets a diagnostic test, including treating a positive screening test as proof regardless of prevalence, specificity, or context.",
+      "Makes a major dose, concentration, or unit error that materially changes the veterinary conclusion or produces a clearly unsafe dose.",
+      "Uses fundamentally incorrect toxicology reasoning about exposure, dose, route, timing, or species susceptibility.",
+      "Fails to recognize a clear veterinary emergency and treats it as routine when urgency is central to the task.",
+      "Makes a fundamental epidemiologic calculation error that changes the outbreak or population-health conclusion.",
+      "Reverses a major transmission relationship in a way that invalidates the control strategy.",
+      "Describes antimicrobial resistance as the animal becoming genetically resistant to the drug rather than resistance in microbial populations.",
+      "Ignores a clearly stated species difference that makes the proposed conclusion invalid.",
+      "Uses fundamentally incorrect One Health transmission reasoning.",
+      "Claims an intervention completely eliminates food, animal, or population risk when the supplied evidence clearly does not support that conclusion.",
+      "Fabricates key clinical, laboratory, epidemiologic, or food-safety findings required for the answer."
+    ],
+    "not_critical": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Minor terminology mistakes or harmless rounding differences.",
+      "Reasonable differences in differential diagnosis.",
+      "Defensible alternative management or processing strategies.",
+      "Reasonable uncertainty or small omissions.",
+      "Minor imprecision that does not materially affect safety or the conclusion."
+    ]
+  },
+  "evaluation_principles": [
+    {
+      "name": "Food safety vs food quality",
+      "principle": "Food that looks, smells, or tastes acceptable is not necessarily microbiologically safe. Food quality and food safety are related but distinct."
+    },
+    {
+      "name": "Hazard vs risk",
+      "principle": "A hazard is a potential source of harm. Risk depends on probability, exposure, dose, susceptibility, and consequence."
+    },
+    {
+      "name": "Infection vs intoxication",
+      "principle": "Foodborne infection and foodborne intoxication have different mechanisms and may require different controls."
+    },
+    {
+      "name": "Process control",
+      "principle": "A food-safety process must be judged by whether it controls the relevant hazard under actual operating conditions."
+    },
+    {
+      "name": "Multiple hurdles",
+      "principle": "Microbial control may depend on combinations of temperature, pH, water activity, preservatives, atmosphere, and storage time."
+    },
+    {
+      "name": "Species matters",
+      "principle": "Veterinary conclusions may differ materially across species. Do not automatically transfer human or one-species findings to another species."
+    },
+    {
+      "name": "Differential diagnosis",
+      "principle": "A differential diagnosis is not a confirmed diagnosis. Strong clinical answers discuss or prioritize plausible alternatives when appropriate."
+    },
+    {
+      "name": "Diagnostic tests",
+      "principle": "Diagnostic results must be interpreted in context. Sensitivity, specificity, prevalence, pre-test probability, sampling, and confirmatory testing can matter."
+    },
+    {
+      "name": "Treatment reasoning",
+      "principle": "Do not reward unsupported treatment recommendations. When exact dosing is required, supplied information must be used correctly with coherent units."
+    },
+    {
+      "name": "Population vs individual",
+      "principle": "An intervention suitable for one animal may not be the optimal herd/flock strategy, and the reverse can also be true."
+    },
+    {
+      "name": "Epidemiology",
+      "principle": "Association does not by itself establish causation. Denominators, sampling, bias, confounding, time frame, and unit of analysis matter."
+    },
+    {
+      "name": "Antimicrobial resistance",
+      "principle": "Antimicrobial exposure can create selection pressure in microbial populations. Do not describe the animal itself as becoming genetically resistant to the antimicrobial."
+    },
+    {
+      "name": "Welfare",
+      "principle": "Animal welfare includes health, comfort, pain/distress, behavioral needs, and affective state where assessable. Productivity alone is not a complete welfare measure."
+    },
+    {
+      "name": "One Health",
+      "principle": "Animal, human, food, and environmental health can be interconnected. Strong answers explain the pathway rather than merely naming One Health."
+    },
+    {
+      "name": "Uncertainty",
+      "principle": "Clinical, epidemiologic, and food-safety evidence may be incomplete or conflicting. Confidence should match the strength of evidence."
+    },
+    {
+      "name": "Multiple valid decisions",
+      "principle": "Veterinary management and food-processing questions can have more than one defensible solution. Evaluate reasoning, evidence, constraints, risk, and trade-offs rather than requiring one predetermined strategy."
+    },
+    {
+      "name": "No jargon worship",
+      "principle": "Technical terminology without correct scientific reasoning should not receive a high score."
+    },
+    {
+      "name": "No citation worship",
+      "principle": "Citations do not compensate for incorrect food or veterinary reasoning."
+    }
+  ]
+}

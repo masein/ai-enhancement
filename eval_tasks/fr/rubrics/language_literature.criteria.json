@@ -1,0 +1,185 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the task actually asked, prioritizes the supplied passage, linguistic data, comparison, or scenario, and avoids substituting unrelated biography, plot trivia, theory labels, or generic commentary.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "linguistic_accuracy",
+      "name": "Linguistic Accuracy",
+      "definition": "Uses linguistic facts and distinctions accurately when present, including grammaticality versus prescription, phoneme versus spelling, morphology versus syntax, semantics versus pragmatics, synchronic pattern versus historical origin, and systematic dialect variation. A minor terminology slip is less serious than a structurally false analysis or stigmatizing claim about a language variety.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "literary_accuracy",
+      "name": "Literary Accuracy",
+      "definition": "Represents the supplied text faithfully; distinguishes author, narrator, speaker, character, and reader interpretation; preserves chronology, perspective, genre facts, and formal features; and does not invent quotations, scenes, actions, or textual details. A plausible reading is not accurate if it depends on evidence the text does not contain.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Makes the relevant distinctions precisely rather than relying on jargon: for example theme versus topic, motif versus isolated image, entailment versus likely inference, implicature versus literal meaning, symbol versus allegory, or evidentiary consistency versus proof.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "grammar_and_syntax_reasoning",
+      "name": "Grammar and Syntax Reasoning",
+      "definition": "When relevant, correctly analyzes clauses, phrases, constituency, grammatical relations, argument structure, agreement, tense/aspect, voice, coordination, subordination, negation, attachment, scope, and structural ambiguity. Equivalent analyses should receive credit when they explain the supplied facts; a central misparse is much more serious than a small labeling difference.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "semantics_pragmatics_and_discourse_reasoning",
+      "name": "Semantics, Pragmatics, and Discourse Reasoning",
+      "definition": "When relevant, accurately distinguishes encoded sentence meaning from speaker meaning, entailment from probable inference, assertion from presupposition, implicature from literal content, deixis from fixed reference, and sentence-level meaning from discourse coherence, framing, and conversational organization.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "close_reading",
+      "name": "Close Reading",
+      "definition": "When relevant, moves from specific textual features—such as diction, syntax, imagery, repetition, sound, lineation, contrast, perspective, or structure—to an explained interpretive effect and broader meaning. Plot summary, paraphrase, or device naming alone is insufficient.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "textual_evidence_use",
+      "name": "Textual Evidence Use",
+      "definition": "When the task is evidence-based, identifies or accurately paraphrases the supplied evidence and explains how it supports the claim. Penalize invented quotations, selective quotation that reverses context, vague references to 'the text,' and interpretations whose support is merely asserted rather than demonstrated.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "narrative_and_genre_reasoning",
+      "name": "Narrative and Genre Reasoning",
+      "definition": "When relevant, correctly reasons about narrator, focalization, reliability, narrative level, chronology, duration, characterization, setting, genre conventions, and genre subversion. It must not infer authorial belief directly from narrative voice or confuse reader knowledge with character knowledge.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "poetic_and_formal_analysis",
+      "name": "Poetic and Formal Analysis",
+      "definition": "When relevant, analyzes speaker, lineation, stanza, syntax, meter/rhythm, rhyme, sound, imagery, figurative language, form, enjambment, caesura, repetition, and formal shifts in relation to meaning. A correct label with no account of function receives limited credit.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "rhetorical_and_stylistic_reasoning",
+      "name": "Rhetorical and Stylistic Reasoning",
+      "definition": "When relevant, identifies speaker/writer, audience, purpose, claim, evidence, warrant, framing, diction, syntax, repetition, analogy, emotional appeal, and arrangement, then explains their likely effect. It distinguishes persuasive technique from logical support and does not treat emotional language as automatically fallacious.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "translation_and_cross_linguistic_reasoning",
+      "name": "Translation and Cross-Linguistic Reasoning",
+      "definition": "When relevant, evaluates denotation, implication, grammar, idiom, register, tone, syntax, cultural reference, ambiguity, rhythm, and form across source and target texts. Recognizes defensible alternatives and explicit trade-offs; word-for-word correspondence is not treated as automatically superior.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "comparative_and_contextual_reasoning",
+      "name": "Comparative and Contextual Reasoning",
+      "definition": "When relevant, compares texts, traditions, media, periods, or contexts on explicit dimensions and integrates historical, social, political, economic, religious, publishing, or cultural context without replacing textual analysis. Similar motifs across cultures are not assumed to mean the same thing.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "literary_theory_and_interpretive_reasoning",
+      "name": "Literary Theory and Interpretive Reasoning",
+      "definition": "When relevant, applies a theoretical lens accurately, grounds it in evidence, explains what it illuminates, and recognizes limits or alternatives. Theory-name dropping, unfalsifiable reasoning, or presenting a theoretical interpretation as textual fact should score poorly.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "textual_history_and_variant_reasoning",
+      "name": "Textual History and Variant Reasoning",
+      "definition": "When relevant, evaluates manuscripts, variants, chronology, distribution, copying relationships, internal plausibility, scribal processes, provenance, editions, and historical word meanings. It does not assume the oldest surviving manuscript is automatically correct or that one modern edition transparently preserves an original.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "ambiguity_alternatives_and_uncertainty",
+      "name": "Ambiguity, Alternatives, and Uncertainty",
+      "definition": "When the evidence permits multiple readings, identifies the source of ambiguity, compares plausible alternatives, states what would resolve them, and calibrates certainty. A valid alternative interpretation or translation should receive full credit when adequately supported; false certainty should not.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_and_corpus_reasoning",
+      "name": "Quantitative and Corpus Reasoning",
+      "definition": "When relevant, uses counts, normalization, distributions, lexical diversity, collocation, stylometric probabilities, or other quantitative evidence correctly; considers sample size, corpus composition, genre, period, editorial, and register confounds; and does not treat statistical association as self-explanatory proof of meaning or authorship.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the task, including requested comparisons, evidence, alternative readings, calculations, or qualifications. Minor omissions are distinguishable from omissions that leave the central reasoning incomplete.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains compatible claims, terminology, readings, calculations, and evidentiary standards throughout the answer; does not contradict its own structural analysis, translation choice, chronology, or stated uncertainty.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Presents reasoning in a clear, readable, appropriately organized way so that claims, evidence, mechanisms, distinctions, and uncertainty can be evaluated. Unnecessary jargon or verbosity does not compensate for unclear analysis.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error": {
+    "id": "critical_language_literature_error",
+    "condition": "A materially false central linguistic, textual, interpretive, translational, rhetorical, or literary claim that fundamentally invalidates the answer or reverses the substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally misparses a sentence when the structure is central to the question.",
+      "Claims a supplied sentence has a meaning incompatible with its grammar or stated context.",
+      "Reverses a central semantic entailment.",
+      "Confuses literal meaning with pragmatic implication in a way that invalidates the answer.",
+      "Treats a consistent dialect construction as inherently ungrammatical solely because it is nonstandard.",
+      "Invents a quotation, scene, stanza, character action, or textual detail central to the interpretation.",
+      "Confuses author and narrator in a way that drives the conclusion.",
+      "Confuses poet and speaker in a way that drives the interpretation.",
+      "Claims a narrator knows information the supplied text explicitly establishes they cannot know.",
+      "Fundamentally misidentifies narrative perspective so that the reading is invalidated.",
+      "Claims textual evidence says the opposite of what the supplied passage states.",
+      "Asserts that a poem uses a formal feature clearly absent from the supplied text when the interpretation depends on it.",
+      "Makes a fundamentally incorrect scansion or rhyme analysis that reverses the formal conclusion.",
+      "Mistranslates a central word or clause so that the meaning is reversed.",
+      "Claims two translations are semantically equivalent when one reverses negation, agency, modality, or another central feature.",
+      "Attributes a historical word its modern meaning despite supplied evidence of semantic change, reversing the interpretation.",
+      "Selects a manuscript reading while ignoring decisive supplied evidence that makes it chronologically or textually impossible.",
+      "Presents a theoretical reading as textual fact while contradicting explicit textual evidence.",
+      "Claims a corpus-frequency result proves interpretation or authorship despite a supplied confound that invalidates the comparison.",
+      "Asserts one unsupported interpretation as certain when the prompt clearly establishes unresolved textual ambiguity."
+    ],
+    "not_critical_examples": [
+      "Minor terminology errors.",
+      "Punctuation preferences.",
+      "Small grammatical-label differences.",
+      "Reasonable alternative interpretations.",
+      "Legitimate theoretical disagreement.",
+      "Different valid translations.",
+      "Minor omissions.",
+      "Reasonable uncertainty.",
+      "Stylistic disagreement.",
+      "Different but defensible close readings.",
+      "Non-central metrical variation.",
+      "Reasonable editorial alternatives."
+    ]
+  }
+}

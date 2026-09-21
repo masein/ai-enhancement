@@ -90,6 +90,25 @@ def test_the_file_that_broke_the_live_build_would_now_ship():
     assert not in_image("DEMO.md") and not in_image(".env")
 
 
+def test_all_108_delivered_files_are_on_the_list_and_in_the_image():
+    """The 37-topic exam's 36 banks, criteria files and rubrics — every one,
+    and exactly the ones in the checkout, so a 37th file cannot arrive and
+    ship without anyone adding it here."""
+    files = startup.DELIVERED_TOPIC_FILES
+    assert len(files) == 108 == len(set(files))
+    assert set(files) <= set(startup.REQUIRED_REPO_FILES)
+    on_disk = {f"eval_tasks/fr/banks/{p.name}" for p in (REPO / "eval_tasks/fr/banks").glob("*")}
+    on_disk |= {f"eval_tasks/fr/rubrics/{p.name}"
+                for s in startup.DELIVERED_TOPIC_SLUGS
+                for p in (REPO / "eval_tasks/fr/rubrics").glob(f"{s}.*")}
+    assert on_disk == set(files)
+    assert [p for p in files if not in_image(p)] == []
+    # the retired five stay in the repo as history and out of the image's
+    # live paths: nothing the service reads points into retired/
+    assert (REPO / "eval_tasks/fr/retired/law_v2.json").is_file()
+    assert not any("retired/" in p for p in startup.REQUIRED_REPO_FILES)
+
+
 def test_the_list_is_true_of_this_checkout():
     """A path on the list that is not in the repo is a typo in the list."""
     assert startup.missing_repo_files() == []

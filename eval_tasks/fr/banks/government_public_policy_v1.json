@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "Distinguish a government from a state. Explain why a change in the governing cabinet or administration does not necessarily mean that the state itself has ceased to exist.",
+    "intent": "Test basic distinctions among government, state, and institutional continuity.",
+    "domain": "Foundations of Government",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A ministry has clear statutory responsibility for issuing building permits but has only 12 trained reviewers for 18,000 annual applications. Distinguish formal political or legal authority from administrative capacity, and explain why the distinction matters for policy performance.",
+    "intent": "Assess whether the answer separates authority from implementation capability.",
+    "domain": "Foundations of Government",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "administrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A government publishes procurement rules requiring competitive bidding, but agencies routinely bypass them without review or sanction. Explain what this suggests about the difference between formal rules, rule of law, and actual implementation.",
+    "intent": "Test reasoning about formal institutions versus effective institutional practice.",
+    "domain": "Foundations of Government",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "Jurisdiction: the hypothetical Republic of Ardin. Its constitution states that only the legislature may create taxes, the executive may issue regulations only under delegated statutes, and courts may invalidate executive measures that exceed delegated authority. The executive announces a new nationwide fuel levy by regulation without a delegating statute. Which institutional issue is central, which body would need to authorize the levy under the supplied rules, and what role could the courts play?",
+    "intent": "Assess separation-of-powers reasoning using rules supplied in the prompt.",
+    "domain": "Constitutional / Institutional Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "institutional_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 5,
+    "prompt": "Two otherwise similar systems differ in one respect: System A requires approval by one legislative chamber for ordinary statutes; System B requires approval by two chambers elected on different cycles. Explain how the additional veto point could affect policy stability, bargaining, and the speed of major policy change without assuming that either design is universally better.",
+    "intent": "Analyze how institutional veto points affect policymaking.",
+    "domain": "Constitutional / Institutional Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_government",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "Compare a unitary system with a federal system for delivering a national vaccination-information campaign. Focus on how authority, financing, implementation responsibility, and regional adaptation could differ rather than ranking one structure as superior.",
+    "intent": "Test comparative institutional reasoning about centralization and decentralization.",
+    "domain": "Federalism / Intergovernmental Relations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparative_government",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A policy requires stable executive-legislative coordination over four years. Compare how a parliamentary confidence relationship and a separately elected presidential executive could create different coordination incentives and veto points. Do not rank the systems overall.",
+    "intent": "Assess mechanism-based comparison of executive-legislative relations.",
+    "domain": "Comparative Government",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_government",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A second legislative chamber is designed to represent regions rather than population. Explain two ways this could change information, bargaining, and geographic representation in national lawmaking, and identify one possible trade-off.",
+    "intent": "Test conceptual reasoning about bicameral design.",
+    "domain": "Legislative Institutions",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "Jurisdiction: the hypothetical Province of Bellmare. A statute authorizes the Health Agency to set licensing conditions after a public consultation and to give written reasons for final rules. The agency skips consultation and issues a rule with no reasons. Courts in Bellmare may set aside agency action that violates mandatory statutory procedure. Analyze the institutional problem and the likely consequence under the supplied rule, without importing any outside legal doctrine.",
+    "intent": "Assess administrative-review reasoning using explicitly supplied jurisdictional rules.",
+    "domain": "Judiciary & Policy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "institutional_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 10,
+    "prompt": "A city is responsible for local bus stops and street maintenance but may not impose new taxes without regional approval. Its maintenance backlog grows after a recession cuts transfers from the regional government. Explain how legal authority, fiscal capacity, and intergovernmental finance constrain the city's options.",
+    "intent": "Test local-government reasoning under fiscal and legal limits.",
+    "domain": "Local Government",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "governance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "Country A decentralizes school administration to municipalities with large differences in tax base and staffing. Country B keeps financing centralized but lets local offices adapt service delivery. Compare the likely mechanisms affecting geographic equity, responsiveness, and administrative consistency.",
+    "intent": "Assess sophisticated institutional comparison focused on mechanisms and capacity.",
+    "domain": "Comparative Government",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_government",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A legislature creates specialized committees that repeatedly review the same policy sectors. Explain how specialization can improve information and oversight while also creating risks such as narrow agendas or dependence on a limited set of stakeholders.",
+    "intent": "Evaluate committee specialization and information effects.",
+    "domain": "Legislative Institutions",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A 100-seat legislature requires 51 votes for passage. Three parties hold 42, 34, and 24 seats. A bill supported by the largest party cannot pass alone. Explain how coalition requirements can alter bargaining over the bill's design, and identify at least two dimensions that coalition partners may negotiate besides whether the bill passes.",
+    "intent": "Assess coalition and legislative bargaining reasoning.",
+    "domain": "Legislative Institutions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "scenario",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A legislature funds an employment program but receives only annual totals for money spent and people enrolled. Explain how stronger oversight could distinguish financial compliance, implementation quality, and actual outcomes, and identify information the legislature should request.",
+    "intent": "Test reasoning about legislative oversight of administration.",
+    "domain": "Legislative Institutions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "governance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "Jurisdiction: the hypothetical Republic of Cordan. The constitution gives the executive authority to direct agencies within existing law, but only the legislature may create new benefit eligibility categories or appropriate additional funds. The prime minister directs the welfare agency to add a new benefit category costing 200 million currency units without new legislation or appropriation. Analyze which parts of the directive can and cannot be implemented under the supplied rules.",
+    "intent": "Assess executive authority versus legislative authority and budget constraints.",
+    "domain": "Executive Government",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "institutional_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 16,
+    "prompt": "A minister announces a goal of reducing passport-processing time from 30 days to 10 days. The passport agency controls staffing schedules, workflow, and IT operations but cannot change its annual budget. Distinguish political direction from administrative execution and identify the implementation levers still available to the agency.",
+    "intent": "Test the distinction between political goals and administrative management.",
+    "domain": "Executive Government",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "administrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "Jurisdiction: the hypothetical State of Darsen. During a fast-moving wildfire, emergency law allows the governor to reassign state personnel for 14 days and temporarily waive ordinary procurement timelines, but it does not permit the governor to suspend criminal law or cancel legislative elections. A major evacuation is underway and communications infrastructure is failing. Identify the urgent lawful actions available, the limits that remain, and the oversight or documentation that should be preserved for later review.",
+    "intent": "Assess emergency-governance reasoning under explicitly supplied powers and limits.",
+    "domain": "Crisis & Emergency Management",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "crisis_management",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 18,
+    "prompt": "Jurisdiction: the hypothetical Federation of Estara. A court invalidates a national agency rule and orders the agency to reconsider it using a lawful procedure; the court does not itself write a replacement rule. Explain what the executive agency, legislature, and court can each do next under these supplied facts, and why judicial invalidation does not by itself implement a new policy.",
+    "intent": "Assess institutional interaction after judicial review.",
+    "domain": "Judiciary & Policy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "institutional_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 19,
+    "prompt": "A national government funds 70% of a childcare subsidy while regions administer eligibility and providers deliver the service. One region has half the caseworker-to-client ratio of the national average and much longer delays. Analyze how financing responsibility, administrative responsibility, and local capacity can jointly affect access.",
+    "intent": "Test intergovernmental coordination and capacity reasoning.",
+    "domain": "Federalism / Intergovernmental Relations",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A country decentralizes primary-care administration to 40 regions to improve responsiveness. Five years later, average waiting times fall nationally, but the gap between the best- and worst-performing regions doubles. Richer regions have stronger tax bases, more clinicians, and better procurement teams. Analyze whether the evidence points to policy-theory failure, implementation heterogeneity, or both, and propose a package of national standards, transfers, capacity support, and local flexibility while explaining the trade-offs.",
+    "intent": "Require synthesis across decentralization, equity, capacity, and intergovernmental design.",
+    "domain": "Federalism / Intergovernmental Relations",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "An electoral system has 10 multi-member districts, each electing 8 representatives by proportional allocation with a 5% district threshold. Explain how district magnitude and the threshold can affect representation of smaller parties and coalition incentives. Do not state that this system is better or worse than alternatives.",
+    "intent": "Assess neutral reasoning about electoral-system mechanisms.",
+    "domain": "Electoral Systems",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "institutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "Compare a single-member plurality district with a five-member proportional district for the stated objective of translating geographically dispersed minority support into representation. Explain the mechanism and any trade-off for local geographic representation.",
+    "intent": "Test neutral comparison of electoral rules under a specified objective.",
+    "domain": "Electoral Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "In a plurality contest, some voters believe their first-choice candidate is unlikely to place in the top two. Explain the concept of strategic voting and why electoral rules can change incentives, without predicting how any real election will turn out.",
+    "intent": "Assess understanding of strategic voting as an institutional incentive.",
+    "domain": "Electoral Systems",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A city holds an online consultation on a zoning plan. Eight thousand people respond, but 72% of responses come from homeowners over age 50, while that group is 28% of the city population. Explain why high participation is not the same as representativeness and how the city could use the responses without treating them as a population referendum.",
+    "intent": "Assess participation, representativeness, and evidence use.",
+    "domain": "Public Participation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A survey of 1,200 adults reports 58% support for a transit expansion with an overall margin of error of about plus or minus 3 percentage points. Support is 62% among a subgroup of only 120 respondents. Explain what can be inferred confidently from the overall estimate, why the subgroup estimate is less precise, and why popularity alone does not establish policy effectiveness.",
+    "intent": "Test survey interpretation and the distinction between opinion and effectiveness.",
+    "domain": "Surveys & Public Opinion",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A ministry publishes detailed spending data and meeting minutes but has no audit follow-up, complaint process, or sanctions for misconduct. Distinguish transparency from accountability using this example.",
+    "intent": "Test a basic governance distinction.",
+    "domain": "Transparency & Accountability",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A legislator's office resolves 4,000 constituent benefit cases in a year. Explain how constituency service can contribute to representation and accountability, while also identifying why the case count alone does not measure legislative effectiveness.",
+    "intent": "Assess representation and performance reasoning.",
+    "domain": "Democratic Institutions & Representation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "governance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A public agency reorganizes from five specialized departments into one integrated service unit. Explain the likely trade-off between specialization and coordination, and identify what information would help determine whether the redesign improves service quality.",
+    "intent": "Test organizational-design reasoning in bureaucracy.",
+    "domain": "Public Administration",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "administrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A government is deciding whether senior agency roles should be filled mainly by career officials or political appointees. Analyze the trade-offs among expertise, continuity, responsiveness to elected leadership, accountability, and institutional memory without assuming one model is always superior.",
+    "intent": "Assess civil-service design trade-offs.",
+    "domain": "Civil Service & Public Workforce",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A tax agency has 2,000 auditors. It expects 12% to retire within two years and annual voluntary attrition of 5% of the remaining workforce. Ignoring new attrition among replacements, estimate how many auditors the agency must recruit over two years just to return to 2,000 staff, and explain why headcount replacement alone may not preserve capacity if experienced staff leave.",
+    "intent": "Combine workforce arithmetic with administrative-capacity reasoning.",
+    "domain": "Civil Service & Public Workforce",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A law assigns a new inspection duty to an agency but provides no new staff, vehicles, data system, or training. Explain why formal responsibility does not by itself establish implementation capacity, and identify the most important capacity gaps.",
+    "intent": "Assess administrative-capacity diagnosis.",
+    "domain": "Administrative Capacity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "administrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A ministry receives funding for a new digital service but has only one procurement specialist, no standard contract templates, and a nine-month vendor-selection backlog. Analyze how procurement capacity can become an implementation bottleneck even when policy funding exists.",
+    "intent": "Test capacity and procurement reasoning.",
+    "domain": "Administrative Capacity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "implementation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "Caseworkers may waive one documentation requirement when an applicant faces exceptional hardship. One office grants waivers in 20% of cases and another in 2%, despite similar caseloads. Analyze possible benefits and risks of frontline discretion and identify data needed before concluding that either office is performing better.",
+    "intent": "Assess street-level administration and variation.",
+    "domain": "Street-Level Administration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "administrative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A benefit is formally available to 500,000 eligible households. Before a new application process, 300,000 participate. After the process adds an annual online recertification, participation falls to 240,000 while the eligible population is unchanged. Calculate the take-up rate before and after, the percentage-point change, and analyze how administrative burden could contribute.",
+    "intent": "Test quantitative take-up reasoning and formal eligibility versus access.",
+    "domain": "Administrative Burden",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A government moves a housing-support application entirely online. Processing cost per application falls 25%, but completion falls sharply among older applicants, people with limited internet access, and applicants needing language assistance. Analyze the efficiency-access trade-off and propose service-design changes that preserve some digital gains without assuming digital delivery works for everyone.",
+    "intent": "Assess digital exclusion, administrative burden, and policy trade-offs.",
+    "domain": "Administrative Burden",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A sanitation department collects 15% more waste than last year and spends its full budget, but illegal dumping complaints rise. Classify the collection volume, spending, and complaint trend as inputs, outputs, or outcomes where appropriate, and explain why more activity does not prove better performance.",
+    "intent": "Test public-sector performance concepts.",
+    "domain": "Public-Sector Performance",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A call center is evaluated only on average call duration. After managers introduce a strict target, average duration falls from 8 minutes to 5 minutes, but repeat calls rise 40%. Analyze the validity of the KPI, the gaming or incentive risk, and a better balanced performance set.",
+    "intent": "Assess metric design and behavioral response.",
+    "domain": "Performance Indicators",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A government launches a youth-employment program, then revises eligibility after early monitoring shows the original criteria exclude many school leavers. Explain why this illustrates policy feedback and why policymaking need not follow a simple linear sequence from formulation to implementation to evaluation.",
+    "intent": "Test understanding of iterative policy processes.",
+    "domain": "Policy Process",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A city states that its homelessness objective is 'to build 1,000 shelter beds.' Explain why this is an intervention or output rather than a complete statement of the underlying policy problem or objective, and identify at least three outcome questions that should be clarified.",
+    "intent": "Assess problem-definition reasoning.",
+    "domain": "Policy Problem Definition",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A transport policy is intended to reduce congestion, preserve access for low-income workers, keep administrative costs low, and cut emissions. Explain why these objectives may conflict and why policy analysis should make the weighting of objectives explicit rather than claiming all can necessarily be maximized.",
+    "intent": "Test reasoning about conflicting objectives.",
+    "domain": "Policy Objectives",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A government wants to reduce industrial water pollution by 30% within five years. It can use an emissions tax, a performance standard, capital-equipment subsidies, or mandatory disclosure. Firms differ widely in abatement cost; regulators have limited inspection capacity; monitoring technology is improving but uncertain; and small firms face financing constraints. Compare the instruments under effectiveness, administrative feasibility, fiscal cost, distribution, innovation incentives, and uncertainty. Explain how the preferred package could change under different priorities rather than declaring one instrument universally best.",
+    "intent": "Require high-level policy-instrument comparison under uncertainty and capacity constraints.",
+    "domain": "Policy Instruments",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A childcare subsidy currently uses a sharp income cutoff at 40,000 currency units. Families earning 39,900 receive 6,000 per year; families earning 40,100 receive nothing. Design two alternatives that reduce the cliff while considering cost, work incentives, administrative complexity, and take-up.",
+    "intent": "Assess policy-design reasoning without requiring one predetermined solution.",
+    "domain": "Policy Design",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A city can reduce summer heat risk by subsidizing home cooling upgrades, opening public cooling centers, planting shade trees, or combining them. The budget is 12 million currency units, low-income neighborhoods have the highest heat exposure, and tree benefits take years to mature. Compare realistic alternatives on timing, coverage, equity, implementation, and uncertainty.",
+    "intent": "Assess comparison of policy alternatives against stated constraints.",
+    "domain": "Policy Alternatives",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A legislature authorizes a school-meal expansion, the budget funds 95% of planned meals, agencies sign contracts, and 80% of eligible schools actually serve the meals. Student food insecurity has not yet been measured. Distinguish enacted policy, funded policy, implemented policy, delivered service, and achieved outcome.",
+    "intent": "Test staged reasoning from adoption to outcomes.",
+    "domain": "Policy Implementation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "implementation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A national rental-assistance program requires the finance ministry to release funds, a housing agency to verify eligibility, local governments to certify landlords, and a tax authority to confirm income. Design an implementation plan that identifies sequencing, data dependencies, staffing, communication, monitoring, and fallback arrangements if one agency misses its deadline.",
+    "intent": "Assess multi-agency implementation planning.",
+    "domain": "Policy Implementation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "implementation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A grant pays local employment offices 500 currency units for every participant enrolled in training, regardless of completion or job placement. Enrollment rises 60% but completion rates fall. Identify the incentive mechanism, plausible unintended consequences, and a redesigned payment metric that reduces gaming risk.",
+    "intent": "Test unintended-consequence reasoning tied to incentives.",
+    "domain": "Unintended Consequences",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A long-running agricultural subsidy has created a large administrative unit, specialized reporting systems, and recipient organizations that plan around the payment. Explain how these features can create policy feedback that affects the political and administrative feasibility of later reform.",
+    "intent": "Assess dynamic policy-feedback reasoning.",
+    "domain": "Policy Feedback",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A metropolitan government subsidizes 30,000 new homes on the urban fringe but does not expand transit. Rents fall near the new developments, average commute time for new residents rises by 18 minutes, road congestion increases, and employers in the city center report recruitment difficulties for low-wage jobs. Analyze the interacting housing, transport, labor-market, infrastructure, environmental, and distributional effects, and identify additional evidence needed before judging overall performance.",
+    "intent": "Require multi-system reasoning across housing, transport, labor, and infrastructure.",
+    "domain": "Systems Thinking in Public Policy",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A well-funded nutrition program distributes 98% of planned food packages on time, yet child malnutrition falls no faster in participating districts than in comparable nonparticipating districts. Diagnose separately the program theory, targeting, service quality, implementation fidelity, outcome measurement, and causal evidence. Explain what findings would indicate implementation failure versus failure of the underlying policy mechanism.",
+    "intent": "Require distinction between strong outputs and weak outcomes.",
+    "domain": "Multi-Step Public Policy Reasoning",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A national government wants a new disability-support service to meet common national access standards, but constitutionally assigned local governments must deliver the service. Local administrative capacity varies sharply, the national budget can fund transfers but cannot directly hire local caseworkers, and rollout must begin in 12 months. Design a feasible multi-level implementation model with standards, funding, capacity support, monitoring, escalation, and room for local adaptation.",
+    "intent": "Assess national policy design implemented through heterogeneous subnational governments.",
+    "domain": "Implementation Feasibility",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "policy_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A department has an annual operating budget of 80 million currency units. Existing recurring commitments are 70 million. A proposed program costs 6 million per year plus a one-time 5 million setup cost. Calculate the first-year and steady-state budget balance if no other spending changes, and explain why one-time and recurring costs must be separated.",
+    "intent": "Test public-budget arithmetic and cost classification.",
+    "domain": "Public Budgeting",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "public_budgeting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A city faces a 12 million currency-unit budget gap. It is considering a one-time asset sale worth 10 million, a recurring fee increase expected to raise 5 million annually, and a recurring service cut saving 4 million annually. Explain which options address the current-year gap and which address the structural gap, including the relevant trade-offs.",
+    "intent": "Assess recurring versus one-time fiscal reasoning.",
+    "domain": "Public Budgeting",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "public_budgeting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A government runs a 3 billion currency-unit deficit this year and begins the year with 50 billion in debt. Explain the difference between deficit and debt and why the annual deficit is a flow while debt is a stock.",
+    "intent": "Test a basic public-finance distinction.",
+    "domain": "Public Finance",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "Jurisdiction: the hypothetical Federation of Faron. National law creates a matching grant under which the central government pays 60% of approved regional public-health spending up to 100 million currency units per region; regions must finance the remainder from their own budgets. Region R proposes 80 million in eligible spending. Calculate each government's share and explain how a matching requirement can affect regional spending incentives and unequal fiscal capacity.",
+    "intent": "Test intergovernmental finance using supplied program rules.",
+    "domain": "Intergovernmental Finance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 55,
+    "prompt": "A flood-control project costs 100 million currency units today and is expected to avoid 30 million in damage at the end of each of the next four years. Using a 5% annual discount rate, calculate the approximate present value of avoided damages and the net present value before considering non-market benefits. Explain what the result does and does not establish.",
+    "intent": "Test discounting and public cost-benefit interpretation.",
+    "domain": "Cost-Benefit Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "cost_benefit",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A government is evaluating a 200 million currency-unit income-support reform. Analysts count the 200 million cash transfer as a social resource cost, also count the tax needed to finance it as another 200 million cost, and then add 15 million in administrative cost. Explain the double-counting problem and distinguish transfer payments from real administrative resource costs while noting that transfers can still matter distributionally and through financing effects.",
+    "intent": "Assess correct treatment of transfers and double counting in CBA.",
+    "domain": "Cost-Benefit Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "cost_benefit",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "Program A costs 12 million currency units and is expected to help 4,000 people obtain sustained employment. Program B costs 15 million and is expected to help 6,000. Calculate the cost per sustained employment outcome for each program and explain why budget impact and cost-effectiveness are different questions.",
+    "intent": "Test cost-effectiveness arithmetic and interpretation.",
+    "domain": "Cost-Effectiveness Analysis",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "cost_effectiveness",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "An existing program costs 20 million currency units and produces 10,000 successful outcomes. A proposed enhancement raises cost to 26 million and expected outcomes to 12,000. Calculate the incremental cost per additional outcome and explain how that differs from the average cost per outcome.",
+    "intent": "Assess incremental cost-effectiveness reasoning.",
+    "domain": "Cost-Effectiveness Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A city raises a transit user fee from 2 to 3 currency units per trip. High-income riders take 35% of trips, middle-income riders 40%, and low-income riders 25%. Low-income riders make twice as many trips per person as the city average and have fewer alternatives. Explain why trip shares alone are insufficient to assess distributional incidence and identify the denominators and behavioral responses that should be examined.",
+    "intent": "Assess distributional analysis and denominator choice.",
+    "domain": "Distributional Analysis",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "Jurisdiction: the hypothetical City of Greslin. Its procurement rule requires the city to select the bid with the lowest evaluated lifecycle cost among bids that meet minimum quality and delivery standards. Bid A costs 9 million upfront and 4 million in expected maintenance; Bid B costs 10 million upfront and 2 million in expected maintenance; both meet the standards. Which bid has the lower evaluated lifecycle cost under the supplied rule, and what additional supplier-risk information would still matter for contract management?",
+    "intent": "Test best-value/lifecycle reasoning using explicit procurement rules.",
+    "domain": "Public Procurement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 61,
+    "prompt": "A municipality is deciding whether to run waste collection in-house, outsource it, or use a mixed model. In-house provision has higher fixed staffing cost but strong operational knowledge; outsourcing offers lower initial bids but requires contract monitoring and has only two credible suppliers. Compare the options on cost, continuity, competition, information asymmetry, accountability, and transaction costs.",
+    "intent": "Assess public-service delivery alternatives without presuming public or private superiority.",
+    "domain": "Contracting & Outsourcing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A government uses a 30-year public-private partnership for a toll road. The private partner finances construction and nominally bears demand risk, but the contract guarantees minimum annual revenue and requires the government to compensate lenders if the project is terminated for public-interest reasons. Analyze which risks are truly transferred, the government's contingent fiscal exposure, lifecycle incentives, and why off-budget presentation does not eliminate economic obligations.",
+    "intent": "Require high-level PPP risk-allocation and fiscal reasoning.",
+    "domain": "Public-Private Partnerships",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "public_finance",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A proposed rail line costs 3.2 billion currency units, has a 50-year asset life, and depends on a demand forecast with a central estimate of 120,000 daily trips but a plausible range of 70,000 to 160,000. The government faces a binding five-year capital ceiling, low-income outer districts would gain the largest accessibility benefit, and maintenance costs rise after year 15. Explain how to structure an appraisal using discounting, demand sensitivity, distributional effects, lifecycle cost, opportunity cost, and staged commitments under uncertainty.",
+    "intent": "Assess capital appraisal under long horizons, uncertainty, equity, and fiscal constraints.",
+    "domain": "Capital Investment Appraisal",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A transport agency can spend 100 million currency units either on a new interchange or on deferred maintenance across 40 existing bridges. Explain what lifecycle-cost, safety, service, resilience, and opportunity-cost information is needed before assuming that new construction creates more public value.",
+    "intent": "Test infrastructure prioritization and maintenance reasoning.",
+    "domain": "Infrastructure Policy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A regulator wants to reduce factory accidents. Compare a prescriptive rule specifying exact safety equipment with an outcome-based rule requiring firms to keep accident risk below a defined threshold. Analyze flexibility, innovation, enforceability, monitoring demands, and consistency.",
+    "intent": "Assess regulatory-design trade-offs.",
+    "domain": "Regulatory Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "regulatory_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "An inspectorate can conduct 10,000 inspections per year for 100,000 regulated sites. Historical data show that 10% of sites account for 65% of serious violations. Explain how risk-based inspection targeting could improve use of scarce capacity, and identify fairness, data-quality, and deterrence concerns.",
+    "intent": "Test regulatory-enforcement reasoning under capacity constraints.",
+    "domain": "Regulatory Enforcement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A proposed food-labeling rule is evaluated against a baseline that assumes consumer misinformation will disappear even without government action. Explain why this is an inappropriate counterfactual for regulatory impact analysis and describe a more realistic baseline and at least two policy alternatives.",
+    "intent": "Assess baseline and alternative selection in regulatory impact analysis.",
+    "domain": "Regulatory Impact Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "regulatory_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A new emissions standard produces 95% formal compliance, yet measured pollution falls only 5% against a target of 25%. Inspections are infrequent, firms can comply through paperwork that does not verify real emissions, and monitoring equipment is unreliable. Diagnose the separate roles of rule design, measurement, implementation fidelity, enforcement, incentives, and underlying causal mechanism.",
+    "intent": "Assess why formal compliance may not produce substantive outcomes.",
+    "domain": "Regulatory Enforcement",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A jurisdiction requires occupational licenses for a low-risk personal service. Applicants must complete 1,000 training hours, average wages are modest, and neighboring jurisdictions require 300 hours with similar complaint rates. Identify the public-interest objective, evidence needed to test whether the requirement is proportionate, and possible effects on entry, prices, quality, and access.",
+    "intent": "Assess neutral regulatory analysis of licensing.",
+    "domain": "Regulation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "regulatory_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A public employment program has a 50 million currency-unit annual budget, a target of 20,000 participants, 400 caseworkers, and a six-month rollout. Create a program-management diagnosis of the main delivery risks by linking objectives, staffing ratios, schedule, service-provider capacity, monitoring, and beneficiary experience.",
+    "intent": "Test integration of program management with policy outcomes.",
+    "domain": "Program Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "implementation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A literacy program reports that 30,000 classes were delivered, 400,000 learners attended at least once, and average reading scores rose by 4 points. Classify the first two measures as activity/output measures and explain why the score increase is an outcome but not automatically a causal impact.",
+    "intent": "Test distinction among activity, outcome, and impact.",
+    "domain": "Program Evaluation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "program_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A region introduces a job-training program and unemployment falls from 8% to 6% over the next year. The national unemployment rate falls from 7% to 5% during the same period. Explain why the before/after comparison alone does not establish program impact and what comparison would be more informative.",
+    "intent": "Assess counterfactual reasoning and confounding.",
+    "domain": "Causal Inference",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A randomized education pilot assigns 2,000 students to tutoring or control. Endline test-score data are missing for 8% of the tutoring group and 22% of the control group, with missingness concentrated among low-attendance students. Explain why random assignment alone does not solve this attrition problem and how the missing data could bias the estimated effect.",
+    "intent": "Assess causal reasoning under differential attrition.",
+    "domain": "Causal Inference",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "Two cities have similar pre-policy trends in bus ridership. City A introduces discounted fares in 2025 while City B does not. Ridership rises 12% in A and 4% in B. Explain the difference-in-differences intuition, calculate the simple 8-percentage-point differential change, and identify assumptions needed before interpreting it causally.",
+    "intent": "Test quantitative causal-inference reasoning and assumptions.",
+    "domain": "Causal Inference",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A scholarship is available only to applicants scoring at least 80 on an eligibility index. Applicants cannot precisely manipulate their score, and outcomes are measured for students just above and below 80. Explain why comparing students near the cutoff can support causal inference and what continuity or manipulation assumptions matter.",
+    "intent": "Assess regression-discontinuity reasoning without rewarding technique name alone.",
+    "domain": "Causal Inference",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A pilot digital-benefit service cuts processing time by 40% in three urban districts with high broadband coverage, experienced staff, and unusually low caseloads. Explain why this does not automatically establish nationwide effectiveness, and identify scalability and external-validity questions for rural and high-caseload regions.",
+    "intent": "Assess pilot evidence and external validity.",
+    "domain": "Pilot Programs & Policy Experiments",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "program_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A national employment reform has conflicting evidence: administrative data show employment up 5 percentage points among participants, a representative survey shows no statistically clear change, and a randomized pilot conducted before nationwide rollout found a 2-point increase in a subset of regions. At the same time, another tax reform began nationally. Analyze what each source can and cannot establish, possible data-quality and selection issues, external-validity limits, the simultaneous-policy confounder, and what evidence would most strengthen the overall assessment.",
+    "intent": "Require synthesis of conflicting administrative, survey, experimental, and policy-context evidence.",
+    "domain": "Evidence-Based Policy",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_and_causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A national survey estimates that 41% of households had difficulty paying energy bills, compared with 38% the prior year. The two estimates have 95% confidence intervals of 38-44% and 35-41%, respectively. Explain why the point estimates suggest an increase but the overlapping intervals counsel caution about claiming a precise change.",
+    "intent": "Assess statistical uncertainty in policy data.",
+    "domain": "Statistics & Public Data",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "Administrative records show 90% vaccination coverage among people with a recorded address, but 14% of the population has no usable address record and that group is concentrated among recent movers and people in temporary housing. Explain how missingness and denominator choice could bias the reported coverage rate.",
+    "intent": "Test administrative-data quality and denominator reasoning.",
+    "domain": "Statistics & Public Data",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A port expansion would benefit exporters and construction workers, impose noise and traffic costs on nearby residents, require financing from taxpayers, and depend on local planning approvals. Map the main stakeholders by interest, likely effect, information, influence, and implementation role. Explain why the most influential stakeholder's preference does not by itself define the public interest.",
+    "intent": "Assess stakeholder analysis without equating power with policy quality.",
+    "domain": "Stakeholder Analysis",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "stakeholder_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "Jurisdiction: the hypothetical Republic of Hesper. Its public-integrity code requires an official to recuse from a procurement decision when the official or an immediate family member has a direct financial interest in a bidder. A procurement director's spouse owns 20% of one bidding company. Analyze the appropriate governance response under the supplied rule and distinguish legal compliance, actual conflict, and appearance concerns.",
+    "intent": "Assess public-sector ethics using an explicit jurisdictional rule.",
+    "domain": "Public-Sector Ethics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "governance_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 82,
+    "prompt": "An agency has repeated procurement fraud involving one employee creating vendors, approving invoices, and confirming delivery. Explain how separation of duties, audit trails, supplier verification, protected reporting channels, and enforcement can reduce corruption risk without providing advice on evading controls.",
+    "intent": "Assess integrity-system design and prevention.",
+    "domain": "Corruption & Integrity Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A large city loses power during a heatwave. Hospitals have backup power but several water-pumping stations and cooling centers do not. Information from different agencies conflicts, and mobile networks are congested. As the public-sector incident leader, identify the first operational priorities, coordination structure, communication approach, and continuity measures. Explain what should be deferred until reliable information improves.",
+    "intent": "Assess crisis leadership, coordination, and communication under uncertainty.",
+    "domain": "Public Leadership",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "crisis_management",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A government is deciding whether to commit immediately to a single 20-year technology platform or use a two-year modular procurement with options to scale. Demand is uncertain and switching costs would be high after full commitment. Compare staged decision-making, option value, monitoring, and the cost of delay.",
+    "intent": "Assess decision-making under uncertainty and irreversibility.",
+    "domain": "Government Decision-Making Under Uncertainty",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A water utility identifies an earthquake as a hazard. Engineers estimate a 10% probability of major damage over ten years and losses of 500 million currency units if the event occurs without mitigation. Explain the difference between hazard, likelihood, impact, risk, mitigation, contingency, and residual risk. What additional information is needed before choosing a mitigation budget?",
+    "intent": "Test government risk-management concepts and expected-risk reasoning.",
+    "domain": "Risk Management in Government",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "Jurisdiction: the hypothetical coastal Province of Ilyra. A severe storm has breached two flood barriers, hospitals report 18 hours of backup fuel, and the main evacuation bridge may close within six hours. Emergency law allows the provincial executive to requisition public vehicles, open temporary shelters, and make emergency purchases for 72 hours, subject to post-event audit; local governments control shelter operations; the national government controls military airlift and must approve its use. Design the first 12 hours of action, identifying life-safety priorities, intergovernmental requests, resource allocation, public communication, continuity of essential services, documentation, and transition planning. Do not assume powers beyond those supplied.",
+    "intent": "Require crisis action under explicit authority, time pressure, scarce resources, and intergovernmental dependence.",
+    "domain": "Crisis & Emergency Management",
+    "acuity": "critical",
+    "difficulty": 5,
+    "style": "crisis_management",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 87,
+    "prompt": "After repeated floods, a region can invest in stronger levees, restore wetlands, update land-use rules, expand insurance coverage, or improve evacuation systems. Explain how prevention, mitigation, preparedness, response, recovery, and resilience differ, and why a portfolio may be more robust than relying on one measure.",
+    "intent": "Assess disaster-policy and resilience reasoning.",
+    "domain": "Disaster Policy & Resilience",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A publicly financed health system has average specialist waiting times of 70 days. The government funds 10% more appointments, but waiting times fall only to 66 days because referrals rise 8% and staffing shortages cause 6% of funded appointments to go unused. Analyze access, capacity, demand, provider constraints, and why spending or appointment funding alone does not establish improved outcomes.",
+    "intent": "Assess health-policy reasoning at system level rather than clinical diagnosis.",
+    "domain": "Health Policy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "Two school districts receive equal per-student funding. District A spends more on teacher recruitment and tutoring; District B spends more on facilities. Test scores rise in A and remain flat in B, but A also had fewer disadvantaged students to begin with. Explain why spending composition, baseline differences, and causal evidence must be considered before attributing the outcome gap to the funding choices.",
+    "intent": "Assess education-policy reasoning about inputs, outcomes, and confounding.",
+    "domain": "Education Policy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_and_causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A fast-growing city faces a housing shortage. It proposes rent subsidies for low-income tenants, faster permitting for dense housing near transit, infrastructure expansion in growth areas, and relocation support for households at risk of displacement. Land-use authority is split between the city and surrounding municipalities, transit capacity is constrained, and the city has a fixed 500 million currency-unit five-year housing budget. Analyze the package across housing supply, affordability, fiscal cost, transport, local authority, displacement, timing, and distribution. Identify which elements address short-run versus long-run mechanisms.",
+    "intent": "Require high-difficulty housing policy analysis across supply, subsidies, transport, authority, and displacement.",
+    "domain": "Housing Policy",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A city introduces congestion charges. Private-car entries to the center fall 18%, bus ridership rises 14%, peak bus crowding rises from 82% to 97% of rated capacity, and average bus delay increases 6 minutes. Analyze direct effects, substitution, capacity constraints, distributional effects, and additional data needed to assess whether the policy improves accessibility rather than merely reducing traffic.",
+    "intent": "Assess transportation-policy trade-offs and system capacity.",
+    "domain": "Transportation Policy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A government considers a carbon tax, renewable-energy subsidy, industrial performance standard, and public investment in grid upgrades. State the main mechanism of each instrument and compare them on emissions incentives, fiscal effects, administrative demands, distribution, and uncertainty. Do not prescribe a single energy or climate ideology.",
+    "intent": "Assess neutral environmental-policy instrument analysis.",
+    "domain": "Environmental & Climate Policy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "An electricity system must replace aging generation over ten years. Policymakers want affordability, reliability, lower emissions, and reduced import dependence. Wind and solar have low operating emissions but require grid and balancing investment; gas is dispatchable but fuel prices are volatile; nuclear has high upfront cost and long lead times. Analyze how a portfolio decision should compare reliability, system cost, financing, environmental impact, security, and uncertainty without assuming a predetermined energy mix.",
+    "intent": "Assess energy-policy trade-offs among multiple objectives.",
+    "domain": "Energy Policy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "decision_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A cash benefit is available to 1 million eligible households, but only 620,000 receive it. A survey of eligible nonparticipants finds 30% were unaware, 25% started but did not complete the application, 15% lack required documents, 10% cite stigma, and the rest cite other reasons. Analyze which mechanisms concern information, administrative burden, documentation, and take-up, and propose evaluation metrics for reforms.",
+    "intent": "Assess social-policy access and administrative burden.",
+    "domain": "Social Policy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A workforce-training program targets unemployed adults. Participants' employment rises from 45% to 60% after training, but participants volunteered and nonparticipants differ in education and prior earnings. Explain the selection-bias problem, what evidence would strengthen a causal claim, and how labor-demand conditions could affect scalability.",
+    "intent": "Assess labor-policy evaluation and selection bias.",
+    "domain": "Labor & Employment Policy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A regional government offers firms a 50 million currency-unit package to locate in a declining industrial area. The firm announces 1,000 jobs, but 300 workers are expected to relocate from nearby regions and analysts estimate 250 jobs would have been created without the subsidy. Explain additionality, displacement, deadweight, opportunity cost, and the evidence needed to estimate the net place-based employment effect.",
+    "intent": "Assess economic-development reasoning beyond announced investment.",
+    "domain": "Economic Development Policy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A science ministry funds university-industry R&D consortia with 120 million currency units over four years. The objective is to increase research spillovers and commercialization, but firms may relabel projects they would have funded anyway. Design an evaluation strategy that addresses additionality, knowledge spillovers, commercialization outcomes, time lags, and the limits of using patent counts alone.",
+    "intent": "Assess science, technology, and innovation policy design and evaluation.",
+    "domain": "Science, Technology & Innovation Policy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "program_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A government replaces a paper benefits process with an integrated digital platform that shares data across tax and social-service agencies and uses an algorithm to flag applications for enhanced review. Processing time falls 35%, but error appeals double among people with unstable income, some users lack digital access, and agencies cannot fully explain which data fields drive flags. Analyze service redesign versus simple digitization, data quality and sharing, privacy and security governance, digital exclusion, algorithmic transparency, human review, appeals, and accountability.",
+    "intent": "Require integrated digital-government, data-governance, and algorithmic-government reasoning.",
+    "domain": "Digital Government / Data / AI",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "Five countries share a river basin. Upstream pollution control is costly to each country, while cleaner water benefits all five; no country can fully exclude others from the benefit. Explain the collective-action and free-riding problem, and compare monitoring, burden-sharing, side payments, and joint institutions as coordination mechanisms without assuming one arrangement is universally optimal.",
+    "intent": "Assess international public policy and global-public-goods coordination.",
+    "domain": "International Public Policy / Global Public Goods",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "governance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A country projects that over 20 years the share of residents aged 65+ will rise from 18% to 29%, the working-age population will fall 8%, and three major cities will continue growing while rural regions lose 15% of population. Analyze the interacting pressures on pensions, health and care services, labor supply, local infrastructure, housing, migration or integration policy, and intergovernmental finance. Distinguish empirical pressures from normative choices about who should bear adjustment costs.",
+    "intent": "Assess long-run demographic policy and migration/integration trade-offs at system level.",
+    "domain": "Demographic Policy / Migration & Integration",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_analysis",
+    "jurisdiction_required": false
+  }
+]

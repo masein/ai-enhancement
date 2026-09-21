@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import pytest
 
+from test_review_ui import law_under_its_draft_rubric
+
 pytestmark = pytest.mark.dashboard
 
 ALLOWED = {12.0, 14.0, 16.0, 20.0, 28.0}
@@ -26,8 +28,8 @@ def test_the_tokens_are_the_scale(live, page):
     assert page.errors == []
 
 
-@pytest.mark.parametrize("where", ["#tab=overview", "#tab=leaderboard", "#topic=medicine_health",
-                                   "#tab=exam", "#tab=queue"])
+@pytest.mark.parametrize("where", ["#tab=overview", "#tab=leaderboard",
+                                   "#topic=medicine_clinical_health", "#tab=exam", "#tab=queue"])
 def test_every_piece_of_text_is_on_the_type_scale(live, page, where):
     page.goto(live["base"] + "/" + where)
     page.wait_for_selector("#view > *")
@@ -46,8 +48,8 @@ def test_every_piece_of_text_is_on_the_type_scale(live, page, where):
 
 
 def test_a_disabled_button_looks_disabled_and_says_why(live, page):
-    page.goto(live["base"] + "/#topic=medicine_health")
-    btn = page.locator("[data-propose='medicine_health']")
+    page.goto(live["base"] + "/#topic=medicine_clinical_health")
+    btn = page.locator("[data-propose='medicine_clinical_health']")
     btn.wait_for()
     assert btn.is_disabled()
     look = btn.evaluate("""b => { const s = getComputedStyle(b);
@@ -75,13 +77,16 @@ def test_one_badge_three_tones_and_one_warning_per_row(live, page):
         return c; };
       return [probe('badge'), probe('badge warn'), probe('badge taint'), probe('badge danger')]; }""")
     assert tones[1] == tones[2] and tones[0] != tones[1] and tones[3] not in (tones[0], tones[1])
-    # the Loop board: what is true of every score is said once, above the board
-    page.goto(live["base"] + "/#tab=loop")
-    page.wait_for_selector("table[data-loop-table] tbody tr")
-    rows = page.evaluate("""() => [...document.querySelectorAll('table[data-loop-table] tbody tr')]
-      .map(tr => tr.querySelectorAll('.badge.taint').length - tr.querySelectorAll('td:nth-child(3) .badge').length)""")
-    assert max(rows) <= 1
-    assert page.locator("[data-loop-caveats]").count() == 1
+    # the Loop board: what is true of every score is said once, above the board.
+    # Every rubric delivered with the 37 topics is signed off, so nothing would
+    # be: law is graded under its retired draft for this, as it was until then
+    with law_under_its_draft_rubric(live):
+        page.goto(live["base"] + "/#tab=loop")
+        page.wait_for_selector("table[data-loop-table] tbody tr")
+        rows = page.evaluate("""() => [...document.querySelectorAll('table[data-loop-table] tbody tr')]
+          .map(tr => tr.querySelectorAll('.badge.taint').length - tr.querySelectorAll('td:nth-child(3) .badge').length)""")
+        assert max(rows) <= 1
+        assert page.locator("[data-loop-caveats]").count() == 1
     assert page.errors == []
 
 

@@ -2,7 +2,13 @@
 
 Dr. Hossein's 100 consumer health questions come with metadata instead of
 reference answers, and with their own rubric. These tests are over the real
-delivered files — if the file changes, they are what says so."""
+delivered files — if the file changes, they are what says so.
+
+Phase 10 retired that bank with its topic; the file is kept byte for byte in
+eval_tasks/fr/retired/, and it is still the one bank whose numbers (nine
+emergencies, a first delivery of fifty inside the second) these tests know.
+So the import machinery is tested on it, into the topic that replaced
+"medicine & health"."""
 
 from __future__ import annotations
 
@@ -18,9 +24,13 @@ import judge as jd
 from service import llm
 
 REPO = Path(__file__).resolve().parents[1]
-MEDICINE = REPO / "eval_tasks" / "fr" / "medicine_v2.json"
-TOPIC = "medicine & health"
-TASK = "exam_medicine_health"
+RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+MEDICINE = RETIRED / "medicine_v2.json"
+LAW_V2 = RETIRED / "law_v2.json"
+TOPIC = "Medicine & Clinical Health"
+TASK = "exam_medicine_clinical_health"
+LAW = "Law"
+NO_RUBRIC = "exam_arts"          # the one topic delivered without a rubric of its own
 
 
 @pytest.fixture
@@ -42,7 +52,7 @@ def test_the_delivered_file_is_what_the_import_expects():
     assert {it["acuity"] for it in items} == {"emergency", "urgent", "moderate", "mild", "routine"}
     # v2 gave every item the author's own difficulty level
     assert all(isinstance(it.get("difficulty"), int) for it in items)
-    law = json.loads((REPO / "eval_tasks" / "fr" / "law_v2.json").read_text("utf-8"))
+    law = json.loads(LAW_V2.read_text("utf-8"))
     assert len(law) == 100 and all(it.get("prompt") and it.get("difficulty") for it in law)
     assert sorted({it["difficulty"] for it in law}) == [1, 2, 3, 4, 5]
 
@@ -129,6 +139,9 @@ def test_the_import_refuses_what_it_should(tmp_path):
         eb.import_bank(tmp_path / "exam", MEDICINE, TOPIC, "  ")
     with pytest.raises(ValueError, match="not an exam topic"):
         eb.import_bank(tmp_path / "exam", MEDICINE, "astrology", "Dr. Hossein")
+    # nor, now, the name this file was first delivered under
+    with pytest.raises(ValueError, match="not an exam topic"):
+        eb.import_bank(tmp_path / "exam", MEDICINE, "medicine & health", "Dr. Hossein")
     bad = tmp_path / "bad.json"
     bad.write_text(json.dumps({"prompt": "not an array"}))
     with pytest.raises(ValueError, match="not a JSON array"):
@@ -183,48 +196,70 @@ def test_a_report_half_import_is_as_withheld_as_any_other_question(bank):
 # ---------------------------------------------------------------------------
 
 def test_the_rubric_follows_the_topic_and_falls_back(tmp_path):
-    assert eb.task_slug(TASK) == "medicine_health" == eb.topic_task(TOPIC)[len("exam_"):]
-    assert jd.rubric_name(TASK) == "medicine_health"
-    assert jd.rubric_name("exam_history") == "exam"            # no rubric of its own
+    slug = "medicine_clinical_health"
+    assert eb.task_slug(TASK) == slug == eb.topic_task(TOPIC)[len("exam_"):]
+    assert jd.rubric_name(TASK) == slug
+    assert jd.rubric_name(NO_RUBRIC) == "exam"            # no rubric of its own
     assert jd.rubric_name(eb.CONTROL_TASK) == "factual_accuracy"
-    med, exam = jd.rubric_for(TASK), jd.rubric_for("exam_history")
-    assert "consumer health question" in med.text and med.sha256 != exam.sha256
-    assert med.version == "2" and med.status == "draft"        # until its author signs it off
-    assert exam.status == ""
-    # the second topic with a file of its own, delivered in the same round
-    assert jd.rubric_name("exam_law") == "law"
+    med, exam = jd.rubric_for(TASK), jd.rubric_for(NO_RUBRIC)
+    assert "Medicine & Clinical Health question" in med.text and med.sha256 != exam.sha256
+    # the 37-topic anchors are the author's own: nothing awaits his sign-off
+    assert med.status == "" and exam.status == ""
+    # the old rubric that did is retired with its topic, not read as this one's
+    assert "DRAFT" in (RETIRED / "rubrics" / "medicine_health.md").read_text("utf-8")
+    assert not (jd.RUBRIC_DIR / "medicine_health.md").exists()
+    # law keeps its slug through the rename, and its file is the new one
+    assert jd.rubric_name(eb.topic_task(LAW)) == "law"
     assert jd.rubric_for("exam_law").criteria is not None
+    assert jd.rubric_for("exam_law").criteria_sha256 != eb.sha256_file(
+        RETIRED / "rubrics" / "law.criteria.json")
     # the canary is graded with the shared rubric, as before
     assert jd.rubric_for("exam_x").sha256 == exam.sha256
 
 
 def test_judge_json_records_which_rubric_graded_each_task(tree, tmp_path, monkeypatch):
-    """The medicine task gets the medicine rubric's sha; everything else
+    """The medicine task gets the medicine rubric's sha; a topic without one
     keeps exam.md's, and the draft stamp is on the file."""
+    from service import config
+    # no rubric in the 37-topic delivery is a draft, so the one that was — the
+    # retired medicine & health pair — is put where an upload from the page
+    # lands, under the slug of the topic that replaced it
+    store = tmp_path / "rubrics"
+    store.mkdir()
+    for suffix in (".md", ".criteria.json"):
+        (store / f"medicine_clinical_health{suffix}").write_bytes(
+            (RETIRED / "rubrics" / f"medicine_health{suffix}").read_bytes())
+    monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)
     d = tree["models"]["fx/chance-160m"]["dir"]
     reqs, plan = jd.plan_requests(d, "claude")
     plan["tasks"][TASK] = [{"cid": "judge:x", "qid": "a" * 64, "half": "diagnose",
                             "doc_hash": "h", "id": "i", "category": TOPIC, "answer_words": 10}]
+    # every topic the fixture sits has a rubric of its own; Arts, delivered
+    # empty, is the one that would be graded by the shared file
+    other = NO_RUBRIC
+    plan["tasks"][other] = [{"cid": "judge:y", "qid": "b" * 64, "half": "diagnose",
+                             "doc_hash": "h2", "id": "j", "category": "Arts",
+                             "answer_words": 10}]
     out = jd.assemble(plan, {}, jd.STUB_IDENT if hasattr(jd, "STUB_IDENT") else
                       {"provider": "stub", "model": "overlap-v1", "id": "stub/overlap-v1",
                        "family": "stub"}, "b", tmp_path, 0.5, False, record=False)
     rub = out["judge"]["rubrics"]
     assert rub[TASK]["sha256"] == jd.rubric_for(TASK).sha256
-    assert rub[TASK]["name"] == "medicine_health" and rub[TASK]["status"] == "draft"
-    other = "exam_history"                       # no rubric of its own: the shared one
-    assert other in rub
-    assert rub[other]["sha256"] == jd.rubric_for("exam_history").sha256
+    assert rub[TASK]["name"] == "medicine_clinical_health"
+    assert rub[TASK]["status"] == "draft"
+    assert rub[other]["sha256"] == jd.rubric_for(other).sha256
     assert rub[other]["name"] == "exam" and "status" not in rub[other]
-    # the file says a draft rubric graded it, and which topic's
+    # the file says a draft rubric graded it, and which topic's — and no
+    # other, because none of the delivered ones is
     assert out["judge"]["rubric_status"] == "draft"
-    assert TASK in out["judge"]["rubrics_draft"]      # and any other draft topic
+    assert out["judge"]["rubrics_draft"] == [TASK]
 
 
 def test_a_bank_with_no_draft_rubric_carries_no_draft_stamp(tmp_path):
     plan = {"model": "m", "model_dir": str(tmp_path), "canary": [], "skipped": None,
             "tasks": {"exam_economics": [{"cid": "judge:x", "qid": "a" * 64, "half": "report",
-                                          "doc_hash": "h", "id": "i", "category": "economics",
-                                          "answer_words": 10}]}}
+                                          "doc_hash": "h", "id": "i",
+                                          "category": "Economics", "answer_words": 10}]}}
     out = jd.assemble(plan, {}, {"provider": "stub", "model": "overlap-v1",
                                  "id": "stub/overlap-v1", "family": "stub"},
                       "b", tmp_path, 0.5, False, record=False)
@@ -242,19 +277,18 @@ def test_both_delivered_banks_keep_their_report_half_out_of_every_request(bank, 
     sent, no report-half question from either bank appears."""
     from service import config, proposals as prop
     root, _ = bank
-    law_file = REPO / "eval_tasks" / "fr" / "law_v2.json"
-    eb.import_bank(root, law_file, "law", "Dr. Hossein", "medicine_v1")
+    eb.import_bank(root, LAW_V2, LAW, "Dr. Hossein", "medicine_v1")
     monkeypatch.setattr(config, "EXAM_DIR", root)
     monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)
     fake = llm.FakeBatches("fake-exam", tmp_path)
-    for topic, task in ((TOPIC, TASK), ("law", "exam_law")):
+    for topic, task in ((TOPIC, TASK), (LAW, "exam_law")):
         fake.submit(eb.draft_requests(root, topic, 2))
         fake.submit([prop.proposal_request(1, "m", task, topic,
                                            [{"qid": "q", "score": 1,
                                              "justification": "vague on escalation"}],
                                            {"diagnose_items": 1, "diagnose_weak": 1}, "rubric")])
     sent = "\n".join(r["system"] + "\n" + r["user"] for r in fake.recorded())
-    for topic in (TOPIC, "law"):
+    for topic in (TOPIC, LAW):
         rows = eb.load_bank(root)[topic]
         report = [r for r in rows if eb.half_of(r["qid"]) == "report"]
         assert report, f"the split put nothing in the report half of {topic}"

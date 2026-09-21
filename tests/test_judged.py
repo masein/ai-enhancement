@@ -73,10 +73,11 @@ def test_control_build_is_deterministic(tree, tmp_path):
 
 
 def test_skill_suites_are_migrated_not_thrown_away(tree):
-    """The four skill suites' 40 items live on in the bank under `other`, as
-    they were, with their skill on the record; AUTHORING.md points at the exam."""
+    """The four skill suites' 40 items live on in the bank under General &
+    Multidisciplinary, as they were, with their skill on the record;
+    AUTHORING.md points at the exam."""
     bank = fr_build.load_bank(tree["judged"]["exam_root"])
-    migrated = [r for r in bank["other"] if r["source"] == "migrated"]
+    migrated = [r for r in bank[fr_build.MIGRATED_TOPIC] if r["source"] == "migrated"]
     assert len(migrated) == 40
     assert {r["skill"] for r in migrated} == set(fr_build.SKILL_SUITES)
     seeds = {}
@@ -106,19 +107,24 @@ def test_rubrics_have_anchors_and_a_length_clause():
     """Five anchors and something about length, however the author writes
     them: ours use "- **3** —", his own use a "### 3" heading. The sha is the
     identity; a version in the heading is a convenience he need not carry."""
-    for task in ("exam_economics", "exam_law", "exam_medicine_health", "exam_history",
-                 fr_build.CONTROL_TASK):
+    # every task the exam builds, so every rubric as delivered: the 36 topics'
+    # own ("### 3", no version), the shared exam.md Arts falls back to and the
+    # control's factual one (both "- **3** —")
+    for task in fr_build.ALL_TASKS:
         r = jd.rubric_for(task)
         assert re.fullmatch(r"[0-9]+|\?", r.version) and re.fullmatch(r"[0-9a-f]{64}", r.sha256)
         for s in range(5):
             assert re.search(rf"^(?:- \*\*{s}\*\*|#+ {s}\b)", r.text, re.M), (task, s)
         assert re.search(r"length", r.text, re.I), task
     # a topic with no rubric of its own shares the exam one; the control keeps
-    # the factual one; a topic with its own is graded by its own
-    assert jd.rubric_for("exam_geography_world_facts")[1] == jd.rubric_for("exam_history")[1]
-    assert jd.rubric_for(fr_build.CONTROL_TASK)[1] != jd.rubric_for("exam_history")[1]
-    assert jd.rubric_for("exam_medicine_health")[1] != jd.rubric_for("exam_history")[1]
-    assert (REPO / "eval_tasks" / "fr" / "rubrics" / "exam.md").exists()
+    # the factual one; a topic with its own is graded by its own. Arts is the
+    # one topic delivered without a rubric
+    shared = (REPO / "eval_tasks" / "fr" / "rubrics" / "exam.md").read_text(encoding="utf-8")
+    assert [t for t in fr_build.exam_tasks() if jd.rubric_for(t).fallback] == ["exam_arts"]
+    assert jd.rubric_for("exam_arts").text == shared
+    assert jd.rubric_for(fr_build.CONTROL_TASK)[1] != jd.rubric_for("exam_arts")[1]
+    assert jd.rubric_for("exam_medicine_clinical_health")[1] != \
+        jd.rubric_for("exam_arts")[1]
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +281,7 @@ def test_fixture_calibration_clears_the_line(tree):
 def test_payload_judged_block(payload, tree):
     J = payload["judged"]
     assert set(J["tasks"]) == set(tree["judged"]["manifest"]["tasks"])
-    assert J["exam"] == fr_build.exam_tasks() and J["topics"]["exam_economics"] == "economics"
+    assert J["exam"] == fr_build.exam_tasks() and J["topics"]["exam_economics"] == "Economics"
     assert J["calibration"]["calibrated"] is True and J["kappaMin"] == 0.6
     assert J["judge"]["stub"] is True
     for t in fr_build.ALL_TASKS:                        # never a leaderboard column

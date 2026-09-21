@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A claimant alleges that a delivery driver ran a red light and hit the claimant's parked bicycle. The pleadings also state that the driver dislikes jazz, the bicycle was purchased two years ago, and a traffic-camera image appears to show the light was red. Identify which facts are legally material to a basic negligence analysis, which are likely irrelevant, and which statement is an allegation rather than established fact.",
+    "intent": "Distinguish material facts, irrelevant facts, evidence, and allegations in a simple legal analysis.",
+    "domain": "Legal Method – Fact Evaluation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A hypothetical statute creates liability when a person (1) knowingly accesses a protected database without authorization and (2) causes at least €5,000 in loss. The evidence shows unauthorized access and €9,000 in loss, but says nothing about what the defendant knew. Explain why the existing evidence does or does not establish liability and identify the missing element.",
+    "intent": "Test element-by-element reasoning and the distinction between evidence for some elements and proof of all elements.",
+    "domain": "Legal Method – Elements",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "rule_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A statute provides: “A ‘commercial drone’ means an unmanned aircraft used for compensation. No commercial drone may operate in Zone A after 20:00.” Dana flies a drone in Zone A at 21:00 solely to photograph her own garden, without compensation. Apply the supplied definition and operative rule.",
+    "intent": "Apply a statutory definition before applying an operative clause.",
+    "domain": "Legal Method – Statutory Interpretation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "statutory_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A statute states: “No person may bring an animal into the archive. This prohibition does not apply to a trained assistance animal accompanying a person with a disability.” Lee enters with a trained assistance dog. A guard argues that the general prohibition still controls because a dog is plainly an animal. Analyze the text and the effect of the exception.",
+    "intent": "Test whether an explicit statutory exception is integrated into the rule.",
+    "domain": "Legal Method – Statutory Interpretation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "statutory_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A park rule says, “No vehicles may enter the botanical garden, except mobility devices used by visitors with impaired mobility.” It defines neither “vehicle” nor “mobility device.” A visitor uses a small battery-powered delivery cart to carry picnic supplies. Identify the strongest textual arguments for and against treating the cart as a prohibited vehicle, the contextual significance of the exception, and what additional facts could matter.",
+    "intent": "Analyze genuine textual ambiguity without forcing false certainty.",
+    "domain": "Legal Method – Ambiguity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A fictional jurisdiction enacted Statute A on 1 January 2020, making conduct X unlawful. An amendment effective 1 July 2023 created an exception for conduct X performed under a certified safety protocol. The defendant acted on 15 March 2022 under such a protocol. No retroactivity rule is supplied. Which version of the statute is the starting point for analysis, and what further legal rule would be needed before applying the 2023 exception to the 2022 conduct?",
+    "intent": "Test temporal validity and resistance to automatically applying later law.",
+    "domain": "Legal Method – Temporal Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A court dismisses a claim because the plaintiff filed after a supplied two-year limitations period. The opinion also says, “Even if timely, claims of this type would usually fail when damages are under €100,” although damages were €10,000 in the actual case. Identify the holding necessary to the judgment and explain whether the €100 statement is holding, dicta, or something else.",
+    "intent": "Distinguish holding from unnecessary judicial commentary.",
+    "domain": "Legal Method – Precedent",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "In a U.S. federal diversity case, the federal district court must decide an issue of State Z law. The State Z supreme court has squarely decided the issue; an intermediate appellate court in neighboring State Y has reached the opposite result; and a respected treatise favors State Y's approach. Explain the relative legal weight of these sources for the district court.",
+    "intent": "Evaluate binding and persuasive authority within an expressly specified system.",
+    "domain": "Legal Method – Authority Hierarchy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "authority_evaluation",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 9,
+    "prompt": "Precedent P holds that a store owed no duty for an unforeseeable injury caused when a customer secretly rewired store equipment. In a new case, store employees had received three prior written warnings that customers were tampering with the same equipment, but management did nothing. Explain whether P necessarily controls or can be distinguished, and why the factual difference matters under the supplied foreseeability rationale.",
+    "intent": "Test analogical reasoning and material factual distinctions.",
+    "domain": "Legal Method – Precedent",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "precedent_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A trial court faces no binding precedent. Two appellate courts in other jurisdictions disagree about an identically worded model statute. Court A relies on the ordinary meaning of “transfer”; Court B relies on statutory structure and an express exception elsewhere in the statute. A local secondary source sides with Court A. Explain how the trial court should evaluate these authorities and competing interpretations without treating any persuasive source as controlling.",
+    "intent": "Analyze conflicting persuasive authorities and source hierarchy.",
+    "domain": "Legal Method – Authority & Interpretation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "authority_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A tenant reports a leaking ceiling to the landlord. The lease says the landlord must repair structural defects within 10 days after written notice. The tenant sends an email notice on 1 May. On 8 May, a ceiling panel falls and injures a guest. The lease also disclaims liability for the tenant's personal property but says nothing about personal injury. Identify and prioritize the main legal issues, including any contract, tort, causation, notice, and remedy questions, without assuming rules not supplied.",
+    "intent": "Spot and prioritize multiple legally material issues without indiscriminate issue dumping.",
+    "domain": "Legal Method – Issue Spotting",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "issue_spotting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A memo cites a recent blog post for the proposition that “all oral contracts are unenforceable.” The blog provides no jurisdiction and cites no primary authority. Explain how a legal researcher should evaluate whether the proposition is supported, including jurisdiction, source type, currentness, and the need to locate controlling law.",
+    "intent": "Evaluate legal-source reliability and proposition support.",
+    "domain": "Legal Method – Legal Research",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "authority_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "For this question, assume Austrian law is the governing system and that a valid federal statute conflicts with nonbinding administrative guidance issued by a ministry. The guidance is more recent but does not purport to amend the statute. Explain which source controls the legal rule and why recency alone does not settle hierarchy.",
+    "intent": "Test authority hierarchy in a named jurisdiction using supplied hierarchy facts.",
+    "domain": "Legal Method – Source Hierarchy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "jurisdiction_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 14,
+    "prompt": "At the pleading stage, a complaint states, “The defendant intentionally destroyed the files.” A later answer denies any destruction. No evidence has yet been submitted. Explain how an analyst should describe the status of the destruction and the alleged intent, and why calling them “established facts” would be premature.",
+    "intent": "Distinguish allegations from findings and respect procedural posture.",
+    "domain": "Legal Method – Procedural Posture",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A supplied procedural rule says: at pleading, well-pleaded factual allegations are assumed true; at summary judgment, the court asks whether admissible evidence creates a genuine dispute; at trial, the factfinder resolves disputed facts. A plaintiff alleges that a machine was defective. At summary judgment, the plaintiff offers an authenticated inspection report finding a defect, while the defendant offers contrary expert testimony. Explain how the defect issue should be treated at each of the three stages and why the same factual dispute can produce different procedural consequences.",
+    "intent": "Integrate procedural posture, evidentiary support, and factfinding standards.",
+    "domain": "Legal Method – Procedural Posture",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "procedural_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "Under a supplied England and Wales contract rule, an advertisement is ordinarily an invitation to treat unless its language shows a clear commitment to be bound without further assent. A shop posts, “One vintage desk, £400, first person to email ‘I accept’ before noon gets it.” At 10:00, Priya emails “I accept.” Analyze whether the advertisement is more plausibly an offer or merely an invitation, using the supplied rule and wording.",
+    "intent": "Apply an expressly supplied contract-formation rule in a named jurisdiction.",
+    "domain": "Private Law – Contracts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "contract_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 17,
+    "prompt": "A contract rule provides: “Acceptance by email is effective when it reaches the offeror's designated inbox, unless the offer requires actual reading.” An offer sent Monday says acceptance must be effective by 17:00 Wednesday. The offeree emails acceptance at 16:55 Wednesday; it reaches the designated inbox at 16:56 but is not read until Thursday. Was acceptance timely under the supplied rule?",
+    "intent": "Apply a self-contained acceptance-timing rule.",
+    "domain": "Private Law – Contracts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "rule_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "An offer states, “I will sell 500 units at €8 each, delivery 1 June.” The response says, “I accept, provided delivery is 15 June.” A supplied rule says a purported acceptance that materially changes the offered terms is a counteroffer, not an acceptance. Classify the response and explain the consequence.",
+    "intent": "Distinguish conditional acceptance from acceptance under a supplied rule.",
+    "domain": "Private Law – Contracts",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "contract_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A contract defines “Business Day” as Monday through Friday excluding public holidays. Clause 5 requires payment “within 3 Business Days after invoice.” Clause 12 says all invoices are “payable within 72 hours.” A precedence clause says specific payment terms prevail over general administrative terms. An invoice is issued Friday at 16:00. Explain the interpretive conflict, identify which clause is more likely to control under the precedence rule, and state what further fact is needed to calculate the deadline exactly.",
+    "intent": "Interpret conflicting contractual provisions using defined terms and a precedence clause.",
+    "domain": "Private Law – Contracts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "legal_drafting_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A contract says, “Buyer’s duty to pay the final €20,000 arises only if the regulator issues Certificate C by 30 June. Seller must use reasonable efforts to obtain Certificate C.” Distinguish the condition that triggers payment from the seller's separate obligation, and explain whether failure of the condition necessarily means the seller did not breach.",
+    "intent": "Distinguish a condition precedent from a covenant or obligation.",
+    "domain": "Private Law – Contracts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "contract_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A services contract states that a failure to deliver a monthly report is curable if corrected within 7 days after written notice, and termination for that breach is permitted only if cure does not occur. The supplier misses the report; the customer gives notice on Monday; the supplier delivers the report three days later but the customer terminates immediately. Analyze the contractual effect of the cure clause.",
+    "intent": "Apply notice-and-cure language before concluding material breach or termination rights.",
+    "domain": "Private Law – Contracts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "contract_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A supplied damages rule allows expectation losses caused by breach, reasonably foreseeable at contracting, proven with reasonable certainty, and reduced by avoidable loss. A seller breaches. The buyer proves €30,000 in replacement-cost loss, of which €8,000 could reasonably have been avoided, plus a speculative €20,000 future marketing loss unsupported by records. Calculate the strongest supported damages figure and explain why each component is included or excluded.",
+    "intent": "Combine contract-remedy doctrine with a simple damages calculation.",
+    "domain": "Private Law – Contracts & Remedies",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A supplied equitable rule permits specific performance only when damages are inadequate and the order can be stated and supervised with sufficient clarity. A seller refuses to transfer a unique parcel of land under a valid contract. The buyer can prove market-value damages but argues no substitute parcel has comparable location features. Analyze the strongest arguments for and against specific performance under the supplied rule.",
+    "intent": "Apply a self-contained equitable-remedy standard and recognize competing factors.",
+    "domain": "Private Law – Contracts & Remedies",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "remedies_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A software license says “Affiliate” means any entity controlled by Licensee. Clause 2 permits use by “Licensee and its Affiliates.” Clause 9 prohibits “assignment or transfer of this Agreement to any third party without consent.” Licensee's wholly controlled subsidiary begins using the software without any assignment document. Analyze whether the use is authorized, and distinguish authorized affiliate use from transfer of the agreement.",
+    "intent": "Interpret defined terms and distinguish license scope from assignment.",
+    "domain": "Private Law – Contracts",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "legal_drafting_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A supply contract defines “Delay Event” as an event beyond Seller's reasonable control, but excludes labor shortages at Seller's own facility. Clause 7 excuses late delivery caused by a Delay Event. Clause 10 caps delay damages at €50,000, except for “willful nonperformance.” Seller's plant suffers a labor shortage, then management deliberately ships the remaining stock to a higher-paying customer, making timely performance impossible. Buyer claims €120,000 in foreseeable loss. Analyze excuse, breach, the damages cap, the willful-nonperformance exception, causation, and what facts remain legally decisive. Do not assume a jurisdiction-specific rule beyond the contract and supplied general damages concepts.",
+    "intent": "Synthesize conflicting clauses, exceptions, causation, remedy limits, and factual uncertainty.",
+    "domain": "Private Law – Contracts",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "contract_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "Under a supplied negligence rule in State Z, a plaintiff must prove duty, breach, factual causation, scope-of-liability causation, and compensable harm. A driver texts while driving, crosses the center line, and hits a cyclist who suffers a broken arm. Analyze each element separately and identify the most straightforward and the potentially contestable elements.",
+    "intent": "Perform element-by-element negligence analysis in an expressly specified jurisdiction.",
+    "domain": "Private Law – Torts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "tort_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 27,
+    "prompt": "A supplied professional-negligence rule says a surgeon breaches the standard of care only if the surgeon's conduct falls below the level reasonably expected of a competent surgeon in the same field under comparable circumstances. A poor outcome occurs despite evidence that the surgeon followed the accepted protocol. Explain why the poor outcome alone does or does not establish breach and what additional evidence would matter.",
+    "intent": "Distinguish adverse outcome from proof of breach under a professional standard.",
+    "domain": "Private Law – Torts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A store knew that a loose floor tile occasionally shifted. Replacing it would have cost €40 and taken ten minutes. The store postponed repair for a week; a customer tripped and was injured. Explain how foreseeability and burden of precaution bear on breach, and why the analysis should not depend solely on hindsight after the accident.",
+    "intent": "Analyze breach through foreseeable risk and reasonable precaution rather than hindsight.",
+    "domain": "Private Law – Torts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "tort_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "Two independent fires, each alone sufficient to destroy a warehouse, merge and destroy it. A supplied causation rule says that when multiple sufficient causes operate concurrently, each may satisfy factual causation even though ordinary but-for phrasing would fail. Apply the supplied rule and explain why simple but-for reasoning is inadequate.",
+    "intent": "Reason about multiple sufficient causes under a self-contained causation rule.",
+    "domain": "Private Law – Torts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "rule_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A driver negligently blocks a tunnel. Ten minutes later, a reckless motorcyclist ignores emergency barriers and speeds into the blockage, injuring a passenger. A supplied scope-of-liability rule asks whether the later conduct was so extraordinary and disconnected from the risk created by the defendant that responsibility should be cut off. Analyze arguments on both sides.",
+    "intent": "Evaluate an intervening event using a supplied proximate-causation standard.",
+    "domain": "Private Law – Torts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "counterargument",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A supplied comparative-fault rule reduces recoverable damages by the claimant's percentage of fault. Total proven damages are €80,000. The factfinder assigns 25% fault to the claimant and 75% to the defendant. Calculate the recoverable amount and identify the legal premise that makes the arithmetic relevant.",
+    "intent": "Apply a supplied comparative-fault rule and calculate apportioned damages.",
+    "domain": "Private Law – Torts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A defendant carelessly leaves a door unlocked in violation of a contractual security obligation, but no theft, damage, or other loss occurs. The plaintiff claims €50,000 in negligence damages solely because the conduct was risky. Under a supplied rule requiring compensable harm for negligence damages, explain the difference between breach of a standard and recoverable negligence loss.",
+    "intent": "Distinguish wrongful or risky conduct from compensable tort harm.",
+    "domain": "Private Law – Torts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "rule_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A climbing gym's waiver states that participants accept ordinary risks inherent in climbing but do not accept risks created by the gym's failure to inspect safety anchors as promised. A participant is injured when an anchor fails because it had not been inspected for six months. Analyze the scope of consent/assumption of risk under the supplied waiver.",
+    "intent": "Interpret the scope of a contractual risk allocation as a tort defense.",
+    "domain": "Private Law – Torts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tort_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A chemical supplier mislabels a container; a warehouse ignores a visible leak; an emergency contractor then uses a clearly unsuitable cleanup method. The three acts contribute to an explosion. A supplied rule requires factual causation for each defendant, then asks whether the type of harm fell within the risk each defendant wrongfully created; it also allows comparative responsibility among contributing defendants. Analyze each actor separately, any intervening-cause arguments, and why fault allocation should be kept distinct from the threshold question of liability.",
+    "intent": "Synthesize multi-actor causation, scope of liability, intervening events, and apportionment.",
+    "domain": "Private Law – Torts",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "tort_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "Alex borrows Bea's camera for one week with permission. Alex has physical possession; Bea retains title and can demand return at the end of the week. Explain why possession, custody, and ownership should not be treated as identical concepts.",
+    "intent": "Test the distinction between possession and legal ownership.",
+    "domain": "Private Law – Property",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "property_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A lease says: “Landlord must repair structural defects after written notice; Tenant must repair damage caused by Tenant or guests.” A pipe fails because of age, flooding the kitchen. The tenant notified the landlord two days earlier. Interpret the allocation of repair responsibility and identify any fact needed to determine whether the landlord breached a deadline, since no repair period is stated.",
+    "intent": "Interpret lease obligations and identify missing timing facts or rules.",
+    "domain": "Private Law – Property",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "legal_drafting_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A deed grants Neighbor “a right of way over the east driveway for access to one residence.” Neighbor later converts the residence into a 20-room guesthouse and uses the driveway for frequent commercial deliveries. Without assuming a jurisdiction-specific easement rule, identify the strongest textual and contextual arguments about whether the expanded use remains within the granted scope.",
+    "intent": "Analyze the scope of an access right from the instrument's text and changed use.",
+    "domain": "Private Law – Property",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "property_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A hypothetical adverse-possession rule requires open, continuous, exclusive, and hostile possession for 10 years. Mira openly occupies land for 6 years, then leaves for 18 months, then returns for 5 more years. The rule gives no rule on tacking or interruptions. Explain which elements can be analyzed, why the time requirement cannot be resolved confidently, and what additional rule is needed.",
+    "intent": "Apply supplied elements while recognizing an omitted interruption rule.",
+    "domain": "Private Law – Property",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A principal tells an agent privately, “Do not buy above €50,000,” but publicly announces that the agent is authorized to negotiate and purchase equipment for the company. A seller, unaware of the private limit, reasonably relies on the public announcement and agrees to sell equipment for €55,000. Under a supplied rule recognizing actual authority from principal-to-agent manifestations and apparent authority from principal-to-third-party manifestations, analyze whether the principal may be bound.",
+    "intent": "Distinguish actual from apparent authority and analyze third-party reliance.",
+    "domain": "Private Law – Business / Agency",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "business_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A corporation owns a delivery van. Its sole shareholder personally owes a credit-card debt. The card issuer tries to seize the corporation's van solely because the debtor owns 100% of the shares. A supplied rule treats the corporation as a separate legal person absent a specific exception, and no exception facts are given. Analyze the ownership issue.",
+    "intent": "Apply corporate personality and separate ownership.",
+    "domain": "Private Law – Corporate",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "business_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A supplied corporate rule requires directors to disclose material personal conflicts and prohibits them from diverting a corporate opportunity for personal benefit without approval by disinterested directors after full disclosure. A director learns through the company of a property opportunity, buys it personally, and never discloses it. The investment later loses money. Analyze the duty issue and explain why the poor outcome does not erase a possible breach.",
+    "intent": "Apply a supplied fiduciary-conflict rule without equating outcome with compliance.",
+    "domain": "Private Law – Corporate",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "business_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A fictional constitution gives the legislature power to enact laws, the executive power to enforce them, and courts power to decide concrete disputes. The executive issues an order creating a new criminal offense and a two-year prison penalty without any statute authorizing it. Analyze the structural legal problem using only the supplied allocation of powers.",
+    "intent": "Apply a self-contained separation-of-powers allocation.",
+    "domain": "Public Law – Constitutional Structure",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "constitutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A hypothetical rights charter permits limits on a protected right only if the government shows: (1) a legitimate aim, (2) suitability, (3) no less rights-restrictive reasonably effective alternative, and (4) overall proportionality. A city bans all public demonstrations for six months to reduce nighttime noise, even though a permit-and-decibel system would address noise with narrower impact. Analyze each step separately and identify the strongest point of challenge.",
+    "intent": "Perform structured proportionality analysis rather than general policy balancing.",
+    "domain": "Public Law – Rights",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "constitutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A fictional federation's constitution gives the central legislature exclusive power over customs and the regional legislatures exclusive power over local zoning. A regional law sets building-height limits for warehouses near the border but also imposes a fee on goods crossing the border. Separate the zoning and border-fee aspects and analyze which allocation of power each implicates.",
+    "intent": "Analyze a law with components falling under different constitutional heads of power.",
+    "domain": "Public Law – Federalism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "constitutional_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "Assume a legal system in which the constitution is supreme, statutes are subordinate to it, and courts may decline to apply statutes inconsistent with the constitution in cases properly before them. A ministry argues that its regulation can validate a statute that violates the constitution because the regulation is newer. Explain the hierarchy error.",
+    "intent": "Apply a supplied public-law hierarchy and judicial-review concept.",
+    "domain": "Public Law – Judicial Review",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "An enabling statute authorizes an agency to “set safety standards for commercial ferries.” The agency adopts a rule requiring ferry operators to contribute 2% of revenue to a public art fund. No link to ferry safety is given. Analyze whether the rule fits the delegated purpose and what argument the agency would need to make to defend it.",
+    "intent": "Assess whether administrative action falls within delegated statutory authority.",
+    "domain": "Public Law – Administrative",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "administrative_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A supplied administrative-fairness rule requires notice of the adverse case and a meaningful opportunity to respond before a license is revoked, unless an urgent safety exception applies. An agency revokes a restaurant license based on an inspection report it never disclosed and gives the owner no chance to respond. No urgent safety facts are provided. Analyze the procedural-fairness issue.",
+    "intent": "Apply a self-contained notice-and-response requirement and exception.",
+    "domain": "Public Law – Administrative",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "administrative_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A licensing statute tells an agency to consider public safety, applicant competence, and facility capacity. Internal emails show the agency denied an application mainly because officials disliked the applicant's newspaper criticism of the agency. Under a supplied rule that decisions may not be based on irrelevant considerations or unauthorized purposes, analyze the decision.",
+    "intent": "Assess relevant and irrelevant considerations in discretionary administration.",
+    "domain": "Public Law – Administrative",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "administrative_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A statute authorizes an agency to make “technical standards necessary to prevent industrial water contamination” after public notice and written reasons. The agency, without notice, adopts a rule banning all facilities within 20 km of any river, including facilities that discharge no water. A supplied rights charter also protects lawful property use subject to proportionate environmental regulation. Analyze delegated authority, procedural compliance, the relevance of the rule's breadth to statutory purpose, and the charter's proportionality test. Separate defects in authority, procedure, and rights justification, and identify any facts needed before a final remedy is chosen.",
+    "intent": "Integrate administrative authority, procedure, statutory purpose, rights, proportionality, and remedies.",
+    "domain": "Public Law – Constitutional / Administrative",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "administrative_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A hypothetical charter protects “private correspondence” from unjustified state inspection. Police use an automated system to scan the metadata—not the contents—of all messages for 24 hours. The charter does not define “correspondence” or “inspection.” Identify the strongest textual and purposive arguments about whether metadata scanning falls within the protected interest before moving to justification.",
+    "intent": "Analyze ambiguity at the threshold of rights protection and distinguish scope from justification.",
+    "domain": "Public Law – Rights",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "counterargument",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A hypothetical offense applies when a person “knowingly possesses property that is stolen.” The statute defines “knowingly” as awareness that the relevant circumstance exists. Rowan possesses a bicycle but genuinely believes it was lawfully abandoned. Explain which fact the prosecution must prove about Rowan's mental state and why mere intentional possession is not enough.",
+    "intent": "Distinguish knowledge of a circumstance from intent to possess.",
+    "domain": "Criminal – Mens Rea",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "criminal_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A statute defines recklessness as conscious disregard of a substantial and unjustifiable risk. A driver sees a warning that a bridge may collapse under vehicles over 3 tonnes, knows the truck weighs 5 tonnes, and crosses anyway. Analyze the mental-state element; then explain how the analysis would differ if the driver reasonably but mistakenly believed the truck weighed 2 tonnes.",
+    "intent": "Apply a supplied recklessness definition and contrast it with lack of risk awareness.",
+    "domain": "Criminal – Mens Rea",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A hypothetical criminal rule permits omission liability only when the defendant had a specific legal duty to act and was capable of acting. A bystander sees a stranger drowning but has no statutory, contractual, or special-relationship duty stated in the facts. Explain why moral blame alone does not establish omission liability under the supplied rule.",
+    "intent": "Distinguish moral expectations from a legal duty supporting criminal omission liability.",
+    "domain": "Criminal – Act / Omission",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "criminal_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A supplied attempt rule requires intent to commit the target offense plus conduct that constitutes a substantial step strongly corroborative of that intent. Kim decides to burglarize a warehouse, buys gloves, studies the floor plan, drives to the warehouse at midnight, and begins cutting the lock before police intervene. Analyze intent and the substantial-step requirement.",
+    "intent": "Apply a supplied attempt test to preparation and execution conduct.",
+    "domain": "Criminal – Attempt",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "criminal_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Under the same supplied attempt rule—intent plus a substantial step strongly corroborative of intent—compare two suspects. A buys tools and writes a private plan but never leaves home. B goes to the target building, disables an exterior camera, but then voluntarily leaves before touching the door. Analyze separately whether each has crossed the line from preparation to attempt; do not assume a rule on abandonment unless supplied.",
+    "intent": "Compare borderline preparation and substantial-step facts while identifying missing abandonment law.",
+    "domain": "Criminal – Attempt",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A supplied complicity rule makes a person liable for another's offense if, with the purpose of facilitating that offense, the person aids or encourages its commission. Sam knows Pat plans a robbery and sells Pat a common backpack at ordinary price but says nothing encouraging. Alex, by contrast, drives Pat to the target after saying, “I'll help you get away.” Compare Sam and Alex under the purpose and assistance requirements.",
+    "intent": "Distinguish knowledge from purposeful facilitation in complicity.",
+    "domain": "Criminal – Complicity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A complicity rule provides that an accomplice may avoid liability by timely withdrawing and taking reasonable steps to neutralize prior assistance before the offense occurs. Lee earlier supplies a getaway car, then two hours before the planned offense takes back the keys and calls police, who arrive after the offense has already begun. Analyze withdrawal and identify which timing facts matter.",
+    "intent": "Apply a supplied withdrawal defense and identify timing uncertainty.",
+    "domain": "Criminal – Complicity",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "criminal_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A supplied self-defense rule permits proportionate force when the defendant reasonably believes it is immediately necessary to prevent unlawful force. During an argument, Dana sees Morgan reach quickly into a coat after Morgan says, “You're going to regret this.” Dana uses moderate force first; Morgan was actually reaching for a phone. Analyze the relevance of actual danger, reasonable belief, immediacy, and proportionality.",
+    "intent": "Apply a supplied self-defense standard to a mistaken but potentially reasonable belief.",
+    "domain": "Criminal – Defenses",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "criminal_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A hypothetical code defines necessity as choosing the lesser harm to avoid an imminent natural or circumstantial danger, and duress as committing an offense because another person threatens imminent serious harm. Taylor breaks into a cabin to escape a sudden blizzard. Jordan transports contraband after an armed person threatens immediate violence. Classify the more relevant defense for each and explain the distinction.",
+    "intent": "Distinguish necessity from duress under supplied definitions.",
+    "domain": "Criminal – Defenses",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A statute prohibits “knowingly entering a restricted laboratory.” A door is accidentally left open and the “Restricted” sign has fallen. Robin enters believing the room is a public conference room. Under a supplied rule that mistake of fact may negate the required mental state, analyze liability without assuming the mistake must be reasonable unless the rule says so.",
+    "intent": "Analyze mistake of fact as it relates to a required mental state.",
+    "domain": "Criminal – Mens Rea / Defense",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "criminal_law",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A fictional offense is graded as Level 1 when the proven loss is below €10,000 and Level 2 when the proven loss is €10,000 or more. Evidence establishes €8,500 in direct loss and a disputed €3,000 estimate that the factfinder has not accepted. At sentencing after conviction, only proven loss counts for grading. Which grade is supported on the stated facts, and what would change if the additional €3,000 were later found proven?",
+    "intent": "Apply a supplied quantitative offense-grading threshold while respecting proven versus disputed facts.",
+    "domain": "Criminal – Offense Grading",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "In a U.S. federal civil action, assume subject-matter jurisdiction and venue are governed by separate supplied statutes. The court clearly has subject-matter jurisdiction, but the defendant argues the case was filed in the wrong federal district under the venue statute. Explain why a venue defect is not the same issue as absence of subject-matter jurisdiction.",
+    "intent": "Distinguish subject-matter jurisdiction from venue in a named procedural system.",
+    "domain": "Procedure & Evidence – Civil Procedure",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "jurisdiction_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 63,
+    "prompt": "A supplied personal-jurisdiction rule permits suit when the defendant deliberately directs commercial activity at the forum and the claim arises from that activity. A seller runs a website accessible worldwide but ships 500 targeted orders to Forum F after buying ads aimed specifically at F residents. The claim concerns one of those orders. Analyze the supplied rule and distinguish mere website accessibility from forum-directed conduct.",
+    "intent": "Apply a self-contained personal-jurisdiction test.",
+    "domain": "Procedure & Evidence – Civil Procedure",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "jurisdiction_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A complaint alleges that the defendant promised to deliver 100 units, accepted full payment, delivered none, and refused a demand for performance. A supplied pleading rule requires factual allegations that, if true, satisfy the claim's elements; disputed facts are not resolved at this stage. Explain how the court should evaluate legal sufficiency without deciding whether the allegations are actually true.",
+    "intent": "Apply pleading-stage assumptions and distinguish sufficiency from proof.",
+    "domain": "Procedure & Evidence – Pleading",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "procedural_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A supplied summary-judgment rule requires judgment only when no genuine dispute of material fact exists and the movant is entitled to judgment as a matter of law. The plaintiff offers sworn testimony that the light was green; the defendant offers authenticated video that appears to show red, but the video's timestamp accuracy is genuinely disputed by competing experts. Explain why strong evidence is not automatically the same as absence of a genuine factual dispute.",
+    "intent": "Distinguish evidentiary strength from the absence of a triable dispute.",
+    "domain": "Procedure & Evidence – Summary Judgment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "procedural_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A supplied civil rule assigns the plaintiff the burden of proving each claim element by a preponderance of the evidence, while the defendant bears the burden of proving an affirmative defense. At trial, the plaintiff proves all claim elements, but the defendant offers no evidence on its pleaded defense. Explain burden allocation and why merely pleading the defense does not satisfy the burden of persuasion.",
+    "intent": "Distinguish pleading a defense from proving it.",
+    "domain": "Procedure & Evidence – Burdens",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "procedural_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "Compare these standards as supplied: “preponderance” means more likely than not; “clear and convincing” requires a firm belief or conviction; “beyond a reasonable doubt” is the highest of the three. Without inventing numeric probabilities, explain how the same body of uncertain evidence might satisfy one standard but not another.",
+    "intent": "Test conceptual reasoning about standards of proof without false numerical precision.",
+    "domain": "Procedure & Evidence – Standards of Proof",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "On appeal in a fictional system, legal questions are reviewed without deference, factual findings for clear error, and discretionary rulings for abuse of discretion. The appellant challenges (a) the meaning of a statute, (b) a trial judge's finding about which witness was credible, and (c) the amount of a procedural scheduling extension. Match each issue to the supplied standard and explain why.",
+    "intent": "Classify appellate issues and apply supplied standards of review.",
+    "domain": "Procedure & Evidence – Appeals",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "procedural_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "In a U.S. federal appeal, assume a supplied preservation rule: an evidentiary objection ordinarily must be timely and specific in the trial court, absent a stated exception. Counsel remained silent at trial and raises the issue for the first time on appeal. No exception facts are given. Analyze the preservation problem without assuming the appellate court will reach the merits.",
+    "intent": "Apply a supplied preservation rule in a named appellate system.",
+    "domain": "Procedure & Evidence – Appeals",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "procedural_reasoning",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 70,
+    "prompt": "A criminal procedure rule provides that a search warrant may issue only on a sworn showing of facts establishing probable cause, and the warrant must particularly describe the place to be searched and items sought. An application merely states, “The suspect is probably hiding evidence somewhere in the city,” without underlying facts or a specific place. Analyze both supplied requirements.",
+    "intent": "Apply probable-cause and particularity requirements in a self-contained search rule.",
+    "domain": "Procedure & Evidence – Criminal Procedure",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "procedural_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "For this U.S. federal criminal-procedure hypothetical, assume the following rule: a warrantless search is permitted if a person with actual or apparent authority voluntarily consents, and the search stays within the objectively reasonable scope of that consent. A roommate says, “You may search the shared living room,” but officers then open a locked box labeled with the defendant's name inside the defendant's private bedroom. Analyze authority, scope, and any missing facts.",
+    "intent": "Apply a supplied consent-search framework in an expressly specified system.",
+    "domain": "Procedure & Evidence – Criminal Procedure",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "procedural_reasoning",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 72,
+    "prompt": "For this U.S. federal criminal-procedure hypothetical, assume illegally obtained evidence must be suppressed unless officers objectively and reasonably relied on a facially valid warrant, but that exception does not apply if the affidavit knowingly contained a material falsehood necessary to probable cause. Officers rely on a warrant; later evidence suggests the affiant knowingly invented the only fact supporting probable cause. Analyze the general suppression rule, the reliance exception, and the exception to that exception.",
+    "intent": "Reason through nested criminal-procedure rules and exceptions.",
+    "domain": "Procedure & Evidence – Criminal Procedure",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "procedural_reasoning",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 73,
+    "prompt": "A supplied detention rule requires a judicial review hearing within 24 hours of arrest unless an emergency exception is documented. A person was arrested Monday at 09:00 and, absent any documented emergency, is still awaiting review Tuesday at 15:00. Calculate whether the stated deadline has been exceeded and identify the procedural consequence question that cannot be answered because no remedy rule is supplied.",
+    "intent": "Apply an urgent procedural deadline while distinguishing violation from remedy.",
+    "domain": "Procedure & Evidence – Criminal Procedure",
+    "acuity": "high",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "An evidence rule defines relevant evidence as evidence tending to make a consequential fact more or less probable, but separately permits exclusion when probative value is substantially outweighed by a stated danger of unfair prejudice. A graphic photograph makes identity slightly more probable but carries a substantial risk of inflammatory impact. Explain why relevance is only the first step and analyze the separate exclusion question.",
+    "intent": "Distinguish logical relevance from legal admissibility.",
+    "domain": "Procedure & Evidence – Evidence",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A supplied hearsay rule excludes an out-of-court statement offered to prove the truth of what it asserts, absent an exception. A witness testifies that a customer said, “The floor is wet,” not to prove the floor was wet, but to show the store manager had notice of a reported hazard before the accident. Analyze whether the statement is offered for its truth.",
+    "intent": "Analyze hearsay by focusing on the purpose for which a statement is offered.",
+    "domain": "Procedure & Evidence – Evidence",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A supplied hearsay rule excludes out-of-court statements offered for truth but admits a business-record exception when a record is made near the time by a person with knowledge, kept in the regular course, and supported by testimony about the recordkeeping practice. A company offers a spreadsheet created months after litigation began by a lawyer summarizing old invoices. Analyze each supplied exception element and identify the weakest point.",
+    "intent": "Apply a self-contained hearsay exception element by element.",
+    "domain": "Procedure & Evidence – Evidence",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A witness establishes that a printed email is a genuine printout of a message sent from the defendant's account. The proponent then argues that authentication proves every factual claim in the email is true. Explain the difference between authentication and substantive truth, and identify what additional admissibility or weight issues could remain.",
+    "intent": "Distinguish authenticity from truth and other admissibility questions.",
+    "domain": "Procedure & Evidence – Evidence",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A supplied authentication rule requires enough evidence for a reasonable factfinder to conclude a digital exhibit is what the proponent claims. A chat screenshot shows a username but no metadata; a witness says the account belongs to the defendant, while the defendant offers evidence that several employees shared the login. Analyze whether the issue is authentication, ultimate authorship, weight, or some combination, and why.",
+    "intent": "Analyze digital authentication under a threshold standard and separate it from ultimate truth.",
+    "domain": "Procedure & Evidence – Evidence",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A plaintiff offers an anonymous screenshot to prove the defendant admitted fault. A supplied evidence code requires relevance, authentication, and exclusion of hearsay unless an exception applies; it also permits exclusion if probative value is substantially outweighed by unfair prejudice or confusion. The screenshot is highly relevant if genuine, but its source is disputed, and no hearsay exception is identified. Analyze admissibility in the correct sequence, keeping relevance, authentication, hearsay, prejudice, and evidentiary weight distinct.",
+    "intent": "Integrate multiple admissibility doctrines without collapsing threshold questions.",
+    "domain": "Procedure & Evidence – Evidence",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A complaint alleges fraud with particularized facts. At pleading, the allegations satisfy the supplied sufficiency rule. At summary judgment, the plaintiff relies on one unauthenticated document and speculation, while the defendant offers sworn denials and authenticated records. At trial, if the document were later authenticated and admitted, credibility would be for the factfinder. Explain how the claim can survive pleading yet fail at summary judgment on the current record, and why that does not mean the allegations were “false” as a matter of law.",
+    "intent": "Integrate pleading, summary judgment, evidence, burdens, and factfinding across stages.",
+    "domain": "Procedure & Evidence – Procedural Posture",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "procedural_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A supplied preliminary-injunction rule requires consideration of likelihood of success, irreparable harm, balance of hardships, and public interest. A claimant shows a strong merits case but only ordinary monetary loss that can be fully compensated later. The defendant shows substantial operational disruption from an injunction. Analyze all four factors and explain why a strong merits showing does not automatically determine equitable relief.",
+    "intent": "Apply a multi-factor injunction standard without treating one factor as dispositive unless the rule says so.",
+    "domain": "Remedies & Professional – Remedies",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "remedies_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A supplied damages rule allows losses caused by the violation and proven with reasonable certainty, but excludes avoidable losses after the claimant receives notice of the breach. Proven pre-notice loss is €12,000; proven post-notice loss is €10,000, of which €6,000 could reasonably have been avoided. Calculate the strongest supported recovery and explain the mitigation step.",
+    "intent": "Combine remedy limits and arithmetic.",
+    "domain": "Remedies & Professional – Remedies",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A business seeks a declaration that a contract clause is invalid and also seeks an order forbidding the counterparty from enforcing the clause. Explain the conceptual difference between declaratory relief and an injunction, and why entitlement to one does not automatically establish entitlement to the other.",
+    "intent": "Distinguish forms of relief and separate liability or validity from enforcement remedy.",
+    "domain": "Remedies & Professional – Remedies",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "remedies_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A supplied rescission rule allows unwinding a contract for qualifying misrepresentation if restoration of substantially received benefits is feasible. A buyer seeks rescission after using specialized equipment for three years, during which the equipment depreciated and was materially altered. Analyze entitlement separately from the feasibility and terms of restoration.",
+    "intent": "Separate grounds for rescission from practical remedial consequences.",
+    "domain": "Remedies & Professional – Remedies",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "remedies_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A supplied professional rule bars representation of clients with directly adverse interests in the same matter unless the lawyer reasonably believes competent and diligent representation is possible and each affected client gives informed written consent; some conflicts may be nonconsentable if competent representation is impossible. A lawyer is asked to represent both buyer and seller in hostile litigation over the same transaction. Analyze the conflict and why consent alone may not resolve it.",
+    "intent": "Apply a supplied current-client conflict rule and recognize nonconsentable conflict logic.",
+    "domain": "Remedies & Professional – Legal Ethics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "legal_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A supplied professional code requires confidentiality of client information but also requires candor to a tribunal and prohibits knowingly offering false evidence. A client privately tells counsel that a document counsel previously submitted is fabricated. The code states that counsel must first seek client correction and, if necessary, take reasonable remedial measures even if disclosure of the fabrication is required. Analyze the lawyer's obligations in sequence and the tension between confidentiality and candor.",
+    "intent": "Integrate confidentiality, candor, false evidence, and remedial duties under supplied rules.",
+    "domain": "Remedies & Professional – Legal Ethics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "legal_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A supplied professional rule says the client decides whether to accept a settlement, while the lawyer may advise on strategy. Counsel accepts an offer without telling the client because counsel believes it is an excellent deal. Explain the allocation of authority and why good intentions do not replace client authorization.",
+    "intent": "Distinguish client decisions from lawyer strategic authority.",
+    "domain": "Remedies & Professional – Legal Ethics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "legal_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A researcher finds a case that squarely supports a proposition, but the database also shows the case was later overruled on that precise point by a higher court in the same jurisdiction. A later article still quotes the old case without discussing the overruling decision. Explain how currentness, negative treatment, hierarchy, and source type affect whether either source supports the proposition today.",
+    "intent": "Evaluate whether a cited authority remains legally valid and controlling.",
+    "domain": "Remedies & Professional – Legal Research",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "authority_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "For this Austrian employment-law hypothetical, assume the supplied classification test weighs control over work, integration into the business, entrepreneurial risk, ability to hire substitutes, and ownership of tools; no single factor is conclusive. A courier must follow detailed routes and hours, uses the company's branded vehicle, cannot hire substitutes, and is paid a fixed weekly amount, but files invoices as a “contractor.” Analyze the supplied factors and explain why the invoice label is not dispositive.",
+    "intent": "Apply a supplied multi-factor worker-classification test in a named jurisdiction.",
+    "domain": "Specialized – Employment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 90,
+    "prompt": "A consumer-protection rule prohibits a trader from making a materially misleading factual representation likely to affect a consumer's purchase decision. A seller advertises a used laptop as “new, never used” while knowing it was previously leased for a year. Analyze each supplied element and distinguish factual representation from mere sales puffery.",
+    "intent": "Apply a self-contained misleading-representation rule.",
+    "domain": "Specialized – Consumer",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "rule_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A hypothetical copyright rule protects original expression but not abstract ideas. Writer A describes the general idea of “a detective solving crimes on a space station.” Writer B independently writes a novel using that premise but different characters, plot, dialogue, and settings. Under the supplied rule, explain what is and is not protected and why shared premise alone may be insufficient.",
+    "intent": "Distinguish unprotected ideas from protected expression.",
+    "domain": "Specialized – Intellectual Property",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "rule_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A supplied trademark-infringement test asks whether the defendant's use is likely to cause confusion about source, sponsorship, or affiliation, considering similarity of marks, similarity of goods, channels of trade, and evidence of actual confusion. “NOVA” is used for bicycles; a new seller uses “NOVAA” for bicycle helmets sold through the same stores. There is no actual-confusion evidence yet. Analyze the factors and explain why absence of actual confusion is not automatically decisive.",
+    "intent": "Apply a supplied multi-factor trademark-confusion test.",
+    "domain": "Specialized – Intellectual Property",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "rule_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A hypothetical patent claim requires elements A, B, C, and D. An accused device contains A, B, and D but replaces C with a different component. Under a supplied literal-infringement rule requiring every claim element, analyze literal infringement and identify what additional doctrine would be needed before considering equivalents or substitutes.",
+    "intent": "Perform claim-element analysis and resist inventing an omitted equivalents doctrine.",
+    "domain": "Specialized – Intellectual Property",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "rule_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A supplied trade-secret rule requires information that is not generally known, has economic value from secrecy, and is subject to reasonable secrecy measures; misappropriation requires improper acquisition, use, or disclosure. A company posts the alleged secret formula on its public website for six months before a competitor copies it. Analyze secrecy, value, precautions, and misappropriation without assuming patent law applies.",
+    "intent": "Apply trade-secret elements and distinguish secrecy protection from other IP regimes.",
+    "domain": "Specialized – Intellectual Property",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "rule_application",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "For this European Union data-protection hypothetical, assume the following supplied framework as of 1 January 2025: personal data may be processed only for specified purposes supported by a valid legal basis, and data collected for one purpose may not be reused incompatibly without another legal basis. A retailer collects addresses solely to deliver purchases, then sells those addresses to an unrelated advertiser without consent or another stated legal basis. Analyze purpose limitation and legal basis using only the supplied framework.",
+    "intent": "Apply a supplied EU data-protection framework with an explicit temporal reference.",
+    "domain": "Specialized – Privacy / Data Protection",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "rule_application",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 96,
+    "prompt": "For this England and Wales conflict-of-laws hypothetical, assume the supplied rule: contract validity is governed by the parties' valid chosen law; absent a valid choice, the law of the seller's habitual residence applies. The contract chooses French law in a valid clause; the seller is habitually resident in England; suit is filed in London. Which law governs contract validity under the supplied rule, and why are forum, jurisdiction, and applicable law distinct questions?",
+    "intent": "Apply a self-contained choice-of-law rule in a named forum and distinguish forum from governing law.",
+    "domain": "Specialized – Conflict of Laws",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "jurisdiction_analysis",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 97,
+    "prompt": "In State Q, Statute 1 governed conduct through 31 December 2021 and prohibited all commercial use of Device D. Statute 2, effective 1 January 2022, permits such use with a license and expressly states it has no retroactive effect. A company used Device D without a license on 15 December 2021 and again on 15 January 2022. Analyze each date under the correct version of law and explain why the later permissive regime does not automatically legalize the earlier conduct.",
+    "intent": "Apply different legal regimes to conduct occurring before and after an effective-date change.",
+    "domain": "Cross-cutting – Temporal Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "rule_application",
+    "jurisdiction_required": true
+  },
+  {
+    "id": 98,
+    "prompt": "A statute provides statutory damages of €500 for each proven unlawful disclosure, capped at €5,000 per claimant per proceeding. The claimant proves 14 unlawful disclosures. Separately, the statute allows proven actual damages, but states that statutory and actual damages cannot be recovered for the same disclosure. The claimant proves €2,000 actual loss attributable to four of the 14 disclosures. Calculate the maximum statutory amount, then explain why the final remedy requires avoiding double recovery for the same four disclosures.",
+    "intent": "Combine statutory caps, per-violation arithmetic, and anti-duplication remedy logic.",
+    "domain": "Cross-cutting – Quantitative Legal Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A brief cites Case A for the proposition that “a regulator may impose any monetary penalty it considers useful.” The supplied summary of Case A shows the court upheld a €10,000 penalty only because a statute expressly authorized penalties up to €25,000 for specified safety violations; the opinion added, in dicta, that broad discretion can sometimes help regulation. Evaluate whether Case A actually supports the brief's proposition, distinguishing holding, statutory authorization, dicta, and the breadth of the claimed rule.",
+    "intent": "Test whether a precedent actually supports the proposition for which it is cited.",
+    "domain": "Cross-cutting – Authority Evaluation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "authority_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A manufacturer contracts with Distributor to deliver 1,000 units by 1 June. Distributor's purchasing manager had actual authority only up to €100,000, but Manufacturer received a company letter signed by the CEO stating that the manager could “negotiate and conclude this supply contract,” with no stated limit. The final price is €120,000. Before delivery, Manufacturer learns that a component may fail under heat but ships anyway. Distributor resells the units to Retailer. Several units fail, damaging Retailer's equipment. Distributor sues Manufacturer for breach; Retailer sues Manufacturer for negligence. Manufacturer argues the contract was unauthorized and that Retailer's maintenance caused part of the damage. A supplied procedural rule places the burden on each claimant to prove claim elements, on Manufacturer to prove comparative fault as an affirmative defense, and allows summary judgment only where no genuine dispute of material fact exists. Analyze: (1) actual and apparent authority, (2) contract formation/binding effect, (3) breach and any remedy limits that would require additional contract language, (4) negligence elements and causation as to Retailer, (5) comparative-fault burden, (6) which factual disputes could block summary judgment, and (7) the strongest counterarguments and missing facts. Do not invent a jurisdiction-specific privity or products-liability rule not supplied.",
+    "intent": "Integrate agency, contract, tort, causation, burdens, defenses, remedies, procedural posture, and missing law.",
+    "domain": "Cross-cutting – Multi-Issue Synthesis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "issue_spotting",
+    "jurisdiction_required": false
+  }
+]

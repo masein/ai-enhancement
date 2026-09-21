@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "Reconstruct this argument into explicit premises and a conclusion, then evaluate the inference separately from the premises: \"Every policy that predictably causes avoidable harm should be revised. This policy predictably causes avoidable harm. So it should be revised, even though revising it will be inconvenient.\"",
+    "intent": "Test argument reconstruction, conclusion identification, and the distinction between premise evaluation and deductive inference.",
+    "domain": "Logic & Argumentation — Argument Reconstruction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "argument_reconstruction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "Consider: \"If the alarm is armed, the indicator is lit. The indicator is lit. Therefore the alarm is armed.\" Is the conclusion deductively guaranteed? Explain the structure without relying on a fallacy label alone, and give one countermodel.",
+    "intent": "Test conditional reasoning and the ability to show invalidity by a possible case where premises are true and the conclusion false.",
+    "domain": "Logic & Argumentation — Deductive Logic",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "deductive_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A speaker argues: \"If a substance is gold, it conducts electricity. This sample is not gold. Therefore it does not conduct electricity.\" Evaluate the inference and explain what further premise would be needed to make the conclusion follow.",
+    "intent": "Test conditional reasoning, hidden assumptions, and repair of an invalid argument.",
+    "domain": "Logic & Argumentation — Deductive Logic",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "argument_debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "Suppose all ravens in a small island sample are black, but the sample was collected only near a coal-processing site. How strong is the inference that all ravens on the island are black? Identify the key evidential weakness and what better evidence would look like.",
+    "intent": "Test inductive strength, representativeness, and evidence quality without confusing induction with deduction.",
+    "domain": "Logic & Argumentation — Inductive Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "inductive_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "Three explanations fit a broken greenhouse window: a storm, a thrown stone, or thermal stress. You learn that there was no storm, a stone is found inside, and nearby cameras show no person but have a ten-minute gap. Compare the explanations using fit with evidence, simplicity, and prior plausibility. State what remains uncertain.",
+    "intent": "Test abductive reasoning and calibrated inference to the best explanation.",
+    "domain": "Logic & Argumentation — Abductive Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "abductive_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A rule says: \"Being a citizen is sufficient for access to the archive, but not necessary.\" Mira is not a citizen. What, if anything, follows about whether Mira has access? Explain using necessary and sufficient conditions.",
+    "intent": "Test application of sufficient-but-not-necessary conditions.",
+    "domain": "Logic & Argumentation — Necessary and Sufficient Conditions",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "formal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A club rule states: \"A member may vote only if dues are paid, and any member whose dues are paid may vote.\" Sam is a member whose dues are unpaid. Priya is a member whose dues are paid. Explain what follows for each and whether paid dues are necessary, sufficient, both, or neither for voting under this rule.",
+    "intent": "Test necessary-and-sufficient reasoning in an applied case.",
+    "domain": "Logic & Argumentation — Necessary and Sufficient Conditions",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "formal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "Evaluate the claim: \"All fair procedures treat everyone identically.\" Construct a genuine counterexample if possible. Your case must satisfy a plausible notion of procedural fairness while not treating everyone identically, and you must explain why it qualifies.",
+    "intent": "Test counterexample construction and careful satisfaction of the target conditions.",
+    "domain": "Logic & Argumentation — Counterexamples",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "counterexample",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "An argument says: \"Either the city bans all private vehicles or it does nothing about congestion. Doing nothing is irresponsible. Therefore it must ban all private vehicles.\" Reconstruct the reasoning and assess whether the initial disjunction is justified.",
+    "intent": "Test false-dilemma analysis through reconstruction rather than mere labeling.",
+    "domain": "Logic & Argumentation — Informal Logic",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "argument_reconstruction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A critic replies to an economist's argument by saying, \"She owns stock in a company that benefits from her recommendation, so her conclusion is false.\" Separate what the conflict of interest can reasonably show about credibility from what it cannot establish about the truth of the conclusion.",
+    "intent": "Test ad hominem, credibility, and evidential relevance distinctions.",
+    "domain": "Logic & Argumentation — Informal Logic",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "distinction_making",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A committee says: \"Most specialists in this narrow field accept hypothesis H, so H is probably true.\" Explain when this appeal to expertise is reasonable evidence and what facts about expertise, consensus, incentives, and independent evidence would weaken or strengthen it.",
+    "intent": "Test nuanced reasoning about authority and testimony.",
+    "domain": "Logic & Argumentation — Appeals to Authority",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A speaker says, \"Only humans are rational, and anyone who is rational deserves political participation; therefore only humans deserve political participation.\" Identify the quantifier or conditional mistake in the inference and explain why the conclusion does not follow even if both premises are granted.",
+    "intent": "Test quantifier/conditional reasoning and invalid exclusion from one-way conditions.",
+    "domain": "Logic & Argumentation — Quantifier Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "formal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "Explain why \"Not all laboratory samples passed the test\" does not mean \"No laboratory samples passed the test.\" Give one concrete distribution of passing and failing samples that makes the first statement true and the second false.",
+    "intent": "Test accessible quantifier scope.",
+    "domain": "Logic & Argumentation — Quantifier Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "formal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "An argument uses the word \"natural\" first to mean \"not artificially manufactured\" and later to mean \"morally good.\" Reconstruct the argument in a way that makes the shift visible, then explain how the shift affects validity.",
+    "intent": "Test precise identification of equivocation and its inferential effect.",
+    "domain": "Logic & Argumentation — Ambiguity and Equivocation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ambiguity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "The sentence \"Every student read a book\" can mean that all students read the same book or that each read at least one book, possibly different books. Show how these readings differ and explain how an argument could become invalid by moving between them.",
+    "intent": "Test scope ambiguity and its effect on reasoning.",
+    "domain": "Logic & Argumentation — Ambiguity and Equivocation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ambiguity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A theorist defends principle P by saying, \"P is correct because every acceptable decision follows P, and a decision is acceptable exactly when it follows P.\" Is this necessarily question-begging? Analyze whether the proposed criterion independently supports P or merely presupposes it.",
+    "intent": "Test careful diagnosis of circularity without over-labeling.",
+    "domain": "Logic & Argumentation — Circularity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A critic proposes a reductio: \"If we accept rule R, then in case C we must accept both that action A is required and that A is forbidden.\" Explain why this would be a stronger reductio than merely showing that R has an unpopular consequence, and identify what must be established about case C for the reductio to work.",
+    "intent": "Test reductio reasoning, contradiction, and case applicability.",
+    "domain": "Logic & Argumentation — Reductio",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A dense passage argues that voluntary promises normally create obligations, infers that institutional membership can sometimes resemble promising, then concludes members have presumptive duties, but adds that coercive entry may defeat the analogy. Reconstruct the argument with an intermediate conclusion, state one hidden assumption needed for the analogy, identify the strongest reasonable reading of \"voluntary,\" and evaluate the coercion objection without replacing the original argument.",
+    "intent": "Test high-complexity reconstruction, charity, hidden assumptions, ambiguity, and objection/reply.",
+    "domain": "Logic & Argumentation — Argument Reconstruction",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "Lena checks a reliable clock that stopped exactly twelve hours ago. By coincidence it displays the correct time when she looks. She believes the displayed time, and it is true. Explain why truth, belief, and apparent justification may still fall short of knowledge.",
+    "intent": "Test epistemic luck and the limits of justified true belief.",
+    "domain": "Epistemology — Knowledge and Epistemic Luck",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "epistemology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "Two hikers see what looks like smoke beyond a ridge. One has normal vision in clear weather; the other has fogged glasses and has been told falsely that a fire drill is underway. Compare their perceptual justification without assuming that a true belief must be equally justified in both cases.",
+    "intent": "Test perceptual justification, defeaters, and the distinction between truth and justification.",
+    "domain": "Epistemology — Perception",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A witness with a strong track record reports that a bridge is closed. A second witness, equally reliable and independent, reports that it is open. How should a rational listener adjust confidence? Discuss reliability, independence, and the effect of disagreement rather than declaring testimony either worthless or decisive.",
+    "intent": "Test testimony and rational response to conflicting evidence.",
+    "domain": "Epistemology — Testimony and Disagreement",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A student argues: \"I cannot rule out with absolute certainty that I am dreaming, so I know nothing about the room around me.\" Assess the inference by distinguishing logical possibility of error from having a defeater or good reason for doubt.",
+    "intent": "Test proportional treatment of skeptical possibilities.",
+    "domain": "Epistemology — Skepticism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "argument_debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "Suppose a navigation method has produced correct results in 990 of 1,000 independently checked trials. One theory of justification emphasizes reasons accessible to the user; another emphasizes the reliability of the process. Explain how the same case can support different verdicts and what additional facts each view would want.",
+    "intent": "Test internalist/externalist-style reasoning without requiring jargon.",
+    "domain": "Epistemology — Justification",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A belief system is highly coherent internally, but all of its members are isolated from observation and could be replaced by a very different but equally coherent system. Explain both why coherence can provide justificatory support and why isolation creates an objection.",
+    "intent": "Test coherentist reasoning and an alternative-system objection.",
+    "domain": "Epistemology — Justification",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A theory says some perceptual beliefs can be justified without being inferred from other beliefs, thereby stopping a regress of reasons. State the regress problem this proposal addresses, then present one objection concerning why those starting beliefs deserve special status.",
+    "intent": "Test foundationalist reasoning conceptually.",
+    "domain": "Epistemology — Justification",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "argument_reconstruction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "Researchers fail to detect a predicted signal in an instrument that would detect the signal 99% of the time if it were present. Explain why this absence of evidence can count as evidence of absence, while a failure using an instrument with only a 5% detection rate would be much weaker.",
+    "intent": "Test expected-evidence reasoning about absence of evidence.",
+    "domain": "Epistemology — Evidence and Confirmation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "For twenty years a machine has started successfully every morning under stable conditions. A mechanic infers it will start tomorrow. Explain why this inference may be rational yet not deductively guaranteed, and identify the assumption about regularity connecting past observations to the future.",
+    "intent": "Test induction and the uniformity assumption.",
+    "domain": "Epistemology — Induction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "inductive_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A person claims their memory is reliable because they remember many occasions on which their memory was accurate. Explain the concern about epistemic circularity and whether the circularity automatically makes every use of memory irrational.",
+    "intent": "Test nuanced analysis of method-dependent support.",
+    "domain": "Epistemology — Epistemic Circularity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "Two equally informed and equally careful reasoners assess the same evidence and reach opposite conclusions. Give a balanced analysis of whether each should reduce confidence, considering possible higher-order evidence about their own reliability and the possibility of hidden asymmetries.",
+    "intent": "Test peer-disagreement reasoning without imposing one universal rule.",
+    "domain": "Epistemology — Peer Disagreement",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A medical expert speaks confidently outside her field about a complex archaeological question. Explain why being an expert in one domain does not automatically transfer authority to another, and identify what evidence could still make her testimony worth considering.",
+    "intent": "Test domain relevance in epistemic authority.",
+    "domain": "Epistemology — Epistemic Authority",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "In a community, members of a stigmatized occupation are routinely given less credibility even when their track records match everyone else's. Analyze the epistemic mechanism involved, including how credibility practices can distort what the group knows, without assuming any partisan conclusion.",
+    "intent": "Test mechanism-based reasoning about credibility deficits and social knowledge.",
+    "domain": "Epistemology — Social Epistemology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "Compare two accounts of knowledge using this case: Ana has strong evidence that one of two identical boxes contains a red ball; she randomly chooses the left box, which happens to contain the ball, and forms the true belief that the left box contains it. One account says justified true belief is enough; another requires a non-accidental connection between belief and truth. Reconstruct the strongest case for each account, explain the role of luck, give one objection to each, and state what the case does and does not establish.",
+    "intent": "Test multi-theory epistemology with luck, objections, and qualified conclusions.",
+    "domain": "Epistemology — Knowledge and Epistemic Luck",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "Two factory-made cups are molecule-for-molecule alike at noon but sit on different tables. Explain why qualitative similarity does not by itself make them numerically identical.",
+    "intent": "Test numerical identity versus qualitative similarity.",
+    "domain": "Metaphysics — Identity",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A wooden tool has one part replaced each year until none of its original material remains, while its use, location, and repair history remain continuous. Compare material-composition, continuity, function, and historical criteria of persistence. Explain why the case need not have one uncontested answer.",
+    "intent": "Test persistence through change using competing identity criteria.",
+    "domain": "Metaphysics — Persistence",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "thought_experiment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A device scans a person, destroys the original body, and creates one psychologically continuous successor elsewhere. A later version creates two equally psychologically continuous successors. Explain why the one-successor case may seem easier for a psychological-continuity theory than the branching case.",
+    "intent": "Test personal identity and one-to-many branching.",
+    "domain": "Metaphysics — Personal Identity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "thought_experiment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Distinguish these claims: (a) the coin actually landed heads, (b) the coin could have landed tails, and (c) the coin had to land heads. Explain which concern actuality, possibility, and necessity.",
+    "intent": "Test basic modal distinctions.",
+    "domain": "Metaphysics — Modality",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "Someone argues: \"I can coherently imagine a conscious being with no physical body; therefore such a being is metaphysically possible.\" Explain why conceivability might count as evidence while still requiring an argument connecting imagination to metaphysical possibility.",
+    "intent": "Test conceivability-versus-possibility reasoning.",
+    "domain": "Metaphysics — Modality",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "Two independent sparks each would have been sufficient to ignite a dry field at the same time. The field burns. Why does a simple test asking \"Would the field have burned without spark A?\" create difficulty for calling A a cause? Discuss overdetermination conceptually.",
+    "intent": "Test counterfactual causation under multiple sufficient causes.",
+    "domain": "Metaphysics — Causation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A backup switch would have started a machine if the primary switch had failed, but the primary switch works first and the backup never activates. Analyze why simple temporal sequence and simple counterfactual dependence can each be incomplete guides to causation in this preemption-style case.",
+    "intent": "Test causal analysis involving preemption and mechanisms.",
+    "domain": "Metaphysics — Causation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "One view says only the present exists; another says past, present, and future events are equally real even though they occur at different times. Describe the central metaphysical disagreement without claiming that ordinary statements about change alone settle it.",
+    "intent": "Test conceptual understanding of competing views of time.",
+    "domain": "Metaphysics — Time",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A deterministic universe is one in which prior states plus laws fix later states. A fatalistic story says an outcome occurs regardless of what anyone does. Explain why determinism does not by itself imply fatalism, using a case where an action is causally necessary for the outcome.",
+    "intent": "Test the determinism/fatalism distinction.",
+    "domain": "Metaphysics — Free Will",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "In a deterministic setting, Jules acts after calm reflection, understands the reasons, would respond differently to sufficiently strong counter-reasons, and is not coerced. Compare a freedom view centered on reasons-responsive control with a view requiring genuinely open alternatives. Explain why they can disagree about responsibility while agreeing on all the physical facts.",
+    "intent": "Test compatibilist/incompatibilist-style reasoning with explicit conceptions of freedom.",
+    "domain": "Metaphysics — Free Will",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "An infallible observer knew yesterday that Noor would choose tea today. Explain why the observer's knowledge being infallible is not the same claim as the knowledge causing Noor's choice. Then identify the separate modal worry about whether Noor could have done otherwise.",
+    "intent": "Test foreknowledge, causation, and modal freedom distinctions.",
+    "domain": "Metaphysics — Freedom and Foreknowledge",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "distinction_making",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A principle says every contingent fact must have an explanation. If accepted, what pressure does it place on a chain of contingent explanations extending without end? Explain why an infinite regress is not automatically logically impossible and what additional premise would be needed to call the regress explanatory failure.",
+    "intent": "Test sufficient-reason reasoning and regress analysis.",
+    "domain": "Metaphysics — Explanation and Regress",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A rescue plan can save five people only by imposing a small but nontrivial risk on one uninvolved person. Compare how a consequence-focused approach and a rights- or constraint-focused approach might analyze the case. Do not assume either automatically wins.",
+    "intent": "Test competing moral principles and framework-sensitive reasoning.",
+    "domain": "Ethics & Metaethics — Normative Ethics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A manager keeps a promise despite a modest loss to overall welfare. Explain how duty-based reasoning could support the decision while still allowing consequences to matter as part of the context.",
+    "intent": "Test non-caricatured deontological reasoning.",
+    "domain": "Ethics & Metaethics — Deontological Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A person tells the truth in one case from honesty, but in another case only because lying would be discovered. Explain how a character-centered ethical approach can distinguish the actions even if the outward behavior is the same.",
+    "intent": "Test virtue, motive, and practical wisdom.",
+    "domain": "Ethics & Metaethics — Virtue Ethics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A principle says \"One must never deceive.\" Construct a difficult case in which deception appears to prevent a grave unjust harm, then explain whether the case refutes the principle, reveals an exception, or instead challenges how the principle was formulated.",
+    "intent": "Test counterexample reasoning about defeasible or absolute moral principles.",
+    "domain": "Ethics & Metaethics — Moral Principles",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "counterexample",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A doctor-like agent truthfully warns a competent adult about risks, but then threatens to withdraw unrelated essential help unless the adult chooses the agent's preferred option. Analyze autonomy, information, coercion, and voluntariness without giving medical advice.",
+    "intent": "Test autonomy and coercion in a self-contained bioethical-style case.",
+    "domain": "Ethics & Metaethics — Autonomy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "applied_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "Two drivers make the same reckless choice. By chance, one encounters no pedestrian; the other injures someone. Should blame differ? Analyze the tension between control-based responsibility and outcome-sensitive judgment.",
+    "intent": "Test moral luck.",
+    "domain": "Ethics & Metaethics — Moral Responsibility",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "thought_experiment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "An action is legal in a hypothetical society but violates a strong promise made freely to another person. Explain why legality alone does not settle the moral question and identify at least two morally relevant considerations.",
+    "intent": "Test the legality/morality distinction.",
+    "domain": "Ethics & Metaethics — Applied Normative Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "An argument says: \"This practice is widespread in nature, therefore humans ought to adopt it.\" Identify the missing normative bridge and explain why the descriptive premise alone does not yield the conclusion.",
+    "intent": "Test the is–ought gap.",
+    "domain": "Ethics & Metaethics — Metaethics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "argument_debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "Two cultures disagree sharply about a moral practice. A student concludes that moral truth must therefore be culture-relative. Explain why disagreement by itself does not entail relativism, and identify what further argument a relativist would need.",
+    "intent": "Test disagreement versus relativism.",
+    "domain": "Ethics & Metaethics — Metaethics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "argument_reconstruction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A theory says moral claims can be true independently of anyone's approval. Give one reason this view might explain moral disagreement as genuine disagreement, and one challenge concerning how people could know such truths.",
+    "intent": "Test moral realism and an epistemic objection.",
+    "domain": "Ethics & Metaethics — Metaethics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Someone says, \"Stealing is wrong\" and another says, \"I disapprove of stealing.\" Explain why these need not express the same kind of claim, even if the speaker who says the first sentence also disapproves.",
+    "intent": "Test normative assertion versus attitude report.",
+    "domain": "Ethics & Metaethics — Metaethics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "distinction_making",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "An emergency policy would produce the best expected aggregate outcome, violate a stringent individual right, and require an official to act from a troubling motive. Analyze the case under consequence-focused, duty/rights-focused, and virtue/character-focused approaches. Identify what each treats as morally salient, where the frameworks conflict, and what moral cost may remain under each option.",
+    "intent": "Test multi-framework moral dilemma analysis without assuming a single winning theory.",
+    "domain": "Ethics & Metaethics — Moral Dilemmas",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A volunteer gives up a weekend to help strangers, but the circumstances do not make such sacrifice a duty. Distinguish obligatory, permissible, praiseworthy-beyond-duty, and forbidden action, and explain which category best fits given the stated facts.",
+    "intent": "Test permissions, obligations, and supererogation.",
+    "domain": "Ethics & Metaethics — Moral Permissions",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A decision-maker is 60% confident in a welfare-maximizing moral theory and 40% confident in a rights-centered theory. Option A is slightly better under the first theory but clearly prohibited under the second; option B is acceptable under both but less beneficial under the first. Explain at least two reasonable ways to reason under this moral uncertainty and why simple confidence-weighting may not settle everything.",
+    "intent": "Test moral uncertainty and cross-theory decision reasoning.",
+    "domain": "Ethics & Metaethics — Moral Uncertainty",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "decision_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A hypothetical state enacts rules through fair procedures, but one rule imposes a severe burden on a small minority for trivial public benefit. Explain why procedural legality and democratic authorization may matter to legitimacy without automatically settling whether the rule is just.",
+    "intent": "Test legality, democratic procedure, legitimacy, rights, and justice neutrally.",
+    "domain": "Political & Social Philosophy — Legitimacy and Justice",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "One conception of liberty emphasizes absence of interference; another emphasizes effective self-direction or control over one's life. Apply both conceptions to a case in which a person faces no legal prohibition but lacks meaningful options because of dependency on a private gatekeeper.",
+    "intent": "Test competing concepts of liberty without ranking them.",
+    "domain": "Political & Social Philosophy — Liberty",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A society can give everyone the same resource bundle or give extra resources to those who need more to reach a basic threshold. Explain how equal treatment, equality of resources, sufficiency, and concern for need can support different judgments.",
+    "intent": "Test distinctions among equality and distributive principles.",
+    "domain": "Political & Social Philosophy — Equality and Distribution",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Three allocation rules are proposed for a public fund: equal shares, priority to the worse off, and rewards proportional to contribution. A fourth rule protects strong claims to previously acquired holdings. Compare the values each rule expresses and identify at least one conflict that cannot be solved by calling all four simply \"fair.\"",
+    "intent": "Test distributive justice across equality, priority, desert, and entitlement.",
+    "domain": "Political & Social Philosophy — Distributive Justice",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "Residents benefit from a flood barrier funded by taxes. One resident refuses to contribute while knowingly enjoying the protection. Reconstruct a fair-play argument for an obligation to contribute and give one objection concerning consent or the voluntariness of accepting benefits.",
+    "intent": "Test political obligation through argument and objection.",
+    "domain": "Political & Social Philosophy — Political Obligation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A majority votes to ban a harmless minority practice merely because most voters dislike it. Analyze the tension between majority rule, equal political participation, individual liberty, and minority rights without endorsing a real political position.",
+    "intent": "Test democratic legitimacy and rights in a neutral hypothetical.",
+    "domain": "Political & Social Philosophy — Democracy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "political_philosophy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A company produces harm through many individually ordinary decisions made under rules that predictably generate the outcome, although no single employee intends the harm. Distinguish causal contribution, individual blame, collective responsibility, and structural responsibility.",
+    "intent": "Test social-philosophical responsibility without assuming every member is equally blameworthy.",
+    "domain": "Political & Social Philosophy — Collective and Structural Responsibility",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "distinction_making",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A committee has voting rules, stores information, revises policies in response to reasons, and sometimes reaches a decision no single member initially preferred. What would support or undermine treating the committee as a genuine agent with beliefs or intentions? Do not assume group agency merely from membership.",
+    "intent": "Test collective agency conceptually.",
+    "domain": "Political & Social Philosophy — Collective Agency",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A robot and a human are behaviorally indistinguishable across a long series of tasks. What evidence does this provide about the robot's beliefs or understanding, and why does behavioral equivalence not by itself settle whether it has subjective experience?",
+    "intent": "Test behavioral evidence while distinguishing intelligence, understanding, and consciousness.",
+    "domain": "Philosophy of Mind & Language — Consciousness and Artificial Minds",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A theory identifies mental states partly by the causal roles they play between inputs, other internal states, and behavior. Explain how this can allow the same mental state to be realized in different physical materials, and give one qualia-based objection.",
+    "intent": "Test functionalism and multiple realizability with an objection.",
+    "domain": "Philosophy of Mind & Language — Functionalism",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "Imagine a being physically and behaviorally identical to a conscious human but stipulated to lack any inner experience. What is this scenario intended to pressure in a purely physical account of consciousness, and why does its mere conceivability not automatically prove metaphysical possibility?",
+    "intent": "Test philosophical-zombie-style reasoning without assuming the conclusion.",
+    "domain": "Philosophy of Mind & Language — Consciousness",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "thought_experiment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A scientist learns every physical fact about color vision while living in a monochrome environment, then sees red for the first time. Explain what a defender of non-reductive views might claim is newly learned and how a physicalist might reply without merely denying the experience.",
+    "intent": "Test explanatory-gap and qualia reasoning with objection/reply.",
+    "domain": "Philosophy of Mind & Language — Consciousness",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "Suppose the name \"Arden\" was introduced to refer to a particular person, but most speakers later associate several false descriptions with Arden. Explain how a theory on which reference can persist despite mistaken descriptive beliefs would analyze the case, and contrast it with a purely description-based account.",
+    "intent": "Test reference versus descriptive information.",
+    "domain": "Philosophy of Mind & Language — Reference",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "Explain the difference between using the word \"oak\" to talk about a kind of tree and mentioning the word \"oak\" as a three-letter English word. Give one sentence of each type.",
+    "intent": "Test the use–mention distinction.",
+    "domain": "Philosophy of Mind & Language — Use and Mention",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "At dinner, a guest says, \"Some of the guests enjoyed the speech,\" in a context where everyone knows whether all enjoyed it. Explain how the utterance can conversationally suggest that not everyone enjoyed it even though that stronger claim is not logically entailed.",
+    "intent": "Test implicature versus entailment.",
+    "domain": "Philosophy of Mind & Language — Implicature",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A supervisor says, \"I promise to review your appeal tomorrow,\" under ordinary conditions. Explain how the utterance can both say something and perform an action, and identify at least one contextual condition whose failure could prevent the promise from succeeding.",
+    "intent": "Test speech acts and felicity conditions.",
+    "domain": "Philosophy of Mind & Language — Speech Acts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A heap loses one grain at a time. It seems implausible that removing any single grain turns a heap into a non-heap, yet after enough removals no heap remains. State the tension and explain two broad ways a theory of vagueness might respond without requiring technical terminology.",
+    "intent": "Test sorites reasoning and vague predicates.",
+    "domain": "Philosophy of Mind & Language — Vagueness",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "thought_experiment",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "An artificial system produces fluent explanations, corrects itself when challenged, and generalizes to novel cases, but its internal processing is symbol manipulation governed by formal rules. Reconstruct the argument that syntax alone may not be sufficient for understanding, give a strong reply based on the capacities of the whole system, and explain why neither behavioral success nor the symbol-manipulation description alone settles consciousness.",
+    "intent": "Test high-complexity artificial-mind reasoning across understanding, systems-level replies, and consciousness.",
+    "domain": "Philosophy of Mind & Language — Artificial Minds",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "objection_and_reply",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A theory predicts an observation only when combined with a calibration assumption. The observation fails. Explain why the failure does not logically identify whether the core theory or the calibration assumption is at fault.",
+    "intent": "Test auxiliary assumptions and limits of simple falsification.",
+    "domain": "Philosophy of Science — Falsification",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "Two theories make the same successful predictions over all current data. One is simpler; the other fits better with well-supported background theories. Explain why the evidence underdetermines a unique choice and how simplicity and coherence with background knowledge might rationally matter without becoming proofs.",
+    "intent": "Test underdetermination and theory choice.",
+    "domain": "Philosophy of Science — Underdetermination",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A model treats a gas as made of perfectly elastic point particles even though real molecules have structure and intermolecular forces. Explain how an unrealistic model can still explain or predict successfully, and why usefulness does not imply literal accuracy of every assumption.",
+    "intent": "Test models and idealization.",
+    "domain": "Philosophy of Science — Models and Idealization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A hypothesis makes a risky novel prediction that its main rival does not expect, and the prediction is observed. Explain why this tends to support the hypothesis relative to the rival, while stopping short of deductive proof.",
+    "intent": "Test confirmation as comparative evidential support.",
+    "domain": "Philosophy of Science — Confirmation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "abductive_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "An observation is recorded only after scientists classify a faint signal using a theory-dependent algorithm. Explain how observation can be theory-influenced without becoming arbitrary or evidentially worthless.",
+    "intent": "Test theory-ladenness without relativistic overreach.",
+    "domain": "Philosophy of Science — Observation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A highly successful theory posits unobservable entities and predicts novel phenomena for decades. Compare a realist interpretation, which treats the theory as approximately describing unobservable reality, with an instrumentalist interpretation focused on empirical success. Give one strength and one challenge for each.",
+    "intent": "Test realism versus instrumentalism.",
+    "domain": "Philosophy of Science — Realism and Instrumentalism",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A biological pattern can be explained by describing the historical cause that produced it, the mechanism that maintains it, or the broader regularity under which it falls. Explain why these may answer different explanatory questions rather than competing as if only one form of explanation were legitimate.",
+    "intent": "Test pluralism about scientific explanation.",
+    "domain": "Philosophy of Science — Explanation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "distinction_making",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "Three theories fit the same observations. Theory A is simplest, B connects to independent evidence from another field, and C makes the most precise future predictions. A new result favors B but only if a contested measurement model is correct. Reconstruct the case for each theory, explain the role of auxiliary assumptions and underdetermination, and state what additional evidence would most discriminate among them.",
+    "intent": "Test complex theory choice, confirmation, underdetermination, and auxiliary assumptions.",
+    "domain": "Philosophy of Science — Theory Choice",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "Consider a generic argument: \"Every contingent thing has an explanation; the universe is contingent; therefore the universe has an explanation outside itself.\" Reconstruct the argument, identify at least one assumption that needs defense, and explain whether the conclusion alone establishes any particular religion.",
+    "intent": "Test cosmological-style reasoning while maintaining religious neutrality.",
+    "domain": "Philosophy of Religion — Cosmological Arguments",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "argument_reconstruction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A design argument claims that a highly ordered feature is much more expected if produced by an intelligent designer than if produced by unguided processes. Explain what comparative evidential claim is being made and why competing explanations and prior plausibility matter.",
+    "intent": "Test abductive analysis of design reasoning without predetermining the outcome.",
+    "domain": "Philosophy of Religion — Design Arguments",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "abductive_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A perfectly good and powerful deity is proposed, yet apparently pointless suffering occurs. Distinguish a claim that this combination is logically inconsistent from the weaker claim that the suffering is evidence against the deity's existence, and explain why the two arguments require different standards.",
+    "intent": "Test logical versus evidential forms of the problem of evil.",
+    "domain": "Philosophy of Religion — Problem of Evil",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "distinction_making",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A person reports a vivid religious experience. Explain how it could provide some personal justification while being less decisive as public evidence, and identify both a possible defeater and a possible reason not to dismiss the report outright.",
+    "intent": "Test religious experience, testimony, and defeasible evidence neutrally.",
+    "domain": "Philosophy of Religion — Religious Experience",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A rare event is reported by several sincere witnesses. The event would be extraordinary if true, but the witnesses are independent and normally reliable. Analyze how prior plausibility, testimony reliability, independence, and alternative explanations should interact. Do not assume in advance that a miracle is either possible or impossible.",
+    "intent": "Test balanced evidential reasoning about miracle claims.",
+    "domain": "Philosophy of Religion — Miracles",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "epistemology",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A researcher can obtain socially valuable results only by deceiving participants about the immediate purpose of a low-risk study, with full debriefing afterward. Analyze consent, deception, harm, social value, and whether debriefing repairs all ethical concerns.",
+    "intent": "Test applied research ethics through competing reasons.",
+    "domain": "Applied & Other Philosophy — Research Ethics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "applied_ethics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A company deploys an automated system whose harmful decision resulted from a data designer, a model builder, a manager who set incentives, and an operator who ignored a warning. Analyze how responsibility might be distributed among them without automatically treating the automated system itself as morally responsible.",
+    "intent": "Test distributed responsibility in technology ethics.",
+    "domain": "Applied & Other Philosophy — Technology Ethics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "Evaluate the claim: \"Technology is neutral; only users determine its effects.\" Use a hypothetical navigation app whose defaults make some routes easier to choose than others. Discuss affordances, design choices, incentives, and user agency.",
+    "intent": "Test technological mediation and neutrality.",
+    "domain": "Applied & Other Philosophy — Philosophy of Technology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "argument_reconstruction",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "Two fairness rules for an automated allocation system conflict: one requires equal error rates across groups, while another requires equal treatment for people with the same relevant risk score. Assume the supplied data make it impossible to satisfy both at once. Explain the philosophical conflict without prescribing a real policy.",
+    "intent": "Test competing fairness principles abstractly and neutrally.",
+    "domain": "Applied & Other Philosophy — Algorithmic Fairness",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A forest is valuable as a source of clean water, as a habitat valued by a community, and perhaps independently of its usefulness to humans. Distinguish instrumental, relational, and intrinsic value, and explain how each could alter the reasons for preservation.",
+    "intent": "Test environmental value concepts.",
+    "domain": "Applied & Other Philosophy — Environmental Philosophy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A present project provides major benefits now but imposes a small probability of severe irreversible harm on people several generations in the future. Analyze responsibility under uncertainty, the moral significance of future persons, reversibility, and the risk of treating precaution as automatically decisive.",
+    "intent": "Test future generations and precaution under uncertainty.",
+    "domain": "Applied & Other Philosophy — Environmental Philosophy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A sculpture is replaced piece by piece during restoration until almost none of the original material remains, but the artistic design, documented history, and public identity continue. Explain how material authenticity, historical authenticity, and artistic identity can come apart.",
+    "intent": "Test aesthetic authenticity and identity.",
+    "domain": "Applied & Other Philosophy — Aesthetics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A gallery displays an ordinary manufactured object as art because of the context, curatorial framing, and intended concept. Compare at least two possible criteria for counting something as art and explain what the case pressures in each.",
+    "intent": "Test competing concepts of art without requiring a single fixed definition.",
+    "domain": "Applied & Other Philosophy — Aesthetics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "Ravi judges that studying tonight best serves his own goals, fully intends to study, yet knowingly chooses to watch entertainment instead without coercion or new information. Explain why this is a problem for simple views on which action always follows one's all-things-considered judgment, and distinguish weakness of will from mere change of mind.",
+    "intent": "Test practical reasoning and weakness of will.",
+    "domain": "Applied & Other Philosophy — Philosophy of Action",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "An employee acts because she wants a promotion, and the promotion would also genuinely reward excellent work. Distinguish the reason that motivates her, the reason that explains her behavior, and the reason that might justify the behavior. Can one consideration play more than one role?",
+    "intent": "Test explanatory, motivating, and normative reasons.",
+    "domain": "Applied & Other Philosophy — Philosophy of Action",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "distinction_making",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "Compare two lives: one contains deep relationships and worthwhile achievement but little felt satisfaction; the other contains intense satisfaction produced by an experience machine disconnected from real projects. Analyze what the case suggests about subjective fulfillment, objective value, authenticity, and meaning, and explain why it does not by itself prove one complete theory of the meaning of life.",
+    "intent": "Test meaning-of-life reasoning and the limits of thought experiments.",
+    "domain": "Applied & Other Philosophy — Meaning of Life",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "thought_experiment",
+    "jurisdiction_required": false
+  }
+]

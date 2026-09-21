@@ -1,0 +1,188 @@
+{
+  "benchmark": "Philosophy",
+  "scoring_range": {
+    "min": 0,
+    "max": 4
+  },
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the philosophical task actually asked, focusing on the supplied argument, case, distinction, or question rather than substituting a different issue.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "philosophical_accuracy",
+      "name": "Philosophical Accuracy",
+      "definition": "States central logical and philosophical claims accurately; does not materially misrepresent supplied positions, arguments, thought experiments, or standard distinctions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Uses key concepts with appropriate precision, including when relevant validity, soundness, necessity, sufficiency, knowledge, justification, identity, modality, causation, obligation, permission, and related distinctions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "argument_reconstruction",
+      "name": "Argument Reconstruction",
+      "definition": "When an argument is supplied or implicit, identifies its conclusion, supporting premises, intermediate conclusions, and structure fairly, preserving the strongest reasonable reading rather than replacing it with a weaker or different argument.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "logical_reasoning",
+      "name": "Logical Reasoning",
+      "definition": "Correctly evaluates deductive form, conditional reasoning, quantifiers, contradictions, reductio, or other formal/informal inferential structure when these are material to the task.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "premise_and_inference_evaluation",
+      "name": "Premise and Inference Evaluation",
+      "definition": "Separates questions about premise truth or support from questions about inferential validity or strength, and explains where any argumentative failure actually occurs.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "distinction_making",
+      "name": "Distinction Making",
+      "definition": "Identifies and applies distinctions needed to avoid conflation, such as truth/validity, validity/soundness, necessary/sufficient, descriptive/normative, explanation/justification, legality/morality, actuality/possibility, or behavior/consciousness.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "counterexample_reasoning",
+      "name": "Counterexample Reasoning",
+      "definition": "When counterexamples matter, tests universal claims with cases that genuinely satisfy the stated conditions and explains exactly why the target conclusion fails; does not treat mere disagreement or an inapplicable case as a counterexample.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "epistemological_reasoning",
+      "name": "Epistemological Reasoning",
+      "definition": "When relevant, reasons correctly about knowledge, truth, belief, justification, evidence, testimony, perception, skepticism, disagreement, induction, reliability, and epistemic luck, with calibrated evidential claims.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "metaphysical_reasoning",
+      "name": "Metaphysical Reasoning",
+      "definition": "When relevant, reasons correctly about identity, persistence, modality, causation, time, freedom, personal identity, or explanation, avoiding conflations such as similarity with identity or determinism with fatalism.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "ethical_and_normative_reasoning",
+      "name": "Ethical and Normative Reasoning",
+      "definition": "When relevant, identifies the normative principles, rights, duties, consequences, virtues, intentions, permissions, or values at issue; does not derive an ought from descriptive premises without a normative bridge; represents competing ethical frameworks fairly.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "philosophy_of_mind_and_language_reasoning",
+      "name": "Philosophy of Mind and Language Reasoning",
+      "definition": "When relevant, accurately analyzes consciousness, mental states, functional roles, behavioral evidence, understanding, meaning, reference, context, speech acts, implicature, ambiguity, or vagueness without collapsing distinct concepts.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "philosophy_of_science_reasoning",
+      "name": "Philosophy of Science Reasoning",
+      "definition": "When relevant, handles confirmation, falsification, auxiliary assumptions, explanation, models, theory choice, observation, realism, instrumentalism, and underdetermination without treating evidence as automatic proof.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "alternative_positions_and_objections",
+      "name": "Alternative Positions and Objections",
+      "definition": "When the issue is contestable or argumentative, presents important competing positions, objections, or replies charitably and at appropriate strength rather than straw-manning or pretending disagreement has vanished.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions",
+      "name": "Assumptions",
+      "definition": "Identifies material explicit or hidden assumptions required for the reasoning, explains their role, and does not silently insert assumptions that change the supplied argument.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_and_qualification",
+      "name": "Uncertainty and Qualification",
+      "definition": "Matches confidence and conclusions to what the reasoning establishes, marks unresolved or underdetermined issues, and distinguishes evidence, plausibility, possibility, and proof.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers all material parts of the prompt and includes the premises, distinctions, objections, applications, or requested comparisons needed for a sufficient answer without padding.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains compatible claims, definitions, and standards across the answer; does not rely on mutually inconsistent premises or switch criteria without explanation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Presents the reasoning in a clear, traceable form with distinctions and inferential steps understandable from the answer itself; jargon, names, quotations, and citations never substitute for explanation.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "philosophical_judgment",
+      "name": "Philosophical Judgment",
+      "definition": "When evaluative judgment is required, weighs premises, inferences, counterexamples, alternatives, conceptual costs, and uncertainty proportionately, reaching only conclusions supported by the stated assumptions and argument.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_philosophy_error",
+    "condition": "A materially false central logical, conceptual, argumentative, epistemological, metaphysical, ethical, or other philosophical claim fundamentally invalidates or reverses the answer.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally misidentifies the conclusion of the supplied argument.",
+      "Materially alters a premise and then criticizes the altered argument.",
+      "Claims a deductively invalid argument is valid when the inference is central.",
+      "Claims a deductively valid argument must have true premises.",
+      "Claims that a false premise by itself makes an argument deductively invalid.",
+      "Fundamentally reverses necessary and sufficient conditions.",
+      "Misses an explicit equivocation that is central to the argument's invalidity.",
+      "Treats a case as a counterexample even though it does not satisfy the principle's stated conditions.",
+      "Treats logical or conceptual possibility as actuality.",
+      "Treats mere conceivability as conclusive proof of metaphysical possibility.",
+      "Treats justified true belief as automatically knowledge in a case whose central point is epistemic luck.",
+      "Treats the mere possibility of error as proof that knowledge is impossible.",
+      "Fundamentally confuses determinism with fatalism.",
+      "Claims foreknowledge itself causally determines an action without argument.",
+      "Fundamentally misrepresents a supplied ethical theory and reverses the analysis because of that error.",
+      "Derives a normative conclusion entirely from descriptive premises while denying the need for any normative bridge.",
+      "Claims moral disagreement logically proves moral relativism.",
+      "Fundamentally confuses legal validity with moral rightness.",
+      "Fundamentally misrepresents a supplied philosophical position or argument.",
+      "Fabricates a premise, philosophical consensus, empirical fact, quotation, or thought-experiment detail required for the conclusion.",
+      "Gives partisan political advocacy instead of neutral political-philosophy analysis where neutrality is required."
+    ],
+    "not_critical_examples": [
+      "Minor terminology mistakes that do not alter the reasoning.",
+      "Reasonable disagreement between defensible philosophical theories.",
+      "A defensible alternative reconstruction of an ambiguous argument.",
+      "Small omissions or failure to mention a weak secondary objection.",
+      "Reasonable differences in intuition.",
+      "Different plausible interpretations of an ambiguous thought experiment.",
+      "Minor symbolic-logic notation errors that do not affect the inference.",
+      "Stylistic differences or cautious uncertainty.",
+      "Legitimate disagreement over unresolved philosophical questions."
+    ]
+  }
+}

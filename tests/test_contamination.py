@@ -61,7 +61,7 @@ def test_the_exam_is_indexed_in_both_halves(tree, tmp_path_factory):
 def test_a_document_quoting_an_exam_question_is_dropped(tree):
     import exam_build as eb
     ix = ct.index(tree["out_dir"], tree["judged"]["exam_root"])
-    q = sorted(eb.load_bank(tree["judged"]["exam_root"])["economics"],
+    q = sorted(eb.load_bank(tree["judged"]["exam_root"])["Economics"],
                key=lambda b: b["qid"])[0]["prompt"]
     body = ("Margins respond before totals do, and the reason is worth setting out slowly. "
             + "Consider a firm that changes one input price and nothing else. " * 6)

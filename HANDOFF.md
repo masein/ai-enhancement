@@ -325,17 +325,21 @@ A rubric is the marking scheme: anchored 0–4 descriptions, a stated priority
 length). Example: `eval_tasks/fr/rubrics/reasoning.md`. Its hash goes into every
 `judge.json`; change the rubric and scores before/after are not comparable.
 
-**Dr. Hossein's delivery is in the repo and in the loop (phases 8b and 8d):**
+**Dr. Hossein's delivery was in the repo and in the loop (phases 8b and 8d).
+Phase 10 retired it** — the files below now live under
+`eval_tasks/fr/retired/` (rubric pairs in `retired/rubrics/`), kept as the
+record of what their judged runs were graded on; the live exam is the 37
+topics of §10c:
 
 | What | Where |
 |---|---|
-| 100 consumer health questions with metadata, as delivered | `eval_tasks/fr/medicine_v2.json` |
-| 100 law questions with metadata, his own difficulty levels and `jurisdiction_required` | `eval_tasks/fr/law_v2.json` |
-| 100 questions each for computer science, economics and physics & engineering | `eval_tasks/fr/computer_science_v1.json`, `economics_v1.json`, `physics_engineering_v1.json` |
-| their criteria files and **his own prose rubrics** — not drafts, he wrote the 0–4 anchors | `eval_tasks/fr/rubrics/{computer_science,economics,physics_engineering}.{md,criteria.json}` |
-| his criteria files, **verbatim** — the platform's schema is his | `eval_tasks/fr/rubrics/medicine_health.criteria.json`, `law.criteria.json` |
+| 100 consumer health questions with metadata, as delivered | `eval_tasks/fr/retired/medicine_v2.json` |
+| 100 law questions with metadata, his own difficulty levels and `jurisdiction_required` | `eval_tasks/fr/retired/law_v2.json` |
+| 100 questions each for computer science, economics and physics & engineering | `eval_tasks/fr/retired/computer_science_v1.json`, `economics_v1.json`, `physics_engineering_v1.json` |
+| their criteria files and **his own prose rubrics** — not drafts, he wrote the 0–4 anchors | `eval_tasks/fr/retired/rubrics/{computer_science,economics,physics_engineering}.{md,criteria.json}` |
+| his criteria files, **verbatim** — the platform's schema is his | `eval_tasks/fr/retired/rubrics/medicine_health.criteria.json`, `law.criteria.json` |
 | his scoring notes for each, as delivered | `docs/medicine-criteria-v2.md`, `docs/law-criteria-v2.md` |
-| the 0–4 rubrics derived from them — **DRAFT**, anchors not yet reviewed | `eval_tasks/fr/rubrics/medicine_health.md`, `law.md` |
+| the 0–4 rubrics derived from them — **DRAFT**, anchors not yet reviewed | `eval_tasks/fr/retired/rubrics/medicine_health.md`, `law.md` |
 
 They import into their topics with him as the approver (`exam_build.py
 import`, AUTHORING.md, or the Exam tab's import panel), the judge grades
@@ -354,19 +358,22 @@ loader, never ask him to rewrite a file. `docs/CRITERIA-SCHEMA.md` is the
 table of every variant and what it maps onto; `tests/test_criteria_schema.py`
 asserts every delivered file still normalises.
 
-**The question floor is cleared.** Both topics are at 100 questions, about 50
-report-half each, over the 30 a topic needs before anything may be proposed
-from it. The demo says so rather than asking for more.
+**The question floor is cleared.** Every topic with questions is at 100,
+about 50 report-half each (the smallest has 40), over the 30 a topic needs
+before anything may be proposed from it. The demo says so rather than asking
+for more. That was true of the two banks here, and it is true of the 36 of
+§10c.
 
 **What is open with him, and the first is a blocker for calling any score on
 these topics a result:**
 
-1. **Rubric sign-off.** Both prose rubrics say DRAFT: their 0–4 anchors were
-   derived from his criteria and he has not reviewed them. Until he removes
-   the word, every judged score for the topic is stamped draft on the page.
-   Removing it changes the rubric's hash, which is correct — scores from
-   before and after are then not comparable. The criteria files themselves
-   are his own and need no sign-off.
+1. **Rubric sign-off.** *(moot since phase 10)* The two prose rubrics said
+   DRAFT: their 0–4 anchors were derived from his criteria and he had not
+   reviewed them. Both are retired now; none of the 36 rubrics of the
+   37-topic exam says DRAFT. The rule stands for any rubric that does: until
+   the word is removed, every judged score for the topic is stamped draft on
+   the page, and removing it changes the rubric's hash, which is correct —
+   scores from before and after are then not comparable.
 2. *(closed)* The law difficulty levels and `jurisdiction_required` arrived
    in `law_v2.json`: his own levels on every item (55 of them differ
    from the id-range mapping we had assumed) and the jurisdiction flag on all
@@ -520,6 +527,102 @@ split, provisional, taint and leak tests are unchanged and pass. The seven
 steps on the live server (search "smol", queue law, page the queue, see it
 land, Propose… on law, approve and generate, the mark in provenance.json) are
 for a person on the box.
+
+---
+
+## 10c. Phase 10 — the 37-topic exam
+
+Brief: `docs/prompts/phase-10-knowledge-classification.md` (three PRs:
+10a–10c). Omar's decision (2026-09-21): the 37 folders of
+`docs/Knowledge Classification/` become the exam's topics, named exactly as
+the folders are; 36 hold 100 questions, a criteria file and a prose rubric
+each, written by masein; Arts is empty. The five topics the exam had —
+medicine & health, law, economics, computer science, physics & engineering —
+are retired: their files and judged runs stay, as history.
+
+- **10a — files, topics, loader, retirement.** The delivered files moved
+  verbatim: banks to `eval_tasks/fr/banks/<slug>_v1.json`, criteria and
+  rubrics to `eval_tasks/fr/rubrics/<slug>.{criteria.json,md}`; the retired
+  five's banks and rubric pairs to `eval_tasks/fr/retired/`, outside every
+  path the service reads. `scripts/categories.yaml` is the 37 topics, with
+  MMLU's 57 subjects remapped per the brief's table (24 topics have MMLU
+  subjects, 13 have none); **General & Multidisciplinary** replaces `other` as
+  the fallback. The MMLU control set is 10 per topic with subjects, 240 items
+  (it was 150). The loader reads two more flag layouts (`critical_error`, one
+  object; `critical_flags`, a list) and the principles under their other
+  names; acuity adds `critical` and `high` (emergency → critical → urgent →
+  high → moderate → mild → routine). Two commands: `import-dir <dir>
+  --approver <name>` and `retire --topic <name> --reason <text>`. **A row
+  belongs to the topic its own `topic` field names, exactly**: the retired
+  `law` and the new `Law` share `bank/law.jsonl`, and every read filters on
+  the stored string; a retired row (`retired_at`) is out of the built tasks,
+  the Loop board, the counts and imports, and is never deleted or re-split.
+  `build` removes the task files of topics that are no longer in the exam
+  (suite=judged runs every yaml in the tasks directory). `build results/full`
+  finds the results under `BENCH_ROOT` when the working directory does not
+  have them — inside the container that is `/app`, where the documented
+  command could not have worked before.
+
+**Deploy steps**, once 10a–10c are all merged — as one sequence; the `build`
+step is also what writes 10b's question-set fingerprints:
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+for t in "medicine & health" law economics "computer science" "physics & engineering"; do
+  sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam retire --topic "$t" --reason "replaced by the 37-topic exam (2026-09-21)"
+done
+sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam import-dir eval_tasks/fr/banks --approver masein
+sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam build results/full
+sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/masein/benchmarks/exam summary
+```
+
+**Expected output** (replayed on a bank shaped like the box's: the five old
+topics at 100 rows each, and the tasks an earlier build wrote for them):
+
+1. `up -d --build` ends with the container healthy. The image build prints
+   `image files OK` — the startup check now covers all 108 delivered files.
+2. `retire`, one line per topic. If a bank has more rows under a topic than
+   the 100 delivered (questions drafted and accepted there), the counts say
+   so; a second run says `retired 0 of 100 rows (100 already retired)`:
+   ```
+   medicine & health: retired 100 of 100 rows in medicine_health.jsonl · reason: replaced by the 37-topic exam (2026-09-21)
+   law: retired 100 of 100 rows in law.jsonl · reason: replaced by the 37-topic exam (2026-09-21)
+   economics: retired 100 of 100 rows in economics.jsonl · reason: replaced by the 37-topic exam (2026-09-21)
+   computer science: retired 100 of 100 rows in computer_science.jsonl · reason: replaced by the 37-topic exam (2026-09-21)
+   physics & engineering: retired 100 of 100 rows in physics_engineering.jsonl · reason: replaced by the 37-topic exam (2026-09-21)
+   ```
+   A name no row carries is refused with the names the bank holds, and
+   exit code 2.
+3. `import-dir`, 36 lines and a total (a second run: `imported 0`, `skipped
+   3600`):
+   ```
+   Agriculture                                  imported 100  skipped   0  (report 55 / diagnose 45)  source agriculture_v1
+   AI & Machine Learning                        imported 100  skipped   0  (report 49 / diagnose 51)  source ai_machine_learning_v1
+   …
+   Law                                          imported 100  skipped   0  (report 62 / diagnose 38)  source law_v1
+   …
+   Technology                                   imported 100  skipped   0  (report 49 / diagnose 51)  source technology_v1
+   total: 36 topics, imported 3600, skipped 0 already in the bank — report 1772 / diagnose 1828 · written by masein
+   ```
+4. `build`: 36 `exam_*` tasks of 100 items, then the control set and what it
+   removed:
+   ```
+   exam_agriculture                                 100 items  (report 55, diagnose 45)
+   …
+   exam_general_multidisciplinary                   100 items  (report 47, diagnose 53)
+   fr_control_mmlu                                  240 items  (report 0, diagnose 240)
+
+   36 exam topics built; no questions yet, so no task: Arts
+   MMLU control set: 240 items — up to 10 from each of the 24 topics with MMLU subjects (the old 15-category exam built 150); the other 13 topics have no MMLU subjects
+   removed 2 task(s) no longer in the exam: exam_medicine_health, exam_physics_engineering
+   ```
+   (`exam_law`, `exam_economics` and `exam_computer_science` are rebuilt in
+   place with the new questions. If the bank still had the old `other` topic,
+   `exam_other` is removed too, and its 40 migrated skill items stay in
+   `bank/other.jsonl`, unread.)
+5. `summary`: 37 lines, 36 at `accepted 100` with their halves as in step 3,
+   and `Arts  accepted   0 (report   0 / diagnose   0)`. The retired five do
+   not appear.
 
 ---
 

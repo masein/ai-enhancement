@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "Python 3.12:\n```python\ndef append_tag(tags=[]):\n    tags.append(\"x\")\n    return tags\n\nprint(append_tag())\nprint(append_tag())\n```\nWhat exactly is printed, why does it happen, and what minimal change preserves the intended behavior of returning a fresh one-element list on every call?",
+    "intent": "Trace state across function calls, explain default-argument lifetime, and repair unintended mutation.",
+    "domain": "Programming Fundamentals",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "code_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "Java 21:\n```java\nint x = 3;\nint y = x++;\nif (y == 3 && ++x == 5) {\n    System.out.println(x + \":\" + y);\n}\n```\nDetermine the output and explain the evaluation order and state changes. Then state one incorrect assumption a reviewer might make when skimming this code.",
+    "intent": "Reason precisely about expressions, side effects, control flow, and state changes.",
+    "domain": "Programming Fundamentals",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "code_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "Python 3.12:\n```python\ndef total_until_negative(values):\n    total = 0\n    for v in values:\n        if v < 0:\n            return total\n        total += v\n    return total\n```\nFor inputs `[]`, `[2, 3]`, `[2, -1, 5]`, and `[-1]`, give the return value. Is the function's behavior better described as 'sum all non-negative values' or 'sum the prefix before the first negative'? Explain using the code rather than the name.",
+    "intent": "Read actual control flow, distinguish intended from implemented behavior, and cover boundaries.",
+    "domain": "Programming Fundamentals",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "edge_case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "JavaScript (ECMAScript 2024):\n```javascript\nfunction makeCounters() {\n  const out = [];\n  for (let i = 0; i < 3; i++) {\n    out.push(() => i);\n  }\n  return out;\n}\nconsole.log(makeCounters().map(f => f()));\n```\nWhat is printed? Explain the closure behavior. Then explain how the result would differ if the loop variable were declared with `var i` instead of `let i`.",
+    "intent": "Reason about lexical scope, closures, and iteration semantics.",
+    "domain": "Programming Fundamentals",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "code_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A text parser reads one line at a time. The specification says: blank lines are ignored; a line beginning with `#` after optional leading spaces is a comment; otherwise the line must contain exactly one `key=value` pair, where both sides are non-empty after trimming. Describe the control flow for validating one line, including the order of checks and the error returned for malformed input.",
+    "intent": "Translate simple requirements into unambiguous control flow and validation behavior.",
+    "domain": "Programming Fundamentals",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "implementation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "Python 3.12:\n```python\ndef f(items):\n    result = []\n    for item in items:\n        if item is None:\n            continue\n        if item == 0:\n            break\n        result.append(10 / item)\n    return result\n```\nDetermine the result or exception for `[2, None, 5]`, `[2, 0, 5]`, and `[2, \"5\"]`. Explain which paths mutate `result` before termination.",
+    "intent": "Trace loops, early exits, exceptions, and partial state.",
+    "domain": "Programming Fundamentals",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "code_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "Consider a recursive function that walks parent links in an in-memory category tree:\n```python\ndef path(node):\n    if node.parent is None:\n        return [node.name]\n    return path(node.parent) + [node.name]\n```\nThe data can be corrupted so that a node eventually points back to an earlier ancestor. Explain the failure mode and give a robust approach that preserves the normal output while detecting cycles.",
+    "intent": "Reason about recursion termination, corrupted state, and defensive traversal.",
+    "domain": "Programming Fundamentals",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "In a language with value semantics for integers and reference semantics for mutable lists, a function receives `(count, items)`, increments `count`, and appends to `items`. Explain which changes a caller should observe and why. Then identify what additional language details would be needed before making the same claim about user-defined records.",
+    "intent": "Distinguish value and reference behavior without overgeneralizing language semantics.",
+    "domain": "Programming Fundamentals",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A command-line program must read a UTF-8 file, transform each non-empty line, write an output file, and ensure the output handle is closed even if transformation fails midway. Describe the resource-lifetime and error-propagation structure you would use. Do not name a framework; focus on semantics.",
+    "intent": "Reason about I/O, exceptions, cleanup, and failure propagation.",
+    "domain": "Error Handling",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "implementation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "Python 3.12 modules `a.py` and `b.py` import each other at module top level. `a.py` reads `b.DEFAULT` during import, while `b.py` defines `DEFAULT` only after importing `a`. Explain why this can fail even though both names exist in the source files, and give one structural fix.",
+    "intent": "Explain module initialization order, partially initialized state, and a minimal dependency fix.",
+    "domain": "Programming Fundamentals",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A function `parse_age(text)` is documented to return an integer from 0 through 130 or raise a validation error. An implementation returns `None` for blank strings, `-1` for non-numeric text, and an integer otherwise. Identify the contract violations and propose a single coherent failure model for callers.",
+    "intent": "Reason about return values, API contracts, and consistent error semantics.",
+    "domain": "Type Systems and API Contracts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "API_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A package exposes an interface `Clock.now()` and a concrete system clock. Business logic currently calls the concrete clock directly from six functions. Explain the smallest design change that would improve determinism in tests without introducing a large abstraction hierarchy.",
+    "intent": "Apply interfaces and dependency boundaries to improve testability with minimal indirection.",
+    "domain": "Testability and Dependency Design",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "refactoring",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "An application tracks 2 million active session IDs. Operations are: frequent membership checks, occasional insert/delete, no need for ordering, and duplicates must not be stored. Compare a list and a hash set for this workload, including expected lookup cost and memory trade-off, and recommend which better fits the access pattern.",
+    "intent": "Select a data structure using access patterns, cost, uniqueness, and memory considerations.",
+    "domain": "Data Structures",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A job scheduler repeatedly needs the smallest `next_run_at` among 500,000 pending jobs, then updates or removes jobs as they run. Explain why sorting the entire collection on every selection is wasteful and propose a structure/approach that improves repeated minimum selection while acknowledging update complexity.",
+    "intent": "Reason about heap-based selection and update trade-offs in application code.",
+    "domain": "Data Structures",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A service must preserve insertion order, support O(1)-average lookup by key, and evict the least recently used entry when capacity is exceeded. Describe a practical in-memory design, including which operations mutate ordering and how you avoid O(n) eviction.",
+    "intent": "Design a cache structure from required access patterns rather than merely naming it.",
+    "domain": "Data Structures",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A graph of package dependencies may contain cycles. You need to report every package reachable from a starting package exactly once. Give an iterative traversal strategy, explain what state prevents infinite revisits, and compare its worst-case time and memory to the size of the reachable subgraph.",
+    "intent": "Implement robust graph traversal with cycle handling and complexity reasoning.",
+    "domain": "Implementation and Algorithms",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "implementation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "You receive a stream of 100 million `(user_id, event_type)` records but may use at most 200 MB of memory. The task is to output exact counts per `event_type`; there are only 40 possible event types. Explain the simplest scalable algorithm and why storing all records or sorting them is unnecessary.",
+    "intent": "Choose a streaming aggregation strategy under memory constraints.",
+    "domain": "Implementation and Algorithms",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A paginated HTTP endpoint currently uses `OFFSET 500000 LIMIT 50` on a table ordered by `(created_at, id)`. Latency grows with page number and inserts happen continuously. Explain why offset pagination has both performance and consistency problems here, then design a cursor/keyset scheme and state what must be encoded in the cursor.",
+    "intent": "Reason about pagination correctness, indexing, evolving data, and latency.",
+    "domain": "Implementation and Algorithms",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "API_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "Two already-sorted files contain unique integer IDs, each too large to fit in memory. You must write the sorted union, removing duplicates, using O(1) additional memory aside from buffers. Describe the algorithm, termination conditions, and how equal values are handled.",
+    "intent": "Design an external streaming merge with correct duplicate handling.",
+    "domain": "Implementation and Algorithms",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "implementation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "An incremental build system stores a directed acyclic dependency graph of files. After one file changes, only affected downstream targets should rebuild. Explain an algorithm for finding the affected set and a valid rebuild order. Also state what validation is needed if the graph may accidentally contain a cycle.",
+    "intent": "Combine graph reachability, topological ordering, and invalid-state detection.",
+    "domain": "Implementation and Algorithms",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "Python 3.12:\n```python\ndef remove_zeros(xs):\n    for x in xs:\n        if x == 0:\n            xs.remove(x)\n    return xs\n```\nFor input `[0, 0, 1, 0]`, determine the returned list and explain the bug. Give a correction that is clear and correct for all list lengths.",
+    "intent": "Diagnose mutation-during-iteration behavior and provide a robust correction.",
+    "domain": "Debugging and Root-Cause Analysis",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A Java 21 service occasionally throws `NullPointerException` at `order.getCustomer().getId()`. Logs show the database row for the order always exists, but 0.2% of orders are guest checkouts with no customer record. Identify the root cause, explain why retrying is ineffective, and propose a domain-appropriate fix plus a regression test.",
+    "intent": "Use evidence to identify a nullability/domain-model mismatch and avoid speculative fixes.",
+    "domain": "Debugging and Root-Cause Analysis",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "After a refactor, a price calculation changed from evaluating discounts left-to-right with rounding after each discount to composing discount functions and rounding only once at the end. Most tests still pass, but some currency totals differ by one cent. Identify the invalid abstraction assumption and describe how to preserve behavior during the refactor.",
+    "intent": "Recognize behaviorally significant evaluation/rounding semantics in a seemingly clean refactor.",
+    "domain": "Refactoring and Code Quality",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "refactoring",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A 900-line class loads invoices, validates them, calculates tax, writes PDF files, sends email, and records audit entries. Only the tax rules change frequently; the other parts are stable. Propose a behavior-preserving refactor focused on responsibilities and testability. Explain what you would not abstract yet and why.",
+    "intent": "Separate cohesive responsibilities without rewarding abstraction for its own sake.",
+    "domain": "Refactoring and Code Quality",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "refactoring",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A drawing application has `Rectangle`, `Circle`, and `Text` objects. Rendering differs by object type, but export, selection, and move operations share behavior. Compare a design based on inheritance with one based on composition/interfaces. Choose a design based on likely evolution, not pattern names, and explain the dependency boundaries.",
+    "intent": "Evaluate inheritance, composition, polymorphism, and responsibilities in a concrete domain.",
+    "domain": "Object-Oriented Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A billing component uses a large `switch` on `payment_method` to call one of four gateways. A fifth gateway will be added, but each gateway also has genuinely different retry rules and request models. Explain when replacing the conditional with polymorphic gateway objects helps, and when a shared base class would create a misleading abstraction.",
+    "intent": "Reason about polymorphism, interface design, and fragile inheritance.",
+    "domain": "Object-Oriented Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_tradeoff",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A data-transformation pipeline is written as pure functions over immutable records until a final step writes to a database. Explain two concrete benefits of keeping side effects at the boundary, one cost, and why purity does not by itself make the database write safe under retries.",
+    "intent": "Connect functional design to reasoning, testing, concurrency, and real side-effect semantics.",
+    "domain": "Functional and Declarative Programming",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "TypeScript 5.x:\n```ts\ntype Result =\n  | { kind: \"ok\"; value: number }\n  | { kind: \"error\"; message: string };\n\nfunction render(r: Result): string {\n  if (r.kind === \"ok\") return String(r.value);\n  return r.message;\n}\n```\nExplain how the tagged union prevents an illegal combination that `{ value?: number; message?: string }` would allow. Then explain why runtime validation is still needed for JSON received from an untrusted API.",
+    "intent": "Reason about illegal states, narrowing, and the boundary between static typing and runtime validation.",
+    "domain": "Type Systems and API Contracts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "code_reading",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A repository method currently catches every exception, logs `\"failed\"`, and returns an empty list. Callers then show “no results.” Explain why this failure policy is dangerous. Propose a better distinction among expected “no rows,” validation failure, transient database failure, and programmer error.",
+    "intent": "Design explicit error semantics instead of silently converting failures into valid-looking data.",
+    "domain": "Error Handling",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_tradeoff",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A network client retries all HTTP failures three times immediately. One endpoint creates a charge and does not support idempotency keys. Explain why this policy is unsafe, which failures might be transient, and how retry behavior should change before automatic retries are enabled for charge creation.",
+    "intent": "Distinguish transient failures, ambiguous outcomes, and retry safety.",
+    "domain": "Error Handling",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A function normalizes usernames: trim surrounding whitespace, lowercase using Unicode-aware case mapping, reject empty results, and enforce maximum 30 characters after normalization. Design unit tests using boundary classes rather than listing random examples. Include at least one property that should hold across many inputs.",
+    "intent": "Design focused boundary and property-based tests from a specification.",
+    "domain": "Testing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "test_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A unit test for `InvoiceService` mocks the repository, tax calculator, clock, logger, metrics client, email sender, feature-flag client, and UUID generator. The test asserts the exact call order for all collaborators. Small internal refactors break many tests although behavior is unchanged. Diagnose the test-design problem and propose a smaller set of test boundaries.",
+    "intent": "Recognize excessive mocking and brittle implementation-level assertions.",
+    "domain": "Testing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "test_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "An integration test creates a row, starts a background worker, sleeps 500 ms, then asserts the row was processed. It passes locally and fails intermittently in CI. Explain the source of nondeterminism and redesign the test without using a larger arbitrary sleep.",
+    "intent": "Diagnose time-based flakiness and design deterministic synchronization.",
+    "domain": "Testing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "test_debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A team reports 97% line coverage for an authorization module. The missing test is “user from tenant A requests resource owned by tenant B.” Explain why the coverage number is weak evidence here and design a compact test matrix that exercises the security boundary.",
+    "intent": "Evaluate coverage critically and design tests around authorization invariants.",
+    "domain": "Testing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "test_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A parser has been heavily unit-tested with hand-picked examples but repeatedly fails on unexpected combinations of delimiters and escaping. Explain when property-based testing could help, identify at least two useful properties, and state what oracle or invariant would make those properties meaningful.",
+    "intent": "Apply property-based testing conceptually without treating random input generation as sufficient.",
+    "domain": "Testing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "test_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A service function calls `datetime.now()`, `random.random()`, writes directly to the filesystem, and performs an HTTP request. Tests patch four global functions. Propose the smallest structural change that makes the core behavior deterministic while avoiding a framework-heavy dependency-injection rewrite.",
+    "intent": "Improve testability by isolating nondeterministic boundaries with minimal design change.",
+    "domain": "Testability and Dependency Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "refactoring",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "Requirement: “Users can export reports quickly.” Identify at least five ambiguities that must be resolved before implementation or acceptance testing. Separate functional questions from non-functional questions, and do not invent target values.",
+    "intent": "Identify missing requirements and distinguish functional behavior from measurable quality constraints.",
+    "domain": "Requirements and Specification",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "requirement_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A ticket says: “When an order is canceled, refund the payment and restore inventory immediately. Cancellation must return within 100 ms even if payment and inventory services are unavailable.” Explain why the requirements conflict unless failure semantics are clarified. Propose questions/acceptance criteria needed before design.",
+    "intent": "Detect impossible or underspecified requirement combinations and surface missing failure behavior.",
+    "domain": "Requirements and Specification",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "requirement_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A 12-person team owns one business application, deploys twice per week, and has modest traffic. They are considering splitting a well-structured monolith into eight services solely because “microservices scale better.” Evaluate the decision using coupling, deployment independence, fault isolation, operational cost, and team boundaries. A simpler architecture may be preferable.",
+    "intent": "Evaluate architecture from concrete needs rather than architecture fashion.",
+    "domain": "Software Architecture",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_tradeoff",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A background image-processing system has an API, a database of jobs, object storage, and workers. Jobs may take 20 minutes. Design component boundaries and job state so API requests do not stay open for processing. Include retry, cancellation, and observability considerations.",
+    "intent": "Design a queue/worker architecture and persistent workflow state for long-running work.",
+    "domain": "Software Architecture",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "An HTTP API accepts `POST /payments` with `{order_id, amount}`. Clients may retry after timeouts, and creating two payments for one order is forbidden. Design request semantics, idempotency handling, persistence constraints, and response behavior for repeated identical and conflicting retries.",
+    "intent": "Design an idempotent API and persistence model under ambiguous client retries.",
+    "domain": "API Design",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "API_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "An API currently returns a user object with fields `id`, `name`, and `plan`. A new server version wants to replace `plan` with nested `subscription`. Mobile clients may remain old for six months. Explain a backward-compatible evolution strategy and identify what would make the change breaking even if the endpoint URL remains unchanged.",
+    "intent": "Reason about API compatibility, version skew, and schema evolution.",
+    "domain": "API Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "API_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A list endpoint supports filtering by status, sorting by creation time, and pagination. Requirements: stable traversal while new rows are inserted, no duplicate/missing rows within a traversal, and pages of 100. Design the ordering and cursor semantics. State the tie-breaker needed when many rows share the same timestamp.",
+    "intent": "Design stable keyset pagination and deterministic ordering.",
+    "domain": "API Design",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "API_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A web form disables the Submit button after the first click, but duplicate orders still appear when users refresh after a slow response. The server endpoint has no idempotency support. Explain why the UI control is insufficient and give a server-side design that prevents duplicate effects.",
+    "intent": "Distinguish client UX protections from server-side correctness.",
+    "domain": "Web Application Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A browser app shows an updated profile immediately after `PATCH /profile`, but a subsequent `GET /profile` through a CDN sometimes returns the old value for 60 seconds. Server logs show the database update committed. Explain the likely caching mechanism and propose a correctness-aware invalidation or cache-control strategy.",
+    "intent": "Diagnose stale web state across browser/CDN/backend boundaries.",
+    "domain": "Web Application Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A frontend accepts dates as `MM/DD/YYYY`; the backend accepts ISO `YYYY-MM-DD`; client-side validation passes, but many requests fail server-side. Identify the contract drift and propose how to define and test a single boundary contract while still validating on both client and server.",
+    "intent": "Reason about duplicated validation, contract drift, and boundary testing.",
+    "domain": "Web Application Engineering",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "An authenticated single-page application calls an API on a different origin using a session cookie. Requests work in local development through a same-origin proxy but fail in production browsers. Describe the cross-origin/session factors you would inspect, including cookie scope, credentials, and server CORS policy, without assuming any specific framework.",
+    "intent": "Debug browser/API boundary behavior using HTTP and cookie semantics.",
+    "domain": "Web Application Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "debugging",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A reverse proxy retries upstream requests once on connection reset. GET requests are fine, but some POST requests create duplicate work. Explain the hidden retry layer, why application developers may miss it, and what combination of proxy policy and application idempotency would make behavior safe.",
+    "intent": "Reason about proxying, retries, and method semantics across layers.",
+    "domain": "Web Application Engineering",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "Design a relational schema for students enrolling in courses. A student can take many courses; a course has many students; duplicate enrollment in the same course is forbidden; enrollment has a `registered_at` timestamp and status. Specify primary/foreign keys and the constraint that enforces uniqueness.",
+    "intent": "Model a many-to-many relationship with integrity constraints.",
+    "domain": "Database Design",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "database_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A table `users(id, email, display_name)` currently allows duplicate non-null emails and null emails. The product now requires: email is optional, but if present it must be unique. Describe the schema constraint/index intent and the migration checks needed before enforcing it on existing data.",
+    "intent": "Preserve integrity while changing nullability/uniqueness rules.",
+    "domain": "Database Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "migration_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "An order stores `customer_name` as a snapshot even though a `customer_id` foreign key exists. Explain why this denormalization can be intentional, what invariant it serves, and what mistake would occur if the application silently treated the snapshot as always equal to the current customer name.",
+    "intent": "Distinguish justified denormalization from inconsistent duplicated state.",
+    "domain": "Database Design",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "Tables:\n- `customers(id)`\n- `orders(id, customer_id)`\n- `order_items(id, order_id, quantity)`\n\nA query joins all three tables and computes `COUNT(orders.id)` grouped by customer to count orders. Customers with multi-item orders are overcounted. Explain the join-cardinality error and provide two correct query approaches.",
+    "intent": "Reason about duplicate rows introduced by joins and correct aggregation.",
+    "domain": "SQL and Query Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "SQL_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "SQL table `events(user_id, occurred_at, type)` has 300 million rows. A query filters one `user_id`, a date range, and orders by `occurred_at DESC LIMIT 100`. Explain what composite index shape is likely useful and why an index only on `type` would not address the dominant access pattern. Avoid vendor-specific syntax.",
+    "intent": "Reason about index usefulness from filter/order access patterns.",
+    "domain": "SQL and Query Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A query uses `WHERE deleted_at != NULL` to find deleted rows and returns none. Explain SQL NULL comparison semantics and give the correct predicate. Then describe how NULL also affects `COUNT(column)` versus `COUNT(*)`.",
+    "intent": "Reason accurately about SQL NULL behavior.",
+    "domain": "SQL and Query Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "SQL_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Two concurrent requests transfer $50 from account A to B. Each request reads both balances, checks A has enough funds, then executes separate debit and credit statements without an enclosing transaction. Explain concrete inconsistent outcomes after a crash or overlap, and state what atomic transaction boundary must include.",
+    "intent": "Apply atomicity and transaction boundaries to a money-like invariant.",
+    "domain": "Transactions and Concurrency Control",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "concurrency_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A stock table stores `quantity=1`. Two buyers both read 1, each decides stock is available, and each updates quantity to 0. Both orders are accepted. Explain why a transaction alone does not necessarily prevent this lost-update/business-invariant failure. Give two valid strategies using either locking/atomic conditional update or optimistic version checking.",
+    "intent": "Reason about check-then-act races, isolation, and invariant enforcement.",
+    "domain": "Transactions and Concurrency Control",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "concurrency_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A profile editor sends the full profile with `version=7`. Another user has already saved version 8. Design optimistic-concurrency behavior: update predicate, response on conflict, and what the client should do next. Explain why blindly retrying the stale write is wrong.",
+    "intent": "Design version-check concurrency control and explicit conflict handling.",
+    "domain": "Transactions and Concurrency Control",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "API_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A database migration wants to rename column `users.full_name` to `display_name`. Old and new application versions run simultaneously for 30 minutes during rollout. A direct rename breaks one version. Design an expand-and-contract migration sequence that preserves service across version overlap and includes data backfill/verification.",
+    "intent": "Plan a zero-downtime backward-compatible schema migration under version skew.",
+    "domain": "Database Migrations and Backward Compatibility",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "migration_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A migration adds `NOT NULL` to a 500-million-row column after backfilling nulls. New writes can still create nulls between the backfill and constraint creation. Identify the race and design a rollout that closes the write-path gap before final enforcement.",
+    "intent": "Reason about migration races, application compatibility, and integrity enforcement.",
+    "domain": "Database Migrations and Backward Compatibility",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "migration_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A team plans to change a primary key from 32-bit integer to UUID across six referencing tables. Discuss the main data-integrity, foreign-key, index-size, migration, and version-overlap concerns. Propose an incremental sequence rather than a one-shot destructive migration.",
+    "intent": "Evaluate a complex schema evolution with dependencies and operational trade-offs.",
+    "domain": "Database Migrations and Backward Compatibility",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "migration_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "Java 21:\n```java\nclass Counter {\n    private int value = 0;\n    void inc() { value++; }\n    int get() { return value; }\n}\n```\nTwo threads each call `inc()` 100,000 times on the same instance. Explain why the final value may be below 200,000 and identify the atomicity problem. Give one correct synchronization approach.",
+    "intent": "Identify a simple data race and non-atomic read-modify-write.",
+    "domain": "Concurrency and Multithreading",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "concurrency_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Two methods use locks in opposite order:\n- `move()` acquires `accountsLock` then `ledgerLock`\n- `reconcile()` acquires `ledgerLock` then `accountsLock`\n\nBoth methods sometimes call helper methods that hide the second acquisition. Explain a possible deadlock interleaving and propose a fix that remains safe even with the indirect helpers.",
+    "intent": "Detect indirect lock-order inversion and design a consistent synchronization policy.",
+    "domain": "Concurrency and Multithreading",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "concurrency_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A cache uses:\n```text\nif key not in map:\n    map[key] = compute(key)\nreturn map[key]\n```\nMultiple threads share `map`. `compute` is expensive and must run at most once per key because it reserves an external resource. Explain why the check-then-act logic is unsafe and design synchronization at key granularity or an equivalent atomic mechanism.",
+    "intent": "Reason about concurrent check-then-act, side effects, and per-key coordination.",
+    "domain": "Concurrency and Multithreading",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "concurrency_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A producer thread sets `ready = true` after populating a shared object; a consumer spins until `ready` then reads the object. There is no synchronization, volatile/atomic declaration, or lock. Explain why reasoning only from source-code order is insufficient on memory-model-aware runtimes, and what kind of synchronization establishes visibility.",
+    "intent": "Recognize memory-visibility requirements beyond mutual exclusion.",
+    "domain": "Concurrency and Multithreading",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Python 3.12 asyncio:\n```python\nasync def fetch_all(urls):\n    results = []\n    for url in urls:\n        results.append(await fetch(url))\n    return results\n```\nAssume `fetch` is asynchronous network I/O. Explain why this code is still sequential. Redesign it to run at most 20 requests concurrently, and describe how you would handle cancellation and errors from individual tasks.",
+    "intent": "Distinguish async syntax from concurrent execution and design bounded fan-out.",
+    "domain": "Asynchronous Programming",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "async_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "An async function applies `wait_for(operation(), timeout=2s)`. The caller catches the timeout and assumes the remote write did not happen, then retries. Explain why timeout and cancellation do not prove the remote side rolled back. State the API property needed before retrying safely.",
+    "intent": "Reason about timeout ambiguity, cancellation, and idempotency.",
+    "domain": "Asynchronous Programming",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "distributed_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A service creates 50,000 async tasks at once to process queue messages. Each task does one database query. The database pool has 50 connections and memory spikes sharply. Explain the backpressure failure and propose bounded concurrency tied to downstream capacity.",
+    "intent": "Connect async fan-out, connection pools, memory, and backpressure.",
+    "domain": "Asynchronous Programming",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "Service A calls Service B to create a shipment. B commits the shipment, but the network drops the response. A retries. B has no idempotency key and creates a second shipment. Explain the failure mechanism and redesign both the request contract and persistence logic so the logical operation has one effect despite physical retries.",
+    "intent": "Handle ambiguous outcomes and duplicate effects across a network boundary.",
+    "domain": "Distributed Application Engineering",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "distributed_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A replicated read store is asynchronously updated from a primary. Immediately after changing an email address, a user refreshes and sees the old value for two seconds. Explain why this can happen, identify when it is acceptable, and give two ways to provide stronger read-after-write behavior if required.",
+    "intent": "Reason about replication lag, stale state, and consistency requirements.",
+    "domain": "Distributed Application Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_tradeoff",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A queue provides at-least-once delivery. A consumer writes an invoice row and then acknowledges the message. The process can crash after the insert but before acknowledgment. Explain the duplicate mechanism and design an idempotent consumer using a stable event/message identifier and a database uniqueness guarantee.",
+    "intent": "Design safe message processing under restart and duplicate delivery.",
+    "domain": "Messaging and Event-Driven Systems",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "distributed_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "Events for one order may arrive out of order: `PAID`, `CANCELED`, `REFUNDED`. The current consumer simply overwrites `order.status` with the latest-arriving event type. Explain how this can produce impossible states. Design state/version rules that make processing robust to duplicate, delayed, and out-of-order events.",
+    "intent": "Design a state machine and ordering strategy for unreliable event delivery.",
+    "domain": "Messaging and Event-Driven Systems",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "state_machine",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A shared cache stores product prices for 10 minutes. Price changes must be visible within 30 seconds. During a promotion, many keys expire at once and database load spikes 20x. Identify both the correctness and stampede problems, then propose a TTL/invalidation/refresh strategy that meets the freshness requirement without synchronizing all expirations.",
+    "intent": "Balance cache freshness, invalidation, stampede control, and backend load.",
+    "domain": "Caching",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A service latency dashboard shows mean latency 120 ms before and after a release, yet user complaints increased. p50 stayed 80 ms, p95 rose from 250 ms to 900 ms, and p99 rose from 600 ms to 4 s. Explain why the mean hid the regression and what additional evidence you would gather before optimizing.",
+    "intent": "Diagnose tail-latency regression using distributions and evidence.",
+    "domain": "Performance Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "Load test data:\n- incoming requests: 800 req/s\n- each request performs 3 database queries\n- DB sustains ~1,800 queries/s before latency rises sharply\n- app CPU is 35%\n- network is 20%\n- cache hit rate is 0%\n\nIdentify the first bottleneck. Would doubling application instances alone solve it? Quantify the query demand and propose evidence-based options.",
+    "intent": "Perform capacity arithmetic and identify the limiting downstream resource.",
+    "domain": "Performance and Scalability Calculations",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A worker pool has 40 workers. Each job occupies one worker for an average of 250 ms, excluding queue time. Incoming rate is 180 jobs/s for ten minutes. Estimate maximum steady-state service rate and explain whether backlog grows. Then state one reason the simple average-time calculation could still underestimate real queueing.",
+    "intent": "Calculate worker throughput and connect utilization to queueing behavior.",
+    "domain": "Performance and Scalability Calculations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "After replacing an O(n) lookup with a hash map, CPU time drops 40% but end-to-end latency barely changes. Traces show 75% of request time is waiting on a remote service. Explain why the optimization does not materially improve latency and identify the next measurement needed before further work.",
+    "intent": "Reason from profiling evidence and avoid optimizing the wrong bottleneck.",
+    "domain": "Performance Engineering",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A Java 21 service's heap grows during a burst, then stabilizes at 6 GB and periodically drops to 3 GB after garbage collection. File-descriptor count, however, increases continuously until requests fail with “too many open files.” Distinguish high managed-memory usage from a resource leak and give a targeted investigation/fix path.",
+    "intent": "Separate heap behavior from external-resource lifetime and diagnose a file-handle leak.",
+    "domain": "Memory and Resource Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "C++20 code stores a raw pointer to an object owned by a container that may erase that object on another control path. A later callback dereferences the pointer. Explain the ownership/lifetime hazard and propose a safer ownership/reference design appropriate to whether the callback should extend lifetime or merely observe it.",
+    "intent": "Reason about manual lifetime, dangling references, and ownership semantics.",
+    "domain": "Memory and Resource Management",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "code_review",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A service retries a dependency call up to five times with no delay. During a dependency slowdown, request volume to the dependency increases roughly 4x and both systems degrade. Explain the retry-storm mechanism and design safer retry behavior including backoff, jitter, limits, and which errors should not be retried.",
+    "intent": "Evaluate reliability mechanisms that can amplify overload.",
+    "domain": "Reliability and Resilience",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "reliability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A checkout service has a 300 ms timeout to inventory. Inventory normally responds in 100 ms, but p99 is 450 ms during peak. Short timeouts cause retries; retries increase peak load. Explain the feedback loop and how you would choose timeout/retry policy from latency distributions and end-to-end budget.",
+    "intent": "Reason about timeout budgets, tail latency, retries, and cascading load.",
+    "domain": "Reliability and Resilience",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "An incident dashboard shows elevated 5xx errors in the API. You can add only one new correlation field to logs across API, worker, and database-access layers. What field would give the highest value for following one request/work item across services, and what events should log it? Explain how this helps separate one causal chain from coincidental errors.",
+    "intent": "Choose targeted observability to correlate failures across components.",
+    "domain": "Observability and Production Diagnosis",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "incident_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A service has normal average latency but intermittent user-visible stalls. You have per-endpoint p50/p95/p99, CPU, memory, thread-pool queue depth, DB pool wait time, and downstream call traces. Describe a structured diagnosis that uses these signals to distinguish CPU saturation, connection-pool contention, and downstream tail latency.",
+    "intent": "Use observability evidence to discriminate competing production hypotheses.",
+    "domain": "Observability and Production Diagnosis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "incident_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "Production fails at startup with `DATABASE_URL missing`; staging works. A recent change introduced a new environment-variable name, but the deployment manifest was not updated. Identify the configuration-drift root cause, the immediate safe fix, and a preventive validation step that fails before production deployment.",
+    "intent": "Diagnose environment-specific configuration failure and improve config validation.",
+    "domain": "Configuration and Environment Management",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A feature flag defaults to `true` in code but is explicitly `false` in staging and accidentally absent in production. The feature performs a destructive cleanup not yet approved for production. Explain why the default is unsafe and propose a configuration strategy that makes risky behavior fail closed.",
+    "intent": "Reason about safe defaults, feature flags, and environment validation.",
+    "domain": "Configuration and Environment Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "security_review",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A developer opens one pull request containing a schema change, data backfill, API behavior change, large refactor, and formatting changes across 300 files. Explain the review and rollback risks, and propose how to isolate semantic changes into a safer sequence without demanding artificially tiny commits.",
+    "intent": "Improve collaborative change management, reviewability, and rollback safety.",
+    "domain": "Version Control and Collaborative Development",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "code_review",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A release branch has a critical production fix while `main` also contains unfinished unrelated work. Explain a safe change-management strategy for applying the narrow fix to production and ensuring the fix is not lost from future development. Focus on history and semantic isolation rather than command syntax.",
+    "intent": "Reason about hotfix propagation and collaborative version-control practice.",
+    "domain": "Version Control and Collaborative Development",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A deployment contains: an application change that can read old and new schema, a database migration that adds a nullable column, a backfill, and a later application change that requires the column. Give a safe CI/CD sequence across stages. Identify which steps are reversible and why rollback becomes harder after data shape assumptions change.",
+    "intent": "Coordinate deployment sequencing, compatibility, migration, and rollback.",
+    "domain": "Continuous Integration and Delivery",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "migration_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A team wants to auto-upgrade every dependency to the newest release each night and deploy if unit tests pass. Explain the supply-chain and compatibility risks, including transitive changes, and propose a safer update policy with lockfiles, staged upgrades, integration testing, and vulnerability prioritization.",
+    "intent": "Balance dependency freshness, compatibility, security, and validation.",
+    "domain": "Dependency and Supply-Chain Management",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_tradeoff",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A legacy billing module has few tests, undocumented edge cases, and a database shared by three other systems. A rewrite estimate is six months. Propose an incremental modernization plan that discovers behavior, adds characterization/integration tests, introduces seams, and reduces migration risk. Explain when a rewrite might still be justified.",
+    "intent": "Evaluate technical debt and modernization under regression and organizational risk.",
+    "domain": "Legacy Systems and Incremental Modernization",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "architecture_tradeoff",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "Review this Python 3.12 code:\n```python\ndef get_document(user, document_id, db):\n    doc = db.query(\"SELECT * FROM documents WHERE id = ?\", [document_id]).one()\n    if user.is_authenticated:\n        return doc\n    raise PermissionError()\n```\nDocuments belong to tenants. Identify the highest-priority correctness/security issue, explain the trust boundary, and propose the minimal server-side fix. Then mention one secondary code-quality concern.",
+    "intent": "Prioritize a material authorization flaw over minor review comments.",
+    "domain": "Secure Coding",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "security_review",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A web endpoint builds SQL by concatenating a user-supplied `sort` string into `ORDER BY`, while all value filters use bound parameters. Explain why parameterizing values does not automatically make the identifier/direction fragment safe. Give a defensive design using an allowlist of supported sort keys and directions, without providing exploit payloads.",
+    "intent": "Identify injection risk at a dynamic SQL structure boundary and mitigate defensively.",
+    "domain": "Secure Coding",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "security_review",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A password database stores `SHA256(password)` with no salt. Explain the security weakness and describe the properties of an appropriate password-storage scheme: per-password salt, deliberately slow password hashing/KDF, and upgradeability. Do not rely on encryption as the primary storage mechanism.",
+    "intent": "Reason about secure credential storage without operationally harmful detail.",
+    "domain": "Secure Coding",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "security_review",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "An API authenticates a user from a signed token. The request body includes `tenant_id`, and the handler trusts that value to choose which tenant's records to query. Explain why successful authentication is insufficient, identify the authorization failure, and design the server-side tenant boundary check.",
+    "intent": "Distinguish authentication, authorization, user identity, and tenant identity.",
+    "domain": "Authentication and Authorization",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "security_review",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A UI hides the “Delete project” button from non-admins, but the backend DELETE endpoint checks only that the caller is logged in. Explain the security flaw and where the permission rule must be enforced. Include one test that would catch the bug.",
+    "intent": "Enforce authorization server-side and test the privilege boundary.",
+    "domain": "Authentication and Authorization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "security_review",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "Production incident: after a deploy, 5xx rate rises from 0.2% to 18%. Database CPU is 95%, connection-pool wait time is 2.5 s, application CPU is 30%, and logs show a new request path issues 40 queries instead of 4. Give an ordered response covering impact mitigation, evidence, hypothesis, targeted rollback/fix, verification, and follow-up.",
+    "intent": "Perform evidence-driven incident response without waiting for perfect certainty.",
+    "domain": "Production Incidents",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "incident_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A background email worker occasionally sends duplicates after deployment. Evidence:\n- queue delivery is at-least-once\n- worker acknowledges only after sending\n- rolling deploy terminates some workers with 10 seconds of grace\n- send operation takes up to 20 seconds\n- message becomes visible again if not acknowledged\n\nExplain the mechanism, immediate mitigation, durable idempotency design, and how to verify the fix.",
+    "intent": "Trace restart/redelivery behavior across queue and external side effects.",
+    "domain": "Production Incidents",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "root_cause_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "After adding a distributed cache, database load fell 60% but p99 latency worsened. Measurements show:\n- cache hit: 92%\n- cache hit latency p99: 8 ms\n- cache miss path p99: 2.4 s\n- popular keys expire at the same 5-minute TTL\n- DB CPU spikes exactly at those expirations\n\nExplain the system-level bottleneck and whether the cache 'optimization' helped or worsened tail behavior. Propose a correction and measurements to confirm it.",
+    "intent": "Diagnose an optimization that moves load into synchronized tail spikes.",
+    "domain": "Performance Engineering",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "An order workflow has states `CREATED`, `PAID`, `PARTIALLY_FULFILLED`, `FULFILLED`, `CANCELED`, `REFUNDED`. Requirements: cancellation is forbidden after any fulfillment; refund requires prior payment; payment webhooks may be duplicated; fulfillment events may arrive late. Define valid/invalid transitions and the invariants needed to prevent impossible states under concurrent events.",
+    "intent": "Translate requirements into a robust state machine with concurrency and duplicate-event handling.",
+    "domain": "State Machines and Workflow Logic",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "state_machine",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A service guarantees: (1) accepted writes must never be lost, (2) reads from the same user should reflect their own successful write immediately, (3) the service should remain available during loss of connectivity to one replica, and (4) operators want minimal system complexity. Explain which requirements drive storage/replication choices and what trade-offs remain. Do not assume that adding more services improves the design.",
+    "intent": "Evaluate architecture trade-offs among durability, consistency, availability, and simplicity.",
+    "domain": "Software Design Trade-Offs",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "architecture_tradeoff",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A payment workflow spans API, database, queue, and cache:\n1. API inserts payment row `PENDING`.\n2. It publishes `ChargeRequested`.\n3. A worker calls the external processor.\n4. On success it updates DB to `PAID` and invalidates the order cache.\n5. Queue is at-least-once; processor can time out after actually charging.\n6. Worker may crash after processor success but before DB update.\n7. Duplicate `ChargeRequested` messages are possible.\n8. The cache may temporarily serve stale `PENDING`.\n\nDesign a failure-safe approach that preserves the invariant “one logical payment causes at most one external charge and eventually converges to the correct durable state.” Address idempotency, persistence, duplicate delivery, ambiguous timeout, recovery, cache consistency, and observability. Identify at least one unsafe simplification that would appear to work in tests.",
+    "intent": "Synthesize distributed failure, idempotency, state invariants, recovery, caching, and observability.",
+    "domain": "Distributed Application Engineering",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_design",
+    "jurisdiction_required": false
+  }
+]

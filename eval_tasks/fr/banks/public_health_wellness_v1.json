@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A city lowers the average daily sodium intake by a small amount across most adults, producing only a modest reduction in blood pressure for each person. Explain why this could still prevent more cardiovascular events population-wide than an intensive program that produces a much larger reduction for a small high-risk group.",
+    "intent": "Assess understanding of population-wide prevention, the prevention paradox, and the distinction between individual benefit and aggregate population benefit.",
+    "domain": "Public-Health Foundations",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "In January, 40 of 10,000 residents develop a new infection. On January 31, 120 residents are living with the infection, including cases diagnosed before January. Identify the measure represented by 40/10,000 and explain why 120/10,000 is a different measure.",
+    "intent": "Test correct distinction between incidence and prevalence and interpretation of their denominators.",
+    "domain": "Epidemiology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "Two neighborhoods report 60 and 90 new asthma cases in one year. The first has 6,000 residents and the second has 18,000. Which neighborhood had the higher annual incidence proportion, and what does this illustrate about using raw counts to compare risk?",
+    "intent": "Test denominator selection and interpretation of incidence proportions.",
+    "domain": "Epidemiology",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A cross-sectional survey finds that adults who sleep fewer than 6 hours are more likely to report depression symptoms. Explain why this finding alone cannot establish that short sleep causes depression, and identify at least two alternative explanations.",
+    "intent": "Evaluate causal reasoning, reverse causation, confounding, and limits of cross-sectional evidence.",
+    "domain": "Causal Inference",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A health department wants to estimate whether long-term exposure to traffic-related air pollution precedes development of chronic respiratory symptoms. Compare a prospective cohort study with a cross-sectional study for this purpose, including temporal ordering, cost, and likely biases.",
+    "intent": "Test study-design selection and trade-off reasoning rather than design-name recall.",
+    "domain": "Study Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "study_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A screening test has 95% sensitivity and 90% specificity. It is introduced in a population where the condition is rare. Explain why many positive results may still be false positives even though the test appears accurate.",
+    "intent": "Assess understanding of base rates, predictive value, sensitivity, specificity, and low-prevalence screening.",
+    "domain": "Screening",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "screening_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "After a cancer screening program begins, 5-year survival after diagnosis rises sharply, but disease-specific mortality in the population is unchanged. Give two screening-related explanations for this pattern and explain why longer measured survival does not by itself prove that screening saves lives.",
+    "intent": "Test lead-time bias, overdiagnosis, and outcome interpretation.",
+    "domain": "Screening",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "screening_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "Classify each intervention by prevention level and justify your choices: reducing youth access to tobacco before use begins; screening asymptomatic adults for hypertension; and rehabilitation after a disabling stroke.",
+    "intent": "Test understanding of primary, secondary, and tertiary prevention using mechanisms.",
+    "domain": "Prevention",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A university dining hall outbreak causes illness in 48 of 120 people who ate a chicken dish and 12 of 180 people who did not. Calculate the attack rate in each group, the relative risk, and interpret the result without claiming the food is definitively proven to be the source.",
+    "intent": "Test outbreak attack-rate calculations, relative risk, and calibrated interpretation.",
+    "domain": "Outbreak Investigation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "outbreak_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "An epidemic curve shows a sharp rise of cases within one incubation period followed by a rapid decline, with most cases reporting attendance at the same banquet. What outbreak pattern is most consistent with this evidence, and what evidence would strengthen or weaken the hypothesis of a common source?",
+    "intent": "Assess outbreak-pattern recognition and evidentiary reasoning.",
+    "domain": "Outbreak Investigation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "outbreak_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A vaccine reduces infection risk from 10% to 4% during a study period. Calculate the absolute risk reduction and relative risk reduction, then explain why neither number means that every vaccinated person is protected.",
+    "intent": "Test absolute versus relative effect interpretation and individual-versus-population reasoning.",
+    "domain": "Vaccination and Population Immunity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "An observational study finds lower mortality among people who voluntarily receive a preventive vaccine than among those who do not. Explain how a healthy-user effect could contribute to the observed association and what design or analytic features could reduce this concern.",
+    "intent": "Assess confounding and bias in observational vaccine-effectiveness studies.",
+    "domain": "Vaccination and Population Immunity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A chronic-disease program can either offer intensive counseling to the highest-risk 5% of adults or make a modest environmental change that slightly improves diet for 70% of residents. Compare the likely strengths and weaknesses of the two strategies in terms of total impact, equity, feasibility, and individual benefit.",
+    "intent": "Test high-risk versus population strategies and prevention trade-offs.",
+    "domain": "Chronic-Disease Prevention",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A wellness influencer claims that one food 'detoxifies the liver' and therefore prevents multiple chronic diseases. What evidence would be needed to evaluate the claim, and why is a plausible-sounding mechanism not enough?",
+    "intent": "Assess evidence evaluation of wellness claims without dismissing them solely for sounding unusual.",
+    "domain": "Wellness Claims and Pseudoscience",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "Someone who is mostly sedentary wants a sustainable general wellness change but has no stated medical condition. Compare the public-health logic of starting with regular moderate activity versus adopting an extreme daily workout plan immediately.",
+    "intent": "Test general low-risk wellness reasoning, adherence, gradual behavior change, and injury-risk reduction.",
+    "domain": "Physical Activity and Fitness",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "wellness_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "Explain the difference between physical activity, structured exercise, and physical fitness, and give an example showing why improved appearance is not a reliable proxy for improved fitness or health.",
+    "intent": "Assess conceptual precision in physical-activity and fitness terminology.",
+    "domain": "Physical Activity and Fitness",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A worker increases training load every week while reducing sleep and recovery time. Performance improves briefly and then declines. Explain how short-term fatigue, recovery, and long-term adaptation can interact, without diagnosing a medical condition.",
+    "intent": "Test training-load and recovery reasoning at a general wellness level.",
+    "domain": "Physical Activity and Fitness",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "wellness_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A study reports that people who eat more whole grains have lower cardiovascular risk. Explain why this does not prove that whole grains alone caused the difference, and name factors that should be considered before translating the association into population guidance.",
+    "intent": "Test nutrition evidence interpretation, confounding, dietary patterns, and population guidance.",
+    "domain": "Nutrition and Public Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "Two packaged foods contain the same calories per serving. One is richer in fiber, protein, and micronutrients, while the other contains more added sugar and little fiber. Explain why equal calories do not make the foods nutritionally interchangeable in a public-health context.",
+    "intent": "Assess understanding of energy balance, nutrient density, satiety, and dietary pattern quality.",
+    "domain": "Nutrition and Public Health",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A community survey finds that fruit and vegetable intake is low in a neighborhood with few grocery stores, high prices, and limited public transport. Propose a mechanism-based intervention strategy that addresses more than individual knowledge.",
+    "intent": "Test food access, social determinants, opportunity, and environmental supports for behavior change.",
+    "domain": "Nutrition and Public Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "community_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "Night-shift workers report shorter, more irregular sleep and poorer daytime alertness than day workers. Explain how circadian timing, light exposure, and schedule regularity could contribute, while avoiding diagnosis of a sleep disorder.",
+    "intent": "Assess circadian and sleep-health reasoning with appropriate scope.",
+    "domain": "Sleep and Circadian Health",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "wellness_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A campaign tells people only that 'sleep is important' but makes no changes to late-night work schedules, noise, housing crowding, or shift patterns. Explain why the campaign might have limited population impact even if the message is accurate.",
+    "intent": "Test health behavior reasoning about capability, opportunity, and environmental constraints.",
+    "domain": "Sleep and Circadian Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "health_behavior",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A city wants to reduce loneliness among older adults. Compare a purely informational campaign with an intervention that also improves transport, accessible community spaces, and opportunities for recurring social contact.",
+    "intent": "Test population mental-health prevention and social-context mechanisms.",
+    "domain": "Population Mental Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "community_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A workplace reports rising stress and burnout. Management offers an optional mindfulness app but leaves workloads, scheduling instability, and supervisor practices unchanged. Analyze why the app may help some workers yet fail to address major population-level drivers.",
+    "intent": "Assess psychosocial hazards, upstream determinants, and individual-versus-system interventions.",
+    "domain": "Population Mental Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "Explain the difference between an abstinence-based objective and a harm-reduction objective for substance use, and give a population-health example of how success could be measured under each approach.",
+    "intent": "Test substance-risk reduction concepts without requiring jurisdiction-specific policy.",
+    "domain": "Substance Use and Harm Reduction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A tobacco-control program combines higher prices, smoke-free environments, cessation support, and plain-language risk communication. Explain why the combined strategy may outperform education alone.",
+    "intent": "Assess multi-level prevention, incentives, environmental supports, and cessation reasoning.",
+    "domain": "Substance Use and Harm Reduction",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A chemical is detected in a town's drinking water at a very low concentration. Explain why the presence of a hazard is not the same as a meaningful health risk, and identify the exposure information needed to estimate risk.",
+    "intent": "Test hazard-versus-exposure-versus-risk reasoning.",
+    "domain": "Environmental Health",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "environmental_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "Two groups are exposed to the same average outdoor heat, but one has more older adults, less tree cover, poorer housing insulation, and fewer air-conditioned public spaces. Explain how equal hazard can produce unequal health outcomes.",
+    "intent": "Assess exposure, vulnerability, environmental determinants, and equity.",
+    "domain": "Climate and Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "health_equity",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A factory has solvent exposure at several workstations. Compare substitution of the solvent, local exhaust ventilation, administrative rotation, and respirators using the hierarchy-of-controls principle.",
+    "intent": "Test occupational exposure-control reasoning and relative reliability of controls.",
+    "domain": "Occupational Health",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "occupational_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "An office reports widespread neck and wrist discomfort. The employer distributes posture leaflets but does not alter workstation setup, task design, break opportunities, or workload. Explain why this may be an incomplete ergonomic intervention.",
+    "intent": "Assess occupational ergonomics and source-control versus behavior-only interventions.",
+    "domain": "Occupational Health",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "occupational_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A low-income neighborhood has higher rates of poorly controlled chronic disease. Describe at least three plausible pathways linking income, housing, transport, food access, work conditions, or care access to the health difference without assuming individual choices are the sole cause.",
+    "intent": "Test mechanism-based social-determinant reasoning.",
+    "domain": "Social Determinants of Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "health_equity",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A citywide prevention program improves average blood pressure by the same amount overall, but participation is 80% in affluent areas and 25% in disadvantaged areas. Explain how the population average can improve while disparities stay the same or widen.",
+    "intent": "Assess equity, intervention reach, and subgroup interpretation.",
+    "domain": "Health Equity and Disparities",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A community clinic offers free preventive visits, but attendance remains low because appointment times overlap with hourly work shifts, public transport is infrequent, and interpreters are rarely available. Explain why nominal availability is not the same as practical access.",
+    "intent": "Test multiple dimensions of access to care.",
+    "domain": "Access to Care",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A community health team chooses a diabetes-prevention program because it performed well elsewhere, but local residents distrust the sponsoring institution and the sessions conflict with common work schedules. What should the team do before scaling the program?",
+    "intent": "Assess community engagement, acceptability, feasibility, and implementation context.",
+    "domain": "Community Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "community_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A health-promotion intervention sends daily reminders to walk more. Uptake is low in an area with unsafe streets and no nearby parks. Analyze the behavior-change mechanism that is missing and suggest a more complete intervention.",
+    "intent": "Test capability-opportunity-motivation style reasoning without requiring framework names.",
+    "domain": "Health Promotion and Behavior Change",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "health_behavior",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Rewrite the message 'This program cuts your risk by 50%' into a more informative risk statement when the event risk falls from 2 in 1,000 to 1 in 1,000. Explain why the revised wording is less likely to mislead.",
+    "intent": "Assess absolute versus relative risk communication and plain-language numeracy.",
+    "domain": "Health Communication",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "health_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A health leaflet states: 'A positive screening result means you have the disease.' Identify the problem and rewrite the idea in plain language that preserves uncertainty and the need for diagnostic follow-up.",
+    "intent": "Test health literacy, screening communication, and predictive-value concepts.",
+    "domain": "Health Literacy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "health_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A hazard increases annual risk from 1 in 10,000 to 2 in 10,000. State the relative increase and the absolute increase, then explain how to communicate both without minimizing or sensationalizing the result.",
+    "intent": "Test risk communication with baseline, relative, and absolute risk.",
+    "domain": "Risk Communication",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A surveillance report shows 300 cases in Region A and 500 in Region B. Region A has 100,000 residents and Region B has 500,000. Which region has the higher case rate, and why is the raw count comparison misleading?",
+    "intent": "Test denominator choice in public-health surveillance.",
+    "domain": "Public-Health Data Interpretation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A health survey estimates obesity prevalence at 24% with a 95% confidence interval of 18% to 30%. Explain what the wide interval tells you about precision and what it does not tell you about the probability that the true value lies in that specific observed interval.",
+    "intent": "Assess confidence-interval interpretation in a public-health context.",
+    "domain": "Biostatistical Interpretation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A study reports p=0.03 for a 0.2 mmHg difference in mean blood pressure between two large groups. Explain why statistical significance alone does not establish meaningful public-health importance.",
+    "intent": "Test statistical versus practical significance.",
+    "domain": "Biostatistical Interpretation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A small study estimates a 20% reduction in injury risk, but its confidence interval ranges from a 10% increase to a 45% reduction. Explain why 'not statistically significant' does not prove there is no effect.",
+    "intent": "Test uncertainty calibration and limits of null findings.",
+    "domain": "Biostatistical Interpretation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "Compare passive, active, and sentinel surveillance for detecting an emerging syndrome. Discuss likely trade-offs in completeness, timeliness, resource use, representativeness, and ability to estimate total burden.",
+    "intent": "Assess surveillance-system trade-offs.",
+    "domain": "Surveillance",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A syndromic surveillance system is tuned to flag any unusual cluster of respiratory complaints. Explain why increasing sensitivity may detect outbreaks earlier but also increase false alarms, and how a public-health team should respond to a signal.",
+    "intent": "Test surveillance sensitivity-specificity trade-offs and verification.",
+    "domain": "Surveillance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A city identifies low vaccination coverage in several districts. Define a measurable program objective, propose one intervention mechanism, and name both a process indicator and an outcome indicator that would show whether the program is working.",
+    "intent": "Test linkage from needs assessment to intervention mechanism and measurable evaluation.",
+    "domain": "Program Planning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "program_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A school nutrition program reports that it distributed 50,000 healthy meals. Explain why this output does not by itself show improved nutrition, and identify process, outcome, and longer-term impact measures that would strengthen the evaluation.",
+    "intent": "Distinguish program activity, output, outcome, and impact.",
+    "domain": "Program Evaluation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "program_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A community walking program is followed by a 10% decline in cardiovascular admissions. During the same period, a new primary-care clinic opens and the local population becomes younger. Explain why the decline cannot automatically be attributed to the walking program and describe a stronger evaluation approach.",
+    "intent": "Assess attribution, confounding, baseline trends, and comparison groups.",
+    "domain": "Program Evaluation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A pilot prevention program achieves high uptake in one small, well-resourced clinic. When scaled citywide, participation falls and staff cannot maintain the original protocol. Analyze why pilot efficacy may not translate into population effectiveness.",
+    "intent": "Test implementation, fidelity, reach, capacity, scalability, and external validity.",
+    "domain": "Program Evaluation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A health system expands free preventive screening, but specialist capacity for follow-up remains fixed. What downstream effects could occur, and what indicators would you monitor to determine whether the expansion improves or harms system performance?",
+    "intent": "Assess systems thinking, bottlenecks, waiting times, overdiagnosis, and unintended consequences.",
+    "domain": "Health Systems",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "Two health systems have similar numbers of primary-care visits per person, but one has shorter waits, better continuity, and fewer avoidable emergency visits. Explain why visit counts alone are insufficient to compare access and quality.",
+    "intent": "Test health-system performance reasoning beyond volume metrics.",
+    "domain": "Health Systems",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A rural region introduces telehealth to improve access. Internet connectivity is poor for older and lower-income residents, while urban residents use the service heavily. Explain how the intervention could improve average access yet widen disparities.",
+    "intent": "Assess digital divide, reach, access, and equity.",
+    "domain": "Digital Health and Public Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "health_equity",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A fitness app reports highly accurate activity estimates in volunteers who own recent smartphones. What evidence is needed before assuming the estimates are valid for the broader population?",
+    "intent": "Test representativeness, measurement validity, selection bias, and digital-health generalizability.",
+    "domain": "Digital Health and Public Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A low-resource country faces both persistent infectious disease and rapidly rising diabetes and cardiovascular disease. Explain why this creates a 'double burden' for the health system and why an intervention designed for a high-resource setting may not transfer unchanged.",
+    "intent": "Assess global-health context, epidemiologic transition, resources, and implementation.",
+    "domain": "Global Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A maternal-health program increases the number of prenatal clinics but attendance changes little. Identify non-clinical barriers that could explain the result and propose data that would help distinguish among them.",
+    "intent": "Test maternal public-health access and social-determinant reasoning.",
+    "domain": "Maternal, Child, and Adolescent Public Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A school injury-prevention program replaces information posters with safer playground surfaces and traffic-calming around the school. Explain the difference between active and passive prevention and why the environmental measures may have broader reach.",
+    "intent": "Assess injury-prevention mechanisms and passive versus active protection.",
+    "domain": "Injury Prevention",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A city wants to reduce fall injuries among older adults. Explain how interventions involving balance and strength, medication review access, home design, lighting, and pedestrian infrastructure can target different parts of the injury pathway without treating aging itself as a disease.",
+    "intent": "Test healthy aging, fall prevention, and multi-level prevention.",
+    "domain": "Aging and Healthy Longevity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "Explain the difference between lifespan and healthspan, and identify two population-level strategies that could improve functional health in later life even if maximum lifespan does not change.",
+    "intent": "Assess aging and healthy-longevity concepts.",
+    "domain": "Aging and Healthy Longevity",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A heatwave is forecast for a city. Power outages are possible, and outdoor workers, older adults living alone, and residents of poorly insulated top-floor apartments are at greater risk. Prioritize the first public-health actions and explain how you would communicate uncertainty.",
+    "intent": "Test emergency prioritization, vulnerable populations, exposure control, communication, and uncertainty.",
+    "domain": "Emergency Public Health",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "practical_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A town's drinking-water system reports possible contamination, but the contaminant and affected neighborhoods are not yet confirmed. What should public-health officials prioritize in the first hours, and how should they balance precaution with avoiding unsupported claims?",
+    "intent": "Assess emergency public-health response under uncertainty.",
+    "domain": "Emergency Public Health",
+    "acuity": "urgent",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A mass gathering experiences a sudden cluster of vomiting illness. Laboratory results are pending. Describe the immediate investigation and control priorities, including case definition, exposure history, isolation of ill food handlers if relevant, environmental assessment, and communication.",
+    "intent": "Test outbreak response prioritization before definitive source confirmation.",
+    "domain": "Emergency Public Health",
+    "acuity": "urgent",
+    "difficulty": 4,
+    "style": "outbreak_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "An intervention requires collecting detailed location data to identify exposure hotspots. Analyze the public-health trade-off between potential collective benefit and privacy, including proportionality, data minimization, transparency, and less-restrictive alternatives.",
+    "intent": "Assess public-health ethics without requiring a single predetermined policy preference.",
+    "domain": "Public-Health Ethics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A health department has evidence suggesting—but not proving—that a new environmental exposure may raise respiratory risk. Draft the key elements of a public message that states what is known, what is uncertain, who may be affected, and what evidence would change the assessment.",
+    "intent": "Test health communication under uncertainty and calibrated risk messaging.",
+    "domain": "Health Communication Under Uncertainty",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "health_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A claim says, 'People who take supplement X have 30% fewer colds, so the supplement prevents colds.' The study was observational, users were more physically active, and cold episodes were self-reported. Identify at least three reasons the causal conclusion may be overstated.",
+    "intent": "Test confounding, information bias, healthy-user effects, and causal overclaiming.",
+    "domain": "Health Misinformation and Evidence Evaluation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A social-media post cites one small randomized trial claiming a new sleep supplement produces a large benefit. The trial has 24 participants, high dropout, multiple outcomes, and no replication. Explain how each feature should affect confidence in the claim.",
+    "intent": "Assess evidence quality, sample size, attrition, multiple comparisons, and replication.",
+    "domain": "Health Misinformation and Evidence Evaluation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Two large studies appear contradictory: one cohort study finds a modest association between a dietary pattern and lower mortality, while a randomized trial of a short-term dietary intervention finds little change in intermediate biomarkers. Explain why the findings may not truly conflict.",
+    "intent": "Test synthesis across differing populations, interventions, durations, outcomes, and study designs.",
+    "domain": "Evidence Evaluation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A city compares neighborhoods and finds that areas with more parks have lower obesity prevalence. Explain why this ecological association cannot establish that an individual who lives near a park is less likely to have obesity, and identify data that would support stronger inference.",
+    "intent": "Test ecological fallacy and multi-level causal inference.",
+    "domain": "Population vs Individual Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A rare occupational exposure doubles the risk of a disease from 1 per 100,000 to 2 per 100,000 among the small group exposed. Explain why the individual relative risk can be large while the exposure contributes little to total population burden.",
+    "intent": "Assess relative risk, absolute risk, exposure prevalence, and population burden.",
+    "domain": "Population vs Individual Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A prevention program reduces risk by an average of 10%, but effects vary substantially by age, income, and baseline risk. Explain why the overall average should not be assumed to apply equally to every subgroup or individual.",
+    "intent": "Test heterogeneity, effect modification, and limits of average effects.",
+    "domain": "Population vs Individual Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A city's annual mortality rate falls from 900 to 820 per 100,000 after an intervention. At the same time, the population becomes much younger. Explain why age structure could create a misleading before-after comparison and how age-standardized rates help.",
+    "intent": "Assess confounding by age and conceptual standardization.",
+    "domain": "Public-Health Data Interpretation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "In a cohort, 120 of 4,000 exposed people and 80 of 8,000 unexposed people develop disease over five years. Calculate the cumulative risk in each group, relative risk, and risk difference, then interpret the public-health meaning of both relative and absolute effects.",
+    "intent": "Test multistep quantitative epidemiologic reasoning.",
+    "domain": "Quantitative Public-Health Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A screening program tests 10,000 people in a population with 1% disease prevalence. The test has 90% sensitivity and 95% specificity. Calculate the expected true positives, false negatives, false positives, and positive predictive value, then explain the practical consequence for follow-up.",
+    "intent": "Test base-rate-sensitive screening calculations and operational interpretation.",
+    "domain": "Screening",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A case-control study reports an odds ratio of 2.5 between an exposure and a rare disease. Explain what the odds ratio means conceptually and why it should not automatically be described as a 150% increase in individual probability.",
+    "intent": "Assess conceptual interpretation of odds ratios and distinction between odds and risk.",
+    "domain": "Epidemiology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "epidemiologic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A cohort contributes 25,000 person-years and records 100 new cases. Calculate the incidence rate per 1,000 person-years and explain why a person-time rate is not the same as the proportion of people who became cases.",
+    "intent": "Test person-time incidence-rate calculation and risk-versus-rate distinction.",
+    "domain": "Epidemiology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "Investigators recruit cases of a disease and controls, then ask both groups to remember past chemical exposures. Explain why recall bias may occur and how it could distort the estimated association.",
+    "intent": "Test information bias in case-control research.",
+    "domain": "Bias and Confounding",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "epidemiologic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "In a cohort study of exercise and mortality, people with severe illness reduce activity before death. Explain how reverse causation could make low activity appear more harmful and describe one design strategy that could reduce this bias.",
+    "intent": "Assess reverse causation and design approaches to limit it.",
+    "domain": "Bias and Confounding",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A study of air pollution includes only hospital patients. Both severe respiratory disease and certain pollution exposures increase the chance of hospitalization. Explain conceptually how conditioning on hospitalization could create a misleading association.",
+    "intent": "Test collider bias conceptually without requiring formal notation.",
+    "domain": "Bias and Confounding",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A study finds that a workplace intervention reduces injuries more for new employees than for experienced employees. Explain how this could represent effect modification rather than confounding, and why the distinction matters for implementation.",
+    "intent": "Assess effect modification versus confounding and subgroup targeting.",
+    "domain": "Bias and Confounding",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "epidemiologic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A natural experiment compares cycling injuries before and after a city opens protected bike lanes, using a similar city without the change as a comparison. Explain why this design can strengthen causal inference and what remaining threats to validity should still be considered.",
+    "intent": "Test quasi-experimental reasoning, comparison groups, and residual confounding.",
+    "domain": "Study Design",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "study_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "Researchers want to know whether a new health-education curriculum changes adolescent vaping initiation over two years, but randomization is not feasible. Propose a reasonable quasi-experimental or longitudinal design and explain how you would address baseline differences and loss to follow-up.",
+    "intent": "Assess study-design construction under practical constraints.",
+    "domain": "Study Design",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "study_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A town reports 25 cases of gastrointestinal illness among 100 attendees at Event A and 60 cases among 400 attendees at Event B. Which event had the higher attack rate, and why might Event B still demand more total resources despite lower individual risk?",
+    "intent": "Test attack-rate calculation and distinction between risk and total burden.",
+    "domain": "Outbreak Investigation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "During an outbreak, one restaurant exposure has a high relative risk but was reported by only 8% of cases, while another exposure has a smaller relative risk but was common among 70% of cases. Explain why source prioritization should consider both strength of association and exposure prevalence, along with timing and plausibility.",
+    "intent": "Test nuanced outbreak hypothesis prioritization.",
+    "domain": "Outbreak Investigation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "outbreak_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A city bans cars from a central street, increasing walking and cycling but shifting some traffic to nearby roads. Analyze potential direct benefits, spillovers, distributional effects, and unintended consequences that should be measured.",
+    "intent": "Assess built-environment systems thinking and second-order effects.",
+    "domain": "Built Environment and Health",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A neighborhood adds trees and shaded pedestrian routes. Explain at least three distinct health pathways through which the change could affect residents, and why the effect may differ by neighborhood context.",
+    "intent": "Test multi-pathway built-environment reasoning involving heat, activity, air quality, mental well-being, and context.",
+    "domain": "Built Environment and Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "environmental_health",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A workplace heat policy gives water and rest breaks but production quotas remain unchanged, so workers often skip breaks. Explain why formal availability of protection may not translate into effective exposure reduction.",
+    "intent": "Assess occupational heat risk, implementation, incentives, and behavior under constraints.",
+    "domain": "Occupational Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "After a flood, a community faces mold exposure, disrupted medication access, contaminated wells, displacement, and mental stress. Explain why a public-health response should prioritize multiple pathways rather than treating the event as a single environmental exposure problem.",
+    "intent": "Test climate-health systems reasoning across environmental, healthcare, and social pathways.",
+    "domain": "Climate and Health",
+    "acuity": "urgent",
+    "difficulty": 5,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A health department wants to improve colorectal cancer screening uptake but has a fixed budget. Compare spending on mass media, mailed reminders, navigation for high-barrier patients, and expanded follow-up capacity. What criteria should guide the allocation?",
+    "intent": "Assess resource allocation, equity, feasibility, reach, and system capacity without requiring a single predetermined choice.",
+    "domain": "Resource Allocation and Priority Setting",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A tax on a health-harming product reduces purchases overall, but the effect differs by income and some consumers switch to substitutes. Explain what evidence is needed to evaluate health impact, distributional effects, substitution, and unintended consequences.",
+    "intent": "Test mechanism-focused policy evaluation without requiring a policy preference.",
+    "domain": "Health Policy and Public-Health Decision-Making",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A hospital system sees fewer medication errors after introducing a new electronic handoff tool. Why should evaluators examine reporting practices, workflow changes, baseline trends, and near misses before concluding the tool caused the improvement?",
+    "intent": "Assess system-level patient-safety evaluation and alternative explanations.",
+    "domain": "Quality and Patient Safety",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A wearable device estimates sleep duration but is inaccurate when users lie awake without moving. Explain how systematic measurement error could bias an observational study relating device-measured sleep to health outcomes.",
+    "intent": "Test measurement bias in digital-health data.",
+    "domain": "Digital Health and Public Health",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "An online article claims that a 'natural' supplement is safe because it comes from plants. Explain why natural origin does not establish safety, and identify the kinds of evidence relevant to evaluating benefit, dose, interactions, adverse effects, and product quality.",
+    "intent": "Assess wellness evidence evaluation and naturalistic-fallacy reasoning.",
+    "domain": "Wellness Claims and Pseudoscience",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A popular diet produces large short-term weight loss in a small uncontrolled group, but adherence falls sharply by six months. Explain why long-term feasibility, comparator choice, attrition, and adverse effects matter when judging the claim.",
+    "intent": "Test wellness evidence, sustainability, and study-quality reasoning.",
+    "domain": "Nutrition and Public Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A community wellness program reports high satisfaction among attendees, but only 12% of the target population participated and participants were healthier at baseline. Explain why satisfaction alone does not establish population effectiveness.",
+    "intent": "Assess reach, selection bias, representativeness, and program effectiveness.",
+    "domain": "Community Health",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "program_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A public-health agency publishes a chart showing a sharp rise in disease prevalence after a new diagnostic threshold is introduced, while hospitalization rates are stable. Explain at least three reasons prevalence can rise without a true increase in underlying disease occurrence.",
+    "intent": "Test prevalence interpretation, case definitions, detection, duration, and diagnostic changes.",
+    "domain": "Public-Health Data Interpretation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A cohort study finds an exposure associated with disease after adjustment for several confounders, but exposure is self-reported with substantial error and 35% of participants are lost to follow-up. Evaluate how residual confounding, measurement error, and selection bias interact with the causal claim.",
+    "intent": "Test integrated bias and causal-inference reasoning.",
+    "domain": "Causal Inference",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "An intervention improves overall vaccination coverage from 70% to 82%. Coverage rises to 90% in high-income districts but only to 72% in low-income districts. Explain how to evaluate both total population benefit and equity, and what additional information is needed before judging the program's distributional impact.",
+    "intent": "Assess population averages, subgroup effects, equity, and missing context.",
+    "domain": "Health Equity and Disparities",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A city wants to reduce diabetes incidence. Compare a strategy focused on individual lifestyle counseling with one that also changes food availability, walkability, and access to preventive care. Explain how the two approaches can be complementary rather than mutually exclusive.",
+    "intent": "Test multi-level chronic-disease prevention and systems thinking.",
+    "domain": "Chronic-Disease Prevention",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A new health message says, 'Experts are certain this exposure is harmless.' The current evidence consists of two small studies with wide confidence intervals and limited follow-up. Critique the message and propose a more accurate way to communicate the evidence.",
+    "intent": "Test uncertainty calibration and communication without false reassurance.",
+    "domain": "Health Communication Under Uncertainty",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "health_communication",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A policy intervention reduces average sugar-sweetened beverage purchases, but retailers respond by discounting other high-sugar products and consumers partly substitute toward them. Explain how behavioral adaptation can reduce the expected health effect and how evaluation should capture substitution.",
+    "intent": "Assess systems thinking, behavioral adaptation, and policy evaluation.",
+    "domain": "Health Policy and Public-Health Decision-Making",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A city observes that neighborhoods with higher unemployment also have higher mortality. Build a causal explanation that integrates at least four pathways involving income, housing, stress, healthcare access, environmental exposure, or behavior, while clearly distinguishing plausible mechanisms from proof of causation.",
+    "intent": "Test integrated social, environmental, behavioral, and healthcare determinants with causal restraint.",
+    "domain": "Social Determinants of Health",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "An outbreak response has limited staff. Teams can intensify case finding, expand laboratory testing, issue public guidance, inspect suspected environmental sources, or support isolation of confirmed cases. Evidence is incomplete and the suspected source may be wrong. Explain how to prioritize the first 24 hours, what trade-offs matter, and what new information would change the plan.",
+    "intent": "Assess high-complexity emergency public-health prioritization under uncertainty and resource constraints.",
+    "domain": "Emergency Public Health",
+    "acuity": "urgent",
+    "difficulty": 5,
+    "style": "practical_decision",
+    "jurisdiction_required": false
+  }
+]

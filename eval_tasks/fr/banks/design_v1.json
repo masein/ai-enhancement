@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A stakeholder says, “We need an app with a dashboard.” Before accepting the dashboard as the solution, what should a designer clarify, and how would those questions reframe the underlying design problem?",
+    "intent": "Tests whether the model distinguishes a requested artifact from user goals, tasks, decisions, information needs, context, constraints, and evidence.",
+    "domain": "Design Foundations — Problem Framing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A handheld workflow will be used in a busy warehouse where workers wear gloves, move between bright and dim areas, hear machinery, and are interrupted frequently. Which context-of-use factors should shape the design, and what kinds of interface decisions follow from them?",
+    "intent": "Tests contextual reasoning about environment, mobility, input, visibility, interruption, and task continuity.",
+    "domain": "Design Foundations — Context of Use",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A team creates three personas using only age, gender, and job title, then assigns each persona different interface preferences without research. What is weak about this approach, and what evidence would make the personas more useful?",
+    "intent": "Tests whether personas are grounded in meaningful behavioral differences, goals, and research rather than demographic stereotypes.",
+    "domain": "Design Foundations — Personas",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "For an expense-reporting tool, distinguish the user’s goal, the task, an interface action, and the organization’s objective. Give one plausible example of each and explain why confusing them can lead to poor design.",
+    "intent": "Tests conceptual separation of goals, tasks, actions, and organizational objectives.",
+    "domain": "Design Foundations — Goals and Tasks",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A museum wants visitors to spend more time in an exhibition, while visitor research shows many people primarily want to find a few specific works quickly and avoid fatigue. How should a designer define success criteria without assuming both objectives can be maximized at once?",
+    "intent": "Tests competing objectives, stakeholder/user needs, success criteria, and explicit trade-offs.",
+    "domain": "Design Foundations — Objectives and Trade-offs",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A team assumes that users abandon a repair-booking flow because it has too many steps, but no one has observed where abandonment occurs. Identify the key assumptions and unknowns, and propose evidence that would test them before redesigning the flow.",
+    "intent": "Tests assumption identification, uncertainty, and evidence planning before solutioning.",
+    "domain": "Design Foundations — Assumptions and Unknowns",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A community service must offer self-service registration on older phones, support intermittent connectivity, work in two languages, and launch within a limited budget. How should these constraints influence scope and design priorities?",
+    "intent": "Tests whether constraints are incorporated into design decisions rather than treated as afterthoughts.",
+    "domain": "Design Foundations — Constraints",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "design_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A team redesigns instructions whose primary goal is accurate completion of a setup task. Which success measures would be more informative than page views or time spent reading, and why?",
+    "intent": "Tests alignment between design objectives and evaluation metrics.",
+    "domain": "Design Foundations — Success Criteria",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "Users repeatedly copy information into a spreadsheet and ask for a new “Export” button. Observation suggests the real problem is that they must reconcile records across two systems. How should the team distinguish the stated request from the underlying need?",
+    "intent": "Tests stated wants versus observed needs, workarounds, and deeper problem framing.",
+    "domain": "Design Foundations — User Needs",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "design_research",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A multi-step application is used by first-time applicants, experienced staff assisting them, and translators. Sessions may be interrupted, connectivity is uneven, and completion has a fixed deadline. Frame the design problem by identifying users, goals, constraints, unknowns, risks, and evidence needed before proposing a redesign.",
+    "intent": "Tests high-complexity problem framing across multiple user groups, contexts, constraints, accessibility, and uncertainty.",
+    "domain": "Design Foundations — Integrated Framing",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A poster gives the title, date, venue, sponsor names, and registration URL nearly the same size and weight. What is the main visual-communication problem, and how could hierarchy make scanning easier?",
+    "intent": "Tests basic visual hierarchy using size, weight, position, contrast, and spacing.",
+    "domain": "Visual Communication — Hierarchy",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "visual_design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "On a settings page, labels sit close to the controls below them while unrelated items share identical backgrounds. How could proximity and common region be used to make grouping clearer? Explain the perceptual effect rather than only naming a Gestalt principle.",
+    "intent": "Tests applied perceptual grouping through proximity and common region.",
+    "domain": "Visual Communication — Grouping",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "visual_design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A comparison table uses different left edges for headings, labels, and values, making rows difficult to scan. Why does alignment matter here, and what alignment strategy would improve the structure?",
+    "intent": "Tests alignment as a mechanism for order, relationships, and scanning.",
+    "domain": "Visual Communication — Alignment",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "visual_design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A dense instruction sheet has almost no space between sections because the team considers whitespace wasted area. Explain how whitespace can improve grouping, emphasis, and readability without simply making the page look emptier.",
+    "intent": "Tests functional use of whitespace and density management.",
+    "domain": "Visual Communication — Whitespace",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "visual_design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A typeface has clearly distinguishable characters, but a long article set in that typeface uses very long lines and cramped line spacing. Which problem is primarily about legibility and which is about readability?",
+    "intent": "Tests the distinction between character-level legibility and extended-text readability.",
+    "domain": "Visual Communication — Typography",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "typography_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A long-form help page uses small body text, wide text columns, tight line spacing, and six competing heading styles. Diagnose the reading problems and propose a typographic hierarchy that improves scanning without prescribing a specific font family.",
+    "intent": "Tests hierarchy, line length, spacing, consistency, legibility, and readability.",
+    "domain": "Visual Communication — Typography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "typography_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A status list marks failures only in red and successes only in green. How should the visual encoding change so the status remains understandable for users who cannot reliably distinguish those colors?",
+    "intent": "Tests color-vision accessibility and redundant encoding using labels, icons, shape, pattern, or position.",
+    "domain": "Visual Communication — Color and Contrast",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "accessibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A toolbar uses eight unlabeled icons, and testing shows new users interpret three of them differently from the designers. What should the team change, and why is visual consistency alone insufficient to solve the ambiguity?",
+    "intent": "Tests icon recognition, labels, metaphor ambiguity, and user evidence.",
+    "domain": "Visual Communication — Iconography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "visual_design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "An assembly guide uses large decorative lifestyle photos while the small instructional diagrams omit important orientation cues. How should imagery be prioritized to improve comprehension and trust in the instructions?",
+    "intent": "Tests imagery as functional communication rather than decoration.",
+    "domain": "Visual Communication — Imagery",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "information_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A visual identity must work on a small package label, a website, printed instructions, and large environmental signage. Which elements should remain invariant for recognition, which may adapt to context, and why is the logo alone not the identity system?",
+    "intent": "Tests identity-system consistency versus flexibility across formats and contexts.",
+    "domain": "Visual Communication — Identity Systems",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "design_critique",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A registration page contains the purpose, eligibility rules, required documents, a primary action, deadlines, exceptions, and background detail. How should the content hierarchy be ordered so users can decide whether and how to proceed?",
+    "intent": "Tests information hierarchy around user decisions, not merely visual emphasis.",
+    "domain": "Information Design & IA — Information Hierarchy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "information_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A six-page setup guide presents forty steps as one uninterrupted numbered list. How would you chunk the information into meaningful units without creating arbitrary equal-sized groups?",
+    "intent": "Tests conceptual chunking based on task structure and dependencies.",
+    "domain": "Information Design & IA — Chunking",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "information_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "An account settings screen exposes every advanced option at once, but most users change only three basic settings. What should remain visible, what could use progressive disclosure, and what information should not be hidden?",
+    "intent": "Tests progressive disclosure while preserving essential information and discoverability.",
+    "domain": "Information Design & IA — Progressive Disclosure",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "information_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A team needs to show monthly service volume and a target level across 18 months. Would a line chart, bar chart, scatterplot, table, or map best support the main comparison, and what labels or annotations would make the display interpretable?",
+    "intent": "Tests chart selection based on temporal comparison and information needs.",
+    "domain": "Information Design & IA — Data Visualization",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "information_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "Two bar charts show the same values, 96 and 100. One axis starts at 0 and the other at 95. Why can the second chart exaggerate the perceived difference, and what should a responsible critique consider before deciding whether the truncated scale is justified?",
+    "intent": "Tests misleading visualization, perceptual distortion, and context-sensitive critique.",
+    "domain": "Information Design & IA — Data Visualization",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "Design a data display for five categories over time when users must compare trends, distinguish categories without relying on color alone, read it on a small screen, and understand that each value has uncertainty. Explain the encoding, labeling, density, and uncertainty choices and how you would evaluate them.",
+    "intent": "Tests integrated accessible data-visualization reasoning across encoding, labels, density, uncertainty, and evaluation.",
+    "domain": "Information Design & IA — Accessible Data Visualization",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "accessibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A help center has top-level categories called Billing, Plans, Payments, Refunds, and Account, and users frequently do not know where subscription changes belong. Diagnose the taxonomy problem and propose a more findable organization, allowing overlap or facets if useful.",
+    "intent": "Tests categorization, overlap, user mental models, and non-tree information structures.",
+    "domain": "Information Design & IA — Taxonomy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "information_architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "In a large knowledge base, some users know the exact document name while others are exploring an unfamiliar topic and do not know the vocabulary. How should search and browse work together for these two behaviors?",
+    "intent": "Tests search versus browsing and complementary findability mechanisms.",
+    "domain": "Information Design & IA — Search and Browse",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "information_architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A service uses navigation labels such as “Fulfillment Operations,” “Entitlement Management,” and “Remediation,” while users say they think in terms of “Track order,” “Change plan,” and “Fix a problem.” How should the labels be revised, and what evidence would support the change?",
+    "intent": "Tests user-centered labeling and avoidance of organization-centric jargon.",
+    "domain": "Information Design & IA — Labeling",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "information_architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A digital archive serves occasional visitors who browse by topic and expert researchers who search by creator, date, collection, and format. Propose an information architecture that supports both mental models without forcing a single strict hierarchy.",
+    "intent": "Tests multiple navigation schemes, faceted organization, mental models, and findability.",
+    "domain": "Information Design & IA — Information Architecture",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "information_architecture",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A flat metal plate on one side of a door and a pull handle on the other support different actions. Explain the difference between the physical affordance and the signifier in this example.",
+    "intent": "Tests accurate distinction between affordances and cues that indicate intended use.",
+    "domain": "Interaction & UX — Affordances and Signifiers",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A user edits a document and presses Save, but nothing visible changes for several seconds. What feedback should the interface provide so the user can understand whether the action was received and what state the document is in?",
+    "intent": "Tests immediate feedback and visibility of system state.",
+    "domain": "Interaction & UX — Feedback",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "interaction_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A file upload can take 30–90 seconds. Users currently see a frozen-looking screen and often submit again. Redesign the loading and progress state to reduce uncertainty and duplicate actions without pretending that progress is more precise than it is.",
+    "intent": "Tests progress feedback, honest system status, duplicate prevention, and context preservation.",
+    "domain": "Interaction & UX — Loading and Status",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "interaction_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A four-burner cooktop has four controls arranged in a straight row, and users frequently turn the wrong burner on. How could the control layout use more natural mapping to reduce the learning and error burden?",
+    "intent": "Tests mapping between controls and effects in a physical product.",
+    "domain": "Interaction & UX — Mapping",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "interaction_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A booking form accepts dates in any text format and reports an error only after submission. What input constraints and feedback could prevent invalid entries while still allowing legitimate dates?",
+    "intent": "Tests preventive constraints, validation timing, and user control.",
+    "domain": "Interaction & UX — Constraints",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "interaction_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "A table allows users to delete 200 selected records with one action. Design the destructive-action behavior, considering labeling, preview, confirmation, undo or recovery, and the risk of confirmation habituation.",
+    "intent": "Tests error prevention and recovery for consequential destructive actions.",
+    "domain": "Interaction & UX — Error Prevention",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "interaction_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "In a six-step form, an error on the last step sends users back to step one and clears several valid fields. Diagnose the recovery problem and propose a flow that preserves state and directs attention to the fields needing correction.",
+    "intent": "Tests error recovery, state preservation, and multi-step flow design.",
+    "domain": "Interaction & UX — Error Recovery",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "usability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A form displays the message “Invalid error” after submission. Rewrite the error behavior conceptually: what should the message tell the user, where should it appear, and how should the affected input be identified?",
+    "intent": "Tests actionable error messages, field association, and recovery guidance.",
+    "domain": "Interaction & UX — Error Messages",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A scheduling system automatically moves users’ tasks when conflicts appear, but it does not show what changed or make the move easy to reverse. How should the automation be redesigned to balance efficiency with visibility, correction, and user control?",
+    "intent": "Tests trustworthy automation, oversight, reversibility, and trade-offs.",
+    "domain": "Interaction & UX — User Control",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A new account has “Share activity publicly” preselected because the organization wants more participation. Evaluate the default from the perspectives of convenience, transparency, reversibility, informed choice, and user interests.",
+    "intent": "Tests defaults as ethical choice architecture rather than merely convenience.",
+    "domain": "Interaction & UX — Defaults",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ethical_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A sign-up form asks for 18 fields, including several items not used until much later. How should the team decide which fields are necessary now, which can be deferred, and how validation and grouping should support completion?",
+    "intent": "Tests form design, data minimization, progressive disclosure, and cognitive load.",
+    "domain": "Interaction & UX — Forms",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "usability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A product proposes a ten-screen tutorial before first use, although the first useful task requires only two concepts. How would you decide what belongs in onboarding, what can be learned in context, and how to evaluate whether onboarding helped?",
+    "intent": "Tests onboarding, first success, progressive instruction, and evaluation.",
+    "domain": "Interaction & UX — Onboarding",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "usability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A data-entry tool serves occasional novices and daily expert users. Novices need explanation and safeguards; experts want density, shortcuts, and less repetition. Propose an interaction strategy that supports progressive expertise without creating two unrelated products.",
+    "intent": "Tests learnability versus expert efficiency and progressive expertise.",
+    "domain": "Interaction & UX — Learnability and Efficiency",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A design system uses the same neutral button treatment everywhere, but one workflow contains a rare, high-consequence action that users repeatedly trigger by mistake. Should the team preserve visual consistency or introduce a deliberate exception? Explain the trade-off and evidence needed.",
+    "intent": "Tests consistency versus context-specific risk reduction.",
+    "domain": "Interaction & UX — Consistency",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "Users cannot export a report. The command is placed under a navigation category called “Operations,” shown only as an icon, disabled during synchronization, and gives no explanation when disabled. Diagnose the failure across information architecture, labeling, hierarchy, system state, and feedback, then propose a coordinated redesign.",
+    "intent": "Tests a multi-causal interaction failure rather than a single isolated usability defect.",
+    "domain": "Interaction & UX — Integrated Diagnosis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "An important action appears only when a pointer hovers over a card. What barriers can this create for keyboard, touch, and other non-hover users, and how should the interaction be redesigned?",
+    "intent": "Tests operability across input methods and avoidance of pointer-only interaction.",
+    "domain": "Accessibility & Inclusion — Input Access",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "accessibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "Opening a modal moves visual attention to it, but keyboard focus remains behind the modal and the close control is reached only after tabbing through the page. What should the focus behavior be and why?",
+    "intent": "Tests predictable focus order, visible focus, and modal keyboard interaction conceptually.",
+    "domain": "Accessibility & Inclusion — Keyboard and Focus",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "accessibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A dashboard visually arranges a heading, summary, alert, and detail table in a clear order, but the underlying reading order presents the table first and the alert last. What problem can this create for screen-reader users, and what conceptual structure should be aligned?",
+    "intent": "Tests reading order, headings, meaningful sequence, and equivalent structure.",
+    "domain": "Accessibility & Inclusion — Screen-Reader Concepts",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "accessibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A page contains a decorative flourish, a photo that conveys the identity of a person mentioned in the text, and a complex process diagram. How should alternative text or equivalent description differ for these three cases?",
+    "intent": "Tests distinction among decorative, meaningful, and complex images.",
+    "domain": "Accessibility & Inclusion — Alternative Text",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "accessibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A process requires users to remember a six-digit reference shown on one screen, navigate through two screens, and type it later from memory. How could the design reduce memory demand while preserving necessary complexity?",
+    "intent": "Tests cognitive accessibility, recognition versus recall, and memory load.",
+    "domain": "Accessibility & Inclusion — Cognitive Accessibility",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "inclusive_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A mobile check-in flow must still work for one-handed use, large text settings, occasional packet loss, and users who may be carrying luggage. Identify design changes that improve robustness across these edge cases without assuming one “average” user.",
+    "intent": "Tests inclusive design across ability, environment, device, and connectivity.",
+    "domain": "Accessibility & Inclusion — Edge Cases",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "inclusive_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A compact interface designed in English breaks when translated text becomes longer, and its navigation assumes left-to-right reading. What should the design system and layout do to support localization and right-to-left contexts without treating translation as a last-minute text swap?",
+    "intent": "Tests text expansion, reading direction, localization, and adaptable components.",
+    "domain": "Accessibility & Inclusion — Localization",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "inclusive_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A team plans to use one symbol and one color as universal indicators of “approved” across many cultural contexts. What should they validate before standardizing the convention, and how can they avoid replacing evidence with national stereotypes?",
+    "intent": "Tests cultural context, symbol interpretation, uncertainty, and validation.",
+    "domain": "Accessibility & Inclusion — Cultural Context",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A list can be reordered only by dragging items with a pointer. What alternative interaction should be provided so users who cannot drag can achieve the same task, and how should the new state be communicated?",
+    "intent": "Tests equivalent operation, state feedback, and input diversity.",
+    "domain": "Accessibility & Inclusion — Operability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "accessibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Redesign a multi-step application for users on small screens, keyboard and screen-reader users, people with limited language proficiency, and users whose sessions may time out. The current form has vague labels, color-only errors, fixed-width layouts, and clears data after timeout. Explain priorities for content, interaction, accessibility, state preservation, and evaluation.",
+    "intent": "Tests integrated accessible workflow redesign across language, input, layout, errors, state, and testing.",
+    "domain": "Accessibility & Inclusion — Integrated Accessible Flow",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A storage container has a smooth lid with no grip feature or indication of where to open it. How could its form provide stronger physical affordances and signifiers without adding written instructions?",
+    "intent": "Tests how physical form can communicate and enable intended action.",
+    "domain": "Product / Industrial Design — Physical Affordances",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "product_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A handheld kitchen tool is used with wet hands for repetitive tasks. How should grip diameter, texture, required force, wrist posture, and variation in hand size influence the design?",
+    "intent": "Tests ergonomic reasoning across grip, force, posture, repetition, and user variation.",
+    "domain": "Product / Industrial Design — Ergonomics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ergonomic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A fixed control is 610 mm from the front edge of a workstation. Supplied reach data for the intended population show a 5th-percentile forward reach of 470 mm and a 95th-percentile reach of 720 mm. Why is designing around the average reach inadequate here, and what redesign directions would better accommodate shorter-reach users?",
+    "intent": "Tests conceptual anthropometric reasoning using supplied range data without requiring external tables.",
+    "domain": "Product / Industrial Design — Anthropometrics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A portable product can use Material A, which is light and inexpensive but scratches easily, or Material B, which is heavier and costlier but more durable and easier to recycle. What additional use-context evidence is needed, and how should the trade-offs be evaluated?",
+    "intent": "Tests material reasoning across weight, durability, cost, recyclability, and context.",
+    "domain": "Product / Industrial Design — Materials",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A concept has many unique decorative parts, hidden fasteners, and several assembly orientations. It looks distinctive but is slow to assemble and easy to assemble incorrectly. How could the design be simplified for manufacturability without assuming appearance is irrelevant?",
+    "intent": "Tests conceptual design-for-manufacturing and assembly trade-offs.",
+    "domain": "Product / Industrial Design — Manufacturability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "product_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A device is fully sealed, improving water resistance, but its high-wear battery cannot be replaced. Evaluate whether a serviceable enclosure is preferable, considering durability, safety, repair, reliability, and use environment rather than treating repairability as an absolute rule.",
+    "intent": "Tests repairability against reliability and safety constraints.",
+    "domain": "Product / Industrial Design — Repairability",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A protective package is difficult to open for users with limited hand strength and cannot be resealed, although the product is stored between uses. Propose packaging changes that balance protection, opening effort, storage, communication, material use, and transport.",
+    "intent": "Tests packaging as a functional, accessible, lifecycle design problem.",
+    "domain": "Product / Industrial Design — Packaging",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "product_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A countertop appliance has a filter that needs monthly cleaning, but reaching it requires removing six screws and disconnecting a fragile cable. How should maintenance and serviceability influence the product architecture?",
+    "intent": "Tests maintenance access, disassembly, cleaning, and durability.",
+    "domain": "Product / Industrial Design — Maintenance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "product_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "Operators must distinguish three physical controls while wearing gloves and working in low light. How can shape, spacing, tactile differentiation, position, and mapping reduce selection errors without relying only on printed labels?",
+    "intent": "Tests robust physical-control design under constrained visibility and input conditions.",
+    "domain": "Product / Industrial Design — Physical Controls",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "ergonomic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Compare three product concepts: A uses 20% less material but is difficult to repair and expected to be replaced more often; B uses more material but has replaceable high-wear parts and a longer expected life; C is modular but more complex to manufacture. Explain how you would evaluate ergonomics, durability, material use, manufacturability, repairability, cost, and lifecycle evidence without declaring one attribute universally decisive.",
+    "intent": "Tests integrated physical-product judgment across lifecycle and manufacturing trade-offs.",
+    "domain": "Product / Industrial Design — Lifecycle Trade-offs",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "Customers enter contact details when booking online, repeat them at arrival, and correct them again at payment because the systems do not share updates. Map the journey-level problem and identify which touchpoints and transitions need redesign.",
+    "intent": "Tests end-to-end service journeys and repeated-information breakdowns.",
+    "domain": "Service & Systems — Service Journeys",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "service_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A service promises an item is available for pickup, but staff often discover after the customer arrives that inventory was not synchronized. Using service-blueprint reasoning, identify user actions, frontstage interactions, backstage processes, and dependencies that must be examined.",
+    "intent": "Tests frontstage/backstage dependencies and operational causes of service failure.",
+    "domain": "Service & Systems — Service Blueprints",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "service_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A caller explains a complex problem to a contact center and is then sent to a physical location where staff have no record of the conversation. How should the handoff be redesigned to reduce repetition, delay, lost context, and error?",
+    "intent": "Tests information continuity and handoffs across staff, systems, and locations.",
+    "domain": "Service & Systems — Handoffs",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "service_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "A user begins an application on the web, asks a question by phone, and finishes in person. Each channel currently has different terminology and requires the user to restart. Design a cross-channel experience that preserves progress and context while allowing channels to differ where appropriate.",
+    "intent": "Tests omnichannel continuity with deliberate channel-specific adaptation.",
+    "domain": "Service & Systems — Cross-Channel Experience",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "service_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A queue’s average wait cannot be reduced in the short term, but customers do not know their place, expected delay, or whether they can briefly leave. What design interventions could improve perceived control, fairness, and status without making false promises?",
+    "intent": "Tests waiting experience, uncertainty, status, fairness, and truthful communication.",
+    "domain": "Service & Systems — Waiting and Queues",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "service_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "Design wayfinding for first-time visitors moving through a large public venue under time pressure. Users may speak different languages, have low vision, or arrive from several entrances. Explain destination naming, decision-point signage, landmarks, maps, redundant cues, and how you would test the system.",
+    "intent": "Tests high-complexity wayfinding across orientation, multilingual use, accessibility, and evaluation.",
+    "domain": "Service & Systems — Wayfinding",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "wayfinding",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A directional sign is visually polished but is mounted after the corridor where visitors must choose left or right. What is the design failure, and what should determine sign placement, hierarchy, wording, and viewing distance?",
+    "intent": "Tests signage at decision points and contextual visibility.",
+    "domain": "Service & Systems — Signage",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "wayfinding",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A self-service kiosk reduces transaction time at one touchpoint, but it creates more exceptions that staff must resolve later and forces users to re-enter information. How should the team evaluate whether the service improved overall?",
+    "intent": "Tests system-level evaluation rather than isolated touchpoint optimization.",
+    "domain": "Service & Systems — System-Level Evaluation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "An interviewer asks, “How helpful was our simple new search feature?” What makes this question leading, and how would you rewrite it to obtain more neutral evidence?",
+    "intent": "Tests recognition and correction of leading interview wording.",
+    "domain": "Research & Evaluation — Interviews",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "research_critique",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A team wants to understand why staff create unofficial workarounds during a recurring operational task. When would observation or contextual inquiry provide evidence that interviews alone might miss?",
+    "intent": "Tests method fit for tacit behavior, context, interruptions, and workarounds.",
+    "domain": "Research & Evaluation — Observation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "design_research",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A survey about a product is emailed only to highly active users, and 92% say they are satisfied. Why can the large response count still fail to represent the target population, and what recruiting changes would improve the evidence?",
+    "intent": "Tests sampling bias, self-selection, and representativeness.",
+    "domain": "Research & Evaluation — Surveys and Sampling",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "research_critique",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A team needs to learn both how often a workflow breaks and why the breakdown occurs in context. Which combination of quantitative and qualitative methods would answer those two questions, and what claims could each method support?",
+    "intent": "Tests matching complementary research methods to frequency and mechanism questions.",
+    "domain": "Research & Evaluation — Method Selection",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "design_research",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "One participant says, “I would never use search,” and the team turns that quote into a requirement to remove search for everyone. What is wrong with the synthesis, and how should the observation be treated?",
+    "intent": "Tests overgeneralization from a memorable quote and appropriate uncertainty.",
+    "domain": "Research & Evaluation — Synthesis",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "research_critique",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "Researchers observe that users repeatedly photograph a confirmation screen because they do not trust they can retrieve the information later. Turn this observation into a defensible research insight by separating evidence, possible underlying need, uncertainty, and design implication.",
+    "intent": "Tests evidence-to-insight synthesis without overstating causality.",
+    "domain": "Research & Evaluation — Research Insights",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "design_research",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A usability-test task says, “Click Settings, choose Export, and press Download.” Rewrite it as a realistic goal-based task that does not reveal the interaction path, and explain why the original wording weakens the test.",
+    "intent": "Tests representative task writing without solution leakage.",
+    "domain": "Research & Evaluation — Usability Testing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "usability_testing",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "In a usability study with 8 participants, 6 complete the task unaided and 2 finish only after the moderator tells them where to click. What is the unaided task-success rate, and why would reporting 8 of 8 as successful misrepresent usability?",
+    "intent": "Tests quantitative task-success interpretation and moderator assistance.",
+    "domain": "Research & Evaluation — Usability Testing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A redesigned workflow reduces median completion time but increases serious errors and the amount of facilitator assistance during testing. How should the team interpret effectiveness, efficiency, and error evidence instead of optimizing only for speed?",
+    "intent": "Tests multi-metric usability evaluation and trade-offs.",
+    "domain": "Research & Evaluation — Usability Metrics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "usability_testing",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "In an A/B test, task completion rises from 60% to 78%. Calculate the absolute percentage-point change and the relative increase. Then explain why those numbers alone do not prove overall design superiority if support requests and error severity also changed.",
+    "intent": "Tests percentage interpretation, metric alignment, and limits of A/B evidence.",
+    "domain": "Research & Evaluation — A/B Testing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A team is still uncertain whether the information architecture and main task sequence are correct. What prototype fidelity is appropriate for the next study, and why might polished visuals be counterproductive at this stage?",
+    "intent": "Tests matching low-fidelity prototypes to structural learning objectives.",
+    "domain": "Prototyping & Systems — Prototype Fidelity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "prototype_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "One product has three major uncertainties: whether users understand its navigation model, whether a timed transition is noticeable without being distracting, and whether a physical grip is comfortable across hand sizes. Choose an appropriate prototype for each uncertainty and explain why one single high-fidelity prototype is not necessarily the best answer.",
+    "intent": "Tests selecting different prototype forms and fidelities for different learning questions.",
+    "domain": "Prototyping & Systems — Mixed-Fidelity Prototyping",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "prototype_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A team believes, “If submission status is visible immediately, users will make fewer duplicate submissions.” Identify the design hypothesis, the evidence needed to test it, and a success measure that would support or challenge the hypothesis.",
+    "intent": "Tests explicit design hypotheses and measurable learning objectives.",
+    "domain": "Prototyping & Systems — Design Hypotheses",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "After testing a prototype, the team changes its layout, labels, colors, navigation, and task sequence all at once, then cannot tell which change affected performance. How should an evidence-driven iteration cycle be structured instead?",
+    "intent": "Tests purposeful iteration, prioritization, learning objectives, and retesting.",
+    "domain": "Prototyping & Systems — Iteration",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "prototype_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A team has a reusable date picker, a recurring pattern for filtering large result sets, and a one-off promotional page. Which is best described as a reusable component, an interaction pattern, and a page-specific solution, and why does the distinction matter?",
+    "intent": "Tests component versus pattern versus local solution.",
+    "domain": "Prototyping & Systems — Components and Patterns",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "design_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A design-system component is consistent across the product, but a specialized workflow has evidence that the component causes repeated task errors. How should a governance process evaluate an exception, document it, and decide whether the local solution should later influence the shared system?",
+    "intent": "Tests design-system governance, justified exceptions, evidence, and contribution models.",
+    "domain": "Prototyping & Systems — Design-System Governance",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "design_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A desktop interface has a three-column layout, dense secondary controls, and a persistent navigation rail. On a narrow viewport, simply shrinking everything makes text hard to read and actions hard to reach. How should content priority, reflow, navigation, and interaction change responsively?",
+    "intent": "Tests responsive redesign as reprioritization and reflow rather than shrinking.",
+    "domain": "Prototyping & Systems — Responsive Design",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "design_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "An interface can detect reduced-motion preference, coarse-pointer input, and a low-bandwidth mode. Which adaptations would be justified by these capabilities, how should the core task remain predictable, and when would adaptation become arbitrary inconsistency?",
+    "intent": "Tests purposeful adaptive design based on capability and user settings.",
+    "domain": "Prototyping & Systems — Adaptive Design",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "design_systems",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A subscription flow makes “Continue subscription” large and prominent while hiding “Cancel” behind several unrelated screens and using guilt-inducing language. Evaluate the design in terms of user agency, transparency, obstruction, and informed choice.",
+    "intent": "Tests recognition of deceptive design without treating conversion as the sole objective.",
+    "domain": "Ethics & Sustainability — Deceptive Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ethical_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A wellness reminder helps users follow a goal they explicitly chose, but the team proposes increasing notification frequency until users interact. How would you distinguish supportive persuasion from exploiting interruption and attention against user interests?",
+    "intent": "Tests persuasive design, user goals, notification costs, and ethical boundaries.",
+    "domain": "Ethics & Sustainability — Persuasive Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ethical_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A service asks for precise location, contact-list access, and demographic data during sign-up even though only a postal code is needed for the core task. How should privacy-by-design principles change data collection, defaults, disclosure, and user control?",
+    "intent": "Tests data minimization, understandable disclosure, appropriate defaults, and control.",
+    "domain": "Ethics & Sustainability — Privacy by Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "ethical_design",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "Package Concept A uses 30% less material than the current package but increases product damage in transit from 2% to 8%; Concept B cuts material by 10% with no measured change in damage. What additional lifecycle information is needed, and why is material reduction alone insufficient to identify the more sustainable design?",
+    "intent": "Tests quantitative lifecycle trade-offs among material use, damage, replacement, transport, and uncertainty.",
+    "domain": "Ethics & Sustainability — Sustainable Packaging",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "sustainability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "A modular product is easy to repair and refurbish but uses more connectors and material than a sealed version. Explain how a circular-design evaluation should compare repair, reuse, reliability, material recovery, manufacturing, and end-of-life rather than assuming “modular” is automatically superior.",
+    "intent": "Tests circularity as a system of lifecycle trade-offs.",
+    "domain": "Ethics & Sustainability — Circularity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "sustainability_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "An interface redesign increases paid conversion, but testing shows many users choose the paid option because the free option is visually de-emphasized, described ambiguously, and difficult to reverse. Evaluate the design objective, user agency, metric alignment, evidence, and alternative designs that could preserve legitimate business goals without relying on confusion.",
+    "intent": "Tests high-complexity ethical design judgment where organizational metrics conflict with informed user choice.",
+    "domain": "Ethics & Sustainability — Metrics and Agency",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "An AI-assisted workflow drafts decisions from incomplete information. It saves expert users time, but novices often accept incorrect suggestions, the interface hides source uncertainty, and corrections are cumbersome. Redesign the experience to address automation bias, provenance or evidence cues, editable output, review, failure states, and user control, and propose how you would evaluate whether the new workflow is actually better.",
+    "intent": "Tests human–AI interaction design without requiring model-architecture knowledge.",
+    "domain": "Cross-disciplinary — Human–AI Interaction",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A visually elegant minimalist interface hides field labels after typing, removes visible navigation in favor of gestures, uses low-contrast secondary text, and suppresses confirmation messages to reduce clutter. Critique the design against discoverability, readability, accessibility, state visibility, error prevention, and the actual goal of task completion.",
+    "intent": "Tests evidence-based critique of minimalism across visual and interaction quality.",
+    "domain": "Cross-disciplinary — Integrated Design Critique",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "design_critique",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A backlog contains: a rare cosmetic spacing inconsistency; a keyboard trap affecting every keyboard-only user in a core flow; a frequently confusing label that causes 12% of users to choose the wrong path; a visual mismatch with the design system; and an irreversible action that caused two users in testing to lose completed work. Prioritize the issues and explain how severity, frequency, accessibility, reversibility, evidence quality, user impact, and implementation effort should influence the order rather than aesthetic visibility alone.",
+    "intent": "Tests evidence-based prioritization across usability, accessibility, consistency, risk, and quantitative evidence.",
+    "domain": "Cross-disciplinary — Prioritization",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "design_decision",
+    "jurisdiction_required": false
+  }
+]

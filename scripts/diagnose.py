@@ -244,11 +244,11 @@ def rollup_categories(groups: dict) -> tuple[dict, list[str]]:
     person thinks in, from scripts/categories.yaml. Same fields as `groups`,
     plus the list of subjects each category holds so the page can expand it.
 
-    A group the mapping does not know goes into `other` AND into the returned
+    A group the mapping does not know goes into OTHER AND into the returned
     `unmapped` list. Dropping it would hide a gap in the mapping; folding it in
     silently would misfile it. Listing it is what lets someone fix the file.
     Returns ({}, []) when nothing maps at all — the groups are then not MMLU
-    subjects and a categories block would be one row called `other`.
+    subjects and a categories block would be one row called General & Multidisciplinary.
     """
     cats: dict[str, dict] = {}
     unmapped: list[str] = []
@@ -608,7 +608,7 @@ def main() -> int:
             # a mapping gap is a fact about scripts/categories.yaml, not about
             # any model — say it once, board-wide, where it will be read
             print(f"\n{len(unmapped)} group(s) are not in scripts/categories.yaml and "
-                  f"were rolled into 'other':")
+                  f"were rolled into {_categories.OTHER!r}:")
             for g in sorted(unmapped):
                 print(f"      {g}  ({', '.join(sorted(unmapped[g]))})")
     if denied:

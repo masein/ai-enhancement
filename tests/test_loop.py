@@ -70,7 +70,7 @@ def test_fixture_children_show_both_outcomes(payload, tree, diag):
     assert cs["verdict"] == "skill" and "taught the skill" in cs["text"]
     assert cs["dReport"] > 0.1 and cs["dDiagnose"] > 0.1
     # by category, the half the training never saw moved for the skill child and not the other
-    econ_t, econ_s = ct["categories"]["economics"], cs["categories"]["economics"]
+    econ_t, econ_s = ct["categories"]["Economics"], cs["categories"]["Economics"]
     assert econ_s["dReport"] > econ_t["dReport"]
     assert any("taught the test, not the skill" in w for w in payload["warnings"])
     # the untainted parent carries no comparison
@@ -89,7 +89,7 @@ def test_diagnose_groups_and_categories_carry_both_halves(diag):
 
 
 def _ready_dataset(client):
-    r = client.post("/api/proposals", json={"model": "fx/good-750m", "topic": "economics",
+    r = client.post("/api/proposals", json={"model": "fx/good-750m", "topic": "Economics",
                                             "requested_by": "t"})
     assert r.status_code == 200, r.text
     pid = r.json()["id"]

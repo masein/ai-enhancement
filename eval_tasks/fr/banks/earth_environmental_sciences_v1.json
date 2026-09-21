@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A horizontal sandstone lies above a shale. A basalt dike cuts both units, and an erosional surface truncates the dike before a younger conglomerate is deposited. Order the four events from oldest to youngest and name the relative-dating principles that justify the order.",
+    "intent": "Reconstruct a simple geologic history using superposition, cross-cutting relationships, and an unconformity.",
+    "domain": "Geology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "geologic_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A cross-section shows, from oldest to youngest, beds A–D. The beds were folded, then fault F displaced the fold. An intrusion cuts A–D and F but is itself truncated by an angular unconformity. Flat-lying beds E–G overlie the unconformity, and a younger fault offsets only F? No: a second fault G2 offsets E–G but does not cut the present erosion surface. Reconstruct the full event sequence and explain which observations constrain each step; identify any ordering that remains ambiguous.",
+    "intent": "Synthesize stratigraphic, structural, intrusive, and erosional evidence while distinguishing constrained from unconstrained event order.",
+    "domain": "Geology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "cross_section_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A volcanic ash bed originally contained 80 arbitrary units of a radioactive parent isotope. It now contains 20 units. If the parent half-life is 1.25 million years and the system remained closed, estimate the ash-bed age and state the assumption that makes the calculation valid.",
+    "intent": "Apply radioactive decay and recognize the closed-system assumption.",
+    "domain": "Geology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A sedimentary vertical sequence fines upward from basal conglomerate to sandstone to mudstone, while marine fossils become more common upward. Give one plausible environmental interpretation and one alternative process that could produce part of the same pattern. What additional evidence would help discriminate between them?",
+    "intent": "Interpret a sedimentary sequence without treating one pattern as uniquely diagnostic.",
+    "domain": "Geology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A granite is buried during mountain building, experiences increased pressure and temperature without melting, and is later exposed and weathered into sediment. Trace the material through the rock cycle and distinguish metamorphism, melting, weathering, erosion, and lithification.",
+    "intent": "Reason through linked rock-cycle processes and distinguish commonly confused process terms.",
+    "domain": "Geology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "For each setting—mid-ocean ridge, ocean-continent subduction zone, and transform boundary—identify the expected dominant crustal deformation, earthquake pattern, and volcanic tendency, and explain the mechanism connecting plate motion to those features.",
+    "intent": "Connect tectonic setting to characteristic deformation, seismicity, and volcanism.",
+    "domain": "Plate Tectonics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "Symmetric bands of normal and reversed magnetic polarity occur on both sides of a mid-ocean ridge, with the youngest oceanic crust at the ridge axis. Explain why this pattern supports seafloor spreading and what observation would contradict a simple symmetric spreading history.",
+    "intent": "Interpret paleomagnetic evidence for plate motion and identify a falsifying observation.",
+    "domain": "Plate Tectonics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "Two convergent margins have similar convergence rates. One is oceanic-continental and the other is continental-continental. Explain why they can produce different volcanic activity, crustal thickness, topography, and earthquake distributions.",
+    "intent": "Compare convergent boundary types using material properties and subduction geometry.",
+    "domain": "Plate Tectonics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A volcanic island chain becomes progressively older away from one active volcano, but the chain bends sharply halfway along its length. Give a plate-tectonic interpretation of both the age progression and the bend, and identify an assumption about the hotspot that would affect the inference.",
+    "intent": "Infer plate motion from an intraplate volcanic chain while recognizing hotspot-motion uncertainty.",
+    "domain": "Plate Tectonics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "spatial_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "A student says, 'Tectonic plates simply ride passively on mantle convection cells, so the direction of surface plate motion must match the direction of mantle flow immediately below them.' Diagnose what is oversimplified and describe a more defensible relationship among plate forces, mantle flow, slab pull, ridge processes, and plate motion.",
+    "intent": "Debug an over-simple model that equates plate motion with a single mantle-flow pattern.",
+    "domain": "Plate Tectonics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "Seismic observations show that S waves do not pass through a major internal layer, while P waves continue through it but change speed and direction. What can reasonably be inferred about that layer, and which part of the conclusion is observation versus inference?",
+    "intent": "Infer physical state from seismic-wave behavior while distinguishing observation from interpretation.",
+    "domain": "Geophysics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A seismic ray entering a deeper layer speeds up and bends away from the normal. Explain what this implies about the velocity contrast and why refraction can reveal internal boundaries that are not directly observed.",
+    "intent": "Use seismic refraction to infer subsurface velocity structure.",
+    "domain": "Geophysics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanistic_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A large ice sheet melts away from a continent. Over thousands of years the crust rises relative to sea level in the formerly glaciated region. Explain this response using isostasy, and distinguish the long-term crustal adjustment from immediate elastic rebound.",
+    "intent": "Explain postglacial isostatic adjustment across different response timescales.",
+    "domain": "Geophysics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "temporal_and_scale_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A seismic-tomography model shows a broad region of lower-than-average wave speed beneath a volcanic province. Give at least two plausible physical causes, explain why velocity alone does not uniquely determine temperature or composition, and name an independent observation that could narrow the interpretation.",
+    "intent": "Evaluate non-unique geophysical inversions and combine multiple lines of evidence.",
+    "domain": "Geophysics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "During a flood, a river's discharge and flow velocity rise, then fall. Explain why the same reach may erode sediment during the rising stage but deposit sediment during recession, even though the river is still flowing downstream.",
+    "intent": "Relate transport capacity and sediment supply to changing river conditions.",
+    "domain": "Geomorphology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanistic_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A steep forested hillslope is clear-cut. Over the next two rainy seasons, peak runoff and shallow landsliding both increase. Explain plausible hydrologic and mechanical mechanisms, and identify one site factor that could reverse or weaken the expected response.",
+    "intent": "Link vegetation removal to runoff and slope stability without assuming a universal outcome.",
+    "domain": "Geomorphology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A valley contains U-shaped cross-sections, striated bedrock, unsorted ridges across the valley, and a modern river occupying only a small part of the floor. Reconstruct the dominant sequence of landscape processes and explain which features are erosional versus depositional.",
+    "intent": "Infer glacial and postglacial landscape history from multiple geomorphic indicators.",
+    "domain": "Geomorphology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "geologic_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A dam sharply reduces sediment supply to a delta but leaves average river discharge nearly unchanged. Over decades, the delta shoreline retreats and channels incise upstream. Explain how a sediment-budget imbalance can generate both responses, and identify a process that could partially offset the retreat.",
+    "intent": "Apply sediment-budget reasoning to linked river and coastal morphology.",
+    "domain": "Geomorphology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mass_balance",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A reservoir receives 18 million m³ of river inflow and 3 million m³ of direct precipitation in one month. Releases are 12 million m³, evaporation is 2 million m³, and seepage loss is 1 million m³. Assuming no other fluxes, calculate the change in reservoir storage and state whether storage rises or falls.",
+    "intent": "Apply a water balance with multiple inputs and outputs.",
+    "domain": "Hydrology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mass_balance",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "Two otherwise similar watersheds experience the same storm. One is heavily urbanized with storm drains and impervious surfaces; the other is mostly forested. Sketch the expected differences in hydrograph timing and peak discharge and explain the infiltration, storage, and routing mechanisms.",
+    "intent": "Relate land cover to runoff generation and hydrograph shape.",
+    "domain": "Hydrology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "hydrologic_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "An aquifer stores an estimated 600 million m³ of groundwater. Pumping is 36 million m³/yr. Recharge is estimated at 18–30 million m³/yr, but monitoring suggests a 3–8 year lag between recharge changes and water-table response. Assess whether current pumping is sustainable over 30 years, quantify the range of annual storage change implied by the recharge estimate, and explain why the large stored volume does not by itself establish sustainability.",
+    "intent": "Evaluate groundwater depletion under uncertain recharge, finite storage, and delayed response.",
+    "domain": "Hydrology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "Groundwater head is 125 m at well A and 119 m at well B, which are 3 km apart along the dominant flow path. Estimate the hydraulic gradient from A to B and state the likely flow direction, assuming the aquifer is isotropic and no strong pumping cone intervenes.",
+    "intent": "Calculate hydraulic gradient and infer groundwater-flow direction under stated assumptions.",
+    "domain": "Hydrology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A floodplain wetland is drained and converted to compacted cropland. Discuss likely effects on storm runoff, groundwater recharge, nutrient retention, and downstream water quality, and identify which effects depend most strongly on soil and drainage design.",
+    "intent": "Trace coupled hydrologic and water-quality consequences of wetland loss.",
+    "domain": "Hydrology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "earth_system_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A lake begins the year with 900 million m³ of water. Annual inflow is 240 million m³, direct precipitation 60 million m³, evaporation 150 million m³, withdrawals 120 million m³, and outflow 90 million m³. Compute the end-of-year storage and explain what the result does and does not imply about long-term drought resilience.",
+    "intent": "Combine a water-budget calculation with interpretation of storage versus resilience.",
+    "domain": "Hydrology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mass_balance",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "Why does unsaturated air usually cool as it rises through the atmosphere even if it does not exchange much heat with its surroundings?",
+    "intent": "Explain adiabatic cooling of rising air.",
+    "domain": "Atmospheric Science",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "An air parcel rises, cools to saturation, and begins condensing water vapor. Explain how latent-heat release changes the parcel's cooling rate and why that can alter atmospheric stability and cloud growth.",
+    "intent": "Explain how condensation couples phase change, lapse rate, and convective stability.",
+    "domain": "Atmospheric Science",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanistic_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A student says, 'Coriolis force creates the wind.' Correct the statement by explaining the roles of pressure-gradient force and Coriolis deflection in large-scale atmospheric flow.",
+    "intent": "Distinguish the force that initiates wind from the effect that deflects moving air.",
+    "domain": "Atmospheric Science",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "Two cities lie at the same latitude: one on a west coast beside a large ocean, the other far inland. Give two physical reasons their seasonal temperature ranges may differ, without assuming the same prevailing winds in every region.",
+    "intent": "Explain maritime versus continental temperature moderation using heat capacity and transport.",
+    "domain": "Atmospheric Science",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A morning sounding shows surface air at 24°C, air at 1 km at 15°C, and air at 2 km at 14°C. A shallow saturated layer lies between 1 and 2 km. Explain what the profile suggests about stability in each layer, why the answer depends on parcel moisture, and what additional information would improve the diagnosis.",
+    "intent": "Interpret a simplified atmospheric profile while handling lapse-rate and moisture uncertainty.",
+    "domain": "Atmospheric Science",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "A region experiences one unusually cold winter during a multi-decade warming trend. Explain why that winter alone neither proves nor disproves the long-term climate trend.",
+    "intent": "Distinguish short-term weather variability from long-term climate statistics.",
+    "domain": "Climate Science",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "Atmospheric CO₂ increases because of an external emissions pulse. Surface warming then increases atmospheric water vapor. Classify the CO₂ increase and the water-vapor response as forcing or feedback, and explain the physical distinction.",
+    "intent": "Distinguish climate forcing from feedback using a causal sequence.",
+    "domain": "Climate Science",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A simplified planet receives 340 W/m² of globally averaged incoming solar radiation and reflects 30%. If it initially emits 238 W/m² of longwave radiation, calculate the net top-of-atmosphere energy imbalance. State the sign convention you use and what the imbalance implies qualitatively.",
+    "intent": "Apply a simplified planetary energy balance and interpret the sign of net energy gain or loss.",
+    "domain": "Climate Science",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "energy_balance",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "A 25-year temperature record shows a warming trend, but the first decade includes a large volcanic eruption, the middle years coincide with an ocean-variability phase associated with temporary cooling, and the observing network becomes denser over time. Describe how you would evaluate attribution to an external forcing without treating any single feature as decisive. Separate the roles of physical mechanism, internal variability, measurement change, and model-data comparison.",
+    "intent": "Analyze climate attribution with forcing, natural variability, observational change, and multiple lines of evidence.",
+    "domain": "Climate Science",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "Three climate models all warm under the same forcing scenario but disagree on regional rainfall change, with one projecting wetter conditions, one little change, and one drier conditions. What conclusions are supported, what remains uncertain, and why does disagreement about a regional response not imply complete ignorance about the forcing mechanism?",
+    "intent": "Interpret model agreement and disagreement at different levels of the climate system.",
+    "domain": "Climate Science",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "Warming reduces spring snow cover, exposing darker ground that absorbs more solar radiation. Explain why this is a positive feedback, identify the energy-flow change, and give one reason the feedback may weaken or saturate seasonally.",
+    "intent": "Identify a climate feedback mechanism and its limits.",
+    "domain": "Climate Science",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Persistent winds drive surface water away from a coastline and deeper water rises to replace it. Explain why this upwelling can increase biological productivity and identify a circumstance in which upwelling might not produce a large phytoplankton bloom.",
+    "intent": "Connect wind-driven upwelling, nutrient supply, and marine productivity with limiting factors.",
+    "domain": "Oceanography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "earth_system_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A subtropical ocean region warms mainly at the surface while freshwater input also increases. Analyze the likely effects on density stratification, vertical nutrient supply, oxygen at depth, and surface productivity. Explain why the signs of the biological responses are not guaranteed.",
+    "intent": "Trace coupled physical and biogeochemical consequences of stronger ocean stratification.",
+    "domain": "Oceanography",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "Atmospheric CO₂ dissolves into seawater. Explain conceptually how this shifts carbonate chemistry, why seawater can become more acidic without its pH falling below 7, and why shell-forming organisms may be affected.",
+    "intent": "Explain ocean acidification through carbonate chemistry and biological consequences.",
+    "domain": "Oceanography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "environmental_chemistry",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "Sea level can rise even if no new water mass is added to the ocean. Explain the mechanism and distinguish it from sea-level rise caused by melting land ice.",
+    "intent": "Distinguish thermal expansion from added-water-mass contributions to sea level.",
+    "domain": "Oceanography",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "In a simplified North Atlantic setting, surface warming decreases density while increased evaporation would increase salinity and density. Explain how these competing effects could alter deep-water formation, and identify the measurements needed before predicting the net circulation response.",
+    "intent": "Reason about competing temperature and salinity controls on seawater density and overturning.",
+    "domain": "Oceanography",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "Compare the direct effect on global mean sea level of melting floating sea ice with melting grounded land ice. Explain the physical reason for the difference and note one indirect way sea-ice loss can still affect climate.",
+    "intent": "Distinguish displacement by floating ice from added mass from land ice and connect sea ice to feedbacks.",
+    "domain": "Cryosphere",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A glacier receives 1.4 m water-equivalent of annual accumulation and loses 1.9 m water-equivalent by melt and sublimation. Calculate its specific mass balance for the year and explain why a single negative year does not by itself establish a long-term trend.",
+    "intent": "Calculate glacier mass balance and distinguish annual variability from multi-year trend.",
+    "domain": "Cryosphere",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "Permafrost thaw exposes previously frozen organic matter to decomposition, releasing greenhouse gases that can promote additional warming. Explain the feedback loop and identify at least two factors that control whether the net climate effect is large or small.",
+    "intent": "Trace a cryosphere-carbon feedback and identify controls on its magnitude.",
+    "domain": "Cryosphere",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "earth_system_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "Satellite observations show a large drop in snow-covered area during one spring, followed by partial recovery the next year. What evidence would be needed to determine whether this is mainly short-term variability or part of a persistent trend?",
+    "intent": "Evaluate temporal evidence for cryosphere change without over-interpreting one or two years.",
+    "domain": "Cryosphere",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A sandy soil and a clay-rich soil receive the same rainfall. Compare their likely infiltration, drainage, plant-available water, and erosion behavior, while explaining why texture alone cannot determine the outcome.",
+    "intent": "Relate soil texture to water movement and retention while acknowledging structure and context.",
+    "domain": "Soil Science",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "An irrigated field in an arid basin has poor drainage. Over several years, crop yields decline as salts accumulate near the surface. Explain the water and solute processes causing salinization and identify two management changes that target different parts of the mechanism.",
+    "intent": "Explain irrigation-driven salinization using evaporation, drainage, and solute balance.",
+    "domain": "Soil Science",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mass_balance",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A soil-management practice increases surface organic carbon for 10 years but also slightly increases nitrous oxide emissions and fuel use. Explain why a claim that the practice is 'climate beneficial' cannot be judged from soil carbon alone, and outline the quantities and time horizon needed for a fuller assessment.",
+    "intent": "Evaluate a land-management claim using multiple greenhouse-gas fluxes, stocks, and time horizons.",
+    "domain": "Soil Science",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "environmental_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A cultivated hillslope shows severe rill erosion after intense storms. Compare contour farming, cover crops, and a downslope grass buffer in terms of how each changes runoff, soil detachment, sediment transport, or deposition. Do not assume one is universally best.",
+    "intent": "Compare soil-conservation interventions by mechanism and landscape position.",
+    "domain": "Soil Science",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "environmental_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A herbivore population grows rapidly for several years and then fluctuates around a lower level after a prolonged drought reduces forage. Explain why carrying capacity should be treated as variable rather than a fixed species constant.",
+    "intent": "Explain environmentally dependent carrying capacity.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "ecological_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "In a food web, a predator declines, its herbivore prey increases, and plant biomass later falls. Explain the plausible indirect interaction and give one reason the plant decline might not be caused primarily by the predator loss.",
+    "intent": "Reason through a trophic cascade while retaining alternative explanations.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A highway fragments a continuous habitat into several patches. Local species richness inside one patch initially changes little, but regional movement and gene flow decline. Explain how conclusions about ecological impact can differ with spatial scale and time horizon.",
+    "intent": "Analyze habitat fragmentation across local and landscape scales.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "spatial_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A restoration report states, 'Higher biodiversity guarantees greater ecosystem stability.' Explain why the statement is too strong. Discuss at least two different meanings of stability and how species traits, redundancy, disturbance type, and scale can change the relationship.",
+    "intent": "Evaluate an overgeneralized biodiversity-stability claim.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A lake's native fish decline after a non-native predator appears. At the same time, water temperature rises, shoreline habitat is lost, and nutrient loading increases. Design a reasoning framework for determining how much of the decline is attributable to the invader versus the other changes, including what observations or comparisons would strengthen causal inference.",
+    "intent": "Disentangle multiple potential causes of ecosystem decline from incomplete observational evidence.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "After a moderate wildfire, grasses return quickly, shrubs expand over several years, and tree recruitment is patchy. Explain why this sequence is consistent with succession but does not imply that the ecosystem must return to its pre-fire state.",
+    "intent": "Explain succession, path dependence, and disturbance effects without assuming a fixed endpoint.",
+    "domain": "Ecology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "ecological_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A wetland contains 2400 kg of phosphorus in its active soil-and-water pool. If 120 kg/yr enters and 120 kg/yr leaves under steady conditions, estimate the simple residence time and explain why equal gross input and output imply no net stock change even though material is cycling rapidly.",
+    "intent": "Compute residence time and distinguish stock, flux, and net change.",
+    "domain": "Biogeochemistry",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A forest carbon stock begins at 180 Mg C/ha. During a year, gross primary production adds 14 Mg C/ha, plant respiration returns 7, decomposition returns 5, harvest removes 1, and lateral export removes 0.5. Compute the net annual stock change and identify which listed quantities are gross fluxes versus the net result.",
+    "intent": "Construct a carbon mass balance from multiple gross fluxes.",
+    "domain": "Biogeochemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mass_balance",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A watershed receives increased nitrogen fertilizer. Stream nitrate rises, algal production increases downstream, and bottom-water oxygen later declines. Trace the sequence of nitrogen transport, primary production, decomposition, and oxygen consumption that can connect the fertilizer input to hypoxia.",
+    "intent": "Trace nutrient pollution through linked nitrogen, carbon, and oxygen processes.",
+    "domain": "Biogeochemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A shallow lake stores large phosphorus reserves in sediments. External phosphorus loading is reduced, yet summer algal blooms persist for several years. Explain how internal loading, redox conditions, and residence time can delay recovery, and what measurements would test this explanation.",
+    "intent": "Explain delayed biogeochemical response using sediment storage and redox-sensitive release.",
+    "domain": "Biogeochemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A terrestrial ecosystem fixes 100 units of carbon per year through photosynthesis and releases 92 through plant and microbial respiration. Explain why the 100-unit gross flux should not be reported as annual carbon sequestration, and compute the simplified net ecosystem carbon uptake if other fluxes are ignored.",
+    "intent": "Distinguish gross production from net carbon storage.",
+    "domain": "Biogeochemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A river segment contains 50 kg of a conservative dissolved pollutant. A clean tributary doubles the river's water volume with no additional pollutant, and no degradation or settling occurs. What happens to average concentration and total pollutant mass immediately after complete mixing? Explain why dilution is not elimination.",
+    "intent": "Distinguish concentration from pollutant mass under dilution.",
+    "domain": "Pollution",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mass_balance",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "Define bioaccumulation and biomagnification by describing how each changes contaminant concentration across time within an organism versus across trophic levels.",
+    "intent": "Distinguish two contaminant-exposure processes.",
+    "domain": "Pollution",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Compare a leaking industrial outfall pipe with fertilizer runoff from thousands of fields as examples of point and nonpoint pollution. Explain why the distinction matters for monitoring design.",
+    "intent": "Distinguish point and diffuse sources and connect source geometry to monitoring.",
+    "domain": "Pollution",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A chlorinated contaminant enters an aquifer from a surface spill. It can dissolve, sorb to sediment, biodegrade under some redox conditions, and volatilize near the water table. Down-gradient wells show low dissolved concentrations, yet soil gas near buildings is elevated. Explain how transport, transformation, phase partitioning, and exposure pathways could produce this pattern, and identify evidence needed to determine whether pollutant mass is actually declining.",
+    "intent": "Synthesize contaminant fate, transport, transformation, and exposure across media.",
+    "domain": "Pollution",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A city adds one particulate-matter monitor beside a busy road and observes concentrations higher than the regional average. Explain what can and cannot be inferred about population-wide exposure, and propose a sampling design that better captures spatial variability.",
+    "intent": "Evaluate representativeness and sampling bias in pollution monitoring.",
+    "domain": "Pollution",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Mine drainage lowers stream pH. Explain two mechanisms by which lower pH can increase the mobility or bioavailability of some metals, and state why the response is not identical for every metal or mineral surface.",
+    "intent": "Relate pH to metal speciation, sorption, and mobility without overgeneralizing.",
+    "domain": "Environmental Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "environmental_chemistry",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A lake's bottom water becomes oxygen-depleted each summer. Sediment-bound phosphorus is then released more readily into the water. Explain how changing redox conditions can alter mineral stability or sorption and thereby affect nutrient availability.",
+    "intent": "Connect redox conditions to nutrient mobility in aquatic sediments.",
+    "domain": "Environmental Chemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanistic_explanation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "An alkaline lake receives a modest acid input but its pH changes only slightly at first. Explain how carbonate buffering can resist pH change and why buffering capacity is finite rather than unlimited.",
+    "intent": "Explain carbonate buffering and its limits.",
+    "domain": "Environmental Chemistry",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A contaminant sorbs strongly to mineral surfaces at neutral pH but much less strongly at low pH. A groundwater plume enters an acidic zone. Predict qualitatively how dissolved concentration and transport speed may change, and identify assumptions about competing ions and mineralogy.",
+    "intent": "Apply pH-dependent adsorption to contaminant mobility under uncertain geochemistry.",
+    "domain": "Environmental Chemistry",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "Two towns face the same probability and intensity of river flooding. Town A has little development in the floodplain; Town B has dense housing with many vulnerable residents. Explain why the flood hazard can be similar while risk differs.",
+    "intent": "Distinguish hazard from exposure and vulnerability.",
+    "domain": "Natural Hazards",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A coastal community faces a rare but very large tsunami hazard. Explain how low event frequency can coexist with high risk, and list the exposure and vulnerability factors that should be considered in addition to recurrence.",
+    "intent": "Reason about risk when probability is low but consequences can be severe.",
+    "domain": "Natural Hazards",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A tropical cyclone brings storm surge to an estuary while extreme rainfall causes river flooding from inland. Explain how the two hazards can compound, why peak impacts may depend on timing, and how a flood barrier designed for one pathway could worsen the other.",
+    "intent": "Analyze compound flooding and risk transfer across connected systems.",
+    "domain": "Natural Hazards",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "hazard_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "Two locations experience the same earthquake magnitude but very different shaking intensity and damage. Explain how distance, local geology, building characteristics, and magnitude versus intensity differ conceptually.",
+    "intent": "Distinguish earthquake source magnitude from location-specific intensity and impact.",
+    "domain": "Natural Hazards",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A severe wildfire is followed months later by an intense rainstorm and destructive debris flows. Explain the cascade from vegetation loss and soil changes to runoff, sediment mobilization, and downstream hazard.",
+    "intent": "Trace a cascading wildfire-to-debris-flow hazard mechanism.",
+    "domain": "Natural Hazards",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A new levee lowers the probability of frequent shallow floods behind it, but development then expands in the protected area and rare overtopping would be catastrophic. Explain how the intervention can reduce one component of risk while increasing exposure or tail consequences.",
+    "intent": "Analyze risk transfer and behavioral adaptation after structural flood protection.",
+    "domain": "Risk / Resilience",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "An early-warning system gives residents two extra hours to evacuate before a hazardous event. Which component(s) of risk can it reduce most directly, and which parts of the physical hazard does it leave unchanged?",
+    "intent": "Distinguish risk-reduction mechanisms from changes in hazard probability or magnitude.",
+    "domain": "Risk / Resilience",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "risk_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "Compare stricter building codes with zoning that discourages new construction in a hazard zone. Explain how each acts on vulnerability, exposure, and long-term risk, and identify one trade-off for each.",
+    "intent": "Compare risk-reduction interventions by the risk component they target.",
+    "domain": "Risk / Resilience",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A city must choose a flood-resilience plan under large uncertainty about future extreme-rainfall intensity. Explain how robustness, flexibility, thresholds for action, and the costs of under- versus over-design can be incorporated without pretending the future probability distribution is known exactly.",
+    "intent": "Reason about resilient decision-making under deep environmental uncertainty.",
+    "domain": "Risk / Resilience",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "environmental_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A city replaces vegetated land with dark roofs, pavement, and storm sewers. Trace likely effects on surface energy balance, local temperature, infiltration, peak runoff, and stream temperature. Identify at least one response that depends strongly on urban design details.",
+    "intent": "Integrate urban land-cover effects across hydrology and surface energy balance.",
+    "domain": "Human–Environment Interactions",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "earth_system_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A tropical watershed loses half of its forest cover. Explain plausible short- and long-term effects on evapotranspiration, runoff, soil erosion, carbon storage, and local surface temperature, noting which effects may differ by season or scale.",
+    "intent": "Trace coupled consequences of deforestation across water, carbon, soil, and energy systems.",
+    "domain": "Human–Environment Interactions",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A proposed mine would disturb a small area upstream of a large river basin but could generate acidic drainage for decades if sulfide-bearing waste is exposed. Explain why impact assessment should consider area, contaminant flux, persistence, downstream transport, and treatment reliability rather than disturbed area alone.",
+    "intent": "Evaluate environmental impact using scale, flux, persistence, and pathway reasoning.",
+    "domain": "Human–Environment Interactions",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A new reservoir could provide hydropower and dry-season water storage, but it would inundate habitat, trap sediment, alter downstream floods, change greenhouse-gas fluxes, and displace communities. Construct a decision framework that separates scientific predictions from value judgments, identifies major uncertainties and time horizons, and avoids assuming a single universally correct choice.",
+    "intent": "Evaluate a complex water-infrastructure decision with multiple objectives, trade-offs, and uncertainties.",
+    "domain": "Human–Environment Interactions",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "environmental_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A fishery reduces harvest sharply, but the target population does not rebound for several years. Give at least four scientifically plausible explanations involving age structure, habitat, food-web interactions, recruitment variability, or continued unreported mortality, and explain how monitoring could distinguish among them.",
+    "intent": "Interpret delayed ecological response to a management intervention without assuming policy failure from one outcome.",
+    "domain": "Human–Environment Interactions",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "An aquifer contains a very large volume of old groundwater but receives only small annual recharge. Explain why calling the resource 'renewable' based on the existence of recharge can be misleading, and specify what quantities and time horizon are needed to assess sustainable withdrawal.",
+    "intent": "Distinguish renewable recharge from stored groundwater and define sustainability operationally.",
+    "domain": "Sustainability / Resources",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A fish population's annual growth is uncertain and becomes more variable as ocean temperature changes. Explain why a harvest set equal to the estimated long-term mean biological production may still be risky, and describe how uncertainty, age structure, and environmental variability affect a defensible sustainable-yield strategy.",
+    "intent": "Analyze sustainable harvest under ecological and environmental uncertainty.",
+    "domain": "Sustainability / Resources",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "environmental_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A product is redesigned so that 80% of its mass is technically recyclable, but collection rates are low and recycling requires substantial energy. Explain why '80% recyclable' does not establish an 80% reduction in environmental impact and identify the life-cycle data needed for a meaningful comparison.",
+    "intent": "Distinguish technical recyclability from actual recycling and total life-cycle impact.",
+    "domain": "Sustainability / Resources",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A forest-management plan increases near-term timber harvest, replants rapidly, and claims long-term carbon neutrality, while another plan harvests less but preserves old habitat. Compare the plans across carbon stocks and fluxes, substitution assumptions, biodiversity, disturbance risk, and 20-year versus 100-year time horizons without selecting a policy winner.",
+    "intent": "Evaluate competing forest-management strategies across multiple metrics and timescales.",
+    "domain": "Sustainability / Resources",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "environmental_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A 100 MW wind project has a 35% annual capacity factor, while a 100 MW plant with dispatchable fuel operates at 80%. Estimate the average power output of each and explain why equal installed capacity does not imply equal annual energy generation.",
+    "intent": "Use capacity factor to distinguish installed power capacity from realized average generation.",
+    "domain": "Energy / Environment",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "Technology A emits 10 g CO₂e/kWh during operation and 30 g CO₂e/kWh from construction and fuel-cycle activities. Technology B emits 350 g CO₂e/kWh during operation and 40 g CO₂e/kWh upstream. Using only these supplied data, compare lifecycle greenhouse-gas intensity and state what important environmental impacts are not captured by this single metric.",
+    "intent": "Compute lifecycle greenhouse-gas intensity while recognizing metric limitations.",
+    "domain": "Energy / Environment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A proposed hydropower project has low operational fossil-fuel emissions but would flood a valley, trap sediment, alter fish migration, and change downstream flow seasonality. Explain why operational emissions alone are insufficient for environmental comparison and identify site-specific evidence needed.",
+    "intent": "Assess multiple environmental dimensions of an energy project without declaring universal superiority.",
+    "domain": "Energy / Environment",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "environmental_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A battery stores 100 MWh of electricity and has an 85% round-trip efficiency. If it is charged with 100 MWh, estimate the energy returned on discharge and the energy lost in the storage cycle. Explain why energy loss is not the same as loss of power capacity.",
+    "intent": "Apply round-trip efficiency and distinguish energy from power.",
+    "domain": "Energy / Environment",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "Late-season snow cover decreases, exposing darker land. Trace the resulting changes in albedo, absorbed solar energy, surface temperature, and snowmelt timing. Identify the feedback sign and one process that could limit it.",
+    "intent": "Trace a snow-albedo feedback through the surface energy budget.",
+    "domain": "Earth-System Science",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "earth_system_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A major explosive volcanic eruption injects sulfate-forming gases into the stratosphere and also deposits ash and nutrients into parts of the ocean. Explain the likely short-term radiative climate effect, why it is not identical to the greenhouse effect, and how biogeochemical responses could differ in sign and duration from the atmospheric forcing.",
+    "intent": "Integrate volcanic aerosol forcing with atmosphere-ocean-biogeochemical responses across timescales.",
+    "domain": "Earth-System Science",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "Over several decades, a high-latitude ocean region warms, loses seasonal sea ice, freshens at the surface, and experiences shifts in plankton communities. Analyze plausible coupled effects on albedo, stratification, gas exchange, nutrient mixing, food webs, and regional circulation. Identify at least two feedbacks and distinguish robust mechanisms from outcomes that require additional regional evidence.",
+    "intent": "Synthesize atmosphere-ocean-cryosphere-ecosystem interactions under warming and freshening.",
+    "domain": "Earth-System Science",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "earth_system_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A semiarid region converts native vegetation to irrigated agriculture using pumped groundwater. Over 40 years, cropland expands, groundwater levels fall, evapotranspiration rises locally, river baseflow declines, and soil salinity increases. Build a coupled water, energy, and solute explanation that accounts for the observations and identify which effects could lag the land-use change.",
+    "intent": "Integrate land use, groundwater, surface water, energy balance, and salinization over decades.",
+    "domain": "Earth-System Science",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "systems_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A drained peatland is rewetted to reduce carbon loss and restore habitat. After rewetting, CO₂ emissions fall, methane emissions rise, dissolved organic carbon export changes, water tables rise, and downstream nutrient concentrations shift. Explain how to evaluate the net environmental outcome across greenhouse gases, carbon storage, water quality, habitat, and different time horizons without reducing the assessment to one metric.",
+    "intent": "Evaluate a restoration intervention through coupled carbon, hydrologic, and ecological responses.",
+    "domain": "Earth-System Science",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "environmental_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "An atmospheric trace gas reservoir contains 5,000 units of mass and receives and loses about 250 units per year under near-steady conditions. Estimate its simple residence time and explain why a 20-year residence time does not mean every molecule remains exactly 20 years.",
+    "intent": "Calculate residence time and interpret it statistically rather than literally.",
+    "domain": "Earth-System Science",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A watershed monitoring program samples water quality only at noon on fair-weather weekdays, yet most sediment and nutrient export occurs during storms. Explain the bias this design can create and propose a sampling strategy that better estimates annual loads.",
+    "intent": "Identify temporal sampling bias and improve monitoring design for episodic environmental fluxes.",
+    "domain": "Environmental Data / Evidence",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "source_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "Sensor A maps land cover at 5 m spatial resolution every 30 days; Sensor B maps at 250 m resolution every day. A researcher wants to detect both small clearings and short-lived flood extent. Explain the spatial-versus-temporal resolution trade-off and how the two sensors could be combined.",
+    "intent": "Reason about remote-sensing resolution trade-offs and multi-sensor design.",
+    "domain": "Environmental Data / Evidence",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "spatial_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "Ground stations in a mountain basin show no long-term precipitation trend, while a coarse satellite product shows a regional increase. The stations are concentrated in valleys, the satellite has difficulty with snow, and the basin contains strong elevation gradients. Explain how both datasets could be internally correct yet support different apparent trends, and design a reconciliation strategy that addresses sampling, scale, bias, and uncertainty.",
+    "intent": "Reconcile apparently conflicting environmental datasets collected at different scales and with different biases.",
+    "domain": "Environmental Data / Evidence",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "An ice-core proxy suggests century-scale temperature variability before thermometers existed, while a nearby instrumental record covers only the most recent 120 years. Describe how to combine the proxy and instrumental evidence without treating them as identical measurements, including calibration, dating uncertainty, spatial representativeness, and the possibility that short and long records emphasize different variability.",
+    "intent": "Integrate proxy and instrumental climate evidence while preserving measurement and scale distinctions.",
+    "domain": "Environmental Data / Evidence",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_evaluation",
+    "jurisdiction_required": false
+  }
+]

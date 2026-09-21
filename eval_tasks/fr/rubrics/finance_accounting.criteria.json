@@ -1,0 +1,186 @@
+{
+  "benchmark": "Finance & Accounting",
+  "score_scale": {
+    "min": 0,
+    "max": 4
+  },
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the question asked, uses the supplied facts and constraints, and avoids materially distracting finance or accounting discussion.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "accounting_accuracy",
+      "name": "Accounting Accuracy",
+      "definition": "Applies accounting mechanics correctly where relevant, preserves the accounting equation, distinguishes recognition from cash timing, and treats assets, liabilities, equity, revenue, expenses, and estimates consistently.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "finance_accuracy",
+      "name": "Finance Accuracy",
+      "definition": "Uses correct finance relationships and definitions, including time value, risk-return, financing, valuation, fixed-income, portfolio, and capital-allocation concepts where relevant.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "financial_reasoning",
+      "name": "Financial Reasoning",
+      "definition": "Explains the economic mechanism linking facts to conclusions rather than merely naming formulas, ratios, or jargon.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Keeps distinct concepts separate, including profit versus cash, revenue versus collection, enterprise versus equity value, coupon versus yield, liquidity versus solvency, and expected versus realized return.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When calculations are required, selects the relevant quantity and formula, uses correct signs, timing, denominators and units, performs arithmetic accurately, and interprets the result.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "financial_statement_reasoning",
+      "name": "Financial Statement Reasoning",
+      "definition": "When statements are involved, traces effects consistently across the income statement, balance sheet, cash-flow statement and equity statement, including immediate and subsequent-period effects.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "cash_flow_reasoning",
+      "name": "Cash-Flow Reasoning",
+      "definition": "When cash flows matter, distinguishes operating, investing and financing effects, treats working-capital changes with correct signs, and separates noncash accounting items from cash movements.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "valuation_reasoning",
+      "name": "Valuation Reasoning",
+      "definition": "When valuation is involved, aligns cash flows, discount rates and value definitions; distinguishes enterprise and equity value; uses compatible multiples; and interprets terminal assumptions and sensitivity.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "capital_budgeting_and_cost_of_capital",
+      "name": "Capital Budgeting and Cost of Capital",
+      "definition": "When project appraisal or discount rates are relevant, uses incremental cash flows, appropriate timing, NPV/IRR logic, working capital and terminal effects, and a risk-appropriate cost of capital.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "investment_and_portfolio_reasoning",
+      "name": "Investment and Portfolio Reasoning",
+      "definition": "When investments are involved, computes and interprets returns correctly, distinguishes expected from realized outcomes, and accounts for weighting, correlation, diversification and concentration.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "risk_and_leverage_analysis",
+      "name": "Risk and Leverage Analysis",
+      "definition": "When risk or financing structure matters, identifies relevant market, credit, liquidity, currency, interest-rate, concentration, refinancing and leverage channels, including downside amplification and residual risk after hedging.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "managerial_accounting_reasoning",
+      "name": "Managerial Accounting Reasoning",
+      "definition": "When internal decisions are involved, distinguishes fixed, variable, avoidable, sunk and opportunity costs; uses contribution analysis appropriately; and interprets budgets, variances and allocations in context.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "audit_and_control_reasoning",
+      "name": "Audit and Control Reasoning",
+      "definition": "When audit or controls are relevant, evaluates assertions, evidence, materiality, segregation, authorization, reconciliation, access and review controls without treating reasonable assurance as a guarantee.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_and_sensitivity",
+      "name": "Assumptions and Sensitivity",
+      "definition": "When results depend on assumptions, identifies key drivers, checks internal and economic plausibility, tests material sensitivities or scenarios, and avoids false precision.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_and_uncertainty",
+      "name": "Evidence and Uncertainty",
+      "definition": "When facts are incomplete or judgments are contestable, distinguishes evidence from inference, considers alternative explanations, identifies missing information, and calibrates confidence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material components needed to answer the question, including secondary statement, risk, assumption, or decision effects when they are necessary to the conclusion.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internal consistency across calculations, accounting entries, financial statements, periods, assumptions, terminology, and conclusions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the analysis in a clear, organized, proportionate way, showing enough setup and interpretation to make the reasoning auditable without unnecessary jargon or formula dumping.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "practical_financial_judgment",
+      "name": "Practical Financial Judgment",
+      "definition": "When a decision or open-ended evaluation is required, weighs relevant cash flows, opportunity costs, liquidity, leverage, financing consequences, risk, objectives, constraints and uncertainty without forcing a single answer when alternatives are defensible.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_finance_accounting_error",
+    "condition": "A materially false central accounting, finance, valuation, investment, risk, audit, or quantitative claim that fundamentally invalidates the answer or reverses its substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Violates the accounting equation in a way central to the answer.",
+      "Uses fundamentally incorrect transaction treatment that invalidates the financial statements.",
+      "Treats revenue and cash receipts as equivalent where timing is central.",
+      "Treats net income as identical to cash flow.",
+      "Treats depreciation or amortization as a current-period cash payment.",
+      "Treats debt principal repayment as an operating expense.",
+      "Uses a working-capital sign error that reverses the cash-flow conclusion.",
+      "Makes a fundamentally incorrect NPV, discounting, compounding, or WACC calculation that reverses the decision.",
+      "Treats IRR as necessarily superior to NPV when the measures conflict.",
+      "Confuses enterprise value and equity value or mixes incompatible valuation numerators and denominators so that the valuation conclusion is invalid.",
+      "Uses an obviously inappropriate discount rate and bases the conclusion on it.",
+      "States the bond price-yield relationship backwards or treats coupon rate and market yield as interchangeable.",
+      "Uses fundamentally incorrect portfolio weighting, correlation, or diversification logic, including claiming diversification eliminates systematic risk.",
+      "Makes a leverage error that reverses the risk conclusion or treats liquidity and solvency as identical.",
+      "Claims audit assurance guarantees that no material misstatement exists.",
+      "Treats a reasonable estimate difference as proven fraud without evidence.",
+      "Fabricates required financial data, market data, accounting rules, or assumptions.",
+      "Asserts a unique precise valuation when the supplied assumptions clearly support a wide range of reasonable values."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Harmless rounding.",
+      "Minor terminology mistakes.",
+      "Small omissions.",
+      "Equivalent valid accounting presentations.",
+      "Defensible valuation-method differences.",
+      "Reasonable forecast differences.",
+      "Alternative well-justified capital structures or portfolio choices.",
+      "Reasonable accounting estimates.",
+      "Minor imprecision that does not materially affect the conclusion."
+    ]
+  }
+}

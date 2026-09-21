@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A consultant can earn $800 in a day doing client work or spend the day preparing a proposal that has no cash expense. If the consultant prepares the proposal, what is the relevant economic cost of that day, and why is it different from the accounting cost?",
+    "intent": "Distinguish opportunity cost from accounting cost and apply scarcity-based choice reasoning.",
+    "domain": "Core Economic Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A bakery currently produces 100 loaves per day. Producing the 101st loaf would add $2.20 to cost and $2.80 to revenue, while average cost at 100 loaves is $2.50. Should the bakery produce the 101st loaf if its objective is profit maximization? Explain using marginal rather than average reasoning.",
+    "intent": "Apply marginal analysis and distinguish marginal from average quantities.",
+    "domain": "Core Economic Reasoning",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "An observed market price clears quantity supplied and quantity demanded, but production creates an unpriced pollution cost. Explain why the market can be in equilibrium without the outcome being efficient or desirable.",
+    "intent": "Distinguish equilibrium from efficiency and normative desirability.",
+    "domain": "Core Economic Reasoning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A city study finds neighborhoods with more restaurants also have higher rents. Give two distinct economic mechanisms that could produce this correlation and explain why the correlation alone does not identify either mechanism as causal.",
+    "intent": "Distinguish correlation from mechanism and causal identification.",
+    "domain": "Core Economic Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A market starts with demand Qd = 120 - 4P and supply Qs = 20 + 2P. Find the competitive equilibrium price and quantity. Then explain which variables are endogenous in this model and give one plausible exogenous shift variable.",
+    "intent": "Solve a basic equilibrium and distinguish endogenous from exogenous variables.",
+    "domain": "Supply & Demand",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "The price of coffee rises from $4 to $5 after a drought reduces coffee harvests. Holding all else equal, distinguish the change in supply from the resulting change in quantity demanded.",
+    "intent": "Distinguish a supply-curve shift from a movement along demand.",
+    "domain": "Supply & Demand",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "comparative_statics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "In the market for electric bicycles, battery costs fall while consumer income rises. Assume e-bikes are normal goods. What happens unambiguously to equilibrium quantity? Is the effect on equilibrium price necessarily determined? Explain.",
+    "intent": "Analyze simultaneous supply and demand shifts and recognize ambiguous price effects.",
+    "domain": "Supply & Demand",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparative_statics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A binding price ceiling is set below the competitive equilibrium in a rental market. Explain the immediate effect on quantity demanded and quantity supplied, then give two possible longer-run non-price responses by landlords or tenants.",
+    "intent": "Analyze direct and dynamic effects of a binding price ceiling.",
+    "domain": "Price Controls and Regulation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "The price of a good rises from $10 to $12 and quantity demanded falls from 100 to 80. Using the midpoint method, calculate the price elasticity of demand and classify demand as elastic, unit elastic, or inelastic over this range.",
+    "intent": "Compute and interpret arc price elasticity of demand.",
+    "domain": "Elasticity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "Demand for a product has elasticity -0.4 at the current price. If the firm raises price by 5%, approximately what percentage change in quantity demanded would you expect, and what is the likely direction of total revenue? Why does this not by itself determine the direction of profit?",
+    "intent": "Use elasticity to infer quantity and revenue effects while distinguishing revenue from profit.",
+    "domain": "Elasticity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "Two demand curves look equally steep on different graphs, but one graph measures price in cents and the other in dollars. Explain why visual steepness alone cannot establish which demand is more elastic.",
+    "intent": "Distinguish elasticity from slope and account for axis scaling.",
+    "domain": "Elasticity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "graph_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A consumer has income $60 and buys only books at $15 each and meals at $10 each. Write the budget constraint, identify both intercepts, and explain how the budget line changes if the book price falls to $12.",
+    "intent": "Reason from prices and income to the consumer budget set.",
+    "domain": "Consumer Theory",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A consumer chooses an interior bundle where the marginal rate of substitution of meals for books is 1.5, while the price ratio P_meals/P_books is 1.0. Under standard convex preferences, explain the direction in which the consumer can reallocate spending to improve utility.",
+    "intent": "Apply the tangency condition and marginal rate of substitution reasoning.",
+    "domain": "Consumer Theory",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "microeconomic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "The price of bus travel falls. For a commuter who views bus travel as an inferior good, explain why the substitution effect and income effect can work in opposite directions, and state what additional condition would be needed for demand for bus travel to slope upward.",
+    "intent": "Distinguish substitution and income effects for an inferior good.",
+    "domain": "Consumer Theory",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A factory's output rises from 50 to 58 units when a sixth worker is hired, and from 58 to 63 when a seventh is hired, holding capital fixed. Calculate the marginal product of each added worker and explain whether the data are consistent with diminishing marginal returns.",
+    "intent": "Calculate marginal product and identify diminishing marginal returns.",
+    "domain": "Producer Theory",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A firm's production function doubles output when both labor and capital are doubled, but with capital fixed, adding successive workers eventually yields smaller output increments. Explain why constant returns to scale can coexist with diminishing marginal returns.",
+    "intent": "Distinguish returns to scale from diminishing marginal returns.",
+    "domain": "Producer Theory",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A firm can produce 100 units using either 10 labor-hours and 4 machine-hours or 6 labor-hours and 7 machine-hours. Labor costs $20 per hour and machine time costs $30 per hour. Which technique is cheaper, and why is this a cost-minimization question rather than a technological-efficiency question alone?",
+    "intent": "Choose a cost-minimizing input combination using input prices.",
+    "domain": "Producer Theory",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A firm pays $50,000 for a nonrefundable specialized market study before deciding whether to launch a product. At the launch decision date, should the $50,000 affect the go/no-go decision? Explain the difference between a sunk cost and a fixed cost.",
+    "intent": "Distinguish sunk and fixed costs in forward-looking decisions.",
+    "domain": "Cost Theory",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A business reports revenue of $300,000 and explicit accounting costs of $220,000. The owner's next-best alternative job would pay $60,000. Ignoring other implicit costs, calculate accounting profit and economic profit.",
+    "intent": "Distinguish accounting profit from economic profit using opportunity cost.",
+    "domain": "Cost Theory",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A competitive firm faces market price $18. Its marginal cost for units 1 through 6 is $6, $10, $14, $18, $22, and $27. If fixed cost is unavoidable in the short run and average variable cost at four units is below $18, how many units should the firm produce? Explain.",
+    "intent": "Apply price-taking profit maximization using P = MR and marginal cost.",
+    "domain": "Perfect Competition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "In a perfectly competitive industry, firms earn positive economic profit in the short run and there are no barriers to entry. Explain the likely long-run adjustment in the number of firms, market supply, price, and economic profit.",
+    "intent": "Explain entry and long-run competitive adjustment.",
+    "domain": "Perfect Competition",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "comparative_statics",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A monopolist faces inverse demand P = 100 - Q and constant marginal cost MC = 20. Find the profit-maximizing quantity and price. Then compare quantity with the competitive benchmark where P = MC.",
+    "intent": "Solve a linear monopoly problem and identify the output restriction relative to competition.",
+    "domain": "Monopoly",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A monopolist can sell 20 units at $50 each or 21 units at $49 each. Calculate total revenue at each quantity and the marginal revenue from the 21st unit. Explain why the marginal revenue is below the price of the 21st unit.",
+    "intent": "Compute marginal revenue under downward-sloping demand.",
+    "domain": "Monopoly",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "An industry has one firm with 70% market share, but entry is easy, customers can switch at negligible cost, and imports are highly responsive to price. Explain why market share alone does not establish substantial market power.",
+    "intent": "Distinguish concentration from market power by considering constraints on pricing.",
+    "domain": "Industrial Organization",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "microeconomic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "Two firms sell a homogeneous product with identical constant marginal cost and no capacity constraints. Compare the basic Bertrand prediction with the basic Cournot prediction for price and quantity, and state the strategic variable each model assumes firms choose.",
+    "intent": "Compare Bertrand and Cournot strategic assumptions and outcomes.",
+    "domain": "Oligopoly and Strategic Interaction",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "Two rival airlines repeatedly choose either High Fare or Low Fare. In a one-period game, Low Fare is each airline's dominant strategy, but both earn more if both choose High Fare. Explain how repeated interaction can change incentives without implying that collusion is automatic or sustainable.",
+    "intent": "Use repeated-game reasoning to analyze strategic interdependence and collusion incentives.",
+    "domain": "Oligopoly and Strategic Interaction",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "game_theory",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "Consider this payoff matrix, where the first number is Firm A's payoff and the second is Firm B's: (Advertise, Advertise)=(4,4), (Advertise, Don't)=(8,1), (Don't, Advertise)=(1,8), (Don't, Don't)=(6,6). Identify each firm's best responses, any dominant strategies, and the Nash equilibrium. Is the Nash equilibrium jointly optimal?",
+    "intent": "Identify best responses, dominant strategies, Nash equilibrium, and social payoff comparison.",
+    "domain": "Game Theory",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "game_theory",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "An incumbent says it will cut price below cost if a new firm enters. After entry, however, accommodating the entrant would yield the incumbent a profit of 5 while fighting would yield a loss of 2. Using backward induction, explain whether the threat is credible.",
+    "intent": "Apply sequential-game and credible-threat reasoning.",
+    "domain": "Game Theory",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "game_theory",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A software platform becomes more useful to users as more complementary app developers join, and more attractive to developers as more users join. Explain how these cross-side network effects can affect pricing on each side and why a zero price to users does not imply zero economic cost or irrational pricing.",
+    "intent": "Analyze two-sided platform pricing with cross-side network effects.",
+    "domain": "Digital and Platform Economics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "An online service has large fixed development costs but near-zero marginal cost per additional user. Separately, users value the service more when many other users join. Explain the difference between economies of scale and network effects and why the two mechanisms have different competitive implications.",
+    "intent": "Distinguish cost-side scale economies from demand-side network effects.",
+    "domain": "Digital and Platform Economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "An insurer cannot observe a customer's health risk before enrollment, and higher-risk customers are more eager to buy generous coverage. Identify the information problem, who has the hidden information, and how screening could respond.",
+    "intent": "Identify adverse selection and a screening response.",
+    "domain": "Information Economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "After buying full insurance, some drivers become less careful because they bear less of the financial cost of accidents. Identify the information problem, explain when the hidden action occurs, and name one contract feature that could reduce the incentive problem.",
+    "intent": "Identify moral hazard and explain incentive-based contract responses.",
+    "domain": "Information Economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "An insurer introduces a voluntary high-deductible plan after customers already know their private risk type. Later, insured behavior also changes because coverage reduces accident-prevention incentives. Explain why both adverse selection and moral hazard may be present and how the timing distinguishes them.",
+    "intent": "Distinguish adverse selection from moral hazard in a dynamic insurance setting.",
+    "domain": "Information Economics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "Employees automatically enrolled in a retirement plan participate at a higher rate than employees who must opt in, even though both groups can choose either option at low cost. Give two behavioral mechanisms consistent with the observation and explain what additional evidence would help distinguish them.",
+    "intent": "Interpret default effects without assuming a single psychological mechanism.",
+    "domain": "Behavioral Economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A person rejects a 50-50 gamble that pays +$120 or -$100 relative to current wealth, but accepts a 50-50 gamble that pays +$220 or -$100. Explain how expected value and loss aversion can lead to different interpretations, and why one observation cannot establish a universal bias.",
+    "intent": "Compare standard risk reasoning with reference-dependent loss aversion.",
+    "domain": "Behavioral Economics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Demand is Qd = 100 - P and supply is Qs = P. Find competitive equilibrium, consumer surplus, producer surplus, and total surplus. Assume no externalities.",
+    "intent": "Calculate competitive surplus measures from linear curves.",
+    "domain": "Welfare Economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A policy transfers $100 from a high-income person to a low-income person while total measured surplus falls by $5 because of administrative cost. Explain why efficiency analysis alone cannot determine whether the policy is socially desirable.",
+    "intent": "Distinguish efficiency from equity and normative welfare weights.",
+    "domain": "Welfare Economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "welfare_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A factory's private marginal cost is MC_private = 10 + Q, and marginal external damage is constant at $6 per unit. Demand is P = 40 - Q. Find the competitive quantity, the efficient quantity, and the Pigouvian tax per unit that would implement the efficient quantity under these assumptions.",
+    "intent": "Compute an efficient quantity with a negative externality and a corrective tax.",
+    "domain": "Externalities",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "Two neighboring firms can bargain over smoke emissions. One values reducing one unit of emissions at $80, while the polluter's cost of abating that unit is $50. Explain the mutually beneficial bargaining range and why high transaction costs could prevent the efficient bargain.",
+    "intent": "Apply property-right bargaining logic and transaction-cost qualifications.",
+    "domain": "Externalities",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "welfare_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A lighthouse signal is non-rival over the relevant shipping area and it is difficult to exclude nearby ships from observing it. Explain why this creates a free-rider problem, and why calling it a public good does not imply that only government provision is possible.",
+    "intent": "Identify public-good characteristics and institutional alternatives.",
+    "domain": "Public Goods and Common Resources",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A fishery is costly to exclude users from, but fish caught by one boat reduce the stock available to others. Classify the fishery as a public good, common-pool resource, private good, or club good, and explain the likely incentive problem.",
+    "intent": "Distinguish common resources from public goods using rivalry and excludability.",
+    "domain": "Public Goods and Common Resources",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "In a competitive market, demand is much less elastic than supply. A $10 per-unit tax is legally remitted by sellers. Explain who is likely to bear more of the economic burden and why legal remittance does not determine incidence.",
+    "intent": "Analyze tax incidence using relative elasticities.",
+    "domain": "Taxation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A worker faces an income-support program that pays $8,000 when earnings are zero and reduces the benefit by $0.50 for each $1 earned until the benefit reaches zero. Explain how the phase-out changes the worker's effective marginal return to earning and why this can create an incentive effect even if the transfer raises income.",
+    "intent": "Analyze transfer phase-outs, marginal incentives, and distribution.",
+    "domain": "Subsidies and Transfers",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "A government pays buyers a $4 subsidy for each unit of a good in a competitive market. Demand is relatively inelastic and supply relatively elastic. Explain how the subsidy is likely to be split between buyers and sellers and why the statutory recipient need not capture the full benefit.",
+    "intent": "Analyze subsidy incidence using elasticity.",
+    "domain": "Subsidies and Transfers",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A minimum wage is set above the competitive wage in a labor market, but employers have some monopsony power because workers face search and mobility frictions. Explain why employment could fall, stay similar, or rise over some range, and identify the key condition governing the result.",
+    "intent": "Compare competitive and monopsony predictions for a minimum wage.",
+    "domain": "Labor Economics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "labor_market",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A worker is paid $25 per hour and produces output worth $32 per hour at the margin. A payroll tax raises the employer's total hourly labor cost by $3 without changing the worker's take-home pay initially. Distinguish the wage from the employer's labor cost and explain how longer-run wage adjustment could shift incidence.",
+    "intent": "Distinguish wages from labor costs and analyze labor-tax incidence dynamically.",
+    "domain": "Labor Economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "labor_market",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "College graduates earn 40% more on average than non-graduates in an observational dataset. Explain why this raw difference does not identify the causal return to education, and give at least two plausible confounders or selection mechanisms.",
+    "intent": "Distinguish raw earnings gaps from causal returns to education.",
+    "domain": "Human Capital and Education Economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A worker can spend one year in training, giving up $45,000 of earnings and paying $5,000 tuition. Training is expected to raise annual earnings by $12,000 for five years. Ignoring discounting, calculate the net private monetary gain over those five years and state one reason the social return could differ.",
+    "intent": "Evaluate a simple human-capital investment and distinguish private from social returns.",
+    "domain": "Human Capital and Education Economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "An insured patient pays 10% of the price of each medical service while the insurer pays the rest. Explain how this cost-sharing rule can affect utilization, and why observing higher spending among insured patients does not by itself reveal whether care is socially excessive.",
+    "intent": "Analyze health-insurance moral hazard and welfare interpretation.",
+    "domain": "Health Economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A firm can manufacture a component internally for $90 per unit plus $100,000 in annual coordination cost, or buy it from a specialist for $80 per unit but incur $180,000 in annual contracting and monitoring cost. At 1,000 units per year, which option is cheaper? Explain how transaction costs affect the make-versus-buy decision.",
+    "intent": "Compare production costs and transaction costs in firm-boundary decisions.",
+    "domain": "Economics of Organizations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "An economy has consumption 600, investment 150, government purchases 200, exports 120, and imports 170. Calculate GDP using the expenditure approach.",
+    "intent": "Compute GDP from expenditure components.",
+    "domain": "GDP and National Accounts",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A domestic manufacturer imports a component for $40, adds $60 of domestic value, and sells the final product domestically for $100. Explain how the import and final sale enter GDP and why counting both $100 of final output and $40 of imported input as domestic production would be wrong.",
+    "intent": "Avoid double counting and apply value-added logic in national accounts.",
+    "domain": "GDP and National Accounts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "Nominal GDP rises from 500 to 540 while the GDP deflator rises from 100 to 104. Approximately what is the percentage change in real GDP? Show the logic rather than treating nominal growth as real growth.",
+    "intent": "Distinguish nominal from real GDP growth using a price deflator.",
+    "domain": "Macroeconomic Measurement",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A consumer price index rises from 125 to 130 over one year. Calculate the inflation rate. Then explain why an index level of 130 does not mean inflation is 130%.",
+    "intent": "Calculate inflation and distinguish the price-index level from the inflation rate.",
+    "domain": "Inflation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "Nominal wages rise 4% while consumer prices rise 6%. Approximate the change in real wages and explain what this implies for purchasing power.",
+    "intent": "Distinguish nominal wage growth from real wage growth.",
+    "domain": "Inflation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "Inflation falls from 8% to 3% while the price level continues to rise. Is this deflation or disinflation? Explain.",
+    "intent": "Distinguish disinflation from deflation.",
+    "domain": "Inflation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "An economy has 70 million employed people, 5 million unemployed people actively seeking work, and 25 million adults not in the labor force. Calculate the unemployment rate and labor-force participation rate for these 100 million adults.",
+    "intent": "Calculate and distinguish unemployment and participation rates.",
+    "domain": "Unemployment",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "After a recession, the unemployment rate falls partly because many job seekers stop searching and leave the labor force. Explain why the falling unemployment rate alone may overstate improvement in the labor market.",
+    "intent": "Interpret unemployment jointly with labor-force participation.",
+    "domain": "Unemployment",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "Country A's real GDP grows 3% while population grows 1.5%. Approximately how fast does real GDP per capita grow? Explain why total GDP growth and living-standard growth are different concepts.",
+    "intent": "Distinguish aggregate output growth from per-capita growth.",
+    "domain": "Economic Growth",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "In a Solow-style model without technological progress, the saving rate permanently rises. Explain the transition path for capital per worker and output per worker, and distinguish the level effect from the long-run growth-rate effect.",
+    "intent": "Analyze a saving-rate change in the Solow model.",
+    "domain": "Solow-Style Growth Model",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "growth_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "In a Solow-style model with population growth n = 2%, depreciation d = 5%, and capital per worker k = 100, suppose output per worker is y = 20 and the saving rate is 40%. Is capital per worker rising or falling? Use investment per worker s*y versus break-even investment (n+d)k.",
+    "intent": "Determine transition dynamics in a Solow-style model.",
+    "domain": "Solow-Style Growth Model",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A fall in business confidence reduces investment spending. Explain the likely short-run effects on aggregate demand, output, and unemployment. Then state one reason the magnitude depends on monetary policy or other conditions.",
+    "intent": "Trace a demand shock through the business cycle with policy dependence.",
+    "domain": "Business Cycles",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "macroeconomic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "An economy experiences rising inflation and falling real output after a sharp increase in energy input costs. Use aggregate demand/aggregate supply reasoning to distinguish this from a pure positive demand shock and explain why stabilization policy faces a trade-off.",
+    "intent": "Analyze a negative supply shock and the inflation-output stabilization trade-off.",
+    "domain": "Aggregate Demand and Aggregate Supply",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "macroeconomic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "Inflation falls while unemployment rises. Give at least three possible mechanisms consistent with these facts—such as weaker aggregate demand, monetary tightening, favorable supply changes combined with another labor-market shock, or labor-force changes—and state what additional evidence would help distinguish them.",
+    "intent": "Compare competing macroeconomic mechanisms and identify discriminating evidence.",
+    "domain": "Business Cycles",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "uncertainty_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "In a simple Keynesian-cross model with fixed prices, no imports, no taxes, and marginal propensity to consume 0.75, autonomous spending rises by $20 billion. What is the textbook spending multiplier and the predicted change in equilibrium output? State why this number need not be a structural constant in reality.",
+    "intent": "Compute a simple multiplier under explicit assumptions and qualify its use.",
+    "domain": "Keynesian Cross and Multiplier Concepts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "In an IS-LM-style framework with sticky prices, the government raises spending while the central bank holds the money supply fixed. Explain the likely direction of output and interest rates, and why the output effect can be smaller if investment is interest-sensitive.",
+    "intent": "Analyze fiscal expansion with goods- and asset-market feedback.",
+    "domain": "IS-LM / Interest-Output Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "macroeconomic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A central bank raises its nominal policy rate from 3% to 5%, while expected inflation over the relevant horizon falls from 4% to 1%. Approximate the change in the ex ante real interest rate and explain why demand may respond more strongly than the nominal-rate change alone suggests.",
+    "intent": "Distinguish nominal from real rates in monetary transmission.",
+    "domain": "Monetary Economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A central bank cuts its policy rate by 100 basis points. Explain why mortgage, corporate bond, and bank lending rates need not each fall by exactly 100 basis points.",
+    "intent": "Explain monetary transmission through risk premia, term structure, and bank conditions.",
+    "domain": "Monetary Policy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "Inflation is above target because of a temporary supply shock, while output is below potential. Explain the competing considerations a central bank faces when setting policy, including expectations, lags, and the difference between supply- and demand-driven inflation.",
+    "intent": "Analyze monetary policy under a supply shock without assuming mechanical control of inflation.",
+    "domain": "Monetary Policy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A bank has $1,000 of assets financed by $920 of deposits and $80 of equity capital. It also holds $100 of reserves as part of its assets. Distinguish bank capital from reserves and calculate the equity-capital ratio using total assets.",
+    "intent": "Distinguish bank capital from reserves using a balance sheet.",
+    "domain": "Banking and Money Creation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A solvent bank holds long-term assets worth more than its liabilities but faces sudden deposit withdrawals it cannot meet with liquid assets. Explain why this is primarily a liquidity problem rather than necessarily a solvency problem, and describe conceptually how lender-of-last-resort support differs from recapitalization.",
+    "intent": "Distinguish liquidity from solvency and institutional responses.",
+    "domain": "Banking and Money Creation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A leveraged firm has assets of $200 and debt of $160. A recession reduces asset value by 15%. Calculate the firm's equity before and after the shock. Explain how this balance-sheet deterioration could amplify the recession through tighter credit or lower investment.",
+    "intent": "Quantify leverage effects and explain a financial-accelerator mechanism.",
+    "domain": "Financial Frictions",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "The government raises purchases by $50 billion during a recession. Explain why the effect on GDP may depend on economic slack, monetary policy, openness to imports, financing, expectations, and the composition of spending rather than on a universal multiplier.",
+    "intent": "Analyze state-dependent fiscal multipliers.",
+    "domain": "Fiscal Policy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A country begins the year with public debt equal to 100% of GDP. The average nominal interest rate on debt is 6%, nominal GDP grows 4%, and the government runs a primary surplus of 1% of GDP. Using the approximation Δd ≈ (i-g)d - primary surplus, estimate the change in the debt-to-GDP ratio.",
+    "intent": "Compute simple debt dynamics from interest-growth differentials and the primary balance.",
+    "domain": "Government Debt and Deficits",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "A country's primary deficit narrows, yet its debt-to-GDP ratio rises. Explain how inherited debt, interest costs, nominal GDP growth, inflation, and valuation effects can make this possible.",
+    "intent": "Distinguish the primary balance from debt dynamics.",
+    "domain": "Government Debt and Deficits",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A small open economy with high capital mobility tries to maintain a fixed exchange rate while also setting its own interest rate far below world rates. Explain the tension among exchange-rate stability, capital mobility, and independent monetary policy.",
+    "intent": "Apply the monetary-policy trilemma conceptually.",
+    "domain": "Open-Economy Macroeconomics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "macroeconomic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "Country A can produce either 12 units of wheat or 6 units of cloth per worker-day. Country B can produce either 8 units of wheat or 8 units of cloth. Calculate the opportunity cost of one unit of cloth in each country and identify comparative advantage in cloth and wheat.",
+    "intent": "Compute comparative advantage from opportunity cost rather than absolute productivity.",
+    "domain": "International Trade",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A small importing country imposes a tariff. Using standard partial-equilibrium reasoning, explain the effects on domestic consumer price, domestic production, domestic consumption, imports, consumer surplus, producer surplus, government revenue, and deadweight loss.",
+    "intent": "Trace the incidence and welfare effects of a tariff in a small-country model.",
+    "domain": "Trade Policy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "trade_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A tariff protects a domestic industry, but trading partners may retaliate and downstream domestic firms use the protected good as an input. Explain why evaluating the policy requires more than comparing the protected industry's gains with tariff revenue.",
+    "intent": "Analyze broader distributional and general-equilibrium effects of trade policy.",
+    "domain": "Trade Policy",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "The exchange rate is quoted as 1.20 domestic currency units per 1 foreign currency unit and later rises to 1.32. By what percentage has the foreign currency appreciated against the domestic currency under this quote convention? Explain the corresponding direction of movement of the domestic currency.",
+    "intent": "Calculate exchange-rate appreciation/depreciation using an explicit quote convention.",
+    "domain": "Exchange Rates",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A domestic currency depreciates sharply. Explain why imports may become more expensive quickly while export volumes and the trade balance adjust only with lags. Include pass-through and the possibility that monetary policy responds to inflation.",
+    "intent": "Trace exchange-rate depreciation through prices, trade volumes, and policy.",
+    "domain": "Exchange Rates",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A firm in Country X borrows $10 million in foreign currency while earning revenue only in domestic currency. Explain how a domestic-currency depreciation can worsen the firm's balance sheet even if the foreign interest rate is unchanged.",
+    "intent": "Identify currency mismatch and exchange-rate risk in international finance.",
+    "domain": "International Finance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A microcredit program is offered in selected villages and borrowers later report higher business profits. Explain why this pattern alone is not enough to show the program caused the gains, and identify at least two design or data features that would strengthen causal inference.",
+    "intent": "Apply causal reasoning to a development intervention.",
+    "domain": "Development Economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A randomized development program raises average household income by 4%, but the effect is 15% for initially credit-constrained households and near zero for others. Explain why the average treatment effect need not imply universal effectiveness and how targeting or external-validity conclusions should be qualified.",
+    "intent": "Interpret heterogeneous treatment effects and external validity in development policy.",
+    "domain": "Development Economics",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "econometric_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "Average income in a region rises 10%, but the bottom quintile's income is unchanged while the top quintile's income rises 25%. Explain why average-income growth alone cannot determine what happened to poverty, inequality, or mobility.",
+    "intent": "Distinguish average income, poverty, inequality, and mobility.",
+    "domain": "Poverty and Inequality",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "data_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A booming city experiences a 12% wage increase and a 20% rent increase. Housing supply is very inelastic in the short run. Explain how part of the productivity or amenity gain can be capitalized into land rents and why migration and longer-run construction matter for the final incidence.",
+    "intent": "Analyze spatial equilibrium feedback among wages, housing supply, rents, and migration.",
+    "domain": "Urban and Regional Economics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "Two factories can each reduce one ton of emissions. Factory A's marginal abatement cost is $30 and Factory B's is $70. A regulator wants one ton of total abatement. Under ideal monitoring, which factory should abate to minimize cost? Explain how a uniform emissions price can help allocate abatement efficiently when marginal costs differ.",
+    "intent": "Apply marginal abatement cost reasoning to environmental policy.",
+    "domain": "Environmental Economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A carbon tax is set equal to estimated marginal climate damage, but households and firms respond by changing energy use, technology, and investment. Explain why the tax rate alone does not determine total emissions reduction or distributional effects.",
+    "intent": "Analyze behavioral response and incidence of environmental pricing.",
+    "domain": "Environmental Economics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "An exhaustible resource owner can extract one unit today for net revenue $100 or leave it underground and extract next year for expected net revenue $106. If the relevant interest rate is 8% and there are no other costs or risks, which timing has the higher present value? Explain the intertemporal trade-off.",
+    "intent": "Compare current versus future extraction using present value.",
+    "domain": "Resource Economics",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A new production technology generates private profit of $5 million for the innovator and estimated knowledge spillovers worth another $3 million to other firms. Explain the difference between private and social returns to innovation and why either underinvestment or strategic overinvestment can arise depending on market structure.",
+    "intent": "Distinguish private and social innovation returns and identify competing incentive mechanisms.",
+    "domain": "Economics of Innovation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mechanism_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A regression of wages on years of education gives a coefficient of 0.08 when log(wage) is the dependent variable, with standard error 0.02 and sample size 5,000. Interpret the coefficient approximately, construct an approximate 95% confidence interval using ±1.96 standard errors, and explain why statistical significance does not by itself imply a causal effect.",
+    "intent": "Interpret a log-level regression coefficient, uncertainty, and causal limits.",
+    "domain": "Regression Interpretation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "econometric_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A policy regression estimates an effect of 0.003 percentage points on annual productivity growth with standard error 0.001, using a very large sample. Explain the difference between statistical significance and economic significance and what additional context is needed to judge materiality.",
+    "intent": "Distinguish statistical precision from economic magnitude.",
+    "domain": "Econometrics Fundamentals",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "econometric_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A job-training program is voluntary. Participants earn $4,000 more one year later than nonparticipants. Identify at least three threats to interpreting this difference causally and describe two plausible identification strategies.",
+    "intent": "Diagnose selection, confounding, reverse causality, and propose causal designs.",
+    "domain": "Causal Inference",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A randomized cash-transfer experiment assigns treatment randomly, but 30% of treated households do not receive the transfer and 10% of control households obtain a similar transfer from another program. Explain the difference between assignment and treatment received, and why an intention-to-treat estimate answers a different question from a treatment-on-the-treated estimate.",
+    "intent": "Interpret noncompliance in randomized experiments.",
+    "domain": "Randomized Experiments",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A policy is introduced in Region T in 2025 but not Region C. The outcome in T is 100 before and 115 after; in C it is 90 before and 100 after. Calculate the basic difference-in-differences estimate. Then explain why strong upward pre-trends in T relative to C before 2025 would threaten the causal interpretation.",
+    "intent": "Compute a difference-in-differences estimate and assess parallel-trends credibility.",
+    "domain": "Difference-in-Differences",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "Researchers use distance to a training center as an instrument for training participation. Distance strongly predicts participation, but living near a center may also directly improve job access. Explain why strong first-stage relevance is not enough and how the direct job-access channel threatens the exclusion restriction.",
+    "intent": "Assess instrument relevance and exclusion-restriction validity.",
+    "domain": "Instrumental Variables",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "A scholarship is awarded to students with an exam score of at least 80. Researchers compare outcomes just above and just below the cutoff. Explain the regression-discontinuity logic, why precise score manipulation is a threat, and why the estimated effect is local to students near the cutoff.",
+    "intent": "Explain regression-discontinuity identification and threats.",
+    "domain": "Regression Discontinuity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "Two unrelated macroeconomic series both trend upward for 20 years and a regression between their levels has a high R-squared. Explain why common trends can create a misleading relationship, and state one diagnostic or modeling approach that could help avoid a spurious interpretation.",
+    "intent": "Recognize spurious time-series regression and the role of trends/stationarity.",
+    "domain": "Time-Series Economics",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "econometric_interpretation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A panel regression includes individual fixed effects and finds that within-person wage changes are positively associated with within-person training changes. Explain what time-invariant confounding fixed effects can remove and give two forms of endogeneity they do not automatically solve.",
+    "intent": "Assess what panel fixed effects can and cannot identify.",
+    "domain": "Panel Data",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "causal_inference",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A government introduces a per-unit tax in a differentiated-product market served by a few firms. Demand is relatively inelastic, firms set prices strategically, and the government uses the revenue to finance a transfer to households that changes demand for the taxed product. Explain why a one-market competitive-incidence formula may be incomplete. Trace the main partial-equilibrium and general-equilibrium channels, identify what is ambiguous without further parameters, and distinguish efficiency effects from distributional judgments.",
+    "intent": "Integrate imperfect competition, tax incidence, strategic response, transfers, demand feedback, and welfare analysis.",
+    "domain": "General Equilibrium and Policy Analysis",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "policy_analysis",
+    "jurisdiction_required": false
+  }
+]

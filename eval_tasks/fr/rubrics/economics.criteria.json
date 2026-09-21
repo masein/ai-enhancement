@@ -1,163 +1,191 @@
 {
+  "task": "Score one answer to one Economics question from 0-4.",
   "criteria": [
     {
       "id": "relevance",
       "name": "Relevance",
-      "definition": "Directly addresses the economics question asked and prioritizes information that is material to the requested task.",
+      "definition": "Directly addresses the economic question asked, uses the supplied facts and institutional context, and avoids replacing the task with generic economic discussion.",
       "weight": 0.05,
       "conditional": false
     },
     {
       "id": "economic_accuracy",
       "name": "Economic Accuracy",
-      "definition": "Uses economically correct facts, relationships, calculations, and mechanisms without materially false central claims.",
-      "weight": 0.05,
-      "conditional": false
-    },
-    {
-      "id": "reasoning",
-      "name": "Reasoning",
-      "definition": "Shows coherent reasoning from assumptions or evidence to conclusions rather than relying on unsupported assertions.",
+      "definition": "States economically correct relationships and conclusions. Central reversals of supply-demand, incidence, nominal/real, debt/deficit, comparative advantage, or other core relationships are severe; minor non-central slips are graded proportionately.",
       "weight": 0.05,
       "conditional": false
     },
     {
       "id": "conceptual_precision",
       "name": "Conceptual Precision",
-      "definition": "Distinguishes closely related economic concepts and uses terminology with the appropriate meaning.",
+      "definition": "Uses economic concepts with their correct meaning and distinctions, including marginal versus average, shifts versus movements, efficiency versus equity, equilibrium versus desirability, and positive versus normative claims.",
       "weight": 0.05,
       "conditional": false
     },
     {
-      "id": "causal_identification",
-      "name": "Causal Identification",
-      "definition": "Correctly distinguishes causal effects from associations and addresses identification threats when causal claims are at issue.",
+      "id": "microeconomic_reasoning",
+      "name": "Microeconomic Reasoning",
+      "definition": "When relevant, correctly analyzes agents, constraints, incentives, margins, market structure, firm or consumer behavior, equilibrium, and welfare. A correct number from an invalid microeconomic model does not receive full credit.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "model_selection",
-      "name": "Model Selection",
-      "definition": "Chooses or invokes an economic model appropriate to the question and explains why it fits the setting when model choice matters.",
+      "id": "macroeconomic_reasoning",
+      "name": "Macroeconomic Reasoning",
+      "definition": "When relevant, correctly distinguishes nominal and real variables, levels and growth, stocks and flows, shocks and transmission mechanisms, short run and long run, expectations, and interactions among monetary, fiscal, and financial conditions. Legitimate alternative macro models should be credited when coherent.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "assumptions",
-      "name": "Assumptions",
-      "definition": "Recognizes and appropriately states assumptions that materially support the analysis or determine whether a conclusion holds.",
+      "id": "international_economic_reasoning",
+      "name": "International Economic Reasoning",
+      "definition": "When relevant, correctly reasons about comparative advantage, trade, tariffs, exchange rates, capital flows, current accounts, adjustment lags, and distributional effects without treating trade balances or currency movements as mechanically good or bad.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "public_and_welfare_economic_reasoning",
+      "name": "Public and Welfare Economic Reasoning",
+      "definition": "When relevant, distinguishes private from social costs/benefits, efficiency from equity, surplus from distribution, externalities from other harms, public goods from common resources, and welfare results from value judgments.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "labor_and_development_reasoning",
+      "name": "Labor and Development Reasoning",
+      "definition": "When relevant, analyzes labor supply/demand, search, human capital, productivity, institutions, poverty, development constraints, heterogeneity, and selection without inferring causal returns from raw group differences or assuming one development path fits all settings.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "strategic_and_information_reasoning",
+      "name": "Strategic and Information Reasoning",
+      "definition": "When relevant, identifies players, strategies, best responses, credibility, repeated interaction, market power, hidden information versus hidden action, and contractual or institutional responses. It should not assume oligopolists automatically collude.",
       "weight": 0.05,
       "conditional": true
     },
     {
       "id": "quantitative_correctness",
       "name": "Quantitative Correctness",
-      "definition": "Performs calculations correctly and interprets numerical results consistently with the relevant economic model.",
+      "definition": "When calculation is required, selects the correct economic relationship, uses consistent units, distinguishes percentages from percentage points, performs arithmetic accurately, and interprets the numerical result economically. Minor arithmetic errors are distinguished from model-invalidating errors.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "equilibrium_and_dynamics",
-      "name": "Equilibrium and Dynamics",
-      "definition": "Correctly explains equilibrium adjustment, comparative statics, timing, feedback, or short-run versus long-run dynamics when relevant.",
+      "id": "econometric_and_causal_reasoning",
+      "name": "Econometric and Causal Reasoning",
+      "definition": "When relevant, distinguishes association, prediction, mechanism, and causality; identifies estimands, selection, confounding, reverse causality, omitted variables, identification assumptions, and design threats. Statistical significance alone is not causal proof.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "welfare_analysis",
-      "name": "Welfare Analysis",
-      "definition": "Correctly considers surplus, efficiency, deadweight loss, externalities, distribution, or other welfare effects when relevant.",
+      "id": "data_interpretation",
+      "name": "Data Interpretation",
+      "definition": "When data, tables, indices, plots, or regression outputs are supplied, correctly interprets scale, units, levels, rates, uncertainty, nominal/real or aggregate/per-capita distinctions, and what the data do and do not establish.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "policy_analysis",
-      "name": "Policy Analysis",
-      "definition": "Analyzes policy mechanisms, intended and unintended effects, trade-offs, incidence, and relevant distributional consequences when applicable.",
+      "id": "comparative_statics_and_equilibrium_reasoning",
+      "name": "Comparative Statics and Equilibrium Reasoning",
+      "definition": "When relevant, traces curve shifts, strategic responses, entry/exit, and equilibrium feedback correctly. It recognizes ambiguous comparative statics when opposing shifts or feedbacks leave the direction undetermined.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "empirical_interpretation",
-      "name": "Empirical Interpretation",
-      "definition": "Interprets estimates, uncertainty, statistical evidence, and empirical designs without overstating what the evidence establishes.",
+      "id": "policy_and_incidence_reasoning",
+      "name": "Policy and Incidence Reasoning",
+      "definition": "When relevant, identifies the policy objective, mechanism, statutory versus economic incidence, behavioral response, implementation context, efficiency, distribution, dynamic effects, uncertainty, and unintended consequences without imposing a predetermined normative conclusion.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "contextualisation",
-      "name": "Contextualisation",
-      "definition": "Accounts for the relevant institutional, market, behavioral, temporal, or contextual features of the scenario.",
+      "id": "assumptions_and_model_selection",
+      "name": "Assumptions and Model Selection",
+      "definition": "When relevant, selects a model appropriate to market structure, horizon, information, openness, expectations, strategic interaction, and institutions; states material assumptions and explains how conclusions may change when they are relaxed. Reasonable simplifying assumptions are acceptable when explicit.",
       "weight": 0.05,
-      "conditional": false
+      "conditional": true
     },
     {
-      "id": "scope_and_qualifications",
-      "name": "Scope and Qualifications",
-      "definition": "States important limitations, boundary conditions, exceptions, or qualifications without obscuring the main answer.",
+      "id": "uncertainty_and_model_limits",
+      "name": "Uncertainty and Model Limits",
+      "definition": "When relevant, recognizes uncertainty, model dependence, forecast conditionality, identification limits, external-validity limits, and cases where supplied evidence is insufficient to choose among competing explanations.",
       "weight": 0.05,
-      "conditional": false
+      "conditional": true
     },
     {
-      "id": "uncertainty_calibration",
-      "name": "Uncertainty Calibration",
-      "definition": "Expresses uncertainty proportionately and distinguishes established implications from conditional or uncertain conclusions.",
-      "weight": 0.05,
-      "conditional": false
-    },
-    {
-      "id": "alternative_explanations",
-      "name": "Alternative Explanations",
-      "definition": "Considers plausible competing mechanisms or explanations when the question involves ambiguous evidence or multiple causal channels.",
+      "id": "mechanism_and_tradeoff_reasoning",
+      "name": "Mechanism and Trade-off Reasoning",
+      "definition": "When relevant, explains the causal channel from policy or shock through incentives and behavior to market response and outcome, and identifies efficiency, distributional, temporal, or stabilization trade-offs rather than naming jargon without mechanism.",
       "weight": 0.05,
       "conditional": true
     },
     {
       "id": "completeness",
       "name": "Completeness",
-      "definition": "Covers the material components needed to answer the question, including requested mechanisms, implications, or distinctions.",
+      "definition": "Covers the material parts of the question at the depth appropriate to its difficulty, including essential qualifications, assumptions, calculations, distributional effects, or identification caveats when they are central, without requiring irrelevant criteria.",
       "weight": 0.05,
       "conditional": false
     },
     {
       "id": "consistency",
       "name": "Consistency",
-      "definition": "Maintains internally consistent assumptions, terminology, calculations, and conclusions throughout the answer.",
+      "definition": "Maintains internal consistency across assumptions, equations, units, comparative statics, mechanisms, and conclusions, and does not contradict its own stated model or evidence.",
       "weight": 0.05,
       "conditional": false
     },
     {
       "id": "clarity",
       "name": "Clarity",
-      "definition": "Presents the reasoning and conclusion in a clear, understandable, and appropriately structured way.",
+      "definition": "Explains the economic reasoning in a clear, organized, and interpretable way. Precision is preferred over unnecessary length, jargon, framework naming, or citation volume.",
       "weight": 0.05,
       "conditional": false
-    },
-    {
-      "id": "actionability",
-      "name": "Actionability",
-      "definition": "When the question calls for a recommendation, decision framework, or practical implication, translates economic analysis into useful next-step guidance without overstating certainty.",
-      "weight": 0.05,
-      "conditional": true
     }
   ],
   "critical_error_flag": {
-    "id": "critical_economic_error",
-    "condition": "Apply when the answer contains a materially false central economic claim, calculation, or causal mechanism that fundamentally misleads the user about the question being asked.",
+    "id": "critical_economics_error",
+    "condition": "A materially false central microeconomic, macroeconomic, quantitative, econometric, international, or policy claim that fundamentally invalidates the answer or reverses its substantive conclusion.",
     "effect": "score=0",
     "examples": [
-      "Reversing a fundamental economic relationship, such as claiming that an increase in price necessarily increases quantity demanded under the standard demand model without stating a relevant exception.",
-      "Giving a major calculation error that changes the substantive conclusion.",
-      "Claiming correlation establishes causation when causal identification is the central point of the question.",
-      "Describing a policy transmission mechanism in the fundamentally wrong direction.",
-      "Fundamentally misdefining a central concept such as comparative advantage, inflation, opportunity cost, or economic profit."
+      "Reversing a central supply-demand relationship.",
+      "Confusing a demand shift with movement along demand in a way that changes the answer.",
+      "Fundamentally incorrect opportunity-cost or comparative-advantage reasoning.",
+      "A fundamentally incorrect elasticity calculation that reverses incidence or revenue conclusions.",
+      "Confusing average cost and marginal cost in a central profit-maximization decision.",
+      "Claiming a monopolist maximizes revenue rather than profit when that changes the solution.",
+      "Fundamentally incorrect Nash-equilibrium reasoning.",
+      "Confusing moral hazard with adverse selection in a way that invalidates the explanation.",
+      "Treating statutory tax incidence as necessarily equal to economic incidence.",
+      "A major consumer- or producer-surplus calculation error that reverses the welfare conclusion.",
+      "Double-counting output in GDP in a way that changes the conclusion.",
+      "Confusing inflation with the price level in a central argument.",
+      "Confusing nominal and real values in a way that reverses the conclusion.",
+      "Confusing debt with deficit in a central fiscal analysis.",
+      "Fundamentally incorrect monetary-policy transmission reasoning.",
+      "Claiming currency depreciation mechanically improves the trade balance regardless of timing or elasticities.",
+      "Confusing absolute and comparative advantage.",
+      "Treating correlation or regression significance as proof of causality.",
+      "Treating an instrument as valid solely because it strongly predicts treatment.",
+      "Ignoring a clearly violated parallel-trends assumption in a difference-in-differences conclusion.",
+      "A major quantitative error that reverses a policy or economic conclusion."
     ],
-    "do_not_classify_as_critical": [
-      "Minor imprecision.",
-      "Small arithmetic errors that do not change the conclusion.",
-      "Reasonable disagreement between economic schools when assumptions are explicitly stated.",
-      "Legitimate model simplifications.",
-      "Omissions that do not reverse the answer."
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Minor terminology mistakes.",
+      "Reasonable differences among economic models.",
+      "Legitimate disagreement about uncertain policy magnitudes.",
+      "Reasonable simplifying assumptions when clearly stated.",
+      "Valid alternative causal interpretations when evidence is ambiguous.",
+      "Small omissions.",
+      "Minor graph-labeling errors that do not affect reasoning.",
+      "Reasonable approximations."
     ]
+  },
+  "score_anchors": {
+    "4": "Economically accurate, directly responsive, uses an appropriate model, explains the mechanism, performs needed calculations correctly, states material assumptions, interprets evidence appropriately, and reaches a sound conclusion.",
+    "3": "Substantially correct and useful, with one meaningful omission, minor economic imprecision, limited reasoning gap, non-central quantitative error, or insufficient qualification; the central conclusion remains sound.",
+    "2": "Partly correct or directionally useful but with important omissions, incomplete reasoning, significant quantitative problems, weak assumptions, incorrect interpretation of some evidence, or incomplete mechanism analysis.",
+    "1": "Contains a substantial economic misunderstanding, inappropriate model, major non-critical calculation error, poor causal reasoning, or badly incomplete analysis, but does not meet the critical-error threshold.",
+    "0": "Critical economics error, no answer, off-topic answer, unrelated fabrication, or equivalent fundamental failure."
   }
 }

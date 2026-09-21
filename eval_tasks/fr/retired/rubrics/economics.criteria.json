@@ -1,0 +1,163 @@
+{
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the economics question asked and prioritizes information that is material to the requested task.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "economic_accuracy",
+      "name": "Economic Accuracy",
+      "definition": "Uses economically correct facts, relationships, calculations, and mechanisms without materially false central claims.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "reasoning",
+      "name": "Reasoning",
+      "definition": "Shows coherent reasoning from assumptions or evidence to conclusions rather than relying on unsupported assertions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Distinguishes closely related economic concepts and uses terminology with the appropriate meaning.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "causal_identification",
+      "name": "Causal Identification",
+      "definition": "Correctly distinguishes causal effects from associations and addresses identification threats when causal claims are at issue.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "model_selection",
+      "name": "Model Selection",
+      "definition": "Chooses or invokes an economic model appropriate to the question and explains why it fits the setting when model choice matters.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions",
+      "name": "Assumptions",
+      "definition": "Recognizes and appropriately states assumptions that materially support the analysis or determine whether a conclusion holds.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "Performs calculations correctly and interprets numerical results consistently with the relevant economic model.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "equilibrium_and_dynamics",
+      "name": "Equilibrium and Dynamics",
+      "definition": "Correctly explains equilibrium adjustment, comparative statics, timing, feedback, or short-run versus long-run dynamics when relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "welfare_analysis",
+      "name": "Welfare Analysis",
+      "definition": "Correctly considers surplus, efficiency, deadweight loss, externalities, distribution, or other welfare effects when relevant.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "policy_analysis",
+      "name": "Policy Analysis",
+      "definition": "Analyzes policy mechanisms, intended and unintended effects, trade-offs, incidence, and relevant distributional consequences when applicable.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "empirical_interpretation",
+      "name": "Empirical Interpretation",
+      "definition": "Interprets estimates, uncertainty, statistical evidence, and empirical designs without overstating what the evidence establishes.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "contextualisation",
+      "name": "Contextualisation",
+      "definition": "Accounts for the relevant institutional, market, behavioral, temporal, or contextual features of the scenario.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "scope_and_qualifications",
+      "name": "Scope and Qualifications",
+      "definition": "States important limitations, boundary conditions, exceptions, or qualifications without obscuring the main answer.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "uncertainty_calibration",
+      "name": "Uncertainty Calibration",
+      "definition": "Expresses uncertainty proportionately and distinguishes established implications from conditional or uncertain conclusions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "alternative_explanations",
+      "name": "Alternative Explanations",
+      "definition": "Considers plausible competing mechanisms or explanations when the question involves ambiguous evidence or multiple causal channels.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material components needed to answer the question, including requested mechanisms, implications, or distinctions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent assumptions, terminology, calculations, and conclusions throughout the answer.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Presents the reasoning and conclusion in a clear, understandable, and appropriately structured way.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "actionability",
+      "name": "Actionability",
+      "definition": "When the question calls for a recommendation, decision framework, or practical implication, translates economic analysis into useful next-step guidance without overstating certainty.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_economic_error",
+    "condition": "Apply when the answer contains a materially false central economic claim, calculation, or causal mechanism that fundamentally misleads the user about the question being asked.",
+    "effect": "score=0",
+    "examples": [
+      "Reversing a fundamental economic relationship, such as claiming that an increase in price necessarily increases quantity demanded under the standard demand model without stating a relevant exception.",
+      "Giving a major calculation error that changes the substantive conclusion.",
+      "Claiming correlation establishes causation when causal identification is the central point of the question.",
+      "Describing a policy transmission mechanism in the fundamentally wrong direction.",
+      "Fundamentally misdefining a central concept such as comparative advantage, inflation, opportunity cost, or economic profit."
+    ],
+    "do_not_classify_as_critical": [
+      "Minor imprecision.",
+      "Small arithmetic errors that do not change the conclusion.",
+      "Reasonable disagreement between economic schools when assumptions are explicitly stated.",
+      "Legitimate model simplifications.",
+      "Omissions that do not reverse the answer."
+    ]
+  }
+}

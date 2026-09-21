@@ -3,158 +3,250 @@
     {
       "id": "relevance",
       "name": "Relevance",
-      "definition": "Whether the answer directly addresses the question's stated task, constraints, and intent.",
+      "definition": "Directly addresses the question actually asked, including supplied code, data, constraints, and requested deliverables, without substituting a nearby but easier Computer Science problem.",
       "weight": 0.05,
       "conditional": false
     },
     {
       "id": "technical_accuracy",
       "name": "Technical Accuracy",
-      "definition": "Whether factual, conceptual, algorithmic, system, security, and implementation claims are technically correct.",
+      "definition": "Uses correct Computer Science facts and semantics. Central claims about program behavior, algorithms, systems, data, security, or machine learning must be materially true under the stated assumptions and must not rely on jargon in place of mechanism.",
       "weight": 0.05,
       "conditional": false
     },
     {
-      "id": "reasoning",
-      "name": "Reasoning",
-      "definition": "Whether the answer provides sound reasoning that connects premises, mechanisms, and conclusions.",
+      "id": "programming_correctness",
+      "name": "Programming Correctness",
+      "definition": "When code or implementation behavior is relevant, traces state and control flow accurately, respects the specified language semantics, terminates as claimed, preserves intended state, and distinguishes a minor syntax defect from logically incorrect code.",
       "weight": 0.05,
-      "conditional": false
+      "conditional": true
     },
     {
-      "id": "conceptual_precision",
-      "name": "Conceptual Precision",
-      "definition": "Whether closely related concepts are distinguished accurately and terminology is used precisely.",
-      "weight": 0.05,
-      "conditional": false
-    },
-    {
-      "id": "algorithmic_correctness",
-      "name": "Algorithmic Correctness",
-      "definition": "Whether proposed or analyzed algorithms are correct for the stated problem and assumptions.",
+      "id": "algorithmic_reasoning",
+      "name": "Algorithmic Reasoning",
+      "definition": "When an algorithm is required, selects or analyzes an approach whose preconditions match the problem, explains why it is correct, identifies invalid greedy or recursive assumptions, and gives counterexamples when correctness fails.",
       "weight": 0.05,
       "conditional": true
     },
     {
       "id": "complexity_analysis",
       "name": "Complexity Analysis",
-      "definition": "Whether time, space, amortized, asymptotic, or resource-complexity claims are correctly analyzed when relevant.",
+      "definition": "When performance analysis is relevant, states time and space costs that match the actual algorithm or code, distinguishes upper from tight bounds and worst from average or amortized behavior, and does not infer practical runtime from asymptotics alone.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "system_model_selection",
-      "name": "System Model Selection",
-      "definition": "Whether the answer selects and applies an appropriate system, concurrency, networking, database, or distributed-systems model.",
+      "id": "data_structure_reasoning",
+      "name": "Data Structure Reasoning",
+      "definition": "When data structures matter, reasons about operation costs, invariants, memory, representation, edge cases, and workload fit. Naming a structure without showing why it satisfies the required operations is insufficient.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "assumptions",
-      "name": "Assumptions",
-      "definition": "Whether material assumptions, constraints, workload characteristics, and failure models are identified and used correctly.",
+      "id": "systems_reasoning",
+      "name": "Systems Reasoning",
+      "definition": "When operating systems, architecture, cloud, performance, or systems design is relevant, models state, resources, locality, latency, throughput, failure, recovery, and operational constraints rather than assuming idealized components.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "concurrency_reasoning",
+      "name": "Concurrency Reasoning",
+      "definition": "When concurrent execution is relevant, identifies shared mutable state, atomicity and visibility requirements, possible interleavings, lock and condition invariants, contention, deadlock or starvation risks, and does not treat timing delays as synchronization.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "database_reasoning",
+      "name": "Database Reasoning",
+      "definition": "When databases are relevant, preserves schema and integrity semantics, reasons correctly about joins, NULLs, keys, normalization, indexes, plans, transactions and isolation, and distinguishes logical correctness from physical optimization.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "networking_and_distributed_reasoning",
+      "name": "Networking and Distributed Reasoning",
+      "definition": "When networking or distributed systems are relevant, distinguishes layers and protocol semantics and accounts for latency, loss, retries, duplicate delivery, stale replicas, clock disagreement, partitions and partial failure without assuming instant global state.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "security_reasoning",
+      "name": "Security Reasoning",
+      "definition": "When security is relevant, identifies assets, threats, trust boundaries and required properties; distinguishes authentication, authorization, confidentiality and integrity; and proposes mitigations that directly address the supplied threat model.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "software_engineering_reasoning",
+      "name": "Software Engineering Reasoning",
+      "definition": "When engineering process or design is relevant, reasons about requirements, interfaces, compatibility, maintainability, testing, rollout, observability, dependencies, and operational complexity rather than offering style preferences or design-pattern names alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "debugging_and_root_cause_analysis",
+      "name": "Debugging and Root-Cause Analysis",
+      "definition": "When diagnosing a failure, uses supplied symptoms, traces, code, and measurements to identify a supported root cause, explains the causal mechanism, proposes a targeted correction and verification step, and avoids speculative bug lists when evidence supports a narrower diagnosis.",
       "weight": 0.05,
       "conditional": true
     },
     {
       "id": "quantitative_correctness",
       "name": "Quantitative Correctness",
-      "definition": "Whether calculations, numerical estimates, equations, and quantitative conclusions are correct when required.",
+      "definition": "When calculations are required, selects the right quantity or computational model, uses consistent units and assumptions, performs arithmetic correctly, and interprets the result without allowing a major numerical error to reverse the conclusion.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "implementation_correctness",
-      "name": "Implementation Correctness",
-      "definition": "Whether implementation-level details, execution behavior, synchronization, APIs, or code-related reasoning are correct when relevant.",
+      "id": "assumptions_and_edge_cases",
+      "name": "Assumptions and Edge Cases",
+      "definition": "When material, states necessary assumptions and handles cases such as empty or singleton input, duplicates, overflow, null values, disconnected or cyclic structures, concurrent access, failed network operations, retries, or unavailable components.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "architecture_and_tradeoffs",
-      "name": "Architecture And Tradeoffs",
-      "definition": "Whether design choices satisfy requirements and constraints and accurately explain meaningful trade-offs.",
+      "id": "tradeoff_and_design_reasoning",
+      "name": "Trade-off and Design Reasoning",
+      "definition": "When multiple valid designs exist, connects choices to explicit requirements and compares correctness, complexity, performance, availability, consistency, durability, security, maintainability, and operational cost without rewarding complexity for its own sake.",
       "weight": 0.05,
       "conditional": true
     },
     {
-      "id": "failure_mode_analysis",
-      "name": "Failure Mode Analysis",
-      "definition": "Whether relevant failure modes, edge cases, partial failures, and recovery behavior are correctly identified.",
-      "weight": 0.05,
-      "conditional": true
-    },
-    {
-      "id": "security_and_safety",
-      "name": "Security And Safety",
-      "definition": "Whether security threats, mechanisms, mitigations, and limitations are handled correctly when security is relevant.",
-      "weight": 0.05,
-      "conditional": true
-    },
-    {
-      "id": "performance_analysis",
-      "name": "Performance Analysis",
-      "definition": "Whether bottlenecks, latency, throughput, resource utilization, caching, scaling, and performance mechanisms are analyzed correctly when relevant.",
-      "weight": 0.05,
-      "conditional": true
-    },
-    {
-      "id": "causal_debugging",
-      "name": "Causal Debugging",
-      "definition": "Whether the answer distinguishes symptoms, hypotheses, evidence, root causes, and remediation rather than merely naming plausible causes.",
-      "weight": 0.05,
-      "conditional": true
-    },
-    {
-      "id": "empirical_interpretation",
-      "name": "Empirical Interpretation",
-      "definition": "Whether measurements, benchmark results, logs, traces, and observed behavior are interpreted cautiously and causally when relevant.",
+      "id": "evidence_and_uncertainty",
+      "name": "Evidence and Uncertainty",
+      "definition": "When evidence is incomplete, distinguishes observed facts from hypotheses, states what additional measurement or documentation would resolve uncertainty, and avoids claiming implementation-specific behavior or a causal diagnosis without support.",
       "weight": 0.05,
       "conditional": true
     },
     {
       "id": "completeness",
       "name": "Completeness",
-      "definition": "Whether the answer covers the material aspects needed to answer the question without important omissions.",
+      "definition": "Covers the material parts of the requested task, including explanation, correction, comparison, proof, calculation, failure mode, or trade-off where explicitly requested, without penalizing omission of irrelevant criteria.",
       "weight": 0.05,
       "conditional": false
     },
     {
       "id": "consistency",
       "name": "Consistency",
-      "definition": "Whether the answer's claims are internally consistent and do not contradict its own assumptions or conclusions.",
+      "definition": "The answer's code, examples, calculations, complexity claims, assumptions, and conclusion agree with one another; it does not propose a fix that contradicts its diagnosis or a design that violates a stated requirement.",
       "weight": 0.05,
       "conditional": false
     },
     {
       "id": "clarity",
       "name": "Clarity",
-      "definition": "Whether the answer is understandable, well organized, and unambiguous without relying on unnecessary jargon.",
+      "definition": "Explains reasoning in a precise, inspectable way: important states, invariants, causal steps, assumptions, and trade-offs are understandable without unnecessary jargon, verbosity, or unsupported citations.",
       "weight": 0.05,
       "conditional": false
-    },
-    {
-      "id": "actionability",
-      "name": "Actionability",
-      "definition": "Whether recommendations or debugging/design steps are sufficiently concrete to be useful when the question calls for them.",
-      "weight": 0.05,
-      "conditional": true
     }
   ],
-  "critical_flag": {
-    "id": "critical_technical_error",
-    "condition": "The answer contains a materially false central technical claim, algorithm, calculation, security mechanism, or system explanation that fundamentally misleads the user.",
+  "critical_error_flag": {
+    "id": "critical_computer_science_error",
+    "condition": "A materially false central programming, algorithmic, systems, database, security, quantitative, machine-learning, or design claim fundamentally invalidates the answer or reverses the substantive conclusion.",
     "effect": "score=0",
     "examples": [
-      "claiming an algorithm has a fundamentally incorrect complexity when that is central to the question",
-      "reversing the behavior of a core networking or protocol mechanism",
-      "proposing an algorithm that cannot satisfy a central stated requirement",
-      "fundamentally misunderstanding transaction isolation in a way that changes the conclusion",
-      "claiming a concurrency mechanism prevents a race when it does not",
-      "giving a fundamentally incorrect security defense",
-      "making a major quantitative calculation error that changes the substantive result",
-      "claiming a distributed system guarantees a property it fundamentally cannot guarantee under the stated assumptions",
-      "describing a core ML mechanism in the fundamentally wrong direction"
+      "Claims an algorithm is correct despite a clear counterexample central to the question.",
+      "Makes fundamentally incorrect time-complexity reasoning that changes the algorithm-selection conclusion.",
+      "Claims a nonterminating function always terminates.",
+      "Introduces a central off-by-one or indexing error that makes the proposed implementation incorrect.",
+      "Uses fundamentally incorrect data-structure semantics.",
+      "Ignores a race condition in a concurrency solution that depends on unsafe shared state.",
+      "Claims a non-atomic sequence is atomic without required synchronization.",
+      "Recommends inconsistent lock ordering that introduces deadlock.",
+      "Uses fundamentally incorrect transaction or isolation reasoning.",
+      "Claims retries are harmless for a non-idempotent operation when duplicates materially alter state.",
+      "Treats distributed communication as perfectly reliable when the problem explicitly includes partial failure.",
+      "Uses fundamentally incorrect network-layer reasoning that invalidates the diagnosis.",
+      "Confuses authentication with authorization in a central security decision.",
+      "Recommends plaintext password storage or equivalently unsafe credential handling.",
+      "Claims encryption alone establishes integrity when tamper detection is required.",
+      "Recommends a mitigation that clearly fails to address the supplied vulnerability.",
+      "Uses test data during training while claiming unbiased generalization performance.",
+      "Makes a major quantitative error that changes system capacity, complexity, or performance conclusions.",
+      "Proposes a system architecture that cannot satisfy a stated critical requirement because of a central design error.",
+      "Asserts that passing tests prove program correctness when the task explicitly exposes untested states."
+    ],
+    "not_critical_examples": [
+      "Minor syntax errors that do not obscure the intended correct solution.",
+      "Small constant-factor mistakes.",
+      "Minor naming issues.",
+      "Reasonable alternative algorithms or architectures.",
+      "Different valid language idioms.",
+      "Minor omissions.",
+      "Non-central performance imperfections.",
+      "Reasonable implementation assumptions that are clearly stated.",
+      "Stylistic disagreements."
     ]
-  }
+  },
+  "evaluation_principles": [
+    {
+      "name": "Correct output is not enough",
+      "statement": "A solution that produces the expected sample result through invalid logic should not receive full credit."
+    },
+    {
+      "name": "Correctness before optimization",
+      "statement": "An incorrect fast solution is not superior to a correct slower solution unless the question explicitly permits approximation."
+    },
+    {
+      "name": "Complexity must match the code",
+      "statement": "Do not reward complexity claims that are inconsistent with the actual implementation."
+    },
+    {
+      "name": "Edge cases matter",
+      "statement": "Strong answers should consider material cases such as empty input, singleton input, duplicates, overflow, null values, disconnected graphs, cyclic graphs, concurrent access, and failed network operations when relevant."
+    },
+    {
+      "name": "Language semantics matter",
+      "statement": "Do not assume behavior is universal across programming languages."
+    },
+    {
+      "name": "Concurrency requires interleaving reasoning",
+      "statement": "Code that appears correct sequentially may fail under concurrent execution; reason about interleavings, atomicity, visibility, and synchronization."
+    },
+    {
+      "name": "Distributed systems can partially fail",
+      "statement": "Strong answers should consider timeouts, retries, duplicates, stale data, partitions, and unavailable nodes when relevant."
+    },
+    {
+      "name": "Security depends on threat models",
+      "statement": "A security control should address the actual attack or failure mode."
+    },
+    {
+      "name": "Authentication is not authorization",
+      "statement": "Verifying identity does not by itself determine permitted actions."
+    },
+    {
+      "name": "Tests are evidence, not proof",
+      "statement": "A passing test suite does not guarantee correctness."
+    },
+    {
+      "name": "Benchmarks and metrics need context",
+      "statement": "Performance measurements depend on workload, input distribution, hardware, concurrency, caching, and environment."
+    },
+    {
+      "name": "Prediction is not causation",
+      "statement": "Machine-learning predictions and feature associations do not by themselves establish causal relationships."
+    },
+    {
+      "name": "Simpler systems can be better",
+      "statement": "Do not reward unnecessary architectural complexity."
+    },
+    {
+      "name": "Abstraction is not indirection for its own sake",
+      "statement": "Strong designs use abstraction to manage complexity, not merely to introduce layers."
+    },
+    {
+      "name": "Failure modes matter",
+      "statement": "Strong system designs explain what happens when components fail."
+    },
+    {
+      "name": "No jargon worship",
+      "statement": "Technical vocabulary does not compensate for invalid reasoning."
+    },
+    {
+      "name": "No citation worship",
+      "statement": "Citations do not compensate for incorrect code, algorithms, calculations, or systems reasoning."
+    }
+  ]
 }

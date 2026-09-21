@@ -33,7 +33,7 @@ def _row(client, mid):
     return next(m for m in client.get("/api/results").json()["models"] if m["id"] == mid)
 
 
-TOPIC = "economics"          # the fixture's one topic above the 30-question floor
+TOPIC = "Economics"          # the fixture's one topic above the 30-question floor
 TASK = "exam_economics"
 
 
@@ -110,7 +110,7 @@ def test_topic_gate_on_the_payload(payload):
     row = next(m for m in payload["models"] if m["id"] == "fx/good-750m")
     assert "propose" not in row["judge"]["tasks"]["fr_control_mmlu"]
     # MMLU's own gate still computes — it is where the caution comes from
-    assert row["diag"]["tasks"]["mmlu"]["propose"]["categories"]["economics"]["ok"] is True
+    assert row["diag"]["tasks"]["mmlu"]["propose"]["categories"]["Economics"]["ok"] is True
 
 
 def test_topic_gate_refuses_a_preliminary_suite_and_an_empty_writer(tree):
@@ -137,7 +137,7 @@ def test_api_enforces_the_same_gate(gap):
     client, _, tree = gap
     r = _propose(client, "fx/chance-160m")
     assert r.status_code == 409 and "same answer on nearly every question" in r.json()["detail"]
-    r = _propose(client, topic="law")
+    r = _propose(client, topic="Law")
     assert r.status_code == 409 and "under the 30" in r.json()["detail"]
     r = _propose(client, topic="astrology")
     assert r.status_code == 404 and "no judged answers on file" in r.json()["detail"]
@@ -168,7 +168,7 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
     p = client.get(f"/api/proposals/{pid}").json()
     assert p["status"] == "proposed" and p["proposer"] == "fake/fake-1"
     assert p["task"] == TASK and p["category"] == TOPIC
-    assert "introductory economics" in p["spec_text"]
+    assert f"introductory {TOPIC}" in p["spec_text"]
     ev = p["evidence"]
     assert 0 < ev["n_shown"] <= 60 and ev["diagnose_weak"] <= ev["diagnose_items"]
     assert 1 <= len(ev["examples"]) <= 8 and ev["patterns"] and ev["share_explained"] == 0.6
@@ -223,7 +223,7 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
     assert ix.grams
     for q in gen:
         body = q["system"] + "\n" + q["user"]
-        assert edited in body and "economics" in body
+        assert edited in body and TOPIC in body
         # THE RULE (b): no 13-gram of any benchmark item, either half
         assert ix.hits(body) == [], "a generation request carries benchmark text"
         assert not any(d["q"] in body for docs in tree["docs"].values() for d in docs if d["q"])
@@ -370,11 +370,11 @@ def test_parse_items_on_the_document_format():
 
 def test_the_generation_request_asks_for_prose_and_nothing_exam_shaped():
     reqs = prop_mod.generation_requests(7, "The model cannot separate a rule from its purpose.",
-                                        "law", 5, "doc", seed=7)
+                                        "Law", 5, "doc", seed=7)
     assert [r.meta["count"] for r in reqs] == [2, 2, 1]
     body = reqs[0].system + "\n" + reqs[0].user
     assert "never write a question-and-answer pair" in body and "not a quiz" in body
-    assert "Topic: law" in body and "Write 2 documents" in body
+    assert "Topic: Law" in body and "Write 2 documents" in body
     assert "The model cannot separate a rule from its purpose." in body
     assert "multiple-choice" in body and str(prop_mod.DOC_TARGET_WORDS) in body
     # the spec and the topic are all it gets: no model, no score, no question

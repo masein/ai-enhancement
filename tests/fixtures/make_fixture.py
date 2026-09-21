@@ -32,9 +32,10 @@ halves — "the training taught the skill". The frozen report carries their
 taint the way the service would compute it from the run/dataset join.
 
 Three models (good, skewed, chance) also sit the exam: a bank drafted by the
-fake exam writer across every topic in categories.yaml and accepted by the
-fixture (approver "fixture"), the four skill suites' 40 items migrated in
-under `other`, and the MMLU control set exam_build builds from the diagnose
+fake exam writer across every topic in categories.yaml but Arts (empty, as it
+was delivered) and accepted by the fixture (approver "fixture"), the four
+skill suites' 40 items migrated in under General & Multidisciplinary, and the
+MMLU control set exam_build builds from the diagnose
 half of this very tree. Every question is split by qid. Their
 answers are graded by scripts/judge.py's STUB grader, and a synthetic
 calibration CSV (human = judge with every seventh row off by one) is
@@ -85,7 +86,7 @@ MMLU_SUBJECTS = {
     "abstract_algebra": "stem", "anatomy": "stem",
     "econometrics": "social_sciences", "high_school_macroeconomics": "social_sciences",
     "us_foreign_policy": "social_sciences", "world_religions": "humanities",
-    "professional_law": "humanities", "nutrition": "other",
+    "professional_law": "humanities", "clinical_knowledge": "other",
 }
 MMLU_PER_SUBJECT = 40      # two-subject categories land above the 30-item noise floor,
                            # one-subject ones below it, so the page shows both states
@@ -598,7 +599,9 @@ def _fr_answer(rng: random.Random, item: dict, p_right: float) -> str:
 EXAM_PER_TOPIC = 6          # drafted candidates per topic in the fixture bank
 # one topic carries enough questions for its report half to clear the 30-item
 # floor, so the gate that guards a proposal has a case that passes
-BIG_TOPIC = "economics"
+BIG_TOPIC = "Economics"
+# delivered with no questions (phase 10): the fixture leaves it that way
+EMPTY_TOPIC = "Arts"
 EXAM_BIG_EXTRA = 70
 
 
@@ -608,7 +611,7 @@ EXAM_BIG_EXTRA = 70
 # a report-half question is a report-half question however it arrived.
 # Both topics that have a criteria file are represented, and between them
 # they carry all three breakdown fields.
-IMPORT_TOPIC = "medicine & health"
+IMPORT_TOPIC = "Medicine & Clinical Health"
 IMPORTED = [
     {"id": 1, "prompt": "My 3 year old has had a fever for two days and is pulling at one ear. "
                         "Do we need to be seen today?",
@@ -644,7 +647,7 @@ IMPORTED = [
 # the second topic with a criteria file, and the one written around
 # difficulty rather than acuity: two flags, one of which caps instead of
 # zeroing, so every test of the flag path has a file that needs both
-IMPORT_TOPIC_LAW = "law"
+IMPORT_TOPIC_LAW = "Law"
 IMPORTED_LAW = [
     {"id": 1, "prompt": "What is the difference between a civil case and a criminal case?",
      "intent": "legal_information", "domain": "general_law", "acuity": "routine",
@@ -681,7 +684,8 @@ def write_exam(root: Path, out_dir: Path) -> dict:
     exam_root = root / "exam"
     eb.migrate_seeds(exam_root)
     fake = llm.FakeBatches("fake-exam", root)
-    eb.draft(exam_root, fake, eb.TOPICS, per_topic=EXAM_PER_TOPIC, wait=True, poll_s=0)
+    eb.draft(exam_root, fake, [t for t in eb.TOPICS if t != EMPTY_TOPIC],
+             per_topic=EXAM_PER_TOPIC, wait=True, poll_s=0)
     eb.draft(exam_root, fake, [BIG_TOPIC], per_topic=EXAM_BIG_EXTRA, wait=True, poll_s=0)
     for c in eb.load_candidates(exam_root, status="candidate"):
         eb.accept(exam_root, c["cid"], approver="fixture")

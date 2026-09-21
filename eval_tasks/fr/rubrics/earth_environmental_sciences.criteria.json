@@ -1,0 +1,187 @@
+{
+  "benchmark": "Earth & Environmental Sciences",
+  "score_range": {
+    "min": 0,
+    "max": 4
+  },
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the scientific task posed, focuses on the material variables and relationships, and avoids irrelevant digressions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "earth_science_accuracy",
+      "name": "Earth Science Accuracy",
+      "definition": "Uses geologic, geophysical, geomorphic, atmospheric, oceanographic, hydrologic, cryospheric, and Earth-system facts and principles correctly where they are relevant; does not confuse core distinctions such as weathering versus erosion, crust versus plate, or land ice versus sea ice.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "environmental_science_accuracy",
+      "name": "Environmental Science Accuracy",
+      "definition": "Correctly represents ecological, biogeochemical, pollution, resource, sustainability, and human-environment processes relevant to the prompt, including material pathways, exposure, and environmental trade-offs.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "systems_reasoning",
+      "name": "Systems Reasoning",
+      "definition": "Identifies relevant reservoirs, fluxes, interactions, feedbacks, and couplings among Earth-system components rather than treating connected processes as independent.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "conceptual_precision",
+      "name": "Conceptual Precision",
+      "definition": "Uses key scientific concepts with the distinctions required by the question, such as stock versus flux, forcing versus feedback, hazard versus risk, concentration versus mass, and observation versus inference.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "quantitative_correctness",
+      "name": "Quantitative Correctness",
+      "definition": "When calculation is required, selects an appropriate relationship, uses consistent units and signs, performs arithmetic correctly, and interprets the numerical result in context.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "spatial_reasoning",
+      "name": "Spatial Reasoning",
+      "definition": "When spatial relationships matter, correctly interprets direction, geometry, gradients, landscape position, map or cross-section relationships, spatial heterogeneity, or scale-dependent patterns.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "temporal_and_scale_reasoning",
+      "name": "Temporal and Scale Reasoning",
+      "definition": "When relevant, distinguishes short-term variability from long-term change, local from regional or global behavior, transient from steady responses, and recognizes lags, residence times, and scale dependence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "mass_and_energy_balance",
+      "name": "Mass and Energy Balance",
+      "definition": "When applicable, conserves mass and energy, distinguishes inputs, outputs, storage, and transformation, and does not infer net change from a gross flux alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "causal_reasoning",
+      "name": "Causal Reasoning",
+      "definition": "When causality is at issue, links causes to outcomes through a plausible mechanism, respects temporal order and confounding, considers multiple causes, and does not treat correlation alone as proof.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "data_interpretation",
+      "name": "Data Interpretation",
+      "definition": "When data are supplied or described, extracts the relevant pattern, trend, contrast, or anomaly accurately and avoids claims not supported by the data or their resolution.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "mechanistic_explanation",
+      "name": "Mechanistic Explanation",
+      "definition": "When the task asks why or how, explains the physical, chemical, geological, hydrological, ecological, or biogeochemical mechanism rather than merely naming the process.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions",
+      "name": "Assumptions",
+      "definition": "When conclusions depend on simplifying conditions or missing information, identifies material assumptions and indicates how changing them could affect the result.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "uncertainty_analysis",
+      "name": "Uncertainty Analysis",
+      "definition": "When uncertainty is material, characterizes its source and consequence proportionately, distinguishes uncertainty in magnitude from uncertainty in mechanism, and avoids either false precision or blanket agnosticism.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "risk_and_hazard_reasoning",
+      "name": "Risk and Hazard Reasoning",
+      "definition": "When hazards are involved, separates hazard, exposure, vulnerability, and resilience; recognizes compound or transferred risk; and does not equate a physical event automatically with disaster impact.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "evidence_evaluation",
+      "name": "Evidence Evaluation",
+      "definition": "When evidence quality matters, distinguishes direct measurement, proxy, model output, inference, and assumption; evaluates representativeness, sampling, calibration, alternative explanations, and corroborating evidence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the principal parts of the task and the major variables needed for a defensible answer, while not requiring exhaustive treatment of immaterial details.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internal logical, scientific, numerical, and unit consistency across the response and does not contradict its own stated assumptions or conclusions.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Communicates the reasoning in a coherent, interpretable way with enough structure to follow the scientific argument, without rewarding unnecessary jargon or length.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "environmental_decision_reasoning",
+      "name": "Environmental Decision Reasoning",
+      "definition": "For decision questions, identifies objectives, constraints, mechanisms, risks, trade-offs, distribution of impacts, time horizons, and uncertainty, while allowing multiple defensible choices when evidence and values do not determine a unique option.",
+      "weight": 0.05,
+      "conditional": true
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_earth_environmental_sciences_error",
+    "condition": "A materially false central geological, physical, chemical, hydrological, ecological, climatic, quantitative, or environmental claim fundamentally invalidates the answer or reverses its substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Fundamentally incorrect plate-tectonic reasoning that reverses the inferred setting or process.",
+      "A major geologic-sequence error that invalidates the reconstructed history.",
+      "Claiming S waves propagate normally through Earth's liquid outer core.",
+      "Fundamentally incorrect water-balance reasoning.",
+      "A major mass-balance or energy-balance error that changes the conclusion.",
+      "Claiming correlation alone establishes an environmental cause.",
+      "Fundamentally confusing weather variability with long-term climate change.",
+      "Claiming the greenhouse effect and ozone depletion are the same mechanism.",
+      "Reversing a major climate feedback in a way that changes the conclusion.",
+      "Claiming melting floating sea ice directly raises sea level by the same added-mass mechanism as melting land ice.",
+      "Fundamentally incorrect groundwater-flow reasoning.",
+      "Treating concentration and total pollutant mass as interchangeable in a way that changes the conclusion.",
+      "Fundamentally incorrect interpretation of hazard, exposure, vulnerability, or risk.",
+      "Claiming dilution necessarily destroys pollutant mass.",
+      "Fundamentally misinterpreting the supplied environmental dataset, map, profile, or cross-section.",
+      "Claiming an ecosystem relationship that directly contradicts the supplied evidence.",
+      "A major quantitative error that reverses the environmental conclusion.",
+      "Fabricating environmental observations required for the answer.",
+      "Asserting a unique environmental outcome when the supplied evidence clearly cannot determine one."
+    ],
+    "not_critical_examples": [
+      "Minor arithmetic errors that do not change the conclusion.",
+      "Minor terminology mistakes.",
+      "Harmless rounding differences.",
+      "Legitimate scientific uncertainty.",
+      "Defensible alternative assumptions that are stated.",
+      "Reasonable model differences.",
+      "Small omissions.",
+      "Alternative but scientifically plausible environmental-management strategies.",
+      "Disagreement about values or policy when scientific facts are handled correctly.",
+      "Minor uncertainty in magnitude that does not alter the core mechanism."
+    ]
+  }
+}

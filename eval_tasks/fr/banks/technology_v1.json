@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A kiosk only needs to display a fixed menu, accept touch input, and send orders to a server. Explain why a specialized embedded computer may be a better fit than a general-purpose desktop, and identify one trade-off.",
+    "intent": "Distinguish general-purpose and specialized computing by matching capabilities and constraints to a task.",
+    "domain": "Computing Devices",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "device_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A workstation has a fast CPU but becomes unresponsive when several large applications and datasets are open. CPU utilization is moderate while memory is nearly full and the system is frequently paging to storage. Which upgrade is most likely to improve responsiveness, and why?",
+    "intent": "Identify memory pressure rather than processor speed as the likely bottleneck.",
+    "domain": "Memory / Storage",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "hardware_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A media workstation must read a 120 GB file once. Its storage can sustain 600 MB/s, while the application can process data at 900 MB/s once loaded. Ignoring overhead, estimate the minimum read time and identify the bottleneck.",
+    "intent": "Calculate transfer time and identify storage throughput as the limiting stage.",
+    "domain": "Memory / Storage",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A vendor claims that a processor with 16 cores will run every application exactly twice as fast as an otherwise similar 8-core processor. Evaluate the claim and explain what workload properties determine whether extra cores help.",
+    "intent": "Reject proportional-core-count reasoning and explain parallelism and serial work.",
+    "domain": "Processors",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "Two laptops have the same processor model. One is faster for the first minute of a sustained workload but then slows substantially, while the other remains steady. Give a plausible technology explanation and the evidence you would check.",
+    "intent": "Reason about thermal and power limits, sustained performance, and measurement evidence.",
+    "domain": "Processors",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A user with 8 GB of RAM and 1 TB of free SSD space is told that the large amount of free storage means memory-heavy applications should not run out of working memory. Explain the error and what the SSD can and cannot do when RAM is exhausted.",
+    "intent": "Distinguish volatile working memory from persistent storage and explain paging limits.",
+    "domain": "Memory / Storage",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "Two SSDs advertise the same peak sequential throughput. One feels much faster when opening many small files and launching applications. Explain why this can happen without either specification being false.",
+    "intent": "Distinguish sequential throughput from random-access latency/IOPS and workload dependence.",
+    "domain": "Memory / Storage",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "A team can choose between a high-core-count GPU and a high-performance CPU for a workload with many independent identical operations followed by a small serial decision step. Explain which parts are likely to benefit from the GPU and why the GPU is not automatically best for the whole workload.",
+    "intent": "Match processor architecture to parallel and serial workload characteristics.",
+    "domain": "Graphics / Accelerated Computing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "hardware_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A game renders at 75 frames per second on a display refreshing at 120 Hz. Explain why the two numbers are not the same concept and what each one limits.",
+    "intent": "Distinguish rendered frame rate from display refresh rate.",
+    "domain": "Graphics / Displays",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "Camera A has twice as many megapixels as Camera B, but B has a larger sensor and better optics. Explain why megapixel count alone cannot establish which camera will produce better images.",
+    "intent": "Evaluate imaging quality using sensor, optics, noise, processing, and conditions rather than pixel count alone.",
+    "domain": "Displays / Imaging",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A device battery stores 60 Wh. During a workload the device averages 15 W, excluding conversion losses. Estimate the ideal runtime, then name two reasons the real runtime could be shorter.",
+    "intent": "Relate energy to power and qualify an ideal battery-runtime calculation.",
+    "domain": "Batteries / Power",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "A charger is rated for up to 100 W, but a connected device accepts at most 45 W and its battery is near full. Explain why the device may draw far less than 100 W and why charger rating alone does not determine charge time.",
+    "intent": "Distinguish charger maximum capability from negotiated device power and charging profile.",
+    "domain": "Batteries / Power",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "Two temperature sensors report nearly identical readings each time, but both are consistently 3 °C above a calibrated reference. What does this suggest about precision versus accuracy, and what corrective step is appropriate?",
+    "intent": "Distinguish repeatability from correctness and recognize calibration error.",
+    "domain": "Sensors",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A manufacturer can make a device thinner and more power-efficient by integrating memory and storage components onto a tightly packed board, but this prevents easy replacement. Analyze the engineering trade-off without assuming either modularity or integration is always superior.",
+    "intent": "Reason about size, efficiency, repairability, upgradeability, and lifecycle trade-offs.",
+    "domain": "Hardware Modularity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A laptop is slow only after running a demanding application for 20 minutes. Storage is not full, RAM remains available, and network activity is low. Describe a prioritized troubleshooting path that distinguishes software behavior, thermal throttling, background tasks, and hardware failure.",
+    "intent": "Troubleshoot sustained performance degradation across plausible hardware and software layers.",
+    "domain": "Device Troubleshooting",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "Connection A provides 1 Gbit/s bandwidth with 80 ms round-trip latency. Connection B provides 100 Mbit/s with 8 ms round-trip latency. Which is likely to feel more responsive for short interactive requests, and which is better for a large sustained download? Explain.",
+    "intent": "Distinguish latency-sensitive and throughput-sensitive workloads.",
+    "domain": "Telecommunications",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "connectivity_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "A phone shows excellent Wi-Fi signal strength, yet video calls freeze and web pages are slow on every device in the home. List the most useful checks in order and explain how they distinguish local Wi-Fi problems from internet-service or remote-service problems.",
+    "intent": "Troubleshoot layered connectivity without equating Wi-Fi signal with internet performance.",
+    "domain": "Wi-Fi",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A desktop reaches full internet speed over Ethernet, but a nearby laptop on Wi-Fi is much slower. Give three plausible local wireless causes and explain why replacing the internet plan is not the first step.",
+    "intent": "Localize a performance problem to the wireless LAN rather than the ISP.",
+    "domain": "Wi-Fi",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A user assumes a newer cellular generation must always be faster than an older one. Explain why actual speed can still be lower in a particular place or time.",
+    "intent": "Explain effects of signal quality, spectrum, congestion, backhaul, device support, and deployment.",
+    "domain": "Cellular Technology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "Why might a cellular operator use different radio characteristics in a dense city and a sparsely populated rural area? Discuss the trade-off among coverage, capacity, propagation, and infrastructure density without naming specific frequency bands.",
+    "intent": "Reason about spectrum and deployment trade-offs at a conceptual level.",
+    "domain": "Cellular Technology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "A moving phone maintains a call while traveling between coverage areas. Explain at a high level what handoff must accomplish and why poor handoff can cause interruption even when both areas have usable signal.",
+    "intent": "Explain cellular handoff as a coordinated transfer rather than simple signal presence.",
+    "domain": "Cellular Technology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A battery-powered sensor sends a few bytes every minute to a nearby hub. Explain why a short-range low-power radio may be preferable to keeping a higher-power wide-area connection active, and name one reliability trade-off.",
+    "intent": "Match connectivity technology to range, data volume, power, and reliability needs.",
+    "domain": "Bluetooth / Short-Range Connectivity",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "Explain the difference among the internet, the World Wide Web, a browser, and a search engine by describing the role each plays when a user visits a page found through search.",
+    "intent": "Test functional understanding of internet and web layers and client software.",
+    "domain": "Internet / Web",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A website opens when its exact URL is entered but does not appear in a search engine. Explain why this is possible and identify which technology layer is working correctly despite the search result absence.",
+    "intent": "Distinguish web reachability from search crawling and indexing.",
+    "domain": "Internet / Web",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "internet_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A site uses HTTPS. Explain what that does protect in a normal connection and why it does not by itself prove that the site operator is trustworthy or that the content is accurate.",
+    "intent": "Distinguish transport security from trustworthiness and content validity.",
+    "domain": "Internet / Web",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A video call uses little bandwidth compared with a large download, yet speech becomes choppy when the network drops 5% of packets. Explain why packet loss can harm the call even if measured bandwidth remains high.",
+    "intent": "Reason about real-time sensitivity to loss and delay rather than bandwidth alone.",
+    "domain": "Internet Performance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "Compare a satellite connection and a fiber connection for a remote site that needs wide coverage, high throughput, and very low interactive latency. Explain why the best choice depends on infrastructure availability and application needs.",
+    "intent": "Analyze terrestrial-versus-satellite trade-offs without assuming a universal winner.",
+    "domain": "Satellite Technology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "A phone has no mobile data connection but can still determine an approximate position outdoors. Explain how satellite positioning can work without internet access and what internet connectivity may still improve.",
+    "intent": "Distinguish position measurement from map/data delivery and assistance services.",
+    "domain": "Navigation / Positioning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A 40 GB file must cross a link whose effective throughput is 200 Mbit/s. Ignoring overhead, estimate the transfer time. Then explain why reducing round-trip latency would have much less effect on this long sustained transfer than increasing throughput.",
+    "intent": "Calculate a transfer and connect the result to throughput-versus-latency reasoning.",
+    "domain": "Internet Performance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "An application stops recognizing a peripheral after an operating-system upgrade, even though the peripheral hardware still functions. Explain how drivers and OS compatibility can create this failure.",
+    "intent": "Reason about the operating system as an abstraction layer between applications and hardware.",
+    "domain": "Operating Systems",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "software_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A device meets an application's CPU and memory requirements but cannot run it because the required driver is unavailable for the installed operating system. Explain why hardware capability alone is insufficient.",
+    "intent": "Distinguish raw hardware resources from platform and driver compatibility.",
+    "domain": "Software Compatibility",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "compatibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A software update fixes important bugs but breaks a critical extension used by a team. Outline a safe decision process involving compatibility testing, staged deployment, rollback, and support lifecycle.",
+    "intent": "Evaluate update trade-offs and deployment risk rather than treating newer as automatically better.",
+    "domain": "Software Installation / Updates",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "lifecycle_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "System A can open files produced by an older version of System B, but B cannot open files created by the newest version of A. Explain how backward and forward compatibility differ in this situation.",
+    "intent": "Reason about directional compatibility between versions.",
+    "domain": "Software Compatibility",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "compatibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "Two applications can exchange JSON messages through an API, but one interprets 'status=closed' as 'completed successfully' while the other uses it for any terminated case, including failure. Why is the integration not fully interoperable?",
+    "intent": "Distinguish syntactic data exchange from semantic interoperability.",
+    "domain": "APIs / Integration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "interoperability",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A service integration works in testing but fails under production load because the provider accepts only a limited number of requests per minute. Explain why a technically correct API connection can still fail operationally and name two design responses.",
+    "intent": "Reason about rate limits, queuing, batching, caching, or backoff as integration constraints.",
+    "domain": "APIs / Integration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "Choose between lossless and lossy compression for (a) source code archives, (b) streaming entertainment video, and (c) scientific images where exact pixel values must be preserved. Justify each choice.",
+    "intent": "Select compression based on reversibility, quality, bandwidth, and preservation needs.",
+    "domain": "File / Media Formats",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "A live stream is encoded at 8 Mbit/s, but the viewer's connection fluctuates between 4 and 12 Mbit/s. Explain why adaptive bitrate streaming can reduce buffering and what quality trade-off it makes when bandwidth falls.",
+    "intent": "Relate stream bitrate to variable network capacity and adaptive quality.",
+    "domain": "Streaming Technology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A team replaces a locally installed perpetual-license application with a browser-based subscription service. Compare the practical technology consequences for offline use, updates, data portability, device requirements, and vendor dependence.",
+    "intent": "Distinguish ownership/access models and their technical operating implications.",
+    "domain": "Software-as-a-Service",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A user stores documents in a cloud folder that synchronizes deletions across devices and assumes this guarantees recovery from accidental deletion. Explain why synchronization is not the same as independent backup and what capability a backup must add.",
+    "intent": "Distinguish cloud storage/sync from historical backup and recovery.",
+    "domain": "Cloud Computing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "A field application must work for hours without connectivity, contains sensitive data, and occasionally needs heavy computation that local devices cannot perform efficiently. Compare a purely local design, a purely cloud design, and a hybrid design.",
+    "intent": "Select an architecture using offline operation, privacy, compute capacity, latency, and synchronization constraints.",
+    "domain": "Cloud vs Local Computing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "architecture_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A factory camera must reject defective items within 30 ms, generates large video streams, and can tolerate only brief cloud outages. Explain when edge processing is useful and what management or hardware constraints it introduces.",
+    "intent": "Evaluate edge computing for latency, bandwidth, resilience, and operational complexity.",
+    "domain": "Edge Computing",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "architecture_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A thin client depends on remote applications and storage, while a thick client performs most work locally. Compare how network outages, local hardware requirements, maintenance, and data control differ.",
+    "intent": "Distinguish client roles and trade-offs in centralized versus local computing.",
+    "domain": "Servers / Clients",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "An organization moves an application to scalable cloud infrastructure and assumes this automatically makes the service reliable. Explain why scalability and reliability are different and identify at least three additional failure considerations.",
+    "intent": "Separate elasticity/capacity from redundancy, software correctness, dependencies, regions, and operations.",
+    "domain": "Cloud Computing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "An enterprise must replace a legacy collaboration platform. The new platform is faster and easier to maintain, but several departments rely on old document formats, custom integrations, and shared identity workflows. Propose a migration strategy that balances interoperability, user disruption, rollback, and long-term support.",
+    "intent": "Synthesize platform selection and migration across formats, integrations, identity, workflows, and lifecycle.",
+    "domain": "Enterprise Platforms / Migration",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "A smart thermostat can continue following a local schedule during an internet outage but cannot receive remote commands. Explain what this shows about the difference between smart functionality and continuous internet dependence.",
+    "intent": "Distinguish local embedded control from optional cloud-connected features.",
+    "domain": "Internet of Things",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "Several low-power sensors use short-range radios that a cloud service cannot directly reach. Explain the role a local gateway can play in protocol translation, aggregation, local control, and cloud connectivity.",
+    "intent": "Understand gateway functions between constrained devices and wider networks.",
+    "domain": "Internet of Things",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "architecture_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "An automated greenhouse turns on irrigation whenever a soil-moisture sensor reports a low value. The sensor drifts over time and begins reading too low. Explain how this can create incorrect actuation and what safeguards could reduce the risk.",
+    "intent": "Connect sensor error to control actions and fault-tolerant automation design.",
+    "domain": "Sensors / Actuators",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A warehouse rule says 'if a package reaches station 4, start conveyor B for 10 seconds.' Does this require artificial intelligence? Explain the difference between deterministic automation and learned decision-making.",
+    "intent": "Distinguish automation from AI based on mechanism rather than marketing language.",
+    "domain": "Automation",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A mobile robot correctly detects obstacles but still collides while turning. Explain why good perception does not guarantee good control, and identify other system components that may be responsible.",
+    "intent": "Distinguish sensing/perception from planning, control, actuation, latency, and calibration.",
+    "domain": "Robotics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_understanding",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "A predictive-maintenance system begins generating many false alarms after a sensor is replaced. Before changing the prediction software, what technology checks should be performed on the measurement chain?",
+    "intent": "Prioritize calibration, units, sampling, sensor placement, and data quality before model changes.",
+    "domain": "Industrial Technology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "A smart-home design can either require cloud access for every light-switch action or keep basic control local and use the cloud only for remote access. Compare the designs for latency, privacy, outage resilience, and maintenance complexity.",
+    "intent": "Evaluate local-control versus cloud-dependent smart-home architectures.",
+    "domain": "Smart Homes / Connected Devices",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "A city deploys adaptive traffic signals using road sensors, network links, a central optimization service, and local controllers. After deployment, queues worsen intermittently. Describe how you would determine whether the problem comes from sensor error, network delay, optimization logic, controller behavior, or human-configured constraints.",
+    "intent": "Diagnose a smart-infrastructure system across sensing, communications, software logic, actuation, and operations.",
+    "domain": "Smart Infrastructure",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A digital twin of a production line uses last week's sensor data but is presented as a live operational replica. Explain why model fidelity and data freshness matter and when the system is better described as a static model than a synchronized twin.",
+    "intent": "Assess digital-twin claims based on synchronization, data quality, and model purpose.",
+    "domain": "Digital Twins",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A machine-vision inspection system performs well under laboratory lighting but poorly on the factory floor. Identify technology factors other than the vision algorithm that could explain the change.",
+    "intent": "Reason about cameras, optics, illumination, positioning, contamination, latency, and calibration.",
+    "domain": "Industrial Technology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A company automates an approval workflow that already contains unnecessary handoffs and ambiguous rules. Explain why automation may increase speed without improving process quality, and what should be analyzed before automating further.",
+    "intent": "Separate automation efficiency from underlying process design quality.",
+    "domain": "Automation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "assumption_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "A connected medical-adjacent home device performs sensing locally but sends all raw data to a cloud service for interpretation. The design must remain useful during outages, minimize sensitive-data exposure, and run for weeks on battery. Compare local, edge-gateway, and cloud processing choices and propose a resilient split of responsibilities without making clinical claims.",
+    "intent": "Synthesize power, privacy, reliability, connectivity, and compute constraints in a connected-device architecture.",
+    "domain": "Connected Device Architecture",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "architecture_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A data center adds many servers but does not expand cooling or power distribution. Explain why compute capacity may fail to scale even though enough rack space remains.",
+    "intent": "Recognize power and cooling as physical constraints on digital infrastructure.",
+    "domain": "Data Centers",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "systems_understanding",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A service keeps two identical servers in the same building and calls the system fault tolerant. Explain which failures this redundancy can handle and which common-cause failures it may not.",
+    "intent": "Distinguish component redundancy from resilience to shared infrastructure failures.",
+    "domain": "Technology Reliability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "reliability_and_lifecycle_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "A chip is manufactured with smaller feature sizes than another chip, and a marketing claim concludes it must therefore be faster and more energy-efficient in every device. Explain what other architecture, workload, packaging, power, and system factors matter.",
+    "intent": "Reject fabrication-node determinism and distinguish process technology from total system performance.",
+    "domain": "Semiconductors",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A manufacturer cannot ship a high-value industrial machine because a low-cost controller chip is unavailable. Explain why a cheap component can constrain the whole product and why substitution may take time.",
+    "intent": "Reason about supply-chain bottlenecks, qualification, redesign, and interoperability.",
+    "domain": "Technology Supply Chains",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "Two system-on-chip designs use the same fabrication process, but one performs better for video encoding while the other performs better for general application workloads. Explain how architecture and specialized blocks can create this result.",
+    "intent": "Distinguish chip architecture and accelerators from manufacturing process alone.",
+    "domain": "Integrated Circuits / Chips",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "hardware_reasoning",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "Device X wins a short synthetic benchmark, while Device Y finishes a long real application workload sooner. Give plausible reasons involving workload mix, thermal behavior, memory, storage, and benchmark methodology.",
+    "intent": "Reconcile apparently conflicting benchmarks using workload and system effects.",
+    "domain": "Benchmark Interpretation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "evidence_and_uncertainty",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "A review states that one device is 'universally faster' because it leads a single benchmark by 20%. Evaluate this conclusion and describe what evidence would be needed to support a broader performance claim.",
+    "intent": "Assess external performance evidence without overgeneralizing from one test.",
+    "domain": "Benchmark Interpretation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A company upgrades CPU speed, core count, and RAM in a server, yet a transaction-processing application shows almost no improvement. Measurements show the database spends most request time waiting on a remote storage service and network round trips. Explain why the upgrade failed and how you would verify the real bottleneck before spending more.",
+    "intent": "Diagnose a non-CPU bottleneck across application, network, and remote storage dependencies.",
+    "domain": "Performance Bottlenecks",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "Device A fails rarely but is sealed and difficult to repair. Device B fails more often but can be repaired in minutes with replaceable modules. Compare reliability, repairability, maintainability, and service downtime.",
+    "intent": "Distinguish failure frequency from ease and speed of restoration.",
+    "domain": "Repairability / Maintainability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A service is unavailable for 43.8 minutes during a 30-day month. Approximate its uptime percentage and explain why that single percentage does not reveal the user impact of when the outage occurred.",
+    "intent": "Calculate uptime and distinguish aggregate availability from impact distribution.",
+    "domain": "Technology Reliability",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A manufacturer finds an alternate supplier for a connector that is mechanically identical to the original. Why might testing and certification still be necessary before substituting it in production?",
+    "intent": "Reason about electrical, durability, tolerance, interoperability, and certification constraints beyond appearance.",
+    "domain": "Technology Supply Chains",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "compatibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "Two products both claim conformance to the same interoperability standard but still fail to work together. Give several plausible reasons that do not require either claim to be fraudulent.",
+    "intent": "Explain version differences, optional features, profiles, implementation bugs, and semantic mismatches.",
+    "domain": "Technology Standards",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "interoperability",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "System A and System B agree on field names and data types, but disagree on what a field called 'active_user' means. Explain why syntactic compatibility is insufficient for semantic interoperability.",
+    "intent": "Distinguish shared structure from shared meaning.",
+    "domain": "Interoperability",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A peripheral fits a computer's physical connector but still does not function. Explain why physical fit is only one compatibility layer and name at least three other layers that may matter.",
+    "intent": "Analyze compatibility across electrical signaling, protocol, driver, OS, and application layers.",
+    "domain": "Hardware / Software Compatibility",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "compatibility_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "Explain the difference between an open standard and open-source software. Give an example scenario where proprietary software could implement an open standard.",
+    "intent": "Separate interface openness from source-code licensing.",
+    "domain": "Open / Proprietary Technology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A company adopts a convenient platform that stores data in a proprietary format, uses vendor-specific APIs, and requires specialized administrator skills. Explain how these choices can create switching costs later, and why accepting some lock-in can still be rational.",
+    "intent": "Analyze vendor lock-in as a trade-off rather than an absolute error.",
+    "domain": "Vendor Lock-In",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "Two devices have similar standalone specifications, but one works seamlessly with a user's existing accessories, services, and applications. Explain why ecosystem compatibility can outweigh a small specification advantage.",
+    "intent": "Reason about complementary products, workflows, switching costs, and network effects.",
+    "domain": "Technology Ecosystems",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "An organization is migrating from a proprietary document and workflow system. It has millions of files, custom macros, user permissions, external partner exchanges, and a seven-year retention requirement. Develop a migration approach that addresses format conversion, semantic loss, access control, parallel operation, validation, and rollback.",
+    "intent": "Synthesize multi-layer migration risk across data, software, identities, partners, and lifecycle obligations.",
+    "domain": "Migration / Interoperability",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Two companies can exchange application data, but their identity systems represent users and groups differently. Explain how the integration can succeed technically while authorization behavior still fails.",
+    "intent": "Recognize identity mapping and semantics as an interoperability layer.",
+    "domain": "Identity Integration",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "interoperability",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "An archive must remain readable for decades and support future migration. Compare the technology considerations of an openly documented, widely implemented format with a feature-rich proprietary format.",
+    "intent": "Evaluate preservation, documentation, ecosystem support, fidelity, and migration risk.",
+    "domain": "File Formats / Preservation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "lifecycle_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "A small organization is choosing between an open-source platform with paid third-party support and a proprietary platform with bundled vendor support. Compare control, integration, support responsibility, skills, licensing, and lifecycle without assuming one model is inherently cheaper or better.",
+    "intent": "Evaluate open versus proprietary systems using operational trade-offs.",
+    "domain": "Open / Proprietary Technology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "technology_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A vendor says a device supports the newest version of a standard, so it must be compatible with every older device. Explain why that conclusion may fail.",
+    "intent": "Evaluate backward compatibility claims involving versions, optional features, and implementation choices.",
+    "domain": "Technology Standards",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "A powerful application contains a needed feature, but users consistently fail to find it because it is hidden several menus deep and uses unfamiliar terminology. Is this primarily a capability problem or a usability problem? Explain.",
+    "intent": "Distinguish backend capability from discoverability and interface design.",
+    "domain": "Human-Computer Interaction",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A cloud editor saves automatically but gives no visible indication of whether changes have synchronized. Users repeatedly close the application during pending uploads. Explain how interface feedback can create or reduce this failure mode.",
+    "intent": "Reason about system-state visibility, user mental models, and synchronization.",
+    "domain": "Human-Computer Interaction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A web application can be operated only with a mouse and has videos without captions. Identify the barriers this creates and describe technology changes that improve accessibility without reducing the underlying feature set.",
+    "intent": "Apply accessibility reasoning to keyboard operation, semantics, and captioning.",
+    "domain": "Accessibility / Assistive Technology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "A wearable reports an estimated physiological metric with high numerical precision. Explain why many displayed decimal places do not prove clinical accuracy and what factors affect consumer-sensor estimates.",
+    "intent": "Distinguish display precision from measurement validity without making clinical claims.",
+    "domain": "Wearable Technology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A service uses strong encryption and access controls but continuously collects precise location history that is not necessary for its core function. Explain why the system could be secure in one sense yet still raise privacy concerns.",
+    "intent": "Distinguish protection from unauthorized access from the amount and purpose of data collection.",
+    "domain": "Privacy / Security Literacy",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "conceptual",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A phone processes voice commands locally and a marketing claim says this guarantees privacy. Explain what other data flows, logs, permissions, backups, or telemetry would need to be checked before accepting that claim.",
+    "intent": "Evaluate local-processing privacy claims without assuming locality guarantees privacy.",
+    "domain": "Privacy / Security Literacy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A QR code contains the text of a Wi-Fi password in one case and a URL in another. Explain the difference between information stored directly in the code and information retrieved from an online resource after scanning.",
+    "intent": "Distinguish optical encoding from network retrieval.",
+    "domain": "QR / Optical Machine-Readable Information",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A contactless payment terminal communicates with a phone over a very short range, but the transaction still depends on other systems beyond that radio exchange. Describe the roles of local contactless communication, the device, and the wider payment network at a technology-literacy level.",
+    "intent": "Explain layered digital-payment technology without drifting into finance or cryptographic detail.",
+    "domain": "Digital Payments / Near-Field Technology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "systems_understanding",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "A search engine has not returned a newly published page even though the page loads normally. Explain the distinct roles of crawling, indexing, querying, and ranking that could account for this.",
+    "intent": "Explain search technology as a pipeline separate from web availability.",
+    "domain": "Search Technology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A navigation app shows the user's position accurately but repeatedly suggests a poor route. Explain why positioning accuracy and route quality are different technology problems.",
+    "intent": "Distinguish location measurement from map data, traffic data, and routing logic.",
+    "domain": "Navigation / Positioning",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "error_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A virtual-reality headset has a high-resolution display but noticeable motion-to-photon delay. Explain why increasing resolution alone may not improve comfort or immersion, and identify other system factors that matter.",
+    "intent": "Analyze VR quality as an interaction among rendering, tracking, latency, display, and frame delivery.",
+    "domain": "VR / AR",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A manufacturer needs ten customized prototypes with complex internal geometry, then plans to produce one million identical units. Explain why additive manufacturing may be attractive for the first phase but not necessarily for mass production.",
+    "intent": "Compare tooling, customization, throughput, material, and unit-cost trade-offs conceptually.",
+    "domain": "Additive Manufacturing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "technology_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "A project proposes a blockchain solely because multiple departments need to share records. Explain what additional requirements would justify a distributed ledger over a conventional database, and what governance or performance trade-offs should be considered.",
+    "intent": "Assess whether decentralized verification and shared write authority are actually needed.",
+    "domain": "Blockchain / Distributed Ledger",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "technology_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A cryptocurrency user loses access to a wallet because the private key is lost, even though the transaction history still exists on the distributed ledger. Explain the distinction between the ledger record and custody of credentials at a technology-literacy level.",
+    "intent": "Distinguish distributed transaction records from possession of access credentials.",
+    "domain": "Cryptocurrency Technology",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technology_literacy",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A headline says quantum computers will replace classical computers because qubits can represent quantum states. Explain why quantum computers are specialized rather than universally faster, and why useful systems require more than simply having many physical qubits.",
+    "intent": "Correct common misconceptions about quantum advantage and error correction conceptually.",
+    "domain": "Quantum Computing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "claim_evaluation",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A laboratory demonstrates a novel battery chemistry with very high energy density in coin-sized cells. A company claims this proves the technology is ready for electric vehicles and grid storage. Evaluate the claim using maturity, cycle life, safety, manufacturing yield, material supply, scale, cost, and integration requirements.",
+    "intent": "Distinguish research demonstration from commercially scalable technology across multiple constraints.",
+    "domain": "Emerging Technology Assessment",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_and_uncertainty",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A technically superior communication platform fails to gain adoption inside an organization. Explain how compatibility, user habits, training, network effects, migration effort, and support can outweigh raw technical advantages.",
+    "intent": "Analyze adoption as a system and organizational fit problem rather than pure technical ranking.",
+    "domain": "Technology Adoption",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "case_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "Device A uses 20% less power during operation but lasts only three years and is difficult to repair. Device B uses more power but lasts six years and is repairable. Explain why sustainability cannot be judged from operating power alone, and identify lifecycle evidence needed for a fair comparison.",
+    "intent": "Evaluate lifecycle sustainability across energy, manufacturing, longevity, repair, reuse, and disposal.",
+    "domain": "Technology Sustainability",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "tradeoff_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "An organization can buy a mature software platform that meets 85% of its needs or build a custom system that could fit the workflow exactly. Compare the technology considerations for integration, time to deploy, maintainability, skills, updates, control, and long-term dependency.",
+    "intent": "Analyze build-versus-buy as a technology lifecycle decision.",
+    "domain": "Technology Selection / Build vs Buy",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "technology_selection",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "System A costs 30% less to acquire than System B, but A requires a proprietary data conversion every three years, more administrator time, and a difficult migration path. Explain how to compare lifecycle cost and technological risk rather than selecting on purchase price alone.",
+    "intent": "Reason about lifecycle cost, migration, staffing, lock-in, and uncertainty.",
+    "domain": "Technology Lifecycle",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "lifecycle_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "Users report that a cloud application became slow after an office move. Their devices are unchanged. Wi-Fi signal is strong, internet speed tests are high, but the application has high response time only during busy hours and only from this office. Design an end-to-end diagnostic plan spanning device, local network, ISP path, cloud service, and application layers, and state what evidence would distinguish each layer.",
+    "intent": "Diagnose end-to-end performance degradation without assuming the visible symptom identifies the cause.",
+    "domain": "End-to-End Performance Troubleshooting",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "troubleshooting",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A remote industrial monitoring system must react within 50 ms to safety-relevant events, continue basic operation during WAN outages, conserve battery-powered sensor energy, support fleet-wide updates, and keep raw data exposure low. Compare local, edge, and cloud responsibilities and propose an architecture that balances latency, privacy, reliability, power, manageability, and scalability.",
+    "intent": "Synthesize local, edge, and cloud design under interacting operational constraints.",
+    "domain": "Local / Edge / Cloud Architecture",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "architecture_analysis",
+    "jurisdiction_required": false
+  }
+]

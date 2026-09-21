@@ -30,7 +30,7 @@ def run(root: Path, *args: str, **env) -> subprocess.CompletedProcess:
     e = {**os.environ, "BENCH_ROOT": str(root), **FAKE, **env}
     for k in ("LLM_API_KEY", "EXAM_API_KEY", "JUDGE_API_KEY"):
         e.pop(k, None)
-    return subprocess.run([sys.executable, str(SCRIPT), "--topics", "economics",
+    return subprocess.run([sys.executable, str(SCRIPT), "--topics", "Economics",
                            "--sit", "stub", "--per-topic", "8", "--count", "4", *args],
                           capture_output=True, text=True, timeout=300, env=e, cwd=REPO)
 
@@ -94,7 +94,7 @@ def test_the_safety_check_passed_and_is_not_vacuous(demo):
     assert demo_loop.leaked(["nothing of the sort here"], questions) == []
     planted = f"Here is the judge's note. {questions[0]} And that is what went wrong."
     assert demo_loop.leaked([planted], questions) == [questions[0]]
-    assert eb.half_of(eb.load_bank(root / "exam")["economics"][0]["qid"]) in ("report", "diagnose")
+    assert eb.half_of(eb.load_bank(root / "exam")["Economics"][0]["qid"]) in ("report", "diagnose")
 
 
 def test_nothing_lands_outside_the_demo_root(demo):
@@ -188,22 +188,36 @@ def test_a_model_answering_in_an_uncurable_shape_says_how_many(tmp_path, monkeyp
         srv.server_close()
 
 
-MEDICINE = REPO / "eval_tasks" / "fr" / "medicine_v2.json"
+# the delivered Medicine & Clinical Health bank of the 37-topic exam, the
+# run DEMO.md gives as its example
+MEDICINE = REPO / "eval_tasks" / "fr" / "banks" / "medicine_clinical_health_v1.json"
+MEDICINE_TOPIC = "Medicine & Clinical Health"
 
 
 def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
     """The medicine run: a human-written bank, its author as the approver,
     and no exam writer configured at all — nobody is drafting anything."""
+    import judge as jd
     root = tmp_path / "bench"
-    r = run(root, "--keep", "--import", str(MEDICINE), "--approver", "Dr. Hossein",
-            "--topic", "medicine & health", EXAM_PROVIDER="", EXAM_MODEL="")
+    # no rubric of the 37-topic exam is marked DRAFT, so the rubric stamp is
+    # shown on a DRAFT copy of this topic's own, installed where the page's
+    # rubric upload puts one — $BENCH_ROOT/rubrics, which the judge reads
+    # first, and which inside the demo is the demo tree's. The criteria file
+    # is not copied: the repo's, signed off, is read beside it.
+    rubric = jd.RUBRIC_DIR / "medicine_clinical_health.md"
+    head, rest = rubric.read_text(encoding="utf-8").split("\n", 1)
+    (root / "demo" / "rubrics").mkdir(parents=True)
+    (root / "demo" / "rubrics" / "medicine_clinical_health.md").write_text(
+        f"{head} (version 1, DRAFT — awaiting sign-off)\n{rest}", encoding="utf-8")
+    r = run(root, "--keep", "--import", str(MEDICINE), "--approver", "masein",
+            "--topic", MEDICINE_TOPIC, EXAM_PROVIDER="", EXAM_MODEL="")
     assert r.returncode == 0, r.stdout + r.stderr
     out = r.stdout
     assert "Import the exam — a human-written bank, not an LLM's drafts" in out
     assert "Draft the exam" not in out and "NOT curation" not in out
     assert re.search(r"imported\s+100 items", out)
     assert re.search(r"split by qid\s+report \d+ / diagnose \d+", out)
-    assert re.search(r"acuity\s+emergency 9,", out)
+    assert re.search(r"acuity\s+emergency 28,", out)
     # 100 questions clears the floor, so the step says so instead of asking
     assert "at or above the 30 this topic needs" in out
     assert "The floor is cleared." in out
@@ -212,52 +226,61 @@ def test_an_imported_bank_replaces_drafting_and_curation(tmp_path):
     assert re.search(r"in a person's vocabulary \(3 of \d+ shown\):", out)
     # the next step after a demo of an imported bank is one paste
     assert "This bank is in the demo's exam, not the live one." in out
-    assert "exam_build.py --root" in out and "--approver 'Dr. Hossein'" in out
+    assert "exam_build.py --root" in out and "--approver 'masein'" in out
+    assert "--topic 'Medicine & Clinical Health'" in out     # quoted: it has spaces and an &
     # the two stamps, one from the judge and one from the rubric
-    assert "CAVEAT draft rubric: medicine & health is graded against medicine_health.md" in out
+    assert ("CAVEAT draft rubric: Medicine & Clinical Health is graded against "
+            "medicine_clinical_health.md") in out
     assert "does not look instruction-tuned" in out          # the default model is a base model
     assert "PASSED: none of them appear" in out              # the split holds for an import too
     j = json.loads((root / "demo" / "results" / "full" / "EleutherAI__pythia-160m"
                     / "judge.json").read_text())
-    rub = j["judge"]["rubrics"]["exam_medicine_health"]
-    assert rub["name"] == "medicine_health" and rub["status"] == "draft"
+    rub = j["judge"]["rubrics"]["exam_medicine_clinical_health"]
+    assert rub["name"] == "medicine_clinical_health" and rub["status"] == "draft"
     assert j["judge"]["rubric_status"] == "draft"
-    bank = [json.loads(x) for x in (root / "demo" / "exam" / "bank" / "medicine_health.jsonl")
+    bank = [json.loads(x) for x in
+            (root / "demo" / "exam" / "bank" / "medicine_clinical_health.jsonl")
             .read_text().splitlines() if x.strip()]
-    assert len(bank) == 100 and all(b["accepted_by"] == "Dr. Hossein" for b in bank)
-    assert all(b["source"] == "medicine_v2" for b in bank)   # the file's stem
+    assert len(bank) == 100 and all(b["accepted_by"] == "masein" for b in bank)
+    assert all(b["source"] == "medicine_clinical_health_v1" for b in bank)   # the file's stem
     # the judge graded it criterion by criterion, and the demo shows what that is
     assert "is graded criterion by criterion, and the 0-4 above is a fold of them" in out
     # the criteria file is the author's own and carries no draft stamp; the
     # prose rubric beside it still does, and the caveat above says which
-    assert re.search(r"medicine_health\.criteria\.json \([0-9a-f]{12}, signed off\)", out)
-    assert re.search(r"Triage\s+[01]\.\d\d\s+\d+", out)
+    assert re.search(r"medicine_clinical_health\.criteria\.json \([0-9a-f]{12}, signed off\)",
+                     out)
+    assert re.search(r"Triage and urgency\s+[01]\.\d\d\s+\d+", out)
     # one line per flag, in the author's words, with what it does to a score
-    assert re.search(r"Critical safety failure\s+\d+ of 100 answers", out)
+    assert re.search(r"Critical medicine clinical health error\s+\d+ of 100 answers", out)
     assert "each sets the whole score to 0" in out
-    # a table per metadata field the topic carries, acuity first
-    assert re.search(r"emergency\s+\d\.\d\d\s+9\s+\d", out)
+    # a table per metadata field that splits the topic, acuity first
+    assert re.search(r"emergency\s+\d\.\d\d\s+28\s+\d", out)
     assert re.search(r"difficulty\s+mean\s+answers", out)
     assert "the author's own level, 1 easiest" in out
     assert "One graded answer in full — the diagnosis half, so it may be shown:" in out
-    assert "folded from" in out and "red_flag_coverage" in out
+    assert "folded from" in out and "triage_and_urgency" in out
     # and the spec request carried the weakest criteria, as labels and numbers
-    assert "the means by acuity, difficulty, intent — labels and numbers only" in out
-    t = j["tasks"]["exam_medicine_health"]
+    assert "the means by acuity, difficulty — labels and numbers only" in out
+    t = j["tasks"]["exam_medicine_clinical_health"]
     assert t["criteria_mean"] and t["breakdowns"]["acuity"] and t["unparseable"] == 0
-    assert list(t["breakdowns"]) == ["acuity", "difficulty", "intent"]
-    assert set(t["flags"]) == {"critical_safety_failure"}
+    # intent is a sentence per question here, which is not a table; the bank
+    # carries jurisdiction_required on every item and never sets it, which
+    # is said once instead of drawn
+    assert list(t["breakdowns"]) == ["acuity", "difficulty"]
+    assert t["breakdowns_constant"] == {"jurisdiction_required": "False"}
+    assert "jurisdiction_required is False on every item — no table for that." in out
+    assert set(t["flags"]) == {"critical_medicine_clinical_health_error"}
     assert all(it.get("fold") for it in t["items"])
 
 
 def test_the_import_flags_are_checked_before_anything_runs(tmp_path):
     root = tmp_path / "bench"
-    r = run(root, "--import", str(MEDICINE), "--topic", "medicine & health")
+    r = run(root, "--import", str(MEDICINE), "--topic", MEDICINE_TOPIC)
     assert r.returncode == 2 and "--import needs --approver" in r.stdout
-    r = run(root, "--import", str(MEDICINE), "--approver", "X", "--topics", "law,economics")
+    r = run(root, "--import", str(MEDICINE), "--approver", "X", "--topics", "Law,Economics")
     assert r.returncode == 2 and "--import takes one topic, not 2" in r.stdout
     r = run(root, "--import", str(tmp_path / "nope.json"), "--approver", "X",
-            "--topic", "medicine & health")
+            "--topic", MEDICINE_TOPIC)
     assert r.returncode == 2 and "no such file" in r.stdout
     assert not (root / "demo").exists()
 
@@ -349,15 +372,19 @@ def test_demo_md_says_what_a_green_run_does_not_prove():
     for other in ("README.md", "SERVICE.md"):
         assert "DEMO.md" in (REPO / other).read_text(encoding="utf-8"), other
     # the medicine run, and the two things a criteria-graded score is not
-    assert '--import eval_tasks/fr/medicine_v2.json --approver "Dr. Hossein"' in doc
-    # and the second bank delivered in the same round, as its own run
-    assert '--import eval_tasks/fr/law_v2.json --approver "Dr. Hossein"' in doc
+    assert ("--import eval_tasks/fr/banks/medicine_clinical_health_v1.json --approver masein"
+            in doc)
+    # and Law, the topic that adds jurisdiction, as its own run
+    assert "--import eval_tasks/fr/banks/law_v1.json --approver masein" in doc
     assert "HuggingFaceTB/SmolLM2-360M-Instruct" in doc
-    assert "rubrics are drafts" in doc and "pending Dr." in doc
+    assert "A rubric whose heading says DRAFT is marked so" in doc
+    assert "until its author signs it off" in doc
     assert "deterministic fold of that topic's\n  criteria" in doc
     assert "Per-criterion agreement with a human has **not** been measured" in doc
-    # the rule applied to this repo's own numbers
-    assert "do not compare to the ones\n  after it" in doc
+    # the rule applied to this repo's own numbers: the retired topics' scores
+    # are about other questions and other criteria, whatever the task is called
+    assert "Scores on the five retired topics do not compare to the new ones" in doc
+    assert "even where the task name is the same" in doc
 
 
 def test_the_author_docs_carry_the_import_and_criteria_rules():
@@ -372,13 +399,19 @@ def test_the_author_docs_carry_the_import_and_criteria_rules():
     assert '"flags": [{"id": "critical_legal_error"' in doc
     assert "refuses to load" in doc
     hand = (REPO / "HANDOFF.md").read_text(encoding="utf-8")
-    # the two open asks back to the author, and the file that holds his criteria
-    assert "medicine_v2.json" in hand and "medicine_health.criteria.json" in hand
-    # the ask that is still open, and the two closed by delivery
+    # the first delivery, where it lives now that it is retired, and the
+    # file that holds his criteria
+    assert "eval_tasks/fr/retired/medicine_v2.json" in hand
+    assert "retired/rubrics/medicine_health.criteria.json" in hand
+    # the asks back to the author: the floor, the sign-off (moot since the
+    # draft rubrics were retired), and the one closed by delivery
     assert "The question floor is cleared." in hand
-    assert "Rubric sign-off." in hand
-    assert "jurisdiction_required" in hand and "law_v2.json" in hand
+    assert "Rubric sign-off.** *(moot since phase 10)*" in hand
+    assert "jurisdiction_required" in hand and "retired/law_v2.json" in hand
     assert "phase-8b-medicine.md" in hand
+    # and the 37-topic exam that replaced it, with the steps that load it
+    assert "## 10c. Phase 10 — the 37-topic exam" in hand
+    assert "import-dir eval_tasks/fr/banks --approver masein" in hand
 
 
 def test_an_unknown_topic_stops_before_anything_runs(tmp_path):
@@ -398,13 +431,28 @@ def test_a_blocked_identity_stops_at_preflight(tmp_path):
 
 
 def test_the_demo_doc_carries_every_delivered_bank():
-    """Five topics now; each is one command, and all five clear the floor."""
+    """Thirty-six banks now; each is one command, and all of them clear the
+    floor. The doc shows two and gives the rule for the rest, so the rule
+    has to reach every file that was delivered."""
+    import exam_build as eb
+    import report_lm_eval as report
+    from categories import topic_slug
     doc = (REPO / "DEMO.md").read_text(encoding="utf-8")
-    for stem in ("medicine_v2", "law_v2", "computer_science_v1", "economics_v1",
-                 "physics_engineering_v1"):
-        assert f"--import eval_tasks/fr/{stem}.json" in doc, stem
+    for stem in ("medicine_clinical_health_v1", "law_v1"):
+        assert f"--import eval_tasks/fr/banks/{stem}.json" in doc, stem
         assert f"--source {stem}" in doc, stem
-    assert "clear the 30-question floor" in doc
+    assert "`banks/<slug>_v1.json`" in doc
+    assert "36 human-written banks of 100 questions" in doc and "Arts arrived empty" in doc
+    banks = sorted((REPO / "eval_tasks" / "fr" / "banks").glob("*.json"))
+    assert sorted(b.name for b in banks) == sorted(
+        f"{topic_slug(t)}_v1.json" for t in eb.TOPICS if t != "Arts")
+    # "every bank clears it": the report half of each, split by qid as the
+    # import splits it, is at or above the floor
+    assert "the 30-question floor.\nEvery bank clears it" in doc
+    for b in banks:
+        items = json.loads(b.read_text(encoding="utf-8"))
+        report_half = sum(1 for it in items if eb.half_of(eb.qid_of(it["prompt"])) == "report")
+        assert len(items) == 100 and report_half >= report.PROPOSE_MIN_N, b.name
     # and what differs between them is the author's file, not our code
     assert "routine` on every item" in doc and "difficulty and domain" in doc
 
