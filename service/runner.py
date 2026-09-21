@@ -317,6 +317,36 @@ def _task_done(task_out: Path) -> bool:
     return any(task_out.glob("*/results*.json")) or any(task_out.glob("results*.json"))
 
 
+CANCELED = -15
+
+
+def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as) -> int:
+    """One lm_eval task, as a child we watch: its exit code, -1 on timeout, or
+    CANCELED when someone asked the queue to stop this run. Polled every two
+    seconds, so a cancel costs at most that plus a clean shutdown."""
+    proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=config.BENCH_ROOT,
+                            env=env, **({"user": run_as[0], "group": run_as[1]}
+                                        if run_as else {}))
+    t0 = time.time()
+    while True:
+        try:
+            return proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            pass
+        why = ("canceled by request" if db.cancel_requested(sid)
+               else f"killed after {config.TASK_TIMEOUT_S}s timeout"
+               if time.time() - t0 > config.TASK_TIMEOUT_S else "")
+        if why:
+            proc.terminate()
+            try:
+                proc.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+            lf.write(f"\n[service] {why}\n")
+            return CANCELED if why.startswith("canceled") else -1
+
+
 def run_submission(sub: dict) -> None:
     sid = sub["id"]
 
@@ -364,6 +394,10 @@ def run_submission(sub: dict) -> None:
     # -- one run at a time: wait for the shared lock ------------------------------
     t0 = time.time()
     while not acquire_lock(sid):
+        if db.cancel_requested(sid):
+            db.update(sid, status="canceled", finished_at=time.time(),
+                      progress="canceled by request while waiting for the run lock")
+            return
         db.update(sid, status="waiting_lock",
                   progress="another run (service or CLI) holds the GPU lock")
         if time.time() - t0 > config.GPU_WAIT_MAX_S:
@@ -378,6 +412,10 @@ def run_submission(sub: dict) -> None:
         need_mib = int(meta["need_gb"] * 1024) + config.FREE_MARGIN_MIB
         t0 = time.time()
         while (free := gpu_free_mib()) < need_mib:
+            if db.cancel_requested(sid):
+                db.update(sid, status="canceled", finished_at=time.time(),
+                          progress="canceled by request while waiting for VRAM")
+                return
             db.update(sid, status="waiting_gpu",
                       progress=f"waiting for VRAM: need {need_mib} MiB, "
                                f"{free} MiB free")
@@ -418,7 +456,11 @@ def run_submission(sub: dict) -> None:
 
         gpu_seconds = 0.0
         failed_tasks: list[str] = []
+        canceled = False
         for i, task in enumerate(tasks, 1):
+            if canceled or db.cancel_requested(sid):
+                canceled = True
+                break
             shots = config.NFEWSHOT.get(task, 0)
             task_out = config.OUT_DIR / safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
@@ -466,19 +508,13 @@ def run_submission(sub: dict) -> None:
                              f"hub offline, token withheld\n")
                 lf.flush()
                 mark = log_path.stat().st_size      # this task's output starts here
-                try:
-                    proc = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT,
-                                          cwd=config.BENCH_ROOT,
-                                          env=job_env,
-                                          **({"user": run_as[0], "group": run_as[1]}
-                                             if run_as else {}),
-                                          timeout=config.TASK_TIMEOUT_S)
-                    status = proc.returncode
-                except subprocess.TimeoutExpired:
-                    status = -1
-                    lf.write(f"\n[service] killed after {config.TASK_TIMEOUT_S}s timeout\n")
+                status = _run_task(sid, cmd, lf, job_env, run_as)
+                if status == CANCELED:
+                    canceled = True
             gpu_seconds += time.time() - t_task
             db.update(sid, gpu_seconds=gpu_seconds)
+            if canceled:
+                break
 
             # checked before the exit code, because this failure has a zero exit
             # code: lm_eval did its job perfectly on a model that was partly
@@ -517,6 +553,11 @@ def run_submission(sub: dict) -> None:
         # let the poller finish it — a judge that waits on a provider must
         # never hold the card. With JUDGE_MODEL=stub the file is written now.
         judge_note = ""
+        if canceled:
+            db.update(sid, status="canceled", finished_at=time.time(),
+                      progress=f"canceled by request after {len(tasks) and i - 1} of "
+                               f"{len(tasks)} tasks — nothing half-written was kept")
+            return
         if sub["suite"] == "judged" and not failed_tasks:
             db.update(sid, status="running", progress="submitting the answers to the judge")
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))

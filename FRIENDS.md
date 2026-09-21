@@ -169,7 +169,10 @@ checkpoints against its training steps.
 **Training** — your live curves, run compare, config diff, benchmark-vs-step.
 The runs list has a search box (name, project or person), a status filter and a
 sort menu — "best loss" and "recently updated" are the two you'll live in.
-**Queue** — submit models, watch progress, read failure logs. The
+**Queue** — submit models, watch progress, read failure logs. Each row has
+what it can do: **Cancel** a queued job, **Cancel** a running one (it asks first,
+then stops it cleanly), **Resubmit** a failed one in one click, **Open results**
+of a finished one. A judged submission picks its topics. The
 queue is searchable and filterable the same way (find *your* jobs, failures
 first); click any column header to sort.
 **Leaderboard** — every model × every task, ± standard error, sortable, with a

@@ -487,6 +487,18 @@ the report half, the provisional stamps and taint are untouched.
   topic opens the import panel on it; Sit ticks it and focuses the model box).
   No shell commands, container paths or sha prefixes on the page; long text
   behind ⓘ. The refreshed stamp has a green dot, amber when the polls stop.
+- **9c — every action answers, every table fits.** Toasts for what changed
+  (errors stay inline). Queue rows act: Cancel (a running job too — `canceling`,
+  and the runner stops its lm_eval child), Resubmit, Open results. A judged
+  Submit picks topics. Imports and accepted questions rebuild the harness tasks
+  themselves; **Make new questions sittable** shows only when a judged run was
+  in the way. The import panel has labels above its fields and the source as
+  text. The Leaderboard shows six task columns (Columns ▾ for the rest), a
+  sticky model column, the score over its error, a density toggle, duplicates
+  folded under their twin, and compare starting empty. Provenance wraps. The
+  model page: one caveat line, one judged topic at a time, no Unknown tile, and
+  "last evaluated" counts judged runs. Training opens on the latest run; the
+  theme is a menu; chart labels keep the end of a long name.
 
 ---
 

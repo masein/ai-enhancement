@@ -185,6 +185,7 @@ def page(browser):
 
 def go_tab(page, label: str) -> None:
     """A tab by its name: one of the six, or one under More ▾ (phase 9b)."""
+    page.wait_for_selector("#tabs #moreBtn")              # the bar is built on first render
     t = page.get_by_role("tab", name=label, exact=True)
     if not t.count():
         page.locator("#moreBtn").click()
@@ -201,3 +202,23 @@ def set_name(page, name: str) -> None:
     who.locator("input").fill(name)
     who.locator("input").press("Enter")
     page.wait_for_selector(f"#who button[data-who='{name}']")
+
+
+def show_all_columns(page) -> None:
+    """The Leaderboard shows six task columns by default (phase 9c); a test
+    about a column that may be hidden asks for all of them first."""
+    menu = page.locator("[data-columns-menu]")
+    if menu.count() == 0:
+        return
+    if menu.get_attribute("open") is None:
+        menu.locator("summary").click()
+    menu.get_by_role("button", name="show all").click()
+    page.wait_for_function("!document.querySelector('[data-hidden-tasks]')")
+
+
+def pick_topic(page, task: str) -> None:
+    """The model page shows one judged topic's tables at a time (phase 9c)."""
+    btn = page.locator(f"[data-topic-pick='{task}']")
+    if btn.count():
+        btn.click()
+        page.wait_for_selector(f"[data-topic-pick='{task}'][aria-pressed='true']")

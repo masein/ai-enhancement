@@ -209,6 +209,9 @@ def init() -> None:
         # means the re-run only repeats the task that was interrupted.
         c.execute("UPDATE submissions SET status='queued', progress='re-queued after restart' "
                   "WHERE status IN ('preflight','waiting_gpu','waiting_lock','running')")
+        # a stop that was asked for and never finished (the process died) is done
+        c.execute("UPDATE submissions SET status='canceled', progress='canceled (the service "
+                  "restarted while stopping it)' WHERE status='canceling'")
         _backfill_judge_batch(c)
         c.commit()
 
@@ -282,21 +285,43 @@ def get(sid: int) -> dict | None:
     return dict(zip(_COLS, row)) if row else None
 
 
+RUNNING = ("preflight", "waiting_gpu", "waiting_lock", "running")
+
+
 def update(sid: int, **fields) -> None:
-    keys = ", ".join(f"{k}=?" for k in fields)
+    # a stop someone asked for is not undone by the runner's next progress
+    # line: a 'canceling' row never goes back to preflight/waiting/running
+    sets = [f"{k}=CASE WHEN status='canceling' AND ? IN ({','.join('?' * len(RUNNING))}) "
+            f"THEN status ELSE ? END" if k == "status" else f"{k}=?" for k in fields]
+    args: list = []
+    for k, v in fields.items():
+        args += [v, *RUNNING, v] if k == "status" else [v]
     with closing(_conn()) as c:
-        c.execute(f"UPDATE submissions SET {keys} WHERE id=?", (*fields.values(), sid))
+        c.execute(f"UPDATE submissions SET {', '.join(sets)} WHERE id=?", (*args, sid))
         c.commit()
 
 
-def cancel(sid: int) -> bool:
-    """Cancel is only honest for jobs that haven't started; a running lm_eval is
-    the worker's to finish (or the operator's to kill)."""
+def cancel(sid: int) -> str | None:
+    """A queued job is canceled on the spot. A running one is ASKED to stop:
+    it goes to 'canceling', and the runner — which polls its lm_eval child —
+    stops it, releases the GPU and marks it canceled. Returns the new status,
+    or None when there was nothing to cancel (done, failed, already gone)."""
     with closing(_conn()) as c:
-        hit = c.execute("UPDATE submissions SET status='canceled', finished_at=? "
-                        "WHERE id=? AND status='queued'", (time.time(), sid))
+        if c.execute("UPDATE submissions SET status='canceled', finished_at=? "
+                     "WHERE id=? AND status='queued'", (time.time(), sid)).rowcount:
+            c.commit()
+            return "canceled"
+        hit = c.execute(f"UPDATE submissions SET status='canceling', progress='stopping: "
+                        f"cancel requested' WHERE id=? AND status IN "
+                        f"({','.join('?' * len(RUNNING))})", (sid, *RUNNING)).rowcount
         c.commit()
-        return hit.rowcount == 1
+        return "canceling" if hit else None
+
+
+def cancel_requested(sid: int) -> bool:
+    with closing(_conn()) as c:
+        row = c.execute("SELECT status FROM submissions WHERE id=?", (sid,)).fetchone()
+    return bool(row) and row[0] == "canceling"
 
 
 def recent(limit: int = 100) -> list[dict]:

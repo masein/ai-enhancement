@@ -18,7 +18,7 @@ from urllib.parse import quote
 
 import pytest
 
-from conftest import go_tab
+from conftest import go_tab, pick_topic, show_all_columns
 
 pytestmark = pytest.mark.dashboard
 
@@ -249,6 +249,7 @@ def test_leaderboard_by_category_view(surface, diag):
     assert table.locator("td.dim").count() > 0 and table.locator("td.num.best").count() > 0
     # the control column carries its warning in the task view
     pg.get_by_label("leaderboard columns").get_by_role("button", name="tasks", exact=True).click()
+    show_all_columns(pg)                             # six task columns by default (9c)
     th = pg.locator("table.lb thead th", has_text=re.compile(r"^mmlu_perm"))
     assert "CONTROL" in th.get_attribute("title")
     assert surface.errors == []
@@ -303,6 +304,7 @@ def test_judged_section_and_the_control_sentence(surface, tree):
 
 def test_judged_columns_appear_once_calibrated(surface):
     pg = surface.open("#tab=leaderboard")
+    show_all_columns(pg)
     heads = pg.locator("table.lb thead tr").first.locator("th").all_text_contents()
     judged = [h for h in heads if "κ" in h]
     assert len(judged) >= 4 and any(h.startswith("Judged avg") for h in judged)
@@ -407,6 +409,7 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
             card.screenshot(path=SCREENS / f"local-judge-provisional-{scheme}.png")
         # never ranked: its judged cells on the board are blank, with the reason on hover
         s.open("#tab=leaderboard")
+        show_all_columns(pg)
         row = pg.locator("table.lb tbody tr", has_text="good-750m").first
         assert "/4" not in row.text_content()
         assert any("graded by a local model" in (c.get_attribute("title") or "")
@@ -424,6 +427,7 @@ def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browse
     try:
         pg = s.open(model_link("fx/good-750m"))
         card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
+        pick_topic(pg, "exam_medicine_health")          # one topic's tables at a time (9c)
         head = card.locator("[data-criteria='medicine & health']")
         assert head.count() == 1 and "by criterion (0–1), weakest first" in head.text_content()
         # every criterion in THIS topic's file has a row, weakest first
@@ -442,9 +446,11 @@ def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browse
         assert "were flagged" in text and "sets the whole score to 0" in text
         assert "applied here and not by the judge" in text
         # law's two flags say different things, because its file does
+        pick_topic(pg, "exam_law")
         law = card.locator("[data-flag-topic='law']")
         assert law.count() == 2
         assert "caps the whole score at 1 of 4" in law.nth(1).text_content()
+        pick_topic(pg, "exam_medicine_health")
         # a table per metadata field, acuity first, with a column per flag
         fields = card.locator("table.jd[data-breakdown-topic='medicine & health']")
         assert [fields.nth(i).get_attribute("data-breakdown-table")
@@ -610,21 +616,26 @@ def test_the_leaderboards_compare_ticks_are_the_only_ones(surface):
     """The radar belongs to the Leaderboard. Its ticks pick up to five models,
     say how many slots are used, redraw the radar, and drop the oldest when a
     sixth arrives. The Models tab has no tick at all: two tables sharing one
-    selection is what broke this."""
+    selection is what broke this. Phase 9c: the column says "compare", and
+    nothing is ticked until someone ticks it — the radar asks until then."""
     pg = surface.open("#tab=models")
     assert pg.locator("table.jd[data-models-table] input[type=checkbox][aria-label^='compare']"
                       ).count() == 0
     surface.tab("Leaderboard")
+    assert pg.locator("table.lb thead th.cmp").text_content() == "compare"
     boxes = pg.locator("table.lb tbody input[type=checkbox]")
     assert boxes.count() > 5
+    assert sum(1 for i in range(boxes.count()) if boxes.nth(i).is_checked()) == 0
+    assert pg.locator("[data-radar-prompt]").count() == 1
+    assert "Tick up to 5" in pg.locator("[data-radar-prompt]").text_content()
     radar = pg.locator(".card", has=pg.locator("h2", has_text="Capability profile"))
-    assert radar.count() == 1 and radar.locator("svg").count() == 1
-    assert "comparing 5 of 5 slots" in radar.text_content()   # the default profile
+    for i in range(5):
+        boxes.nth(i).check()
+    assert "comparing 5 of 5 slots" in radar.text_content()
     drawn = radar.locator("svg").inner_html()
     assert len(drawn) > 200
     # untick one: the count follows and the radar is redrawn without it
-    first_on = next(i for i in range(boxes.count()) if boxes.nth(i).is_checked())
-    boxes.nth(first_on).uncheck()
+    boxes.nth(0).uncheck()
     assert "comparing 4 of 5 slots" in radar.text_content()
     assert radar.locator("svg").inner_html() != drawn
     # tick one that was not in the set: back to five, and it is on the radar
@@ -690,6 +701,7 @@ def test_a_criterion_that_scored_zero_says_zero(browser, zero_criterion):
     s = Surface(ctx.new_page(), zero_criterion.as_uri())
     try:
         pg = s.open(model_link("fx/good-750m"))
+        pick_topic(pg, "exam_medicine_health")
         table = pg.locator("table.jd[data-criteria-table='medicine & health']")
         first = table.locator("tr[data-criterion]").first
         mean = first.locator("td").nth(1)

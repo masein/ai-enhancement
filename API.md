@@ -215,7 +215,7 @@ Each row:
 ```json
 {"id": 12, "hf_id": "myorg/my-model", "kind": "instruct", "suite": "quick",
  "submitter": "masein", "note": "run7 step 4000",
- "status": "running",              // queued | preflight | waiting_lock | waiting_gpu | running | done | failed | canceled
+ "status": "running",              // queued | preflight | waiting_lock | waiting_gpu | running | canceling | done | failed | canceled
  "progress": "2/4 · arc_easy (5-shot)",
  "error": "",                      // human-readable reason when failed
  "params": 596049920, "vocab": 151936, "batch": 1, "need_gb": 4.2,
@@ -224,13 +224,18 @@ Each row:
 ```
 
 Status lifecycle: `queued → preflight → (waiting_lock | waiting_gpu)* → running → done | failed`,
-plus `canceled` (only reachable from `queued`). `waiting_lock` means a manual CLI
+plus `canceling → canceled` (a stop asked for, and done). `waiting_lock` means a manual CLI
 run holds the GPU; `waiting_gpu` means not enough free VRAM yet — both clear on
 their own.
 
 ### POST /api/submissions/{id}/cancel
 
-Only while `queued` (409 otherwise — a running job finishes its current task).
+A `queued` job is canceled at once (`{"status": "canceled"}`). A running one —
+preflight, waiting or running — is **asked to stop** (`{"status": "canceling"}`):
+the runner watches its lm_eval child every two seconds, ends it, frees the GPU,
+keeps nothing half-written, submits no judge batch and marks the row
+`canceled`. A progress update never turns a `canceling` row back into a running
+one. 409 when the job has already finished.
 
 ### GET /api/runs/{id}/log?tail=200
 
@@ -286,7 +291,10 @@ and `…/reject` `{"approver", "reason"}` — a name is required and recorded.
 `GET /api/exam/bank?topic=` — the bank with **report-half text withheld**:
 those rows carry `qid`, `topic`, `half` and `withheld`, never the question.
 `POST /api/exam/build` — write the harness tasks from the bank plus the MMLU
-control set (no GPU).
+control set (no GPU). An import and an accepted candidate do this themselves
+(their answer carries `build: {built, tasks | why}`), except while a judged run
+is sitting the exam; `GET /api/exam` then says `tasks_stale: true` and the page
+offers **Make new questions sittable**.
 
 `POST /api/exam/import/preview` and `POST /api/exam/import` —
 `{"topic", "approver", "imported_by", "source", "filename", "items"` **or**
@@ -631,7 +639,7 @@ curl -s -X POST http://100.74.89.105:8899/api/submissions \
 |---|---|---|
 | 401 | server requires `X-Token` | get the token from the operator; dashboard users append `?token=…` |
 | 404 | unknown submission id | check `GET /api/submissions` |
-| 409 | cancel on a non-queued job | it's already running or finished |
+| 409 | cancel on a finished job | it has already finished |
 | 422 | bad request shape | `hf_id` must be `org/name` or `local/<name>`; suite `quick|full`; kind `auto|base|instruct` |
 | 409 / 507 | artifact upload refused | name already taken (immutable — pick a new one) / size cap or storage quota hit |
 | (failed status) | preflight or run failure | read `error` on the row; raw output at `/api/runs/{id}/log` |

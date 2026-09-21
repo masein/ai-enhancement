@@ -84,11 +84,14 @@ def test_exam_curation_in_the_browser(live, page):
     page.wait_for_selector(".rv[data-candidate]", timeout=15000)
     text = page.locator("#view").text_content()
     assert "fake/fake-exam" in text and "awaiting curation 4" in text
-    rows = page.locator("table.jd[data-topics-table] tbody tr")
+    # "By topic" is the rubrics table now (9c-4): every topic with questions
+    # has its row there, and clicking the topic filters the list below
+    page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
+    rows = page.locator("[data-panel='rubrics'] tr[data-rubric-row]")
     assert rows.count() == 15                                      # one per topic in categories.yaml
     assert "other" in text and "economics" in text
     # filter to one topic by clicking it
-    page.locator("table.jd[data-topics-table] tbody tr a", has_text=re.compile(r"^law$")).click()
+    page.locator("[data-panel='rubrics'] a[data-filter-topic='law']").click()
     page.wait_for_selector(".card h2:has-text('Awaiting curation — law')")
     # the list is dropped with the filter and re-fetched, so wait for it to
     # land rather than counting whatever is on screen this frame
@@ -102,8 +105,10 @@ def test_exam_curation_in_the_browser(live, page):
     set_name(page, "Omar")                               # the one name, in the header
     card = page.locator(f".rv[data-candidate='{cid}']")
     card.get_by_role("button", name="Accept into the bank").click()
-    page.wait_for_function("document.querySelector('#view').textContent.includes('accepted →')")
-    assert page.locator(f".rv[data-candidate='{cid}']").count() == 0
+    page.wait_for_selector("[data-toast='curate']")                 # a toast says so (9c-1)
+    assert "Accepted into law" in page.locator("[data-toast='curate']").first.text_content()
+    # the toast lands before the list is fetched again: wait for the card to go
+    page.wait_for_selector(f".rv[data-candidate='{cid}']", state="detached")
     bank = eb.load_bank(root / "exam")["law"]
     # the law bank also holds imported items, which carry no candidate id
     assert any(r.get("cid") == cid and r["edited"] and r["accepted_by"] == "Omar"
@@ -111,14 +116,16 @@ def test_exam_curation_in_the_browser(live, page):
     card = page.locator(".rv[data-candidate]").first
     card.get_by_label("reject reason").fill("recall, not understanding")
     card.get_by_role("button", name="Reject").click()
-    page.wait_for_function("document.querySelector('#view').textContent.includes('rejected')")
-    assert page.locator(".rv[data-candidate]").count() == 0
-    # rebuild the harness tasks from the bank, from the page
-    page.get_by_role("button", name="Rebuild the harness tasks from the bank").click()
-    page.wait_for_selector("[data-action-ok='exbuild']", timeout=30000)
-    built = page.locator("[data-action-ok='exbuild']").text_content()
-    assert built.startswith("Built") and "law (" in built
+    page.wait_for_function("[...document.querySelectorAll('[data-toast=curate]')]"
+                           ".some(t => t.textContent.includes('Rejected'))")
+    page.wait_for_function("document.querySelectorAll('.rv[data-candidate]').length === 0")
+    # 9c-4: accepting made the question sittable by itself — the harness task
+    # holds it, and there is no rebuild step left for a person to know about
     assert (root / "exam" / "tasks" / "exam_law.yaml").exists()
+    accepted = next(r for r in eb.load_bank(root / "exam")["law"] if r.get("cid") == cid)
+    tasks = (root / "exam" / "tasks" / "exam_law.jsonl").read_text(encoding="utf-8")
+    assert accepted["qid"] in tasks or accepted["prompt"][:40] in tasks
+    assert page.locator("[data-action='exbuild']").count() == 0
     # screenshots: the Exam tab, light and dark, desktop and phone
     SCREENS.mkdir(exist_ok=True)
     eb.draft(root / "exam", llm.FakeBatches("fake-exam", root), ["economics"], per_topic=2,
@@ -308,6 +315,9 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     upload(page, "questions file", "medicine_v2.json", "application/json", raw)
     panel.get_by_label("topic").select_option(topic)
     panel.get_by_label("written by").fill("Dr. Hossein")
+    # the source is the file's own name, shown as text; "change" opens a box (9c-4)
+    assert panel.locator("[data-source]").get_attribute("data-source") == "medicine_v2"
+    panel.locator("[data-source-change]").click()
     panel.get_by_label("source").fill("medicine_v1")
     set_name(page, "Omar")
     before = len(eb.load_bank(root / "exam").get(topic, []))
@@ -327,9 +337,10 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     assert withheld and not any(q[:60] in html for q in withheld)
     # commit, and the bank on disk holds his records under his name
     panel.locator("button[data-commit='import']").click()
-    page.wait_for_selector("[data-action-ok='eximport']", timeout=30000)
+    page.wait_for_selector("[data-toast='import']", timeout=30000)
+    assert "Imported 100" in page.locator("[data-toast='import']").text_content()
     said = page.locator("[data-action-ok='eximport']").text_content()
-    assert "Imported 100" in said and "report" in said and "diagnose" in said
+    assert "report" in said and "diagnose" in said
     bank = eb.load_bank(root / "exam")[topic]
     mine = [r for r in bank if r.get("source") == "medicine_v1"]
     assert len(mine) == 100
@@ -593,6 +604,17 @@ def test_a_topic_on_the_shared_rubric_says_so_on_both_boards(live, page):
     assert page.errors == []
 
 
+def make_stale(root):
+    """The bank one step ahead of the harness tasks: what a judged run in
+    progress leaves behind when an import could not rebuild them."""
+    import os
+    import time as _t
+    import exam_build as eb
+    earlier = _t.time() - 3600
+    for p in eb.tasks_dir(root / "exam").glob("exam_*.jsonl"):
+        os.utime(p, (earlier, earlier))
+
+
 def test_a_button_that_calls_the_api_says_what_happened(live, page):
     """The rebuild button answered "refused: 500" in small grey text under
     itself, which the person read as "nothing happens" — and behind it was a
@@ -600,9 +622,11 @@ def test_a_button_that_calls_the_api_says_what_happened(live, page):
     is working, says what happened, and on a refusal says what the SERVER
     said."""
     base = live["base"]
+    make_stale(live["root"])                     # 9c-4: the button shows only when needed
     page.goto(base + "/#tab=exam")
     page.wait_for_selector("[data-action='exbuild']")
     btn = page.locator("[data-action='exbuild']")
+    assert btn.text_content() == "Make new questions sittable"
     # the refusal: the server's own sentence, in the error style, not a status
     page.route("**/api/exam/build", lambda route: route.fulfill(
         status=500, content_type="application/json",
@@ -617,11 +641,11 @@ def test_a_button_that_calls_the_api_says_what_happened(live, page):
     # and the success: what was built, where, in a line a person can read
     page.unroute("**/api/exam/build")
     btn.click()
-    page.wait_for_selector("[data-action-ok='exbuild']", timeout=30000)
-    ok = page.locator("[data-action-ok='exbuild']").text_content()
-    assert "Built" in ok and "task" in ok
-    assert "exam_" not in ok                     # topic names, not task ids
-    assert "medicine & health (" in ok or "law (" in ok
+    # the success is a toast in words (9c-1), and the button goes: nothing is stale
+    page.wait_for_selector("[data-toast='build']", timeout=30000)
+    ok = page.locator("[data-toast='build']").text_content()
+    assert "can be sat now" in ok and "exam_" not in ok
+    page.wait_for_selector("[data-action='exbuild']", state="detached", timeout=30000)
     assert page.locator("[data-action-error='exbuild']").count() == 0
     # the 500 we injected is the only thing the console should have to say
     assert all("500" in e for e in page.errors), page.errors
@@ -629,6 +653,7 @@ def test_a_button_that_calls_the_api_says_what_happened(live, page):
 
 def test_a_button_that_is_working_says_so_and_cannot_be_pressed_twice(live, page):
     base = live["base"]
+    make_stale(live["root"])
     page.goto(base + "/#tab=exam")
     page.wait_for_selector("[data-action='exbuild']")
     # hold the request open: the button must say it is working meanwhile
@@ -639,8 +664,8 @@ def test_a_button_that_is_working_says_so_and_cannot_be_pressed_twice(live, page
     assert btn.inner_text().strip() == "working…"
     assert btn.is_disabled()
     assert page.locator("[data-action-busy='exbuild']").count() == 1
-    page.wait_for_selector("[data-action-ok='exbuild']", timeout=30000)
-    assert btn.is_disabled() is False
+    page.wait_for_selector("[data-toast='build']", timeout=30000)
+    assert page.locator("[data-action-busy='exbuild']").count() == 0
     page.unroute("**/api/exam/build")
     assert page.errors == []
 
@@ -730,10 +755,12 @@ def test_a_refusal_replaces_the_last_success_rather_than_sitting_under_it(live, 
     panel.get_by_role("button", name="Preview").click()
     page.wait_for_selector("[data-action-ok='eximport']", timeout=30000)
     panel.locator("button[data-commit='import']").click()
+    # the answer is a toast (9c-1), and under the button what it did to the halves
+    page.wait_for_selector("[data-toast='import']", timeout=30000)
+    assert "Imported 100" in page.locator("[data-toast='import']").text_content()
     page.wait_for_function(
         "() => (document.querySelector(\"[data-action-ok='eximport']\") || {}).textContent"
-        "?.startsWith('Imported')", timeout=30000)
-    assert "Imported 100" in panel.locator("[data-action-ok='eximport']").text_content()
+        "?.startsWith('report')", timeout=30000)
     # then one the server refuses: the success must be gone, not above it
     upload(page, "questions file", "broken.json", "application/json", '{"a": [], "b": []}')
     # the file's onchange is async (it reads the file), so wait for the answer
@@ -762,15 +789,15 @@ def test_the_page_imports_the_wrapped_file_the_author_sent(live, page):
     upload(page, "questions file", "physics_engineering_v1.json", "application/json",
            PHYSICS_FILE.read_text(encoding="utf-8"))
     panel.get_by_label("topic").select_option("physics & engineering")
-    panel.get_by_label("source").fill("physics_engineering_v1")
+    # the file's own name is the source already — nothing to type
+    assert panel.locator("[data-source]").get_attribute("data-source") == "physics_engineering_v1"
     panel.get_by_role("button", name="Preview").click()
     page.wait_for_selector("[data-action-ok='eximport']", timeout=30000)
     said = panel.locator("[data-action-ok='eximport']").text_content()
     assert "Read 100 questions" in said and 'from "questions" in the file' in said
     panel.locator("button[data-commit='import']").click()
-    page.wait_for_function(
-        "() => (document.querySelector(\"[data-action-ok='eximport']\") || {}).textContent"
-        "?.startsWith('Imported')", timeout=30000)
+    page.wait_for_selector("[data-toast='import']", timeout=30000)
+    assert "Imported 100 questions" in page.locator("[data-toast='import']").text_content()
     mine = [r for r in eb.load_bank(root / "exam")["physics & engineering"]
             if r.get("source") == "physics_engineering_v1"]
     assert len(mine) == 100

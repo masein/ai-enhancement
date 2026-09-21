@@ -1984,6 +1984,49 @@ button.info:hover, button.info[aria-expanded="true"] { color:var(--accent); back
   font-size:12.5px; font-weight:400; color:var(--text-secondary); line-height:1.5;
   box-shadow:0 10px 28px rgba(0,0,0,.16); white-space:normal; }
 .infopop[hidden] { display:none; }
+/* ---- phase 9c: every action answers, every table fits ---- */
+.toasts { position:fixed; right:18px; bottom:18px; z-index:80; display:flex; flex-direction:column;
+  gap:8px; align-items:flex-end; max-width:min(440px, calc(100vw - 36px)); }
+.toast { display:flex; gap:10px; align-items:center; background:var(--text-primary);
+  color:var(--plane); border-radius:10px; padding:10px 12px 10px 14px; font-size:13px;
+  box-shadow:0 10px 28px rgba(0,0,0,.25); }
+.toast a, .toast button.quiet { color:var(--plane); font-weight:600; text-decoration:underline; }
+.toast button.quiet:hover { background:rgba(255,255,255,.12); }
+.toast .xbtn { color:var(--plane); opacity:.7; }
+button.danger { background:var(--critical); border-color:var(--critical); color:#fff; font-weight:600; }
+td.rowacts { white-space:nowrap; }
+.frm.fields { align-items:flex-end; }
+.fld { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.fld-label { font-size:11.5px; font-weight:600; color:var(--text-secondary); }
+.fld-text { font-size:13px; padding:5px 0; }
+/* the Leaderboard: the model column stays put, the score sits over its error */
+table.lb th.model, table.lb td.model { position:sticky; left:0; z-index:1;
+  background:var(--surface-1); box-shadow:1px 0 0 var(--grid); }
+table.lb td.num .se { display:block; font-size:10.5px; line-height:1.15; }
+table.lb.dense td { padding-top:2px; padding-bottom:2px; }
+table.lb th.cmp { text-align:center; }
+table.lb thead tr:first-child th.sortable:not(.model) { white-space:normal; vertical-align:bottom; }
+tr.duprow td { background:var(--plane); }
+tr.duprow td.model { background:var(--plane); padding-left:22px; }
+button.duptoggle { display:inline; padding:0 4px; font-size:11.5px; }
+details.colmenu { position:relative; display:inline-block; }
+details.colmenu > summary { list-style:none; cursor:pointer; }
+details.colmenu > summary::-webkit-details-marker { display:none; }
+.colmenu-list { position:absolute; z-index:40; top:calc(100% + 4px); left:0; min-width:220px;
+  display:flex; flex-direction:column; gap:3px; padding:10px 12px; background:var(--surface-1);
+  border:1px solid var(--border); border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,.16); }
+/* Provenance: long ids wrap, the model column stays */
+table.prov th, table.prov td { white-space:normal; font-size:12px; padding:5px 6px; }
+table.prov th { text-transform:none; letter-spacing:0; }
+table.prov td .mono, table.prov td { overflow-wrap:anywhere; }
+table.prov th.model, table.prov td.model, table.prov th:first-child { position:sticky; left:0;
+  background:var(--surface-1); z-index:1; box-shadow:1px 0 0 var(--grid); }
+/* the model page: caveats on one line */
+.caveats { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:10px 0; }
+.caveats .badge { margin:0; }
+details.caveat-why { display:inline-block; }
+details.caveat-why > summary { cursor:pointer; color:var(--accent); font-size:12.5px; }
+details.caveat-why[open] { display:block; flex-basis:100%; }
 @media print { .filters, .tabs, button { display:none !important; }
   .view { display:block !important; } body { background:#fff; } }
 """
@@ -2031,7 +2074,7 @@ const state = {
   mdl: { q: '', kind: 'all', src: 'all', family: 'all', judgedOnly: false,
          taintedOnly: false, prelimOnly: false, sort: { key: 'avg', dir: -1 } },  // Models tab
   rvName: '',                          // the name approvals are recorded under (remembered)
-  sub: { hf_id: '', kind: 'auto', suite: 'full', submitter: '', note: '' },  // Submit form
+  sub: { hf_id: '', kind: 'auto', suite: 'full', submitter: '', note: '', tasks: null },  // Submit form
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
   // focus from filter inputs and kill slider drags
@@ -2054,6 +2097,9 @@ function el(tag, attrs = {}, ...kids) {
   return e;
 }
 const pct  = (v, d = 1) => v == null ? '—' : (100 * v).toFixed(d) + '%';
+// "qwen35-d…-step945": the start and the end of a long name, never just the start
+const midTrunc = (s, n) => s.length <= n ? s
+  : s.slice(0, Math.ceil((n - 1) * 0.45)) + '…' + s.slice(s.length - Math.floor((n - 1) * 0.55));
 const num  = (v, d = 3) => v == null ? '—'
   : (+v).toFixed(d).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
 const P    = v => v == null ? '—' : v >= 995e6 ? (v / 1e9).toFixed(v % 1e9 ? 1 : 0) + 'B'
@@ -2127,6 +2173,16 @@ const anyCk = () => DATA.models.some(m => m.source === 'artifact');
 // the one number allowed to rank models, or null. Preliminary models have no
 // average at all — not a smaller one — so every ranking view drops them.
 const officialAvg = m => state.avgMode === 'raw' ? m.avgRaw : m.avg;
+
+// when this model was last evaluated — a judged run counts. SmolLM2-360M was
+// judged on 09-21 and the Models tab said 09-20
+function lastEval(m) {
+  const judged = Math.max(0, ...Object.values((m.judge || {}).tasks || {})
+    .map(t => t.judged_at || 0));
+  const ran = m.date ? Date.parse(String(m.date)) / 1000 : 0;
+  const t = Math.max(judged, isNaN(ran) ? 0 : ran);
+  return t ? new Date(t * 1000).toISOString().slice(0, 16) : (m.date || null);
+}
 
 const ord = n => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
                    return n + (s[(v - 20) % 10] || s[v] || s[0]); };
@@ -2205,7 +2261,7 @@ function modelSentence(m) {
   });
   if (atChance.length)
     out.push(`Not statistically above chance on ${few(atChance)}.`);
-  if (m.date) out.push(`Last evaluated ${String(m.date).slice(0, 10)}.`);
+  if (lastEval(m)) out.push(`Last evaluated ${String(lastEval(m)).slice(0, 10)}.`);
   return out.join(' ');
 }
 // the same run submitted twice: both rows stay, one rank. Naming the row it
@@ -2432,11 +2488,13 @@ function barPanel(task, models, opts) {
     // 18, not 22: at 11.5px a 22-character id runs past the panel's left edge and
     // the first letters are simply cut off. The full id is on hover and in the
     // row tooltip, so the gutter is the constraint, not the information.
-    const name = m.name.length > 18 ? m.name.slice(0, 17) + '…' : m.name;
+    // cut in the MIDDLE: "qwen35-delta-moe-…" named both checkpoints of one
+    // run identically; their difference is at the end of the name
+    const name = midTrunc(m.name, 18);
     svg.append(el('svg:text', { x: LBL - 8, y: y + BH * 0.75, 'font-size': 11.5,
       fill: dim ? 'var(--muted)' : 'var(--text-secondary)', 'text-anchor': 'end', class: 'blab',
-      'data-model': m.id, text: name },
-      el('svg:title', { text: m.id })));
+      'data-model': m.id, 'data-full-name': m.name, text: name },
+      el('svg:title', { text: m.name === m.id ? m.id : `${m.name}\n${m.id}` })));
     svg.append(el('svg:path', { class: 'bar', 'data-model': m.id,
       d: barPath(base, vx, y, BH),
       opacity: dim ? 0.45 : null,
@@ -3051,49 +3109,64 @@ function vJudged(m) {
       + 'single answers, never pairwise. Length is in the rubric and reported below; a '
       + 'thirty-script canary is re-graded every run so a change to the model behind the id '
       + 'would show.' }));
-  card.append(el('p', { class: ok ? 'note' : 'warn' },
+  // up to five paragraphs of caveats stood above the first number; now one
+  // line of badges, and the words behind "why?"
+  const caveats = [], why = el('div', { class: 'caveat-text' });
+  const caveat = (label, para, attrs = {}) => {
+    caveats.push(el('span', { class: 'badge taint', ...attrs, text: label }));
+    why.append(para);
+  };
+  const standing = el('p', { class: ok ? 'note' : 'warn', 'data-judge-state': ok ? 'counts' : 'prelim' },
     el('b', { text: ok ? 'Counts. ' : 'Preliminary. ' }),
     cal ? `Cohen's κ ${cal.kappa} against a human grader over ${cal.n} answers `
         + `(line at ${J.kappaMin})` + (cal.judge_id ? `, for judge ${cal.judge_id}` : '') + '. '
-        : 'No calibration on file for this judge (scripts/judge_calibrate.py). ',
+        : 'No calibration on file for this judge yet. ',
     ok ? 'Topic scores may enter the separate judged average; they never enter the '
        + 'multiple-choice average.'
        : st.reasons.length ? 'Shown, never ranked, never averaged: ' + st.reasons.join('; ') + '.'
-       : 'Shown, never ranked, never averaged.'));
+       : 'Shown, never ranked, never averaged.');
+  if (ok) card.append(standing);
+  else caveat(cal ? 'below the κ line' : 'not calibrated', standing, { 'data-caveat': 'calibration' });
   const j = m.judge;
   if (!j) { card.append(note('Not judged: this model has no judge.json on file. Submit it with '
     + 'suite=judged, or run scripts/judge.py over its fr_* answers.')); return card; }
   if (j.skipped) { card.append(note(j.skipped + '. A judge scores its own family higher; the '
     + 'cell stays empty rather than flattering.')); return card; }
-  if (j.judge.stub) card.append(el('p', { class: 'warn', text: 'Graded by the STUB grader — a '
-    + 'word-overlap stand-in for plumbing tests. Not a judgement of anything.' }));
-  if (prov) card.append(el('p', { class: 'warn', 'data-provisional': 'judge' },
+  if (j.judge.stub) caveat('stub grader', el('p', { class: 'warn', text: 'Graded by the STUB grader — a '
+    + 'word-overlap stand-in for plumbing tests. Not a judgement of anything.' }), { 'data-caveat': 'stub' });
+  if (prov) caveat('provisional', el('p', { class: 'warn', 'data-provisional': 'judge' },
     el('b', { text: 'Provisional. ' }),
     `${upFirst(j.judge.provisional_reason || 'graded by a local model — not a pinned benchmark')}: `
     + `${j.judge.served_model || j.judge.model} at ${j.judge.base_url || 'a local server'}`
     + (j.judge.weights ? ` (weights ${j.judge.weights})` : '')
     + '. A local server\'s model id is whatever was typed at launch, so these scores are shown '
-    + 'greyed, never ranked and never in any average.'));
+    + 'greyed, never ranked and never in any average.'), { 'data-caveat': 'provisional' });
   // a rubric is an instrument: one its author has not signed off yet grades,
   // but it does not settle anything, and deleting DRAFT from its heading
   // changes its sha — which is the point, a different rubric is a different
   // instrument and before/after across the change do not compare
-  if (j.judge.rubric_status === 'draft') card.append(el('p', { class: 'warn',
+  if (j.judge.rubric_status === 'draft') caveat('draft rubric', el('p', { class: 'warn',
     'data-rubric': 'draft' }, el('b', { text: 'Draft rubric. ' }),
     `${(j.judge.rubrics_draft || []).map(frName).join(', ') || 'a topic'} is graded against a `
     + 'rubric its author has not signed off yet, so its scores are a reading, not a result. '
     + 'Sign-off is recorded by removing DRAFT from the rubric\'s heading, which changes its '
-    + 'sha: scores from before and after do not compare.'));
-  if (j.judge.single_provider_loop) card.append(el('p', { class: 'warn', text: 'Single-provider '
-    + 'loop: the judge shares a provider with the exam writer or the generator. Every score here '
-    + 'carries that caveat — a judge scores its own family higher.' }));
+    + 'sha: scores from before and after do not compare.'), { 'data-caveat': 'draft' });
+  if (j.judge.single_provider_loop) caveat('single provider', el('p', { class: 'warn',
+    text: 'Single-provider loop: the judge shares a provider with the exam writer or the '
+    + 'generator. Every score here carries that caveat — a judge scores its own family higher.' }),
+    { 'data-caveat': 'single-provider' });
   const cn = j.canary;
-  if (cn) card.append(el('p', { class: cn.drifted ? 'warn' : 'small', 'data-canary': cn.drifted ? 'drifted' : 'steady' },
+  const canaryPara = cn && el('p', { class: cn.drifted ? 'warn' : 'small', 'data-canary': cn.drifted ? 'drifted' : 'steady' },
     el('b', { text: cn.drifted ? 'Canary moved. ' : 'Canary steady. ' }),
     `${cn.graded} of ${cn.n} fixed scripts re-graded: mean absolute deviation `
     + `${cn.mad_vs_human} from the human marks` + (cn.mad_vs_previous != null
       ? `, ${cn.mad_vs_previous} from the previous run (limit ${cn.threshold})` : ', first run for this judge')
-    + (cn.drifted ? ' — the judge is not the judge it was; these scores are preliminary.' : '.')));
+    + (cn.drifted ? ' — the judge is not the judge it was; these scores are preliminary.' : '.'));
+  if (cn && cn.drifted) caveat('canary moved', canaryPara, { 'data-caveat': 'canary' });
+  // the whole list of caveats is one line; their words are one click away
+  if (caveats.length) card.append(el('div', { class: 'caveats', 'data-caveats': String(caveats.length) },
+    ...caveats, el('details', { class: 'caveat-why' }, el('summary', { text: 'why?' }), why)));
+  if (cn && !cn.drifted) card.append(canaryPara);
 
   // per topic, weakest first, on the REPORT half — the diagnose half is never the score
   const cats = J.exam.filter(t => j.tasks[t] && pubScore(j.tasks[t]) != null)
@@ -3156,8 +3229,18 @@ function vJudged(m) {
           el('td', { class: 'num', text: num(s, 2) })))))));
     }
     // a topic graded criterion by criterion: what it was weak AT, the
-    // critical failures in words, and the acuity the failures fell on
-    for (const t of cats) {
+    // critical failures in words, and the acuity the failures fell on — one
+    // topic at a time, picked with a segmented control. Every topic stacked
+    // made a 14,443 px page for a model judged on two.
+    const crit = cats.filter(t => j.tasks[t].criteria_mean);
+    const pick = crit.includes((state.mdlTopic || {})[m.id]) ? state.mdlTopic[m.id] : crit[0];
+    if (crit.length > 1) card.append(el('div', { class: 'ctrl', style: 'margin-top:14px' },
+      el('span', { class: 'small', text: 'topic' }),
+      el('div', { class: 'seg', role: 'group', 'aria-label': 'judged topic', 'data-topic-switch': '1' },
+        crit.map(t => el('button', { 'aria-pressed': String(t === pick), 'data-topic-pick': t,
+          text: frName(t), onclick: () => { state.mdlTopic = state.mdlTopic || {};
+            state.mdlTopic[m.id] = t; render(); } })))));
+    for (const t of crit.filter(t => t === pick)) {
       const v = j.tasks[t];
       if (!v.criteria_mean) continue;
       const labels = v.criteria_labels || {};
@@ -3404,10 +3487,10 @@ function vModel() {
         a.active_params ? `${P(a.active_params)} active · ${a.experts} experts, `
                         + `${a.experts_per_tok}/token (${a.active_src})`
                         : (m.paramsSrc ? 'from ' + m.paramsSrc : null)),
-      tile('Training compute', comp ? flop(comp.c) + ' FLOP' : 'Unknown',
-        comp ? `6ND · N ${P(comp.N)} ${comp.nsrc} · D ${fmtCount(comp.D)} tokens `
-             + `(run ${comp.run.name})`
-             : 'no tracked training run supplies a token count for this model'),
+      // unknown is the usual answer for a Hub model; a tile saying so is noise
+      comp ? tile('Training compute', flop(comp.c) + ' FLOP',
+        `6ND · N ${P(comp.N)} ${comp.nsrc} · D ${fmtCount(comp.D)} tokens (run ${comp.run.name})`)
+        : '',
       tile(state.avgMode === 'raw' ? 'Average (raw)' : 'Average (above chance)',
         avg != null ? pct(avg) : '—',
         r ? `${ord(r.n)} of ${r.of} ranked` : `preliminary · ${m.nhave}/${m.nreq} required`),
@@ -3461,7 +3544,7 @@ function vModel() {
     ['kind decided by', m.kindReason], ['seed', m.seed], ['limit', m.limit],
     ['model code', (a.code_sha || []).join(', ')],
     ['eval wall clock', m.minutes != null ? m.minutes + ' min' : null],
-    ['last evaluated', m.date],
+    ['last evaluated', lastEval(m)],
   ].filter(([, v]) => v != null && v !== '' && v !== false);
   const provCard = el('div', { class: 'card' },
     el('h2', { text: 'Provenance' }),
@@ -3777,7 +3860,12 @@ function actButton(slot, label, run, attrs = {}) {
     text: a.busy ? 'working…' : label,
     onclick: async () => {
       a.busy = true; a.ok = ''; a.err = ''; render();
-      try { a.ok = (await run()) || 'done.'; }
+      try {
+        const out = await run();
+        // {toast, …}: the answer is a toast, and nothing is left under the button
+        if (out && typeof out === 'object') { toast(out.toast, out); a.ok = out.line || ''; }
+        else a.ok = out || 'done.';
+      }
       catch (e) { a.err = String((e && e.message) || e); }
       finally { a.busy = false; render(); }
     } }));
@@ -3792,6 +3880,32 @@ function actNote(slot) {
   if (a.ok) return el('p', { class: 'note', 'data-action-ok': slot, text: a.ok });
   return '';
 }
+
+// ---------------------------------------------------------------------------
+// A toast: every action that changes something says so — bottom-right, four
+// seconds, a polite live region, and a link to where the thing went. Errors
+// stay inline, next to the control that caused them. A toast that carries a
+// button stays long enough to press it.
+// ---------------------------------------------------------------------------
+function toast(text, opts = {}) {
+  let box = document.getElementById('toasts');
+  if (!box) {
+    box = el('div', { id: 'toasts', class: 'toasts', role: 'status', 'aria-live': 'polite' });
+    document.body.append(box);
+  }
+  const t = el('div', { class: 'toast', 'data-toast': opts.key || '1' },
+    el('span', { class: 'toast-text', text }),
+    opts.go ? el('a', { href: opts.href || '#', 'data-toast-link': '1', text: opts.link || 'open',
+      onclick: e => { e.preventDefault(); t.remove(); opts.go(); } }) : '',
+    opts.action ? el('button', { class: 'quiet', 'data-toast-action': '1', text: opts.action.label,
+      onclick: async () => { t.remove(); await opts.action.run(); } }) : '',
+    el('button', { class: 'xbtn', 'aria-label': 'dismiss', text: '×', onclick: () => t.remove() }));
+  box.append(t);
+  setTimeout(() => t.remove(), opts.ms || (opts.action ? 15000 : 4000));
+  return t;
+}
+const goQueue = () => navigate({ tab: 'queue', topic: null, model: null });
+const goReview = () => { state.rv.loaded = false; navigate({ tab: 'review', topic: null, model: null }); };
 
 // ---------------------------------------------------------------------------
 // ⓘ beside a card's title: the long explanation, one click away, instead of a
@@ -4178,14 +4292,10 @@ function normScore(t, v) {
 const CMP_MAX = 5;
 
 // the compared set: explicit ticks, else the top few by average
+// what the radar draws: the models someone ticked, and none until they do —
+// five pre-ticked boxes read as a choice the page had made for you
 function cmpEffective(ms) {
-  if (state.cmpSel.length) return state.cmpSel.filter(id => ms.some(m => m.id === id));
-  // prefer official models; fall back to partial averages so a report with no
-  // official result still shows a profile rather than an empty card
-  return [...ms].filter(m => m.partialAvg != null)
-    .sort((a, b) => (officialAvg(b) ?? -1) - (officialAvg(a) ?? -1)
-                 || b.partialAvg - a.partialAvg)
-    .slice(0, CMP_MAX).map(m => m.id);
+  return state.cmpSel.filter(id => ms.some(m => m.id === id));
 }
 function cmpToggle(id, ms) {
   if (!state.cmpSel.length) {        // first tick: materialize the default so it edits intuitively
@@ -4212,6 +4322,10 @@ function radarCard(ms) {
   const axes = radarAxes();
   if (axes.length < 3) return null;
   const ids = cmpEffective(ms);
+  if (!ids.length) return el('div', { class: 'card', 'data-radar-prompt': '1' },
+    el('h2', { text: 'Capability profile' }),
+    el('p', { class: 'small', text: `Tick up to ${CMP_MAX} models in the compare column above `
+      + 'to draw their profiles here — one axis per benchmark, one shape per model.' }));
   const series = ids.map((id, i) => {
     const m = DATA.models.find(x => x.id === id);
     const slot = state.cmpSel.length ? state.cmpColors[id] : i;
@@ -4392,6 +4506,7 @@ const MCOLS = [
 
 function mdlValue(m, key) {
   if (key === 'avg') return officialAvg(m);
+  if (key === 'date') return lastEval(m);
   if (key === 'judged') return m.judge ? Object.keys(m.judge.tasks || {}).length : 0;
   if (key === 'params') return m.params || 0;
   return m[key];
@@ -4497,7 +4612,7 @@ function vModels() {
                 (m.judgeState && m.judgeState.ok) ? '' : el('span', { class: 'badge taint',
                   title: ((m.judgeState || {}).reasons || []).join('; '), text: 'not ranked' }))
             : el('span', { class: 'se', text: '—' })),
-          el('td', { class: 'small se', text: m.date ? String(m.date).slice(0, 10) : '—' }),
+          el('td', { class: 'small se', text: lastEval(m) ? String(lastEval(m)).slice(0, 10) : '—' }),
           el('td', {}, (m.tainted || []).length ? el('span', { class: 'badge taint',
             title: 'trained on data derived from ' + m.tainted.map(frName).join(', '),
             text: 'tainted' }) : '',
@@ -4510,8 +4625,8 @@ function vModels() {
 function vLeaderboard(ms) {
   const cmpSet = new Set(cmpEffective(ms));
   const cols = [
-    { key: 'cmp',    label: '', nosort: true },
     { key: 'name',   label: 'Model',  num: false },
+    { key: 'cmp',    label: 'compare', nosort: true },
     { key: 'params', label: 'Params', num: true },
     { key: 'avg',    label: 'Avg',    num: true },
     ...DATA.accTasks.map(t => ({ key: t, label: t, num: true, task: t })),
@@ -4528,6 +4643,12 @@ function vLeaderboard(ms) {
       : []),
     { key: 'date', label: 'Last eval', num: false },   // when its newest task ran
   ];
+  // at most six task columns unless someone asks for more: 1,923 px in a
+  // 1,234 px card was the table the tab is named after
+  const allTaskCols = cols.filter(c => c.task || c.judged);
+  const shownTasks = lbShownTasks(allTaskCols);
+  const nHidden = allTaskCols.length - shownTasks.size;
+  const visCols = cols.filter(c => !(c.task || c.judged) || shownTasks.has(c.key));
   const jval = (m, c) => !(m.judgeState && m.judgeState.ok) ? null : c.judged === 'avg' ? m.judgedAvg
     : (m.tainted || []).includes(c.judged) ? null      // shown on the page, never ranked here
     : (((m.judge || {}).tasks || {})[c.judged] ? pubScore(m.judge.tasks[c.judged]) : null);
@@ -4544,11 +4665,18 @@ function vLeaderboard(ms) {
   });
   // ranked rows first, whatever the sort: a preliminary model's per-task
   // numbers are valid, and it is still not on the ladder
-  const lbAll = [...sorted.filter(m => officialAvg(m) != null),
-                 ...sorted.filter(m => officialAvg(m) == null)];
+  const ordered = [...sorted.filter(m => officialAvg(m) != null),
+                   ...sorted.filter(m => officialAvg(m) == null)];
+  // a duplicate folds under its twin — "1 duplicate ▸" — instead of taking a
+  // row of its own, often the first one
+  const dupsOf = {};
+  for (const m of ordered)
+    if (m.duplicateOf && ordered.some(x => x.id === m.duplicateOf))
+      (dupsOf[m.duplicateOf] = dupsOf[m.duplicateOf] || []).push(m);
+  const lbAll = ordered.filter(m => !(m.duplicateOf && dupsOf[m.duplicateOf]));
   const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
                                                             state.src, state.avgMode]));
-  const rows = lbPg.rows;
+  const rows = lbPg.rows.flatMap(m => [m, ...((state.lbDupOpen || {})[m.id] ? dupsOf[m.id] || [] : [])]);
   // best per column (max for accuracy/avg, min for perplexity). Perplexity has
   // NO standard error from the harness, so a 0.001 lead is not a win: values
   // within a tie band of the leader are all marked tied (≈) instead. The band
@@ -4571,8 +4699,9 @@ function vLeaderboard(ms) {
     return s.length > 1 ? 'mixed!' : s.length ? s[0] + '-shot' : '';
   };
   const thead = el('thead', {},
-    el('tr', {}, cols.map(c => c.nosort
-      ? el('th', { title: 'tick to compare in the capability profile above', text: '' })
+    el('tr', {}, visCols.map(c => c.nosort
+      ? el('th', { class: 'cmp', title: 'tick up to five to draw their profiles below',
+          text: 'compare' })
       : el('th', {
       class: (c.num ? 'num ' : '') + 'sortable' + (c.key === 'name' ? ' model' : '')
            + (c.judged ? ' judged' : '')
@@ -4587,13 +4716,18 @@ function vLeaderboard(ms) {
         dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
         render(); },
       'aria-sort': state.sort.key === c.key ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none' },
-      c.label + ' ', state.sort.key === c.key
+      // a task name may break after an underscore: "arc_challenge" and
+      // "winogrande" were the widest things in the table
+      ...(c.task ? String(c.label).split('_').flatMap((w, i, a) =>
+            i < a.length - 1 ? [w + '_', el('wbr')] : [w]) : [c.label]), ' ',
+      state.sort.key === c.key
         ? el('span', { class: 'dir', text: state.sort.dir > 0 ? '▲' : '▼' }) : ''))),
-    el('tr', {}, cols.map(c => el('th', {
+    el('tr', {}, visCols.map(c => el('th', {
       class: (c.num ? 'num' : '') + (c.key === 'name' ? ' model' : ''),
       text: c.judged ? 'rubric 0–4' : c.task ? (c.lower ? DATA.tasks[c.task].metric : shotOf(c.task)) : '' }))));
-  const tbody = el('tbody', {}, rows.map(m => el('tr', {},
-    cols.map(c => {
+  const tbody = el('tbody', {}, rows.map(m => el('tr', {
+      class: m.duplicateOf && dupsOf[m.duplicateOf] ? 'duprow' : null, 'data-lb-row': m.id },
+    visCols.map(c => {
       if (c.key === 'cmp') return el('td', {}, el('input', { type: 'checkbox',
         'aria-label': 'compare ' + m.name, checked: cmpSet.has(m.id) ? '' : null,
         onchange: () => cmpToggle(m.id, ms) }));
@@ -4606,6 +4740,11 @@ function vLeaderboard(ms) {
         // the Back button all work for free because the view lives in the URL
         el('a', { class: 'mname mlink', text: m.name,
                   href: '#model=' + encodeURIComponent(m.id) }),
+        dupsOf[m.id] ? el('button', { class: 'quiet duptoggle', 'data-dup-toggle': m.id,
+          'aria-expanded': String(!!(state.lbDupOpen || {})[m.id]),
+          text: `${dupsOf[m.id].length} duplicate ${(state.lbDupOpen || {})[m.id] ? '▾' : '▸'}`,
+          onclick: e => { e.preventDefault(); state.lbDupOpen = state.lbDupOpen || {};
+            state.lbDupOpen[m.id] = !state.lbDupOpen[m.id]; render(); } }) : '',
         ckBadge(m) || (m.kind === 'instruct'
           ? el('span', { class: 'badge instruct', text: 'instruct' })
           : el('span', { class: 'badge', text: 'base' })),
@@ -4622,7 +4761,8 @@ function vLeaderboard(ms) {
           a.active_params ? el('span', { class: 'se', text: ` ${P(a.active_params)} act` }) : '');
       }
       if (c.key === 'date') return el('td', { class: 'small', style: 'white-space:nowrap',
-        text: String(m.date || '—').slice(0, 16).replace('T', ' ') });
+        title: String(lastEval(m) || '').replace('T', ' '),
+        text: String(lastEval(m) || '—').slice(0, 10) });
       if (c.key === 'avg') {
         const a = officialAvg(m);
         if (a == null) return el('td', { class: 'num' },
@@ -4661,7 +4801,7 @@ function vLeaderboard(ms) {
           ? 'tied for best — perplexity carries no standard error here, so a lead '
             + 'this small is not a difference' : '' },
         c.lower ? num(cc.v, 3) : pct(cc.v),
-        cc.se && !c.lower ? el('span', { class: 'se', text: ` ±${(100 * cc.se).toFixed(1)}` }) : '');
+        cc.se && !c.lower ? el('span', { class: 'se', text: `±${(100 * cc.se).toFixed(1)}` }) : '');
     }))));
   const nOff = ms.filter(m => m.official).length;
   // the table first: it is what the tab is named after and what most visits
@@ -4694,8 +4834,18 @@ function vLeaderboard(ms) {
         text: 'shade every score by how far it is from chance — useful once the '
             + 'table is taller than the screen' })),
     lbViewCtrl(ms),
+    state.lbView === 'cats' ? '' : el('div', { class: 'ctrl', style: 'margin:2px 0 6px' },
+      lbColumnsMenu(allTaskCols, shownTasks),
+      nHidden ? el('span', { class: 'count-note', 'data-hidden-tasks': String(nHidden),
+        text: `${nHidden} task${nHidden > 1 ? 's' : ''} hidden` }) : '',
+      el('span', { class: 'small', style: 'margin-left:12px', text: 'Rows' }),
+      el('div', { class: 'seg', role: 'group', 'aria-label': 'row density' },
+        [[false, 'comfortable'], [true, 'compact']].map(([v, l]) =>
+          el('button', { 'aria-pressed': String(!!state.lbDense === v), text: l,
+            onclick: () => { state.lbDense = v; render(); } })))),
     state.lbView === 'cats' ? lbCategoryTable(ms)
-      : [lbPg.pager, el('div', { class: 'lb-wrap' }, el('table', { class: 'lb' }, thead, tbody))]),
+      : [lbPg.pager, el('div', { class: 'lb-wrap' }, el('table', {
+          class: 'lb' + (state.lbDense ? ' dense' : ''), 'data-lb-table': '1' }, thead, tbody))]),
     radarCard(ms) || '',
     aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
 }
@@ -4707,10 +4857,48 @@ function vLeaderboard(ms) {
 // column comes from — so nothing here is a diagnosis-half claim.
 const mmluCats = m => ((((m.diag || {}).tasks || {}).mmlu || {}).categories) || null;
 
+// which task columns show: remembered per browser; by default the required
+// tasks, then the rest, six at most
+function lbShownTasks(taskCols) {
+  const keys = taskCols.map(c => c.key);
+  let want = null;
+  try { want = JSON.parse(localStorage.getItem('bench-lb-shown') || 'null'); } catch (e) { /* none */ }
+  if (state.lbShown) want = state.lbShown;
+  if (!Array.isArray(want)) {
+    const req = (DATA.required || []).filter(t => keys.includes(t));
+    want = [...req, ...keys.filter(k => !req.includes(k))].slice(0, 6);
+  }
+  return new Set(want.filter(k => keys.includes(k)));
+}
+
+function lbColumnsMenu(taskCols, shown) {
+  const save = next => {
+    state.lbShown = next;
+    try { localStorage.setItem('bench-lb-shown', JSON.stringify(next)); } catch (e) { /* private mode */ }
+    render();
+  };
+  return el('details', { class: 'colmenu', 'data-columns-menu': '1',
+      open: state.lbColsOpen ? '' : null, ontoggle: e => { state.lbColsOpen = e.target.open; } },
+    el('summary', { class: 'btn', text: 'Columns ▾' }),
+    el('div', { class: 'colmenu-list' },
+      el('div', { class: 'small se', text: 'task columns to show' }),
+      taskCols.map(c => el('label', { class: 'small' },
+        el('input', { type: 'checkbox', 'data-column': c.key, checked: shown.has(c.key) ? '' : null,
+          onchange: e => save(e.target.checked ? [...shown, c.key]
+                                               : [...shown].filter(k => k !== c.key)) }),
+        ' ' + c.label)),
+      el('div', { class: 'frm' },
+        el('button', { class: 'quiet', text: 'show all', onclick: () => save(taskCols.map(c => c.key)) }),
+        el('button', { class: 'quiet', text: 'the default six', onclick: () => {
+          state.lbShown = null;
+          try { localStorage.removeItem('bench-lb-shown'); } catch (e) { /* private mode */ }
+          render(); } }))));
+}
+
 function lbViewCtrl(ms) {
   const n = ms.filter(mmluCats).length;
   return el('div', { class: 'ctrl', style: 'margin:2px 0 6px' },
-    el('span', { class: 'small', text: 'Columns' }),
+    el('span', { class: 'small', text: 'View' }),
     el('div', { class: 'seg', role: 'group', 'aria-label': 'leaderboard columns' },
       [['tasks', 'tasks'], ['cats', 'MMLU by category']].map(([v, l]) =>
         el('button', { 'aria-pressed': String(state.lbView === v), text: l,
@@ -4995,7 +5183,7 @@ function vRuns(ms) {
         DATA.meta.transformers) : ''),
     el('p', { class: 'sub', text: 'Every field here can change a score. Publish this table with the numbers, or the numbers are hearsay. Sorted newest-eval-first — click any column to re-sort.' }),
     provPg.pager,
-    el('div', { class: 'lb-wrap' }, el('table', {},
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'prov', 'data-prov-table': '1' },
       el('thead', {}, el('tr', {}, PROV_COLS.map(c => el('th', {
         class: (c.num ? 'num ' : '') + 'sortable',
         onclick: () => { state.provSort = { key: c.key,
@@ -5006,7 +5194,7 @@ function vRuns(ms) {
         c.label + ' ', state.provSort.key === c.key
           ? el('span', { class: 'dir', text: state.provSort.dir > 0 ? '▲' : '▼' }) : '')))),
       el('tbody', {}, provRows.map(m => el('tr', {},
-        el('td', { 'data-model': m.id }, m.name, ckBadge(m) || ''),
+        el('td', { class: 'model', 'data-model': m.id }, m.name, ckBadge(m) || ''),
         el('td', {}, el('span', { class: 'mono', text: m.id })),
         el('td', { text: (m.archinfo && m.archinfo.arch) || '—' }),
         el('td', { class: 'num', title: m.archinfo ? `heads ${m.archinfo.heads ?? '—'} · ctx ${m.archinfo.ctx ?? '—'}` : '',
@@ -5456,12 +5644,22 @@ async function loadTraining(force = false) {
   state.trFetching = true;
   try {
     state.trRuns = await api('api/truns');
+    // an empty right pane until someone picks a run was the first thing the
+    // tab showed; open on the most recent one instead, once
+    let picked = false;
+    if (!state.trAutoPicked && !state.trSel.length && state.trRuns.length) {
+      state.trAutoPicked = picked = true;
+      const latest = [...state.trRuns].sort((a, b) =>
+        (b.updated_at || b.created_at || 0) - (a.updated_at || a.created_at || 0))[0];
+      state.trSel = [latest.id]; state.trColors = { [latest.id]: 0 };
+    }
     await Promise.all(state.trSel.map(async id => {
       const row = state.trRuns.find(r => r.id === id);
       if (force || !state.trSeries[id] || (row && row.status === 'running'))
         state.trSeries[id] = await api(`api/truns/${id}`);
     }));
-    if (state.tab === 'training') (state.trRedraw || render)();
+    // a run picked here changes the right pane, which only a full render builds
+    if (state.tab === 'training') (picked ? render : (state.trRedraw || render))();
   } catch (e) { /* next poll retries */ }
   finally { state.trFetching = false; }
 }
@@ -5811,6 +6009,75 @@ const ACTIVE_STATUS = new Set(['preflight', 'waiting_gpu', 'waiting_lock', 'runn
 const stClass = s => s === 'done' ? 'st st-done' : s === 'failed' ? 'st st-failed'
                    : ACTIVE_STATUS.has(s) ? 'st st-active' : 'st st-muted';
 
+// What a row can do, by what it is. Queued: Cancel. Running: Log and Cancel,
+// which asks first. Failed or canceled: the reason is in the row, and
+// Resubmit is one click — same model, suite and topics. Done: Open results —
+// the topic page for one topic, the model page otherwise.
+async function queueCancel(r) {
+  try {
+    const j = await post(`api/submissions/${r.id}/cancel`);
+    toast(j.status === 'canceling' ? `Stopping #${r.id} — the task in flight ends first`
+                                   : `Canceled #${r.id}`, { key: 'cancel' });
+  } catch (e) { state.qmsg = `#${r.id}: ${e.message}`; }
+  state.qConfirm = null;
+  await loadQueue(); (state.queueRedraw || render)();
+}
+
+async function queueResubmit(r) {
+  let tasks = [];
+  try { tasks = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
+  try {
+    const j = await post('api/submissions', { hf_id: r.hf_id, kind: r.kind || 'auto',
+      suite: r.suite, note: r.note || '', submitter: whoName() || r.submitter || '',
+      ...(tasks.length ? { tasks } : {}) });
+    toast(j.note ? `#${j.id}: ${j.note}` : `Queued #${j.id} again — ${r.hf_id}`, { key: 'resubmit' });
+  } catch (e) { state.qmsg = `#${r.id}: ${e.message}`; }
+  await loadQueue(); (state.queueRedraw || render)();
+}
+
+function queueOpen(r) {
+  let tasks = [];
+  try { tasks = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
+  const exam = tasks.filter(t => t.startsWith('exam_'));
+  if (r.suite === 'judged' && exam.length === 1) {
+    state.ans.model = r.hf_id; state.ans.rows = null;
+    state.after = { scroll: '[data-panel="answers"]' };
+    return navigate({ topic: exam[0].replace(/^exam_/, ''), model: null });
+  }
+  if (DATA.models.some(m => m.id === r.hf_id)) return navigate({ model: r.hf_id, topic: null });
+  toast(`${r.hf_id} is not on the board yet — its results land on the next refresh`);
+}
+
+function queueActions(r) {
+  const log = el('a', { href: `api/runs/${r.id}/log`, target: '_blank', rel: 'noopener',
+                        class: 'small', text: 'Log' });
+  const small = { style: 'padding:2px 9px;font-size:12px' };
+  if (r.status === 'queued')
+    return [el('button', { ...small, 'data-row-cancel': String(r.id), text: 'Cancel',
+      onclick: () => queueCancel(r) })];
+  if (ACTIVE_STATUS.has(r.status)) {
+    if (state.qConfirm === r.id)
+      return [log, el('span', { class: 'small', text: ' Stop this run? ' }),
+        el('button', { ...small, class: 'danger', 'data-row-stop': String(r.id), text: 'Stop it',
+          onclick: () => queueCancel(r) }),
+        el('button', { ...small, class: 'quiet', text: 'Keep it',
+          onclick: () => { state.qConfirm = null; (state.queueRedraw || render)(); } })];
+    return [log, ' ', el('button', { ...small, 'data-row-cancel': String(r.id), text: 'Cancel',
+      onclick: () => { state.qConfirm = r.id; (state.queueRedraw || render)(); } })];
+  }
+  if (r.status === 'canceling') return [log, el('span', { class: 'small se', text: ' stopping…' })];
+  if (r.status === 'failed' || r.status === 'canceled')
+    return [log, ' ', el('button', { ...small, 'data-row-resubmit': String(r.id), text: 'Resubmit',
+      title: `the same model, suite${r.suite === 'judged' ? ' and topics' : ''}, queued again`,
+      onclick: () => queueResubmit(r) })];
+  if (r.status === 'done') {
+    const judgedDone = r.suite !== 'judged' || (r.judge && r.judge.status === 'done');
+    return [judgedDone ? el('button', { ...small, class: 'secondary', 'data-row-open': String(r.id),
+      text: 'Open results', onclick: () => queueOpen(r) }) : '', ' ', log];
+  }
+  return [log];
+}
+
 function vQueue() {
   // the judged suite's availability (and its reason when it has none) comes
   // from the same endpoint the Loop tab reads
@@ -5844,9 +6111,27 @@ function vQueue() {
       oninput: e => { sf.note = e.target.value; } }),
   };
   for (const o of f.suite.options) o.selected = o.value === sf.suite;
+  // judged: the same topic boxes as the topic page. All ticked is the whole
+  // exam; one ticked is the loop's usual unit of work
+  const built = (state.loop.built || []);
+  if (sf.tasks == null && built.length) sf.tasks = [...built];
+  const topicBoxes = sf.suite === 'judged' && built.length ? el('div', {},
+    el('p', { class: 'small', text: 'topics in this run:' }),
+    el('div', { class: 'frm', style: 'flex-wrap:wrap', 'data-submit-topics': '1' },
+      built.map(task => el('label', { class: 'small', style: 'margin-right:10px' },
+        el('input', { type: 'checkbox', 'data-submit-task': task,
+          checked: (sf.tasks || []).includes(task) ? '' : null,
+          onchange: e => { sf.tasks = e.target.checked ? [...(sf.tasks || []), task]
+                                                       : (sf.tasks || []).filter(t => t !== task); } }),
+        ' ' + frName(task))))) : '';
+  f.suite.addEventListener('change', () => render());
   const btn = el('button', { class: 'primary', text: 'Submit model', onclick: async () => {
     const body = { hf_id: sf.hf_id.trim(), kind: sf.kind, suite: sf.suite,
                    submitter: whoName(), note: sf.note };
+    if (sf.suite === 'judged') {
+      if (!(sf.tasks || []).length) { state.qmsg = 'pick at least one topic'; render(); return; }
+      if (sf.tasks.length < built.length) body.tasks = sf.tasks;
+    }
     if (!body.hf_id) { state.qmsg = 'enter a Hugging Face model id first'; render(); return; }
     btn.disabled = true;
     try {
@@ -5854,9 +6139,13 @@ function vQueue() {
         headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
         body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({}));
-      state.qmsg = r.ok ? `#${j.id}: ${j.note || 'queued'}`
-                        : 'rejected: ' + (typeof j.detail === 'string' ? j.detail : r.status);
-      if (r.ok) { sf.hf_id = ''; sf.note = ''; }
+      state.qmsg = r.ok ? '' : 'rejected: ' + (typeof j.detail === 'string' ? j.detail : r.status);
+      if (r.ok) {
+        toast(j.note ? `#${j.id}: ${j.note}` : `Queued #${j.id} — ${body.hf_id}`
+              + (body.tasks ? ` · ${body.tasks.map(frName).join(', ')}` : ''),
+              { key: 'submit', go: goQueue, link: 'see it' });
+        sf.hf_id = ''; sf.note = '';
+      }
     } catch (e) { state.qmsg = 'submit failed — server unreachable?'; }
     await loadQueue(); render();
   }});
@@ -5888,13 +6177,7 @@ function vQueue() {
           : `judging ${judgeCount(r.judge)}` }) : '',
       r.error ? el('div', { class: 'down', text: r.error }) : ''),
     el('td', { class: 'num', text: r.gpu_seconds ? Math.round(r.gpu_seconds / 60) + ' min' : '—' }),
-    el('td', {},
-      el('a', { href: `api/runs/${r.id}/log`, target: '_blank', rel: 'noopener', text: 'log' }),
-      r.status === 'queued' ? el('button', { style: 'margin-left:8px;padding:2px 8px;font-size:12px',
-        text: 'cancel', onclick: async () => {
-          await fetch(`api/submissions/${r.id}/cancel`, { method: 'POST' }).catch(() => {});
-          await loadQueue(); render();
-        }}) : ''));
+    el('td', { class: 'rowacts' }, queueActions(r)));
   // ---- queue filter + sort: a long shared queue needs "my jobs, failures first" ----
   const QCOLS = [
     { key: 'id',          label: '#', num: true, defDir: -1 },
@@ -5974,6 +6257,7 @@ function vQueue() {
         + 'resubmitting a finished model costs nothing, and a quick run upgrades to full by '
         + 'running only the missing tasks. Results land on this leaderboard automatically.' }),
       el('div', { class: 'frm' }, f.hf_id, f.kind, f.suite, f.note, btn),
+      topicBoxes,
       state.qmsg ? el('p', { class: 'small', style: 'margin-top:8px', text: state.qmsg }) : ''),
     el('div', { class: 'card' },
       el('h2', { text: 'Queue' }),
@@ -6007,6 +6291,11 @@ async function rvPost(path, body) {
     body: JSON.stringify(body) }).catch(() => null);
   const j = r ? await r.json().catch(() => ({})) : {};
   state.rv.msg = r && r.ok ? '' : 'refused: ' + (j.detail || (r ? r.status : 'server unreachable'));
+  const pid = (/proposals\/(\d+)\//.exec(path) || [])[1];
+  if (r && r.ok) toast(/approve$/.test(path) ? `Approved the spec of proposal #${pid}`
+    : /reject$/.test(path) ? 'Rejected' : /generate$/.test(path)
+      ? `Dataset #${j.dataset_id} requested — it appears here when the batch completes` : 'Done',
+    { key: 'review' });
   await loadReview(); render();
 }
 
@@ -6491,7 +6780,9 @@ async function loadLoop() {
     Object.assign(state.loop, { rows: j.topics, blocked: j.judged_blocked,
                                 built: j.tasks_built || [], floor: j.floor, loaded: true,
                                 model: j.model || '', models: j.models || [], failed: '' });
-    if (changed && (state.tab === 'loop' || state.topic) && !state.model) render();
+    // the Queue tab reads it too: whether the judged suite is on, and its topics
+    if (changed && (state.tab === 'loop' || state.tab === 'queue' || state.topic)
+        && !state.model) render();
   } catch (e) {
     // netFail already put the banner up and set the backoff; the board itself
     // must also stop saying "Loading…" forever, which is what it did
@@ -6582,14 +6873,15 @@ function proposeControl(r) {
   if (!model || !gate) return '';
   const slot = 'propose:' + r.slug;
   const attrs = { 'data-propose': r.slug, 'data-propose-model': model };
-  const done = j => `Proposal #${j.id} requested for ${model} on ${r.topic}. It lands on the `
-    + 'Review tab when the batch completes.';
+  const done = j => `Proposal #${j.id} requested — ${r.topic}`;
   if (gate.ok)
     return el('div', {}, actButton(slot, 'Propose', async () => {
       if (!whoName()) throw new Error(askName());
       const j = await post('api/proposals', { model, topic: r.topic, requested_by: whoName() });
       state.loop.loaded = false; state.rv.loaded = false; loadLoop();
-      return done(j);
+      return { key: 'propose', toast: done(j), go: goReview, link: 'Review',
+               line: `Proposal #${j.id} requested for ${model}. It lands on the Review tab when `
+                 + 'the batch completes.' };
     }, { ...attrs, class: 'primary', 'data-gate': 'ok',
          title: `ask the LLM what skill ${model} is missing on ${r.topic}` }), actNote(slot));
   if (gate.overridable)
@@ -6597,8 +6889,10 @@ function proposeControl(r) {
       'data-gate': 'overridable', text: 'Propose…', title: gate.why,
       onclick: () => proposeDialog({ model, topic: r.topic, gate,
         returnTo: `[data-propose="${r.slug}"]`,
-        onDone: j => { actState(slot).ok = done(j) + ' It is marked "proposed over a '
-                         + 'provisional judge", and so is everything made from it.';
+        onDone: j => { toast(done(j) + ' — over a provisional judge',
+                         { key: 'propose', go: goReview, link: 'Review' });
+                       actState(slot).ok = `Proposal #${j.id} requested for ${model}. It is marked `
+                         + '"proposed over a provisional judge", and so is everything made from it.';
                        state.loop.loaded = false; state.rv.loaded = false; loadLoop(); render(); } }) }),
       el('div', { class: 'propwhy', 'data-why': 'propose', title: gate.why,
         text: 'the judge is provisional — Propose… says what that means' }), actNote(slot));
@@ -6803,10 +7097,12 @@ function loopSitPanel(r) {
       body: JSON.stringify(body) }).catch(() => null);
     const j = res ? await res.json().catch(() => ({})) : {};
     s.busy = false;
-    s.msg = res && res.ok
-      ? `#${j.id} queued — ${(j.tasks || []).map(frName).join(', ')}. The queue shows it, and `
-        + 'the judge batch after it.'
-      : 'refused: ' + (j.detail || (res ? res.status : 'server unreachable'));
+    if (res && res.ok) {
+      s.msg = '';
+      toast(`Queued #${j.id} — ${(j.tasks || []).map(frName).join(', ')}`,
+            { key: 'sit', go: goQueue, link: 'see the queue' });
+      loadQueue();
+    } else s.msg = 'refused: ' + (j.detail || (res ? res.status : 'server unreachable'));
     render();
   };
   return el('div', { class: 'card', 'data-panel': 'sit' },
@@ -7107,10 +7403,10 @@ async function exPost(path, body) {
     headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
     body: JSON.stringify(body || {}) }).catch(() => null);
   const j = r ? await r.json().catch(() => ({})) : {};
-  state.ex.msg = r && r.ok ? (j.qid ? `accepted → ${j.half} half (${j.topic})`
-    : j.status === 'rejected' ? 'rejected' : j.tasks ? 'tasks rebuilt: '
-      + Object.entries(j.tasks).map(([t, v]) => `${t.replace(/^exam_/, '')} ${v.items}`).join(', ') : 'ok')
-    : 'refused: ' + (j.detail || (r ? r.status : 'server unreachable'));
+  state.ex.msg = r && r.ok ? '' : 'refused: ' + (j.detail || (r ? r.status : 'server unreachable'));
+  if (r && r.ok) toast(j.qid ? `Accepted into ${j.topic} — ${j.half} half`
+                             + ((j.build || {}).built ? ', and it can be sat now' : '')
+                           : j.status === 'rejected' ? 'Rejected' : 'Done', { key: 'curate' });
   state.ex.loaded = false;
   await loadExam(); render();
 }
@@ -7169,61 +7465,33 @@ function vExam() {
       el('b', { text: 'No questions yet. ' }),
       'Import a person\'s bank below, or ask whoever runs the server to have the exam writer '
       + 'draft candidates — they appear under "Awaiting curation" within a poll.'),
-    el('div', { class: 'frm', style: 'margin-top:8px' },
-      actButton('exbuild', 'Rebuild the harness tasks from the bank', async () => {
+    // an import or an accepted question makes itself sittable; this shows only
+    // when the bank got ahead of the harness anyway (a judged run was sitting)
+    st.tasks_stale ? el('div', { class: 'frm', style: 'margin-top:8px' },
+      actButton('exbuild', 'Make new questions sittable', async () => {
         const j = await post('api/exam/build');
         const ts = Object.entries(j.tasks || {});
         state.ex.loaded = false; loadExam();
-        return `Built ${ts.length} task${ts.length === 1 ? '' : 's'}: `
-          + ts.map(([t, v]) => `${frName(t)} (${v.items})`).join(', ')
-          + `. They are in ${j.tasks_dir}; a suite=judged run uses them now.`;
-      }, { title: 'writes $EXAM_DIR/tasks from the accepted questions + the MMLU control '
-                  + 'set; no GPU' })),
+        return { key: 'build', toast: `New questions can be sat now — ${ts.length} `
+          + `topic${ts.length === 1 ? '' : 's'} rebuilt.` };
+      }, { class: 'primary', title: 'the bank has questions a judged run would not ask yet' }),
+      el('span', { class: 'small se', text: 'the bank has questions a judged run would not ask yet' }))
+      : '',
     actNote('exbuild'),
     state.ex.msg ? el('p', { class: 'small', text: state.ex.msg }) : '');
-  const withQ = topics.filter(t => sum[t].accepted || sum[t].pending);
-  const noQ = topics.filter(t => !(sum[t].accepted || sum[t].pending));
-  const table = el('div', { class: 'card' }, el('h2', {}, 'By topic',
-      infoTip(`Target ${st.target_per_topic || 60} accepted questions per topic. Under 30 in the `
-        + 'report half the published score is noise and the page greys it. Click a topic to '
-        + 'show only its candidates below.')),
-    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-topics-table': '1' },
-      el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { class: 'num', text: 'accepted' }),
-        el('th', { class: 'num', text: 'report half' }), el('th', { class: 'num', text: 'diagnose half' }),
-        el('th', { class: 'num', text: 'awaiting curation' }), el('th', { text: 'toward target' }))),
-      el('tbody', {}, [...withQ, ...(state.ex.showEmpty ? noQ : [])].map(t => { const s = sum[t];
-        const bar = el('div', { class: 'dxbar', style: 'width:140px;height:8px' },
-          el('span', { style: `width:${Math.min(100, 100 * s.accepted / (s.target || 60)).toFixed(1)}%;background:var(--s1)` }));
-        return el('tr', { class: s.report < CAT_MIN_N ? 'dim' : null },
-          el('td', {}, el('a', { href: '#', text: t, onclick: e => { e.preventDefault();
-            state.ex.topic = state.ex.topic === t ? '' : t; state.ex.loaded = false;
-            // drop the list with the filter: showing another topic's questions
-            // under this topic's heading, until the fetch lands, is a lie
-            state.ex.candidates = null; render(); } })),
-          el('td', { class: 'num', text: String(s.accepted) }),
-          el('td', { class: 'num', text: String(s.report) }),
-          el('td', { class: 'num', text: String(s.diagnose) }),
-          el('td', { class: 'num', text: String(s.pending) }),
-          el('td', {}, bar)); }),
-        noQ.length ? el('tr', { 'data-empty-topics': String(noQ.length) },
-          el('td', { colspan: '6', class: 'small' },
-            el('b', { text: `${noQ.length} topic${noQ.length > 1 ? 's' : ''} without questions: ` }),
-            noQ.join(', '), ' ',
-            el('button', { class: 'quiet', 'data-show-empty': '1',
-              text: state.ex.showEmpty ? 'hide them' : 'show them',
-              onclick: () => { state.ex.showEmpty = !state.ex.showEmpty; render(); } }))) : ''))));
   const cands = state.ex.candidates;
   const cur = el('div', { class: 'card' },
     el('h2', { text: 'Awaiting curation' + (state.ex.topic ? ` — ${state.ex.topic}` : '') }),
     el('p', { class: 'sub', text: 'Read each against the rubric: does it ask for understanding, is '
       + 'the reference the substance rather than a wording, is it answerable in five sentences, '
-      + 'is it new? Accept, edit and accept, or reject with a reason. Click a topic above to filter.' }),
+      + 'is it new? Accept, edit and accept, or reject with a reason. Click a topic in the table '
+      + 'above to show only its questions.' }),
     cands == null ? el('p', { class: 'small', 'data-loading': 'candidates', text: 'Loading…' })
       : cands.length ? cands.slice(0, 40).map(exCandidate)
       : el('p', { class: 'small', text: 'Nothing waiting' + (state.ex.topic ? ' in this topic.' : '.') }),
     cands && cands.length > 40
       ? el('p', { class: 'small', text: `${cands.length - 40} more after these.` }) : '');
-  return [head, exImport(), exRubrics(), table, cur];
+  return [head, exImport(), exRubrics(), cur];
 }
 
 // ---------------------------------------------------------------------------
@@ -7258,15 +7526,24 @@ function exImport() {
       // a new file is a new attempt: the last answer does not apply to it
       s.preview = null; actState('eximport').ok = actState('eximport').err = '';
       render(); } });
-  const srcIn = el('input', { type: 'text', placeholder: 'source (the file, e.g. law_v2)',
-    value: s.source, 'aria-label': 'source', 'data-keep': 'import-source',
-    oninput: e => { s.source = e.target.value; } });
+  // the source is the file's own name, shown as text; "change" opens a box.
+  // Last night's two wrong sources came from typing the topic into it
+  const srcIn = s.editSource
+    ? el('input', { type: 'text', value: s.source, 'aria-label': 'source', 'data-keep': 'import-source',
+        oninput: e => { s.source = e.target.value; } })
+    : el('span', { class: 'fld-text', 'data-source': s.source || '' },
+        s.source || el('span', { class: 'se', text: 'the file\'s name, once chosen' }), ' ',
+        s.source ? el('button', { class: 'quiet', 'data-source-change': '1', text: 'change',
+          onclick: () => { s.editSource = true; render(); } }) : '');
   // WHO WROTE THEM, which is not usually who is sitting here: the record has
   // to carry the author, or "these are Dr. Hossein's questions" lives only in
   // somebody's memory of the afternoon
-  const authorIn = el('input', { type: 'text', placeholder: 'written by (the author)',
+  const authorIn = el('input', { type: 'text', placeholder: 'e.g. Dr. Hossein',
     value: s.author, 'aria-label': 'written by', 'data-keep': 'import-author',
     oninput: e => { s.author = e.target.value; } });
+  // labels above the fields: a placeholder is not a label, and it was cut off
+  const fld = (label, control) => el('label', { class: 'fld' },
+    el('span', { class: 'fld-label', text: label }), control);
   // both buttons answer in the same place, so a new attempt cannot leave the
   // last one's success sitting above its refusal — that read as a partial
   // import when a wrapped file was rejected after a good one
@@ -7286,7 +7563,9 @@ function exImport() {
       + 'from; your own name (top right) is recorded as the person who imported them.')),
     el('p', { class: 'sub', text: 'Choose the file and the topic, and say who wrote it. '
       + 'Preview first: nothing is written until you commit.' }),
-    el('div', { class: 'frm' }, fileIn, topicSel, authorIn, srcIn,
+    el('div', { class: 'frm fields' }, fld('Questions file', fileIn), fld('Topic', topicSel),
+      fld('Written by', authorIn), fld('Source', srcIn)),
+    el('div', { class: 'frm' },
       actButton('eximport', 'Preview', async () => {
         s.preview = null;                       // never a stale table under a new answer
         const j = await post('api/exam/import/preview', ready());
@@ -7299,20 +7578,30 @@ function exImport() {
           + (j.invalid ? `, ${j.invalid} unusable` : '')
           + '. Nothing is written yet.';
       }),
-      p ? actButton('eximport', `Import ${p.imported + (p.updated || 0)} questions`,
+      p ? ((p.imported || p.updated)
+        ? actButton('eximport', `Import ${p.imported + (p.updated || 0)} questions`,
             async () => {
               const body = ready();
               s.preview = null;
               const j = await post('api/exam/import', body);
-              s.file = ''; s.name = '';
+              s.file = ''; s.name = ''; s.source = ''; s.editSource = false;
               state.ex.loaded = false; loadExam();
-              return `Imported ${j.imported}`
-                + (j.updated ? `, revised ${j.updated} already in the bank` : '')
-                + (j.skipped ? `, skipped ${j.skipped} unchanged` : '')
-                + ` — report ${j.report} / diagnose ${j.diagnose}. They are in the bank; `
-                + 'rebuild the harness tasks to sit them.';
-            }, { 'data-commit': 'import',
-                 disabled: (p.imported || p.updated) ? null : '' }) : ''),
+              state.loop.loaded = false;
+              const b = j.build || {};
+              return { key: 'import', toast: `Imported ${j.imported} question${j.imported === 1 ? '' : 's'}`
+                  + (j.updated ? `, revised ${j.updated}` : '') + ` — ${j.topic}`
+                  + (b.built ? '. They can be sat now.' : '.'),
+                go: () => { const r = loopRowOf(slugOfTopic(j.topic)); if (r) loopGo(r, 'topic'); },
+                link: 'the topic page',
+                ...(b.built ? {} : { action: { label: 'Make these questions sittable',
+                  run: async () => { await post('api/exam/build'); state.ex.loaded = false;
+                                     loadExam(); toast('They can be sat now.'); } } }),
+                line: `report ${j.report} / diagnose ${j.diagnose}`
+                  + (j.skipped ? ` · ${j.skipped} already in the bank, unchanged` : '')
+                  + (b.built ? '' : ` · ${b.why || 'not yet sittable'}`) };
+            }, { 'data-commit': 'import', class: 'primary' })
+        : el('button', { disabled: '', 'data-commit': 'import', text: 'Nothing new to import',
+            title: 'every question in this file is already in the bank, unchanged' })) : ''),
     // the file that is loaded, which is not a result and does not replace one
     s.name ? el('p', { class: 'small se', 'data-import-file': '1',
                        text: `file: ${s.name}` }) : '',
@@ -7400,8 +7689,15 @@ function exRubrics() {
           ? el('tr', { 'data-rubric-row': r.topic, 'data-rubric-error': '1' },
               el('td', {}, r.topic),
               el('td', { class: 'warn', colspan: '4' }, r.error))
-          : el('tr', { 'data-rubric-row': r.topic },
-          el('td', {}, r.topic),
+          : el('tr', { 'data-rubric-row': r.topic,
+              class: state.ex.topic === r.topic ? 'domrow' : null },
+          el('td', {}, el('a', { href: '#', text: r.topic, 'data-filter-topic': r.topic,
+            title: 'show only this topic\'s questions awaiting curation',
+            onclick: e => { e.preventDefault();
+              state.ex.topic = state.ex.topic === r.topic ? '' : r.topic; state.ex.loaded = false;
+              // drop the list with the filter: another topic's questions under
+              // this topic's heading, until the fetch lands, is a lie
+              state.ex.candidates = null; render(); } })),
           // having a rubric is not having questions: three topics shipped
           // with both files and an empty bank, and looked ready
           el('td', { class: 'small' }, bankCell((st.banks || {})[r.topic])),
@@ -7888,9 +8184,45 @@ function applyTheme(t) {
   else document.documentElement.setAttribute('data-theme', t);
   document.getElementById('themeBtn').textContent = 'Theme \u25be';
   document.getElementById('themeBtn').title =
-    `theme: ${t} — click to cycle auto / light / dark / dim, remembered in this browser`;
+    `theme: ${t} — choose auto, light, dark or dim; remembered in this browser`;
+  for (const it of document.querySelectorAll('#themeMenu [role=menuitemradio]'))
+    it.setAttribute('aria-checked', String(it.dataset.theme === t));
   try { localStorage.setItem('bench-theme', t); } catch (e) { /* private mode etc. */ }
 }
+// "Theme ▾" promised a menu and cycled on click. A menu: Auto, Light, Dark,
+// Dim, the current one ticked
+(() => {
+  const btn = document.getElementById('themeBtn');
+  const labels = { auto: 'Auto (follow the system)', light: 'Light', dark: 'Dark', dim: 'Dim' };
+  const menu = el('div', { class: 'moremenu themes', role: 'menu', id: 'themeMenu', hidden: '',
+      'aria-label': 'theme',
+      onkeydown: e => {
+        const list = [...menu.querySelectorAll('[role=menuitemradio]')];
+        const i = list.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown') { e.preventDefault(); list[(i + 1) % list.length].focus(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+        else if (e.key === 'Escape') { e.preventDefault(); open(false); btn.focus(); }
+        else if (e.key === 'Tab') open(false);
+      } },
+    THEMES.map(t => el('button', { role: 'menuitemradio', 'data-theme': t, tabindex: '-1',
+      'aria-checked': 'false', text: labels[t],
+      onclick: () => { themeIdx = THEMES.indexOf(t); applyTheme(t); open(false); btn.focus(); } })));
+  const open = on => {
+    menu.hidden = !on; btn.setAttribute('aria-expanded', String(on));
+    if (on) (menu.querySelector('[aria-checked=true]') || menu.firstChild).focus();
+  };
+  btn.setAttribute('aria-haspopup', 'menu');
+  btn.setAttribute('aria-expanded', 'false');
+  btn.setAttribute('aria-controls', 'themeMenu');
+  const wrap = el('span', { class: 'morewrap themewrap' });
+  btn.replaceWith(wrap);
+  wrap.append(btn, menu);
+  btn.addEventListener('click', () => open(menu.hidden));
+  btn.addEventListener('keydown', e => { if (e.key === 'ArrowDown') { e.preventDefault(); open(true); } });
+  document.addEventListener('mousedown', e => {
+    if (!menu.hidden && !e.target.closest('.themewrap')) open(false);
+  });
+})();
 let themeIdx = 0;
 try {   // remembered per browser — the dashboard is a page people leave open
   const saved = localStorage.getItem('bench-theme');
@@ -7899,10 +8231,6 @@ try {   // remembered per browser — the dashboard is a page people leave open
 // always applied, even on 'auto': the button's title names the current theme,
 // and a button whose tooltip is only right after the first click is a lie
 applyTheme(THEMES[themeIdx]);
-document.getElementById('themeBtn').addEventListener('click', () => {
-  themeIdx = (themeIdx + 1) % THEMES.length;
-  applyTheme(THEMES[themeIdx]);
-});
 
 // boot: embedded data renders immediately; live mode fetches then polls
 if (LIVE) {

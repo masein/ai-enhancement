@@ -328,10 +328,14 @@ def submissions(limit: int = 100):
 
 @app.post("/api/submissions/{sid}/cancel")
 def cancel(sid: int):
-    if not db.cancel(sid):
-        raise HTTPException(409, "only queued submissions can be canceled — a running "
-                                 "job finishes its current task")
-    return {"id": sid, "status": "canceled"}
+    """Queued: canceled now. Running: asked to stop — the runner ends the task
+    in flight, frees the GPU and marks it canceled; nothing it half-wrote is
+    kept, and no judge batch is submitted."""
+    st = db.cancel(sid)
+    if not st:
+        raise HTTPException(409, "only a queued or running submission can be canceled — "
+                                 "this one has already finished")
+    return {"id": sid, "status": st}
 
 
 # ---------------------------------------------------------------------------
@@ -671,6 +675,35 @@ class CandidateReject(BaseModel):
     reason: str = ""
 
 
+def _tasks_stale() -> bool:
+    """The bank has questions the harness tasks do not: something was accepted
+    or imported since the tasks were last written (or they never were)."""
+    bank = [p.stat().st_mtime for p in exam_build.bank_dir(config.EXAM_DIR).glob("*.jsonl")
+            if p.stat().st_size]
+    if not bank:
+        return False
+    tasks = [p.stat().st_mtime for p in exam_build.tasks_dir(config.EXAM_DIR).glob("exam_*.jsonl")]
+    return not tasks or max(bank) > min(tasks)
+
+
+def _rebuild_if_idle() -> dict:
+    """Make the bank sittable: write the harness tasks, the way the old
+    "Rebuild the harness tasks from the bank" button did — an implementation
+    step a person should never have had to know about. Not while a judged run
+    is using the tasks; then the page offers it once that run is done."""
+    busy = next((r for r in db.recent(100) if r["suite"] == "judged"
+                 and r["status"] in ("preflight", "waiting_gpu", "waiting_lock", "running")),
+                None)
+    if busy:
+        return {"built": False, "why": f"judged run #{busy['id']} is sitting the exam now — "
+                                       f"make the new questions sittable when it is done"}
+    try:
+        m = exam_build.build(config.OUT_DIR, config.EXAM_DIR)
+    except (FileNotFoundError, ValueError, OSError) as e:
+        return {"built": False, "why": f"the tasks could not be built: {e}"}
+    return {"built": True, "tasks": len(m["tasks"])}
+
+
 @app.get("/api/exam")
 def exam_status():
     why = llm.blocked("exam")
@@ -679,13 +712,9 @@ def exam_status():
             "root": str(config.EXAM_DIR), "tasks_built": config.judged_tasks(),
             "target_per_topic": exam_build.TARGET_PER_TOPIC,
             "summary": exam_build.summary(config.EXAM_DIR),
-            "draft_command": f"python3 scripts/exam_build.py draft --root {config.EXAM_DIR} "
-                             f"--per-topic 8",
-            # the other way a bank arrives: written by a person, imported whole.
-            # Both paths are shown on the tab, because only one of them was.
-            "import_command": f"python3 scripts/exam_build.py --root {config.EXAM_DIR} import "
-                              f"<questions.json> --topic \"<topic>\" --approver \"<name>\"",
-            "migrate_command": f"python3 scripts/exam_build.py --root {config.EXAM_DIR} migrate",
+            # new questions the harness tasks do not have yet: the page offers
+            # "Make new questions sittable" only then
+            "tasks_stale": _tasks_stale(),
             "note": "the published per-topic score comes from the report half; only the "
                     "diagnose half is ever shown here or placed in a request"}
 
@@ -714,7 +743,8 @@ def exam_accept(cid: str, a: CandidateAccept, x_token: str = Header(default=""))
         raise HTTPException(409, str(e)) from None
     db.curation_add(cid, rec["topic"], rec["qid"], "accepted", who, rec["edited"])
     return {"cid": cid, "qid": rec["qid"], "topic": rec["topic"],
-            "half": exam_build.half_of(rec["qid"]), "edited": rec["edited"], "accepted_by": who}
+            "half": exam_build.half_of(rec["qid"]), "edited": rec["edited"], "accepted_by": who,
+            "build": _rebuild_if_idle()}
 
 
 @app.post("/api/exam/candidates/{cid}/reject")
@@ -832,7 +862,8 @@ def exam_import(body: ImportIn, x_token: str = Header(default="")):
     db.curation_add(f"import:{out['source']}", out["topic"], "", "imported", by or who,
                     False, f"{out['imported']} imported, {out['updated']} revised, "
                            f"{out['skipped']} already in the bank; written by {who}")
-    return out
+    # sittable at once: a person imports questions to have them asked
+    return {**out, "build": _rebuild_if_idle()}
 
 
 def _rubric_row(topic: str) -> dict:
