@@ -50,12 +50,12 @@ async def lifespan(_app: FastAPI):
     # without eval_tasks/fr/ shipped and got as far as a person pressing a button
     startup.check_repo_files()
     db.init()
-    try:                         # topics re-dated by an old merge get their own time back
-        fixed = llm_poller.backfill_judged_at()
-        if fixed:
-            print(f"[judge] per-topic judged_at restored from the run records: {', '.join(fixed)}")
+    try:                         # records older code left wrong: once per database
+        line = llm_poller.repair_once()
+        if line:
+            print(f"[judge] restored from the run records (once): {line}")
     except Exception as e:       # noqa: BLE001 — a repair must never stop the service starting
-        print(f"[judge] could not restore per-topic judged_at: {e!r}")
+        print(f"[judge] could not restore the judge records, will retry next start: {e!r}")
     llm.startup_check()          # a set-but-broken LLM config fails here, not at a click
     worker.start()
     llm_poller.start()

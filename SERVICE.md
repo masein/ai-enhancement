@@ -79,6 +79,14 @@ device on the tailnet). To stop the service: `pkill -f "uvicorn service.app"` �
 a run in flight is killed with it; on restart the interrupted submission is
 re-queued automatically and per-task resume repeats only the interrupted task.
 
+A start also repairs judge records that older code wrote wrong: per-topic
+`judged_at` in `judge.json`, and judged rows whose batch finished before the
+poller wrote the final count (they read "62/130 done … judge.json lands when
+it completes"). That runs **once per database** — the `repairs` table records
+that it ran and what it changed — and logs one line,
+`[judge] restored from the run records (once): …`, only on the start that did
+it. If it fails part-way, the record is removed and the next start tries again.
+
 ## Knobs (environment variables, all optional)
 
 | var | default | meaning |

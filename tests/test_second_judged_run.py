@@ -374,3 +374,97 @@ def test_a_page_open_through_a_whole_judged_run_shows_the_judged_scores(svc, mon
         assert errors == []
     finally:
         ctx.close()
+
+
+# ---------------------------------------------------------------------------
+# after #33: rows whose batch finished under older code, and a repair that
+# says what it did once
+# ---------------------------------------------------------------------------
+
+def _start(appmod):
+    """One start of the service: the lifespan, in and out."""
+    from fastapi.testclient import TestClient
+    c = TestClient(appmod.app)
+    c.__enter__()
+    return c
+
+
+def test_rows_whose_batch_finished_under_older_code_read_as_finished(tmp_path, monkeypatch,
+                                                                     capsys):
+    """Verified live after #33: #45 read "62/130 done" and #46 "475/680 done",
+    both "judge.json lands when it completes", with both batches long done.
+    62/130 reads as half the answers lost."""
+    client, appmod, _ = make_service(tmp_path, monkeypatch)
+    client.__exit__(None, None, None)
+    from service import config, db, llm_poller
+    import sqlite3
+    with sqlite3.connect(config.DB_PATH) as c:            # a database from before this deploy
+        c.execute("DELETE FROM repairs")
+
+    def row(tasks, bid, n, seen, at, plan_tasks, status="done", batch="done", progress=None):
+        sid = db.add(MODEL, "instruct", "judged", "masein", "", tasks=tasks)
+        rid = db.judge_run_create(MODEL, bid, n, "stub/overlap-v1",
+                                  json.dumps({"tasks": {t: {} for t in plan_tasks}}))
+        if batch == "done":
+            db.judge_run_update(rid, status="done", finished_at=at)
+        db.batch_add(bid, "judge", rid, n, "anthropic", "claude-x")
+        db.batch_progress(bid, seen)
+        if batch != "pending":
+            db.batch_finish(bid, batch, "")
+        db.update(sid, status=status, judge_batch=bid, progress=progress or (
+            f"done · judge batch {bid} submitted ({n} answers); judge.json lands when it completes"))
+        return sid
+    five = [ECON, LAW, MED, "exam_computer_science", "exam_physics_engineering"]
+    t45, t46 = time.mktime((2026, 9, 20, 21, 22, 0, 0, 0, -1)), time.mktime(
+        (2026, 9, 20, 23, 5, 0, 0, 0, -1))
+    s45 = row([ECON], "b45", 130, "62/130 done", t45, [ECON])
+    s46 = row([], "b46", 680, "475/680 done", t46, five + [jd.CONTROL_TASK])
+    s47 = row([ECON], "b47", 130, "130/130 done", t46 + 36000, [ECON],
+              progress="judged: 5 topics, judge.json written 09:25")    # the old count
+    out = row([LAW], "b48", 42, "18/42 done", 0, [LAW], batch="pending")
+    bad = row([MED], "b49", 42, "3/42 done", 0, [MED], batch="failed")
+    capsys.readouterr()
+
+    c = _start(appmod)                                    # the deploy
+    got = rows(c)
+    assert got[s45]["judge"]["progress"] == "130/130 done"
+    assert got[s45]["progress"] == "judged: economics, judge.json written 21:22"
+    assert got[s46]["judge"]["progress"] == "680/680 done"
+    assert got[s46]["progress"] == "judged: 5 topics, judge.json written 23:05"
+    assert got[s47]["progress"] == "judged: economics, judge.json written " + \
+        time.strftime("%H:%M", time.localtime(t46 + 36000))
+    # a batch still out, or one that failed, says what it said
+    assert got[out]["judge"]["progress"] == "18/42 done"
+    assert "judge.json lands" in got[out]["progress"]
+    assert got[bad]["judge"]["progress"] == "3/42 done"
+    log = capsys.readouterr().out
+    assert log.count("restored from the run records") == 1, log
+    assert f"#{s45}, #{s46}, #{s47}" in log
+    c.__exit__(None, None, None)
+
+    # a restart, a second process: the record says it ran, and nothing runs
+    called = []
+    monkeypatch.setattr(llm_poller, "backfill_judged_at", lambda: called.append(1) or [])
+    monkeypatch.setattr(llm_poller, "repair_finished_rows", lambda: called.append(1) or [])
+    for _ in range(2):
+        _start(appmod).__exit__(None, None, None)
+    assert called == []
+    assert "restored from the run records" not in capsys.readouterr().out
+
+
+def test_the_repair_is_claimed_by_one_caller_and_retried_if_it_fails(svc, monkeypatch):
+    from service import db, llm_poller
+    db.release_repair(llm_poller.REPAIR)
+    assert db.claim_repair("x") is True
+    assert db.claim_repair("x") is False                   # the second process
+    monkeypatch.setattr(llm_poller, "backfill_judged_at",
+                        lambda: (_ for _ in ()).throw(OSError("disk")))
+    with pytest.raises(OSError):
+        llm_poller.repair_once()
+    calls = []
+    monkeypatch.setattr(llm_poller, "backfill_judged_at", lambda: calls.append(1) or [])
+    assert llm_poller.repair_once() == ""                  # the next start ran it again…
+    assert calls == [1]
+    assert llm_poller.repair_once() == ""                  # …and that one was the last
+    assert calls == [1]
+    assert db.claim_repair(llm_poller.REPAIR) is False     # recorded as run

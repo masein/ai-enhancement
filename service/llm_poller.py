@@ -10,6 +10,7 @@ created is a second human click. worker.py's shape, on purpose.
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 import traceback
@@ -109,10 +110,86 @@ def _finish_judge(row: dict, results: dict[str, llm.Result]) -> None:
     sub = db.submission_of_batch(row["batch_id"])
     if not sub:
         return
-    when = time.strftime("%H:%M", time.localtime())
+    db.update(sub["id"], progress=judged_line(run))
+
+
+def judged_line(run: dict, at: float | None = None) -> str:
+    """What a judged row says once its batch has landed."""
+    when = time.strftime("%H:%M", time.localtime(time.time() if at is None else at))
     what = judged_what(run)
-    db.update(sub["id"], progress=(f"judged: {what}, judge.json written {when}" if what
-                                   else f"judged, judge.json written {when}"))
+    return (f"judged: {what}, judge.json written {when}" if what
+            else f"judged, judge.json written {when}")
+
+
+# a row still telling the reader its batch is out, or the pre-#33 count of
+# the merged file ("judged: 5 topics" on a one-topic run)
+_STILL_OUT = re.compile(r"judge batch \S+ submitted|judge\.json lands when it completes")
+_WRITTEN = ", judge.json written"
+
+
+def repair_finished_rows() -> list[int]:
+    """A judged row whose batch finished before the poller wrote the final
+    count and rewrote the row (code before #32) still reads as in flight:
+    #45 "62/130 done" and #46 "475/680 done", both "judge.json lands when it
+    completes". 62/130 reads as half the answers lost. For every row whose
+    own batch and judge run are done: the count becomes n/n, and the row
+    says what a new run's says, with the time the run actually finished.
+    A row whose batch is pending or failed is not touched. Returns the rows
+    changed."""
+    runs = {r["batch_id"]: r for r in db.judge_runs(1000)}
+    batches = {b["batch_id"]: b for b in db.batches_list(5000) if b["kind"] == "judge"}
+    fixed = []
+    for s in db.recent(500):
+        bid = s.get("judge_batch") or ""
+        b, run = batches.get(bid), runs.get(bid)
+        if s["suite"] != "judged" or not b or not run \
+                or b["status"] != "done" or run["status"] != "done":
+            continue
+        changed = False
+        n = run["n_items"]
+        if b.get("progress") != f"{n}/{n} done":
+            db.batch_progress(bid, f"{n}/{n} done")
+            changed = True
+        old = s.get("progress") or ""
+        if s["status"] == "done":
+            new = judged_line(db.judge_run_get(run["id"]) or run,
+                              run.get("finished_at") or b.get("finished_at"))
+            stale = _STILL_OUT.search(old) or (
+                old.startswith("judged") and old.split(_WRITTEN)[0] != new.split(_WRITTEN)[0])
+            if stale:
+                db.update(s["id"], progress=new)
+                changed = True
+        if changed:
+            fixed.append(s["id"])
+    return sorted(fixed)
+
+
+REPAIR = "judge-records-2026-09"
+
+
+def repair_once() -> str:
+    """The one-off repairs of judge records older code left wrong, run once
+    per database and recorded in `repairs`: per-topic times in judge.json,
+    then the finished rows' counts and text. A second start — or a second
+    process starting beside the first — finds the record and does nothing,
+    so this can say what it did exactly once. Returns that line ("" when
+    it did not run or found nothing to change)."""
+    if not db.claim_repair(REPAIR):
+        return ""
+    try:
+        times = backfill_judged_at()
+        rows = repair_finished_rows()
+    except Exception:
+        db.release_repair(REPAIR)              # failed part-way: the next start tries again
+        raise
+    bits = []
+    if times:
+        bits.append(f"per-topic judged_at for {', '.join(times)}")
+    if rows:
+        bits.append(f"final count and text on {', '.join(f'#{i}' for i in rows)}")
+    line = "; ".join(bits)
+    db.finish_repair(REPAIR, line or "nothing to restore")
+    return line
 
 
 def backfill_judged_at() -> list[str]:

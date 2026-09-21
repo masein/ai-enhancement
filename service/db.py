@@ -160,6 +160,13 @@ CREATE TABLE IF NOT EXISTS llm_batches (
   finished_at REAL,
   progress    TEXT DEFAULT ''                       -- what the provider last said: "40/80 done"
 );
+-- one-off repairs of records older code wrote wrong: each runs once per
+-- database, and this row is the record that it did and what it changed
+CREATE TABLE IF NOT EXISTS repairs (
+  name        TEXT PRIMARY KEY,
+  ran_at      REAL NOT NULL,
+  result      TEXT DEFAULT ''
+);
 """
 
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
@@ -535,6 +542,30 @@ def submission_of_batch(batch_id: str) -> dict | None:
         row = c.execute(f"SELECT {','.join(_COLS)} FROM submissions WHERE judge_batch=? "
                         "ORDER BY id DESC LIMIT 1", (batch_id,)).fetchone()
     return dict(zip(_COLS, row)) if row else None
+
+
+def claim_repair(name: str) -> bool:
+    """True for exactly one caller per database: the one that inserted the
+    row. A restart, or a second process starting beside the first, gets
+    False and does nothing."""
+    with closing(_conn()) as c:
+        cur = c.execute("INSERT OR IGNORE INTO repairs (name, ran_at) VALUES (?, ?)",
+                        (name, time.time()))
+        c.commit()
+        return cur.rowcount == 1
+
+
+def finish_repair(name: str, result: str) -> None:
+    with closing(_conn()) as c:
+        c.execute("UPDATE repairs SET result=? WHERE name=?", (result[:2000], name))
+        c.commit()
+
+
+def release_repair(name: str) -> None:
+    """A repair that failed part-way: let the next start try again."""
+    with closing(_conn()) as c:
+        c.execute("DELETE FROM repairs WHERE name=?", (name,))
+        c.commit()
 
 
 def batch_progress(batch_id: str, progress: str) -> None:
