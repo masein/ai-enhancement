@@ -499,6 +499,27 @@ the report half, the provisional stamps and taint are untouched.
   model page: one caveat line, one judged topic at a time, no Unknown tile, and
   "last evaluated" counts judged runs. Training opens on the latest run; the
   theme is a menu; chart labels keep the end of a long name.
+- **9d — one visual system.** Tokens on the root: spacing 4/8/12/16/24/32,
+  type 12/14/16/20/28, radii 6/10, one border colour and one surface; every
+  font size in the stylesheet is on the scale (glyphs under 10.5 px excepted).
+  Buttons: primary, secondary, quiet, danger; disabled looks disabled and says
+  why beside it. One badge with three tones (neutral, warning, danger) and at
+  most one warning per row — the Loop board's provisional / single provider /
+  draft rubric triplet is one line above it. One table: plain-case headers
+  that stick while the page scrolls, 40 px rows, right-aligned tabular
+  numbers, the pager. Empty states name the action that fills them; loading
+  is a skeleton. A focus ring on every control, and anything with a click
+  handler is reachable by Tab and Enter. Checked in light, dark and dim.
+
+Definition of done (brief): automated — no tab scrolls sideways at 1,280 or
+1,512 px; the answers list and every paged table fit their container, with
+room; the Leaderboard shows at most six task columns and says how many are
+hidden; Overview's first screen at 1,512 × 900 is the hero and Top models;
+search, pager, override dialog and version bar each have their tests; the
+split, provisional, taint and leak tests are unchanged and pass. The seven
+steps on the live server (search "smol", queue law, page the queue, see it
+land, Propose… on law, approve and generate, the mark in provenance.json) are
+for a person on the box.
 
 ---
 

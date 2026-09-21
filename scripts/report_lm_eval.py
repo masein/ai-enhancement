@@ -1469,10 +1469,19 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
 CSS = r"""
 :root { color-scheme: light; }
 .viz-root {
+  /* phase 9d: one visual system. Spacing 4/8/12/16/24/32, type 12/14/16/20/28,
+     radii 6/10, one border colour (--border) and one surface (--surface-1) */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
+  --fs-1:12px; --fs-2:14px; --fs-3:16px; --fs-4:20px; --fs-5:28px;
+  --r-1:6px; --r-2:10px;
   --surface-1:#fcfcfb; --plane:#f9f9f7; --text-primary:#0b0b0b; --text-secondary:#52514e;
-  --muted:#898781; --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+  --muted:#6f6d68; --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
   --good:#0ca30c; --critical:#d03b3b; --warning:#fab219; --success-text:#006300;
-  --accent:#2a78d6; --accent-soft:rgba(42,120,214,0.10);
+  /* the warning and danger tones as TEXT: amber on white is 1.8:1, so text
+     that must be read gets a darker amber; 4.5:1 or better on every surface */
+  --warning-text:#8a5b00; --critical-text:#c23030;
+  /* the accent is also the link colour: #2a78d6 was 4.2:1 on the page */
+  --accent:#236bc4; --accent-soft:rgba(35,107,196,0.10);
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
   --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
 }
@@ -1484,6 +1493,7 @@ CSS = r"""
     --success-text:#0ca30c; --accent:#3987e5; --accent-soft:rgba(57,135,229,0.16);
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
     --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --warning-text:#fab219; --critical-text:#ef6b6b;
   }
 }
 :root[data-theme="dark"] .viz-root {
@@ -1493,6 +1503,7 @@ CSS = r"""
   --success-text:#0ca30c; --accent:#3987e5; --accent-soft:rgba(57,135,229,0.16);
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --warning-text:#fab219; --critical-text:#ef6b6b;
 }
 /* dim: slate blue-grey, softer than the near-black dark theme (the GitHub /
    wandb "dimmed" look). Same dark series palette — re-validated against both
@@ -1504,56 +1515,59 @@ CSS = r"""
   --success-text:#3fb950; --accent:#58a6ff; --accent-soft:rgba(88,166,255,0.16);
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --warning-text:#fab219; --critical-text:#ef6b6b;
 }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--plane); color:var(--text-primary);
-  font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:14px; line-height:1.5; }
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:var(--fs-2); line-height:1.5; }
 .wrap { max-width:1320px; margin:0 auto; padding:26px 22px 70px; }
-h1 { font-size:21px; font-weight:650; margin:0; letter-spacing:-0.01em; }
-h2 { font-size:15px; font-weight:600; margin:0 0 3px; }
-.sub { color:var(--text-secondary); font-size:13px; margin:2px 0 0; }
+h1 { font-size:var(--fs-4); font-weight:650; margin:0; letter-spacing:-0.01em; }
+h2 { font-size:var(--fs-3); font-weight:600; margin:0 0 3px; }
+.sub { color:var(--text-secondary); font-size:var(--fs-2); margin:2px 0 0; }
 .topbar { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
 .meta-chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
-.chip { display:inline-flex; align-items:center; gap:6px; font-size:12px;
+.chip { display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-1);
   color:var(--text-secondary); background:var(--surface-1); border:1px solid var(--border);
   border-radius:999px; padding:3px 10px; }
-.chip .mono { font-size:11px; }
-.card { background:var(--surface-1); border:1px solid var(--border); border-radius:12px;
-  padding:18px 20px; margin:14px 0; }
-button, .btn { font:inherit; font-size:13px; color:var(--text-primary); background:var(--surface-1);
-  border:1px solid var(--border); border-radius:8px; padding:6px 11px; cursor:pointer; }
+.chip .mono { font-size:var(--fs-1); }
+.card { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2);
+  padding:var(--sp-4) var(--sp-5); margin:var(--sp-4) 0; }
+button, .btn { font:inherit; font-size:var(--fs-2); color:var(--text-primary); background:var(--surface-1);
+  border:1px solid var(--border); border-radius:var(--r-1); padding:var(--sp-1) var(--sp-3);
+  min-height:32px; cursor:pointer; }
 button:hover, .btn:hover { background:var(--plane); }
-input[type=search] { font:inherit; font-size:13px; color:var(--text-primary);
-  background:var(--surface-1); border:1px solid var(--border); border-radius:8px;
+input[type=search] { font:inherit; font-size:var(--fs-2); color:var(--text-primary);
+  background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-1);
   padding:6px 11px; width:220px; }
 input[type=search]:focus { outline:2px solid var(--accent-soft); border-color:var(--accent); }
 .filters { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:14px 0 4px; }
-.seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.seg { display:inline-flex; border:1px solid var(--border); border-radius:var(--r-1); overflow:hidden; }
 .seg button { border:0; border-radius:0; background:var(--surface-1); padding:6px 12px; }
 .seg button + button { border-left:1px solid var(--border); }
 .seg button[aria-pressed="true"] { background:var(--accent-soft); color:var(--text-primary); font-weight:600; }
-.count-note { font-size:12px; color:var(--muted); }
+.count-note { font-size:var(--fs-1); color:var(--muted); }
 .tabs { display:flex; gap:2px; border-bottom:1px solid var(--axis); margin:10px 0 0;
   overflow-x:auto; }
-.tabs button { border:0; background:none; border-radius:8px 8px 0 0; padding:8px 13px;
+.tabs button { border:0; background:none; border-radius:var(--r-1) 8px 0 0; padding:8px 13px;
   color:var(--text-secondary); white-space:nowrap; }
 .tabs button:hover { background:var(--surface-1); }
 .tabs button[aria-selected="true"] { color:var(--text-primary); font-weight:600;
   box-shadow:inset 0 -2px 0 var(--accent); }
 .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
-.tile { background:var(--surface-1); border:1px solid var(--border); border-radius:12px;
+.tile { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2);
   padding:13px 16px; }
-.tile .label { color:var(--text-secondary); font-size:12px; }
-.tile .value { font-size:24px; font-weight:600; letter-spacing:-0.02em; }
-.tile .note { font-size:11.5px; color:var(--muted); margin-top:2px; }
+.tile .label { color:var(--text-secondary); font-size:var(--fs-1); }
+.tile .value { font-size:var(--fs-4); font-weight:600; letter-spacing:-0.02em; }
+.tile .note { font-size:var(--fs-1); color:var(--muted); margin-top:2px; }
 .hero-row { display:grid; grid-template-columns:minmax(260px,1.2fr) 2fr; gap:12px; }
 @media (max-width:800px){ .hero-row { grid-template-columns:1fr; } }
-.hero { font-size:46px; font-weight:650; letter-spacing:-0.03em; line-height:1.05; }
+.hero { font-size:var(--fs-5); font-weight:700; letter-spacing:-0.02em; line-height:1.15; }
 table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
-th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.06em;
-  color:var(--muted); font-weight:600; padding:6px 9px; border-bottom:1px solid var(--axis);
+th { text-align:left; font-size:var(--fs-1); text-transform:none; letter-spacing:0;
+  color:var(--muted); font-weight:600; padding:var(--sp-2) var(--sp-2); border-bottom:1px solid var(--border);
   white-space:nowrap; }
-td { padding:6px 9px; border-bottom:1px solid var(--grid); font-size:13px; }
+td { padding:var(--sp-2) var(--sp-2); height:40px; box-sizing:border-box;
+  border-bottom:1px solid var(--border); font-size:var(--fs-2); }
 td.num, th.num { text-align:right; }
 tr:last-child td { border-bottom:none; }
 .lb-wrap { overflow-x:auto; }
@@ -1563,55 +1577,56 @@ th .dir { font-size:9px; }
 /* typeahead dropdown under the metric query bar */
 .ac { position:relative; max-width:620px; }
 .ac-list { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:30;
-  background:var(--surface-1); border:1px solid var(--border); border-radius:10px;
+  background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2);
   box-shadow:0 10px 28px rgba(0,0,0,.14); max-height:288px; overflow-y:auto; }
 .ac-item { display:flex; gap:10px; align-items:center; padding:7px 11px;
-  cursor:pointer; font-size:13px; }
+  cursor:pointer; font-size:var(--fs-2); }
 .ac-item[aria-selected=true], .ac-item:hover { background:var(--accent-soft); }
 .ac-item .ac-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;
   white-space:nowrap; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-  font-size:12.5px; }
+  font-size:var(--fs-1); }
 .ac-item mark { background:none; color:var(--accent); font-weight:650; padding:0; }
 .ac-tag { font-size:10px; color:var(--muted); border:1px solid var(--border);
   border-radius:999px; padding:1px 7px; flex:none; }
 .toolbar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0 4px; }
-.toolbar input, .toolbar select { font:inherit; font-size:12.5px; color:var(--text-primary);
-  background:var(--plane); border:1px solid var(--border); border-radius:8px;
+.toolbar input, .toolbar select { font:inherit; font-size:var(--fs-1); color:var(--text-primary);
+  background:var(--plane); border:1px solid var(--border); border-radius:var(--r-1);
   padding:5px 9px; }
 .toolbar input:focus, .toolbar select:focus { outline:2px solid var(--accent-soft);
   border-color:var(--accent); }
 .lb td.model, .lb th.model { position:sticky; left:0; background:var(--surface-1); z-index:1; }
 .lb tr:hover td { background:var(--plane); }
-.lb .se { color:var(--muted); font-size:11px; }
+.lb .se { color:var(--muted); font-size:var(--fs-1); }
 .best { font-weight:650; }
 .best::after { content:"\2009\25CF"; color:var(--accent); font-size:8px; vertical-align:2px; }
-.badge { display:inline-block; font-size:10.5px; border:1px solid var(--border);
-  border-radius:5px; padding:0 5px; margin-left:6px; color:var(--text-secondary);
+.badge { display:inline-block; font-size:var(--fs-1); border:1px solid var(--border);
+  border-radius:var(--r-1); padding:0 5px; margin-left:6px; color:var(--text-secondary);
   vertical-align:1px; }
-.badge.instruct { color:var(--accent); border-color:var(--accent-soft);
-  background:var(--accent-soft); }
+/* three tones and no others (9d): "instruct" is information, so neutral —
+   the accent tint it wore was 3.9:1 in the dark theme */
+.badge.instruct { color:var(--text-primary); font-weight:600; }
 .badge.ckpt { border-style:dashed; color:var(--text-secondary); }
-.badge.prelim { color:var(--warning); border-color:var(--warning); }
+.badge.prelim { color:var(--warning-text); border-color:var(--warning); }
 .tiebest { font-weight:650; }
 .tiebest::after { content:"\2009\2248"; color:var(--muted); font-size:9px; vertical-align:1px; }
-.mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px;
+.mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:var(--fs-1);
   color:var(--text-secondary); }
 .legend { display:flex; gap:14px; flex-wrap:wrap; margin:6px 0 10px; }
-.legend span { display:inline-flex; align-items:center; gap:6px; font-size:12px;
+.legend span { display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-1);
   color:var(--text-secondary); }
 .key { width:11px; height:11px; border-radius:3px; display:inline-block; }
 .key.line { width:14px; height:0; border-top:3px solid; border-radius:2px; }
 .panels { display:grid; grid-template-columns:repeat(auto-fill,minmax(380px,1fr)); gap:12px; }
 @media (max-width:520px){ .panels { grid-template-columns:1fr; } }
-.panel { background:var(--surface-1); border:1px solid var(--border); border-radius:12px;
+.panel { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2);
   padding:14px 16px 8px; }
-.panel h3 { font-size:13.5px; font-weight:600; margin:0; }
-.panel .pmeta { font-size:11.5px; color:var(--muted); margin:1px 0 8px; }
+.panel h3 { font-size:var(--fs-2); font-weight:600; margin:0; }
+.panel .pmeta { font-size:var(--fs-1); color:var(--muted); margin:1px 0 8px; }
 /* chip row under a task heading: what it measures, how many options, coverage,
    whether it separates anything, where the ceiling is. Every chip carries the
    long version in its title, so the row stays short. */
 /* heat legend + "about these benchmarks" */
-.hl { display:inline-flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:11.5px;
+.hl { display:inline-flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:var(--fs-1);
   color:var(--text-secondary); }
 .hl-item { display:inline-flex; align-items:center; gap:4px; }
 .hl-sw { width:16px; height:11px; border-radius:3px; border:1px solid var(--border);
@@ -1620,74 +1635,74 @@ th .dir { font-size:9px; }
 .lb th.hasinfo::after { content:"\2009\24D8"; font-size:9px; color:var(--muted);
   vertical-align:1px; }
 .about { padding:0; }
-.about-toggle { font:inherit; font-size:13px; font-weight:600; width:100%; text-align:left;
+.about-toggle { font:inherit; font-size:var(--fs-2); font-weight:600; width:100%; text-align:left;
   background:none; border:0; color:var(--text-primary); padding:12px 16px; cursor:pointer;
-  border-radius:12px; }
+  border-radius:var(--r-2); }
 .about-toggle:hover { color:var(--accent); }
 .about-body { padding:0 16px 14px; display:grid;
   grid-template-columns:repeat(auto-fit,minmax(290px,1fr)); gap:14px 22px; }
 .about-item { border-top:1px solid var(--border); padding-top:10px; }
 .about-head { display:flex; align-items:center; gap:5px; flex-wrap:wrap; margin-bottom:4px; }
-.about-name { font-weight:600; font-size:13px; }
-.about-desc { margin:0; font-size:12.5px; line-height:1.5; color:var(--text-secondary); }
+.about-name { font-weight:600; font-size:var(--fs-2); }
+.about-desc { margin:0; font-size:var(--fs-1); line-height:1.5; color:var(--text-secondary); }
 /* model detail page */
-.backlink { display:inline-block; font-size:12.5px; color:var(--accent);
+.backlink { display:inline-block; font-size:var(--fs-1); color:var(--accent);
   text-decoration:none; margin:10px 2px; }
 .backlink:hover { text-decoration:underline; }
 .mhead { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.mtitle { margin:0; font-size:24px; letter-spacing:-0.01em; }
-.rankbadge { font-size:12px; font-weight:650; color:var(--accent);
-  background:var(--accent-soft); border-radius:6px; padding:1px 7px; }
+.mtitle { margin:0; font-size:var(--fs-4); letter-spacing:-0.01em; }
+.rankbadge { font-size:var(--fs-1); font-weight:650; color:var(--accent);
+  background:var(--accent-soft); border-radius:var(--r-1); padding:1px 7px; }
 .mlink { color:inherit; text-decoration:none; border-bottom:1px dotted var(--border); }
 .mlink:hover { color:var(--accent); border-bottom-color:var(--accent); }
 .mtbl td, .mtbl th { vertical-align:middle; }
 .mtbl .tname { font-weight:550; cursor:help; }
 .mtbl .sbar { display:block; }
 .mtbl td.dimmed { color:var(--muted); }
-.mtbl tr.domrow td { font-size:11px; font-weight:650; letter-spacing:.06em;
+.mtbl tr.domrow td { font-size:var(--fs-1); font-weight:650; letter-spacing:.06em;
   text-transform:uppercase; color:var(--muted); padding-top:14px; border-bottom:none; }
-.mtbl tr.flagrow td { font-size:11.5px; color:var(--muted); padding-top:0; border-bottom:none; }
+.mtbl tr.flagrow td { font-size:var(--fs-1); color:var(--muted); padding-top:0; border-bottom:none; }
 .provlist { display:grid; grid-template-columns:minmax(120px,max-content) 1fr;
-  gap:4px 16px; margin:8px 0 0; font-size:12.5px; }
+  gap:4px 16px; margin:8px 0 0; font-size:var(--fs-1); }
 .provlist dt { color:var(--muted); }
 .provlist dd { margin:0; overflow-wrap:anywhere; }
 /* per-item diagnosis */
-.dxlead { margin:4px 0 0; padding:9px 12px; border-radius:10px; font-size:13px;
+.dxlead { margin:4px 0 0; padding:9px 12px; border-radius:var(--r-2); font-size:var(--fs-2);
   line-height:1.55; background:var(--accent-soft); color:var(--text-primary); }
 .dxlead + .dxlead { margin-top:7px; }
 .dxlead b { font-weight:650; }
 .dxlead.calm { background:var(--plane); color:var(--text-secondary); }
-.dx { border:1px solid var(--border); border-radius:10px; margin-top:8px;
+.dx { border:1px solid var(--border); border-radius:var(--r-2); margin-top:8px;
   background:var(--surface-1); }
 .dx > summary { cursor:pointer; padding:9px 12px; display:flex; align-items:center;
-  gap:10px; flex-wrap:wrap; font-size:13px; list-style:none; }
+  gap:10px; flex-wrap:wrap; font-size:var(--fs-2); list-style:none; }
 .dx > summary::-webkit-details-marker { display:none; }
-.dx > summary::before { content:'▸'; color:var(--muted); font-size:11px; width:9px; }
+.dx > summary::before { content:'▸'; color:var(--muted); font-size:var(--fs-1); width:9px; }
 .dx[open] > summary::before { content:'▾'; }
 .dx[open] > summary { border-bottom:1px solid var(--border); }
 .dx > summary:hover { color:var(--accent); }
 .dx .dxname { font-weight:600; }
 .dx .dxbody { padding:10px 12px 14px; }
-.dxflag { font-size:10.5px; font-weight:650; letter-spacing:.03em; border-radius:5px;
+.dxflag { font-size:var(--fs-1); font-weight:650; letter-spacing:.03em; border-radius:var(--r-1);
   padding:1px 6px; background:color-mix(in srgb, var(--s2) 16%, transparent);
   color:var(--s2); border:1px solid color-mix(in srgb, var(--s2) 45%, transparent); }
-.dxbar { display:flex; height:12px; border-radius:6px; overflow:hidden;
+.dxbar { display:flex; height:12px; border-radius:var(--r-1); overflow:hidden;
   background:var(--plane); min-width:120px; }
 .dxbar > span { display:block; height:100%; }
-.dxkey { display:flex; flex-wrap:wrap; gap:4px 16px; margin:9px 0 0; font-size:12px; }
+.dxkey { display:flex; flex-wrap:wrap; gap:4px 16px; margin:9px 0 0; font-size:var(--fs-1); }
 .dxkey > span { display:flex; align-items:baseline; gap:6px; cursor:help; }
 .dxkey i { display:inline-block; width:10px; height:10px; border-radius:3px;
   border:1px solid var(--border); flex:none; transform:translateY(1px); }
 .dxkey b { font-weight:600; font-variant-numeric:tabular-nums; }
-.dxsub { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }
+.dxsub { width:100%; border-collapse:collapse; font-size:var(--fs-1); margin-top:6px; }
 .dxsub td, .dxsub th { padding:3px 8px 3px 0; border-bottom:1px solid var(--border);
   text-align:left; }
-.dxsub th { font-size:11px; font-weight:600; color:var(--muted); }
+.dxsub th { font-size:var(--fs-1); font-weight:600; color:var(--muted); }
 .dxsub td.num, .dxsub th.num { text-align:right; font-variant-numeric:tabular-nums; }
 /* categories first, subjects on expand; a dim row is under the noise floor */
 .dxcat { border-bottom:1px solid var(--border); }
 .dxcat > summary { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-  padding:5px 0; cursor:pointer; font-size:12.5px; list-style:none; }
+  padding:5px 0; cursor:pointer; font-size:var(--fs-1); list-style:none; }
 .dxcat > summary::-webkit-details-marker { display:none; }
 .dxcat > summary::before { content:"\25B8"; color:var(--muted); font-size:10px; width:10px; }
 .dxcat[open] > summary::before { content:"\25BE"; }
@@ -1700,95 +1715,95 @@ th .dir { font-size:9px; }
 .dxperm .dxsub { width:auto; min-width:60%; }
 .lb td.dim { color:var(--muted); }
 .badge.taint { color:var(--s2); border-color:var(--s2); }
-.jbar { display:flex; height:10px; border-radius:5px; overflow:hidden; background:var(--plane); min-width:110px; }
+.jbar { display:flex; height:10px; border-radius:var(--r-1); overflow:hidden; background:var(--plane); min-width:110px; }
 .jbar > span { display:block; height:100%; }
-.jd { width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }
+.jd { width:100%; border-collapse:collapse; font-size:var(--fs-1); margin-top:6px; }
 .jd td, .jd th { padding:4px 8px 4px 0; border-bottom:1px solid var(--border); text-align:left; }
-.jd th { font-size:11px; font-weight:600; color:var(--muted); }
+.jd th { font-size:var(--fs-1); font-weight:600; color:var(--muted); }
 .jd td.num, .jd th.num { text-align:right; font-variant-numeric:tabular-nums; }
 .jd tr.dim td { color:var(--muted); }
 .jd tr.dim .jbar { opacity:.4; }
 .lb th.judged { color:var(--text-secondary); font-style:italic; }
 /* the one button that can spend money and make training data: never colour alone */
-.propose { font:inherit; font-size:11.5px; padding:2px 9px; border-radius:6px;
+.propose { font:inherit; font-size:var(--fs-1); padding:2px 9px; border-radius:var(--r-1);
   border:1px solid var(--accent); background:var(--accent-soft); color:var(--accent);
   cursor:pointer; margin-left:auto; }
 .propose:disabled { border-color:var(--border); background:var(--plane);
   color:var(--muted); cursor:not-allowed; }
-.propwhy { flex-basis:100%; font-size:11.5px; color:var(--muted); margin:0 0 4px 20px; }
-.rv { border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin:10px 0; }
-.rv h3 { margin:0 0 4px; font-size:15px; }
+.propwhy { flex-basis:100%; font-size:var(--fs-1); color:var(--muted); margin:0 0 4px 20px; }
+.rv { border:1px solid var(--border); border-radius:var(--r-2); padding:12px 14px; margin:10px 0; }
+.rv h3 { margin:0 0 4px; font-size:var(--fs-3); }
 .rv textarea { width:100%; box-sizing:border-box; min-height:70px; font:inherit;
-  font-size:13px; color:var(--text-primary); background:var(--surface-1);
-  border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin:6px 0; }
+  font-size:var(--fs-2); color:var(--text-primary); background:var(--surface-1);
+  border:1px solid var(--border); border-radius:var(--r-1); padding:8px 10px; margin:6px 0; }
 .rv .frm input { min-width:120px; }
 .rv .ex { border-left:2px solid var(--border); padding:2px 0 2px 10px; margin:0 0 8px;
-  font-size:12.5px; }
-.rv .ex .kv { color:var(--muted); font-size:11.5px; }
-.kvs { display:flex; flex-wrap:wrap; gap:4px 18px; font-size:12.5px; margin:4px 0; }
+  font-size:var(--fs-1); }
+.rv .ex .kv { color:var(--muted); font-size:var(--fs-1); }
+.kvs { display:flex; flex-wrap:wrap; gap:4px 18px; font-size:var(--fs-1); margin:4px 0; }
 .kvs b { font-weight:600; }
-.provlist.small dd { font-size:12px; }
-.dxex { margin-top:10px; font-size:12.5px; }
-.dxex > summary { cursor:pointer; color:var(--accent); font-size:12px; }
+.provlist.small dd { font-size:var(--fs-1); }
+.dxex { margin-top:10px; font-size:var(--fs-1); }
+.dxex > summary { cursor:pointer; color:var(--accent); font-size:var(--fs-1); }
 .dxex ul { list-style:none; padding:0; margin:8px 0 0; }
 .dxex li { border-left:2px solid var(--border); padding:2px 0 2px 10px; margin:0 0 9px; }
 .dxex .q { display:block; }
-.dxex .kv { color:var(--muted); font-size:11.5px; }
+.dxex .kv { color:var(--muted); font-size:var(--fs-1); }
 .dxex .kv b { color:var(--text-secondary); font-weight:550; }
-.dxh { font-size:11px; font-weight:650; letter-spacing:.06em; text-transform:uppercase;
+.dxh { font-size:var(--fs-1); font-weight:650; letter-spacing:.06em; text-transform:uppercase;
   color:var(--muted); margin:16px 0 2px; }
-.domhead { font-size:12px; font-weight:650; letter-spacing:.06em; text-transform:uppercase;
+.domhead { font-size:var(--fs-1); font-weight:650; letter-spacing:.06em; text-transform:uppercase;
   color:var(--muted); margin:18px 2px 8px; }
 .domhead .se { text-transform:none; letter-spacing:0; font-weight:400; }
 .tchips { display:flex; flex-wrap:wrap; gap:5px; margin:5px 0 2px; }
-.tchip { font-size:10.5px; line-height:1.5; border:1px solid var(--border);
-  border-radius:5px; padding:0 6px; color:var(--text-secondary); cursor:help;
+.tchip { font-size:var(--fs-1); line-height:1.5; border:1px solid var(--border);
+  border-radius:var(--r-1); padding:0 6px; color:var(--text-secondary); cursor:help;
   white-space:nowrap; }
 .tchip.dom { background:var(--accent-soft); border-color:var(--accent-soft);
   color:var(--accent); }
-.tchip.flat { color:var(--warning); border-color:var(--warning); }
+.tchip.flat { color:var(--warning-text); border-color:var(--warning); }
 .tchip.front { border-style:dashed; }
 /* a two-state toggle in a .ctrl row — pressed state is not colour alone */
-.tgl { font:inherit; font-size:12px; cursor:pointer; border-radius:8px;
+.tgl { font:inherit; font-size:var(--fs-1); cursor:pointer; border-radius:var(--r-1);
   padding:4px 10px; border:1px solid var(--border); background:var(--plane);
   color:var(--text-secondary); }
 .tgl.on { background:var(--accent-soft); border-color:var(--accent);
   color:var(--accent); font-weight:600; }
 .tgl:disabled { opacity:.45; cursor:not-allowed; }
 .tv { display:none; margin-top:12px; } .tv.open { display:block; }
-.small { font-size:12px; color:var(--text-secondary); }
-.up { color:var(--success-text); } .down { color:var(--critical); }
+.small { font-size:var(--fs-1); color:var(--text-secondary); }
+.up { color:var(--success-text); } .down { color:var(--critical-text); }
 .note { border-left:2px solid var(--axis); padding:6px 0 6px 12px; margin:12px 0;
-  color:var(--text-secondary); font-size:13px; }
+  color:var(--text-secondary); font-size:var(--fs-2); }
 .warn { border-left:2px solid var(--warning); padding:6px 0 6px 12px; margin:10px 0;
-  color:var(--text-secondary); font-size:13px; }
+  color:var(--text-secondary); font-size:var(--fs-2); }
 .warn b, .note b { color:var(--text-primary); }
 /* a band the page cannot lose: a demo report must say what it is wherever
    it is opened, so it is markup at the top of the document, not a toast */
-.pagebanner { border:1px solid var(--warning); border-left-width:4px; border-radius:6px;
-  padding:10px 14px; margin:0 0 14px; font-size:13.5px; font-weight:600;
+.pagebanner { border:1px solid var(--warning); border-left-width:4px; border-radius:var(--r-1);
+  padding:10px 14px; margin:0 0 14px; font-size:var(--fs-2); font-weight:600;
   color:var(--text-primary); background:color-mix(in srgb, var(--warning) 10%, transparent); }
 .pagebanner a { font-weight:500; }
 /* the board's checks, folded where they are not about the work in front of
    you. Folded, never dismissed: they are findings */
 .warnfold { margin:8px 0; }
-.warnfold > summary { cursor:pointer; font-size:12.5px; color:var(--text-secondary);
+.warnfold > summary { cursor:pointer; font-size:var(--fs-1); color:var(--text-secondary);
   padding:4px 0; }
 .warnfold[open] > summary { color:var(--text-primary); }
 .lb td.model { white-space:nowrap; }
 .lb td.model .mname { display:inline-block; max-width:22ch; overflow:hidden;
   text-overflow:ellipsis; vertical-align:bottom; }
-.st { display:inline-block; font-size:11px; border-radius:999px; padding:2px 9px;
+.st { display:inline-block; font-size:var(--fs-1); border-radius:999px; padding:2px 9px;
   border:1px solid var(--border); white-space:nowrap; }
 .st-done { color:var(--success-text); border-color:var(--success-text); }
-.st-failed { color:var(--critical); border-color:var(--critical); }
+.st-failed { color:var(--critical-text); border-color:var(--critical); }
 .st-active { color:var(--accent); border-color:var(--accent); }
 .st-muted { color:var(--muted); }
 @keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:1} }
 .st-active::before { content:'●'; margin-right:5px; animation:pulse 1.4s infinite; }
 .frm { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
-.frm input, .frm select { font:inherit; font-size:13px; color:var(--text-primary);
-  background:var(--plane); border:1px solid var(--border); border-radius:8px;
+.frm input, .frm select { font:inherit; font-size:var(--fs-2); color:var(--text-primary);
+  background:var(--plane); border:1px solid var(--border); border-radius:var(--r-1);
   padding:6px 10px; }
 .frm input:focus, .frm select:focus { outline:2px solid var(--accent-soft);
   border-color:var(--accent); }
@@ -1801,7 +1816,7 @@ th .dir { font-size:9px; }
 @media (max-width:900px){ .tr-grid { grid-template-columns:1fr; } }
 .runlist { max-height:72vh; overflow-y:auto; }
 .runrow { display:flex; gap:8px; padding:7px 9px; border-bottom:1px solid var(--grid);
-  cursor:pointer; align-items:flex-start; font-size:13px; border-radius:6px; }
+  cursor:pointer; align-items:flex-start; font-size:var(--fs-2); border-radius:var(--r-1); }
 .runrow:hover { background:var(--plane); }
 .runrow.sel { background:var(--accent-soft); }
 .rchip { width:10px; height:10px; border-radius:3px; border:1px solid var(--border);
@@ -1809,19 +1824,19 @@ th .dir { font-size:9px; }
 .rbody { flex:1; min-width:0; }
 .rtop { display:flex; align-items:center; gap:8px; }
 .rname { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.rmeta { font-size:11.5px; color:var(--muted); margin-top:1px; white-space:nowrap;
+.rmeta { font-size:var(--fs-1); color:var(--muted); margin-top:1px; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis; }
 .ctrl { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:2px 0 10px; }
 .ctrl input[type=range] { width:140px; accent-color:var(--accent); }
-.ctrl input[type=search] { font:inherit; font-size:12.5px; color:var(--text-primary);
-  background:var(--plane); border:1px solid var(--border); border-radius:8px;
+.ctrl input[type=search] { font:inherit; font-size:var(--fs-1); color:var(--text-primary);
+  background:var(--plane); border:1px solid var(--border); border-radius:var(--r-1);
   padding:5px 9px; width:190px; }
 .msec { margin-bottom:10px; }
-.msec-h { background:none; border:0; padding:4px 0 6px; font-size:12.5px; font-weight:600;
+.msec-h { background:none; border:0; padding:4px 0 6px; font-size:var(--fs-1); font-weight:600;
   color:var(--text-secondary); cursor:pointer; display:flex; gap:6px; align-items:center;
   box-shadow:none; }
 .msec-h:hover { background:none; color:var(--text-primary); }
-.msec-h::before { content:'▾'; font-size:11px; color:var(--muted); }
+.msec-h::before { content:'▾'; font-size:var(--fs-1); color:var(--muted); }
 .msec.closed .msec-h::before { content:'▸'; }
 .msec-h .count-note { font-weight:400; }
 .diffrow td { background:var(--accent-soft); }
@@ -1834,31 +1849,31 @@ td.cfgv { white-space:pre-wrap; overflow-wrap:anywhere; max-width:440px; }
   gap:16px; align-items:start; margin-top:6px; }
 @media (max-width:900px){ .radar-grid { grid-template-columns:1fr; } }
 .radar .hit { cursor:pointer; }
-.radar-tbl th, .radar-tbl td { font-size:12.5px; }
-.xbtn { border:0; background:none; padding:0 2px; font-size:15px; line-height:1;
+.radar-tbl th, .radar-tbl td { font-size:var(--fs-1); }
+.xbtn { border:0; background:none; padding:0 2px; font-size:var(--fs-3); line-height:1;
   color:var(--muted); cursor:pointer; }
-.xbtn:hover { color:var(--critical); background:none; }
+.xbtn:hover { color:var(--critical-text); background:none; }
 .lb td input[type=checkbox] { accent-color:var(--accent); margin:0; vertical-align:middle;
   cursor:pointer; }
 mark { background:var(--accent-soft); color:var(--text-primary); border-radius:3px;
   padding:0 1px; }
-pre.mono { background:var(--plane); border:1px solid var(--border); border-radius:8px;
+pre.mono { background:var(--plane); border:1px solid var(--border); border-radius:var(--r-1);
   padding:10px 12px; margin:8px 0 0; }
 .mx { border-collapse:separate; border-spacing:2px; font-variant-numeric:tabular-nums;
   width:auto; }
-.mx th { border:0; font-size:10.5px; padding:3px 6px; text-transform:none; letter-spacing:0; }
+.mx th { border:0; font-size:var(--fs-1); padding:3px 6px; text-transform:none; letter-spacing:0; }
 .mx th.rowh { text-align:right; max-width:170px; overflow:hidden; text-overflow:ellipsis; }
 .mx th.colh span { writing-mode:vertical-rl; transform:rotate(180deg); max-height:120px;
   overflow:hidden; text-overflow:ellipsis; display:inline-block; }
-.mx td { border:0; border-radius:5px; background:var(--plane); width:34px; height:30px;
-  text-align:center; font-size:13px; cursor:default; }
+.mx td { border:0; border-radius:var(--r-1); background:var(--plane); width:34px; height:30px;
+  text-align:center; font-size:var(--fs-2); cursor:default; }
 .mx td.self { background:none; }
 .mx td:hover { outline:2px solid var(--accent-soft); }
 #tip { position:fixed; pointer-events:none; opacity:0; transition:opacity .08s;
-  background:var(--surface-1); border:1px solid var(--border); border-radius:8px;
-  padding:7px 10px; font-size:12px; box-shadow:0 4px 16px rgba(0,0,0,.16); z-index:50;
+  background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-1);
+  padding:7px 10px; font-size:var(--fs-1); box-shadow:0 4px 16px rgba(0,0,0,.16); z-index:50;
   max-width:320px; }
-#tip .v { font-size:14px; font-weight:650; color:var(--text-primary); }
+#tip .v { font-size:var(--fs-2); font-weight:650; color:var(--text-primary); }
 #tip .l { color:var(--text-secondary); }
 #tip .k { display:inline-block; width:10px; border-top:3px solid; border-radius:2px;
   margin-right:6px; vertical-align:3px; }
@@ -1868,7 +1883,7 @@ svg text { font-family:system-ui,-apple-system,sans-serif; }
 .dimmed .bar:not(.hot) { opacity:0.3; }
 .dimmed text.blab:not(.hot) { opacity:0.35; }
 a { color:var(--accent); }
-footer { margin-top:28px; font-size:12px; color:var(--muted); }
+footer { margin-top:28px; font-size:var(--fs-1); color:var(--muted); }
 /* ---- phase 9a: buttons that say what they are ---- */
 button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
 button.primary:hover { filter:brightness(1.07); background:var(--accent); }
@@ -1879,12 +1894,12 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
   background:var(--plane); border-color:var(--border); color:var(--text-secondary); }
 .dot-warn::before { content:''; display:inline-block; width:8px; height:8px; border-radius:50%;
   background:var(--warning); margin-right:6px; vertical-align:1px; }
-.badge.over { color:var(--warning); border-color:var(--warning); }
+.badge.over { color:var(--warning-text); border-color:var(--warning); }
 /* ---- the pager ---- */
 .pager { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:10px 0 2px; }
-.pager select { font:inherit; font-size:12.5px; color:var(--text-primary);
-  background:var(--surface-1); border:1px solid var(--border); border-radius:8px; padding:3px 6px; }
-.pager button { padding:3px 9px; font-size:12.5px; }
+.pager select { font:inherit; font-size:var(--fs-1); color:var(--text-primary);
+  background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-1); padding:3px 6px; }
+.pager button { padding:3px 9px; font-size:var(--fs-1); }
 .pager .pgnum[aria-current="page"] { background:var(--accent); border-color:var(--accent);
   color:#fff; font-weight:600; }
 /* ---- model search ---- */
@@ -1892,49 +1907,49 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .ms input { width:100%; box-sizing:border-box; }
 .ms-list { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:40; margin:0;
   padding:4px 0; list-style:none; background:var(--surface-1); border:1px solid var(--border);
-  border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,.16); max-height:320px; overflow-y:auto; }
+  border-radius:var(--r-2); box-shadow:0 10px 28px rgba(0,0,0,.16); max-height:320px; overflow-y:auto; }
 .ms-list[hidden] { display:none; }
 .ms-item { display:flex; flex-direction:column; gap:1px; padding:6px 11px; cursor:pointer;
-  font-size:13px; }
+  font-size:var(--fs-2); }
 .ms-item.active, .ms-item:hover { background:var(--accent-soft); }
 .ms-item.over { opacity:.6; }
-.ms-sep { padding:6px 11px 2px; font-size:11px; font-weight:600; color:var(--muted);
+.ms-sep { padding:6px 11px 2px; font-size:var(--fs-1); font-weight:600; color:var(--muted);
   text-transform:uppercase; letter-spacing:.05em; }
-.ms-foot { padding:6px 11px; font-size:12px; color:var(--warning); border-top:1px solid var(--grid); }
+.ms-foot { padding:6px 11px; font-size:var(--fs-1); color:var(--warning-text); border-top:1px solid var(--grid); }
 /* ---- the build bar ---- */
 .buildbar { position:sticky; top:0; z-index:60; display:flex; gap:10px; align-items:center;
   flex-wrap:wrap; padding:9px 22px; background:var(--accent-soft); border-bottom:1px solid var(--accent);
-  font-size:13px; backdrop-filter:blur(6px); }
+  font-size:var(--fs-2); backdrop-filter:blur(6px); }
 /* ---- dialog ---- */
 .dlg-back { position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.38);
   display:flex; align-items:center; justify-content:center; padding:16px; }
-.dlg { background:var(--surface-1); border:1px solid var(--border); border-radius:12px;
+.dlg { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2);
   max-width:540px; width:100%; padding:20px 22px; box-shadow:0 18px 50px rgba(0,0,0,.3); }
-.dlg h2 { font-size:17px; margin-bottom:6px; }
-.dlg ul { margin:6px 0 10px; padding-left:20px; font-size:13px; }
+.dlg h2 { font-size:var(--fs-3); margin-bottom:6px; }
+.dlg ul { margin:6px 0 10px; padding-left:20px; font-size:var(--fs-2); }
 .dlg-field { display:flex; flex-direction:column; gap:3px; margin:10px 0; }
-.dlg-field input { font:inherit; font-size:13px; color:var(--text-primary); background:var(--plane);
-  border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
+.dlg-field input { font:inherit; font-size:var(--fs-2); color:var(--text-primary); background:var(--plane);
+  border:1px solid var(--border); border-radius:var(--r-1); padding:6px 10px; }
 .dlg-check { display:flex; gap:8px; align-items:center; font-weight:600; margin:10px 0; }
 .dlg-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
 /* ---- the answers, as cards: nothing sideways ---- */
 .anslist { display:flex; flex-direction:column; gap:10px; margin-top:8px; min-width:0; }
 .anscard { display:grid; grid-template-columns:minmax(0,1fr) 140px; gap:8px 16px;
-  border:1px solid var(--border); border-radius:10px; padding:12px 14px; background:var(--surface-1); }
-.anscard .ansmeta { font-size:12px; color:var(--text-secondary); margin-bottom:4px; }
+  border:1px solid var(--border); border-radius:var(--r-2); padding:12px 14px; background:var(--surface-1); }
+.anscard .ansmeta { font-size:var(--fs-1); color:var(--text-secondary); margin-bottom:4px; }
 .anscard .qa { display:grid; grid-template-columns:52px minmax(0,1fr); gap:5px 10px; }
-.anscard .lbl { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase;
+.anscard .lbl { font-size:var(--fs-1); font-weight:600; color:var(--muted); text-transform:uppercase;
   letter-spacing:.05em; padding-top:2px; }
-.anscard .txt { overflow-wrap:anywhere; font-size:13px; min-width:0; }
+.anscard .txt { overflow-wrap:anywhere; font-size:var(--fs-2); min-width:0; }
 .clamp3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 .anscard .side { text-align:right; }
-.anscard .score { font-size:24px; font-weight:650; letter-spacing:-.02em; line-height:1.1; }
+.anscard .score { font-size:var(--fs-4); font-weight:650; letter-spacing:-.02em; line-height:1.1; }
 .anscard .side .badge { margin:4px 0 0 4px; }
 .critrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
 .critcells { display:flex; gap:2px; flex-wrap:nowrap; }
 .critcell { width:14px; height:14px; border-radius:3px; flex:none; box-shadow:inset 0 0 0 1px var(--border); }
 .critcell.na { background:none; border:1px dashed var(--axis); box-sizing:border-box; }
-.badge.new { color:var(--accent); border-color:var(--accent); background:var(--accent-soft); }
+.badge.new { color:var(--text-primary); font-weight:600; }
 @media (max-width:800px) {
   .anscard { grid-template-columns:minmax(0,1fr); }
   .anscard .side { text-align:left; }
@@ -1943,16 +1958,16 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .topright { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
 button.who { font-weight:600; }
 .who-edit { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
-.who-edit input { font:inherit; font-size:13px; color:var(--text-primary); background:var(--surface-1);
-  border:1px solid var(--border); border-radius:8px; padding:5px 9px; width:150px; }
+.who-edit input { font:inherit; font-size:var(--fs-2); color:var(--text-primary); background:var(--surface-1);
+  border:1px solid var(--border); border-radius:var(--r-1); padding:5px 9px; width:150px; }
 .who-edit.ask input { border-color:var(--warning); outline:2px solid color-mix(in srgb, var(--warning) 35%, transparent); }
 .morewrap { position:relative; display:inline-block; }
 .moremenu { position:absolute; top:calc(100% + 2px); left:0; z-index:45; min-width:200px;
-  background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:4px;
+  background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2); padding:4px;
   box-shadow:0 10px 28px rgba(0,0,0,.16); display:flex; flex-direction:column; }
 .moremenu[hidden] { display:none; }
-.moremenu [role=menuitem] { border:0; background:none; text-align:left; border-radius:7px;
-  padding:7px 10px; color:var(--text-primary); font-size:13px; text-decoration:none; }
+.moremenu [role=menuitem] { border:0; background:none; text-align:left; border-radius:var(--r-1);
+  padding:7px 10px; color:var(--text-primary); font-size:var(--fs-2); text-decoration:none; }
 .moremenu [role=menuitem]:hover, .moremenu [role=menuitem]:focus { background:var(--accent-soft); }
 .moremenu [role=menuitem][aria-current] { font-weight:600; }
 .moremenu [role=menuitem][hidden] { display:none; }
@@ -1961,14 +1976,14 @@ button.who { font-weight:600; }
 .dot.ok { background:var(--good); }
 .dot.warn { background:var(--warning); }
 .dot.info { background:var(--axis); }
-details.checks { margin:10px 0 0; font-size:13px; }
+details.checks { margin:10px 0 0; font-size:var(--fs-2); }
 details.checks > summary { cursor:pointer; list-style:none; display:inline-flex; align-items:center;
   color:var(--text-secondary); padding:3px 0; }
 details.checks > summary::-webkit-details-marker { display:none; }
 details.checks > summary .showhide::after { content:'\00a0— show'; color:var(--accent); }
 details.checks[open] > summary .showhide::after { content:'\00a0— hide'; }
 .checklist { list-style:none; margin:6px 0 0; padding:0; border:1px solid var(--border);
-  border-radius:10px; background:var(--surface-1); }
+  border-radius:var(--r-2); background:var(--surface-1); }
 .checklist .check { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline;
   padding:8px 12px; border-bottom:1px solid var(--grid); }
 .checklist .check:last-child { border-bottom:0; }
@@ -1976,19 +1991,19 @@ details.checks[open] > summary .showhide::after { content:'\00a0— hide'; }
 .check-more { flex-basis:100%; }
 .check-more > summary { cursor:pointer; color:var(--muted); }
 .infowrap { position:relative; display:inline-block; margin-left:6px; vertical-align:1px; }
-button.info { border:0; background:none; padding:0 3px; font-size:13px; color:var(--muted);
+button.info { border:0; background:none; padding:0 3px; font-size:var(--fs-2); color:var(--muted);
   cursor:pointer; line-height:1; }
 button.info:hover, button.info[aria-expanded="true"] { color:var(--accent); background:none; }
 .infopop { position:absolute; left:0; top:calc(100% + 6px); z-index:35; width:min(420px, 80vw);
-  background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:10px 12px;
-  font-size:12.5px; font-weight:400; color:var(--text-secondary); line-height:1.5;
+  background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2); padding:10px 12px;
+  font-size:var(--fs-1); font-weight:400; color:var(--text-secondary); line-height:1.5;
   box-shadow:0 10px 28px rgba(0,0,0,.16); white-space:normal; }
 .infopop[hidden] { display:none; }
 /* ---- phase 9c: every action answers, every table fits ---- */
 .toasts { position:fixed; right:18px; bottom:18px; z-index:80; display:flex; flex-direction:column;
   gap:8px; align-items:flex-end; max-width:min(440px, calc(100vw - 36px)); }
 .toast { display:flex; gap:10px; align-items:center; background:var(--text-primary);
-  color:var(--plane); border-radius:10px; padding:10px 12px 10px 14px; font-size:13px;
+  color:var(--plane); border-radius:var(--r-2); padding:10px 12px 10px 14px; font-size:var(--fs-2);
   box-shadow:0 10px 28px rgba(0,0,0,.25); }
 .toast a, .toast button.quiet { color:var(--plane); font-weight:600; text-decoration:underline; }
 .toast button.quiet:hover { background:rgba(255,255,255,.12); }
@@ -1997,26 +2012,26 @@ button.danger { background:var(--critical); border-color:var(--critical); color:
 td.rowacts { white-space:nowrap; }
 .frm.fields { align-items:flex-end; }
 .fld { display:flex; flex-direction:column; gap:3px; min-width:0; }
-.fld-label { font-size:11.5px; font-weight:600; color:var(--text-secondary); }
-.fld-text { font-size:13px; padding:5px 0; }
+.fld-label { font-size:var(--fs-1); font-weight:600; color:var(--text-secondary); }
+.fld-text { font-size:var(--fs-2); padding:5px 0; }
 /* the Leaderboard: the model column stays put, the score sits over its error */
 table.lb th.model, table.lb td.model { position:sticky; left:0; z-index:1;
   background:var(--surface-1); box-shadow:1px 0 0 var(--grid); }
-table.lb td.num .se { display:block; font-size:10.5px; line-height:1.15; }
-table.lb.dense td { padding-top:2px; padding-bottom:2px; }
+table.lb td.num .se { display:block; font-size:var(--fs-1); line-height:1.15; }
+table.lb.dense td { padding-top:2px; padding-bottom:2px; height:32px; }
 table.lb th.cmp { text-align:center; }
 table.lb thead tr:first-child th.sortable:not(.model) { white-space:normal; vertical-align:bottom; }
 tr.duprow td { background:var(--plane); }
 tr.duprow td.model { background:var(--plane); padding-left:22px; }
-button.duptoggle { display:inline; padding:0 4px; font-size:11.5px; }
+button.duptoggle { display:inline; padding:0 4px; font-size:var(--fs-1); }
 details.colmenu { position:relative; display:inline-block; }
 details.colmenu > summary { list-style:none; cursor:pointer; }
 details.colmenu > summary::-webkit-details-marker { display:none; }
 .colmenu-list { position:absolute; z-index:40; top:calc(100% + 4px); left:0; min-width:220px;
   display:flex; flex-direction:column; gap:3px; padding:10px 12px; background:var(--surface-1);
-  border:1px solid var(--border); border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,.16); }
+  border:1px solid var(--border); border-radius:var(--r-2); box-shadow:0 10px 28px rgba(0,0,0,.16); }
 /* Provenance: long ids wrap, the model column stays */
-table.prov th, table.prov td { white-space:normal; font-size:12px; padding:5px 6px; }
+table.prov th, table.prov td { white-space:normal; font-size:var(--fs-1); padding:5px 6px; }
 table.prov th { text-transform:none; letter-spacing:0; }
 table.prov td .mono, table.prov td { overflow-wrap:anywhere; }
 table.prov th.model, table.prov td.model, table.prov th:first-child { position:sticky; left:0;
@@ -2025,8 +2040,34 @@ table.prov th.model, table.prov td.model, table.prov th:first-child { position:s
 .caveats { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:10px 0; }
 .caveats .badge { margin:0; }
 details.caveat-why { display:inline-block; }
-details.caveat-why > summary { cursor:pointer; color:var(--accent); font-size:12.5px; }
+details.caveat-why > summary { cursor:pointer; color:var(--accent); font-size:var(--fs-1); }
 details.caveat-why[open] { display:block; flex-basis:100%; }
+/* ---- phase 9d: one visual system ---- */
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline:2px solid var(--accent); outline-offset:2px; }
+button.secondary { background:var(--surface-1); }
+.badge.warn, .badge.taint, .badge.prelim, .badge.over {
+  color:var(--warning-text); border-color:color-mix(in srgb, var(--warning) 70%, transparent);
+  background:color-mix(in srgb, var(--warning) 10%, transparent); }
+.badge.danger { color:var(--critical-text); border-color:color-mix(in srgb, var(--critical) 70%, transparent);
+  background:color-mix(in srgb, var(--critical) 10%, transparent); }
+/* the paged tables: the header stays in view while the page scrolls */
+.lb-wrap.stick { overflow:visible; }
+.lb-wrap.stick thead tr:first-child th { position:sticky; top:0; z-index:3;
+  background:var(--surface-1); box-shadow:0 1px 0 var(--border); }
+.lb-wrap.stick table.lb thead tr:first-child th.model { z-index:4; }
+@media (max-width:900px) { .lb-wrap.stick { overflow-x:auto; }
+  .lb-wrap.stick thead tr:first-child th { position:static; } }
+.empty { display:flex; flex-direction:column; align-items:flex-start; gap:var(--sp-2);
+  padding:var(--sp-4); margin:var(--sp-2) 0; border:1px dashed var(--border);
+  border-radius:var(--r-2); color:var(--text-secondary); }
+.empty p { margin:0; }
+.skeleton { display:flex; flex-direction:column; gap:var(--sp-3); padding:var(--sp-3) 0; }
+.sk-row { height:14px; border-radius:var(--r-1);
+  background:linear-gradient(90deg, var(--plane) 0%, var(--border) 50%, var(--plane) 100%);
+  background-size:200% 100%; animation:sk 1.4s ease-in-out infinite; }
+@keyframes sk { from { background-position:200% 0; } to { background-position:-200% 0; } }
+@media (prefers-reduced-motion: reduce) { .sk-row { animation:none; } }
 @media print { .filters, .tabs, button { display:none !important; }
   .view { display:block !important; } body { background:#fff; } }
 """
@@ -2035,7 +2076,7 @@ JS = r"""
 'use strict';
 // Two lives, one page: embedded JSON = the frozen single-file report;
 // an empty (null) data slot = served by service/app.py, which makes this the
-// LIVE dashboard — same charts, data fetched, plus a Submit & Queue tab.
+// LIVE dashboard — same charts, data fetched, plus a Queue tab.
 let DATA = JSON.parse(document.getElementById('data').textContent || 'null');
 const LIVE = DATA === null;
 const state = {
@@ -2082,6 +2123,8 @@ const state = {
 };
 
 // ---------- tiny DOM helper: everything dynamic goes through textContent ----------
+const NATIVE = new Set(['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'SUMMARY', 'LABEL',
+                        'DETAILS', 'OPTION']);
 function el(tag, attrs = {}, ...kids) {
   const svg = tag.startsWith('svg:');
   const e = svg ? document.createElementNS('http://www.w3.org/2000/svg', tag.slice(4))
@@ -2091,6 +2134,16 @@ function el(tag, attrs = {}, ...kids) {
     if (k === 'text') e.textContent = v;
     else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
     else e.setAttribute(k, v);
+  }
+  // phase 9d: a click handler on something that is not a control (a sortable
+  // column header, a row) is reachable from the keyboard too — Tab to it,
+  // Enter or Space to act
+  if (!svg && attrs.onclick && !NATIVE.has(e.tagName) && !e.hasAttribute('tabindex')) {
+    e.setAttribute('tabindex', '0');
+    if (!/^T[HDR]$/.test(e.tagName) && !e.hasAttribute('role')) e.setAttribute('role', 'button');
+    e.addEventListener('keydown', ev => {
+      if (ev.target === e && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); e.click(); }
+    });
   }
   for (const k of kids.flat(2)) if (k !== null && k !== undefined)
     e.append(k.nodeType ? k : document.createTextNode(k));
@@ -2297,6 +2350,13 @@ const taintBadge = m => (m.tainted || []).length
       title: `trained on data derived from the diagnosis half of ${m.tainted.map(tName).join(', ')}`
         + ' — that score is shown per model and never ranked',
       text: 'trained on ' + m.tainted.map(tName).join(', ') + ' diagnostics' }) : null;
+// one warning badge per row: trained-on-it outranks preliminary, and the
+// other one rides in its tooltip rather than as a second amber chip
+const warnBadge = m => {
+  const t = taintBadge(m), p = prelimBadge(m);
+  if (t && p) t.title += `\n\nalso ${p.textContent}: ${p.title}`;
+  return t || p;
+};
 const ckBadge = m => m.source === 'artifact'
   ? el('span', { class: 'badge ckpt', title: 'uploaded checkpoint (local artifact)',
                  text: 'ckpt' }) : null;
@@ -3474,7 +3534,7 @@ function vModel() {
       el('h2', { class: 'mtitle', text: m.name }),
       ckBadge(m) || el('span', { class: 'badge' + (m.kind === 'instruct' ? ' instruct' : ''),
         text: m.kind }),
-      prelimBadge(m) || '', taintBadge(m) || '',
+      warnBadge(m) || '',
       // the badge carries its date too: #7 from August is not #7 today
       r ? el('span', { class: 'rankbadge', 'data-rank': String(r.n),
         title: `${r.n} of ${r.of} ranked models`
@@ -3826,6 +3886,20 @@ const tile = (label, value, notetext, tip) => el('div', { class: 'tile', title: 
   el('div', { class: 'value', text: value }),
   notetext ? el('div', { class: 'note', text: notetext }) : null);
 const note = t => el('p', { class: 'note', text: t });
+// an empty state is a sentence and the action that fills it
+function empty(text, label, go, attrs = {}) {
+  return el('div', { class: 'empty', 'data-empty': '1', ...attrs },
+    el('p', { text }),
+    label ? el('button', { class: 'secondary', 'data-empty-action': '1', text: label,
+      onclick: go }) : '');
+}
+// while something loads: the shape of what is coming, not the word "Loading…"
+function skeleton(rows = 4, attrs = {}) {
+  return el('div', { class: 'skeleton', role: 'status', 'aria-busy': 'true',
+      'aria-label': 'loading', ...attrs },
+    Array.from({ length: rows }, (_, i) => el('div', { class: 'sk-row',
+      style: `width:${[92, 78, 86, 64, 88, 72][i % 6]}%` })));
+}
 
 // ---------------------------------------------------------------------------
 // A button that calls the API answers in three ways, always: it says it is
@@ -4584,7 +4658,7 @@ function vModels() {
   const pg = paged('models', ms, JSON.stringify([f.q, f.kind, f.src, f.family, f.judgedOnly,
                                                  f.taintedOnly, f.prelimOnly, f.sort]));
   const table = el('div', { class: 'card' }, pg.pager,
-    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-models-table': '1' },
+    el('div', { class: 'lb-wrap stick' }, el('table', { class: 'jd', 'data-models-table': '1' },
       el('thead', {}, el('tr', {}, MCOLS.map(th), el('th', { text: 'flags' }))),
       el('tbody', {}, pg.rows.map(m => {
         const topics = m.judge ? Object.keys(m.judge.tasks || {})
@@ -4618,7 +4692,9 @@ function vModels() {
             text: 'tainted' }) : '',
             m.provisional ? el('span', { class: 'badge taint', text: 'provisional' }) : ''));
       })))));
-  if (!ms.length) table.append(note('No model matches these filters.'));
+  if (!ms.length) table.append(empty('No model matches these filters.', 'Clear the filters',
+    () => { Object.assign(state.mdl, { q: '', kind: 'all', src: 'all', family: 'all',
+      judgedOnly: false, taintedOnly: false, prelimOnly: false }); render(); }));
   return [head, table];
 }
 
@@ -4748,7 +4824,7 @@ function vLeaderboard(ms) {
         ckBadge(m) || (m.kind === 'instruct'
           ? el('span', { class: 'badge instruct', text: 'instruct' })
           : el('span', { class: 'badge', text: 'base' })),
-        prelimBadge(m) || '', taintBadge(m) || '', dupBadge(m) || '');
+        warnBadge(m) || '', dupBadge(m) || '');
       if (c.key === 'params') {
         const a = m.archinfo || {};
         // a sparse model loads every expert but routes each token through a few:
@@ -4844,7 +4920,7 @@ function vLeaderboard(ms) {
           el('button', { 'aria-pressed': String(!!state.lbDense === v), text: l,
             onclick: () => { state.lbDense = v; render(); } })))),
     state.lbView === 'cats' ? lbCategoryTable(ms)
-      : [lbPg.pager, el('div', { class: 'lb-wrap' }, el('table', {
+      : [lbPg.pager, el('div', { class: 'lb-wrap stick' }, el('table', {
           class: 'lb' + (state.lbDense ? ' dense' : ''), 'data-lb-table': '1' }, thead, tbody))]),
     radarCard(ms) || '',
     aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
@@ -4908,7 +4984,8 @@ function lbViewCtrl(ms) {
     el('span', { class: 'count-note', text: state.lbView === 'cats'
       ? `leaderboard-half MMLU score per category, from each model's diagnosis (${n} of `
         + `${ms.length} have one) — categories under ${CAT_MIN_N} items are greyed`
-      : 'switch to see MMLU broken down by category for every diagnosed model' }));
+      : n ? 'switch to see MMLU broken down by category for every diagnosed model'
+      : 'MMLU by category needs a diagnosis on file, and no model here has one' }));
 }
 
 function lbCategoryTable(ms) {
@@ -5183,7 +5260,7 @@ function vRuns(ms) {
         DATA.meta.transformers) : ''),
     el('p', { class: 'sub', text: 'Every field here can change a score. Publish this table with the numbers, or the numbers are hearsay. Sorted newest-eval-first — click any column to re-sort.' }),
     provPg.pager,
-    el('div', { class: 'lb-wrap' }, el('table', { class: 'prov', 'data-prov-table': '1' },
+    el('div', { class: 'lb-wrap stick' }, el('table', { class: 'prov', 'data-prov-table': '1' },
       el('thead', {}, el('tr', {}, PROV_COLS.map(c => el('th', {
         class: (c.num ? 'num ' : '') + 'sortable',
         onclick: () => { state.provSort = { key: c.key,
@@ -5946,7 +6023,7 @@ function vTraining() {
         let statusLine = `Training ${selRuns[0].row.status} · benchmarks: `
           + `${evs.length - pendingEvs.length}/${evs.length} done`;
         if (inQueue) statusLine += `, ${inQueue} in the eval queue`;
-        if (failedEvs) statusLine += `, ${failedEvs} failed (see Submit & Queue)`;
+        if (failedEvs) statusLine += `, ${failedEvs} failed (see the Queue tab)`;
         if (series.length || evs.length) {
           const XTITLE = { step: 'benchmark score vs step',
                            tokens: 'benchmark score vs training tokens',
@@ -6219,9 +6296,11 @@ function vQueue() {
   const qThead = el('thead');
   const qTbody = el('tbody');
   const qPager = el('div');
-  const qTableWrap = el('div', { class: 'lb-wrap' }, el('table', { 'data-queue-table': '1' },
+  const qTableWrap = el('div', { class: 'lb-wrap stick' }, el('table', { 'data-queue-table': '1' },
     qThead, qTbody));
-  const qEmpty = el('p', { class: 'small', text: 'Nothing submitted yet.' });
+  const qEmpty = empty('Nothing in the queue yet. Submit a model above — it runs here, one '
+    + 'at a time.', 'Submit a model', () => {
+      const i = document.querySelector('[data-ms="submit"] input'); if (i) i.focus(); });
   // in place, same reason as everywhere: the 5s poll must never eat a keystroke
   function rebuildQueue() {
     const any = state.queue.length > 0;
@@ -6602,7 +6681,10 @@ function rvProposal(p, llmOk) {
         el('button', { class: 'primary', text: 'Generate data', disabled: llmOk ? null : '',
           title: llmOk ? '' : (usage.reason || 'LLM not configured'),
           onclick: () => rvPost(`api/proposals/${p.id}/generate`,
-            { requester: whoName(), count: +count.value, fmt: fmt.value }) })));
+            { requester: whoName(), count: +count.value, fmt: fmt.value }) }),
+        // disabled says why, beside it, not only on hover
+        llmOk ? '' : el('span', { class: 'propwhy', 'data-why': 'generate',
+          text: usage.reason || 'no generator is configured on this server' })));
     if ((p.datasets || []).length)
       card.append(el('p', { class: 'small', text: 'datasets: ' + p.datasets.map(d =>
         `#${d.id} ${d.status}${d.error ? ' (' + d.error + ')' : ''}`).join(' · ') }));
@@ -6683,22 +6765,25 @@ function vReview() {
   const waiting = props.filter(p => p.status === 'pending' || p.status === 'proposed');
   const approved = props.filter(p => p.status === 'approved');
   const closed = props.filter(p => p.status === 'rejected' || p.status === 'failed');
-  const sec = (title, sub, list, empty) => el('div', { class: 'card' },
+  const sec = (title, sub, list, emptyNote) => el('div', { class: 'card' },
     el('h2', { text: title }), el('p', { class: 'sub', text: sub }),
-    list.length ? list.map(p => rvProposal(p, llmOk)) : el('p', { class: 'small', text: empty }));
+    list.length ? list.map(p => rvProposal(p, llmOk)) : emptyNote);
   return [llmCard, rvTopicPicker(), rvTopicDetail(llmOk),
     sec('Awaiting review', 'Read the judged numbers first: if the suite is preliminary or the '
       + 'model wrote nothing on this topic, the button that made this proposal should have '
       + 'been disabled — reject it.', waiting,
-      'Nothing waiting. A proposal starts from a topic row in a model\'s Judged section.'),
+      empty('Nothing waiting — no proposals yet. A proposal starts on a topic page, from '
+        + 'what the judge wrote about the answers.', 'Propose from a topic page →',
+        () => navigate({ tab: 'loop', topic: null, model: null }))),
     sec('Approved — ready to generate', 'The spec below is exactly what the generator '
-      + 'receives.', approved, 'No approved specs.'),
+      + 'receives.', approved, empty('No approved specs yet. Approve one above, and it waits '
+        + 'here to be generated from.')),
     el('div', { class: 'card' }, el('h2', { text: 'Datasets' }),
       el('p', { class: 'sub', text: 'Generated, gated, and recorded. A training run that '
         + 'consumes one registers it (datasets=[id] on the run), and every checkpoint of '
         + 'that run then carries the taint badge and loses the task from its average.' }),
       (state.rv.datasets || []).length ? (state.rv.datasets || []).map(rvDataset)
-        : el('p', { class: 'small', text: 'No datasets yet.' })),
+        : empty('No datasets yet. Generate one from an approved spec above.')),
     closed.length ? el('details', { class: 'card' },
       el('summary', { style: 'cursor:pointer', text: `${closed.length} rejected or failed` }),
       closed.map(p => rvProposal(p, llmOk))) : ''];
@@ -6725,7 +6810,7 @@ function modelAnswers(m, cats) {
     loadAnswers(m.id, topic);
   const j = a.rows;
   if (!j || a.model !== m.id || a.topic !== topic) {
-    wrap.append(el('p', { class: 'small', text: 'Loading…' }));
+    wrap.append(skeleton(4, { 'data-loading': 'answers' }));
     return wrap;
   }
   const rep = j.report_half || {};
@@ -6911,18 +6996,31 @@ function overBadge(over) {
     text: 'over a provisional judge' });
 }
 
+// a row carries one warning badge at most: its own (the model trained on this
+// topic). What is true of every score on the board — a provisional judge, a
+// single provider, draft rubrics — is said once, above it (loopCaveats)
 function judgedBadges(last) {
-  if (!last) return [];
-  const out = [];
-  if (last.provisional) out.push(el('span', { class: 'badge taint', title: last.provisional_reason,
-    text: 'provisional' }));
-  if (last.draft_rubric) out.push(el('span', { class: 'badge taint', text: 'draft rubric' }));
-  if (last.single_provider_loop) out.push(el('span', { class: 'badge taint',
+  if (!last || !last.tainted) return [];
+  return [el('span', { class: 'badge taint',
+    title: 'this model trained on data derived from this topic', text: 'trained on it' })];
+}
+
+function loopCaveats(rows) {
+  const lasts = rows.map(r => r.last_judged).filter(Boolean);
+  if (!lasts.length) return '';
+  const bits = [];
+  const prov = lasts.find(l => l.provisional);
+  if (prov) bits.push(el('span', { class: 'badge taint', title: prov.provisional_reason,
+    text: 'provisional judge' }));
+  if (lasts.some(l => l.single_provider_loop)) bits.push(el('span', { class: 'badge taint',
     title: 'the same provider wrote, sat or graded more than one step of this loop',
     text: 'single provider' }));
-  if (last.tainted) out.push(el('span', { class: 'badge taint',
-    title: 'this model trained on data derived from this topic', text: 'trained on it' }));
-  return out;
+  const draft = rows.filter(r => r.last_judged && r.last_judged.draft_rubric).map(r => r.topic);
+  if (draft.length) bits.push(el('span', { class: 'badge taint',
+    title: 'rubrics their author has not signed off yet', text: `draft rubric: ${draft.join(', ')}` }));
+  if (!bits.length) return '';
+  return el('p', { class: 'caveats', 'data-loop-caveats': '1' },
+    el('span', { class: 'small', text: 'Every score below: ' }), ...bits);
 }
 
 function vLoop() {
@@ -6945,12 +7043,13 @@ function vLoop() {
     state.loop.blocked ? el('p', { class: 'warn', 'data-loop-blocked': '1' },
       el('b', { text: 'No topic can be sat right now. ' }), state.loop.blocked) : '',
     state.loop.msg ? el('p', { class: 'small', 'data-loop-msg': '1', text: state.loop.msg }) : '',
-    loopFailure());
+    loopFailure(), loopCaveats(rows));
   const sel = head.querySelector('select[aria-label="results for"]');
   if (sel) sel.id = 'loopModel';
   if (!state.loop.loaded)
     return [head, el('div', { class: 'card' }, el('p', { class: 'small',
-      text: state.loop.failed ? 'No board to show yet — see above.' : 'Loading…' }))];
+      text: state.loop.failed ? 'No board to show yet — see above.' : '' }),
+      state.loop.failed ? '' : skeleton(8, { 'data-loading': 'loop' }))];
   // topics with questions first; the ones without fold into one row that
   // says so and opens — ten empty rows were two thirds of the board
   const full = rows.filter(r => r.error || r.bank.accepted);
@@ -7011,7 +7110,7 @@ function vLoop() {
     el('td', {}, el('button', { class: 'primary', 'data-step': 'import', text: 'Import a bank',
       onclick: () => { eximpState().topic = ''; loopGo({ topic: '' }, 'import'); } }))) : '';
   const table = el('div', { class: 'card' },
-    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-loop-table': '1' },
+    el('div', { class: 'lb-wrap stick' }, el('table', { class: 'jd', 'data-loop-table': '1' },
       el('thead', {}, el('tr', {},
         el('th', { text: 'topic' }), el('th', { text: 'bank (report / diagnose)' }),
         el('th', { text: 'rubric' }), el('th', { text: who ? `results — ${who}` : 'results' }),
@@ -7036,7 +7135,8 @@ function vTopic() {
       onclick: e => { e.preventDefault(); navigate({ topic: null, tab: 'loop' }); } }));
   if (!r) return [el('div', { class: 'card' }, back,
     el('h2', { text: state.topic }), el('p', { class: 'small',
-      text: state.loop.loaded ? 'No such topic.' : 'Loading…' }))];
+      text: state.loop.loaded ? 'No such topic.' : '' }),
+      state.loop.loaded ? '' : skeleton(5, { 'data-loading': 'topic' }))];
   const last = r.last_judged;
   const st = loopStep(r);
   const headCard = el('div', { class: 'card', 'data-topic-page': r.slug }, back,
@@ -7125,7 +7225,7 @@ function loopSitPanel(r) {
     el('p', { class: 'small', text: 'topics in this run:' }), pick,
     s.msg ? el('p', { class: 'small', 'data-sit-msg': '1', text: s.msg }) : '',
     el('p', { class: 'small' }, 'The queue is on ',
-      el('a', { href: '#tab=queue', text: 'Submit & Queue',
+      el('a', { href: '#tab=queue', text: 'Queue',
         onclick: e => { e.preventDefault(); navigate({ tab: 'queue', topic: null }); } }),
       ' — a judged row says which topics it sat and how far the judge batch is.'));
 }
@@ -7261,7 +7361,7 @@ function ansCard(it, j) {
     el('div', { class: 'side' },
       el('div', { class: 'score', text: it.graded ? `${it.score} / 4` : '—' }),
       it.graded ? '' : el('div', { class: 'se', text: 'the judge\'s reply was unreadable' }),
-      el('div', {}, flags.map(f => el('span', { class: 'badge taint', title: f.effect_words,
+      el('div', {}, flags.map(f => el('span', { class: 'badge danger', title: f.effect_words,
         'data-flag': f.id, text: f.label })))));
 }
 
@@ -7275,7 +7375,8 @@ function loopAnswersPanel(r) {
       + 'score: it appears below as one line and never as a row — not its questions, not '
       + 'its answers, not its qids.' }));
   if (!models.length) {
-    card.append(note('No model has been judged on this topic yet. Sit the exam above.'));
+    card.append(empty('No model has been judged on this topic yet.', 'Sit the exam', () => {
+      state.after = { scroll: '[data-panel="sit"]', focus: '[data-ms="sit"] input' }; render(); }));
     return card;
   }
   const want = a.model && models.includes(a.model) ? a.model
@@ -7305,7 +7406,7 @@ function loopAnswersPanel(r) {
       onclick: e => { e.preventDefault(); navigate({ model: want, topic: null }); } })));
   const j = a.rows;
   if (!j || a.topic !== r.topic) {
-    card.append(el('p', { class: 'small', text: 'Loading…' }));
+    card.append(skeleton(4, { 'data-loading': 'answers' }));
     return card;
   }
   const rep = j.report_half || {};
@@ -7333,7 +7434,9 @@ function loopAnswersPanel(r) {
   card.append(el('div', { class: 'anslist', 'data-answers-table': '1' },
     pg.rows.map(it => ansCard(it, j))));
   if (pg.pager) card.append(pager('answers', rows.length));        // and again under the list
-  if (!rows.length) card.append(note('No answer matches these filters.'));
+  if (!rows.length) card.append(empty('No answer matches these filters.', 'Clear the filters',
+    () => { Object.assign(state.ans, { acuity: 'all', flag: 'all', score: 'all', crit: 'all' });
+            render(); }));
   return card;
 }
 
@@ -7486,9 +7589,10 @@ function vExam() {
       + 'the reference the substance rather than a wording, is it answerable in five sentences, '
       + 'is it new? Accept, edit and accept, or reject with a reason. Click a topic in the table '
       + 'above to show only its questions.' }),
-    cands == null ? el('p', { class: 'small', 'data-loading': 'candidates', text: 'Loading…' })
+    cands == null ? skeleton(3, { 'data-loading': 'candidates' })
       : cands.length ? cands.slice(0, 40).map(exCandidate)
-      : el('p', { class: 'small', text: 'Nothing waiting' + (state.ex.topic ? ' in this topic.' : '.') }),
+      : empty('Nothing waiting' + (state.ex.topic ? ' in this topic.' : '.')
+          + ' Drafted questions appear here to accept or reject; a person\'s bank is imported whole above.'),
     cands && cands.length > 40
       ? el('p', { class: 'small', text: `${cands.length - 40} more after these.` }) : '');
   return [head, exImport(), exRubrics(), cur];
@@ -7680,7 +7784,7 @@ function exRubrics() {
       + 'the 0–4 into a fold of per-criterion scores. Changing either file changes its sha256, '
       + 'which is recorded in every judge.json: scores from before and after are not '
       + 'comparable, so re-sit the topic after a change.')),
-    st.rows == null ? el('p', { class: 'small', text: 'Loading…' })
+    st.rows == null ? skeleton(5, { 'data-loading': 'rubrics' })
       : el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
         el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { text: 'bank' }),
           el('th', { text: 'rubric' }),
@@ -7803,7 +7907,7 @@ function exRubricUpload(st) {
       p.ok && p.changed ? el('p', { class: 'warn', 'data-sha-warning': '1' },
         el('b', { text: 'This changes the file\'s sha256. ' }), p.warning) : '',
       p.ok && !p.changed ? el('p', { class: 'small', text: 'Identical to the file in use.' }) : '',
-      el('pre', { class: 'mono', style: 'max-height:260px;overflow:auto;font-size:11.5px',
+      el('pre', { class: 'mono', style: 'max-height:260px;overflow:auto;font-size:12px',
                   text: (p.diff || []).join('\n') || '(no difference)' })) : '');
 }
 
@@ -8235,7 +8339,7 @@ applyTheme(THEMES[themeIdx]);
 // boot: embedded data renders immediately; live mode fetches then polls
 if (LIVE) {
   document.getElementById('view').replaceChildren(
-    el('p', { class: 'small', style: 'margin:20px 4px', text: 'Loading results…' }));
+    skeleton(6, { 'data-loading': 'results' }));
   refreshResults().then(() => {
     if (DATA && !DATA.models.length) { state.tab = 'queue'; render(); }
   });

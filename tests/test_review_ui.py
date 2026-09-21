@@ -438,7 +438,11 @@ def test_the_loop_tab_is_one_row_per_topic_with_the_next_step(live, page):
     # a rubric its author has not signed off is stamped on the row that uses it
     law = page.locator("tr[data-loop-row='law']")
     assert "law.md" in law.text_content() and "DRAFT" in law.text_content()
-    assert "draft rubric" in law.text_content()            # and on its judged run
+    # and its judged run is named once, above the board, not as a badge per row
+    # (9d: at most one warning badge on a row)
+    caveats = page.locator("[data-loop-caveats]").text_content()
+    assert "draft rubric" in caveats and "law" in caveats
+    assert "draft rubric" not in law.text_content()
     # no judge is configured in this fixture, so a topic nobody has sat says
     # so on the button rather than offering it
     assert page.locator("[data-loop-blocked]").count() == 1
