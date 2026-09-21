@@ -44,7 +44,11 @@ docker compose up -d --build
 docker compose logs -f        # Ctrl-C stops the log view, not the service
 ```
 
-Update after a `git pull`: `docker compose up -d --build` again. Stop:
+Update after a `git pull`: `docker compose up -d --build` again — or, to put
+the sha in the "the dashboard was updated" bar a page left open sees,
+`EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build`
+(with sudo: `sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose
+up -d --build`). Stop:
 `docker compose down` (an in-flight run is killed; it re-queues on next start and
 per-task resume repeats only the interrupted task).
 
@@ -114,6 +118,8 @@ it. If it fails part-way, the record is removed and the next start tries again.
 | `JUDGE_PROVIDER` / `JUDGE_MODEL` / `JUDGE_API_KEY` | *(unset — off)* | the judge: an API call, batch mode. A **dated** model id, never an alias; a **different provider** from the exam writer and the generator; `stub` for a dry run. The page states the reason when any rule fails. `local` is the one exception to the dated id: it runs, **provisional** |
 | `JUDGE_CANARY_MAX_DRIFT` | 0.5 | thirty fixed scripts are re-graded every run; if their grades move more than this from the previous run the run is preliminary |
 | `ALLOW_SINGLE_PROVIDER_LOOP` | 0 | the documented override for a one-provider trial; every judged score is then stamped "single-provider loop" |
+| `ALLOW_PRELIMINARY_OVERRIDE` | 1 | Propose from a topic whose judge is not evidence yet (a local model, not calibrated, single provider, draft rubric): the topic page shows **Propose…**, asks, and a person ticks "I understand these grades are not evidence". The proposal, its spec, the dataset's `provenance.json` and any model trained on it are marked "proposed over a provisional judge". Reasons about the data (too few questions, nothing written, collapsed output) are never overridable. `0` restores the hard gate: the button disabled, the old words |
+| `EVALBOARD_BUILD` | *(unset)* | build arg: the git sha the image is built from, shown to a page that was loaded before a deploy. Optional — the page's own hash tells an old page from a new one without it |
 | `JUDGED_TASKS_DIR` | `$EXAM_DIR/tasks` | where `scripts/exam_build.py build` put the exam tasks |
 | `LOCAL_BASE_URL` | `http://localhost:8000/v1` | the `local` provider's OpenAI-compatible server (vLLM). Loopback only on the deploy box |
 | `LOCAL_CONCURRENCY` | 2 | `local` requests in flight at once — the card is shared |

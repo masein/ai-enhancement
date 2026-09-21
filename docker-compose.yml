@@ -22,7 +22,11 @@
 
 services:
   bench:
-    build: .
+    build:
+      context: .
+      args:
+        # EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+        EVALBOARD_BUILD: ${EVALBOARD_BUILD:-}
     image: aienh-bench
     pid: "host"
     # the box's loopback, reachable from inside the container: the `local`
@@ -70,6 +74,7 @@ services:
       JUDGE_API_KEY: ${JUDGE_API_KEY:-}
       JUDGE_CANARY_MAX_DRIFT: ${JUDGE_CANARY_MAX_DRIFT:-0.5}
       ALLOW_SINGLE_PROVIDER_LOOP: ${ALLOW_SINGLE_PROVIDER_LOOP:-0}
+      ALLOW_PRELIMINARY_OVERRIDE: ${ALLOW_PRELIMINARY_OVERRIDE:-1}
       # the `local` provider (vLLM). Inside this container localhost is the
       # container, so the box's loopback is reached through the host gateway
       # below — vLLM stays bound to 127.0.0.1 on the box and nothing new is

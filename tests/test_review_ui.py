@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import json
 import re
-import socket
-import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -14,89 +12,9 @@ from urllib.parse import quote
 
 import pytest
 
-import make_fixture
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens"
-
-
-@pytest.fixture(scope="module")
-def live(tmp_path_factory):
-    import uvicorn
-
-    from service import config, llm, llm_poller, worker
-    import service.app as appmod
-    root = tmp_path_factory.mktemp("live")
-    tree = make_fixture.build(root)
-    saved = {k: getattr(config, k) for k in (
-        "BENCH_ROOT", "RESULTS_ROOT", "OUT_DIR", "DB_PATH", "ARTIFACTS_DIR", "LOGS_DIR",
-        "DATASETS_DIR", "SUBMIT_TOKEN", "LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_POLL_S",
-        "EXAM_DIR", "EXAM_PROVIDER", "EXAM_MODEL", "EXAM_API_KEY", "JUDGED_TASKS_DIR")}
-    for k, v in {"BENCH_ROOT": root, "RESULTS_ROOT": root / "results",
-                 "OUT_DIR": root / "results" / "full", "DB_PATH": root / "service.sqlite3",
-                 "ARTIFACTS_DIR": root / "artifacts", "LOGS_DIR": root / "logs",
-                 "DATASETS_DIR": root / "datasets", "SUBMIT_TOKEN": "",
-                 "LLM_PROVIDER": "fake", "LLM_MODEL": "fake-1", "LLM_API_KEY": "",
-                 "LLM_POLL_S": 0.3, "EXAM_DIR": root / "exam", "EXAM_PROVIDER": "fake",
-                 "EXAM_MODEL": "fake-exam", "EXAM_API_KEY": "",
-                 "JUDGED_TASKS_DIR": root / "exam" / "tasks"}.items():
-        setattr(config, k, v)
-    worker_start = worker.start
-    worker.start = lambda: None
-    llm.reset()
-    appmod._cache.update(key=None, payload=None, at=0.0)
-    # an upload from the page must not land in the developer's checkout: the
-    # service prefers the repo's rubrics directory when it can write there,
-    # and on this machine it can
-    rubric_store = appmod._rubric_store
-    appmod._rubric_store = lambda: (root / "rubrics", False)
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        port = s.getsockname()[1]
-    server = uvicorn.Server(uvicorn.Config(appmod.app, host="127.0.0.1", port=port,
-                                           log_level="warning"))
-    th = threading.Thread(target=server.run, daemon=True)
-    th.start()
-    base = f"http://127.0.0.1:{port}"
-    for _ in range(100):
-        try:
-            urllib.request.urlopen(base + "/healthz", timeout=1)
-            break
-        except Exception:
-            time.sleep(0.1)
-    else:
-        raise RuntimeError("live server did not come up")
-    yield {"base": base, "tree": tree, "root": root}
-    server.should_exit = True
-    th.join(5)
-    llm_poller.stop()
-    worker.start = worker_start
-    appmod._rubric_store = rubric_store
-    for k, v in saved.items():
-        setattr(config, k, v)
-    llm.reset()
-
-
-@pytest.fixture(scope="module")
-def browser():
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
-        b = p.chromium.launch()
-        yield b
-        b.close()
-
-
-@pytest.fixture
-def page(browser):
-    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
-    pg = ctx.new_page()
-    errors = []
-    pg.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
-    pg.on("console", lambda m: errors.append(f"console.error: {m.text}")
-          if m.type == "error" else None)
-    pg.errors = errors
-    yield pg
-    ctx.close()
 
 
 def model_url(base, mid):
@@ -119,29 +37,34 @@ def open_topics(pg, base, mid):
 
 
 def test_propose_buttons_carry_their_reasons(live, page):
-    """The action is on the exam topic, and every refusal says why on the row."""
+    """The action is on the exam topic, and every refusal says why on the row.
+    Phase 9a: the model page links to the topic page, where Propose lives —
+    one entry point — and keeps the reason in words beside the link."""
     base = live["base"]
     card = open_topics(page, base, "fx/good-750m")
     econ = card.locator("tr[data-topic='economics']")
-    assert econ.locator("button.propose").is_enabled()
+    assert econ.locator("a.propose").count() == 1
     assert econ.locator(".propwhy").count() == 0
     law = card.locator("tr[data-topic='law']")
-    assert law.locator("button.propose").is_disabled()
     assert "under the 30" in law.locator(".propwhy").first.text_content()
+    assert "no proposal" in law.locator(".propwhy").first.text_content()
     # a model that wrote the same sentence every time has revealed no topic gap
     card = open_topics(page, base, "fx/chance-160m")
     econ = card.locator("tr[data-topic='economics']")
-    assert econ.locator("button.propose").is_disabled()
     assert "same answer on nearly every question" in econ.locator(".propwhy").first.text_content()
     # MMLU's finding for the same category rides along as a caution, not a gate
     card = open_topics(page, base, "fx/skewed-360m")
     econ = card.locator("tr[data-topic='economics']")
-    assert econ.locator("button.propose").is_enabled()
+    assert econ.locator("a.propose").count() == 1
     assert "caution — MMLU for this category" in econ.text_content()
     assert "answer positions" in econ.locator(".propwhy").first.text_content()
+    # the link opens the topic page on this model's answers
+    econ.locator("a.propose").click()
+    page.wait_for_selector("[data-topic-page='economics']")
+    page.wait_for_selector("[data-propose='economics'][data-propose-model='fx/skewed-360m']")
     # and the Diagnose section no longer offers one: MMLU does not pick the topic
     det = open_mmlu(page, base, "fx/good-750m")
-    assert det.locator("button.propose").count() == 0
+    assert det.locator("button.propose, a.propose").count() == 0
     assert page.errors == []
 
 
@@ -241,7 +164,8 @@ def test_the_review_tab_starts_from_a_topic(live, page):
     assert "diagnosis-half answers scored below 3 of 4" in first.text_content()
     # and the propose button for the model that can be proposed from
     good = detail.locator("[data-topic-model='fx/good-750m']")
-    assert good.locator("button.propose").is_enabled()
+    assert good.locator("a.propose").count() == 1               # to the topic page
+    assert "no proposal" not in good.text_content()
     assert page.errors == []
 
 
@@ -261,10 +185,21 @@ def test_review_flow_in_the_browser(live, page):
     # a name, remembered for every decision on this page
     page.get_by_label("your name").first.fill("Omar")
 
+    # the model page sends you to the topic page, and Propose is there
     card = open_topics(page, base, "fx/good-750m")
-    card.locator("tr[data-topic='economics'] button.propose").click()
+    card.locator("tr[data-topic='economics'] a.propose").click()
+    btn = page.locator("[data-propose='economics'][data-propose-model='fx/good-750m']")
+    btn.wait_for()
+    assert btn.get_attribute("data-gate") == "ok"          # a calibrated judge: no warning
+    # the answers panel's own fetch re-renders the page when it lands; a click
+    # in that window goes to a button that is being replaced. Click once the
+    # page has settled — the answers are on screen.
+    page.wait_for_selector("[data-answers-table] [data-answer]", timeout=E2E_MS)
+    btn.click()
+    page.wait_for_selector("[data-action-ok='propose:economics']", timeout=E2E_MS)
+    assert "Proposal #" in page.locator("[data-action-ok='propose:economics']").text_content()
+    page.goto(base + "/#tab=review")
     page.wait_for_selector(".card h2:has-text('Review')")
-    assert "proposal #" in page.locator("#view").text_content()
     card = page.locator(".rv[data-proposal]").first
     card.locator("textarea").wait_for(timeout=E2E_MS)         # the poller and the 5 s poll
     text = card.text_content()
@@ -507,7 +442,7 @@ def test_the_loop_tab_is_one_row_per_topic_with_the_next_step(live, page):
     page.wait_for_selector("table.jd[data-loop-table] tbody tr")
     page.screenshot(path=SCREENS / "loop-board.png", full_page=True)
     page.goto(base + "/#topic=medicine_health")
-    page.wait_for_selector("[data-panel='answers'] table.jd[data-answers-table]")
+    page.wait_for_selector("[data-panel='answers'] [data-answers-table] [data-answer]")
     page.screenshot(path=SCREENS / "loop-topic.png", full_page=True)
     assert page.errors == []
 
@@ -518,10 +453,10 @@ def test_the_topic_page_shows_the_answers_and_never_the_report_half(live, page):
     import exam_build as eb
     base, root = live["base"], live["root"]
     page.goto(base + "/#topic=medicine_health")            # deep link, cold
-    page.wait_for_selector("[data-panel='answers'] table.jd[data-answers-table]")
-    rows = page.locator("table.jd[data-answers-table] tbody tr")
+    page.wait_for_selector("[data-panel='answers'] [data-answers-table] [data-answer]")
+    rows = page.locator("[data-answers-table] [data-answer]")
     assert rows.count() > 0
-    assert rows.count() == page.locator("tr[data-half='diagnose']").count()
+    assert rows.count() == page.locator("[data-answer][data-half='diagnose']").count()
     # the published half is a sentence, and the only sentence
     line = page.locator("[data-report-half]").first.text_content()
     assert "The report half." in line and "published score" in line
@@ -532,8 +467,8 @@ def test_the_topic_page_shows_the_answers_and_never_the_report_half(live, page):
     html = page.content()
     for b in report:
         assert b["prompt"][:60] not in html and b["qid"] not in html
-    # a diagnose-half row carries the question, the answer, the score and the
-    # judge's words — and a bar per criterion
+    # a diagnose-half card carries the question, the answer, the score and the
+    # judge's words — and a cell per criterion
     first = rows.first
     assert first.locator("[data-answer-text]").count() == 1
     assert first.locator("[data-criterion]").count() == 15

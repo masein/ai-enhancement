@@ -18,6 +18,7 @@ import json
 import math
 import os
 import re
+import subprocess
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -27,7 +28,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from . import config, db, llm, llm_poller, startup, worker
+from . import config, db, llm, llm_poller, startup, suggest, worker
 from . import proposals as prop
 
 # the report module is the single source of truth for parsing and for the page
@@ -65,6 +66,18 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="benchmark service", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def _stamp_build(request: Request, call_next):
+    """Every /api/* answer says which build answered it. A page loaded before
+    a deploy compares this with its own <meta name="evalboard-build"> and
+    offers to reload: a page never reloads its own JavaScript, and one left
+    open across #33 ran the old refresh code until someone noticed."""
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["X-Evalboard-Build"] = BUILD
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -147,14 +160,19 @@ def trail_for(model_ids) -> dict[str, dict]:
     database query."""
     links = db.taint_links()
     props = {d["id"]: d["proposal_id"] for d in db.dataset_list(500)}
+    marks = {r["id"]: prop.override_of(r) for r in db.proposal_list(limit=500)}
     out: dict[str, dict] = {}
     for mid in model_ids:
         for link in links:
             pre = link["hf_prefix"]
             if mid in link["checkpoints"] or (pre and (mid == pre or mid.startswith(pre))):
                 ds = list(link["datasets"])
-                out[mid] = {"run_id": link["run_id"], "datasets": ds,
-                            "proposals": sorted({props[d] for d in ds if d in props})}
+                pids = sorted({props[d] for d in ds if d in props})
+                out[mid] = {"run_id": link["run_id"], "datasets": ds, "proposals": pids}
+                # taint follows the data; so does the mark on how it was proposed
+                over = {str(p): marks[p] for p in pids if marks.get(p)}
+                if over:
+                    out[mid]["over_provisional_judge"] = over
                 break
     return out
 
@@ -536,6 +554,19 @@ async def artifact_upload(name: str, request: Request, x_token: str = Header(def
         tmp.unlink(missing_ok=True)
 
 
+@app.get("/api/models/suggest")
+def models_suggest(q: str = ""):
+    """What the model-id boxes offer as you type: the models this board knows
+    first, then Hugging Face Hub matches (cached, two-second limit). A Hub
+    that does not answer leaves the local matches and a footer saying so."""
+    arts = []
+    if config.ARTIFACTS_DIR.is_dir():
+        arts = sorted(d.name for d in config.ARTIFACTS_DIR.iterdir()
+                      if d.is_dir() and not d.name.startswith("."))
+    local = suggest.local_candidates(results_payload(), db.recent(500), arts)
+    return suggest.suggest(q[:100], local)
+
+
 @app.get("/api/artifacts")
 def artifact_index():
     out = []
@@ -581,6 +612,10 @@ class ProposalIn(BaseModel):
     model: str
     topic: str                   # an exam topic from scripts/categories.yaml
     requested_by: str = ""
+    # propose over a judge whose grades are not evidence yet — accepted only
+    # when every reason is about the judge, the setting allows it, and a name
+    # is recorded; the proposal and everything made from it carry the mark
+    override_preliminary: bool = False
 
 
 class ApproveIn(BaseModel):
@@ -1062,7 +1097,9 @@ def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
     open_p = next((p for p in mine if p["status"] in ("pending", "proposed", "approved")), None)
     ds = [d for d in sets if d.get("proposal_id") in {p["id"] for p in mine}]
     ready = [d for d in ds if d.get("status") == "ready"]
-    gate = (last or {}).get("propose") or {}
+    judged_rows = [m for m in payload.get("models") or []
+                   if ((m.get("judge") or {}).get("tasks") or {}).get(task)]
+    gates = {m["id"]: propose_gate(m, topic) for m in judged_rows}
     if rub.get("error"):
         # a topic whose instrument cannot be read cannot be sat, judged or
         # proposed from; the row says which file is missing rather than
@@ -1093,15 +1130,20 @@ def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
                                        "criteria_sha256")},
         "last_judged": last,
         # the same object the propose endpoint enforces — the page never
-        # decides for itself whether a topic may be proposed from
-        "propose": {"ok": bool(gate.get("ok")), "why": gate.get("why"),
-                    "short": gate.get("short"), "caution": gate.get("caution")} if last else None,
-        "proposal": {k: open_p[k] for k in ("id", "status", "model", "category",
-                                            "created_at", "requested_by")} if open_p else None,
+        # decides for itself whether a topic may be proposed from. One per
+        # judged model: the topic page proposes for the model you are reading
+        "propose": gates.get(last["model"]) if last else None,
+        "propose_by_model": gates,
+        "proposal": {**{k: open_p[k] for k in ("id", "status", "model", "category",
+                                               "created_at", "requested_by")},
+                     "override": prop.override_of(open_p)} if open_p else None,
         # kept/dropped live in the provenance record the gate wrote, which is
         # the only place that count is authoritative
         "datasets": [{"id": d["id"], "status": d.get("status"), "count": d.get("count"),
-                      "kept": _dataset_kept(d), "created_at": d.get("created_at")} for d in ds],
+                      "kept": _dataset_kept(d), "created_at": d.get("created_at"),
+                      "over_provisional_judge": prop.override_of(
+                          next((q for q in mine if q["id"] == d.get("proposal_id")), {}))}
+                     for d in ds],
         "next": {"step": step, "label": STEPS[step], "ok": ok, "why": why},
     }
 
@@ -1122,8 +1164,8 @@ def _loop_row_safe(topic: str, payload: dict, props: list[dict], sets: list[dict
                 "rubric": {"name": "", "own": False, "version": "", "status": "",
                            "scoring": "single", "sha256": "", "criteria_count": 0,
                            "criteria_sha256": ""},
-                "last_judged": None, "propose": None, "proposal": None, "datasets": [],
-                "error": why,
+                "last_judged": None, "propose": None, "propose_by_model": {},
+                "proposal": None, "datasets": [], "error": why,
                 "next": {"step": "read", "label": "Read the results", "ok": False, "why": why}}
 
 
@@ -1243,6 +1285,84 @@ def _require_llm() -> llm.Backend:
         raise HTTPException(503, str(e)) from None
 
 
+_EVIDENCE: dict[tuple, bool] = {}
+
+
+def _mtime(p: Path) -> float:
+    try:
+        return p.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _has_evidence(model: str, task: str) -> bool:
+    """Whether the judge wrote anything a proposal could be built from: an
+    assessment of a diagnosis-half answer that fell short. Cached against the
+    two files it reads, because the Loop board asks on every poll."""
+    model_dir = config.OUT_DIR / model.replace("/", "__")
+    key = (model, task, _mtime(model_dir / "judge.json"),
+           _mtime(exam_build.tasks_dir(config.EXAM_DIR) / f"{task}.jsonl"))
+    if key not in _EVIDENCE:
+        if len(_EVIDENCE) > 512:
+            _EVIDENCE.clear()
+        _EVIDENCE[key] = bool(prop.justifications_for(model_dir, task, limit=1)[0])
+    return _EVIDENCE[key]
+
+
+def propose_gate(row: dict | None, topic: str, evidence: bool = True) -> dict:
+    """Whether `row`'s model may propose from `topic`, with every reason, in
+    the shape the page and POST /api/proposals both read:
+    {ok, overridable, soft, hard, why, short, caution, provisional}.
+
+    `soft` reasons are about the judge and, with ALLOW_PRELIMINARY_OVERRIDE,
+    can be overridden behind a warning; `hard` reasons are about the data and
+    the queue and never can. With the setting off this is the gate as it was
+    before the split, in the same words. One function, so the page never
+    keeps its own copy of the rule."""
+    task = exam_build.topic_task(topic)
+    allow = config.ALLOW_PRELIMINARY_OVERRIDE
+    judge = (row or {}).get("judge") or {}
+    t = (judge.get("tasks") or {}).get(task)
+    g = (t or {}).get("propose") or {}
+    hard: list[tuple[str, str]] = []
+    if judge.get("skipped"):
+        hard.append((f"the judge did not grade this model: {judge['skipped']}",
+                     "the judge did not grade this model"))
+    elif not t:
+        hard.append((f"{(row or {}).get('id', 'this model')} has no judged answers on file for "
+                     f"{topic!r} — sit the exam first", "no judged answers on file"))
+    hard += [(h["why"], h["short"]) for h in g.get("hard") or []]
+    if row and t:
+        dup = db.proposal_active(row["id"], task, topic)
+        if dup:
+            hard.append((f"proposal #{dup['id']} for this model and topic is already "
+                         f"{dup['status']} — review it in the Review tab",
+                         f"proposal #{dup['id']} is already {dup['status']}"))
+        if evidence and not hard and not _has_evidence(row["id"], task):
+            hard.append(("the judge wrote no assessment of a diagnosis-half answer that fell "
+                         "short on this topic — nothing to propose from",
+                         "no answer fell short — nothing to propose from"))
+    soft = list(g.get("soft") or []) + (list(g.get("soft_extra") or []) if allow else [])
+    if not t:
+        soft = []
+    if not allow and g and not g.get("ok"):
+        why, short = g.get("why"), g.get("short")        # the gate as it was, word for word
+    elif hard:
+        why, short = "; ".join(h[0] for h in hard), hard[0][1]
+    elif soft:
+        why = ("the judged suite is preliminary, so no topic score is evidence yet: "
+               + "; ".join(soft))
+        short = ("a provisional judge — proposing marks everything made from it" if allow
+                 else "the judged suite is preliminary")
+    else:
+        why = short = None
+    ok = not soft and not hard
+    return {"ok": ok, "overridable": bool(allow and soft and not hard),
+            "soft": soft, "hard": [h[0] for h in hard], "why": why, "short": short,
+            "caution": g.get("caution") if ok else None,
+            "provisional": bool(g.get("provisional"))}
+
+
 @app.post("/api/proposals")
 def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
     """Ask the LLM what skill is missing, from the judge's written assessments
@@ -1262,15 +1382,21 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
     if not t:
         raise HTTPException(404, f"{p.model} has no judged answers on file for {p.topic!r} — "
                                  f"submit it with suite=judged first")
-    gate = t.get("propose")
-    if gate is None:
+    if t.get("propose") is None:
         raise HTTPException(422, f"{p.topic!r} is not an exam topic")
-    if not gate["ok"]:
+    # recomputed on every request: the page's copy is a courtesy, this is the rule
+    gate = propose_gate(row, p.topic)
+    override = None
+    if gate["hard"] or (not config.ALLOW_PRELIMINARY_OVERRIDE and not gate["ok"]):
         raise HTTPException(409, gate["why"])
-    dup = db.proposal_active(p.model, task, p.topic)
-    if dup:
-        raise HTTPException(409, f"proposal #{dup['id']} for this model and topic is already "
-                                 f"{dup['status']} — review it in the Review tab")
+    if gate["soft"]:
+        if not (p.override_preliminary and gate["overridable"]):
+            raise HTTPException(409, gate["why"])
+        if not p.requested_by.strip():
+            raise HTTPException(422, "a name is recorded on a proposal made over a provisional "
+                                     "judge — type yours first")
+        override = {"by": p.requested_by.strip()[:80], "at": time.time(),
+                    "reasons": gate["soft"]}
     _spend_check(1)
     model_dir = config.OUT_DIR / p.model.replace("/", "__")
     justifications, counts = prop.justifications_for(model_dir, task)
@@ -1288,6 +1414,10 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
         "examples": justifications[:prop.EXAMPLES_SHOWN],
     }
     pid = db.proposal_create(p.model, task, p.topic, p.requested_by.strip()[:80], evidence)
+    if override:
+        db.proposal_update(pid, override=json.dumps(override))
+        print(f"[propose] #{pid} {p.model} · {p.topic}: proposed over a provisional judge by "
+              f"{override['by']} — {'; '.join(override['reasons'])}")
     req = prop.proposal_request(pid, p.model, task, p.topic, justifications, counts,
                                 _judge_rubric(task), prop.criteria_evidence(model_dir, task),
                                 audience=prop.audience_for(p.topic, task))
@@ -1304,12 +1434,20 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
     return {"id": pid, "status": "pending", "batch_id": bid, "task": task}
 
 
+def _override_of(r: dict) -> dict | None:
+    try:
+        return json.loads(r.get("override") or "null") or None
+    except (ValueError, TypeError):
+        return None
+
+
 def _proposal_view(r: dict, datasets: list[dict] | None = None) -> dict:
     out = dict(r)
     try:
         out["evidence"] = json.loads(r.get("evidence") or "{}")
     except (ValueError, TypeError):
         out["evidence"] = {}
+    out["override"] = _override_of(r)
     out["datasets"] = [{"id": d["id"], "status": d["status"], "fmt": d["fmt"],
                         "count": d["count"], "error": d["error"]}
                        for d in (datasets or []) if d["proposal_id"] == r["id"]]
@@ -1422,6 +1560,7 @@ def _dataset_view(d: dict, props: dict[int, dict]) -> dict:
         out["provenance"] = {}
     p = props.get(d["proposal_id"]) or {}
     out.update({"model": p.get("model"), "task": p.get("task"), "category": p.get("category"),
+                "over_provisional_judge": prop.override_of(p),
                 "download": f"/api/datasets/{d['id']}/items.jsonl" if d["status"] == "ready"
                 else None})
     return out
@@ -1498,6 +1637,29 @@ _PAGE = (report.TEMPLATE
          .replace("__CSS__", report.CSS)
          .replace("__DATA__", "null")
          .replace("__JS__SLOT__", report.JS))
+
+
+def build_id(page: str) -> str:
+    """The build this process serves: the git short sha when it is known
+    (EVALBOARD_BUILD, passed into the image at build time, or the checkout
+    the service runs from), plus a hash of the page itself. The hash is what
+    makes the check honest: an image built without the sha, or with a stale
+    one, still tells an old page apart from a new one."""
+    page_hash = hashlib.sha256(page.encode("utf-8")).hexdigest()[:7]
+    sha = os.environ.get("EVALBOARD_BUILD", "").strip()[:12]
+    if not sha:
+        try:
+            sha = subprocess.run(["git", "-C", str(Path(__file__).resolve().parent.parent),
+                                  "rev-parse", "--short", "HEAD"], capture_output=True,
+                                 text=True, timeout=2).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            sha = ""
+    return f"{sha}+{page_hash}" if sha else page_hash
+
+
+BUILD = build_id(_PAGE)
+_PAGE = _PAGE.replace('<meta charset="utf-8">',
+                      f'<meta charset="utf-8">\n<meta name="evalboard-build" content="{BUILD}">', 1)
 
 
 @app.get("/", response_class=HTMLResponse)

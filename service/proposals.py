@@ -544,7 +544,24 @@ def provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash
         out["provisional_reason"] = (f"a local model was the {' and the '.join(local)} — "
                                      f"not a pinned benchmark")
         out["local_models"] = local
+    over = override_of(prop)
+    if over:                      # a person proposed past a judge that was not evidence
+        out["proposed_over_provisional_judge"] = over
     return out
+
+
+def override_of(prop: dict) -> dict | None:
+    """{by, at, reasons} when this proposal was made over a provisional judge
+    (POST /api/proposals with override_preliminary), else None. It travels:
+    the proposal, the approved spec, the dataset's provenance.json and the
+    taint trail of any model trained on it all carry it."""
+    raw = prop.get("override")
+    if isinstance(raw, dict):
+        return raw or None
+    try:
+        return json.loads(raw or "null") or None
+    except (ValueError, TypeError):
+        return None
 
 
 def _provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash: str,

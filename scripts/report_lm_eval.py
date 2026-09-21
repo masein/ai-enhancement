@@ -341,41 +341,69 @@ EMPTY_SHARE = 0.5          # empty or near-empty answers, as a share of the topi
 DEGENERATE_DISTINCT = 2    # distinct answers, at or below which it wrote one thing
 
 
-def topic_gate(task: str, t: dict, state: dict | None, caution: str | None) -> dict:
-    """{ok, why, caution} for proposing a skill spec from one exam topic.
-    Broadest reason first: if the judged suite cannot be believed, no topic
-    score is evidence of anything; then whether this topic has enough
-    report-half questions to have a score at all; then whether the model
-    wrote enough for the judge to have assessed anything. `caution` is
-    MMLU's finding for the same category — context, never a gate."""
-    why = short = None
-    if not state or not state.get("ok"):
-        rs = "; ".join((state or {}).get("reasons") or ["the judged suite is preliminary"])
-        why = f"the judged suite is preliminary, so no topic score is evidence yet: {rs}"
+def topic_gate(task: str, t: dict, state: dict | None, caution: str | None,
+               head: dict | None = None) -> dict:
+    """Whether a skill spec may be proposed from one exam topic, as two kinds
+    of reason, both always evaluated:
+
+    - `soft`: about the JUDGE — not calibrated against a person, provisional
+      (a local model), a canary that moved, a different judge than the one
+      this server runs. Overridable in the service, with a warning, and the
+      mark travels with everything made from it. `soft_extra` holds the two
+      caveats that are not gates today (single-provider loop, draft rubric):
+      they join `soft` only where the override is on.
+    - `hard`: about the DATA — too few report-half questions to have a score,
+      a model that wrote nothing usable, output that collapsed. Never
+      overridable: no warning makes noise evidence.
+
+    `ok`, `why` and `short` are the gate exactly as it was before the split:
+    the preliminary suite first, then the data. The service's
+    ALLOW_PRELIMINARY_OVERRIDE=0 uses them unchanged. `caution` is MMLU's
+    finding for the same category — context, never a gate."""
+    head = head or {}
+    soft = list((state or {}).get("reasons") or ([] if (state or {}).get("ok")
+                                                  else ["the judged suite is preliminary"]))
+    soft_extra = []
+    if head.get("single_provider_loop"):
+        soft_extra.append("single-provider loop: the same provider wrote, sat or graded more "
+                          "than one step of this loop")
+    if task in (head.get("rubrics_draft") or []):
+        soft_extra.append("the rubric for this topic is a draft its author has not signed off")
+    hard = []
+    n_rep = t.get("n_report") or 0
+    a = t.get("answers") or {}
+    n = a.get("n") or 0
+    blank = (a.get("empty", 0) + a.get("short", 0))
+    if n_rep < PROPOSE_MIN_N:
+        hard.append({"why": f"{n_rep} report-half questions in this topic — under the "
+                            f"{PROPOSE_MIN_N} floor, so the score is noise. Write more questions "
+                            f"on the Exam tab",
+                     "short": f"under the {PROPOSE_MIN_N}-question floor — write more on the "
+                              f"Exam tab"})
+    if n and blank / n >= EMPTY_SHARE:
+        hard.append({"why": f"the model wrote nothing usable on {blank} of {n} answers here — "
+                            f"that is a generation failure, not a topic gap; multiple choice "
+                            f"is the instrument for this model",
+                     "short": f"the model wrote nothing usable on {blank} of {n} answers"})
+    elif n >= 8 and (a.get("distinct") or n) <= DEGENERATE_DISTINCT:
+        hard.append({"why": f"the model gave the same answer on nearly every question here "
+                            f"({a.get('distinct')} distinct answers in {n}) — the output has "
+                            f"collapsed, and no data for this topic fixes that",
+                     "short": "the model gave the same answer on nearly every question"})
+    if soft:
+        why = ("the judged suite is preliminary, so no topic score is evidence yet: "
+               + "; ".join(soft))
         short = "the judged suite is preliminary"
+    elif hard:
+        why, short = hard[0]["why"], hard[0]["short"]
     else:
-        n_rep = t.get("n_report") or 0
-        a = t.get("answers") or {}
-        n = a.get("n") or 0
-        blank = (a.get("empty", 0) + a.get("short", 0))
-        if n_rep < PROPOSE_MIN_N:
-            why = (f"{n_rep} report-half questions in this topic — under the {PROPOSE_MIN_N} "
-                   f"floor, so the score is noise. Write more questions on the Exam tab")
-            short = f"under the {PROPOSE_MIN_N}-question floor — write more on the Exam tab"
-        elif n and blank / n >= EMPTY_SHARE:
-            why = (f"the model wrote nothing usable on {blank} of {n} answers here — that "
-                   f"is a generation failure, not a topic gap; multiple choice is the "
-                   f"instrument for this model")
-            short = f"the model wrote nothing usable on {blank} of {n} answers"
-        elif n >= 8 and (a.get("distinct") or n) <= DEGENERATE_DISTINCT:
-            why = (f"the model gave the same answer on nearly every question here "
-                   f"({a.get('distinct')} distinct answers in {n}) — the output has "
-                   f"collapsed, and no data for this topic fixes that")
-            short = "the model gave the same answer on nearly every question"
+        why = short = None
     # the caution is decision-relevant only where a decision is possible; on a
     # row that is already refused it would be one more line of noise
     return {"ok": why is None, "why": why, "short": short,
-            "caution": caution if why is None else None}
+            "caution": caution if why is None else None,
+            "soft": soft, "soft_extra": soft_extra, "hard": hard,
+            "provisional": bool(head.get("provisional"))}
 
 
 def judged_avg(trimmed: dict | None, tainted: list[str] | None = None) -> float | None:
@@ -1074,7 +1102,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                     continue
                 topic = EXAM_TOPICS.get(task)
                 mc = (mmlu_cats.get("categories") or {}).get(topic) or {}
-                t["propose"] = topic_gate(task, t, jstate, mc.get("why"))
+                t["propose"] = topic_gate(task, t, jstate, mc.get("why"), judge.get("judge"))
         model_rows.append({
             "id": mid, "name": display[mid],
             "family": re.split(r"[^a-z0-9]", mid.split("/")[-1].lower())[0],
@@ -1832,6 +1860,76 @@ svg text { font-family:system-ui,-apple-system,sans-serif; }
 .dimmed text.blab:not(.hot) { opacity:0.35; }
 a { color:var(--accent); }
 footer { margin-top:28px; font-size:12px; color:var(--muted); }
+/* ---- phase 9a: buttons that say what they are ---- */
+button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+button.primary:hover { filter:brightness(1.07); background:var(--accent); }
+button.secondary { background:var(--surface-1); border-color:var(--accent); color:var(--accent); }
+button.quiet { background:none; border-color:transparent; color:var(--accent); }
+button.quiet:hover { background:var(--accent-soft); }
+button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:none;
+  background:var(--plane); border-color:var(--border); color:var(--text-secondary); }
+.dot-warn::before { content:''; display:inline-block; width:8px; height:8px; border-radius:50%;
+  background:var(--warning); margin-right:6px; vertical-align:1px; }
+.badge.over { color:var(--warning); border-color:var(--warning); }
+/* ---- the pager ---- */
+.pager { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:10px 0 2px; }
+.pager select { font:inherit; font-size:12.5px; color:var(--text-primary);
+  background:var(--surface-1); border:1px solid var(--border); border-radius:8px; padding:3px 6px; }
+.pager button { padding:3px 9px; font-size:12.5px; }
+.pager .pgnum[aria-current="page"] { background:var(--accent); border-color:var(--accent);
+  color:#fff; font-weight:600; }
+/* ---- model search ---- */
+.ms { position:relative; flex:2; min-width:240px; }
+.ms input { width:100%; box-sizing:border-box; }
+.ms-list { position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:40; margin:0;
+  padding:4px 0; list-style:none; background:var(--surface-1); border:1px solid var(--border);
+  border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,.16); max-height:320px; overflow-y:auto; }
+.ms-list[hidden] { display:none; }
+.ms-item { display:flex; flex-direction:column; gap:1px; padding:6px 11px; cursor:pointer;
+  font-size:13px; }
+.ms-item.active, .ms-item:hover { background:var(--accent-soft); }
+.ms-item.over { opacity:.6; }
+.ms-sep { padding:6px 11px 2px; font-size:11px; font-weight:600; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.05em; }
+.ms-foot { padding:6px 11px; font-size:12px; color:var(--warning); border-top:1px solid var(--grid); }
+/* ---- the build bar ---- */
+.buildbar { position:sticky; top:0; z-index:60; display:flex; gap:10px; align-items:center;
+  flex-wrap:wrap; padding:9px 22px; background:var(--accent-soft); border-bottom:1px solid var(--accent);
+  font-size:13px; backdrop-filter:blur(6px); }
+/* ---- dialog ---- */
+.dlg-back { position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.38);
+  display:flex; align-items:center; justify-content:center; padding:16px; }
+.dlg { background:var(--surface-1); border:1px solid var(--border); border-radius:12px;
+  max-width:540px; width:100%; padding:20px 22px; box-shadow:0 18px 50px rgba(0,0,0,.3); }
+.dlg h2 { font-size:17px; margin-bottom:6px; }
+.dlg ul { margin:6px 0 10px; padding-left:20px; font-size:13px; }
+.dlg-field { display:flex; flex-direction:column; gap:3px; margin:10px 0; }
+.dlg-field input { font:inherit; font-size:13px; color:var(--text-primary); background:var(--plane);
+  border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
+.dlg-check { display:flex; gap:8px; align-items:center; font-weight:600; margin:10px 0; }
+.dlg-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+/* ---- the answers, as cards: nothing sideways ---- */
+.anslist { display:flex; flex-direction:column; gap:10px; margin-top:8px; min-width:0; }
+.anscard { display:grid; grid-template-columns:minmax(0,1fr) 140px; gap:8px 16px;
+  border:1px solid var(--border); border-radius:10px; padding:12px 14px; background:var(--surface-1); }
+.anscard .ansmeta { font-size:12px; color:var(--text-secondary); margin-bottom:4px; }
+.anscard .qa { display:grid; grid-template-columns:52px minmax(0,1fr); gap:5px 10px; }
+.anscard .lbl { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase;
+  letter-spacing:.05em; padding-top:2px; }
+.anscard .txt { overflow-wrap:anywhere; font-size:13px; min-width:0; }
+.clamp3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.anscard .side { text-align:right; }
+.anscard .score { font-size:24px; font-weight:650; letter-spacing:-.02em; line-height:1.1; }
+.anscard .side .badge { margin:4px 0 0 4px; }
+.critrow { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.critcells { display:flex; gap:2px; flex-wrap:nowrap; }
+.critcell { width:14px; height:14px; border-radius:3px; flex:none; box-shadow:inset 0 0 0 1px var(--border); }
+.critcell.na { background:none; border:1px dashed var(--axis); box-sizing:border-box; }
+.badge.new { color:var(--accent); border-color:var(--accent); background:var(--accent-soft); }
+@media (max-width:800px) {
+  .anscard { grid-template-columns:minmax(0,1fr); }
+  .anscard .side { text-align:left; }
+}
 @media print { .filters, .tabs, button { display:none !important; }
   .view { display:block !important; } body { background:#fff; } }
 """
@@ -1874,12 +1972,13 @@ const state = {
   topic: null,                         // open topic page, by slug (hash-routed)
   loop: { rows: null, blocked: '', msg: '', loaded: false },                 // Loop tab
   loopSit: { model: '', kind: 'auto', tasks: null, msg: '', busy: false },   // sit-the-exam form
-  ans: { model: '', rows: null, loading: false, topic: '', open: {},
-         acuity: 'all', flag: 'all', score: 'all', sort: 'score' },          // Answers panel
+  ans: { model: '', rows: null, loading: false, topic: '', open: {}, seen: {}, fresh: {},
+         acuity: 'all', flag: 'all', score: 'all', crit: 'all', sort: 'score' }, // Answers panel
   loopRead: {},                        // topics whose answers this browser has opened
   mdl: { q: '', kind: 'all', src: 'all', family: 'all', judgedOnly: false,
          taintedOnly: false, sort: { key: 'avg', dir: -1 } },              // Models tab
   rvName: '',                          // the name approvals are recorded under (remembered)
+  sub: { hf_id: '', kind: 'auto', suite: 'full', submitter: '', note: '' },  // Submit form
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
   // focus from filter inputs and kill slider drags
@@ -2595,27 +2694,24 @@ const CAT_MIN_N = 30;
 // topic under the noise floor, or a model that wrote nothing must say so and
 // never quietly offer data instead.
 function proposeBtn(mid, topic, gate) {
-  const b = el('button', { class: 'propose', text: 'Propose a skill spec',
-    disabled: gate.ok ? null : '', title: gate.ok
-      ? 'ask the configured LLM what skill is missing here, from the judge\'s written '
-        + 'assessments of diagnosis-half answers only — a person reviews the answer '
-        + 'before anything is generated'
-      : gate.why,
-    onclick: async e => {
-      e.preventDefault();
-      b.disabled = true;
-      const r = await fetch('api/proposals', { method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
-        body: JSON.stringify({ model: mid, topic: topic,
-                               requested_by: state.rvName }) }).catch(() => null);
-      const j = r ? await r.json().catch(() => ({})) : {};
-      state.rv.msg = r && r.ok ? `proposal #${j.id} submitted for ${mid} · ${topic} — `
-          + 'the LLM answer lands here when the batch completes'
-        : 'refused: ' + (j.detail || (r ? r.status : 'server unreachable'));
-      state.rv.loaded = false;
-      navigate({ tab: 'review', model: null });
-    } });
-  return b;
+  // one entry point: proposing happens on the topic page, where the answers
+  // are and where the one copy of the gate is; this row says where to go
+  const slug = slugOfTopic(topic);
+  return el('a', { class: 'propose', href: '#topic=' + slug, 'data-propose-link': topic,
+    text: 'Propose on the topic page →',
+    onclick: e => { e.preventDefault(); state.ans.model = mid; state.ans.rows = null;
+      navigate({ topic: slug, model: null }); } });
+}
+
+// the payload's copy of the gate, in words for a row that links to the topic
+// page: a data reason refuses; a judge reason is asked about there
+function proposeWhy(g) {
+  if (!g) return '';
+  if ((g.hard || []).length) return el('div', { class: 'propwhy', title: g.why,
+    text: 'no proposal: ' + g.hard[0].short });
+  if ((g.soft || []).length) return el('div', { class: 'propwhy', title: g.why,
+    text: 'the judged suite is preliminary — the topic page says what proposing would mean' });
+  return '';
 }
 
 function dxCategories(mid, t, v, atChance) {
@@ -2969,9 +3065,7 @@ function vJudged(m) {
             title: k ? `${k.n} human-graded answers in this topic` : 'not calibrated per topic' }),
           el('td', { class: 'num se', text: String(nr) + (nr < CAT_MIN_N ? ' · under ' + CAT_MIN_N : '') }),
           el('td', {}, jBar(v.dist, v.n)),
-          LIVE ? el('td', {}, g ? proposeBtn(m.id, frName(t), g) : '',
-            g && !g.ok ? el('div', { class: 'propwhy', title: g.why,
-              text: 'no proposal: ' + (g.short || g.why) }) : '',
+          LIVE ? el('td', {}, g ? proposeBtn(m.id, frName(t), g) : '', proposeWhy(g),
             g && g.caution ? el('div', { class: 'propwhy', text: 'caution — MMLU for this '
               + 'category: ' + g.caution }) : '') : ''); })))));
     if (m.judgedAvg != null)
@@ -3163,7 +3257,8 @@ function vTaint(m) {
       tt.proposals.map((pid, i) => el('span', {}, i ? ', ' : '',
         el('a', { href: '#tab=review', text: `proposal #${pid}`,
           onclick: e => { e.preventDefault(); state.rv.loaded = false;
-            navigate({ tab: 'review', model: null, topic: null }); } })))) : '',
+            navigate({ tab: 'review', model: null, topic: null }); } }), ' ',
+        overBadge((tt.over_provisional_judge || {})[String(pid)])))) : '',
     '.'));
   for (const [t, c] of Object.entries(tc)) {
     const rubric = c.scale === 'rubric';
@@ -3550,6 +3645,7 @@ async function post(path, body) {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
     body: JSON.stringify(body || {}) }).catch(() => null);
   if (!r) throw new Error('the server is unreachable — it may be restarting');
+  checkBuild(r);
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail
     : (j.detail ? JSON.stringify(j.detail) : `the server answered HTTP ${r.status}`));
@@ -3580,6 +3676,329 @@ function actNote(slot) {
     el('b', { text: 'Refused. ' }), a.err);
   if (a.ok) return el('p', { class: 'note', 'data-action-ok': slot, text: a.ok });
   return '';
+}
+
+// ---------------------------------------------------------------------------
+// One pager for every long table: "1–25 of 49" · size · ‹ Prev · 1 2 … 7 ·
+// Next ›. The page lives in state, so a 5-second poll never throws anyone back
+// to page 1; a change of filter or sort does (the caller passes a signature of
+// them), because page 3 of a different list is a different page. The size is
+// remembered per table in this browser — a convenience: 25 without storage.
+// ---------------------------------------------------------------------------
+const PAGE_SIZES = [10, 25, 50, 100];
+state.pg = {};
+
+function pgState(key, dflt) {
+  let p = state.pg[key];
+  if (!p) {
+    let size = dflt;
+    try {
+      const v = +localStorage.getItem('bench-pagesize-' + key);
+      if (PAGE_SIZES.includes(v) || v === dflt) size = v;
+    } catch (e) { /* storage unavailable: the default */ }
+    p = state.pg[key] = { page: 1, size, dflt, sig: undefined };
+  }
+  return p;
+}
+
+function pageNumbers(cur, n) {
+  if (n <= 7) return Array.from({ length: n }, (_, i) => i + 1);
+  if (cur <= 4) return [1, 2, 3, 4, 5, '…', n];
+  if (cur >= n - 3) return [1, '…', n - 4, n - 3, n - 2, n - 1, n];
+  return [1, '…', cur - 1, cur, cur + 1, '…', n];
+}
+
+// rows -> { rows: this page's slice, pager: the control (or '' when one page
+// of the smallest size holds everything) }
+function paged(key, rows, sig, redraw, dflt = 25) {
+  const p = pgState(key, dflt);
+  if (p.sig !== sig) { p.sig = sig; p.page = 1; }
+  const pages = Math.max(1, Math.ceil(rows.length / p.size));
+  if (p.page > pages) p.page = pages;
+  const start = (p.page - 1) * p.size;
+  return { rows: rows.slice(start, start + p.size), pager: pager(key, rows.length, redraw) };
+}
+
+function pager(key, total, redraw) {
+  const p = state.pg[key];
+  if (total <= PAGE_SIZES[0]) return '';
+  const pages = Math.max(1, Math.ceil(total / p.size));
+  const go = n => { p.page = Math.min(Math.max(1, n), pages); (redraw || render)(); };
+  const from = total ? (p.page - 1) * p.size + 1 : 0;
+  const to = Math.min(total, p.page * p.size);
+  return el('nav', { class: 'pager', 'data-pager': key, 'aria-label': 'pages' },
+    el('span', { class: 'count-note', 'data-page-range': `${from}-${to}`,
+      text: `${from}–${to} of ${total}` }),
+    mkSel('rows per page', [...new Set([...PAGE_SIZES, p.dflt])].sort((a, b) => a - b)
+      .map(n => [String(n), `${n} per page`]), String(p.size),
+      v => { p.size = +v; p.page = 1;
+        try { localStorage.setItem('bench-pagesize-' + key, v); } catch (e) { /* private mode */ }
+        (redraw || render)(); }),
+    el('button', { class: 'quiet', text: '‹ Prev', disabled: p.page <= 1 ? '' : null,
+      'data-page-prev': '1', onclick: () => go(p.page - 1) }),
+    ...pageNumbers(p.page, pages).map(n => n === '…'
+      ? el('span', { class: 'se', text: '…' })
+      : el('button', { class: 'pgnum', text: String(n), 'data-page': String(n),
+          'aria-current': n === p.page ? 'page' : null, onclick: () => go(n) })),
+    el('button', { class: 'quiet', text: 'Next ›', disabled: p.page >= pages ? '' : null,
+      'data-page-next': '1', onclick: () => go(p.page + 1) }));
+}
+
+// ---------------------------------------------------------------------------
+// Model search in a model-id box: after two characters (200 ms debounce) a
+// list opens under it — the models this board knows first, then the Hub's,
+// fetched by the service. ARIA combobox: ↑/↓ move, Enter picks, Esc closes,
+// Tab accepts the highlighted one. Its state lives in state.ms, so a poll that
+// rebuilds the view gives back the text, the caret (data-keep) and the list.
+// ---------------------------------------------------------------------------
+state.ms = {};
+
+function msState(key) {
+  return state.ms[key] || (state.ms[key] = { items: [], open: false, active: -1, footer: '',
+                                             seq: 0, timer: null, q: '', onPick: null });
+}
+
+function msQuery(key, q) {
+  const s = msState(key);
+  s.q = q;
+  clearTimeout(s.timer);
+  if (q.trim().length < 2) { s.open = false; s.items = []; s.active = -1; msPaint(key); return; }
+  s.timer = setTimeout(async () => {
+    const seq = ++s.seq;
+    try {
+      const j = await api('api/models/suggest?q=' + encodeURIComponent(q.trim()));
+      if (seq !== s.seq) return;                  // a newer keystroke already asked
+      s.items = j.items || []; s.footer = j.footer || '';
+      s.open = true; s.active = -1;
+    } catch (e) {
+      if (seq !== s.seq) return;
+      s.items = []; s.footer = 'search unavailable — type the id'; s.open = true;
+    }
+    msPaint(key);
+  }, 200);
+}
+
+function msPick(key, i) {
+  const s = msState(key);
+  const it = s.items[i];
+  if (!it) return;
+  s.open = false; s.active = -1;
+  const input = document.querySelector(`[data-ms="${key}"] input`);
+  if (input) input.value = it.id;
+  if (s.onPick) s.onPick(it);
+  msPaint(key);
+}
+
+function msKey(key, e) {
+  const s = msState(key);
+  const n = s.items.length;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (!s.open && n) s.open = true;
+    s.active = Math.min(s.active + 1, n - 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    s.active = Math.max(s.active - 1, 0);
+  } else if (e.key === 'Enter') {
+    if (s.open && s.active >= 0) { e.preventDefault(); msPick(key, s.active); }
+    return;
+  } else if (e.key === 'Escape') {
+    if (s.open) { e.preventDefault(); s.open = false; s.active = -1; }
+  } else if (e.key === 'Tab') {
+    if (s.open && s.active >= 0) msPick(key, s.active);   // and focus moves on as usual
+    return;
+  } else return;
+  msPaint(key);
+}
+
+function msItem(key, it, i, active) {
+  const bits = [];
+  if (it.params) bits.push(P(it.params));
+  if (it.kind) bits.push(it.kind_guessed ? it.kind + ' (from its name)' : it.kind);
+  if (it.on_board) bits.push('on the board');
+  if (it.judged) bits.push(`judged on ${it.judged} topic${it.judged > 1 ? 's' : ''}`);
+  if (it.queued) bits.push('in the queue');
+  if (it.artifact) bits.push('uploaded checkpoint');
+  if (it.over_cap) bits.push('over the size cap');
+  return el('li', { id: `ms-${key}-${i}`, role: 'option', class: 'ms-item'
+      + (i === active ? ' active' : '') + (it.over_cap ? ' over' : ''),
+    'aria-selected': String(i === active), 'data-ms-item': it.id,
+    onmousedown: e => { e.preventDefault(); msPick(key, i); } },
+    el('span', { class: 'mono', text: it.id }),
+    bits.length ? el('span', { class: 'se', text: bits.join(' · ') }) : '');
+}
+
+// the list and the input's ARIA, in place: a search landing must not rebuild
+// the page around the person typing
+function msPaint(key) {
+  const s = msState(key);
+  for (const box of document.querySelectorAll(`[data-ms="${key}"]`)) {
+    const input = box.querySelector('input');
+    const list = box.querySelector('[role="listbox"]');
+    const show = s.open && (s.items.length > 0 || !!s.footer);
+    input.setAttribute('aria-expanded', String(show));
+    if (show && s.active >= 0) input.setAttribute('aria-activedescendant', `ms-${key}-${s.active}`);
+    else input.removeAttribute('aria-activedescendant');
+    list.hidden = !show;
+    const kids = [];
+    let hubShown = false;
+    s.items.forEach((it, i) => {
+      if (it.source === 'hub' && !hubShown) {
+        hubShown = true;
+        kids.push(el('li', { role: 'presentation', class: 'ms-sep', text: 'Hugging Face Hub' }));
+      }
+      kids.push(msItem(key, it, i, s.active));
+    });
+    if (s.open && !s.items.length && !s.footer)
+      kids.push(el('li', { role: 'presentation', class: 'ms-sep', text: 'no matches' }));
+    if (s.footer) kids.push(el('li', { role: 'presentation', class: 'ms-foot',
+      'data-ms-footer': '1', text: s.footer }));
+    list.replaceChildren(...kids);
+    const act = list.querySelector('.ms-item.active');
+    if (act && act.scrollIntoView) act.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function modelBox(key, value, onInput, onPick, attrs = {}) {
+  const s = msState(key);
+  s.onPick = onPick;
+  const input = el('input', Object.assign({ type: 'text', role: 'combobox',
+    'aria-autocomplete': 'list', 'aria-controls': `ms-list-${key}`, 'aria-expanded': 'false',
+    autocomplete: 'off', spellcheck: 'false', 'data-keep': 'ms-' + key, value }, attrs, {
+    oninput: e => { onInput(e.target.value); msQuery(key, e.target.value); },
+    onkeydown: e => msKey(key, e),
+    onblur: () => setTimeout(() => {
+      // a poll re-render moves focus to the new copy of this box; that is not
+      // the person leaving it
+      const a = document.activeElement;
+      if (a && a.dataset && a.dataset.keep === 'ms-' + key) return;
+      if (s.open) { s.open = false; msPaint(key); }
+    }, 150) }));
+  const box = el('div', { class: 'ms', 'data-ms': key, style: attrs.style ? null : null },
+    input, el('ul', { id: `ms-list-${key}`, role: 'listbox', class: 'ms-list', hidden: '',
+      'aria-label': 'matching models' }));
+  // painted once it is in the document
+  queueMicrotask(() => msPaint(key));
+  return box;
+}
+
+// ---------------------------------------------------------------------------
+// A page left open across a deploy runs the old code forever: it never
+// reloads its own JavaScript. Every /api/* answer carries the build that
+// served it; when it differs from the one this page was built as, a bar says
+// so, and after a minute the page reloads itself — never while someone is
+// typing or a dialog is open. The hash survives a reload.
+// ---------------------------------------------------------------------------
+const BUILD = (document.querySelector('meta[name="evalboard-build"]') || {}).content || '';
+let _newBuild = '';
+
+function checkBuild(r) {
+  const b = r && r.headers ? r.headers.get('X-Evalboard-Build') : '';
+  if (!BUILD || !b || b === BUILD || _newBuild) return;
+  _newBuild = b;
+  buildBar();
+}
+
+function typingNow() {
+  const a = document.activeElement;
+  if (!a || a === document.body) return false;
+  if (a.isContentEditable || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT') return true;
+  return a.tagName === 'INPUT'
+    && !['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'color'].includes(a.type);
+}
+const dialogOpen = () => !!document.querySelector('[role="dialog"]');
+
+function buildBar() {
+  const wait = window.__evalboardReloadMs || 60000;
+  const due = Date.now() + wait;
+  const secs = el('span', { class: 'se' });
+  const bar = el('div', { class: 'buildbar', role: 'status', 'data-build-bar': _newBuild },
+    el('b', { text: 'The dashboard was updated. ' }), 'Reload to get the new version. ',
+    el('button', { class: 'primary', text: 'Reload', 'data-reload': '1',
+      onclick: () => location.reload() }), ' ', secs);
+  document.body.prepend(bar);
+  const tick = setInterval(() => {
+    const left = Math.max(0, Math.ceil((due - Date.now()) / 1000));
+    const held = typingNow() || dialogOpen();
+    secs.textContent = held ? 'It reloads by itself once you stop typing.'
+      : left ? `Reloading by itself in ${left}s.` : 'Reloading…';
+    if (!left && !held) { clearInterval(tick); location.reload(); }
+  }, 500);
+}
+
+// ---------------------------------------------------------------------------
+// Propose over a provisional judge: an in-page dialog, not window.confirm. The
+// reasons in words, what the mark means, the name it is recorded under, and a
+// box to tick before "Propose anyway" can be pressed. Esc cancels; focus stays
+// inside and goes back to the button that opened it.
+// ---------------------------------------------------------------------------
+function proposeDialog({ model, topic, gate, returnTo, onDone }) {
+  const back = el('div', { class: 'dlg-back', 'data-dialog': 'propose' });
+  const name = el('input', { type: 'text', value: rememberedName(), 'aria-label': 'your name',
+    placeholder: 'your name (recorded)' });
+  const ack = el('input', { type: 'checkbox', id: 'dlg-ack', 'data-dialog-ack': '1' });
+  const go = el('button', { class: 'primary', text: 'Propose anyway', disabled: '',
+    'data-dialog-go': '1' });
+  const cancel = el('button', { text: 'Cancel', 'data-dialog-cancel': '1' });
+  const err = el('p', { class: 'warn', hidden: '', 'data-dialog-error': '1' });
+  const sync = () => { go.disabled = !(ack.checked && name.value.trim()); };
+  name.addEventListener('input', () => {
+    state.rvName = name.value;
+    try { localStorage.setItem('bench-name', state.rvName); } catch (e) { /* private mode */ }
+    sync();
+  });
+  ack.addEventListener('change', sync);
+  const box = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true',
+      'aria-labelledby': 'dlg-title' },
+    el('h2', { id: 'dlg-title', text: gate.provisional ? 'This judge is a small local model'
+                                                       : 'These grades are not evidence yet' }),
+    el('p', { class: 'small', text: `Proposing for ${model} on ${topic}. What is wrong with `
+      + 'the grades:' }),
+    el('ul', { 'data-dialog-reasons': '1' }, (gate.soft || []).map(r => el('li', { text: r }))),
+    el('p', {}, 'Anything proposed from these grades is marked ',
+      el('b', { text: 'proposed over a provisional judge' }),
+      ': the spec, the dataset, and any model trained on it. Use it for demos and trials, '
+      + 'not for results.'),
+    el('label', { class: 'dlg-field' }, el('span', { class: 'small', text: 'your name' }), name),
+    el('label', { class: 'dlg-check', for: 'dlg-ack' }, ack,
+      ' I understand these grades are not evidence'),
+    err,
+    el('div', { class: 'dlg-actions' }, cancel, go));
+  back.append(box);
+  const close = () => {
+    back.remove();
+    document.removeEventListener('keydown', onKey, true);
+    const again = returnTo && document.querySelector(returnTo);
+    if (again) again.focus();
+  };
+  const onKey = e => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    const f = [...box.querySelectorAll('input, button, a[href], select, textarea')]
+      .filter(x => !x.disabled && !x.hidden);
+    if (!f.length) return;
+    const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && (i <= 0)) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && (i === f.length - 1 || i < 0)) { e.preventDefault(); f[0].focus(); }
+  };
+  cancel.addEventListener('click', close);
+  back.addEventListener('mousedown', e => { if (e.target === back) close(); });
+  go.addEventListener('click', async () => {
+    go.disabled = true; go.textContent = 'Proposing…'; err.hidden = true;
+    try {
+      const j = await post('api/proposals', { model, topic, requested_by: name.value.trim(),
+                                              override_preliminary: true });
+      close();
+      onDone(j);
+    } catch (e) {
+      err.hidden = false;
+      err.replaceChildren(el('b', { text: 'Refused. ' }), String((e && e.message) || e));
+      go.textContent = 'Propose anyway'; sync();
+    }
+  });
+  document.addEventListener('keydown', onKey, true);
+  document.body.append(back);
+  (name.value.trim() ? ack : name).focus();
 }
 
 function lbMini(rows) {
@@ -3916,10 +4335,12 @@ function vModels() {
       render();
     } : null },
     c.label + (f.sort.key === c.key ? (f.sort.dir > 0 ? ' ▲' : ' ▼') : ''));
-  const table = el('div', { class: 'card' },
+  const pg = paged('models', ms, JSON.stringify([f.q, f.kind, f.src, f.family, f.judgedOnly,
+                                                 f.taintedOnly, f.sort]));
+  const table = el('div', { class: 'card' }, pg.pager,
     el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-models-table': '1' },
       el('thead', {}, el('tr', {}, MCOLS.map(th), el('th', { text: 'flags' }))),
-      el('tbody', {}, ms.map(m => {
+      el('tbody', {}, pg.rows.map(m => {
         const topics = m.judge ? Object.keys(m.judge.tasks || {})
           .filter(t => t !== (DATA.judged || {}).control) : [];
         // no compare tick here: the radar is the Leaderboard's, and two tables
@@ -3981,7 +4402,7 @@ function vLeaderboard(ms) {
   const val = (m, c) => c.key === 'avg' ? officialAvg(m)
                       : c.judged ? jval(m, c)
                       : c.task ? (cell(c.task, m.id) || {}).v : m[c.key];
-  const rows = [...ms].sort((a, b) => {
+  const sorted = [...ms].sort((a, b) => {
     const c = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg');
     const va = val(a, c), vb = val(b, c);
     if (va == null && vb == null) return 0;
@@ -3989,6 +4410,13 @@ function vLeaderboard(ms) {
     return typeof va === 'string' ? state.sort.dir * natCmp(va, vb)
                                   : state.sort.dir * (va - vb);
   });
+  // ranked rows first, whatever the sort: a preliminary model's per-task
+  // numbers are valid, and it is still not on the ladder
+  const lbAll = [...sorted.filter(m => officialAvg(m) != null),
+                 ...sorted.filter(m => officialAvg(m) == null)];
+  const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
+                                                            state.src, state.avgMode]));
+  const rows = lbPg.rows;
   // best per column (max for accuracy/avg, min for perplexity). Perplexity has
   // NO standard error from the harness, so a 0.001 lead is not a win: values
   // within a tie band of the leader are all marked tied (≈) instead. The band
@@ -4135,7 +4563,7 @@ function vLeaderboard(ms) {
             + 'table is taller than the screen' })),
     lbViewCtrl(ms),
     state.lbView === 'cats' ? lbCategoryTable(ms)
-      : el('div', { class: 'lb-wrap' }, el('table', { class: 'lb' }, thead, tbody))),
+      : [lbPg.pager, el('div', { class: 'lb-wrap' }, el('table', { class: 'lb' }, thead, tbody))]),
     radarCard(ms) || '',
     aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
 }
@@ -4417,15 +4845,19 @@ function vRuns(ms) {
   ];
   const pv = (m, c) => c.get ? c.get(m) : m[c.key];
   const provCol = PROV_COLS.find(c => c.key === state.provSort.key) || PROV_COLS[14];
-  const provRows = [...ms].sort((a, b) => {
+  const provAll = [...ms].sort((a, b) => {
     const va = pv(a, provCol), vb = pv(b, provCol);
     if (va === vb) return 0;
     if (va == null) return 1; if (vb == null) return -1;
     return state.provSort.dir * (provCol.num ? va - vb : natCmp(va, vb));
   });
+  const provPg = paged('provenance', provAll, JSON.stringify([state.provSort, state.q,
+                                                              state.kind, state.src]));
+  const provRows = provPg.rows;
   frag.push(el('div', { class: 'card' },
     el('h2', { text: 'Run provenance' }),
     el('p', { class: 'sub', text: 'Every field here can change a score. Publish this table with the numbers, or the numbers are hearsay. Sorted newest-eval-first — click any column to re-sort.' }),
+    provPg.pager,
     el('div', { class: 'lb-wrap' }, el('table', {},
       el('thead', {}, el('tr', {}, PROV_COLS.map(c => el('th', {
         class: (c.num ? 'num ' : '') + 'sortable',
@@ -5009,7 +5441,9 @@ function vTraining() {
     }
     const rs = trVisible();
     listCount.textContent = `${rs.length} of ${state.trRuns.length}`;
-    listWrap.replaceChildren(...(rs.length ? rs.map(runRow)
+    const pg = paged('training', rs, JSON.stringify([state.trQ, state.trStatus, state.trOrder]),
+                     rebuildRows, 20);
+    listWrap.replaceChildren(...(rs.length ? [pg.pager, ...pg.rows.map(runRow)]
       : [el('p', { class: 'small', text: 'No run matches the filter.' })]));
   }
   rebuildRows();
@@ -5244,15 +5678,22 @@ function vQueue() {
   // the judged suite's availability (and its reason when it has none) comes
   // from the same endpoint the Loop tab reads
   if (!state.loop.loaded && netReady()) loadLoop();
+  // the form's values live in state: picking a model re-renders (to set its
+  // kind), and a re-render must not wipe the suite and note already chosen
+  const sf = state.sub;
   const f = {
-    hf_id: el('input', { type: 'text', style: 'flex:2;min-width:260px',
-      placeholder: 'org/model on the Hub, or local/<name> for an uploaded artifact' }),
-    kind: el('select', {}, ['auto', 'base', 'instruct'].map(v =>
-      el('option', { value: v, text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
+    hf_id: modelBox('submit', sf.hf_id, v => { sf.hf_id = v; },
+      it => { sf.hf_id = it.id; if (it.kind) sf.kind = it.kind; render(); },
+      { 'aria-label': 'model id',
+        placeholder: 'search: org/model on the Hub, or local/<name> for an uploaded artifact' }),
+    kind: el('select', { 'aria-label': 'kind', onchange: e => { sf.kind = e.target.value; } },
+      ['auto', 'base', 'instruct'].map(v => el('option', { value: v,
+        selected: sf.kind === v ? '' : null,
+        text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
     // judged is offered even when it cannot run: an option that is simply
     // absent tells a person nothing, and 'why is there no judged suite?' was
     // the first question asked of this page
-    suite: el('select', {},
+    suite: el('select', { 'aria-label': 'suite', onchange: e => { sf.suite = e.target.value; } },
       el('option', { value: 'full', text: 'full — all tasks, comparable' }),
       el('option', { value: 'quick', text: 'quick — hellaswag + arc_easy + ppl, minutes' }),
       el('option', { value: 'control', text: 'control — mmlu_perm only: MMLU with the '
@@ -5261,12 +5702,17 @@ function vQueue() {
         title: state.loop.blocked || '',
         text: 'judged — the written exam, graded by the judge'
           + (state.loop.blocked ? ' (unavailable)' : '') })),
-    submitter: el('input', { type: 'text', placeholder: 'your name', style: 'width:130px' }),
-    note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px' }),
+    submitter: el('input', { type: 'text', placeholder: 'your name', style: 'width:130px',
+      'aria-label': 'your name', 'data-keep': 'submit-name', value: sf.submitter || rememberedName(),
+      oninput: e => { sf.submitter = e.target.value; } }),
+    note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px',
+      'aria-label': 'note', 'data-keep': 'submit-note', value: sf.note,
+      oninput: e => { sf.note = e.target.value; } }),
   };
-  const btn = el('button', { text: 'Submit model', onclick: async () => {
-    const body = { hf_id: f.hf_id.value.trim(), kind: f.kind.value, suite: f.suite.value,
-                   submitter: f.submitter.value, note: f.note.value };
+  for (const o of f.suite.options) o.selected = o.value === sf.suite;
+  const btn = el('button', { class: 'primary', text: 'Submit model', onclick: async () => {
+    const body = { hf_id: sf.hf_id.trim(), kind: sf.kind, suite: sf.suite,
+                   submitter: (sf.submitter || rememberedName()).trim(), note: sf.note };
     if (!body.hf_id) { state.qmsg = 'enter a Hugging Face model id first'; render(); return; }
     btn.disabled = true;
     try {
@@ -5276,6 +5722,7 @@ function vQueue() {
       const j = await r.json().catch(() => ({}));
       state.qmsg = r.ok ? `#${j.id}: ${j.note || 'queued'}`
                         : 'rejected: ' + (typeof j.detail === 'string' ? j.detail : r.status);
+      if (r.ok) { sf.hf_id = ''; sf.note = ''; }
     } catch (e) { state.qmsg = 'submit failed — server unreachable?'; }
     await loadQueue(); render();
   }});
@@ -5354,7 +5801,9 @@ function vQueue() {
     qCount);
   const qThead = el('thead');
   const qTbody = el('tbody');
-  const qTableWrap = el('div', { class: 'lb-wrap' }, el('table', {}, qThead, qTbody));
+  const qPager = el('div');
+  const qTableWrap = el('div', { class: 'lb-wrap' }, el('table', { 'data-queue-table': '1' },
+    qThead, qTbody));
   const qEmpty = el('p', { class: 'small', text: 'Nothing submitted yet.' });
   // in place, same reason as everywhere: the 5s poll must never eat a keystroke
   function rebuildQueue() {
@@ -5375,7 +5824,10 @@ function vQueue() {
       : el('th', { text: c.label }))));
     const rs = qVisible();
     qCount.textContent = `${rs.length} of ${state.queue.length}`;
-    qTbody.replaceChildren(...rs.map(qrow));
+    const pg = paged('queue', rs, JSON.stringify([state.qQ, state.qStatus, state.qSort]),
+                     rebuildQueue);
+    qPager.replaceChildren(pg.pager);
+    qTbody.replaceChildren(...pg.rows.map(qrow));
   }
   state.queueRedraw = rebuildQueue;
   rebuildQueue();
@@ -5391,7 +5843,7 @@ function vQueue() {
       state.qmsg ? el('p', { class: 'small', style: 'margin-top:8px', text: state.qmsg }) : ''),
     el('div', { class: 'card' },
       el('h2', { text: 'Queue' }),
-      qToolbar, qTableWrap, qEmpty)];
+      qToolbar, qPager, qTableWrap, qEmpty)];
 }
 
 // ---------- Review: the human in the loop ----------
@@ -5591,9 +6043,7 @@ function rvTopicDetail(llmOk) {
         el('span', { class: 'small', text: `${num(v, 2)} / 4 on ${nr} report-half questions `
           + `· ${num(t.score_diagnose, 2)} / 4 on ${t.n_diagnose} diagnosis-half`
           + ((m.tainted || []).includes(task) ? ' · trained on this topic' : '') })),
-      el('div', { class: 'frm' }, g ? proposeBtn(m.id, topic, g) : '',
-        g && !g.ok ? el('span', { class: 'propwhy', title: g.why,
-          text: 'no proposal: ' + (g.short || g.why) }) : '',
+      el('div', { class: 'frm' }, g ? proposeBtn(m.id, topic, g) : '', proposeWhy(g),
         g && g.caution ? el('span', { class: 'propwhy', text: 'caution — MMLU: ' + g.caution }) : ''),
       rvJust(m.id, topic));
     card.append(row);
@@ -5605,8 +6055,9 @@ function rvProposal(p, llmOk) {
   const ev = p.evidence || {};
   const head = el('div', { class: 'mhead' },
     el('h3', { text: `#${p.id} · ${p.model} · ${p.task} · ${p.category}` }),
-    el('span', { class: stClass(p.status === 'proposed' ? 'queued' : p.status === 'pending'
-      ? 'running' : p.status === 'approved' ? 'done' : p.status), text: p.status }));
+    el('span', {}, overBadge(p.override), ' ',
+      el('span', { class: stClass(p.status === 'proposed' ? 'queued' : p.status === 'pending'
+        ? 'running' : p.status === 'approved' ? 'done' : p.status), text: p.status })));
   const meta = el('p', { class: 'small', text:
     `requested ${p.created_at ? rel(p.created_at) + ' ago' : ''}`
     + (p.requested_by ? ` by ${p.requested_by}` : '')
@@ -5618,6 +6069,11 @@ function rvProposal(p, llmOk) {
     card.append(el('p', { class: 'small', text: 'Waiting for the LLM batch to complete '
       + `(batch ${p.batch_id}). Batches take minutes to hours; this page polls.` }));
   if (p.error) card.append(el('p', { class: 'warn', text: p.error }));
+  if (p.override) card.append(el('p', { class: 'warn', 'data-over-provisional': 'proposal' },
+    el('b', { text: 'Proposed over a provisional judge. ' }),
+    `${p.override.by} proposed this although the grades were not evidence: `
+    + `${(p.override.reasons || []).join('; ')}. The spec, the dataset and any model trained `
+    + 'on it carry the same mark. For demos and trials, not for results.'));
   if (ev.provisional) card.append(el('p', { class: 'warn', 'data-provisional': 'proposal' },
     el('b', { text: 'Provisional. ' }), `${upFirst(ev.provisional_reason)}: ${ev.served_model} at `
     + `${ev.base_url}` + (ev.weights ? ` (weights ${ev.weights})` : '') + '.'));
@@ -5699,7 +6155,8 @@ function rvDataset(d) {
       el('span', { class: stClass(d.status === 'ready' ? 'done' : d.status === 'pending'
         ? 'running' : 'failed'), text: d.status }),
       pv.items ? ` · ${pv.items.kept} kept of ${pv.items.generated} generated` : '',
-      pv.provisional ? ' · provisional' : '',
+      pv.provisional ? ' · provisional' : '', ' ',
+      overBadge(pv.proposed_over_provisional_judge || d.over_provisional_judge),
       d.download ? [' · ', el('a', { href: d.download.replace(/^\//, ''), text: 'items.jsonl' })] : ''));
   if (d.error) det.append(el('p', { class: 'warn', text: d.error }));
   if (pv.provisional) det.append(el('p', { class: 'warn', 'data-provisional': 'dataset' },
@@ -5816,12 +6273,12 @@ function modelAnswers(m, cats) {
   wrap.append(ansFilters(j));
   wrap.append(el('p', { class: 'small', 'data-answer-count': String(rows.length),
     text: `${rows.length} of ${j.n_diagnose} diagnosis-half answers` }));
-  wrap.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-answers-table': '1' },
-    el('thead', {}, el('tr', {}, el('th', { text: 'acuity' }),
-      el('th', { text: 'question and answer' }), el('th', { class: 'num', text: 'score' }),
-      el('th', { text: `criteria (${(j.criteria || []).length})` }),
-      el('th', { text: 'what the judge wrote' }))),
-    el('tbody', {}, rows.map(it => ansRow(it, j))))));
+  const pg = paged('answers', rows,
+    JSON.stringify([a.model, a.topic, a.acuity, a.flag, a.score, a.crit, a.sort]));
+  wrap.append(pg.pager);
+  wrap.append(el('div', { class: 'anslist', 'data-answers-table': '1' },
+    pg.rows.map(it => ansCard(it, j))));
+  if (pg.pager) wrap.append(pager('answers', rows.length));
   return wrap;
 }
 
@@ -5888,6 +6345,8 @@ function loopRowOf(slug) {
 // the two you are already looking at.
 function loopGo(r, step) {
   if (step === 'import') return navigate({ tab: 'exam', topic: null, model: null });
+  if (step === 'propose') { state.ans.model = (r.last_judged || {}).model || '';
+                            state.ans.rows = null; }
   if (step === 'review' || step === 'generate')
     { state.rv.topic = r.topic; state.rv.loaded = false; return navigate({ tab: 'review', topic: null, model: null }); }
   if (step === 'read') markRead(r.topic);
@@ -5911,36 +6370,78 @@ function markRead(topic) {
 // answers for the topic: the step after reading is only honest after reading.
 function loopStep(r) {
   if (r.next.step === 'read' && state.loopRead[r.topic] && r.propose)
-    return { step: 'propose', label: 'Propose', ok: r.propose.ok,
+    return { step: 'propose', label: r.propose.overridable ? 'Propose…' : 'Propose',
+             ok: r.propose.ok || r.propose.overridable,
              why: r.propose.why || '', short: r.propose.short || '' };
   return { ...r.next, short: r.next.why };
 }
 
+// the board's button for the next step. Proposing is not done from here: it
+// opens the topic page, where the answers are and the one Propose control is
 function loopBtn(r) {
   const st = loopStep(r);
-  const slot = 'loop:' + r.slug;
-  const b = st.step === 'propose'
-    ? actButton(slot, st.label, () => loopPropose(r),
-        { 'data-step': st.step, disabled: st.ok ? null : '', title: st.ok ? '' : st.why })
-    : el('button', { 'data-step': st.step, disabled: st.ok ? null : '',
-        title: st.ok ? '' : st.why, text: st.label,
-        onclick: () => loopGo(r, st.step) });
+  const b = el('button', { 'data-step': st.step, disabled: st.ok ? null : '',
+    class: st.ok ? 'primary' : null, title: st.ok ? '' : st.why, text: st.label,
+    onclick: () => loopGo(r, st.step) });
   return el('div', {}, b,
     st.ok ? '' : el('div', { class: 'propwhy', 'data-why': st.step,
-      title: st.why, text: st.short || st.why || '' }),
-    st.step === 'propose' ? actNote(slot) : '');
+      title: st.why, text: st.short || st.why || '' }));
 }
 
-async function loopPropose(r) {
-  const last = r.last_judged || {};
-  if (!last.model) throw new Error('no judged run on this topic to propose from');
-  if (!state.rvName.trim()) throw new Error('your name is recorded on a proposal — type it first');
-  const j = await post('api/proposals',
-    { model: last.model, topic: r.topic, requested_by: state.rvName });
-  state.loop.loaded = false; state.rv.loaded = false;
-  loadLoop();
-  return `Proposal #${j.id} submitted for ${last.model} on ${r.topic}. `
-    + 'It lands on the Review tab when the batch completes.';
+// Which model the topic page proposes for: the one whose answers are open,
+// else the last judged. The gate is the service's, per model.
+function topicProposeModel(r) {
+  const models = ansJudgedModels(r.task);
+  const a = state.ans;
+  if (a.model && models.includes(a.model)) return a.model;
+  const last = (r.last_judged || {}).model;
+  return last && models.includes(last) ? last : models[0] || '';
+}
+
+// Propose, on the topic page — the only place it starts. ok: a primary
+// button. Every reason about the judge and none about the data: "Propose…",
+// a secondary button with an amber dot that asks first. Any reason about the
+// data: disabled, and the reason beside it in words.
+function proposeControl(r) {
+  const model = topicProposeModel(r);
+  const gate = (r.propose_by_model || {})[model]
+    || (model && model === (r.last_judged || {}).model ? r.propose : null);
+  if (!model || !gate) return '';
+  const slot = 'propose:' + r.slug;
+  const attrs = { 'data-propose': r.slug, 'data-propose-model': model };
+  const done = j => `Proposal #${j.id} requested for ${model} on ${r.topic}. It lands on the `
+    + 'Review tab when the batch completes.';
+  if (gate.ok)
+    return el('div', {}, actButton(slot, 'Propose', async () => {
+      if (!rememberedName().trim()) throw new Error('your name is recorded on a proposal — type it first');
+      const j = await post('api/proposals', { model, topic: r.topic, requested_by: rememberedName().trim() });
+      state.loop.loaded = false; state.rv.loaded = false; loadLoop();
+      return done(j);
+    }, { ...attrs, class: 'primary', 'data-gate': 'ok',
+         title: `ask the LLM what skill ${model} is missing on ${r.topic}` }), actNote(slot));
+  if (gate.overridable)
+    return el('div', {}, el('button', { ...attrs, class: 'secondary dot-warn',
+      'data-gate': 'overridable', text: 'Propose…', title: gate.why,
+      onclick: () => proposeDialog({ model, topic: r.topic, gate,
+        returnTo: `[data-propose="${r.slug}"]`,
+        onDone: j => { actState(slot).ok = done(j) + ' It is marked "proposed over a '
+                         + 'provisional judge", and so is everything made from it.';
+                       state.loop.loaded = false; state.rv.loaded = false; loadLoop(); render(); } }) }),
+      el('div', { class: 'propwhy', 'data-why': 'propose', title: gate.why,
+        text: 'the judge is provisional — Propose… says what that means' }), actNote(slot));
+  return el('div', {}, el('button', { ...attrs, class: 'primary', disabled: '', 'data-gate': 'hard',
+      title: gate.why, text: 'Propose' }),
+    el('div', { class: 'propwhy', 'data-why': 'propose', title: gate.why,
+      text: gate.short || gate.why || '' }), actNote(slot));
+}
+
+// a proposal made over a provisional judge, wherever it shows up: the mark
+// and, in its tooltip, why the grades were not evidence
+function overBadge(over) {
+  if (!over) return '';
+  return el('span', { class: 'badge over', 'data-over-provisional': '1',
+    title: `proposed by ${over.by} over a provisional judge: ${(over.reasons || []).join('; ')}`,
+    text: 'over a provisional judge' });
 }
 
 function judgedBadges(last) {
@@ -6063,7 +6564,8 @@ function vTopic() {
     r.bank.under_floor && r.bank.accepted ? el('p', { class: 'warn', text:
       `${r.bank.report} report-half questions — under the ${r.bank.floor} this topic needs `
       + 'before anything may be proposed from it. Import or write more on the Exam tab.' }) : '',
-    el('div', { class: 'frm' }, loopBtn(r), rvNameInput()),
+    el('div', { class: 'frm' },
+      r.next.step === 'read' && r.propose ? proposeControl(r) : loopBtn(r), rvNameInput()),
     judgingLine(r),
     state.loop.msg ? el('p', { class: 'small', 'data-loop-msg': '1', text: state.loop.msg }) : '');
   return [headCard, loopSitPanel(r), loopAnswersPanel(r), loopOutputPanel(r)];
@@ -6121,9 +6623,9 @@ function loopSitPanel(r) {
     state.loop.blocked ? el('p', { class: 'warn', 'data-sit-blocked': '1',
       text: state.loop.blocked }) : '',
     el('div', { class: 'frm' },
-      el('input', { type: 'text', 'aria-label': 'model id', value: s.model,
-        placeholder: 'org/model, or local/<name>', style: 'flex:2;min-width:240px',
-        'data-keep': 'sit-model', oninput: e => { s.model = e.target.value; } }),
+      modelBox('sit', s.model, v => { s.model = v; },
+        it => { s.model = it.id; if (it.kind) s.kind = it.kind; render(); },
+        { 'aria-label': 'model id', placeholder: 'search: org/model, or local/<name>' }),
       el('select', { 'aria-label': 'kind', onchange: e => { s.kind = e.target.value; } },
         ['auto', 'base', 'instruct'].map(v => el('option', { value: v,
           selected: s.kind === v ? '' : null, text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
@@ -6178,6 +6680,10 @@ function ansFilters(j) {
       [['all', 'score: any'], ['weak', 'scored under 2'], ['0', '0'], ['1', '1'], ['2', '2'],
        ['3', '3'], ['4', '4'], ['ungraded', 'the judge\'s reply was unreadable']],
       v => { a.score = v; render(); }),
+    (j.criteria || []).length ? sel('criterion filter', a.crit,
+      [['all', 'criteria: any'], ['any', 'any criterion below 0.5'],
+       ...(j.criteria || []).map(c => [c.id, `${c.label} below 0.5`])],
+      v => { a.crit = v; render(); }) : '',
     sel('sort', a.sort, [['score', 'weakest first'], ['best', 'best first'],
                          ['difficulty', 'by difficulty']],
       v => { a.sort = v; render(); }));
@@ -6189,6 +6695,10 @@ function ansVisible(j) {
     if (a.acuity !== 'all' && (it.meta || {}).acuity !== a.acuity) return false;
     if (a.flag === 'none' && Object.values(it.flags || {}).some(Boolean)) return false;
     if (a.flag !== 'all' && a.flag !== 'none' && !(it.flags || {})[a.flag]) return false;
+    const cv = it.criteria || {};
+    if (a.crit === 'any' && !Object.values(cv).some(v => v != null && v < 0.5)) return false;
+    if (a.crit !== 'all' && a.crit !== 'any' && !(cv[a.crit] != null && cv[a.crit] < 0.5))
+      return false;
     if (a.score === 'ungraded') return !it.graded;
     if (a.score === 'weak') return it.graded && it.score < 2;
     if (a.score !== 'all') return it.graded && String(it.score) === a.score;
@@ -6200,42 +6710,69 @@ function ansVisible(j) {
   return rows;
 }
 
-// the per-criterion strip: bars, because fifteen numbers in a row is a wall.
-// Each bar carries its criterion and value as a title, for the mouse and for
-// anything reading the DOM.
-function ansStrip(it, criteria) {
-  return el('div', { class: 'frm', style: 'gap:2px;flex-wrap:nowrap;align-items:flex-end' },
-    criteria.map(c => {
-      const v = (it.criteria || {})[c.id];
-      return el('span', { class: 'dxbar', 'data-criterion': c.id,
-        title: `${c.label}: ${v == null ? 'not applicable' : num(v, 2)}`,
-        style: 'width:8px;height:22px;display:inline-flex;align-items:flex-end' },
-        v == null ? '' : el('span', { style: `height:${Math.max(8, 100 * v).toFixed(0)}%;`
-          + 'width:100%;display:block;background:var(--s1);border-radius:1px' }));
-    }));
+// The criteria as one row of 14 px cells — at most 23, about 350 px — on a
+// one-hue sequential scale from the theme's accent (colour-blind safe: it is
+// lightness that carries the value). The cells are the overview; the three
+// weakest, named in words beside them, are what people read. Each cell says
+// its criterion and value to the mouse and to a screen reader.
+const critColor = v => `color-mix(in srgb, var(--accent) ${Math.round(10 + 90 * v)}%, var(--plane))`;
+
+function ansCells(it, criteria) {
+  return el('span', { class: 'critcells' }, criteria.map(c => {
+    const v = (it.criteria || {})[c.id];
+    const words = `${c.label}: ${v == null ? 'not applicable' : num(v, 2)}`;
+    return el('span', { class: 'critcell' + (v == null ? ' na' : ''), role: 'img',
+      'data-criterion': c.id, title: words, 'aria-label': words,
+      style: v == null ? null : `background:${critColor(v)}` });
+  }));
 }
 
-function ansRow(it, j) {
+function ansWeakest(it, criteria, n = 3) {
+  return criteria.map(c => ({ c, v: (it.criteria || {})[c.id] }))
+    .filter(x => x.v != null && x.v < 1)
+    .sort((a, b) => a.v - b.v || natCmp(a.c.label, b.c.label)).slice(0, n);
+}
+
+// One answer: what was asked, what the model wrote, what the judge wrote, the
+// criteria; the score large on the right with the flags under it. Nothing
+// sideways — the judge's note is the most useful text here and it wraps.
+function ansCard(it, j) {
   const meta = it.meta || {};
   const flags = (j.flags || []).filter(f => (it.flags || {})[f.id]);
   const open = state.ans.open[it.qid];
-  return el('tr', { 'data-answer': it.qid, 'data-half': 'diagnose' },
-    el('td', { class: 'small', style: 'white-space:nowrap' }, meta.acuity || '—',
-      meta.difficulty != null ? el('div', { class: 'se', text: 'difficulty ' + meta.difficulty }) : ''),
-    el('td', { style: 'min-width:340px' },
-      el('div', { class: 'small', text: it.prompt || '(question not on disk)' }),
-      el('div', { class: open ? '' : 'clamp2', style: 'margin-top:4px',
-                  'data-answer-text': '1' },
-        el('span', { class: 'se', text: it.answer || '(the model wrote nothing)' })),
-      el('a', { href: '#', class: 'small', text: open ? 'less' : 'more',
-        onclick: e => { e.preventDefault();
-          state.ans.open[it.qid] = !open; render(); } })),
-    el('td', { class: 'num' }, it.graded ? `${it.score} / 4`
-      : el('span', { class: 'se', text: 'unreadable' }),
-      flags.length ? el('div', {}, flags.map(f => el('span', { class: 'badge taint',
-        title: f.effect_words, 'data-flag': f.id, text: f.label }))) : ''),
-    el('td', {}, ansStrip(it, j.criteria || [])),
-    el('td', { class: 'small se', text: it.justification || '—' }));
+  const crit = j.criteria || [];
+  const weak = ansWeakest(it, crit);
+  const head = [meta.acuity, meta.difficulty != null ? 'difficulty ' + meta.difficulty : null,
+                meta.jurisdiction_required != null
+                  ? (meta.jurisdiction_required ? 'jurisdiction required' : '') : null,
+                meta.intent].filter(Boolean).join(' · ');
+  const long = (it.answer || '').length > 220;
+  return el('article', { class: 'anscard', 'data-answer': it.qid, 'data-half': 'diagnose' },
+    el('div', { class: 'main', style: 'min-width:0' },
+      head ? el('div', { class: 'ansmeta', text: head }) : '',
+      el('div', { class: 'qa' },
+        el('span', { class: 'lbl', text: 'Q' }),
+        el('div', { class: 'txt', text: it.prompt || '(question not on disk)' }),
+        el('span', { class: 'lbl', text: 'A' }),
+        el('div', { class: 'txt' },
+          el('div', { class: open ? '' : 'clamp3', 'data-answer-text': '1',
+                      text: it.answer || '(the model wrote nothing)' }),
+          long ? el('button', { class: 'quiet', style: 'padding:2px 0;font-size:12px',
+            'data-answer-toggle': '1', 'aria-expanded': String(!!open),
+            text: open ? 'Show less' : 'Show the whole answer',
+            onclick: () => { state.ans.open[it.qid] = !open; render(); } }) : ''),
+        el('span', { class: 'lbl', text: 'Judge' }),
+        el('div', { class: 'txt', 'data-judge-note': '1', text: it.justification || '—' }),
+        crit.length ? el('span', { class: 'lbl', text: 'Criteria' }) : '',
+        crit.length ? el('div', { class: 'critrow' }, ansCells(it, crit),
+          el('span', { class: 'small se', 'data-weakest': '1', text: weak.length
+            ? 'weakest: ' + weak.map(x => `${x.c.label} ${(+x.v).toFixed(1)}`).join(' · ')
+            : 'every criterion met' })) : '')),
+    el('div', { class: 'side' },
+      el('div', { class: 'score', text: it.graded ? `${it.score} / 4` : '—' }),
+      it.graded ? '' : el('div', { class: 'se', text: 'the judge\'s reply was unreadable' }),
+      el('div', {}, flags.map(f => el('span', { class: 'badge taint', title: f.effect_words,
+        'data-flag': f.id, text: f.label })))));
 }
 
 function loopAnswersPanel(r) {
@@ -6258,9 +6795,22 @@ function loopAnswersPanel(r) {
     loadAnswers(want, r.topic);
     markRead(r.topic);
   }
+  // a model judged while this page was open: said once, beside the select,
+  // until the select is used — a list that grows silently is a list nobody
+  // notices has grown
+  const seen = a.seen[r.task];
+  if (seen) for (const m of models) if (!seen.has(m)) (a.fresh[r.task] = a.fresh[r.task] || []).push(m);
+  a.seen[r.task] = new Set(models);
+  const fresh = (a.fresh[r.task] || []).filter(m => models.includes(m));
+  const scoreOf = m => { const mm = DATA.models.find(x => x.id === m);
+    const t = mm && mm.judge && mm.judge.tasks[r.task];
+    return t && pubScore(t) != null ? ` — ${num(pubScore(t), 2)} / 4` : ''; };
   card.append(el('div', { class: 'frm' },
-    mkSel('model', models.map(m => [m, m]), want,
-      v => { state.ans.model = v; state.ans.rows = null; render(); }),
+    el('span', { 'data-answers-model': '1' },
+      mkSel('model', models.map(m => [m, m + scoreOf(m)]), want,
+        v => { state.ans.model = v; state.ans.rows = null; a.fresh[r.task] = []; render(); })),
+    fresh.length ? el('span', { class: 'badge new', 'data-new-model': fresh.join(','),
+      text: 'new: ' + fresh.join(', ') }) : '',
     el('a', { class: 'small', href: '#model=' + encodeURIComponent(want),
       text: 'this model\'s page',
       onclick: e => { e.preventDefault(); navigate({ model: want, topic: null }); } })));
@@ -6288,12 +6838,12 @@ function loopAnswersPanel(r) {
   card.append(ansFilters(j));
   card.append(el('p', { class: 'small', 'data-answer-count': String(rows.length),
     text: `${rows.length} of ${j.n_diagnose} diagnosis-half answers` }));
-  card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-answers-table': '1' },
-    el('thead', {}, el('tr', {}, el('th', { text: 'acuity' }),
-      el('th', { text: 'question and answer' }), el('th', { class: 'num', text: 'score' }),
-      el('th', { text: `criteria (${(j.criteria || []).length})` }),
-      el('th', { text: 'what the judge wrote' }))),
-    el('tbody', {}, rows.map(it => ansRow(it, j))))));
+  const pg = paged('answers', rows,
+    JSON.stringify([a.model, a.topic, a.acuity, a.flag, a.score, a.crit, a.sort]));
+  card.append(pg.pager);
+  card.append(el('div', { class: 'anslist', 'data-answers-table': '1' },
+    pg.rows.map(it => ansCard(it, j))));
+  if (pg.pager) card.append(pager('answers', rows.length));        // and again under the list
   if (!rows.length) card.append(note('No answer matches these filters.'));
   return card;
 }
@@ -6310,12 +6860,14 @@ function loopOutputPanel(r) {
   if (r.proposal) {
     card.append(el('p', { class: 'small', 'data-proposal': String(r.proposal.id) },
       `Proposal #${r.proposal.id} for ${r.proposal.model} is ${r.proposal.status}`
-      + (r.proposal.requested_by ? `, requested by ${r.proposal.requested_by}` : ''), '. ',
+      + (r.proposal.requested_by ? `, requested by ${r.proposal.requested_by}` : ''), ' ',
+      overBadge(r.proposal.override), '. ',
       el('a', { href: '#tab=review', text: 'Review it',
         onclick: e => { e.preventDefault(); state.rv.topic = r.topic;
           navigate({ tab: 'review', topic: null }); } })));
   } else {
-    card.append(el('p', { class: 'small' }, 'No open proposal. ', loopBtn(r)));
+    card.append(el('p', { class: 'small' }, 'No open proposal. '
+      + (r.next.step === 'read' ? 'Propose from the top of this page.' : '')));
   }
   const ready = (r.datasets || []).filter(d => d.status === 'ready');
   if (ready.length) {
@@ -6325,7 +6877,7 @@ function loopOutputPanel(r) {
         el('th', { text: 'hand to training' }))),
       el('tbody', {}, ready.map(d => el('tr', { 'data-dataset': String(d.id) },
         el('td', {}, el('a', { href: `api/datasets/${d.id}`, target: '_blank', rel: 'noopener',
-          text: `#${d.id}` }),
+          text: `#${d.id}` }), ' ', overBadge(d.over_provisional_judge),
           el('div', { class: 'se', text: `${d.kept ?? d.count} kept of ${d.count}` })),
         el('td', { class: 'num', text: String(d.kept ?? d.count) }),
         el('td', {}, el('code', { class: 'mono', text: `--gap-dataset ${d.id}` }),
@@ -6974,6 +7526,7 @@ function netFail(path, err) {
 async function api(path, opts) {
   try {
     const r = await fetch(path, opts);
+    checkBuild(r);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
     netOk();
@@ -7008,11 +7561,16 @@ async function loadQueue() {
     // judged run, again when its judge batch lands minutes later: the row is
     // already 'done' by then, so only the judge's own status says so
     const judgeDone = r => ((r || {}).judge || {}).status === 'done';
+    // a row this page has never seen that is already finished counts too: a
+    // fast run, or a laptop waking up, can go from queued to judged between
+    // two polls. The first load is not "new" — the boot fetch covered it.
+    const first = !state.queueLoaded;
     const justFinished = rows.some(r => {
       const p = prev.get(r.id);
-      return p && ((r.status === 'done' && p.status !== 'done')
-                   || (judgeDone(r) && !judgeDone(p)));
+      if (!p) return !first && (r.status === 'done' || judgeDone(r));
+      return (r.status === 'done' && p.status !== 'done') || (judgeDone(r) && !judgeDone(p));
     });
+    state.queueLoaded = true;
     const changed = rows.length !== state.queue.length || rows.some(r => {
       const p = prev.get(r.id);
       return !p || p.status !== r.status || p.progress !== r.progress

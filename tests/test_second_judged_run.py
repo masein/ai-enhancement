@@ -308,6 +308,40 @@ def browser():
         b.close()
 
 
+class Served:
+    """The real app behind a browser page, routed in-process: every request
+    the page makes goes to the TestClient. `fail_results` makes the next N
+    /api/results fetches fail, as a deploy or a blip would."""
+
+    def __init__(self, browser, client, appmod):
+        self.client, self.appmod = client, appmod
+        self.fail_results, self.failed = 0, []
+        self.ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+        self.page = self.ctx.new_page()
+        self.loads, self.errors = [], []
+        self.page.on("load", lambda _: self.loads.append(1))
+        self.page.on("pageerror", lambda e: self.errors.append(str(e)))
+        self.page.route("https://board.test/**", self.serve)
+
+    def serve(self, route):
+        req = route.request
+        path = req.url.split("board.test", 1)[1] or "/"
+        if path.startswith("/api/results") and self.fail_results:
+            self.fail_results -= 1
+            self.failed.append(path)
+            return route.fulfill(status=503, content_type="application/json",
+                                 body='{"detail":"restarting"}')
+        fresh(self.appmod)                                 # past the debounce, as minutes would be
+        r = self.client.request(req.method, path.split("#")[0], content=req.post_data_buffer,
+                                headers={"content-type": req.headers.get("content-type", "")})
+        route.fulfill(status=r.status_code, body=r.content,
+                      content_type=r.headers.get("content-type", "application/json"))
+
+    def open(self, hash_):
+        self.page.goto("https://board.test/" + hash_)
+        return self.page
+
+
 @pytest.mark.dashboard
 def test_a_page_open_through_a_whole_judged_run_shows_the_judged_scores(svc, monkeypatch,
                                                                          browser):
@@ -322,31 +356,9 @@ def test_a_page_open_through_a_whole_judged_run_shows_the_judged_scores(svc, mon
     for f in config.OUT_DIR.glob("*/judge.json"):         # nothing judged yet, anywhere
         f.unlink()
     fresh(appmod)
-    fail_results = {"n": 0}
-    failed: list[str] = []
-
-    def serve(route):
-        req = route.request
-        path = req.url.split("board.test", 1)[1] or "/"
-        if path.startswith("/api/results") and fail_results["n"]:
-            fail_results["n"] -= 1
-            failed.append(path)
-            return route.fulfill(status=503, content_type="application/json",
-                                 body='{"detail":"restarting"}')
-        fresh(appmod)                                      # past the debounce, as minutes would be
-        r = client.request(req.method, path.split("#")[0], content=req.post_data_buffer,
-                           headers={"content-type": req.headers.get("content-type", "")})
-        route.fulfill(status=r.status_code, body=r.content,
-                      content_type=r.headers.get("content-type", "application/json"))
-
-    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
-    pg = ctx.new_page()
-    loads, errors = [], []
-    pg.on("load", lambda _: loads.append(1))
-    pg.on("pageerror", lambda e: errors.append(str(e)))
-    pg.route("https://board.test/**", serve)
+    s = Served(browser, client, appmod)
     try:
-        pg.goto("https://board.test/#tab=models")
+        pg = s.open("#tab=models")
         row = pg.locator(f"[data-model-row='{MODEL}']")
         row.wait_for(timeout=20000)
         judged = row.locator("td").nth(5)                  # 'judged topics'
@@ -360,20 +372,62 @@ def test_a_page_open_through_a_whole_judged_run_shows_the_judged_scores(svc, mon
                              timeout=20000)
         assert judged.text_content().strip() == "—"       # the answers alone grade nothing
 
-        fail_results["n"] = 1                              # the next results fetch fails once
+        s.fail_results = 1                                 # the next results fetch fails once
         assert llm_poller.tick() == 1                      # judge.json lands
         # the judged-topics cell: its count, and each topic's score in its title
         pg.wait_for_function(
             f"(document.querySelector(\"[data-model-row='{MODEL}']\")"
             ".querySelectorAll('td')[5].querySelector('span[title]') || {}).title", timeout=40000)
-        assert failed, "the failed fetch never happened — the retry was not exercised"
+        assert s.failed, "the failed fetch never happened — the retry was not exercised"
         assert judged.text_content().strip().startswith("1")     # one topic judged
         assert re.fullmatch(r"economics \d\.\d\d",
                             judged.locator("span[title]").first.get_attribute("title"))
-        assert len(loads) == 1                             # without a reload
-        assert errors == []
+        assert len(s.loads) == 1                           # without a reload
+        assert s.errors == []
     finally:
-        ctx.close()
+        s.ctx.close()
+
+
+@pytest.mark.dashboard
+def test_an_open_topic_page_lists_a_model_judged_while_it_was_open(svc, monkeypatch, browser):
+    """Omar's tab, 2026-09-21: #49 (SmolLM2-135M) landed on medicine and the
+    answers panel's model select still listed only the 360M. The page learns
+    the judge landed (#33); the select must then list both, say what each
+    scored, and mark the new one once."""
+    client, appmod, _ = svc
+    from service import config, llm_poller
+    other = "fx/skewed-360m"
+    for f in config.OUT_DIR.glob("*/judge.json"):         # one model judged on economics
+        if f.parent.name != "fx__good-750m":
+            f.unlink()
+    fresh(appmod)
+    s = Served(browser, client, appmod)
+    try:
+        pg = s.open("#topic=economics")
+        sel = pg.locator("[data-panel='answers'] select[aria-label='model']")
+        sel.wait_for(timeout=20000)
+        assert [o.get_attribute("value") for o in sel.locator("option").all()] == [MODEL]
+        assert re.search(r"good-750m — \d\.\d\d / 4", sel.locator("option").first.text_content())
+        sid = client.post("/api/submissions", json={"hf_id": other, "suite": "judged",
+                                                    "tasks": [ECON]}).json()["id"]
+        run_judged(monkeypatch, sid)
+        assert llm_poller.tick() == 1
+        # the runner and the judge both finish between two polls: the page first
+        # sees this row already judged, and that counts as a run landing too
+        pg.wait_for_function(
+            "document.querySelectorAll(\"[data-panel='answers'] select[aria-label='model'] "
+            "option\").length === 2", timeout=40000)
+        values = sorted(o.get_attribute("value") for o in sel.locator("option").all())
+        assert values == sorted([MODEL, other])
+        new = pg.locator("[data-new-model]")
+        assert new.get_attribute("data-new-model") == other
+        assert "new: " + other in new.text_content()
+        # used once, it goes
+        sel.select_option(other)
+        pg.wait_for_selector("[data-new-model]", state="detached")
+        assert len(s.loads) == 1 and s.errors == []
+    finally:
+        s.ctx.close()
 
 
 # ---------------------------------------------------------------------------

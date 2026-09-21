@@ -456,6 +456,27 @@ box against vLLM with a real model on the card, and Dr. Hossein's sign-off plus
 the ≥10 further questions (§8). Until both, every medicine score carries two
 stamps and counts for nothing.
 
+## 10b. Phase 9 — a dashboard people like using
+
+Brief: `docs/prompts/phase-9-ux.md` (four PRs: 9a–9d). The page was correct
+and read like an audit log; phase 9 changes how it reads, never what it says —
+the report half, the provisional stamps and taint are untouched.
+
+- **9a — the five asks.** Model search in both model-id boxes
+  (`GET /api/models/suggest`: the board's own models first, then the Hub via
+  the service, cached, two-second limit). The answers as cards that never
+  scroll sideways, criteria as 14 px cells with the three weakest named, a
+  "criterion below 0.5" filter. `X-Evalboard-Build` on every `/api/*` answer
+  and `<meta name="evalboard-build">` on the page: a page from an older build
+  shows a bar and reloads itself after a minute, never mid-typing. **Propose
+  with a warning**: the gate is split into `soft` (about the judge) and `hard`
+  (about the data), both always evaluated; soft-only is **Propose…** behind a
+  dialog, and the proposal, spec, dataset `provenance.json` and taint trail
+  carry "proposed over a provisional judge". `ALLOW_PRELIMINARY_OVERRIDE=0`
+  restores the old gate word for word. Propose starts only on the topic page;
+  the model page and Review link to it. One `pager()` for the answers, queue,
+  Models, Leaderboard (ranked first), Provenance and Training.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

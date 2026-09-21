@@ -8,7 +8,11 @@ own in a function-scoped temp dir.
 from __future__ import annotations
 
 import json
+import socket
 import sys
+import threading
+import time
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -93,3 +97,87 @@ def fresh(appmod) -> None:
     """Step past the payload's five-second debounce (load shedding, not the
     property under test)."""
     appmod._cache["at"] = 0.0
+
+
+# ---------------------------------------------------------------------------
+# A live service in a thread, per module, and a browser page that records its
+# own errors — the LIVE dashboard fetches, so these need a real HTTP server.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def live(tmp_path_factory):
+    import uvicorn
+
+    from service import config, llm, llm_poller, worker
+    import service.app as appmod
+    root = tmp_path_factory.mktemp("live")
+    tree = make_fixture.build(root)
+    saved = {k: getattr(config, k) for k in (
+        "BENCH_ROOT", "RESULTS_ROOT", "OUT_DIR", "DB_PATH", "ARTIFACTS_DIR", "LOGS_DIR",
+        "DATASETS_DIR", "SUBMIT_TOKEN", "LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_POLL_S",
+        "EXAM_DIR", "EXAM_PROVIDER", "EXAM_MODEL", "EXAM_API_KEY", "JUDGED_TASKS_DIR")}
+    for k, v in {"BENCH_ROOT": root, "RESULTS_ROOT": root / "results",
+                 "OUT_DIR": root / "results" / "full", "DB_PATH": root / "service.sqlite3",
+                 "ARTIFACTS_DIR": root / "artifacts", "LOGS_DIR": root / "logs",
+                 "DATASETS_DIR": root / "datasets", "SUBMIT_TOKEN": "",
+                 "LLM_PROVIDER": "fake", "LLM_MODEL": "fake-1", "LLM_API_KEY": "",
+                 "LLM_POLL_S": 0.3, "EXAM_DIR": root / "exam", "EXAM_PROVIDER": "fake",
+                 "EXAM_MODEL": "fake-exam", "EXAM_API_KEY": "",
+                 "JUDGED_TASKS_DIR": root / "exam" / "tasks"}.items():
+        setattr(config, k, v)
+    worker_start = worker.start
+    worker.start = lambda: None
+    llm.reset()
+    appmod._cache.update(key=None, payload=None, at=0.0)
+    # an upload from the page must not land in the developer's checkout: the
+    # service prefers the repo's rubrics directory when it can write there,
+    # and on this machine it can
+    rubric_store = appmod._rubric_store
+    appmod._rubric_store = lambda: (root / "rubrics", False)
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(appmod.app, host="127.0.0.1", port=port,
+                                           log_level="warning"))
+    th = threading.Thread(target=server.run, daemon=True)
+    th.start()
+    base = f"http://127.0.0.1:{port}"
+    for _ in range(100):
+        try:
+            urllib.request.urlopen(base + "/healthz", timeout=1)
+            break
+        except Exception:
+            time.sleep(0.1)
+    else:
+        raise RuntimeError("live server did not come up")
+    yield {"base": base, "tree": tree, "root": root}
+    server.should_exit = True
+    th.join(5)
+    llm_poller.stop()
+    worker.start = worker_start
+    appmod._rubric_store = rubric_store
+    for k, v in saved.items():
+        setattr(config, k, v)
+    llm.reset()
+
+
+@pytest.fixture(scope="module")
+def browser():
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        yield b
+        b.close()
+
+
+@pytest.fixture
+def page(browser):
+    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+    pg = ctx.new_page()
+    errors = []
+    pg.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
+    pg.on("console", lambda m: errors.append(f"console.error: {m.text}")
+          if m.type == "error" else None)
+    pg.errors = errors
+    yield pg
+    ctx.close()

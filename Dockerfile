@@ -64,4 +64,10 @@ EXPOSE 8899
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
   CMD python -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8899/healthz', timeout=4)" || exit 1
 
+# The git sha this image was built from, for the page's "the dashboard was
+# updated" bar. Optional: without it the page's own hash still tells an old
+# page from a new one. Last, so a new sha never invalidates the layers above.
+ARG EVALBOARD_BUILD=""
+ENV EVALBOARD_BUILD=${EVALBOARD_BUILD}
+
 CMD ["python", "-m", "uvicorn", "service.app:app", "--host", "0.0.0.0", "--port", "8899"]

@@ -330,14 +330,47 @@ that covers it (model, `at` — when THAT topic's grades landed, from its own
 `judged_at`, not the file's last merge — folded report-half score, and the provisional /
 draft-rubric / single-provider / trained-on-it stamps), any open proposal,
 any datasets, and **`next`** — the one step to take, as `{step, label, ok,
-why}`. `propose` carries the same gate object `POST /api/proposals` enforces.
-Nothing here is a second implementation of a rule: when the button is
-disabled, `why` is the sentence the API itself would refuse with.
+why}`. `propose` carries the same gate object `POST /api/proposals` enforces,
+for the last-judged model, and `propose_by_model` has one per model judged on
+the topic (the topic page proposes for the model whose answers are open):
+
+```json
+{"ok": false, "overridable": true, "provisional": true,
+ "soft": ["graded by a local model — not a pinned benchmark", "..."],
+ "hard": [], "why": "the judged suite is preliminary, …", "short": "…", "caution": null}
+```
+
+`soft` reasons are about the **judge** (not calibrated against a person, a
+local model, a moved canary, a different judge, a single-provider loop, a draft
+rubric); `hard` reasons are about the **data** and the queue (under the
+report-half floor, nothing usable written, collapsed output, a skipped judge
+file, no judged answers, a proposal already active, no answer that fell short).
+Both are always evaluated. `ok` is neither; `overridable` is soft reasons only,
+with `ALLOW_PRELIMINARY_OVERRIDE` on. Nothing here is a second implementation
+of a rule: when the button is disabled, `why` is the sentence the API itself
+would refuse with.
 
 `models[].taintTrail` in `/api/results` is the audit trail behind a tainted
 model: `{run_id, datasets, proposals}` — the training run that consumed the
 data, the datasets it consumed and the proposals those came from, so "what
-taught this model?" is three links rather than three queries.
+taught this model?" is three links rather than three queries. When any of
+those proposals was made over a provisional judge, `over_provisional_judge`
+maps its id to `{by, at, reasons}`.
+
+`GET /api/models/suggest?q=` — what the model-id boxes offer as you type (two
+characters at least): the models this board knows first (board rows, every
+`hf_id` in the queue, uploaded `local/…` artifacts), then Hugging Face Hub
+text-generation matches, most downloaded first, asked by the service (cached
+ten minutes per query, two-second limit). `{"items": [{"id", "params", "kind",
+"kind_guessed", "on_board", "judged", "over_cap", "source": "board"|"known"|"hub"}],
+"hub_ok", "footer"}` — a Hub that does not answer leaves the local matches and
+a `footer` saying so.
+
+Every `/api/*` response carries `X-Evalboard-Build`: the git short sha the
+service was built from (when known) plus a hash of the page it serves. The
+page carries the same value in `<meta name="evalboard-build">`; when they
+differ, a page loaded before a deploy offers to reload, and reloads itself
+after a minute unless someone is typing or a dialog is open.
 
 `GET /api/answers?model=&topic=` — one model's **diagnosis-half** answers on
 one topic: the question, what the model wrote, the folded score, the
@@ -392,11 +425,12 @@ header and a separate judged average — never part of `avg`.
 
 ### Find the gap: proposals and generated datasets
 
-The pipeline behind the Diagnose section's **Propose a skill spec** button
+The pipeline behind the topic page's **Propose** button — the one place a
+proposal starts; the model page and the Review tab link to it
 (DIAGNOSE.md, phase 4). Off unless the operator set `LLM_PROVIDER`; `GET
 /api/llm` says so, and shows today's batch-item use against the daily cap.
 
-- `POST /api/proposals` `{"model", "topic", "requested_by"}` — the LLM reads
+- `POST /api/proposals` `{"model", "topic", "requested_by", "override_preliminary"}` — the LLM reads
   the **judge's written assessments** of this model's **diagnosis-half**
   answers on that exam topic and proposes a skill spec. No exam question text
   goes with them: anything the judge quoted from a question is stripped, and a
@@ -404,9 +438,16 @@ The pipeline behind the Diagnose section's **Propose a skill spec** button
   own words when the judged suite is preliminary (κ, a moved canary, a
   different judge), when the topic has under 30 report-half questions, or when
   the model wrote nothing usable on it. MMLU's distribution finding for the
-  matching category rides along as `caution` — context, never a gate. Returns
-  `{"id", "status": "pending", "batch_id", "task"}`; the poller turns it into
-  `proposed` when the batch completes.
+  matching category rides along as `caution` — context, never a gate. The gate
+  is recomputed on every request (the shape above): any `hard` reason is a 409
+  with all of them; `soft` reasons without `override_preliminary: true` are a
+  409 as before; soft reasons with it, and a name, are accepted and recorded as
+  `override: {"by", "at", "reasons"}` on the proposal. That mark travels: the
+  proposal, its approved spec, the dataset's `provenance.json`
+  (`proposed_over_provisional_judge`) and the taint trail of any model trained
+  on it. `ALLOW_PRELIMINARY_OVERRIDE=0` restores the hard gate word for word.
+  Returns `{"id", "status": "pending", "batch_id", "task"}`; the poller turns
+  it into `proposed` when the batch completes.
 - `GET /api/proposals[?status=]`, `GET /api/proposals/{id}` — each with
   `spec_text` (the LLM's), `edited_text` (the human's), `evidence`
   (`share_explained`, `patterns`, the topic's report- and diagnosis-half

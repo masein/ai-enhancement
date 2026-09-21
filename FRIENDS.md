@@ -135,8 +135,8 @@ an owner.
 |---|---|---|
 | **Import a bank** | Questions written by a person arrive whole, under their name — Exam tab, import panel. An LLM can draft candidates instead, but nothing reaches the bank unread. | whoever owns the subject |
 | **Sit the exam** | One model answers that topic's questions. The judge grades every answer against the topic's rubric and criteria file, and folds a 0–4 in code. | anyone with a model |
-| **Read the results** | The answers panel: what the model wrote, the score, which flags fired, each criterion as a bar, and what the judge wrote about it. Diagnosis half only. | whoever wants to know why |
-| **Propose** | An LLM reads the judge's *written assessments* — never the questions — and says what skill is missing. | anyone, once the gate is clear |
+| **Read the results** | The answers, one card each: what the model wrote, the score, which flags fired, each criterion as a small cell with the three weakest named, and what the judge wrote about it. Diagnosis half only. | whoever wants to know why |
+| **Propose** | On the topic page, and only there. An LLM reads the judge's *written assessments* — never the questions — and says what skill is missing. When the only thing wrong is the judge (a local model, not yet checked against a person), the button reads **Propose…** and asks first; what it makes is marked "proposed over a provisional judge", all the way to any model trained on it. | anyone, once the gate is clear |
 | **Review the spec** | A person approves, edits or rejects that sentence. This is the airlock: only approved text reaches a generator. | the reviewer |
 | **Generate** | A generator that has seen only the spec writes prose documents. A 13-gram gate drops anything that overlaps an exam question or a benchmark item. | the reviewer |
 | **Hand to training** | The dataset id and the `--gap-dataset` line. A run that consumes it registers it, and its checkpoints carry a taint badge on that topic. | whoever trains |

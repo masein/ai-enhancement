@@ -203,6 +203,12 @@ JUDGE_CANARY_MAX_DRIFT = float(os.environ.get("JUDGE_CANARY_MAX_DRIFT", "0.5"))
 # the documented override for a single-provider trial: every judged score is
 # then stamped "single-provider loop" on the page and in provenance
 ALLOW_SINGLE_PROVIDER_LOOP = os.environ.get("ALLOW_SINGLE_PROVIDER_LOOP", "0") == "1"
+# Propose over a judge whose grades are not evidence yet (a local model, not
+# calibrated, single provider, draft rubric): allowed, behind a warning a
+# person has to tick, and everything made from it is marked "proposed over a
+# provisional judge". Reasons about the DATA (too few questions, nothing
+# written, collapsed output) are never overridable. 0 restores the hard gate.
+ALLOW_PRELIMINARY_OVERRIDE = os.environ.get("ALLOW_PRELIMINARY_OVERRIDE", "1") == "1"
 JUDGED_TASKS_DIR = Path(os.environ.get("JUDGED_TASKS_DIR", EXAM_DIR / "tasks"))
 
 

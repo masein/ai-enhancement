@@ -89,7 +89,8 @@ CREATE TABLE IF NOT EXISTS proposals (
   error         TEXT DEFAULT '',
   created_at    REAL NOT NULL,
   updated_at    REAL NOT NULL,
-  approved_at   REAL
+  approved_at   REAL,
+  override      TEXT                              -- JSON {by, at, reasons}: proposed over a provisional judge
 );
 CREATE TABLE IF NOT EXISTS datasets (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -197,7 +198,8 @@ def init() -> None:
                      "ALTER TABLE proposals ADD COLUMN judge_run TEXT DEFAULT '{}'",
                      "ALTER TABLE submissions ADD COLUMN tasks TEXT DEFAULT '[]'",
                      "ALTER TABLE llm_batches ADD COLUMN progress TEXT DEFAULT ''",
-                     "ALTER TABLE submissions ADD COLUMN judge_batch TEXT DEFAULT ''"):
+                     "ALTER TABLE submissions ADD COLUMN judge_batch TEXT DEFAULT ''",
+                     "ALTER TABLE proposals ADD COLUMN override TEXT"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:
@@ -431,7 +433,7 @@ def trun_series(rid: int, max_points: int = 400) -> dict:
 _PROP_COLS = ["id", "model", "task", "category", "status", "spec_text", "edited_text",
               "evidence", "proposer", "requested_by", "approver", "reject_reason",
               "batch_id", "prompt_sha", "judge_run", "error", "created_at", "updated_at",
-              "approved_at"]
+              "approved_at", "override"]
 _DS_COLS = ["id", "proposal_id", "status", "fmt", "count", "requester", "batch_id",
             "provenance", "error", "created_at", "finished_at"]
 _BATCH_COLS = ["batch_id", "kind", "ref_id", "n_items", "provider", "model", "status",
