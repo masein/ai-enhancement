@@ -933,6 +933,22 @@ def required_tasks(acc_tasks: list[str]) -> tuple[list[str], list[str]]:
     return [t for t in want if t in acc_tasks], [t for t in want if t not in acc_tasks]
 
 
+def avg_se(tasks: list[str], cells: dict[str, dict], scaled: bool) -> float | None:
+    """The standard error of a mean over `tasks`, from each task's own: the
+    tasks are separate item sets, so the variances add and the mean divides
+    by k. Scaled above chance, each error scales with 1/(1 − chance) as the
+    score does. None when any task carries no error (a perplexity, a smoke
+    run): an average of those is not z-testable, and the page says so."""
+    ses = []
+    for t in tasks:
+        se = (cells.get(t) or {}).get("se")
+        if se is None:
+            return None
+        c = _CHANCE.get(t)
+        ses.append(se / (1 - c) if scaled and c is not None and 0 < c < 1 else se)
+    return math.sqrt(sum(x * x for x in ses)) / len(ses) if ses else None
+
+
 def above_chance(task: str, v: float) -> float:
     """Accuracy rescaled so 0 = chance and 1 = perfect. Raw accuracy is not
     comparable across tasks with different guess rates: 50% on a 2-option task
@@ -1174,6 +1190,12 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                     / len(required)) if official else None,
             "avgRaw": (sum(cells[t][mid]["v"] for t in required)
                        / len(required)) if official else None,
+            # and their standard errors, carried through the mean so two
+            # averages can be z-tested like any two scores (11c's frontier)
+            "avgSe": avg_se(required, {t: cells[t][mid] for t in required}, True)
+            if official else None,
+            "avgRawSe": avg_se(required, {t: cells[t][mid] for t in required}, False)
+            if official else None,
             # the same two over whatever it DID run — a diagnostic, never a rank
             "partialAvg": (sum(have) / len(have)) if have else None,
             "official": official,
@@ -1489,6 +1511,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             "anyDiag": any(r.get("diag") for r in by_model.values()),
             # the category order the page lays MMLU out in (scripts/categories.yaml)
             "categories": _categories.category_order(),
+            # the 37 topics in their 8 areas (scripts/areas.yaml): the Leaderboard's
+            # MMLU-by-area and judged-by-area columns, and the model page's groups
+            "areas": _categories.areas(),
             "diagSalt": next((r["diag"].get("split_salt")
                               for r in by_model.values() if r.get("diag")), None),
         },
@@ -1509,6 +1534,7 @@ CSS = r"""
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
   --fs-1:12px; --fs-2:14px; --fs-3:16px; --fs-4:20px; --fs-5:28px;
   --r-1:6px; --r-2:10px;
+  --bar-h:57px;                  /* the sticky bar and its hairline */
   /* phase 11b: prose in the system sans, data and labels in the system mono.
      No web font: the page has to work on a server with no internet. */
   --font-sans:system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -1634,8 +1660,7 @@ h2 { font-size:var(--fs-4); font-weight:700; margin:0 0 3px; letter-spacing:-0.0
   box-shadow:0 10px 28px rgba(0,0,0,.10); padding:10px 22px; margin:0;
   max-height:min(60vh,520px); overflow:auto; z-index:59; }
 /* the pill stays short enough that the tabs are not pushed off the bar */
-@media (max-width:1200px) { .bar-checks .checks-judged { display:none; } }
-@media (max-width:1000px) { .bar-checks .showhide { display:none; } }
+@media (max-width:1400px) { .bar-checks .checks-judged, .bar-checks .showhide { display:none; } }
 @media (max-width:720px) {
   .bar-in { height:auto; padding:8px 16px; flex-wrap:wrap; row-gap:4px; }
   .bar-title .t-full { display:none; }
@@ -1679,6 +1704,7 @@ input[type=search]:focus { outline:2px solid var(--accent-soft); border-color:va
 .tabs { display:flex; gap:2px; margin:0; overflow-x:auto; scrollbar-width:none;
   align-self:stretch; align-items:stretch; flex:1 1 auto; min-width:0; }
 .tabs::-webkit-scrollbar { display:none; }
+.tabs .morewrap { display:flex; align-items:stretch; }
 .tabs button { border:0; background:none; border-radius:0; padding:8px 13px;
   color:var(--text-secondary); white-space:nowrap; }
 .tabs button:hover { color:var(--text-primary); }
@@ -1710,12 +1736,99 @@ tbody tr:hover { background:var(--accent-soft); }
 tbody tr.open > td:first-child, tbody tr[aria-selected="true"] > td:first-child {
   box-shadow:inset 3px 0 0 var(--accent); }
 tbody tr.open { background:var(--accent-soft); }
+/* ---- 11c: the Leaderboard ------------------------------------------------ */
+.lbbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; margin:10px 0 2px; }
+.lbbar .chips, .lbbar .pills { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.lbbar .pills { margin-left:auto; }
+.lbbar .propwhy { flex-basis:100%; }
+.chip-btn, .pill { font-family:var(--font-mono); font-size:var(--fs-1); border-radius:999px;
+  padding:4px 12px; min-height:28px; border:1px solid var(--border); background:var(--surface-1);
+  color:var(--text-secondary); white-space:nowrap; }
+.chip-btn:hover, .pill:hover { color:var(--text-primary); border-color:var(--axis); }
+.chip-btn.on { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+.pill.on { border-color:var(--accent); color:var(--text-primary); }
+.pill[aria-expanded="true"] { border-color:var(--accent); }
+/* two header rows: the group over its columns, the unit under a name */
+table.lb thead tr.grp th { font-size:var(--fs-1); color:var(--accent); border-bottom:0;
+  padding-bottom:0; letter-spacing:.08em; text-align:center; }
+table.lb thead tr.grp th.nogrp { color:transparent; }
+table.lb thead tr.grp th:not(.nogrp) { box-shadow:inset 0 -2px 0 var(--accent-soft); }
+table.lb th .unit { font-size:var(--fs-1); color:var(--muted); }
+table.lb th .dir { color:var(--accent); }
+/* one line per row */
+table.lb td { white-space:nowrap; }
+table.lb td.tcell b { font-family:var(--font-mono); font-weight:700; }
+table.lb td.tcell .se { font-family:var(--font-mono); display:inline; }
+table.lb td.model { position:sticky; left:32px; background:var(--surface-1); z-index:1;
+  padding-left:12px; max-width:280px; }
+table.lb td.model .badge { margin-left:4px; padding:0 4px; }
+table.lb tbody td.model { box-shadow:inset 3px 0 0 var(--fam, var(--axis)); }
+table.lb td.model .mname { display:inline-block; max-width:190px; overflow:hidden;
+  text-overflow:ellipsis; vertical-align:bottom; }
+table.lb th.model { position:sticky; left:32px; z-index:3; }
+/* the rank and the model stay put while the scores scroll sideways */
+table.lb .rank { white-space:nowrap; color:var(--muted); position:sticky; left:0; z-index:2;
+  background:var(--surface-1); width:32px; min-width:32px; max-width:32px;
+  padding-left:4px; padding-right:4px; }
+table.lb tbody tr.open td.rank { background:color-mix(in srgb, var(--accent) 8%, var(--surface-1)); }
+table.lb .rank .disclose { border:0; background:none; min-height:0; padding:0 3px 0 0;
+  color:var(--accent); font-size:var(--fs-1); }
+table.lb tbody tr { cursor:pointer; }
+table.lb tbody tr.detail { cursor:auto; background:var(--plane); }
+table.lb tbody tr.detail:hover { background:var(--plane); }
+table.lb tbody tr.detail > td { white-space:normal; padding:14px 16px 18px; height:auto; }
+table.lb tbody tr.open td.model { background:color-mix(in srgb, var(--accent) 8%, var(--surface-1)); }
+/* a tinted cell's text is ink, never the accent — its error too, in the
+   secondary ink, which holds 4.5:1 on the strongest step in every theme */
+table.lb.tinted td[data-step] { color:var(--text-primary); }
+table.lb.tinted td[data-step] .se { color:var(--text-secondary); }
+.dgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px 22px; }
+.dblock .eyebrow { margin-bottom:6px; }
+table.mini { width:auto; }
+table.mini td, table.mini th { height:auto; padding:3px 10px 3px 0; border-bottom:1px solid var(--border); }
+.minibars { display:flex; flex-direction:column; gap:4px; }
+.minibar { display:grid; grid-template-columns:150px 1fr 34px; gap:8px; align-items:center;
+  font-size:var(--fs-1); }
+.minibar .mb-t { height:8px; background:var(--grid); border-radius:4px; overflow:hidden; }
+.minibar .mb-f { display:block; height:100%; background:var(--accent); }
+.minibar .mb-v { text-align:right; }
+.jgroup { margin:4px 0 6px; }
+.tchip.grey { color:var(--text-secondary); background:var(--plane); border-color:var(--border); }
+a.tchip { text-decoration:none; }
+.dlinks { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+.colmenu-list .colgroup { margin:6px 0 8px; display:flex; flex-direction:column; gap:2px; }
+.colmenu-list.pop { min-width:260px; padding:10px 12px; gap:4px; }
+.colmenu-list .colgroup { max-height:260px; overflow:auto; }
+.tintsw { margin-top:8px; border-top:1px solid var(--border); padding-top:8px; }
+.modelsmenu.pop { min-width:280px; padding:10px 12px; gap:6px; }
+.mlist { display:flex; flex-direction:column; gap:2px; max-height:280px; overflow:auto; }
+.mlist .mrow { display:flex; align-items:center; gap:4px; white-space:nowrap; }
+.mlist [role=menuitem] { border:0; background:none; text-align:left; padding:5px 8px; }
+.famdot { width:8px; height:8px; border-radius:50%; display:inline-block; flex:none; }
+details.howto { margin-top:14px; border-top:1px solid var(--border); padding-top:10px; }
+details.howto > summary { cursor:pointer; font-family:var(--font-mono); font-size:var(--fs-1);
+  color:var(--text-secondary); list-style:none; }
+details.howto > summary::-webkit-details-marker { display:none; }
+details.howto .about { margin-top:12px; }
+/* Insights */
+.igrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(460px, 1fr)); gap:22px 30px; }
+.ibox { min-width:0; }
+.ihead .eyebrow { margin-bottom:2px; }
+svg .fpt { cursor:pointer; }
+svg .fpt:focus { outline:none; stroke:var(--accent); stroke-width:3; }
+svg .wbar:focus rect { stroke:var(--accent); stroke-width:2; }
+.rchips { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:6px 0; }
+.mchip { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono);
+  font-size:var(--fs-1); border:1px solid var(--border); border-radius:999px; padding:2px 4px 2px 10px; }
+details.astable > summary { cursor:pointer; font-size:var(--fs-1); color:var(--accent); }
+@media (max-width:720px) { .igrid { grid-template-columns:1fr; } .lbbar .pills { margin-left:0; } }
+@media (max-width:520px) { .igrid { grid-template-columns:minmax(0, 1fr); } }
 /* a table that scrolls sideways can pin its first column (11c uses it) */
 td.pin, th.pin { position:sticky; left:0; background:var(--surface-1); z-index:1; }
 /* the Leaderboard carries a dozen numeric columns: it keeps the 44px row and
    takes its breathing room from the gutters instead (11c narrows the cells
    themselves, to one line each) */
-table.lb td, table.lb th { padding-left:var(--sp-2); padding-right:var(--sp-2); }
+table.lb td, table.lb th { padding-left:6px; padding-right:6px; }
 tbody tr.open td.pin, tbody tr:hover td.pin {
   background:color-mix(in srgb, var(--accent) 8%, var(--surface-1)); }
 tr:last-child td { border-bottom:none; }
@@ -2135,6 +2248,7 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .topright { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
 button.who { font-weight:600; font-family:var(--font-mono); font-size:var(--fs-1);
   white-space:nowrap; }
+#themeBtn { white-space:nowrap; }
 button.who.ask { border-color:var(--warning);
   outline:2px solid color-mix(in srgb, var(--warning) 35%, transparent); }
 .who-edit { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
@@ -2199,12 +2313,12 @@ td.rowacts { white-space:nowrap; }
 .fld { display:flex; flex-direction:column; gap:3px; min-width:0; }
 .fld-label { font-size:var(--fs-1); font-weight:600; color:var(--text-secondary); }
 .fld-text { font-size:var(--fs-2); padding:5px 0; }
-/* the Leaderboard: the model column stays put, the score sits over its error */
-table.lb th.model, table.lb td.model { position:sticky; left:0; z-index:1;
-  background:var(--surface-1); box-shadow:1px 0 0 var(--grid); }
-table.lb td.num .se { display:block; font-size:var(--fs-1); line-height:1.15; }
-table.lb th.cmp { text-align:center; }
-table.lb thead tr:first-child th.sortable:not(.model) { white-space:normal; vertical-align:bottom; }
+/* the Leaderboard: the model column stays put, and (11c) a score and its
+   error share one line — the unit is in the header */
+table.lb th.model, table.lb td.model { position:sticky; left:32px; z-index:1;
+  background:var(--surface-1); }
+table.lb td.num .se { display:inline; font-size:var(--fs-1); }
+table.lb thead tr:not(.grp) th.sortable:not(.model) { white-space:normal; vertical-align:bottom; }
 tr.duprow td { background:var(--plane); }
 tr.duprow td.model { background:var(--plane); padding-left:22px; }
 button.duptoggle { display:inline; padding:0 4px; font-size:var(--fs-1); }
@@ -2237,11 +2351,26 @@ button.secondary { background:var(--surface-1); }
   background:color-mix(in srgb, var(--critical) 10%, transparent); }
 /* the paged tables: the header stays in view while the page scrolls */
 .lb-wrap.stick { overflow:visible; }
-.lb-wrap.stick thead tr:first-child th { position:sticky; top:0; z-index:3;
+.lb-wrap.stick thead tr:first-child th { position:sticky; top:var(--bar-h); z-index:3;
   background:var(--surface-1); box-shadow:0 1px 0 var(--border); }
 .lb-wrap.stick table.lb thead tr:first-child th.model { z-index:4; }
+/* the Leaderboard has two header rows: the group row is a fixed height, and
+   the names row sticks just under it — both under the page's own bar */
+.lb-wrap.stick table.lb thead tr.grp th { height:24px; box-shadow:none; }
+.lb-wrap.stick table.lb thead tr:nth-child(2) th { position:sticky; top:calc(var(--bar-h) + 24px);
+  z-index:3; background:var(--surface-1); box-shadow:0 1px 0 var(--border); }
+.lb-wrap.stick table.lb thead tr:nth-child(2) th.model { z-index:4; }
+/* narrow: the table scrolls sideways in its own box, so a header cannot also
+   stick to the page — only the rank and the model stay put, sideways */
 @media (max-width:900px) { .lb-wrap.stick { overflow-x:auto; }
-  .lb-wrap.stick thead tr:first-child th { position:static; } }
+  .lb-wrap.stick thead tr th,
+  .lb-wrap.stick table.lb thead tr:first-child th,
+  .lb-wrap.stick table.lb thead tr:nth-child(2) th { position:static; top:auto; }
+  .lb-wrap.stick table.lb thead tr:nth-child(2) th.rank,
+  .lb-wrap.stick table.lb thead tr:nth-child(2) th.model { position:sticky; top:auto; }
+  /* the table scrolls sideways here anyway: a name on one line keeps the
+     header two lines tall instead of five */
+  table.lb thead tr:not(.grp) th.sortable:not(.model) { white-space:nowrap; } }
 .empty { display:flex; flex-direction:column; align-items:flex-start; gap:var(--sp-2);
   padding:var(--sp-4); margin:var(--sp-2) 0; border:1px dashed var(--border);
   border-radius:var(--r-2); color:var(--text-secondary); }
@@ -4047,7 +4176,8 @@ function overviewLoop() {
 // ---------------------------------------------------------------------------
 const hashFor = () => state.model ? 'model=' + encodeURIComponent(state.model)
                                   : state.topic ? 'topic=' + encodeURIComponent(state.topic)
-                                  : 'tab=' + state.tab;
+                                  : 'tab=' + state.tab
+                                    + (state.tab === 'leaderboard' && lbHash() ? '&' + lbHash() : '');
 
 function routeFromHash() {
   const h = decodeURIComponent(location.hash.replace(/^#/, ''));
@@ -4059,10 +4189,14 @@ function routeFromHash() {
   const tp = /^topic=(.+)$/.exec(h);
   if (tp && LIVE && topicOfSlug(tp[1])) { state.topic = tp[1]; state.tab = 'loop'; return; }
   state.topic = null;
-  const t = /^tab=(.+)$/.exec(h);
+  // "tab=leaderboard&chip=knowledge&open=…": the Leaderboard's view rides
+  // along, so a pasted link reproduces it (11c). Old hashes have no "&".
+  const t = /^tab=([^&]+)(?:&(.*))?$/.exec(location.hash.replace(/^#/, ''));
   if (!t) return;
-  const want = TAB_ALIASES[t[1]] || t[1];
+  const tab = decodeURIComponent(t[1]);
+  const want = TAB_ALIASES[tab] || tab;
   if (TABS.some(([id]) => id === want)) state.tab = want;
+  if (state.tab === 'leaderboard') lbFromHash(t[2] || '');
 }
 
 // slug ↔ topic, from the same map the payload carries (exam_law ↔ law)
@@ -4734,7 +4868,7 @@ function radarAxes() {
 }
 function normScore(t, v) {
   const c = (DATA.tasks[t] || {}).chance;
-  if (state.radarNorm === 'raw' || !(c > 0)) return v;
+  if (state.avgMode === 'raw' || !(c > 0)) return v;
   return Math.max(0, Math.min(1, (v - c) / (1 - c)));
 }
 // How many models the capability profile will hold at once. The cap exists for
@@ -4771,151 +4905,11 @@ function cmpToggle(id, ms) {
   }
   render();
 }
-function radarCard(ms) {
-  const axes = radarAxes();
-  if (axes.length < 3) return null;
-  const ids = cmpEffective(ms);
-  if (!ids.length) return el('div', { class: 'card', 'data-radar-prompt': '1' },
-    el('h2', { text: 'Capability profile' }),
-    el('p', { class: 'small', text: `Tick up to ${CMP_MAX} models in the compare column above `
-      + 'to draw their profiles here — one axis per benchmark, one shape per model.' }));
-  const series = ids.map((id, i) => {
-    const m = DATA.models.find(x => x.id === id);
-    const slot = state.cmpSel.length ? state.cmpColors[id] : i;
-    const vals = {};
-    for (const ax of axes) {
-      const parts = ax.tasks.map(t => ({ t, c: cell(t, id) })).filter(p => p.c);
-      vals[ax.key] = parts.length
-        ? { n: parts.reduce((s, p) => s + normScore(p.t, p.c.v), 0) / parts.length, parts }
-        : null;
-    }
-    return { id, m, color: trColor(slot), vals };
-  }).filter(s => s.m);
-  const W = 540, H = 400, cx = 270, cy = 205, R = 140, N = axes.length;   // side margins fit long task names
-  const ang = i => -Math.PI / 2 + 2 * Math.PI * i / N;
-  const pt = (i, r) => [cx + r * Math.cos(ang(i)), cy + r * Math.sin(ang(i))];
-  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', class: 'radar',
-    role: 'img', 'aria-label': 'capability profile' });
-  for (const f of [0.25, 0.5, 0.75, 1]) {
-    svg.append(el('svg:polygon', {
-      points: axes.map((_, i) => pt(i, f * R).map(v => v.toFixed(1)).join(',')).join(' '),
-      fill: 'none', stroke: f === 1 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1 }));
-    svg.append(el('svg:text', { x: cx + 4, y: cy - f * R + 3.5, 'font-size': 9.5,
-      fill: 'var(--muted)', text: Math.round(f * 100) + '%' }));
-  }
-  axes.forEach((ax, i) => {
-    const [x, y] = pt(i, R);
-    svg.append(el('svg:line', { x1: cx, y1: cy, x2: x, y2: y, stroke: 'var(--grid)', 'stroke-width': 1 }));
-    const [lx, ly] = pt(i, R + 16), c = Math.cos(ang(i));
-    svg.append(el('svg:text', { x: lx, y: ly + 4, 'font-size': 11, fill: 'var(--text-secondary)',
-      'text-anchor': c > 0.15 ? 'start' : c < -0.15 ? 'end' : 'middle', text: ax.label }));
-  });
-  const unit = state.radarNorm === 'chance' ? 'above chance' : 'accuracy';
-  // marks are pointer-transparent and every hit target is appended LAST: a later
-  // model's translucent fill must never swallow an earlier model's hover
-  const hits = [];
-  for (const s of series) {
-    const pts = axes.map((ax, i) => s.vals[ax.key] ? pt(i, s.vals[ax.key].n * R) : null);
-    const have = pts.filter(Boolean);
-    if (have.length >= 2)
-      svg.append(el('svg:path', { d: 'M' + have.map(p => p.map(v => v.toFixed(1)).join(',')).join('L') + 'Z',
-        fill: s.color, 'fill-opacity': 0.12, stroke: s.color, 'stroke-width': 2,
-        'stroke-linejoin': 'round', 'pointer-events': 'none' }));
-    axes.forEach((ax, i) => {
-      const v = s.vals[ax.key]; if (!v) return;
-      const [x, y] = pts[i];
-      svg.append(el('svg:circle', { cx: x, cy: y, r: 3.5, fill: s.color,
-        stroke: 'var(--surface-1)', 'stroke-width': 1.5, 'pointer-events': 'none' }));
-      const rows = [s.m.name, `${ax.label}: ${pct(v.n)} ${unit}`,
-        ...v.parts.map(p => `${p.t}: ${pct(p.c.v)} raw` + (p.c.se ? ` ± ${(100 * p.c.se).toFixed(1)}` : ''))];
-      hits.push(el('svg:circle', { class: 'hit', cx: x, cy: y, r: 8, tabindex: 0,
-        'data-tip': JSON.stringify(rows), 'data-tipkey': s.color }));
-    });
-  }
-  svg.append(...hits);
-  const seg = (label, opts, cur, pick) => el('div', { class: 'seg', role: 'group', 'aria-label': label },
-    opts.map(([v, l]) => el('button', { 'aria-pressed': String(cur === v), text: l,
-      onclick: () => pick(v) })));
-  const legend = el('div', { class: 'legend', style: 'margin:6px 0 0' }, series.map(s => {
-    const missing = axes.filter(ax => !s.vals[ax.key]).map(ax => ax.label);
-    return el('span', { title: missing.length ? 'not evaluated on: ' + missing.join(', ') : s.id },
-      el('span', { class: 'key', style: `background:${s.color}` }), s.m.name,
-      missing.length ? el('span', { class: 'se', text: ` (${missing.length} axis missing)` }) : '',
-      el('button', { class: 'xbtn', 'aria-label': 'remove ' + s.m.name, text: '×',
-        onclick: () => cmpToggle(s.id, ms) }));
-  }));
-  const table = el('table', { class: 'radar-tbl' },
-    // truncated with the full id on hover: an untruncated checkpoint name here
-    // sets the column's min-content width and shoves every other model out of
-    // the card. The legend above already carries the names in full.
-    el('thead', {}, el('tr', {}, el('th', { text: 'axis' }),
-      series.map(s => el('th', { class: 'num', title: s.id,
-        text: s.m.name.length > 16 ? s.m.name.slice(0, 15) + '…' : s.m.name })))),
-    el('tbody', {}, axes.map(ax => el('tr', {}, el('td', { text: ax.label }),
-      series.map(s => el('td', { class: 'num', text: s.vals[ax.key] ? pct(s.vals[ax.key].n) : '—' }))))));
-  return el('div', { class: 'card' },
-    el('h2', { text: 'Capability profile' }),
-    el('p', { class: 'sub', text:
-      `One axis per benchmark, one shape per model — tick up to ${CMP_MAX} in the table below. `
-      + 'Axes are scaled ABOVE CHANCE by default: 25% on a '
-      + '4-way task is 0, perfect is 100%, so a 4-way and a 2-way task are comparable; switch to '
-      + 'raw accuracy to quote the number itself. Perplexity tasks are excluded (different scale). '
-      + 'Read the shape here and the numbers below — a radar’s area exaggerates differences and '
-      + 'its shape depends on axis order.' }),
-    el('div', { class: 'ctrl', style: 'margin-top:8px' },
-      seg('scale', [['chance', 'above chance'], ['raw', 'raw accuracy']], state.radarNorm,
-          v => { state.radarNorm = v; render(); }),
-      seg('axes', [['tasks', 'tasks'], ['categories', 'categories']], state.radarAxes,
-          v => { state.radarAxes = v; render(); }),
-      // the slot count, said out loud. A full set silently dropping a model on
-      // the next tick is the single most confusing thing this card used to do.
-      el('span', { class: 'small', style: 'margin-left:auto',
-        text: `comparing ${ids.length} of ${CMP_MAX} slots`
-            + (ids.length >= CMP_MAX ? ' — full, the next tick replaces the oldest' : '')
-            + (state.cmpEvicted ? ` · dropped ${state.cmpEvicted}` : '') })),
-    el('div', { class: 'radar-grid' },
-      el('div', {}, svg, legend),
-      el('div', { class: 'lb-wrap' }, table)));
-}
-
-// Cell shading. Polarity where a baseline exists, magnitude where it does not:
-// a task WITH a chance level gets a diverging fill centred on it (blue above,
-// red below, nothing at the line), because "which side of chance" is the fact
-// that decides whether a number means anything on this board. A task without
-// one — perplexity, gsm8k — gets a single-hue sequential fill across its own
-// column range.
-//
-// Not red-to-green, which was the obvious thing to copy: that scheme fails the
-// palette checks (the yellow sits outside the lightness band and hits 1.63:1
-// against the surface) and green/yellow separate by only ΔE 10 under
-// protanopia, which is roughly one man in twelve. The pair used here is the one
-// already validated for this palette. Intensity tops out well below opaque and
-// the number stays in a text token, so every cell is readable without colour.
-function heatBg(c, v, rng) {
-  if (v == null) return null;
-  const i = DATA.tasks[c.task] || {};
-  let hue, k;
-  if (!c.lower && i.chance > 0) {
-    const d = (v - i.chance) / (1 - i.chance);
-    if (Math.abs(d) < 0.005) return null;            // sitting on the line
-    const span = d > 0 ? 1 : (i.chance / (1 - i.chance)) || 1;
-    hue = d > 0 ? 'var(--s1)' : 'var(--s8)';
-    k = Math.abs(d) / span;
-  } else {
-    if (!rng || rng.hi === rng.lo) return null;
-    const t = (v - rng.lo) / (rng.hi - rng.lo);
-    k = c.lower ? 1 - t : t;                          // perplexity: lower is better
-    hue = 'var(--s1)';
-  }
-  const a = (8 + 52 * Math.max(0, Math.min(1, k))).toFixed(1);
-  return `color-mix(in srgb, ${hue} ${a}%, transparent)`;
-}
-
 // The benchmark descriptions, where someone reading the table can actually find
 // them. A tooltip alone is not an answer for a friend who has never seen the
 // board — this is collapsed by default so it costs nothing, and open it once and
 // every column has a sentence.
-function aboutBenchmarks(tasks) {
+function aboutBenchmarks(tasks, inline = false) {
   const body = el('div', { class: 'about-body' }, tasks.map(t => {
     const i = DATA.tasks[t] || {};
     return el('div', { class: 'about-item' },
@@ -4932,6 +4926,9 @@ function aboutBenchmarks(tasks) {
           title: 'no pair of models here differs by more than their combined error' }) : ''),
       el('p', { class: 'about-desc', text: i.desc || 'No description recorded for this task.' }));
   }));
+  // 11c: inside "How to read this table", which is itself the disclosure
+  if (inline) return el('div', { class: 'about', 'data-about': '1' },
+    el('div', { class: 'eyebrow', text: `About these benchmarks (${tasks.length})` }), body);
   return el('div', { class: 'card about' },
     el('button', { class: 'about-toggle', 'aria-expanded': String(state.lbAbout),
       onclick: () => { state.lbAbout = !state.lbAbout; render(); },
@@ -4990,40 +4987,41 @@ function vModels() {
   const f = state.mdl;
   const families = [...new Set(DATA.models.map(m => m.family).filter(Boolean))].sort();
   const ms = mdlVisible();
-  const seg = (label, cur, opts, on) => el('div', { class: 'seg', role: 'group',
-    'aria-label': label }, opts.map(([v, t, n]) =>
-    el('button', { 'aria-pressed': String(cur === v), 'data-filter': `${label}:${v}`,
-      text: n == null ? t : `${t} (${n})`, onclick: () => { on(v); render(); } })));
   const nCk = DATA.models.filter(m => m.source === 'artifact').length;
+  const count = pred => DATA.models.filter(pred).length;
+  // 11c: the same "Label: Value ▾" pills as the Leaderboard, on the shared
+  // popover. The three yes/no filters combine, so they are one pill of boxes
+  const shows = [['judged', 'has a judged run', 'judgedOnly'], ['tainted', 'tainted', 'taintedOnly'],
+                 ['preliminary', 'preliminary', 'prelimOnly']];
+  const on = shows.filter(([, , k]) => f[k]);
+  const showBtn = el('button', { class: 'pill' + (on.length ? ' on' : ''), id: 'pill-mshow',
+    'data-show-filters': on.map(([v]) => v).join(' '),
+    text: `Show: ${on.length ? on.map(([, t]) => t).join(', ') : 'all'} ▾` });
+  const showPill = popover(showBtn, () => el('div', { class: 'moremenu colmenu-list', id: 'pop-mshow',
+      'aria-label': 'show only' },
+    shows.map(([v, t, k]) => el('label', { class: 'small' },
+      el('input', { type: 'checkbox', 'data-filter': v, checked: f[k] ? '' : null,
+        onchange: e => { f[k] = e.target.checked; render(); } }), ' ' + t))),
+    { key: 'mshow', menu: false, rebuild: true });
   const head = el('div', { class: 'card' },
     el('h2', { text: 'Models' }),
     el('p', { class: 'sub', text: 'Every model on this board, with what is known about it. '
       + 'The filters are this table\'s — they narrow the list below and nothing else. The '
-      + 'radar and its compare ticks belong to the Leaderboard, where they are.' }),
-    el('div', { class: 'toolbar' },
+      + 'radar and its model chips belong to the Leaderboard, where they are.' }),
+    el('div', { class: 'toolbar lbbar' },
       el('input', { type: 'search', id: 'mq', value: f.q, style: 'flex:1;min-width:180px',
         placeholder: 'name, id or family…', 'aria-label': 'filter models',
         oninput: e => { f.q = e.target.value; render(); } }),
-      seg('kind', f.kind, [['all', 'All', DATA.models.length],
-        ['base', 'Base', DATA.models.filter(m => m.kind === 'base').length],
-        ['instruct', 'Instruct', DATA.models.filter(m => m.kind === 'instruct').length]],
-        v => { f.kind = v; }),
-      nCk ? seg('source', f.src, [['all', 'All'], ['hub', 'Models'],
-        ['artifact', 'Checkpoints', nCk]], v => { f.src = v; }) : '',
-      mkSel('family filter', [['all', 'family: any'], ...families.map(x => [x, x])],
-        f.family, v => { f.family = v; render(); }),
-      el('label', { class: 'small' },
-        el('input', { type: 'checkbox', 'data-filter': 'judged',
-          checked: f.judgedOnly ? '' : null,
-          onchange: e => { f.judgedOnly = e.target.checked; render(); } }), ' has a judged run'),
-      el('label', { class: 'small' },
-        el('input', { type: 'checkbox', 'data-filter': 'tainted',
-          checked: f.taintedOnly ? '' : null,
-          onchange: e => { f.taintedOnly = e.target.checked; render(); } }), ' tainted'),
-      el('label', { class: 'small' },
-        el('input', { type: 'checkbox', 'data-filter': 'preliminary',
-          checked: f.prelimOnly ? '' : null,
-          onchange: e => { f.prelimOnly = e.target.checked; render(); } }), ' preliminary'),
+      el('div', { class: 'pills' },
+        pillMenu('mkind', 'Kind', [['all', `All (${DATA.models.length})`],
+          ['base', `base (${count(m => m.kind === 'base')})`],
+          ['instruct', `instruct (${count(m => m.kind === 'instruct')})`]],
+          f.kind, v => { f.kind = v; render(); }),
+        nCk ? pillMenu('msrc', 'Source', [['all', 'All'], ['hub', 'Hub models'],
+          ['artifact', `checkpoints (${nCk})`]], f.src, v => { f.src = v; render(); }) : '',
+        pillMenu('mfamily', 'Family', [['all', 'any'], ...families.map(x => [x, x])],
+          f.family, v => { f.family = v; render(); }),
+        showPill),
       el('span', { class: 'count-note', 'data-model-count': String(ms.length),
         text: `${ms.length} of ${DATA.models.length} models` })));
   const th = c => el('th', { class: c.num ? 'num' : null,
@@ -5080,262 +5078,1011 @@ function vModels() {
   return [head, table];
 }
 
+// ===========================================================================
+// The Leaderboard (11c). One toolbar row: topic-group chips on the left and
+// "Label: Value ▾" filter pills on the right, every one of them on 11a's
+// popover so a poll never closes it. Two header rows, one-line cells tinted
+// by their rank on the whole board, rows that open in place, and Insights
+// under the table. The view lives in the hash, so a pasted link reproduces it.
+// ===========================================================================
+
+const LB_CHIPS = [
+  ['all', 'All tasks'], ['knowledge', 'Knowledge'], ['commonsense', 'Commonsense'],
+  ['reasoning', 'Reasoning'], ['math', 'Math'], ['truthfulness', 'Truthfulness'],
+  ['judged', 'Judged topics']];
+const LB_GROUP = { knowledge: 'Knowledge', commonsense: 'Commonsense', reasoning: 'Reasoning',
+  math: 'Math', truthfulness: 'Truthfulness' };
+const LB_KINDS = [['all', 'All'], ['base', 'base'], ['instruct', 'instruct'],
+  ['checkpoint', 'checkpoint']];
+const LB_SIZES = [['all', 'All'], ['s', '< 200M'], ['m', '200M–1B'], ['l', '1–3B'],
+  ['xl', '> 3B']];
+const LB_STATUS = [['all', 'All'], ['ranked', 'ranked'], ['preliminary', 'preliminary'],
+  ['tainted', 'tainted']];
+const LB_DEFAULTS = { chip: 'all', kind: 'all', size: 'all', status: 'all' };
+
+// everything the Leaderboard remembers lives here, not in the DOM: a render
+// every five seconds rebuilds the DOM, and an opened row must survive it
+function lbS() {
+  if (!state.lb) {
+    let tint = true, howto = false;
+    try {
+      tint = localStorage.getItem('bench-lb-tint') !== 'off';
+      howto = localStorage.getItem('bench-lb-howto') === 'open';
+    } catch (e) { /* private mode: the defaults */ }
+    state.lb = { ...LB_DEFAULTS, open: [], models: null, tint, howto, shown: {},
+                 focus: null, weak: null, radarSrc: 'tasks' };
+  }
+  return state.lb;
+}
+
+// the part of the hash after "tab=leaderboard": only what differs from the
+// defaults, so a plain link stays plain
+function lbHash() {
+  const L = lbS(), out = [];
+  for (const k of Object.keys(LB_DEFAULTS))
+    if (L[k] !== LB_DEFAULTS[k]) out.push(`${k}=${encodeURIComponent(L[k])}`);
+  if (L.open.length) out.push('open=' + L.open.map(encodeURIComponent).join(','));
+  return out.join('&');
+}
+function lbFromHash(rest) {
+  const L = lbS(), p = new URLSearchParams(rest || '');
+  L.chip = LB_CHIPS.some(([v]) => v === p.get('chip')) ? p.get('chip') : 'all';
+  if (L.chip === 'judged' && !judgedCalibrated()) L.chip = 'all';
+  L.kind = LB_KINDS.some(([v]) => v === p.get('kind')) ? p.get('kind') : 'all';
+  L.size = LB_SIZES.some(([v]) => v === p.get('size')) ? p.get('size') : 'all';
+  L.status = LB_STATUS.some(([v]) => v === p.get('status')) ? p.get('status') : 'all';
+  L.open = (p.get('open') || '').split(',').filter(id => DATA.models.some(m => m.id === id));
+}
+// a change to the view: the address bar follows without a history entry per
+// click, and the page paints
+function lbSet(patch) {
+  Object.assign(lbS(), patch);
+  const want = hashFor();
+  if (location.hash.slice(1) !== want) history.replaceState(null, '', '#' + want);
+  render();
+}
+
+// the family a model belongs to: the Hub organisation, or a local run's name
+// without its step. Coloured by the series palette in name order; past eight,
+// grey. Never colour alone: the family is in the tooltip, the opened row and
+// the Models popover.
+function famOf(m) {
+  if (m.id.startsWith('local/')) return m.id.slice(6).replace(/-step\d+$/, '');
+  return m.id.includes('/') ? m.id.split('/')[0] : m.family || m.id;
+}
+let _famKey = null, _famMap = null;
+function famColor(m) {
+  if (_famKey !== DATA.models.length) {
+    const fams = [...new Set(DATA.models.map(famOf))].sort(natCmp);
+    _famMap = new Map(fams.map((f, i) => [f, i < 8 ? `var(--s${i + 1})` : 'var(--axis)']));
+    _famKey = DATA.models.length;
+  }
+  return _famMap.get(famOf(m)) || 'var(--axis)';
+}
+
+const officialSe = m => state.avgMode === 'raw' ? m.avgRawSe : m.avgSe;
+const judgedCalibrated = () => !!(DATA.judged && DATA.judged.calibration
+  && DATA.judged.calibration.calibrated && DATA.models.some(m => m.judgeState && m.judgeState.ok));
+const judgedOkM = m => !!(m.judgeState && m.judgeState.ok);
+// why the judged chip, column set and radar source are off, in words
+function judgedOffWhy() {
+  const cal = (DATA.judged || {}).calibration;
+  const local = DATA.models.some(m => m.judge && ((m.judgeState || {}).reasons || [])
+    .some(r => /local|provisional/i.test(r)));
+  return 'judged columns appear once a person has agreed with the judge — today: not '
+    + 'calibrated' + (cal ? '' : ' (no calibration on file)') + (local ? ', local judge' : '');
+}
+
+// MMLU by area: the leaderboard-half items of every MMLU subject mapped to an
+// area's topics, pooled — a mean weighted by item count
+function areaMmlu(m, area) {
+  const cats = mmluCats(m);
+  if (!cats) return null;
+  let s = 0, n = 0;
+  for (const t of (DATA.meta.areas || {})[area] || []) {
+    const g = cats[t];
+    if (g && g.score_report != null && g.n_report) { s += g.score_report * g.n_report; n += g.n_report; }
+  }
+  return n ? { v: s / n, n, se: Math.sqrt(Math.max(s / n * (1 - s / n), 1e-9) / n) } : null;
+}
+// a judged area mean, by judged_avg()'s rules: only a calibrated judge, no
+// tainted topic, and at least half the area's topics judged
+function areaJudged(m, area) {
+  const topics = (DATA.meta.areas || {})[area] || [];
+  const tasks = topics.map(t => 'exam_' + slugOfTopic(t)).filter(t => t !== 'exam_');
+  const out = { v: null, k: 0, n: tasks.length };
+  if (!judgedOkM(m)) return out;
+  const vals = [];
+  for (const t of tasks) {
+    const j = ((m.judge || {}).tasks || {})[t];
+    if (!j || (m.tainted || []).includes(t)) continue;
+    const v = pubScore(j);
+    if (v != null) vals.push(v);
+  }
+  out.k = vals.length;
+  if (vals.length && vals.length * 2 >= tasks.length)
+    out.v = vals.reduce((a, b) => a + b, 0) / vals.length;
+  return out;
+}
+
+// the columns a chip shows, with the group each one sits under
+function lbColumns(ms) {
+  const L = lbS();
+  if (L.chip === 'judged' && !judgedCalibrated()) L.chip = 'all';
+  const areas = Object.keys(DATA.meta.areas || {});
+  const groupOf = t => {
+    for (const [g, ts] of CATS) if (ts.includes(t)) return LB_GROUP[g];
+    return DATA.pplTasks.includes(t) ? 'Perplexity' : 'Other tasks';
+  };
+  const shot = t => {
+    const s = [...new Set(ms.map(m => (cell(t, m.id) || {}).shots).filter(x => x != null))];
+    return s.length > 1 ? 'mixed!' : s.length ? s[0] + '-shot' : '';
+  };
+  const task = t => {
+    const lower = DATA.pplTasks.includes(t);
+    return { key: t, label: t, num: true, task: t, lower, group: groupOf(t),
+             unit: lower ? (DATA.tasks[t] || {}).metric : [shot(t), '%'].filter(Boolean).join(' · ') };
+  };
+  const judgedCols = () => (DATA.judged && DATA.judged.exam || [])
+    .filter(t => (DATA.judged.tasks || []).includes(t)).map(t => ({
+      key: 'j:' + t, label: frName(t), num: true, judged: t, optional: true,
+      group: 'Judged · ' + (Object.entries(DATA.meta.areas || {})
+        .find(([, ts]) => ts.includes(frName(t))) || ['topics'])[0],
+      unit: 'κ ' + ((((DATA.judged.calibration || {}).per_category || {})[frName(t)] || {}).kappa
+                   ?? (DATA.judged.calibration || {}).kappa) + ' · 0–4' }));
+  const cats = lbCategoryCols(ms).map(c => ({ ...c, label: c.cat, optional: true,
+    group: 'MMLU by topic', unit: 'report half · %' }));
+  const javg = DATA.models.some(m => Object.keys((m.judge || {}).tasks || {})
+    .some(t => t.startsWith('exam_')))
+    ? [{ key: 'javg', num: true, judged: 'avg', group: 'Judged',
+         label: 'Judged avg', unit: judgedCalibrated()
+           ? `κ ${DATA.judged.calibration.kappa} · 0–4` : 'rubric 0–4' }] : [];
+  const lead = [
+    { key: 'rank', label: '#', group: '', nosort: true },
+    { key: 'name', label: 'Model', group: '' },
+    { key: 'params', label: 'Params', num: true, group: '' },
+    { key: 'avg', label: 'Avg', num: true, group: '',
+      unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' }];
+  const tail = [{ key: 'date', label: 'Last eval', group: '' }];
+  let mid;
+  if (L.chip === 'all') {
+    // today's view: the harness tasks, six by default, the rest one tick away
+    const order = [...CATS.map(([g]) => LB_GROUP[g]), 'Other tasks', 'Perplexity'];
+    mid = [...DATA.accTasks.map(task), ...DATA.pplTasks.map(task)]
+      .map(c => ({ ...c, optional: true }))
+      .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
+    if (judgedCalibrated()) mid.push(...judgedCols());
+    mid.push(...cats, ...javg);
+  } else if (L.chip === 'knowledge') {
+    mid = [...(CATS.find(([g]) => g === 'knowledge')[1]).filter(t => DATA.accTasks.includes(t))
+             .map(task),
+           ...areas.map(a => ({ key: 'area:' + a, label: a, num: true, area: a,
+             group: 'MMLU by area', unit: 'report half · %' })),
+           ...cats];
+  } else if (L.chip === 'judged') {
+    mid = judgedCalibrated()
+      ? [...areas.map(a => ({ key: 'jarea:' + a, label: a, num: true, jarea: a,
+            group: 'Judged by area', unit: 'mean · 0–4' })), ...javg, ...judgedCols()]
+      : [...javg];
+  } else {
+    mid = (CATS.find(([g]) => g === L.chip) || [null, []])[1]
+      .filter(t => DATA.accTasks.includes(t)).map(task);
+  }
+  return [...lead, ...mid, ...tail];
+}
+
+// which optional columns show, per chip: All tasks keeps its remembered six
+function lbShownFor(cols) {
+  const L = lbS();
+  const opt = cols.filter(c => c.optional);
+  if (L.chip === 'all') return lbShownTasks(opt);
+  const want = L.shown[L.chip];
+  // a chip's own group columns show; the long per-topic lists wait to be asked for
+  return new Set(Array.isArray(want) ? want.filter(k => opt.some(c => c.key === k)) : []);
+}
+function lbSaveShown(next) {
+  const L = lbS();
+  if (L.chip === 'all') {
+    state.lbShown = next;
+    try { localStorage.setItem('bench-lb-shown', JSON.stringify(next)); } catch (e) { /* private */ }
+  } else L.shown[L.chip] = next;
+  render();
+}
+
+// the filters, for the rows: kind, size and status, and the Models popover's
+// own selection
+function lbFilter(ms) {
+  const L = lbS();
+  const sizeOk = m => {
+    if (L.size === 'all') return true;
+    const p = m.params;
+    if (p == null) return false;
+    return L.size === 's' ? p < 2e8 : L.size === 'm' ? p >= 2e8 && p < 1e9
+      : L.size === 'l' ? p >= 1e9 && p < 3e9 : p >= 3e9;
+  };
+  return ms.filter(m =>
+    (L.kind === 'all' || (L.kind === 'checkpoint' ? m.source === 'artifact' : m.kind === L.kind))
+    && sizeOk(m)
+    && (L.status === 'all'
+        || (L.status === 'ranked' && officialAvg(m) != null)
+        || (L.status === 'preliminary' && officialAvg(m) == null)
+        || (L.status === 'tainted' && (m.tainted || []).length))
+    && (!L.models || L.models.includes(m.id)));
+}
+
+// A "Label: Value ▾" pill with a single-choice menu on the shared popover
+function pillMenu(key, label, opts, cur, pick, attrs = {}) {
+  const now = (opts.find(([v]) => v === cur) || opts[0])[1];
+  const btn = el('button', { class: 'pill' + (cur !== opts[0][0] ? ' on' : ''), id: 'pill-' + key,
+    'data-pill': key, 'data-value': cur, text: `${label}: ${now} ▾`, ...attrs });
+  return popover(btn, () => el('div', { class: 'moremenu', id: 'pop-' + key,
+      'aria-label': label.toLowerCase() },
+    opts.map(([v, t]) => el('button', { role: 'menuitemradio', 'data-choice': v,
+      'aria-checked': String(v === cur), text: t,
+      onclick: () => { popClose(true); pick(v); } }))), { key });
+}
+
+// the rank tint: each column's rank among every row that has the cell, over
+// the whole board — so a filter never changes a colour — in five steps. A
+// cell the z-test cannot tell from the column's best shares the top step.
+function lbTints(cols, val) {
+  const out = {};
+  for (const c of cols) {
+    if (!c.num || c.key === 'params') continue;
+    // provisional scores are never tinted: a judged column is on the board
+    // only once the judge is calibrated, and a model whose judge is not ok
+    // has no judged cell to tint
+    const pool = DATA.models.filter(m => !m.duplicateOf
+      && (c.key !== 'avg' || officialAvg(m) != null)
+      && (!c.judged && !c.jarea || judgedOkM(m)))
+      .map(m => ({ id: m.id, v: val(m, c) })).filter(x => x.v != null);
+    if (pool.length < 2) continue;
+    pool.sort((a, b) => c.lower ? a.v - b.v : b.v - a.v);
+    const steps = {};
+    pool.forEach((x, i) => { steps[x.id] = 5 - Math.floor(i * 5 / pool.length); });
+    out[c.key] = { steps, best: pool[0] };
+  }
+  return out;
+}
+
+// tied with the best by the same z-test the rest of the board uses: a task's
+// pairwise table, or two averages and their standard errors
+function tiedWithBest(c, m, best, val) {
+  if (!best || best.id === m.id) return false;
+  if (c.task && !c.lower) {
+    const row = (DATA.sig[c.task] || []).find(([a, b]) =>
+      (a === best.id && b === m.id) || (a === m.id && b === best.id));
+    return !!row && !row[4];
+  }
+  const pair = (sa, sb, va, vb) => sa != null && sb != null
+    && Math.abs(va - vb) / Math.sqrt(sa * sa + sb * sb || 1e-12) <= 1.96;
+  if (c.key === 'avg') {
+    const b = DATA.models.find(x => x.id === best.id);
+    return pair(officialSe(b), officialSe(m), officialAvg(b), officialAvg(m));
+  }
+  if (c.area) {
+    const b = DATA.models.find(x => x.id === best.id);
+    const x = areaMmlu(b, c.area), y = areaMmlu(m, c.area);
+    return !!(x && y) && pair(x.se, y.se, x.v, y.v);
+  }
+  return false;
+}
+
 function vLeaderboard(ms) {
-  const cmpSet = new Set(cmpEffective(ms));
-  const cols = [
-    { key: 'name',   label: 'Model',  num: false },
-    { key: 'cmp',    label: 'compare', nosort: true },
-    { key: 'params', label: 'Params', num: true },
-    { key: 'avg',    label: 'Avg',    num: true },
-    ...DATA.accTasks.map(t => ({ key: t, label: t, num: true, task: t })),
-    ...DATA.pplTasks.map(t => ({ key: t, label: t, num: true, task: t, lower: true })),
-    // judged topic columns exist on the board only once a person has agreed
-    // with the judge (kappa over the line); the kappa rides in the header.
-    // Thirty-six of them, so they start hidden, behind Columns ▾
-    ...(DATA.judged && DATA.judged.calibration && DATA.judged.calibration.calibrated
-        && DATA.models.some(m => m.judgeState && m.judgeState.ok)
-      ? DATA.judged.exam.filter(t => DATA.judged.tasks.includes(t)).map(t => ({
-          key: 'j:' + t, label: frName(t) + ' κ'
-            + (((DATA.judged.calibration.per_category || {})[frName(t)] || {}).kappa
-               ?? DATA.judged.calibration.kappa), num: true, judged: t, group: 'judged' }))
-      : []),
-    // MMLU by category, one column each — the ~24 topics MMLU has subjects
-    // for, hidden until someone asks for them
-    ...lbCategoryCols(ms),
-    // one number for the exam, shown by default: the report-half mean over
-    // the topics judged on the questions they hold now (10b) — a preliminary
-    // judge's greyed, never marked best
-    ...(DATA.models.some(m => Object.keys((m.judge || {}).tasks || {}).some(t => t.startsWith('exam_')))
-      ? [{ key: 'javg', num: true, judged: 'avg', fixed: true,
-           label: 'Judged avg' + (DATA.judged && DATA.judged.calibration
-             && DATA.judged.calibration.calibrated ? ` κ${DATA.judged.calibration.kappa}` : '') }]
-      : []),
-    { key: 'date', label: 'Last eval', num: false },   // when its newest task ran
-  ];
-  // at most six task columns unless someone asks for more: 1,923 px in a
-  // 1,234 px card was the table the tab is named after
-  const optional = c => (c.task || c.judged || c.cat) && !c.fixed;
-  const allTaskCols = cols.filter(optional);
-  const shownTasks = lbShownTasks(allTaskCols);
-  const nHidden = allTaskCols.length - shownTasks.size;
-  const visCols = cols.filter(c => !optional(c) || shownTasks.has(c.key));
-  const judgedOk = m => !!(m.judgeState && m.judgeState.ok);
+  const L = lbS();
+  const cols = lbColumns(ms);
+  const shown = lbShownFor(cols);
+  const opt = cols.filter(c => c.optional);
+  const nHidden = opt.length - opt.filter(c => shown.has(c.key)).length;
+  const visCols = cols.filter(c => !c.optional || shown.has(c.key));
   const jval = (m, c) => c.judged === 'avg' ? m.judgedAvg
-    : !judgedOk(m) ? null
+    : !judgedOkM(m) ? null
     : (m.tainted || []).includes(c.judged) ? null      // shown on the page, never ranked here
     : (((m.judge || {}).tasks || {})[c.judged] ? pubScore(m.judge.tasks[c.judged]) : null);
   const val = (m, c) => c.key === 'avg' ? officialAvg(m)
-                      : c.judged ? jval(m, c)
-                      : c.cat ? ((mmluCats(m) || {})[c.cat] || {}).score_report
-                      : c.task ? (cell(c.task, m.id) || {}).v : m[c.key];
-  const sorted = [...ms].sort((a, b) => {
-    const c = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg');
-    const va = val(a, c), vb = val(b, c);
+    : c.key === 'params' ? m.params
+    : c.key === 'name' ? m.name
+    : c.key === 'date' ? lastEval(m)
+    : c.judged ? jval(m, c)
+    : c.jarea ? areaJudged(m, c.jarea).v
+    : c.area ? (areaMmlu(m, c.area) || {}).v
+    : c.cat ? ((mmluCats(m) || {})[c.cat] || {}).score_report
+    : c.task ? (cell(c.task, m.id) || {}).v : null;
+  const rowsIn = lbFilter(ms);
+  const sortCol = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg');
+  const sorted = [...rowsIn].sort((a, b) => {
+    const va = val(a, sortCol), vb = val(b, sortCol);
     if (va == null && vb == null) return 0;
     if (va == null) return 1; if (vb == null) return -1;
-    return typeof va === 'string' ? state.sort.dir * natCmp(va, vb)
-                                  : state.sort.dir * (va - vb);
+    return typeof va === 'string' ? state.sort.dir * natCmp(va, vb) : state.sort.dir * (va - vb);
   });
   // ranked rows first, whatever the sort: a preliminary model's per-task
   // numbers are valid, and it is still not on the ladder
   const ordered = [...sorted.filter(m => officialAvg(m) != null),
                    ...sorted.filter(m => officialAvg(m) == null)];
-  // a duplicate folds under its twin — "1 duplicate ▸" — instead of taking a
-  // row of its own, often the first one
   const dupsOf = {};
   for (const m of ordered)
     if (m.duplicateOf && ordered.some(x => x.id === m.duplicateOf))
       (dupsOf[m.duplicateOf] = dupsOf[m.duplicateOf] || []).push(m);
   const lbAll = ordered.filter(m => !(m.duplicateOf && dupsOf[m.duplicateOf]));
   const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
-                                                            state.src, state.avgMode]));
+    state.src, state.avgMode, L.chip, L.kind, L.size, L.status, L.models]));
   const rows = lbPg.rows.flatMap(m => [m, ...((state.lbDupOpen || {})[m.id] ? dupsOf[m.id] || [] : [])]);
-  // best per column (max for accuracy/avg, min for perplexity). Perplexity has
-  // NO standard error from the harness, so a 0.001 lead is not a win: values
-  // within a tie band of the leader are all marked tied (≈) instead. The band
-  // is a stated placeholder until bootstrap CIs exist — see the tab text.
+  const tints = L.tint ? lbTints(visCols, val) : {};
   const pplBand = lead => Math.max(0.005, 0.01 * Math.abs(lead));
-  const best = {}, tiedCount = {}, rng = {};
-  for (const c of cols) {
-    if (!c.num || c.key === 'params') continue;
-    const vs = ms.filter(m => c.judged !== 'avg' || judgedOk(m)).map(m => val(m, c))
-      .filter(v => v != null);
-    if (vs.length > 1) {
-      best[c.key] = c.lower ? Math.min(...vs) : Math.max(...vs);
-      tiedCount[c.key] = c.lower
-        ? vs.filter(v => v <= best[c.key] + pplBand(best[c.key])).length : 1;
-      // column range drives the sequential fill for tasks with no chance level
-      if (c.task) rng[c.key] = { lo: Math.min(...vs), hi: Math.max(...vs) };
-    }
+
+  // ---- header: two rows, the group over its columns, the unit under a name
+  const groups = [];
+  for (const c of visCols) {
+    const g = c.group || '';
+    if (groups.length && groups[groups.length - 1].g === g) groups[groups.length - 1].n++;
+    else groups.push({ g, n: 1 });
   }
-  const shotOf = t => {
-    const s = [...new Set(ms.map(m => (cell(t, m.id) || {}).shots).filter(x => x != null))];
-    return s.length > 1 ? 'mixed!' : s.length ? s[0] + '-shot' : '';
-  };
   const thead = el('thead', {},
-    el('tr', {}, visCols.map(c => c.nosort
-      ? el('th', { class: 'cmp', title: 'tick up to five to draw their profiles below',
-          text: 'compare' })
-      : el('th', {
-      class: (c.num ? 'num ' : '') + 'sortable' + (c.key === 'name' ? ' model' : '')
-           + (c.judged ? ' judged' : '')
-           + (c.task && (DATA.tasks[c.task] || {}).desc ? ' hasinfo' : ''),
-      // the description on the column itself; the full list is in the panel
-      // below the table, because a tooltip is not documentation
-      title: c.judged ? 'rubric score 0–4 from the calibrated judge — a separate judged average, '
-          + 'never part of Avg' : c.task ? [(DATA.tasks[c.task] || {}).control ? 'CONTROL — never in Avg' : null,
-                       (DATA.tasks[c.task] || {}).domain,
-                       (DATA.tasks[c.task] || {}).desc].filter(Boolean).join(' — ') : null,
-      onclick: () => { state.sort = { key: c.key,
-        dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
-        render(); },
-      'aria-sort': state.sort.key === c.key ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none' },
-      // a task name may break after an underscore: "arc_challenge" and
-      // "winogrande" were the widest things in the table
-      ...(c.task ? String(c.label).split('_').flatMap((w, i, a) =>
-            i < a.length - 1 ? [w + '_', el('wbr')] : [w]) : [c.label]), ' ',
-      state.sort.key === c.key
-        ? el('span', { class: 'dir', text: state.sort.dir > 0 ? '▲' : '▼' }) : ''))),
-    el('tr', {}, visCols.map(c => el('th', {
-      class: (c.num ? 'num' : '') + (c.key === 'name' ? ' model' : ''),
-      text: c.judged ? 'rubric 0–4' : c.task ? (c.lower ? DATA.tasks[c.task].metric : shotOf(c.task)) : '' }))));
-  const tbody = el('tbody', {}, rows.map(m => el('tr', {
-      class: m.duplicateOf && dupsOf[m.duplicateOf] ? 'duprow' : null, 'data-lb-row': m.id },
-    visCols.map(c => {
-      if (c.key === 'cmp') return el('td', {}, el('input', { type: 'checkbox',
-        'aria-label': 'compare ' + m.name, checked: cmpSet.has(m.id) ? '' : null,
-        onchange: () => cmpToggle(m.id, ms) }));
-      if (c.key === 'name') return el('td', { class: 'model', 'data-model': m.id,
-        title: modelSentence(m) + '\n\n' + m.id + (m.archinfo && m.archinfo.hidden
-          ? `\n${m.archinfo.arch || ''} · hidden ${m.archinfo.hidden} · layers ${m.archinfo.layers} · vocab ${m.archinfo.vocab}` : '') },
-        // the name truncates, the badges never do: a long checkpoint id used to
-        // set the column's min-content width and push every task off-screen
-        // a real link, not a click handler: middle-click, copy-link-address and
-        // the Back button all work for free because the view lives in the URL
-        el('a', { class: 'mname mlink', text: m.name,
-                  href: '#model=' + encodeURIComponent(m.id) }),
-        dupsOf[m.id] ? el('button', { class: 'quiet duptoggle', 'data-dup-toggle': m.id,
-          'aria-expanded': String(!!(state.lbDupOpen || {})[m.id]),
-          text: `${dupsOf[m.id].length} duplicate ${(state.lbDupOpen || {})[m.id] ? '▾' : '▸'}`,
-          onclick: e => { e.preventDefault(); state.lbDupOpen = state.lbDupOpen || {};
-            state.lbDupOpen[m.id] = !state.lbDupOpen[m.id]; render(); } }) : '',
-        ckBadge(m) || (m.kind === 'instruct'
-          ? el('span', { class: 'badge instruct', text: 'instruct' })
-          : el('span', { class: 'badge', text: 'base' })),
-        warnBadge(m) || '', dupBadge(m) || '');
-      if (c.key === 'params') {
-        const a = m.archinfo || {};
-        // a sparse model loads every expert but routes each token through a few:
-        // total drives VRAM, active drives the fair comparison, so show both
-        return el('td', { class: 'num',
-          title: (m.paramsSrc ? 'from ' + (m.paramsSrc === 'config' ? 'harness config' : 'model name') : '')
-            + (a.active_params ? `\n${a.experts} experts, ${a.experts_per_tok} per token`
-                 + `\nactive ${P(a.active_params)} of ${P(m.params)} (${a.active_src})` : '') },
-          P(m.params),
-          a.active_params ? el('span', { class: 'se', text: ` ${P(a.active_params)} act` }) : '');
-      }
-      if (c.key === 'date') return el('td', { class: 'small', style: 'white-space:nowrap',
-        title: String(lastEval(m) || '').replace('T', ' '),
-        text: String(lastEval(m) || '—').slice(0, 10) });
-      if (c.key === 'avg') {
-        const a = officialAvg(m);
-        if (a == null) return el('td', { class: 'num' },
-          el('span', { class: 'se',
+    el('tr', { class: 'grp' }, groups.map(({ g, n }) => el('th', { colspan: String(n),
+      class: g ? 'grp' : 'grp nogrp', scope: 'colgroup', text: g }))),
+    el('tr', {}, visCols.map(c => {
+      if (c.nosort) return el('th', { class: 'rank pin0', scope: 'col', 'data-col': c.key,
+        text: c.label });
+      const info = c.task ? DATA.tasks[c.task] || {} : {};
+      return el('th', { 'data-col': c.key, 'data-task': c.task || null, 'data-area': c.area || null,
+        'data-jarea': c.jarea || null,
+        class: (c.num ? 'num ' : '') + 'sortable' + (c.key === 'name' ? ' model pin' : '')
+          + (c.judged || c.jarea ? ' judged' : '') + (info.desc ? ' hasinfo' : ''),
+        scope: 'col',
+        title: c.judged || c.jarea ? 'rubric score 0–4 from the calibrated judge — never part of Avg'
+          : c.task ? [info.control ? 'CONTROL — never in Avg' : null, info.domain, info.desc]
+              .filter(Boolean).join(' — ') || null
+          : c.area ? `MMLU, pooled over ${((DATA.meta.areas || {})[c.area] || []).join(', ')}`
+          : null,
+        'aria-sort': state.sort.key === c.key ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none',
+        onclick: () => { state.sort = { key: c.key,
+          dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
+          render(); } },
+        ...(c.task ? String(c.label).split('_').flatMap((w, i, a) =>
+              i < a.length - 1 ? [w + '_', el('wbr')] : [w]) : [c.label]),
+        state.sort.key === c.key ? el('span', { class: 'dir', text: state.sort.dir > 0 ? ' ▲' : ' ▼' }) : '',
+        c.unit ? el('span', { class: 'unit', text: c.unit }) : '');
+    })));
+
+  // ---- a cell: one line, the number in bold mono and its error beside it
+  const one = (c, m, v, se, fmt, extra = {}) => {
+    const t = tints[c.key];
+    const step = t && v != null ? t.steps[m.id] : null;
+    const isBest = t && t.best.id === m.id;
+    const tied = !isBest && t && v != null && tiedWithBest(c, m, t.best, val);
+    const pplTie = c.lower && t && v != null && !isBest && v <= t.best.v + pplBand(t.best.v);
+    return el('td', { class: 'num tcell' + (isBest ? ' best' : tied || pplTie ? ' tiebest' : ''),
+        style: step ? `background:var(--heat-${tied || isBest ? 5 : step})` : null,
+        'data-step': step ? String(tied || isBest ? 5 : step) : null, ...extra },
+      el('b', { text: v == null ? '—' : fmt(v) }),
+      // a thin space: the error belongs to the number, and a dozen columns
+      // have to fit the card
+      se != null ? el('span', { class: 'se', text: `\u2009±${se}` }) : '');
+  };
+  const pctn = v => (100 * v).toFixed(1);
+  const ncols = visCols.length;
+  const tbody = el('tbody', {});
+  rows.forEach((m, i) => {
+    const open = L.open.includes(m.id);
+    const did = 'lbd-' + i;
+    const tr = el('tr', { class: (m.duplicateOf && dupsOf[m.duplicateOf] ? 'duprow' : '')
+        + (open ? ' open' : ''), 'data-lb-row': m.id,
+      onclick: e => {
+        // links, buttons, checkboxes and badges with a job of their own keep it
+        if (e.target.closest('a, button, input, select, label, .badge[title]')) return;
+        lbToggle(m.id);
+      } },
+      visCols.map(c => {
+        if (c.key === 'rank') {
+          const r = rankOf(m);
+          return el('td', { class: 'rank pin0' },
+            el('button', { class: 'disclose', 'aria-expanded': String(open),
+              'aria-controls': did, 'data-open-row': m.id,
+              'aria-label': (open ? 'close ' : 'open ') + m.name,
+              text: open ? '▾' : '▸', onclick: () => lbToggle(m.id) }),
+            el('span', { class: 'mono', text: r ? String(r.n) : '—',
+              title: r ? `rank ${r.n} of ${r.of} ranked models on this board`
+                       : 'preliminary — not ranked' }));
+        }
+        if (c.key === 'name') return el('td', { class: 'model pin', 'data-model': m.id,
+            style: `--fam:${famColor(m)}`,
+            title: modelSentence(m) + `\n\nfamily: ${famOf(m)}\n` + m.id },
+          el('a', { class: 'mname mlink', text: m.name, href: '#model=' + encodeURIComponent(m.id) }),
+          dupsOf[m.id] ? el('button', { class: 'quiet duptoggle', 'data-dup-toggle': m.id,
+            'aria-expanded': String(!!(state.lbDupOpen || {})[m.id]),
+            text: `${dupsOf[m.id].length} duplicate ${(state.lbDupOpen || {})[m.id] ? '▾' : '▸'}`,
+            onclick: e => { e.preventDefault(); state.lbDupOpen = state.lbDupOpen || {};
+              state.lbDupOpen[m.id] = !state.lbDupOpen[m.id]; render(); } }) : '',
+          ckBadge(m) || (m.kind === 'instruct'
+            ? el('span', { class: 'badge instruct', text: 'instruct' })
+            : el('span', { class: 'badge', text: 'base' })),
+          warnBadge(m) || '', dupBadge(m) || '');
+        if (c.key === 'params') {
+          const a = m.archinfo || {};
+          return el('td', { class: 'num', title: (m.paramsSrc ? 'from ' + (m.paramsSrc === 'config'
+              ? 'harness config' : 'model name') : '') + (a.active_params
+              ? `\n${a.experts} experts, ${a.experts_per_tok} per token` : '') },
+            P(m.params) + (a.active_params ? ` · ${P(a.active_params)} act` : ''));
+        }
+        if (c.key === 'date') {
+          const d = String(lastEval(m) || '');
+          const [y, mo, da] = d.slice(0, 10).split('-');
+          const short = da ? `${+da} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug',
+            'Sep', 'Oct', 'Nov', 'Dec'][+mo - 1]} ${y.slice(2)}` : '—';
+          return el('td', { class: 'small nowrap mono', title: d.replace('T', ' '), text: short });
+        }
+        if (c.key === 'avg') {
+          const a = officialAvg(m);
+          if (a == null) return el('td', { class: 'num se',
             title: (m.missing || []).length ? 'missing: ' + m.missing.join(', ') : '',
-            text: `— ${m.nhave}/${m.nreq}` }));
-        const r = rankOf(m);
-        return el('td', { class: 'num' + (a === best.avg ? ' best' : ''),
-          title: `mean over the ${m.nreq} required tasks, `
-            + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0')
-            + (r ? `\nrank ${r.n} of ${r.of} ranked models on this board (not of the `
-                 + `filtered view)` : '') },
-          pct(a),
-          // the rank is over the whole board, so it does not move when you filter
-          r ? el('span', { class: 'se', text: ` #${r.n}/${r.of}` })
-            : el('span', { class: 'se', text: ` ${m.nreq}/${m.nreq}` }));
-      }
-      if (c.judged) {
-        const v = jval(m, c);
-        if (v == null) return el('td', { class: 'num se', text: '—',
-          title: (m.tainted || []).includes(c.judged)
-            ? 'trained on data derived from this topic — shown on the model page, not ranked'
-            : m.judgeState ? m.judgeState.reasons.join('; ') : 'not judged' });
-        const prelim = !judgedOk(m);
-        return el('td', { class: 'num' + (prelim ? ' dim' : v === best[c.key] ? ' best' : ''),
-          'data-judged-avg': c.judged === 'avg' ? (prelim ? 'preliminary' : 'counts') : null,
-          title: c.judged === 'avg' ? `report half, over the ${Object.keys((m.judge || {}).tasks || {})
-            .filter(t => t.startsWith('exam_')).length} topics judged on the current questions`
-            + (prelim ? ` — preliminary: ${(m.judgeState || {}).reasons.join('; ')}` : '') : '',
-          text: num(v, 2) }, el('span', { class: 'se', text: ' /4' }));
-      }
-      if (c.cat) {
-        const g = (mmluCats(m) || {})[c.cat];
-        if (!g || g.score_report == null) return el('td', { class: 'num', text: '—' });
-        const dim = g.n_report < CAT_MIN_N;
-        return el('td', { class: 'num' + (dim ? ' dim' : !dim && g.score_report === best[c.key] ? ' best' : ''),
-          title: `MMLU, ${c.cat}: ${g.n_report} leaderboard-half items`
-            + (dim ? ` — under ${CAT_MIN_N}, treat as noise` : '') },
-          pct(g.score_report), el('span', { class: 'se', text: ` ${g.n_report}` }));
-      }
-      const cc = cell(c.task, m.id);
-      if (!cc) return el('td', { class: 'num', text: '—' });
-      const lead = best[c.key];
-      const within = lead != null && (c.lower
-        ? cc.v <= lead + pplBand(lead) : cc.v === lead);
-      const mark = !within ? '' : (c.lower && tiedCount[c.key] > 1) ? ' tiebest' : ' best';
-      return el('td', { class: 'num' + mark,
-        style: state.lbHeat ? `background:${heatBg(c, cc.v, rng[c.key]) || 'none'}` : null,
-        title: mark === ' tiebest'
-          ? 'tied for best — perplexity carries no standard error here, so a lead '
-            + 'this small is not a difference' : '' },
-        c.lower ? num(cc.v, 3) : pct(cc.v),
-        cc.se && !c.lower ? el('span', { class: 'se', text: `±${(100 * cc.se).toFixed(1)}` }) : '');
-    }))));
-  const nOff = ms.filter(m => m.official).length;
-  // the table first: it is what the tab is named after and what most visits
-  // want. The radar follows, drawn from whatever the compare ticks hold
-  return [el('div', { class: 'card' },
-    el('h2', { text: 'Leaderboard' }),
-    el('p', { class: 'sub', text: 'Click a column to sort. Accuracy cells are score ± stderr; '
-      + 'perplexity columns are lower-is-better, excluded from Avg, and carry no standard '
-      + 'error — so ● marks a best value and ≈ marks values too close to call. '
-      + `Avg exists only for models that completed all ${DATA.required.length} required `
-      + `tasks (${DATA.required.join(', ')}): ${nOff} of ${ms.length} here. `
-      + 'Anything short of that is preliminary — its per-task scores are valid and shown, '
-      + 'it just has no overall number.' }),
-    el('div', { class: 'ctrl', style: 'margin:8px 0 2px' },
-      el('span', { class: 'small', text: 'Avg scale' }),
-      el('div', { class: 'seg', role: 'group', 'aria-label': 'average scale' },
-        [['chance', 'above chance'], ['raw', 'raw accuracy']].map(([v, l]) =>
-          el('button', { 'aria-pressed': String(state.avgMode === v), text: l,
-            onclick: () => { state.avgMode = v; render(); } }))),
-      el('span', { class: 'count-note', text: state.avgMode === 'raw'
-        ? 'raw: the number you quote, but a 2-option task starts at 50%'
-        : 'chance = 0, perfect = 100% — comparable across tasks with different guess rates' })),
-    el('div', { class: 'ctrl', style: 'margin:2px 0 6px' },
-      el('span', { class: 'small', text: 'Cells' }),
-      el('div', { class: 'seg', role: 'group', 'aria-label': 'cell shading' },
-        [[false, 'numbers'], [true, 'heat']].map(([v, l]) =>
-          el('button', { 'aria-pressed': String(state.lbHeat === v), text: l,
-            onclick: () => { state.lbHeat = v; render(); } }))),
-      state.lbHeat ? heatLegend() : el('span', { class: 'count-note',
-        text: 'shade every score by how far it is from chance — useful once the '
-            + 'table is taller than the screen' })),
-    lbViewCtrl(ms),
-    state.lbView === 'cats' ? '' : el('div', { class: 'ctrl', style: 'margin:2px 0 6px' },
-      lbColumnsMenu(allTaskCols, shownTasks),
-      nHidden ? el('span', { class: 'count-note', 'data-hidden-tasks': String(nHidden),
-        text: `${nHidden} task${nHidden > 1 ? 's' : ''} hidden` }) : '',
-      ),
-    state.lbView === 'cats' ? lbCategoryTable(ms)
-      : [statusLine(lbPg, 'models',
-            [`${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
-             `sorted by ${lbSortLabel(cols)}`]),
-         lbPg.pager, el('div', { class: 'lb-wrap stick' }, el('table', {
-          class: 'lb', 'data-lb-table': '1' }, thead, tbody))]),
-    radarCard(ms) || '',
-    aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
+            text: `— ${m.nhave}/${m.nreq}` });
+          const se = officialSe(m);
+          return one(c, m, a, se != null ? (100 * se).toFixed(1) : null, pctn, {
+            title: `mean over the ${m.nreq} required tasks, `
+              + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0') });
+        }
+        if (c.judged) {
+          const v = jval(m, c);
+          if (v == null) return el('td', { class: 'num se', text: '—',
+            title: c.judged !== 'avg' && (m.tainted || []).includes(c.judged)
+              ? 'trained on data derived from this topic — shown on the model page, not ranked'
+              : m.judgeState ? (m.judgeState.reasons || []).join('; ') || 'not judged' : 'not judged' });
+          const prelim = !judgedOkM(m);
+          const td = prelim ? el('td', { class: 'num dim', text: num(v, 2) })
+            : one(c, m, v, null, x => num(x, 2));
+          if (c.judged === 'avg') td.dataset.judgedAvg = prelim ? 'preliminary' : 'counts';
+          return td;
+        }
+        if (c.jarea) {
+          const r = areaJudged(m, c.jarea);
+          if (r.v == null) return el('td', { class: 'num se', text: '—', 'data-jarea-cell': c.jarea,
+            title: `${r.k} of ${r.n} topics judged` + (judgedOkM(m) ? '' : ' — not ranked') });
+          return one(c, m, r.v, null, x => num(x, 2), { title: `${r.k} of ${r.n} topics judged`,
+            'data-jarea-cell': c.jarea });
+        }
+        if (c.area) {
+          const r = areaMmlu(m, c.area);
+          if (!r) return el('td', { class: 'num se', text: '—' });
+          return one(c, m, r.v, (100 * r.se).toFixed(1), pctn,
+            { title: `${r.n} leaderboard-half items` });
+        }
+        if (c.cat) {
+          const g = (mmluCats(m) || {})[c.cat];
+          if (!g || g.score_report == null) return el('td', { class: 'num se', text: '—' });
+          if (g.n_report < CAT_MIN_N) return el('td', { class: 'num dim',
+            title: `${g.n_report} items — under ${CAT_MIN_N}, treat as noise`,
+            text: pctn(g.score_report) });
+          return one(c, m, g.score_report, null, pctn, { title: `${g.n_report} leaderboard-half items` });
+        }
+        const cc = cell(c.task, m.id);
+        if (!cc) return el('td', { class: 'num se', text: '—' });
+        return one(c, m, cc.v, cc.se && !c.lower ? (100 * cc.se).toFixed(1) : null,
+          c.lower ? x => num(x, 3) : pctn);
+      }));
+    tbody.append(tr);
+    if (open) tbody.append(el('tr', { class: 'detail', id: did, 'data-lb-detail': m.id },
+      el('td', { colspan: String(ncols) }, lbDetail(m))));
+  });
+
+  const table = el('table', { class: 'lb' + (L.tint ? ' tinted' : ''), 'data-lb-table': '1' },
+    thead, tbody);
+  return [el('div', { class: 'card', 'data-lb-card': '1' },
+      el('h2', { text: 'Leaderboard' }),
+      lbToolbar(ms, cols, shown, nHidden),
+      statusLine(lbPg, 'models', [
+        `${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
+        `sorted by ${lbSortLabel(cols)}`,
+        L.chip !== 'all' ? (LB_CHIPS.find(([v]) => v === L.chip) || [])[1] : null]),
+      lbPg.pager,
+      el('div', { class: 'lb-wrap stick' }, table),
+      lbHowTo(ms)),
+    insightsCard(ms)];
 }
+
+function lbToggle(id) {
+  const L = lbS();
+  lbSet({ open: L.open.includes(id) ? L.open.filter(x => x !== id) : [...L.open, id] });
+}
+
+// ---- the toolbar: one row ---------------------------------------------------
+function lbToolbar(ms, cols, shown, nHidden) {
+  const L = lbS();
+  const calOk = judgedCalibrated();
+  const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'task groups' },
+    LB_CHIPS.map(([v, t]) => {
+      const off = v === 'judged' && !calOk;
+      return el('button', { class: 'chip-btn' + (L.chip === v ? ' on' : ''), 'data-chip': v,
+        'aria-pressed': String(L.chip === v), disabled: off ? '' : null,
+        title: off ? judgedOffWhy() : null, text: t,
+        onclick: () => { if (!off) lbSet({ chip: v }); } });
+    }));
+  const pills = el('div', { class: 'pills' },
+    pillMenu('kind', 'Kind', LB_KINDS, L.kind, v => lbSet({ kind: v })),
+    pillMenu('size', 'Size', LB_SIZES, L.size, v => lbSet({ size: v })),
+    pillMenu('status', 'Status', LB_STATUS, L.status, v => lbSet({ status: v })),
+    lbColumnsPill(cols, shown, nHidden),
+    lbModelsPill(ms),
+    pillMenu('scale', 'Scale', [['chance', 'above chance'], ['raw', 'raw accuracy']],
+      state.avgMode, v => { state.avgMode = v; render(); }));
+  return el('div', { class: 'lbbar' }, chips, pills,
+    calOk ? '' : el('span', { class: 'propwhy', 'data-why': 'judged-chip', text: judgedOffWhy() }));
+}
+
+// Columns · 4 hidden ▾ — the current chip's columns, Show all, and the tint
+function lbColumnsPill(cols, shown, nHidden) {
+  const L = lbS();
+  const opt = cols.filter(c => c.optional);
+  const btn = el('button', { class: 'pill' + (nHidden ? ' on' : ''), id: 'pill-columns',
+    'data-columns-menu': '1', 'data-hidden-tasks': nHidden ? String(nHidden) : null,
+    text: `Columns${nHidden ? ` · ${nHidden} hidden` : ''} ▾` });
+  return popover(btn, () => {
+    const tagOf = c => c.judged ? 'judged' : c.cat ? 'cats' : 'tasks';
+    const heads = { tasks: 'Task columns', judged: 'Judged topics (rubric 0–4)',
+                    cats: 'MMLU by topic' };
+    const tags = ['tasks', 'judged', 'cats'].filter(t => opt.some(c => tagOf(c) === t));
+    return el('div', { class: 'moremenu colmenu-list', id: 'pop-columns', 'aria-label': 'columns' },
+      opt.length ? tags.map(tag => {
+        const cs = opt.filter(c => tagOf(c) === tag), keys = cs.map(c => c.key);
+        return el('div', { class: 'colgroup', 'data-column-group': tag },
+          el('div', { class: 'small se' }, heads[tag] + ' ',
+            el('button', { class: 'quiet', text: 'all', 'data-column-group-all': tag,
+              onclick: () => lbSaveShown([...new Set([...shown, ...keys])]) }),
+            el('button', { class: 'quiet', text: 'none', 'data-column-group-none': tag,
+              onclick: () => lbSaveShown([...shown].filter(k => !keys.includes(k))) })),
+          cs.map(c => el('label', { class: 'small' },
+            el('input', { type: 'checkbox', 'data-column': c.key, checked: shown.has(c.key) ? '' : null,
+              onchange: e => lbSaveShown(e.target.checked ? [...shown, c.key]
+                                                          : [...shown].filter(k => k !== c.key)) }),
+            ' ' + c.label)));
+      }) : el('p', { class: 'small', text: 'Every column of this group is shown.' }),
+      el('div', { class: 'frm' },
+        opt.length ? el('button', { class: 'quiet', 'data-show-all': '1', text: 'Show all',
+          onclick: () => lbSaveShown(opt.map(c => c.key)) }) : '',
+        L.chip === 'all' ? el('button', { class: 'quiet', text: 'the default six', onclick: () => {
+          state.lbShown = null;
+          try { localStorage.removeItem('bench-lb-shown'); } catch (e) { /* private */ }
+          render(); } }) : ''),
+      el('label', { class: 'small tintsw' },
+        el('input', { type: 'checkbox', 'data-tint': '1', checked: L.tint ? '' : null,
+          onchange: e => {
+            try { localStorage.setItem('bench-lb-tint', e.target.checked ? 'on' : 'off'); }
+            catch (x) { /* private */ }
+            lbSet({ tint: e.target.checked }); } }),
+        ' Tint cells by rank'));
+  }, { key: 'columns', menu: false, rebuild: true });
+}
+
+// Models ▾ — a search, a checklist with each family's colour, and Apply
+function lbModelsPill(ms) {
+  const L = lbS();
+  const n = L.models ? L.models.length : ms.length;
+  const btn = el('button', { class: 'pill' + (L.models ? ' on' : ''), id: 'pill-models',
+    'data-models-menu': '1', text: `Models${L.models ? ` · ${n} of ${ms.length}` : ''} ▾` });
+  return popover(btn, () => {
+    const pick = new Set(L.models || ms.map(m => m.id));
+    const list = el('div', { class: 'mlist' });
+    const foot = el('p', { class: 'small se', 'data-models-foot': '1' });
+    const say = () => { foot.textContent = pick.size === ms.length ? 'All models shown'
+      : `${pick.size} of ${ms.length} shown`; };
+    const fill = q => list.replaceChildren(...ms.filter(m => !q
+        || (m.name + ' ' + m.id + ' ' + famOf(m)).toLowerCase().includes(q.toLowerCase()))
+      .map(m => el('label', { class: 'small mrow' },
+        el('input', { type: 'checkbox', 'data-model-pick': m.id, checked: pick.has(m.id) ? '' : null,
+          onchange: e => { if (e.target.checked) pick.add(m.id); else pick.delete(m.id); say(); } }),
+        el('span', { class: 'famdot', style: `background:${famColor(m)}`, title: famOf(m) }),
+        ' ' + m.name, el('span', { class: 'se', text: ' ' + famOf(m) }))));
+    fill('');
+    say();
+    return el('div', { class: 'moremenu modelsmenu', id: 'pop-models', 'aria-label': 'models' },
+      el('input', { type: 'search', placeholder: 'search models…', 'aria-label': 'search models',
+        'data-keep': 'lbmodels', oninput: e => fill(e.target.value) }),
+      el('div', { class: 'frm' },
+        el('button', { class: 'quiet', text: 'Select all', onclick: () => {
+          ms.forEach(m => pick.add(m.id)); fill(''); say(); } }),
+        el('button', { class: 'quiet', text: 'Clear', onclick: () => {
+          pick.clear(); fill(''); say(); } })),
+      list, foot,
+      el('button', { class: 'primary', 'data-models-apply': '1', text: 'Apply', onclick: () => {
+        popClose(true);
+        lbSet({ models: pick.size === ms.length ? null : [...pick] }); } }));
+  }, { key: 'models', menu: false });
+}
+
+// ---- the paragraph that used to sit above the table -------------------------
+function lbHowTo(ms) {
+  const L = lbS();
+  const nOff = ms.filter(m => m.official).length;
+  return el('details', { class: 'howto', 'data-how-to-read-lb': '1', open: L.howto ? '' : null,
+      ontoggle: e => {
+        L.howto = e.target.open;
+        try { localStorage.setItem('bench-lb-howto', L.howto ? 'open' : 'closed'); }
+        catch (x) { /* private */ } } },
+    el('summary', { text: 'How to read this table ▾' }),
+    el('p', { class: 'sub', text: 'Click a column to sort, and a row to open it in place. Each '
+      + 'cell is a score and its standard error, on one line; the unit is in the header. '
+      + 'Perplexity columns are lower-is-better, excluded from Avg, and carry no standard error. '
+      + '● marks a column\'s best value and ≈ marks values the z-test cannot tell from it. '
+      + 'The tint is each cell\'s rank in its column, over the whole board, in five steps — '
+      + 'filtering never changes a colour. '
+      + `Avg exists only for models that completed all ${DATA.required.length} required tasks `
+      + `(${DATA.required.join(', ')}): ${nOff} of ${ms.length} here. Anything short of that is `
+      + 'preliminary — its per-task scores are valid and shown, it just has no overall number.' }),
+    aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks], true));
+}
+
+// ---- a row opened in place -------------------------------------------------
+function lbDetail(m) {
+  const block = (eyebrow, ...kids) => el('div', { class: 'dblock' },
+    el('div', { class: 'eyebrow', text: eyebrow }), ...kids);
+  const out = [];
+  // TASKS: every task, its error, its n-shot and its rank among the board
+  out.push(block('Tasks', el('table', { class: 'mini' }, el('tbody', {},
+    [...DATA.accTasks, ...DATA.pplTasks].map(t => {
+      const c = cell(t, m.id);
+      if (!c) return el('tr', {}, el('td', { text: t }), el('td', { class: 'num se', text: '—' }),
+        el('td'), el('td'));
+      const lower = DATA.pplTasks.includes(t);
+      const pool = DATA.models.map(x => ({ id: x.id, c: cell(t, x.id) })).filter(x => x.c)
+        .sort((a, b) => lower ? a.c.v - b.c.v : b.c.v - a.c.v);
+      const r = pool.findIndex(x => x.id === m.id) + 1;
+      const best = pool[0];
+      const row = best && best.id !== m.id && !lower ? (DATA.sig[t] || []).find(([a, b]) =>
+        (a === best.id && b === m.id) || (a === m.id && b === best.id)) : null;
+      return el('tr', {}, el('td', { text: t }),
+        el('td', { class: 'num' }, el('b', { text: lower ? num(c.v, 3) : (100 * c.v).toFixed(1) }),
+          c.se && !lower ? el('span', { class: 'se', text: ` ±${(100 * c.se).toFixed(1)}` }) : ''),
+        el('td', { class: 'se', text: c.shots != null ? `${c.shots}-shot` : '' }),
+        el('td', { class: 'se', text: `#${r}/${pool.length}`
+          + (best && best.id === m.id ? ' · best' : row && !row[4] ? ' · tied with best' : '') }));
+    })))));
+  // MMLU BY AREA: eight mini bars above chance
+  const areas = Object.keys(DATA.meta.areas || {});
+  if (mmluCats(m) && areas.length) {
+    out.push(block('MMLU by area', el('div', { class: 'minibars' }, areas.map(a => {
+      const r = areaMmlu(m, a);
+      const above = r ? Math.max(0, (r.v - 0.25) / 0.75) : null;
+      return el('div', { class: 'minibar', tabindex: '0',
+          'data-tip': JSON.stringify([a, r ? `${(100 * r.v).toFixed(1)}% · ${r.n} items` : 'no items',
+            'topics: ' + ((DATA.meta.areas || {})[a] || []).join(', ')]) },
+        el('span', { class: 'mb-l', text: a }),
+        el('span', { class: 'mb-t' }, el('span', { class: 'mb-f',
+          style: `width:${above == null ? 0 : (100 * above).toFixed(1)}%` })),
+        el('span', { class: 'mb-v mono', text: above == null ? '—' : (100 * above).toFixed(0) }));
+    }))));
+  }
+  // JUDGED TOPICS: report half only, by area, weakest first
+  const jt = Object.entries((m.judge || {}).tasks || {}).filter(([t]) => t.startsWith('exam_'));
+  if (jt.length) {
+    const ok = judgedOkM(m);
+    const byArea = Object.entries(DATA.meta.areas || {}).map(([a, ts]) => [a,
+      jt.filter(([t]) => ts.includes(frName(t)))
+        .map(([t, v]) => ({ t, v: pubScore(v) })).filter(x => x.v != null)
+        .sort((x, y) => x.v - y.v)]).filter(([, xs]) => xs.length);
+    out.push(block('Judged topics',
+      ok ? '' : el('p', { class: 'small', 'data-provisional-line': '1',
+        text: 'provisional — ' + ((m.judgeState || {}).reasons || ['judge not calibrated'])[0]
+          + ' · not ranked' }),
+      byArea.map(([a, xs]) => el('div', { class: 'jgroup' },
+        el('span', { class: 'se', text: a + (ok ? '' : '') }),
+        el('div', { class: 'tchips' }, xs.map(x => el('a', {
+          class: 'tchip' + (ok ? '' : ' grey'), href: '#topic=' + x.t.replace(/^exam_/, ''),
+          text: `${frName(x.t)} ${num(x.v, 2)}` })))))));
+  }
+  // LINKS
+  const canRun = LIVE && (m.source === 'artifact' || !m.id.startsWith('local/'));
+  out.push(block('Links', el('p', { class: 'small', 'data-family': famOf(m) },
+      el('span', { class: 'famdot', style: `background:${famColor(m)}` }),
+      ` family: ${famOf(m)} · ${m.kind}` + (m.source === 'artifact' ? ' · uploaded checkpoint' : '')),
+    el('div', { class: 'dlinks' },
+    el('a', { href: '#model=' + encodeURIComponent(m.id), text: 'Open model page →' }),
+    el('a', { href: '#tab=provenance', text: 'Provenance →' }),
+    el('button', { class: 'quiet', 'data-add-radar': m.id,
+      text: state.cmpSel.includes(m.id) ? 'On the radar' : 'Add to radar',
+      disabled: state.cmpSel.includes(m.id) || state.cmpSel.length >= CMP_MAX ? '' : null,
+      title: !state.cmpSel.includes(m.id) && state.cmpSel.length >= CMP_MAX
+        ? `the radar holds ${CMP_MAX} — remove one first` : null,
+      onclick: () => cmpToggle(m.id, DATA.models) }),
+    canRun ? el('button', { class: 'quiet', 'data-run-exam': m.id, text: 'Run exam',
+      onclick: () => { state.sub.hf_id = m.id; state.sub.suite = 'judged';
+        state.after = { focus: '[data-ms="submit"] input' };
+        navigate({ tab: 'queue', model: null, topic: null }); } }) : '')));
+  return el('div', { class: 'dgrid' }, out);
+}
+
+// ===========================================================================
+// Insights: three charts under the table, each with its table beside it for
+// anyone who does not read charts, every point reachable by keyboard.
+// ===========================================================================
+
+function insightsCard(ms) {
+  return el('div', { class: 'card', 'data-insights': '1' },
+    el('h2', { text: 'Insights' }),
+    el('p', { class: 'sub', text: 'What the table says at a glance: which models are the best '
+      + 'for their size, where one model is weakest, and how a handful of models compare shape '
+      + 'for shape. Every judged number here is a report-half number.' }),
+    el('div', { class: 'igrid' }, frontierChart(ms), weakestChart(), radarBlock(ms)));
+}
+
+const logx = (v, lo, hi, a, b) => a + (Math.log10(v) - Math.log10(lo))
+  / Math.max(1e-9, Math.log10(hi) - Math.log10(lo)) * (b - a);
+
+// A model is on the frontier when no SMALLER model beats it by a gap the
+// z-test calls real — the same test as the rest of the board, so a lead
+// inside the noise never draws the line. Without standard errors a lead
+// cannot be called real, and does not count.
+function frontierOf(pts) {
+  const real = (q, p) => q.se != null && p.se != null
+    && (q.y - p.y) / Math.sqrt(q.se * q.se + p.se * p.se || 1e-12) > 1.96;
+  return pts.filter(p => !pts.some(q => q.x < p.x && q.y > p.y && real(q, p)));
+}
+
+function frontierChart(ms) {
+  const L = lbS();
+  const ranked = DATA.models.filter(m => officialAvg(m) != null && m.params && !m.duplicateOf);
+  const prelim = DATA.models.filter(m => officialAvg(m) == null && !m.duplicateOf).length;
+  const pts = ranked.map(m => ({ m, x: m.params, y: officialAvg(m), se: officialSe(m) }));
+  const head = el('div', { class: 'ihead' },
+    el('div', { class: 'eyebrow', text: 'Score against size' }),
+    el('p', { class: 'small', text: `Ranked models only, parameters on a log scale. The dashed `
+      + `line is the frontier: models no smaller model beats by more than the noise.`
+      + (prelim ? ` ${prelim} preliminary not shown.` : '') }));
+  if (pts.length < 2) return el('div', { class: 'ibox', 'data-frontier': '1' }, head,
+    el('p', { class: 'small', text: 'Two ranked models are needed to draw this.' }));
+  const front = new Set(frontierOf(pts).map(p => p.m.id));
+  const W = 560, H = 300, x0 = 46, x1 = W - 16, y0 = H - 34, y1 = 14;
+  const lo = Math.min(...pts.map(p => p.x)) / 1.4, hi = Math.max(...pts.map(p => p.x)) * 1.4;
+  const ymax = Math.min(1, Math.max(...pts.map(p => p.y + (p.se || 0))) * 1.1 || 1);
+  const X = v => logx(v, lo, hi, x0, x1), Y = v => y0 - (v / ymax) * (y0 - y1);
+  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', class: 'frontier',
+    role: 'img', 'aria-label': 'average score against parameter count',
+    onclick: e => { if (!e.target.closest('.fpt') && L.focus) lbSet({ focus: null }); } });
+  for (let k = 0; k <= 4; k++) {
+    const v = ymax * k / 4;
+    svg.append(el('svg:line', { x1: x0, x2: x1, y1: Y(v), y2: Y(v), stroke: 'var(--grid)' }),
+      el('svg:text', { x: x0 - 6, y: Y(v) + 4, 'text-anchor': 'end', 'font-size': 10,
+        fill: 'var(--muted)', text: Math.round(100 * v) + '%' }));
+  }
+  for (let e = Math.ceil(Math.log10(lo)); e <= Math.floor(Math.log10(hi)); e++)
+    for (const f of [1, 3]) {
+      const v = f * Math.pow(10, e);
+      if (v < lo || v > hi) continue;
+      svg.append(el('svg:text', { x: X(v), y: H - 12, 'text-anchor': 'middle', 'font-size': 10,
+        fill: 'var(--muted)', text: P(v) }));
+    }
+  const sel = L.focus && pts.find(p => p.m.id === L.focus);
+  let caption = '';
+  if (sel) {
+    const worse = pts.filter(p => p.x > sel.x && p.y < sel.y);
+    svg.append(el('svg:rect', { x: X(sel.x), y: Y(sel.y), width: Math.max(0, x1 - X(sel.x)),
+      height: Math.max(0, y0 - Y(sel.y)), fill: 'var(--accent-soft)', 'data-shade': '1' }));
+    caption = `${worse.length} model${worse.length === 1 ? '' : 's'} here `
+      + `${worse.length === 1 ? 'is' : 'are'} bigger and score${worse.length === 1 ? 's' : ''} `
+      + `lower than ${sel.m.name}`;
+  }
+  const fp = pts.filter(p => front.has(p.m.id)).sort((a, b) => a.x - b.x || a.y - b.y);
+  if (fp.length > 1) {
+    svg.append(el('svg:path', { d: 'M' + fp.map(p => `${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`)
+      .join('L'), fill: 'none', stroke: 'var(--accent)', 'stroke-width': 1.5,
+      'stroke-dasharray': '5 4', 'data-frontier-line': '1' }));
+    const last = fp[fp.length - 1];
+    svg.append(el('svg:text', { x: Math.min(X(last.x) + 6, x1 - 40), y: Y(last.y) - 8,
+      'font-size': 10, fill: 'var(--accent)', text: 'frontier' }));
+  }
+  for (const p of pts) {
+    const on = front.has(p.m.id), hot = sel && sel.m.id === p.m.id;
+    svg.append(el('svg:circle', { class: 'fpt' + (hot ? ' hot' : ''), cx: X(p.x), cy: Y(p.y),
+      r: hot ? 7 : 5, fill: famColor(p.m), stroke: on ? 'var(--text-primary)' : 'var(--surface-1)',
+      'stroke-width': on ? 1.8 : 1.2, tabindex: 0, 'data-point': p.m.id,
+      'data-on-frontier': on ? '1' : null,
+      'data-tip': JSON.stringify([p.m.name, `${P(p.x)} parameters`,
+        `Avg ${(100 * p.y).toFixed(1)}%` + (p.se != null ? ` ± ${(100 * p.se).toFixed(1)}` : ''),
+        on ? 'on the frontier' : 'a smaller model beats it by more than the noise']),
+      onclick: () => lbSet({ focus: hot ? null : p.m.id }),
+      onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault(); lbSet({ focus: hot ? null : p.m.id }); } } }));
+  }
+  const table = el('details', { class: 'astable' }, el('summary', { text: 'Show as table' }),
+    el('table', { class: 'mini' }, el('thead', {}, el('tr', {},
+        el('th', { text: 'model' }), el('th', { class: 'num', text: 'params' }),
+        el('th', { class: 'num', text: 'avg' }), el('th', { text: 'frontier' }))),
+      el('tbody', {}, [...pts].sort((a, b) => a.x - b.x).map(p => el('tr', {},
+        el('td', { text: p.m.name }), el('td', { class: 'num', text: P(p.x) }),
+        el('td', { class: 'num', text: (100 * p.y).toFixed(1)
+          + (p.se != null ? ` ±${(100 * p.se).toFixed(1)}` : '') }),
+        el('td', { text: front.has(p.m.id) ? 'on it' : '—' }))))));
+  return el('div', { class: 'ibox', 'data-frontier': '1' }, head, svg,
+    el('p', { class: 'small', 'data-frontier-caption': '1', text: caption
+      || 'Click a point to see which models are bigger and score lower.' }), table);
+}
+
+// One judged model's own topics, weakest first, on the 0–4 scale. It orders
+// one model's topics; it does not rank models.
+function weakestChart() {
+  const L = lbS();
+  const judged = DATA.models.filter(m => Object.keys((m.judge || {}).tasks || {})
+    .some(t => t.startsWith('exam_')));
+  const head = el('div', { class: 'ihead' }, el('div', { class: 'eyebrow', text: 'Weakest topics' }));
+  if (!judged.length) return el('div', { class: 'ibox', 'data-weakest': '1' }, head,
+    el('p', { class: 'small', 'data-weakest-empty': '1',
+      text: 'No model has been judged yet — Loop ▸ Sit the exam' }));
+  // the model the loop is on: the one judged last, unless someone picked another
+  const lastJ = m => Math.max(0, ...Object.values((m.judge || {}).tasks || {}).map(t => t.judged_at || 0));
+  const m = judged.find(x => x.id === L.weak) || [...judged].sort((a, b) => lastJ(b) - lastJ(a))[0];
+  const ok = judgedOkM(m);
+  const all = Object.entries(m.judge.tasks).filter(([t]) => t.startsWith('exam_'))
+    .map(([t, v]) => ({ t, v: pubScore(v) })).filter(x => x.v != null).sort((a, b) => a.v - b.v);
+  // the twelve weakest, and the rest one click away: 37 bars is a wall
+  const xs = L.weakAll ? all : all.slice(0, 12);
+  const btn = el('button', { class: 'pill', id: 'pill-weak', 'data-weak-model': m.id,
+    text: `${m.name} · Change model… ▾` });
+  const change = popover(btn, () => {
+    const list = el('div', { class: 'mlist' });
+    const fill = q => list.replaceChildren(...judged.filter(x => !q
+        || x.name.toLowerCase().includes(q.toLowerCase()))
+      .map(x => el('button', { role: 'menuitem', text: x.name, 'data-weak-pick': x.id,
+        onclick: () => { popClose(true); lbSet({ weak: x.id }); } })));
+    fill('');
+    return el('div', { class: 'moremenu', id: 'pop-weak', 'aria-label': 'judged models' },
+      el('input', { type: 'search', placeholder: 'judged models…', 'aria-label': 'search judged models',
+        oninput: e => fill(e.target.value) }), list);
+  }, { key: 'weak', menu: false });
+  const rowH = 22, W = 560, H = xs.length * rowH + 8, x0 = 250, x1 = W - 44;
+  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', class: 'weakest',
+    role: 'img', 'aria-label': `${m.name}'s judged topics, weakest first` });
+  if (!ok) svg.append(el('svg:defs', {}, el('svg:pattern', { id: 'hatch', width: 6, height: 6,
+    patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' },
+    el('svg:rect', { width: 6, height: 6, fill: 'var(--grid)' }),
+    el('svg:line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: 'var(--axis)', 'stroke-width': 2 }))));
+  xs.forEach((x, i) => {
+    const y = 4 + i * rowH, w = (x.v / 4) * (x1 - x0);
+    const a = el('svg:a', { href: '#topic=' + x.t.replace(/^exam_/, ''), class: 'wbar',
+      'data-weak-topic': x.t,
+      'data-tip': JSON.stringify([frName(x.t), `${num(x.v, 2)} / 4 · report half`
+        + (ok ? '' : ' · provisional'), 'Open the topic →']) },
+      el('svg:text', { x: x0 - 8, y: y + 14, 'text-anchor': 'end', 'font-size': 11,
+        fill: 'var(--text-secondary)', text: frName(x.t) }),
+      el('svg:rect', { x: x0, y: y + 3, width: Math.max(1, w), height: rowH - 8, rx: 2,
+        fill: ok ? 'var(--accent)' : 'url(#hatch)', 'fill-opacity': ok ? 0.75 : 1 }),
+      el('svg:text', { x: x0 + w + 6, y: y + 14, 'font-size': 11, fill: 'var(--text-primary)',
+        class: 'mono', text: num(x.v, 2) }));
+    svg.append(a);
+  });
+  return el('div', { class: 'ibox', 'data-weakest': '1' },
+    head, el('div', { class: 'frm' }, change,
+      ok ? '' : el('span', { class: 'badge warn', 'data-provisional': 'weakest', text: 'provisional',
+        title: ((m.judgeState || {}).reasons || []).join('; ') })),
+    svg,
+    all.length > 12 ? el('button', { class: 'quiet', 'data-weak-all': '1',
+      text: L.weakAll ? 'Show the twelve weakest' : `Show all ${all.length} topics`,
+      onclick: () => lbSet({ weakAll: !L.weakAll }) }) : '',
+    el('p', { class: 'small', text: `${m.name}'s own topics, weakest first — the report half, on `
+      + 'the 0–4 rubric. This orders one model\'s topics; it does not rank models.'
+      + (ok ? '' : ' Provisional: a local or uncalibrated judge, so no number here is ranked.') }),
+    el('details', { class: 'astable' }, el('summary', { text: 'Show as table' }),
+      el('table', { class: 'mini' }, el('tbody', {}, all.map(x => el('tr', {},
+        el('td', {}, el('a', { href: '#topic=' + x.t.replace(/^exam_/, ''), text: frName(x.t) })),
+        el('td', { class: 'num', text: num(x.v, 2) + ' / 4' })))))));
+}
+
+// The radar: up to five models as chips, and three sources. Judged by area is
+// an average, so it waits for a calibrated judge.
+function radarSource() {
+  const L = lbS();
+  const areas = Object.keys(DATA.meta.areas || {});
+  if (L.radarSrc === 'areas') return areas.map(a => ({ key: a, label: a,
+    get: m => { const r = areaMmlu(m, a); return r ? { n: Math.max(0, (r.v - 0.25) / 0.75),
+      rows: [`${(100 * r.v).toFixed(1)}% raw · ${r.n} items`] } : null; } }));
+  if (L.radarSrc === 'judged' && judgedCalibrated()) return areas.map(a => ({ key: a, label: a,
+    get: m => { const r = areaJudged(m, a); return r.v == null ? null
+      : { n: r.v / 4, rows: [`${num(r.v, 2)} / 4 · ${r.k} of ${r.n} topics`] }; } }));
+  return (DATA.required || DATA.accTasks).filter(t => DATA.accTasks.includes(t)).map(t => ({
+    key: t, label: t, get: m => { const c = cell(t, m.id);
+      return c ? { n: normScore(t, c.v), rows: [`${(100 * c.v).toFixed(1)}% raw`
+        + (c.se ? ` ± ${(100 * c.se).toFixed(1)}` : '')] } : null; } }));
+}
+
+function radarBlock(ms) {
+  const L = lbS();
+  const ids = state.cmpSel.filter(id => DATA.models.some(m => m.id === id));
+  const axes = radarSource();
+  const calOk = judgedCalibrated();
+  const add = el('button', { class: 'pill', id: 'pill-radar-add', 'data-radar-add': '1',
+    disabled: ids.length >= CMP_MAX ? '' : null,
+    title: ids.length >= CMP_MAX ? `the radar holds ${CMP_MAX} — remove one first` : null,
+    text: 'Add a model… ▾' });
+  const addPop = popover(add, () => {
+    const list = el('div', { class: 'mlist' });
+    const fill = q => list.replaceChildren(...DATA.models.filter(m => !ids.includes(m.id)
+        && (!q || m.name.toLowerCase().includes(q.toLowerCase())))
+      .map(m => el('button', { role: 'menuitem', 'data-radar-pick': m.id, text: m.name,
+        onclick: () => { popClose(true); cmpToggle(m.id, DATA.models); } })));
+    fill('');
+    return el('div', { class: 'moremenu', id: 'pop-radar-add', 'aria-label': 'add a model' },
+      el('input', { type: 'search', placeholder: 'models…', 'aria-label': 'search models',
+        oninput: e => fill(e.target.value) }), list);
+  }, { key: 'radar-add', menu: false });
+  const chips = el('div', { class: 'rchips', 'data-radar-chips': '1' },
+    ids.map(id => {
+      const m = DATA.models.find(x => x.id === id);
+      const color = trColor(state.cmpColors[id] ?? ids.indexOf(id));
+      return el('span', { class: 'mchip', 'data-radar-chip': id },
+        el('span', { class: 'key', style: `background:${color}` }), m.name,
+        el('button', { class: 'xbtn', 'aria-label': 'remove ' + m.name, text: '×',
+          onclick: () => cmpToggle(id, DATA.models) }));
+    }), addPop);
+  const src = el('div', { class: 'seg', role: 'group', 'aria-label': 'radar source' },
+    [['tasks', 'Tasks'], ['areas', 'MMLU by area'], ['judged', 'Judged by area']].map(([v, t]) => {
+      const off = v === 'judged' && !calOk;
+      return el('button', { 'aria-pressed': String(L.radarSrc === v), 'data-radar-src': v, text: t,
+        disabled: off ? '' : null, title: off ? judgedOffWhy() : null,
+        onclick: () => { if (!off) lbSet({ radarSrc: v }); } });
+    }));
+  const head = el('div', { class: 'ihead' }, el('div', { class: 'eyebrow', text: 'Compare shapes' }));
+  const body = !ids.length || axes.length < 3
+    ? el('p', { class: 'small', 'data-radar-prompt': '1', text: axes.length < 3
+        ? 'Too few axes to draw a shape for this source.'
+        : `Add up to ${CMP_MAX} models to draw their shapes — one axis per `
+          + (L.radarSrc === 'tasks' ? 'task' : 'area') + ', one shape per model.' })
+    : radarSvg(axes, ids.map(id => ({ m: DATA.models.find(x => x.id === id),
+        color: trColor(state.cmpColors[id] ?? ids.indexOf(id)) })));
+  return el('div', { class: 'ibox', 'data-radar': '1' }, head, chips, src, body,
+    calOk ? '' : el('p', { class: 'small se', text: 'Judged by area: ' + judgedOffWhy() + '.' }));
+}
+
+function radarSvg(axes, series) {
+  const W = 540, H = 380, cx = 270, cy = 195, R = 130, N = axes.length;
+  const ang = i => -Math.PI / 2 + 2 * Math.PI * i / N;
+  const pt = (i, r) => [cx + r * Math.cos(ang(i)), cy + r * Math.sin(ang(i))];
+  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', class: 'radar',
+    role: 'img', 'aria-label': 'model shapes' });
+  for (const f of [0.25, 0.5, 0.75, 1]) {
+    svg.append(el('svg:polygon', {
+      points: axes.map((_, i) => pt(i, f * R).map(v => v.toFixed(1)).join(',')).join(' '),
+      fill: 'none', stroke: f === 1 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1 }));
+  }
+  axes.forEach((ax, i) => {
+    const [x, y] = pt(i, R);
+    svg.append(el('svg:line', { x1: cx, y1: cy, x2: x, y2: y, stroke: 'var(--grid)' }));
+    const [lx, ly] = pt(i, R + 16), c = Math.cos(ang(i));
+    svg.append(el('svg:text', { x: lx, y: ly + 4, 'font-size': 11, fill: 'var(--text-secondary)',
+      'text-anchor': c > 0.15 ? 'start' : c < -0.15 ? 'end' : 'middle', text: ax.label }));
+  });
+  const hits = [];
+  for (const s of series) {
+    const vals = axes.map(ax => ax.get(s.m));
+    const pts = vals.map((v, i) => v ? pt(i, v.n * R) : null);
+    const have = pts.filter(Boolean);
+    if (have.length >= 2) svg.append(el('svg:path', {
+      d: 'M' + have.map(p => p.map(v => v.toFixed(1)).join(',')).join('L') + 'Z',
+      fill: s.color, 'fill-opacity': 0.12, stroke: s.color, 'stroke-width': 2,
+      'pointer-events': 'none' }));
+    vals.forEach((v, i) => {
+      if (!v) return;
+      const [x, y] = pts[i];
+      svg.append(el('svg:circle', { cx: x, cy: y, r: 3.5, fill: s.color,
+        stroke: 'var(--surface-1)', 'stroke-width': 1.5, 'pointer-events': 'none' }));
+      hits.push(el('svg:circle', { class: 'hit', cx: x, cy: y, r: 8, tabindex: 0,
+        'data-tip': JSON.stringify([s.m.name, `${axes[i].label}: ${(100 * v.n).toFixed(0)}`,
+          ...v.rows]), 'data-tipkey': s.color }));
+    });
+  }
+  svg.append(...hits);
+  const table = el('details', { class: 'astable' }, el('summary', { text: 'Show as table' }),
+    el('table', { class: 'mini' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'axis' }),
+        series.map(s => el('th', { class: 'num', title: s.m.id, text: midTrunc(s.m.name, 16) })))),
+      el('tbody', {}, axes.map(ax => el('tr', {}, el('td', { text: ax.label }),
+        series.map(s => { const v = ax.get(s.m);
+          return el('td', { class: 'num', text: v ? (100 * v.n).toFixed(0) : '—' }); }))))));
+  return el('div', {}, svg, table);
+}
+
+document.addEventListener('keydown', e => {
+  // Esc clears the frontier's highlight — after any open popover has had it
+  if (e.key === 'Escape' && !e.defaultPrevented && state.lb && state.lb.focus) lbSet({ focus: null });
+});
+
 
 // The optional "MMLU by category" view: one column per category from
 // scripts/categories.yaml, one row per model that has a diagnosis, so a trained
@@ -5361,136 +6108,11 @@ function lbShownTasks(taskCols) {
   try { want = JSON.parse(localStorage.getItem('bench-lb-shown') || 'null'); } catch (e) { /* none */ }
   if (state.lbShown) want = state.lbShown;
   if (!Array.isArray(want)) {
-    const plain = taskCols.filter(c => !c.group).map(c => c.key);
+    const plain = taskCols.filter(c => c.task).map(c => c.key);
     const req = (DATA.required || []).filter(t => plain.includes(t));
     want = [...req, ...plain.filter(k => !req.includes(k))].slice(0, 6);
   }
   return new Set(want.filter(k => keys.includes(k)));
-}
-
-function lbColumnsMenu(taskCols, shown) {
-  const save = next => {
-    state.lbShown = next;
-    try { localStorage.setItem('bench-lb-shown', JSON.stringify(next)); } catch (e) { /* private mode */ }
-    render();
-  };
-  return el('details', { class: 'colmenu', 'data-columns-menu': '1',
-      open: state.lbColsOpen ? '' : null, ontoggle: e => { state.lbColsOpen = e.target.open; } },
-    el('summary', { class: 'btn', text: 'Columns ▾' }),
-    el('div', { class: 'colmenu-list' },
-      [[null, 'task columns to show'], ['judged', 'judged topics (rubric 0–4)'],
-       ['cats', 'MMLU by category']].flatMap(([g, head]) => {
-        const cs = taskCols.filter(c => (c.group || null) === g);
-        if (!cs.length) return [];
-        const keys = cs.map(c => c.key);
-        return [el('div', { class: 'small se', 'data-column-group': g || 'tasks' }, head + ' ',
-            g ? el('button', { class: 'quiet', style: 'padding:0 6px', text: 'all',
-              'data-column-group-all': g, onclick: () => save([...new Set([...shown, ...keys])]) }) : '',
-            g ? el('button', { class: 'quiet', style: 'padding:0 6px', text: 'none',
-              'data-column-group-none': g, onclick: () => save([...shown].filter(k => !keys.includes(k))) }) : ''),
-          ...cs.map(c => el('label', { class: 'small' },
-            el('input', { type: 'checkbox', 'data-column': c.key, checked: shown.has(c.key) ? '' : null,
-              onchange: e => save(e.target.checked ? [...shown, c.key]
-                                                   : [...shown].filter(k => k !== c.key)) }),
-            ' ' + c.label))];
-      }),
-      el('div', { class: 'frm' },
-        el('button', { class: 'quiet', text: 'show all', onclick: () => save(taskCols.map(c => c.key)) }),
-        el('button', { class: 'quiet', text: 'the default six', onclick: () => {
-          state.lbShown = null;
-          try { localStorage.removeItem('bench-lb-shown'); } catch (e) { /* private mode */ }
-          render(); } }))));
-}
-
-function lbViewCtrl(ms) {
-  const n = ms.filter(mmluCats).length;
-  return el('div', { class: 'ctrl', style: 'margin:2px 0 6px' },
-    el('span', { class: 'small', text: 'View' }),
-    el('div', { class: 'seg', role: 'group', 'aria-label': 'leaderboard columns' },
-      [['tasks', 'tasks'], ['cats', 'MMLU by category']].map(([v, l]) =>
-        el('button', { 'aria-pressed': String(state.lbView === v), text: l,
-          disabled: (v === 'cats' && !n) ? '' : null,
-          title: v === 'cats' && !n ? 'no model here has an MMLU diagnosis on file' : null,
-          onclick: () => { state.lbView = v; render(); } }))),
-    el('span', { class: 'count-note', text: state.lbView === 'cats'
-      ? `leaderboard-half MMLU score per category, from each model's diagnosis (${n} of `
-        + `${ms.length} have one) — categories under ${CAT_MIN_N} items are greyed`
-      : n ? 'switch to see MMLU broken down by category for every diagnosed model'
-      : 'MMLU by category needs a diagnosis on file, and no model here has one' }));
-}
-
-function lbCategoryTable(ms) {
-  const have = ms.filter(mmluCats);
-  const cats = (DATA.meta.categories || []).filter(c => have.some(m => mmluCats(m)[c]));
-  const cols = [{ key: 'name', label: 'Model' }, { key: 'mmlu', label: 'mmlu', task: true },
-                ...cats.map(c => ({ key: 'cat:' + c, label: c, cat: c }))];
-  const val = (m, c) => c.key === 'name' ? m.name
-    : c.task ? (cell('mmlu', m.id) || {}).v
-    : ((mmluCats(m)[c.cat] || {}).score_report);
-  const sortKey = cols.some(c => c.key === state.sort.key) ? state.sort.key : 'mmlu';
-  const dir = sortKey === state.sort.key ? state.sort.dir : -1;
-  const rows = [...have].sort((a, b) => {
-    const c = cols.find(c => c.key === sortKey);
-    const va = val(a, c), vb = val(b, c);
-    if (va == null && vb == null) return 0;
-    if (va == null) return 1; if (vb == null) return -1;
-    return typeof va === 'string' ? dir * natCmp(va, vb) : dir * (va - vb);
-  });
-  const best = {};
-  for (const c of cols) if (c.key !== 'name') {
-    const vs = have.map(m => val(m, c)).filter(v => v != null);
-    if (vs.length > 1) best[c.key] = Math.max(...vs);
-  }
-  const th = c => el('th', {
-    class: (c.key === 'name' ? 'model ' : 'num ') + 'sortable',
-    'aria-sort': sortKey === c.key ? (dir > 0 ? 'ascending' : 'descending') : 'none',
-    onclick: () => { state.sort = { key: c.key,
-      dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : -1) };
-      render(); } },
-    c.label + ' ', sortKey === c.key ? el('span', { class: 'dir', text: dir > 0 ? '▲' : '▼' }) : '');
-  const table = el('table', { class: 'lb lbcats' },
-    el('thead', {}, el('tr', {}, cols.map(th))),
-    el('tbody', {}, rows.map(m => el('tr', {}, cols.map(c => {
-      if (c.key === 'name') return el('td', { class: 'model', 'data-model': m.id },
-        el('a', { class: 'mname mlink', text: m.name, href: '#model=' + encodeURIComponent(m.id) }),
-        prelimBadge(m) || '');
-      if (c.task) {
-        const cc = cell('mmlu', m.id);
-        return el('td', { class: 'num' + (cc && cc.v === best.mmlu ? ' best' : ''),
-          style: state.lbHeat && cc ? `background:${heatBg({ task: 'mmlu' }, cc.v) || 'none'}` : null },
-          cc ? pct(cc.v) : '—',
-          cc && cc.se ? el('span', { class: 'se', text: ` ±${(100 * cc.se).toFixed(1)}` }) : '');
-      }
-      const g = mmluCats(m)[c.cat];
-      if (!g || g.score_report == null) return el('td', { class: 'num', text: '—' });
-      const dim = g.n_report < CAT_MIN_N;
-      return el('td', { class: 'num' + (dim ? ' dim' : '')
-          + (!dim && g.score_report === best[c.key] ? ' best' : ''),
-        style: state.lbHeat && !dim ? `background:${heatBg({ task: 'mmlu' }, g.score_report) || 'none'}` : null,
-        title: `${g.n_report} leaderboard-half items` + (dim ? ` — under ${CAT_MIN_N}, treat as noise` : '')
-          + ` · subjects: ${(g.groups || []).join(', ')}` },
-        pct(g.score_report), el('span', { class: 'se', text: ` ${g.n_report}` }));
-    })))));
-  const skipped = ms.length - have.length;
-  return el('div', {},
-    el('div', { class: 'lb-wrap' }, table),
-    el('p', { class: 'small', style: 'margin:8px 0 0', text:
-      'Each cell: leaderboard-half accuracy on that category, then its item count. '
-      + (skipped ? `${skipped} model${skipped > 1 ? 's' : ''} without a diagnosis on file `
-                 + '(run scripts/diagnose.py) are not shown in this view.' : '') }));
-}
-
-// the key for the shading — colour alone is never the only encoding here (the
-// number is in every cell), but an unexplained colour is still a puzzle
-function heatLegend() {
-  const chip = (bg, label) => el('span', { class: 'hl-item' },
-    el('span', { class: 'hl-sw', style: `background:${bg}` }), label);
-  return el('span', { class: 'hl' },
-    chip('color-mix(in srgb, var(--s8) 52%, transparent)', 'below chance'),
-    chip('none', 'at chance'),
-    chip('color-mix(in srgb, var(--s1) 22%, transparent)', 'above'),
-    chip('color-mix(in srgb, var(--s1) 60%, transparent)', 'far above'),
-    el('span', { class: 'small', text: '· perplexity shades by column range' }));
 }
 
 // tasks under their domain, payload order preserved, undomained ones last
@@ -8770,7 +9392,7 @@ let _tabsBuilt = false;
 // its focus. Only the button is found again, by data-pop-anchor.
 // ---------------------------------------------------------------------------
 
-const POP = { key: null, panel: null, anchor: null, opts: null };
+const POP = { key: null, panel: null, anchor: null, opts: null, build: null };
 const POP_EDGE = 8;             // never closer than this to the window's edge
 
 function popItems() {
@@ -8804,7 +9426,7 @@ function popClose(backToButton = false) {
   if (!panel) return;
   panel.remove();
   if (anchor && anchor.isConnected) anchor.setAttribute('aria-expanded', 'false');
-  POP.key = POP.panel = POP.anchor = POP.opts = null;
+  POP.key = POP.panel = POP.anchor = POP.opts = POP.build = null;
   if (backToButton && anchor && anchor.isConnected) anchor.focus();
 }
 
@@ -8832,14 +9454,16 @@ function popover(btn, build, opts = {}) {
   btn.setAttribute('aria-expanded', String(POP.key === key));
   btn.setAttribute('aria-controls', 'pop-' + key);
   btn.dataset.popAnchor = key;
-  btn.addEventListener('click', e => { e.preventDefault(); popOpen(key, btn, build(), opts); });
+  btn._popBuild = build;
+  const open = () => { popOpen(key, btn, build(), opts); if (POP.key === key) POP.build = build; };
+  btn.addEventListener('click', e => { e.preventDefault(); open(); });
   btn.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
       if (POP.key === key) return;
       e.preventDefault();
       // …and this keystroke opened the menu: it does not also move inside it
       e.stopPropagation();
-      popOpen(key, btn, build(), opts);
+      open();
     }
   });
   return btn;
@@ -8851,7 +9475,20 @@ function popReanchor() {
   const a = document.querySelector(`[data-pop-anchor="${POP.key}"]`);
   if (!a) { popClose(); return; }          // its button is gone: so is the menu
   POP.anchor = a;
+  if (a._popBuild) POP.build = a._popBuild;
   a.setAttribute('aria-expanded', 'true');
+  // a panel whose choices apply at once (Columns) shows what is true now:
+  // its contents are built again, and the control that had focus keeps it
+  if ((POP.opts || {}).rebuild && POP.build) {
+    const f = document.activeElement;
+    const id = f && POP.panel.contains(f) && ['column', 'choice', 'tint', 'showAll']
+      .map(k => f.dataset[k] != null ? `[data-${k.replace(/[A-Z]/g, c => '-' + c.toLowerCase())}="${f.dataset[k]}"]` : null)
+      .find(Boolean);
+    const fresh = POP.build();
+    POP.panel.replaceChildren(...fresh.childNodes);
+    const again = id && POP.panel.querySelector(id);
+    if (again) again.focus();
+  }
   popPlace();
 }
 

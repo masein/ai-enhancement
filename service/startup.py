@@ -47,6 +47,7 @@ DELIVERED_TOPIC_FILES = [
 # the ones a request can reach. Each says which code path needs it.
 REQUIRED_REPO_FILES = [
     "scripts/categories.yaml",              # the topic spine: every exam task name
+    "scripts/areas.yaml",                   # the page groups the 37 topics into 8 areas
     "eval_tasks/fr/_fr_template_yaml",      # exam_build.build() writes each task from it
     "eval_tasks/fr/canary.jsonl",           # judge.load_canary(): every judged run starts here
     "eval_tasks/fr/rubrics/exam.md",        # the shared rubric, for a topic without its own

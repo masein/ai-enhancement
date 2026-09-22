@@ -77,6 +77,51 @@ def with_subjects(path: Path = YAML_PATH) -> list[str]:
     return [c for c in category_order(path) if _table(path).get(c)]
 
 
+AREAS_PATH = Path(__file__).with_name("areas.yaml")
+_TOPIC = re.compile(r"^\s+-\s+(\S.*?)\s*$")
+
+
+def parse_areas(text: str) -> dict[str, list[str]]:
+    """area -> topics, in file order (scripts/areas.yaml). The same shape as
+    categories.yaml, but its items are topic names, which have spaces and
+    capitals. ValueError names the bad line."""
+    out: dict[str, list[str]] = {}
+    seen: dict[str, str] = {}
+    cur: str | None = None
+    for no, raw in enumerate(text.splitlines(), 1):
+        line = raw.split("#", 1)[0].rstrip()
+        if not line.strip():
+            continue
+        m = _CAT.match(line)
+        if m:
+            cur = m.group(1).strip()
+            if cur in out:
+                raise ValueError(f"areas.yaml:{no}: area {cur!r} listed twice")
+            out[cur] = []
+            continue
+        m = _TOPIC.match(line)
+        if m and cur is not None:
+            t = m.group(1)
+            if t in seen:
+                raise ValueError(f"areas.yaml:{no}: topic {t!r} is already under {seen[t]!r}")
+            seen[t] = cur
+            out[cur].append(t)
+            continue
+        raise ValueError(f"areas.yaml:{no}: expected 'Area:' or '  - Topic', got {raw!r}")
+    return out
+
+
+@functools.lru_cache(maxsize=4)
+def areas(path: Path = AREAS_PATH) -> dict[str, list[str]]:
+    """The eight areas the 37 topics are grouped into, area -> topics in file
+    order. {} when the file is missing: the page then shows no area columns
+    rather than inventing a grouping."""
+    try:
+        return parse_areas(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+
+
 def topic_slug(name: str) -> str:
     """'Medicine & Clinical Health' -> 'medicine_clinical_health': the topic
     as a task name."""

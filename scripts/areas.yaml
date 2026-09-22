@@ -1,0 +1,67 @@
+# The 37 exam topics, grouped into 8 areas.
+#
+# The Leaderboard reads the areas for its grouped columns — MMLU by area, and
+# the judged topics by area once the judge is calibrated — and the model page
+# groups its topic table under them. The grouping is the phase-11 brief's
+# proposal; masein can change it.
+#
+# Rules, enforced by tests/test_areas.py:
+#   * every one of the 37 topics in scripts/categories.yaml appears in exactly
+#     one area, spelled exactly as it is there
+#   * every area has at least one topic with MMLU subjects, so "MMLU by area"
+#     has a number in every column
+#   * the file stays this shape — `Area:` lines and `  - Topic` lines, nothing
+#     else — because scripts/categories.py reads it without pyyaml
+
+Mathematics & Science:
+  - Mathematics & Statistics
+  - Physics & Astronomy
+  - Chemistry & Materials Science
+  - Biology & Life Sciences
+  - Earth & Environmental Sciences
+
+Computing & Technology:
+  - Computer Science
+  - Software Engineering & Programming
+  - AI & Machine Learning
+  - Systems & Cybersecurity
+  - IT
+  - Technology
+  - Data & Information Science
+
+Engineering & Applied:
+  - Engineering
+  - Manufacturing & Applied Sciences
+  - Architecture & Built Environment
+  - Design
+  - Agriculture
+  - Food & Veterinary Sciences
+
+Health & Mind:
+  - Medicine & Clinical Health
+  - Public Health & Wellness
+  - Psychology & Cognitive Sciences
+
+Society:
+  - Economics
+  - Sociology
+  - Anthropology & Human Geography
+  - Political Science & International Relations
+  - Government & Public Policy
+  - Education
+
+Humanities & Arts:
+  - History & Archaeology
+  - Philosophy
+  - Ethics & Religion
+  - Language & Literature
+  - Arts
+  - Media & Communication
+
+Business & Law:
+  - Law
+  - Business & Management
+  - Finance & Accounting
+
+General:
+  - General & Multidisciplinary

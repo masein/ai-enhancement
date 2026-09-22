@@ -212,12 +212,14 @@ def show_all_columns(page) -> None:
     """The Leaderboard shows six task columns by default (phase 9c); a test
     about a column that may be hidden asks for all of them first."""
     menu = page.locator("[data-columns-menu]")
-    if menu.count() == 0:
+    if menu.count() == 0 or not menu.get_attribute("data-hidden-tasks"):
         return
-    if menu.get_attribute("open") is None:
-        menu.locator("summary").click()
-    menu.get_by_role("button", name="show all").click()
+    # the Columns pill opens 11a's popover (11c); Show all applies at once
+    if page.locator("#pop-columns").count() == 0:
+        menu.click()
+    page.locator("#pop-columns [data-show-all]").click()
     page.wait_for_function("!document.querySelector('[data-hidden-tasks]')")
+    page.keyboard.press("Escape")
 
 
 def pick_topic(page, task: str) -> None:

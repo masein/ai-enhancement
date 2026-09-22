@@ -240,19 +240,29 @@ def test_permutation_control_sentence(surface):
     assert surface.errors == []
 
 
-def test_leaderboard_by_category_view(surface, diag):
+def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
+    """11c: the Knowledge chip replaced the "MMLU by category" view — MMLU, its
+    eight areas, and the per-topic columns one tick away under Columns."""
     pg = surface.open("#tab=leaderboard")
-    pg.get_by_role("button", name="MMLU by category", exact=True).click()
-    table = pg.locator("table.lbcats")
-    heads = table.locator("thead th").all_text_contents()
-    assert any(h.startswith("Economics") for h in heads) and any(h.startswith("mmlu") for h in heads)
-    assert table.locator("tbody tr").count() == len(diag)     # diagnosed models only
-    assert "1 model without a diagnosis on file" in pg.locator("#view").text_content()
-    assert table.locator("td.dim").count() > 0 and table.locator("td.num.best").count() > 0
-    # the control column carries its warning in the task view
-    pg.get_by_label("leaderboard columns").get_by_role("button", name="tasks", exact=True).click()
+    pg.locator("[data-chip='knowledge']").click()
+    pg.wait_for_selector("table.lb thead th[data-area]")
+    assert pg.locator("table.lb thead th[data-area]").count() == 8
+    assert pg.locator("table.lb thead th[data-task='mmlu']").count() == 1
+    # the per-topic columns, one tick away: a topic under 30 items is greyed
+    pg.locator("[data-columns-menu]").click()
+    pg.locator("#pop-columns [data-column-group-all='cats']").click()
+    pg.wait_for_selector("table.lb thead th[data-col='cat:Economics']")
+    pg.keyboard.press("Escape")
+    table = pg.locator("table.lb")
+    assert table.locator("td.dim").count() > 0 and table.locator("td.best").count() > 0
+    # a model without a diagnosis on file has no area to show, and says so with a dash
+    rows = pg.evaluate("""() => [...document.querySelectorAll('table.lb tbody tr[data-lb-row]')]
+      .filter(tr => !mmluCats(DATA.models.find(m => m.id === tr.dataset.lbRow))).length""")
+    assert rows >= 1
+    # the control column carries its warning in All tasks
+    pg.locator("[data-chip='all']").click()
     show_all_columns(pg)                             # six task columns by default (9c)
-    th = pg.locator("table.lb thead th", has_text=re.compile(r"^mmlu_perm"))
+    th = pg.locator("table.lb thead th[data-task='mmlu_perm']")
     assert "CONTROL" in th.get_attribute("title")
     assert surface.errors == []
 
@@ -310,13 +320,16 @@ def test_judged_section_and_the_control_sentence(surface, tree):
 def test_judged_columns_appear_once_calibrated(surface):
     pg = surface.open("#tab=leaderboard")
     show_all_columns(pg)
-    heads = pg.locator("table.lb thead tr").first.locator("th").all_text_contents()
+    # 11c: the names are the second header row, under their groups; the κ and
+    # the 0–4 scale are on each judged column's unit line
+    heads = pg.locator("table.lb thead tr:not(.grp) th").all_text_contents()
     judged = [h for h in heads if "κ" in h]
     assert len(judged) >= 4 and any(h.startswith("Judged avg") for h in judged)
     assert any(h.startswith("Economics") for h in judged)
+    assert all("0–4" in h for h in judged)
     assert not any(h.startswith(("fr_", "exam_")) for h in heads)   # never as a task column
-    row = pg.locator("table.lb tbody tr", has_text="good-750m").first
-    assert "/4" in row.text_content()
+    row = pg.locator("table.lb tbody tr[data-lb-row='fx/good-750m']")
+    assert float(row.locator("[data-judged-avg]").text_content()) >= 0
     assert surface.errors == []
 
 
@@ -603,8 +616,9 @@ def test_screenshots_for_the_pr(surface):
             pg.locator("details.dxcat > summary").first.click()
             pg.screenshot(path=SCREENS / f"model-skewed-{scheme}-{width}.png", full_page=True)
             surface.open("#tab=leaderboard")
-            pg.get_by_role("button", name="MMLU by category", exact=True).click()
-            pg.screenshot(path=SCREENS / f"leaderboard-categories-{scheme}-{width}.png",
+            pg.locator("[data-chip='knowledge']").click()
+            pg.wait_for_selector("table.lb thead th[data-area]")
+            pg.screenshot(path=SCREENS / f"leaderboard-knowledge-{scheme}-{width}.png",
                           full_page=True)
             surface.open(model_link("fx/good-750m-tuned-test"))
             pg.locator(".card", has=pg.locator("h2", has_text="What the training taught")) \
@@ -626,20 +640,27 @@ def test_the_models_tab_lists_every_model_and_filters_it(surface):
     # the old floating filters are gone from the shell
     assert pg.locator("#kindSeg").count() == 0 and pg.locator("#srcSeg").count() == 0
     # every filter narrows this list, and says so by the count
-    pg.locator("[data-filter='kind:instruct']").click()
+    # 11c: the filters are the Leaderboard's "Label: Value ▾" pills
+    pg.locator("#pill-mkind").click()
+    pg.locator("#pop-mkind [data-choice='instruct']").click()
     pg.wait_for_function("n => document.querySelectorAll('tr[data-model-row]').length < n", arg=n)
     instruct = pg.locator("tbody tr[data-model-row]").count()
     assert 0 < instruct < n
     assert all("instruct" in pg.locator("tbody tr[data-model-row]").nth(i).text_content()
                for i in range(instruct))
-    pg.locator("[data-filter='kind:all']").click()
+    assert pg.locator("#pill-mkind").text_content().startswith("Kind: instruct")
+    pg.locator("#pill-mkind").click()
+    pg.locator("#pop-mkind [data-choice='all']").click()
     pg.wait_for_function("n => document.querySelectorAll('tr[data-model-row]').length === n", arg=n)
     # a judged-run filter, because 'which of these sat the exam' is a question
-    pg.locator("input[data-filter='judged']").check()
+    pg.locator("#pill-mshow").click()
+    pg.locator("#pop-mshow input[data-filter='judged']").check()
     pg.wait_for_function("n => document.querySelectorAll('tr[data-model-row]').length <= n", arg=n)
     judged = pg.locator("tbody tr[data-model-row]").count()
     assert judged >= 1
-    pg.locator("input[data-filter='judged']").uncheck()
+    assert pg.locator("#pill-mshow").get_attribute("data-show-filters") == "judged"
+    pg.locator("#pop-mshow input[data-filter='judged']").uncheck()
+    pg.keyboard.press("Escape")
     # search
     pg.get_by_label("filter models").fill("good")
     pg.wait_for_function("() => document.querySelectorAll('tr[data-model-row]').length >= 1")
@@ -656,46 +677,39 @@ def test_the_models_tab_lists_every_model_and_filters_it(surface):
     assert surface.errors == []
 
 
-def test_the_leaderboards_compare_ticks_are_the_only_ones(surface):
-    """The radar belongs to the Leaderboard. Its ticks pick up to five models,
-    say how many slots are used, redraw the radar, and drop the oldest when a
-    sixth arrives. The Models tab has no tick at all: two tables sharing one
-    selection is what broke this. Phase 9c: the column says "compare", and
-    nothing is ticked until someone ticks it — the radar asks until then."""
+def test_the_radars_model_chips_are_the_only_comparison(surface):
+    """11c: the radar's chips replaced the compare column. Up to five models,
+    added from a search and removed with ×; a sixth waits for a free slot,
+    and says so. The Models tab has no tick at all."""
     pg = surface.open("#tab=models")
     assert pg.locator("table.jd[data-models-table] input[type=checkbox][aria-label^='compare']"
                       ).count() == 0
     surface.tab("Leaderboard")
-    assert pg.locator("table.lb thead th.cmp").text_content() == "compare"
-    boxes = pg.locator("table.lb tbody input[type=checkbox]")
-    assert boxes.count() > 5
-    assert sum(1 for i in range(boxes.count()) if boxes.nth(i).is_checked()) == 0
-    assert pg.locator("[data-radar-prompt]").count() == 1
-    assert "Tick up to 5" in pg.locator("[data-radar-prompt]").text_content()
-    radar = pg.locator(".card", has=pg.locator("h2", has_text="Capability profile"))
-    for i in range(5):
-        boxes.nth(i).check()
-    assert "comparing 5 of 5 slots" in radar.text_content()
-    drawn = radar.locator("svg").inner_html()
+    assert pg.locator("table.lb thead th.cmp").count() == 0
+    assert pg.locator("table.lb tbody input[type=checkbox]").count() == 0
+    radar = pg.locator("[data-radar]")
+    assert "Add up to 5 models" in radar.locator("[data-radar-prompt]").text_content()
+    ids = [m["id"] for m in DATA_MODELS(pg)][:6]
+    for mid in ids[:5]:
+        pg.locator("#pill-radar-add").click()
+        pg.locator(f"#pop-radar-add [data-radar-pick='{mid}']").click()
+        pg.wait_for_selector(f"[data-radar-chip='{mid}']")
+    assert radar.locator("[data-radar-chip]").count() == 5
+    drawn = radar.locator("svg.radar").inner_html()
     assert len(drawn) > 200
-    # untick one: the count follows and the radar is redrawn without it
-    boxes.nth(0).uncheck()
-    assert "comparing 4 of 5 slots" in radar.text_content()
-    assert radar.locator("svg").inner_html() != drawn
-    # tick one that was not in the set: back to five, and it is on the radar
-    off = next(i for i in range(boxes.count()) if not boxes.nth(i).is_checked())
-    mid = pg.locator("table.lb tbody tr").nth(off).locator("td.model").first.get_attribute(
-        "data-model")
-    boxes.nth(off).check()
-    assert "comparing 5 of 5 slots" in radar.text_content()
-    assert "full, the next tick replaces the oldest" in radar.text_content()
-    assert mid.split("/")[-1] in radar.text_content()          # it is on the radar now
-    # a sixth lands and the oldest leaves — the newest click always wins
-    spare = next(i for i in range(boxes.count()) if not boxes.nth(i).is_checked())
-    boxes.nth(spare).check()
-    assert "comparing 5 of 5 slots" in radar.text_content()
-    assert "dropped" in radar.text_content()
-    assert sum(1 for i in range(boxes.count()) if boxes.nth(i).is_checked()) == 5
+    # full: Add is off and says why, and so is a row's own Add to radar
+    add = pg.locator("#pill-radar-add")
+    assert add.is_disabled() and "remove one first" in add.get_attribute("title")
+    pg.locator(f"tr[data-lb-row='{ids[5]}'] button.disclose").click()
+    row_add = pg.locator(f"[data-add-radar='{ids[5]}']")
+    assert row_add.is_disabled() and "remove one first" in row_add.get_attribute("title")
+    # remove one: the radar is redrawn without it, and Add comes back
+    radar.locator(f"[data-radar-chip='{ids[0]}'] button.xbtn").click()
+    pg.wait_for_selector(f"[data-radar-chip='{ids[0]}']", state="detached")
+    assert radar.locator("svg.radar").inner_html() != drawn
+    assert pg.locator("#pill-radar-add").is_enabled()
+    pg.locator(f"[data-add-radar='{ids[5]}']").click()
+    pg.wait_for_selector(f"[data-radar-chip='{ids[5]}']")
     assert surface.errors == []
 
 

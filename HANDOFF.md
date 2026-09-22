@@ -792,6 +792,61 @@ cards and the model page.
   - **Removed: the comfortable/compact density switch** — the one-line row is
     the compact one. `test_every_action_answers.py` no longer clicks it.
 
+- **11c — the Leaderboard.**
+  - **One toolbar row** (a single strip that wraps on a narrow card): the
+    topic-group chips `All tasks · Knowledge · Commonsense · Reasoning · Math ·
+    Truthfulness · Judged topics` on the left, and on the right the pills
+    `Kind: All ▾`, `Size: All ▾`, `Status: All ▾`, `Columns · N hidden ▾`,
+    `Models ▾` and `Scale: above chance ▾`, all on 11a's popover. The view is in
+    the hash (`#tab=leaderboard&chip=knowledge&kind=instruct&open=<id>`); old
+    hashes still land. **Removed:** the Avg-scale, Cells (numbers | heat) and
+    View (tasks | MMLU by category) switches, and the Columns `<details>` — the
+    Scale pill, the rank tint, the Knowledge chip and the Columns pill replace
+    them.
+  - **Knowledge** shows MMLU and **MMLU by area**: eight columns, each the
+    leaderboard-half items of the MMLU subjects mapped to that area's topics,
+    pooled (a mean weighted by item count). The 24 per-topic MMLU columns are
+    under Columns. **Judged topics** shows the judged area means, by
+    `judged_avg()`'s rules (no tainted topic, at least half the area judged, or
+    "—" with "k of n topics judged") — and only once the judge is calibrated;
+    until then the chip is disabled and says why.
+  - **Two header rows**: the group over its columns, then the name with its
+    unit on a muted second line (`5-shot · %`). **One-line cells**: `52.3 ±0.4`,
+    the `%` in the header. **The rank tint**: each cell's rank in its column
+    over the whole board (so a filter never changes a colour), in five steps
+    from `--heat-5`; a cell the z-test cannot tell from the column's best
+    shares the top step, in bold, with `≈`. Judged cells are tinted only when
+    the judge is calibrated. A new `#` column (the rank, or "—" for a
+    preliminary model) replaces "#1/14" under Avg; Params is one line; a 3px
+    family bar on the model cell, never colour alone.
+  - **Rows open in place**: a click on a row (or ▸, Enter, Space) opens a detail
+    row under it — Tasks with each rank and "tied with best", MMLU by area as
+    bars above chance, Judged topics as chips by area (grey, with one
+    "provisional … not ranked" line and no area mean while the judge is
+    provisional), and Links (model page, Provenance, Add to radar, Run exam).
+    Open rows are kept by model id in `state` and in the hash: they survive
+    polls, paging, sorting and a pasted link.
+  - **Avg has a standard error now** (`avgSe` / `avgRawSe` in the payload,
+    `avg_se()`): the per-task errors carried through the mean, scaled with the
+    score. The frontier's z-test needs it.
+  - **Insights** under the table: score against size with a z-tested frontier
+    (a lead inside the noise never draws the line; click a point to shade the
+    models that are bigger and score lower); Weakest topics for one judged
+    model (the one judged last, or chosen) — report half, weakest first, grey
+    and hatched while provisional; and the radar with up to five model chips
+    and three sources (Tasks, MMLU by area, Judged by area — the last disabled
+    until the judge is calibrated). **Removed:** the Capability profile card and
+    the compare column — the chips are the comparison. Every chart has "Show
+    as table".
+  - The long paragraph went behind **How to read this table ▾**, collapsed and
+    remembered, with About these benchmarks inside it.
+  - **`scripts/areas.yaml`** groups the 37 topics into 8 areas (the brief's
+    proposal; masein can change it), read by `categories.areas()` without
+    pyyaml; `tests/test_areas.py` holds it to every topic in exactly one area,
+    spelled as `categories.yaml` spells it.
+  - The Models tab's filters are the same pills: `Kind`, `Source`, `Family`,
+    and `Show:` (judged / tainted / preliminary, which combine).
+
 **Deploy steps**, after each phase-11 PR merges. This phase has no data
 migration: it changes code (11c also adds `scripts/areas.yaml`).
 

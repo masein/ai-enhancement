@@ -92,24 +92,26 @@ def test_the_model_page_picks_a_judged_topic_from_a_searchable_select(live, page
 def test_the_leaderboard_shows_the_judged_average_and_hides_the_topic_columns(live, page):
     page.goto(live["base"] + "/#tab=leaderboard")
     page.wait_for_selector("table.lb")
-    heads = page.locator("table.lb thead tr").first.locator("th").all_text_contents()
-    assert any(h.startswith("Judged avg") for h in heads)       # shown by default
-    assert not any(h.startswith("MMLU ") for h in heads)        # categories: hidden
-    assert not any("κ" in h and not h.startswith("Judged avg") for h in heads)   # topics: hidden
+    cols = page.evaluate("[...document.querySelectorAll('table.lb thead th[data-col]')]"
+                         ".map(th => th.dataset.col)")
+    assert "javg" in cols                                         # shown by default
+    assert not any(c.startswith("cat:") for c in cols)            # categories: hidden
+    assert not any(c.startswith("j:") for c in cols)              # topics: hidden
     avg = page.locator("table.lb tbody tr[data-lb-row='fx/good-750m'] [data-judged-avg]")
-    assert avg.count() == 1 and "/4" in avg.text_content()
-    menu = page.locator("[data-columns-menu]")
-    menu.locator("summary").click()
+    # 11c: one line per cell — the 0–4 unit is in the header, not in the cell
+    assert avg.count() == 1 and float(avg.text_content()) >= 0
+    assert "0–4" in page.locator("table.lb thead th[data-col='javg']").text_content()
+    page.locator("[data-columns-menu]").click()
+    menu = page.locator("#pop-columns")
     assert menu.locator("[data-column-group='judged']").count() == 1
     menu.locator("[data-column-group-all='cats']").click()
     page.wait_for_function("[...document.querySelectorAll('table.lb thead th')]"
-                           ".some(th => th.textContent.startsWith('MMLU Economics'))")
-    menu = page.locator("[data-columns-menu]")
-    if menu.get_attribute("open") is None:
-        menu.locator("summary").click()
+                           ".some(th => th.dataset.col === 'cat:Economics')")
+    # the popover stayed open, and its boxes say what is true now
+    assert menu.locator("[data-column-group='cats'] input:not(:checked)").count() == 0
     menu.locator("[data-column-group-none='cats']").click()
     page.wait_for_function("![...document.querySelectorAll('table.lb thead th')]"
-                           ".some(th => th.textContent.startsWith('MMLU '))")
+                           ".some(th => (th.dataset.col || '').startsWith('cat:'))")
     assert page.errors == []
 
 

@@ -149,7 +149,7 @@ def test_the_board_checks_are_one_line_on_every_tab(live):
     prelim = pg.locator("li[data-check='preliminary'] [data-show-me]")
     if prelim.count():
         prelim.click()
-        pg.wait_for_selector("input[data-filter='preliminary']:checked")
+        pg.wait_for_selector("#pill-mshow[data-show-filters~='preliminary']")
         assert pg.evaluate("location.hash") == "#tab=models"
     # and exactly once per page: the Provenance tab used to print the same
     # findings again under its own "Warnings" heading

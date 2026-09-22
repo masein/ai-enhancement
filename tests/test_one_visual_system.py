@@ -157,7 +157,9 @@ def test_the_text_reads_in_every_theme(live, browser, theme):
             pg.wait_for_selector("#view .card")
             pg.wait_for_timeout(800)
             worst = pg.evaluate("""() => {
-              const rgb = c => (c.match(/[\\d.]+/g) || []).slice(0, 3).map(Number);
+              // color-mix() computes to color(srgb r g b) with 0–1 channels (11c's tint)
+              const rgb = c => { const n = (c.match(/[\\d.]+/g) || []).slice(0, 3).map(Number);
+                return /^color\\(/.test(c) ? n.map(v => v * 255) : n; };
               const lum = ([r, g, b]) => { const f = v => (v /= 255) <= 0.03928 ? v / 12.92
                 : Math.pow((v + 0.055) / 1.055, 2.4); return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
               // the background a reader sees: translucent layers composited over
@@ -166,7 +168,8 @@ def test_the_text_reads_in_every_theme(live, browser, theme):
                 for (; e; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor;
                   const v = (c.match(/[\\d.]+/g) || []).map(Number);
                   const al = v.length > 3 ? v[3] : 1;
-                  if (al > 0) { layers.push([v.slice(0, 3), al]); if (al >= 1) break; } }
+                  const ch = /^color\\(/.test(c) ? v.slice(0, 3).map(x => x * 255) : v.slice(0, 3);
+                  if (al > 0) { layers.push([ch, al]); if (al >= 1) break; } }
                 let out = [255, 255, 255];
                 for (const [c, al] of layers.reverse())
                   out = out.map((x, i) => c[i] * al + x * (1 - al));

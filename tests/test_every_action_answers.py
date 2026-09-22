@@ -287,23 +287,26 @@ def test_the_leaderboard_shows_six_task_columns_and_says_how_many_are_hidden(bro
         pg = s.open()
         go_tab(pg, "Leaderboard")
         pg.wait_for_selector("table[data-lb-table]")
-        heads = pg.locator("table[data-lb-table] thead tr").first.locator("th")
-        task_cols = [h for h in heads.all_text_contents()
-                     if h.split(" ")[0] in (p["accTasks"] + p["pplTasks"])]
-        assert len(task_cols) <= 6
+        # 11c: two header rows — the group over its columns, then the names
+        heads = pg.locator("table[data-lb-table] thead tr:not(.grp) th")
+        task_cols = pg.locator("table[data-lb-table] thead th[data-task]").count()
+        assert task_cols <= 6
         # every task-like column (benchmarks, perplexity, judged topics) is in
-        # the Columns menu; what is not shown is counted out loud
-        pg.locator("[data-columns-menu] summary").click()
-        n_cols = pg.locator("[data-columns-menu] input[data-column]").count()
-        n_shown = pg.locator("[data-columns-menu] input[data-column]:checked").count()
+        # the Columns popover; what is not shown is counted out loud on the pill
+        pg.locator("[data-columns-menu]").click()
+        pg.wait_for_selector("#pop-columns")
+        n_cols = pg.locator("#pop-columns input[data-column]").count()
+        n_shown = pg.locator("#pop-columns input[data-column]:checked").count()
         assert n_shown <= 6 and n_cols > n_shown
         hidden = pg.locator("[data-hidden-tasks]")
         assert hidden.get_attribute("data-hidden-tasks") == str(n_cols - n_shown)
         assert "hidden" in hidden.text_content()
-        pg.locator("[data-columns-menu] summary").click()
-        # the model column is first and stays put; the compare column is named
-        assert heads.first.get_attribute("class").split()[-1] == "model"
-        assert pg.locator("table[data-lb-table] thead th.cmp").text_content() == "compare"
+        pg.keyboard.press("Escape")
+        # the rank comes first, then the model, which stays put; there is no
+        # compare column any more — the radar's model chips are the comparison
+        assert heads.nth(0).get_attribute("data-col") == "rank"
+        assert heads.nth(1).get_attribute("data-col") == "name"
+        assert pg.locator("table[data-lb-table] thead th.cmp").count() == 0
         assert pg.locator("table[data-lb-table] td.model").first.evaluate(
             "e => getComputedStyle(e).position") == "sticky"
         # the duplicate folds under its twin
@@ -313,10 +316,11 @@ def test_the_leaderboard_shows_six_task_columns_and_says_how_many_are_hidden(bro
         # 11b removed the comfortable/compact switch: the one-line row IS the
         # compact one, so there is nothing left to choose between
         assert pg.get_by_role("button", name="compact").count() == 0
-        # the Columns menu brings a column back
-        pg.locator("[data-columns-menu] summary").click()
-        pg.get_by_role("button", name="show all").click()
+        # the Columns popover brings a column back, and stays open to say so
+        pg.locator("[data-columns-menu]").click()
+        pg.locator("#pop-columns [data-show-all]").click()
         pg.wait_for_function("!document.querySelector('[data-hidden-tasks]')")
+        assert pg.locator("#pop-columns input[data-column]:not(:checked)").count() == 0
         assert s.errors == []
     finally:
         ctx.close()

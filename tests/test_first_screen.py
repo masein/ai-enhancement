@@ -136,7 +136,7 @@ def test_the_overview_skips_the_duplicate_and_links_the_preliminary(browser, pay
         link = pg.locator("[data-show-prelim]")
         if link.count():
             link.click()
-            pg.wait_for_selector("input[data-filter='preliminary']:checked")
+            pg.wait_for_selector("#pill-mshow[data-show-filters~='preliminary']")
             shown = pg.locator("table[data-models-table] tbody tr").count()
             assert shown == sum(1 for m in p["models"]
                                 if m.get("avg") is None) or shown <= 25
