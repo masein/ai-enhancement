@@ -271,9 +271,11 @@ def test_the_model_page_leads_with_the_exam(surface):
     """The exam is the instrument, so it comes first; the multiple-choice
     results and the per-item diagnosis follow as the second opinion."""
     pg = surface.open(model_link("fx/good-750m"))
+    # 11d: the name is the hero's h1; the first section under it is the exam
+    assert pg.locator("[data-model-hero] h1").text_content() == "good-750m"
     heads = [h.strip() for h in pg.locator("#view .card h2").all_text_contents()]
-    assert heads[0].startswith("good-750m") or heads[0] == ""      # the head card has no h2 title
     order = [h for h in heads if h]
+    assert order[0] == "Judged free response — the exam"
     assert order.index("Judged free response — the exam") < order.index("Results")
     assert order.index("Results") < order.index("Diagnose")
     assert order[-1] == "Provenance"
@@ -294,7 +296,7 @@ def test_judged_section_and_the_control_sentence(surface, tree):
     assert "Knew it, couldn't pick it" in text
     m = re.search(r"of the (\d+) control items this model got wrong as multiple choice, it answered (\d+)", text)
     assert m and int(m.group(2)) / int(m.group(1)) >= 0.5
-    assert "By topic (0–4), weakest first — report half" in text
+    assert "By topic (0–4), weakest first within each area — report half" in text
     assert "Score against answer length" in text and "Economics" in text
     # topics, score-vs-length, the control — plus one per-criterion table for
     # every topic graded criterion by criterion, and one breakdown table per
@@ -447,7 +449,8 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
             "signed off" in draft.text_content()
         assert "changes its sha" in draft.text_content()
         # greyed: every topic row, in the muted colour rather than the text colour
-        rows = card.locator("table.jd").first.locator("tbody tr")
+        # the topic rows, not the area headers between them (11d)
+        rows = card.locator("table.jd").first.locator("tbody tr[data-topic]")
         assert rows.count() > 0
         assert all("dim" in (rows.nth(i).get_attribute("class") or "") for i in range(rows.count()))
         style = "e => getComputedStyle(e).color"

@@ -99,14 +99,16 @@ def routed(browser, payload, width=1512, height=900):
 
 @pytest.mark.dashboard
 def test_the_first_screen_is_the_board_not_banners(browser, payload):
-    """1,512 × 900: the hero and Top models, fully on screen."""
+    """1,512 × 900: the highlight cards fully on screen, and Top models begun.
+    11d: the best average is the first highlight card, not a hero of its own."""
     ctx, s = routed(browser, payload)
     try:
         pg = s.open()
-        pg.wait_for_selector(".hero-row .card")
-        boxes = pg.evaluate("""() => [...document.querySelectorAll('.hero-row .card')]
-          .map(c => c.getBoundingClientRect().bottom)""")
-        assert len(boxes) == 2 and max(boxes) <= 900, boxes
+        pg.wait_for_selector("[data-highlights]")
+        hl = pg.locator("[data-highlights]").bounding_box()
+        top = pg.locator("[data-top-models]").bounding_box()
+        assert hl["y"] + hl["height"] <= 900, hl
+        assert top["y"] < 900, top
         assert pg.locator("#warnings li[data-check]").first.is_hidden()   # the checks: one line
         assert pg.locator("details[data-how-to-read]").get_attribute("open") is None
         assert s.errors == []
@@ -127,11 +129,12 @@ def test_the_overview_skips_the_duplicate_and_links_the_preliminary(browser, pay
     ctx, s = routed(browser, p)
     try:
         pg = s.open()
-        pg.wait_for_selector(".hero-row .card")
-        hero = pg.locator(".hero-row .card").first.text_content()
-        assert top["id"] not in hero and twin["id"] in hero
-        top_models = pg.locator(".hero-row .card").nth(1).text_content()
-        assert top["name"] not in top_models.replace(twin["name"], "")
+        pg.wait_for_selector("[data-hl='best']")
+        # the best-model card names the twin, never the duplicate
+        best = pg.locator("[data-hl-value='best']").text_content()
+        assert best.startswith(twin["name"] + " ·") and not best.startswith(top["name"] + " ·")
+        names = [a.text_content() for a in pg.locator("[data-top-models] td.model a").all()]
+        assert twin["name"] in names and top["name"] not in names
         assert "preliminary and carries no overall rank" not in pg.locator("#view").text_content()
         link = pg.locator("[data-show-prelim]")
         if link.count():

@@ -151,7 +151,9 @@ def test_the_sections_are_numbered_in_order(live, page, label):
     page.wait_for_selector("#view .card")
     go_tab(page, label)
     page.wait_for_selector("#view .card h2")
-    ix = page.evaluate("""() => [...document.querySelectorAll('#view > .card > h2[data-ix]')]
+    # a card's heading may sit in its .sechead, beside the card's actions
+    ix = page.evaluate("""() => [...document.querySelectorAll(
+        '#view > .card > h2[data-ix], #view > .card > .sechead > h2[data-ix]')]
       .map(e => e.dataset.ix)""")
     assert ix == [f"{i:02d}" for i in range(1, len(ix) + 1)], (label, ix)
     assert len(ix) >= 1

@@ -1736,6 +1736,44 @@ tbody tr:hover { background:var(--accent-soft); }
 tbody tr.open > td:first-child, tbody tr[aria-selected="true"] > td:first-child {
   box-shadow:inset 3px 0 0 var(--accent); }
 tbody tr.open { background:var(--accent-soft); }
+/* ---- 11d: Overview ------------------------------------------------------- */
+.statline { font-size:var(--fs-1); color:var(--muted); margin:6px 0 2px; }
+#view > .statline:first-child { margin-top:-2px; }
+.hlgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:14px;
+  margin-top:10px; }
+.hcard { border:1px solid var(--border); border-radius:var(--r-2); padding:14px 16px;
+  display:flex; flex-direction:column; gap:6px; background:var(--surface-1); }
+.hcard-v { font-family:var(--font-mono); font-size:var(--fs-5); font-weight:700;
+  letter-spacing:-0.02em; line-height:1.15;
+  color:var(--text-primary); overflow-wrap:anywhere; }
+.hcard-verdict { margin:0; font-size:var(--fs-2); color:var(--text-secondary); }
+.hcard-link { margin-top:auto; font-size:var(--fs-1); font-family:var(--font-mono); }
+table.mini-lb td.model { position:static; box-shadow:inset 3px 0 0 var(--fam, var(--axis));
+  padding-left:12px; }
+/* ---- 11d: the model page -------------------------------------------------- */
+.mhero .mhead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-top:4px; }
+.mhero h1.mtitle { font-size:var(--fs-5); font-weight:800; letter-spacing:-0.025em; margin:0; }
+.mhero .eyebrow { margin:0; }
+.mprose { color:var(--muted); font-size:var(--fs-2); max-width:72ch; margin:14px 0 0; }
+nav.modelnav { position:sticky; top:var(--bar-h); z-index:6; display:flex; gap:6px; flex-wrap:wrap;
+  padding:8px 0; margin:var(--sp-4) 0 0; background:var(--plane); }
+.navchip { font-family:var(--font-mono); font-size:var(--fs-1); text-decoration:none;
+  border:1px solid var(--border); border-radius:999px; padding:3px 11px; color:var(--text-secondary);
+  background:var(--surface-1); }
+.navchip::before { content:attr(data-ix); color:var(--accent); margin-right:6px; font-weight:600; }
+.navchip[aria-current="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
+.navchip[aria-current="true"]::before { color:#fff; }
+[id^="sec-"] { scroll-margin-top:calc(var(--bar-h) + 52px); }
+tr.arearow td { background:var(--plane); height:auto; padding-top:8px; padding-bottom:6px; }
+table[data-judged-topics] td.num { white-space:nowrap; }
+/* the row's action is a small text button: it goes to the topic page */
+table[data-judged-topics] a.propose { border:0; background:none; padding:0; min-height:0;
+  font-family:var(--font-mono); font-size:var(--fs-1); font-weight:600; color:var(--accent);
+  text-decoration:none; }
+table[data-judged-topics] a.propose:hover { text-decoration:underline; }
+td.lencell { font-family:var(--font-mono); color:var(--text-primary); }
+td.lencell.few { color:var(--muted); }
+details.lenfold > summary { cursor:pointer; font-size:var(--fs-1); color:var(--accent); margin:4px 0; }
 /* ---- 11c: the Leaderboard ------------------------------------------------ */
 .lbbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; margin:10px 0 2px; }
 .lbbar .chips, .lbbar .pills { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
@@ -1905,12 +1943,7 @@ h2[data-ix]::before { content:attr(data-ix); font-family:var(--font-mono);
 /* chip row under a task heading: what it measures, how many options, coverage,
    whether it separates anything, where the ceiling is. Every chip carries the
    long version in its title, so the row stays short. */
-/* heat legend + "about these benchmarks" */
-.hl { display:inline-flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:var(--fs-1);
-  color:var(--text-secondary); }
-.hl-item { display:inline-flex; align-items:center; gap:4px; }
-.hl-sw { width:16px; height:11px; border-radius:3px; border:1px solid var(--border);
-  display:inline-block; }
+/* "about these benchmarks" */
 .lb th.hasinfo { cursor:help; }
 .lb th.hasinfo::after { content:"\2009\24D8"; font-size:9px; color:var(--muted);
   vertical-align:1px; }
@@ -3200,7 +3233,7 @@ function proposeBtn(mid, topic, gate) {
   // are and where the one copy of the gate is; this row says where to go
   const slug = slugOfTopic(topic);
   return el('a', { class: 'propose', href: '#topic=' + slug, 'data-propose-link': topic,
-    text: 'Propose on the topic page →',
+    text: 'Propose →', title: 'proposing happens on the topic page, where the answers are',
     onclick: e => { e.preventDefault(); state.ans.model = mid; state.ans.rows = null;
       navigate({ topic: slug, model: null }); } });
 }
@@ -3590,31 +3623,57 @@ function vJudged(m) {
   const cats = J.exam.filter(t => j.tasks[t] && pubScore(j.tasks[t]) != null)
     .sort((a, b) => pubScore(j.tasks[a]) - pubScore(j.tasks[b]));
   if (cats.length) {
-    card.append(el('div', { class: 'dxh', text: 'By topic (0–4), weakest first — report half'
-      + (prov ? ' · provisional, not ranked' : '') }));
-    card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+    card.append(el('div', { class: 'dxh', text: 'By topic (0–4), weakest first within each area — '
+      + 'report half' + (prov ? ' · provisional, not ranked' : '') }));
+    // what is true of every row is said once, above the table: a soft gate
+    // (the judged suite is preliminary) used to repeat on each one
+    const soft = cats.some(t => { const g = j.tasks[t].propose;
+      return g && !(g.hard || []).length && (g.soft || []).length; });
+    if (LIVE && soft) card.append(el('p', { class: 'propwhy', 'data-prelim-note': '1',
+      text: 'The judged suite is preliminary — the topic page says what proposing would mean.' }));
+    const areaOf = t => (Object.entries(DATA.meta.areas || {})
+      .find(([, ts]) => ts.includes(frName(t))) || ['Other'])[0];
+    const areas = [...Object.keys(DATA.meta.areas || {}), 'Other'];
+    const row = t => { const v = j.tasks[t];
+      const k = cal && cal.per_category && cal.per_category[frName(t)];
+      const nr = v.n_report != null ? v.n_report : v.n;
+      const g = v.propose;
+      const tainted = (m.tainted || []).includes(t);
+      return el('tr', { class: prov || nr < CAT_MIN_N ? 'dim' : null, 'data-topic': frName(t) },
+        el('td', {}, frName(t), tainted ? el('span', { class: 'badge taint',
+          title: 'this model trained on data derived from this topic\'s diagnosis half — the '
+            + 'score is shown and is not a ranking claim',
+          text: 'trained on it' }) : ''),
+        el('td', { class: 'num', text: `${num(pubScore(v), 2)} / 4` }),
+        el('td', { class: 'num se', text: k ? String(k.kappa) : '—',
+          title: k ? `${k.n} human-graded answers in this topic` : 'not calibrated per topic' }),
+        el('td', { class: 'num se', text: String(nr) + (nr < CAT_MIN_N ? ' · under ' + CAT_MIN_N : '') }),
+        el('td', {}, jBar(v.dist, v.n)),
+        LIVE ? el('td', {}, g ? proposeBtn(m.id, frName(t), g) : '',
+          g && (g.hard || []).length ? proposeWhy(g) : '',
+          g && g.caution ? el('div', { class: 'propwhy', text: 'caution — MMLU for this '
+            + 'category: ' + g.caution }) : '') : ''); };
+    const body = [];
+    for (const area of areas) {
+      const ts = cats.filter(t => areaOf(t) === area);    // already weakest first
+      if (!ts.length) continue;
+      const of = ((DATA.meta.areas || {})[area] || []).length;
+      // an area mean only for a judge whose scores count — never while provisional
+      const mean = !prov && ok && ts.length * 2 >= of
+        ? ts.filter(t => !(m.tainted || []).includes(t)).map(t => pubScore(j.tasks[t])) : null;
+      body.push(el('tr', { class: 'arearow', 'data-area-row': area },
+        el('td', { colspan: LIVE ? 6 : 5 }, el('span', { class: 'eyebrow', text: area }),
+          el('span', { class: 'se', text: ` · ${ts.length} of ${of || ts.length} topics judged` }),
+          mean && mean.length ? el('span', { class: 'se', 'data-area-mean': area,
+            text: ` · mean ${num(mean.reduce((x, y) => x + y, 0) / mean.length, 2)} / 4` }) : '')),
+        ...ts.map(row));
+    }
+    card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-judged-topics': '1' },
       el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { class: 'num', text: 'score' }),
         el('th', { class: 'num', text: 'κ' }), el('th', { class: 'num', text: 'items (report half)' }),
         el('th', { text: 'score distribution 0 → 4 (all items)' }),
         LIVE ? el('th', { text: 'what to do' }) : '')),
-      el('tbody', {}, cats.map(t => { const v = j.tasks[t];
-        const k = cal && cal.per_category && cal.per_category[frName(t)];
-        const nr = v.n_report != null ? v.n_report : v.n;
-        const g = v.propose;
-        const tainted = (m.tainted || []).includes(t);
-        return el('tr', { class: prov || nr < CAT_MIN_N ? 'dim' : null, 'data-topic': frName(t) },
-          el('td', {}, frName(t), tainted ? el('span', { class: 'badge taint',
-            title: 'this model trained on data derived from this topic\'s diagnosis half — the '
-              + 'score is shown and is not a ranking claim',
-            text: 'trained on it' }) : ''),
-          el('td', { class: 'num', text: `${num(pubScore(v), 2)} / 4` }),
-          el('td', { class: 'num se', text: k ? String(k.kappa) : '—',
-            title: k ? `${k.n} human-graded answers in this topic` : 'not calibrated per topic' }),
-          el('td', { class: 'num se', text: String(nr) + (nr < CAT_MIN_N ? ' · under ' + CAT_MIN_N : '') }),
-          el('td', {}, jBar(v.dist, v.n)),
-          LIVE ? el('td', {}, g ? proposeBtn(m.id, frName(t), g) : '', proposeWhy(g),
-            g && g.caution ? el('div', { class: 'propwhy', text: 'caution — MMLU for this '
-              + 'category: ' + g.caution }) : '') : ''); })))));
+      el('tbody', {}, body))));
     if (m.judgedAvg != null)
       card.append(el('p', { class: 'small', text: `Judged average ${num(m.judgedAvg, 2)} / 4 over `
         + `${cats.filter(t => !(m.tainted || []).includes(t)).length} topics, report half`
@@ -3625,12 +3684,12 @@ function vJudged(m) {
     card.append(el('p', { class: 'small', text: `Topics under ${CAT_MIN_N} report-half questions `
       + 'are greyed: the exam bank is still being written (Exam tab). The diagnose half of each '
       + 'topic is what a proposal may read; it is never the score.' }));
-    // score vs length
-    const rows = [];
-    for (const t of cats) for (const b of j.tasks[t].score_vs_length || [])
-      rows.push([frName(t), b.bucket, b.n, b.mean]);
-    if (rows.length) {
-      const drift = cats.map(t => { const b = j.tasks[t].score_vs_length || [];
+    // score vs length: one row per topic, a column per length (11d) — the
+    // row-per-bucket table was 148 rows for 37 topics
+    const LEN = [['≤20 words', '≤ 20'], ['21–50', '21–50'], ['51–120', '51–120'], ['>120', '> 120']];
+    const withLen = cats.filter(t => (j.tasks[t].score_vs_length || []).length);
+    if (withLen.length) {
+      const drift = withLen.map(t => { const b = j.tasks[t].score_vs_length || [];
         return b.length > 1 ? b[b.length - 1].mean - b[0].mean : 0; });
       const worst = Math.max(...drift);
       card.append(el('div', { class: 'dxh', text: 'Score against answer length' }));
@@ -3639,12 +3698,29 @@ function vJudged(m) {
           + 'length may be driving the judge. Check the rubric\'s length clause before believing '
           + 'the category scores.'
         : 'No category rewards length by a point or more; the length clause is holding.' }));
-      card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
-        el('thead', {}, el('tr', {}, el('th', { text: 'category' }), el('th', { text: 'answer length' }),
-          el('th', { class: 'num', text: 'items' }), el('th', { class: 'num', text: 'mean score' }))),
-        el('tbody', {}, rows.map(([c, b, n, s]) => el('tr', {}, el('td', { text: c }),
-          el('td', { text: b }), el('td', { class: 'num se', text: String(n) }),
-          el('td', { class: 'num', text: num(s, 2) })))))));
+      // a neutral grey by the mean on the absolute 0–4 scale: these are
+      // provisional scores, so nothing here is a rank tint
+      const cellOf = b => {
+        if (!b) return el('td', { class: 'num se', text: '—' });
+        const few = b.n < 5;
+        return el('td', { class: 'num lencell' + (few ? ' few' : ''),
+          style: few ? null : `background:color-mix(in srgb, var(--text-primary) `
+            + `${(3 + 11 * Math.max(0, Math.min(4, b.mean)) / 4).toFixed(1)}%, var(--surface-1))`,
+          title: few ? `${b.n} answers — too few to read` : `${b.n} answers` },
+          el('b', { text: num(b.mean, 2) }), el('span', { class: 'se', text: ` · ${b.n}` }),
+          few ? el('span', { class: 'se', text: ' few' }) : '');
+      };
+      const table = el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-length-table': '1' },
+        el('thead', {}, el('tr', {}, el('th', { text: 'topic' }),
+          LEN.map(([, h]) => el('th', { class: 'num' }, h, el('span', { class: 'unit',
+            text: 'words · mean · items' }))))),
+        el('tbody', {}, withLen.map(t => { const bs = j.tasks[t].score_vs_length || [];
+          return el('tr', { 'data-length-row': frName(t) }, el('td', { text: frName(t) }),
+            LEN.map(([k]) => cellOf(bs.find(b => b.bucket === k)))); }))));
+      card.append(withLen.length > 10
+        ? el('details', { class: 'lenfold', 'data-length-fold': '1' },
+            el('summary', { text: `Show the table (${withLen.length} topics)` }), table)
+        : table);
     }
     // a topic graded criterion by criterion: what it was weak AT, the
     // critical failures in words, and the acuity the failures fell on — one
@@ -3899,33 +3975,48 @@ function vModel() {
   const back = el('a', { class: 'backlink', href: '#tab=' + state.tab,
     text: '← Back to ' + (TABS.find(([id]) => id === state.tab) || [, 'the board'])[1] });
 
-  const head = el('div', { class: 'card' },
-    el('div', { class: 'mhead' },
-      el('h2', { class: 'mtitle', text: m.name }),
-      ckBadge(m) || el('span', { class: 'badge' + (m.kind === 'instruct' ? ' instruct' : ''),
-        text: m.kind }),
-      warnBadge(m) || '',
-      // the badge carries its date too: #7 from August is not #7 today
-      r ? el('span', { class: 'rankbadge', 'data-rank': String(r.n),
-        title: `${r.n} of ${r.of} ranked models`
-          + (m.date ? `, from the evaluation of ${String(m.date).slice(0, 10)}` : ''),
-        text: `#${r.n}` + (m.date ? ` · evaluated ${String(m.date).slice(0, 10)}` : '') }) : ''),
+  // 11d: the hero — an eyebrow, the name, the id, three highlight cards, and
+  // the prose underneath for anyone who wants it in words
+  const ranked = DATA.models.filter(x => officialAvg(x) != null && !x.duplicateOf)
+    .sort((x, y) => officialAvg(y) - officialAvg(x));
+  let avgVerdict;
+  if (avg == null) avgVerdict = `Preliminary — ${m.nhave} of ${m.nreq} required tasks, so no `
+    + 'average and no rank.';
+  else {
+    const i = ranked.findIndex(x => x.id === m.id);
+    const other = i > 0 ? ranked[i - 1] : ranked[1];
+    if (!other) avgVerdict = 'The only ranked model on the board.';
+    else {
+      const d = avg - officialAvg(other), sa = officialSe(m), sb = officialSe(other);
+      const words = i > 0 ? `${(100 * -d).toFixed(1)} points behind ${other.name}`
+                          : `Leads ${other.name} by ${(100 * d).toFixed(1)} points`;
+      avgVerdict = `${words[0].toUpperCase()}${words.slice(1)} — ` + (sa == null || sb == null
+        ? 'no standard error to test it.'
+        : Math.abs(d) / Math.sqrt(sa * sa + sb * sb || 1e-12) > 1.96 ? 'a real gap.' : 'within noise.');
+    }
+  }
+  const eyebrow = ['model', m.source === 'artifact' ? 'checkpoint' : m.kind,
+    r ? `#${r.n} of ${r.of}` : 'preliminary'].join(' · ');
+  const head = el('div', { class: 'card mhero', 'data-model-hero': '1' },
+    el('p', { class: 'eyebrow', 'data-model-eyebrow': '1', text: eyebrow }),
+    el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
+      warnBadge(m) || '', dupBadge(m) || ''),
     el('p', { class: 'sub mono', text: m.id }),
-    el('p', { class: 'small', style: 'margin-top:8px', text: modelSentence(m) }),
-    el('div', { class: 'tiles', style: 'margin-top:14px' },
-      tile('Parameters', m.params ? P(m.params) : 'Unknown',
-        a.active_params ? `${P(a.active_params)} active · ${a.experts} experts, `
-                        + `${a.experts_per_tok}/token (${a.active_src})`
-                        : (m.paramsSrc ? 'from ' + m.paramsSrc : null)),
-      // unknown is the usual answer for a Hub model; a tile saying so is noise
-      comp ? tile('Training compute', flop(comp.c) + ' FLOP',
-        `6ND · N ${P(comp.N)} ${comp.nsrc} · D ${fmtCount(comp.D)} tokens (run ${comp.run.name})`)
-        : '',
-      tile(state.avgMode === 'raw' ? 'Average (raw)' : 'Average (above chance)',
-        avg != null ? pct(avg) : '—',
-        r ? `${ord(r.n)} of ${r.of} ranked` : `preliminary · ${m.nhave}/${m.nreq} required`),
-      tile('Tasks', `${m.nhave}/${m.nreq}`,
-        (m.missing || []).length ? 'missing ' + m.missing.join(', ') : 'all required tasks')));
+    el('div', { class: 'hlgrid' },
+      hlCard('params', 'Parameters', m.params ? P(m.params) : 'Unknown',
+        (a.active_params ? `${P(a.active_params)} active · ${a.experts} experts, `
+          + `${a.experts_per_tok} per token (${a.active_src}).`
+          : m.paramsSrc ? `From the ${m.paramsSrc === 'config' ? 'harness config' : 'model name'}.`
+          : 'Not in the config or the name.')
+        // the compute estimate, when it is known — not a card of its own
+        + (comp ? ` Training compute ${flop(comp.c)} FLOP (6ND, run ${comp.run.name}).` : '')),
+      hlCard('avg', state.avgMode === 'raw' ? 'Average · raw' : 'Average above chance',
+        avg != null ? `${(100 * avg).toFixed(1)}` + (officialSe(m) != null
+          ? ` ±${(100 * officialSe(m)).toFixed(1)}` : '') : '—', avgVerdict),
+      hlCard('tasks', 'Tasks', `${m.nhave}/${m.nreq}`,
+        (m.missing || []).length ? `Missing ${m.missing.join(', ')}.`
+          : 'All required tasks' + (m.date ? `, evaluated ${String(m.date).slice(0, 10)}.` : '.'))),
+    el('p', { class: 'mprose', text: modelSentence(m) }));
 
   // results, grouped by domain the way the task panels are
   const rows = [];
@@ -4001,14 +4092,37 @@ function vModel() {
 // interesting part is halfway down it. A sub-nav that sticks is the cheapest
 // fix: anchors, not routes, so Back still leaves the page the way it came.
 function modelNav(sections) {
-  return el('div', { class: 'card modelnav', 'data-model-nav': '1',
-    style: 'position:sticky;top:0;z-index:5;padding:8px 14px' },
-    el('div', { class: 'frm', style: 'gap:14px' },
-      sections.filter(([, , node]) => node).map(([id, label]) =>
-        el('a', { href: '#sec-' + id, class: 'small', 'data-nav': id, text: label,
-          onclick: e => { e.preventDefault();
-            const t = document.getElementById('sec-' + id);
-            if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }))));
+  const have = sections.filter(([, , node]) => node);
+  return el('nav', { class: 'modelnav', 'data-model-nav': '1', 'aria-label': 'sections' },
+    have.map(([id, label], i) =>
+      el('a', { href: '#sec-' + id, class: 'navchip', 'data-nav': id,
+        'data-ix': String(i + 1).padStart(2, '0'), text: label,
+        onclick: e => { e.preventDefault();
+          const t = document.getElementById('sec-' + id);
+          if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } })));
+}
+
+// The chip of the section in view is lit as you scroll. One observer for the
+// page; a render re-points it at the new section nodes.
+let _secObs = null;
+function watchSections() {
+  if (_secObs) { _secObs.disconnect(); _secObs = null; }
+  const nav = document.querySelector('[data-model-nav]');
+  if (!nav || !('IntersectionObserver' in window)) return;
+  const secs = [...document.querySelectorAll('#view [id^="sec-"]')];
+  const seen = new Map();
+  const light = () => {
+    // the topmost section with any part inside the band under the bar
+    const vis = secs.filter(x => seen.get(x.id));
+    const cur = vis.length ? vis[0].id.slice(4) : null;
+    for (const a of nav.querySelectorAll('a[data-nav]'))
+      a.setAttribute('aria-current', a.dataset.nav === cur ? 'true' : 'false');
+  };
+  _secObs = new IntersectionObserver(es => {
+    for (const e of es) seen.set(e.target.id, e.isIntersecting);
+    light();
+  }, { rootMargin: '-110px 0px -55% 0px' });
+  secs.forEach(x => _secObs.observe(x));
 }
 
 // Every submission of this model, newest first: which suite, what came of it,
@@ -4059,22 +4173,36 @@ function vOverview(ms) {
     pairs++; if (ok) real++;
     if (ok && (!big || Math.abs(diff) > Math.abs(big.diff))) big = { t, a, b, diff, z };
   }
+  // 11d: the four stat tiles are one mono line under the hero
+  const hours = DATA.meta.hours >= 1 ? `${DATA.meta.hours} h` : `${Math.round(DATA.meta.hours * 60)} min`;
+  const dates = DATA.meta.dates[0]
+    ? `${String(DATA.meta.dates[0]).slice(0, 10)} → ${String(DATA.meta.dates[1]).slice(0, 10)}` : null;
+  frag.push(el('p', { class: 'statline mono', 'data-statline': '1' }, [
+    `${ms.length} model${ms.length === 1 ? '' : 's'}`
+      + (ms.length !== DATA.models.length ? ` of ${DATA.models.length}` : ''),
+    `${DATA.accTasks.length + DATA.pplTasks.length} tasks`,
+    pairs ? `${real.toLocaleString()} of ${pairs.toLocaleString()} gaps are real` : null,
+    `${hours} of evaluation`, dates].filter(Boolean).join(' · ')));
+  // 01 Highlights: a value and a sentence that says what it means, each
+  // derived from the data it sits on
+  frag.push(highlightsCard(ranked));
+  // 02 Top models, in the table component, with the biggest real gap under it
   if (ranked.length) {
-    const top = ranked[0];
-    frag.push(el('div', { class: 'hero-row' },
-      el('div', { class: 'card' },
-        el('p', { class: 'sub', text: `Best official average — all ${top.nreq} required `
-          + `tasks, ${state.avgMode === 'raw' ? 'raw accuracy' : 'scaled above chance'}` }),
-        el('div', { class: 'hero', text: pct(officialAvg(top)) }),
-        el('p', { class: 'sub', text: top.id
-          + (top.params ? ` · ${P(top.params)} params` : '') }),
-        // every clause derived from the payload, so it cannot drift from the
-        // table below it — including the one nobody writes down by choice
-        el('p', { class: 'small', style: 'margin-top:8px',
-                  text: modelSentence(top) })),
-      el('div', { class: 'card' },
-        el('h2', { text: 'Top models' }),
-        lbMini(ranked.slice(0, 5)))));
+    let gap = '';
+    if (big) {
+      const an = DATA.models.find(m => m.id === big.a), bn = DATA.models.find(m => m.id === big.b);
+      const [win, lose] = big.diff > 0 ? [an, bn] : [bn, an];
+      gap = el('p', { class: 'statline mono', 'data-biggest-gap': '1',
+        text: `Biggest real gap · ${big.t}: ${win.name} over ${lose.name} by `
+          + `${(100 * Math.abs(big.diff)).toFixed(1)} points (z = ${Math.abs(big.z).toFixed(1)}) · `
+          + `${pairs - real} of ${pairs} pairs are inside the noise` });
+    }
+    frag.push(el('div', { class: 'card', 'data-top-models': '1' },
+      el('div', { class: 'sechead' }, el('h2', { text: 'Top models' }),
+        el('span', { class: 'acts' }, el('a', { href: '#tab=leaderboard', 'data-see-leaderboard': '1',
+          text: 'See the leaderboard →', onclick: e => { e.preventDefault();
+            navigate({ tab: 'leaderboard', model: null, topic: null }); } }))),
+      el('div', { class: 'lb-wrap' }, lbMini(ranked.slice(0, 5))), gap));
   } else {
     frag.push(el('div', { class: 'card' },
       el('h2', { text: 'No official result yet' }),
@@ -4091,29 +4219,8 @@ function vOverview(ms) {
       + ' — per-task results only, not in the ranking above. ',
       el('a', { href: '#tab=models', 'data-show-prelim': '1', text: 'See them',
         onclick: e => { e.preventDefault(); showMe({ tab: 'models', prelim: true }); } })));
+  // 03 The loop
   if (LIVE) frag.push(overviewLoop());
-  frag.push(el('div', { class: 'tiles' },
-    tile('Models compared', String(ms.length),
-         ms.length !== DATA.models.length ? `of ${DATA.models.length} (filtered)` : null),
-    tile('Tasks', String(DATA.accTasks.length + DATA.pplTasks.length),
-         `${DATA.accTasks.length} accuracy · ${DATA.pplTasks.length} perplexity`),
-    tile('Real differences', pairs ? `${real} / ${pairs}` : '—',
-         'pairs of models whose gap is bigger than the noise',
-         'every pair of models on every task, z-tested: this many differ by more than their '
-         + 'combined standard error (|z| > 1.96); the rest are ties, whatever the order says'),
-    tile('Eval wall-clock', DATA.meta.hours >= 1 ? DATA.meta.hours + ' h'
-                            : Math.round(DATA.meta.hours * 60) + ' min',
-         DATA.meta.dates[0] ? (DATA.meta.dates[0] + ' → ' + DATA.meta.dates[1])
-           .replaceAll('T', ' ') : null)));
-  if (big) {
-    const an = DATA.models.find(m => m.id === big.a), bn = DATA.models.find(m => m.id === big.b);
-    const [win, lose] = big.diff > 0 ? [an, bn] : [bn, an];
-    frag.push(el('div', { class: 'card' },
-      el('h2', { text: 'Biggest statistically real gap' }),
-      el('p', { class: 'sub', text:
-        `${big.t}: ${win.name} beats ${lose.name} by ${(100 * Math.abs(big.diff)).toFixed(1)} points (z = ${Math.abs(big.z).toFixed(1)}). `
-        + `${pairs - real} of ${pairs} pairwise comparisons are inside the noise — treat overlapping whiskers as ties.` })));
-  }
   frag.push(el('details', { class: 'card', 'data-how-to-read': '1' },
     el('summary', { style: 'cursor:pointer' }, el('h2', { style: 'display:inline',
       text: 'How to read these numbers' })),
@@ -4123,6 +4230,105 @@ function vOverview(ms) {
     note('Whiskers are ±1 standard error. If two whiskers overlap, do not call a winner — every pairwise z-test verdict rides along in the JSON export (the "sig" field) when you need the arbiter.')));
   return frag;
 }
+// ---------------------------------------------------------------------------
+// 11d: the highlight cards. Each has a value and ONE sentence that says what
+// it means, derived from the numbers under it — the best model's lead is the
+// z-test's verdict, not an adjective. Cards 2–4 are the loop's, so only a
+// live page has them.
+// ---------------------------------------------------------------------------
+const hlCard = (key, eyebrow, value, verdict, link) => el('div', { class: 'hcard', 'data-hl': key },
+  el('div', { class: 'eyebrow', text: eyebrow }),
+  el('div', { class: 'hcard-v', 'data-hl-value': key, text: value }),
+  el('p', { class: 'hcard-verdict', 'data-verdict': key, text: verdict }),
+  link || '');
+const hlLink = (text, go) => el('a', { href: '#', class: 'hcard-link', text,
+  onclick: e => { e.preventDefault(); go(); } });
+
+// the model the loop is on: the one judged last
+function loopModel() {
+  const lastJ = m => Math.max(0, ...Object.entries((m.judge || {}).tasks || {})
+    .filter(([t]) => t.startsWith('exam_')).map(([, v]) => v.judged_at || 0));
+  const judged = DATA.models.filter(m => !m.duplicateOf && Object.keys((m.judge || {}).tasks || {})
+    .some(t => t.startsWith('exam_')));
+  return judged.length ? [...judged].sort((a, b) => lastJ(b) - lastJ(a))[0] : null;
+}
+const whyProvisional = m => {
+  const jj = ((m.judge || {}).judge) || {};
+  if (jj.provisional || jj.provider === 'local') return 'provisional, local judge';
+  if (!judgedOkM(m)) return 'provisional, the judge is not calibrated';
+  return 'calibrated judge';
+};
+
+function hlBest(ranked) {
+  const toLb = hlLink('See the leaderboard →', () => navigate({ tab: 'leaderboard', model: null, topic: null }));
+  const top = ranked[0], next = ranked[1];
+  if (!top) return hlCard('best', 'Best model', '—', `Nothing has completed all `
+    + `${DATA.required.length} required tasks yet, so nothing is ranked.`, toLb);
+  const av = officialAvg(top);
+  let verdict;
+  if (!next) verdict = 'The only ranked model on the board.';
+  else {
+    const d = av - officialAvg(next), sa = officialSe(top), sb = officialSe(next);
+    const lead = `Leads ${next.name} by ${(100 * d).toFixed(1)} points — `;
+    if (sa == null || sb == null) verdict = lead + 'no standard error to test it.';
+    else {
+      const z = d / Math.sqrt(sa * sa + sb * sb || 1e-12);
+      verdict = lead + (Math.abs(z) > 1.96 ? `a real gap (z = ${z.toFixed(1)}).` : 'within noise.');
+    }
+  }
+  return hlCard('best', 'Best model', `${top.name} · ${(100 * av).toFixed(1)}`, verdict, toLb);
+}
+
+function hlWeakest() {
+  const m = loopModel();
+  const toLoop = hlLink('Open the Loop →', () => navigate({ tab: 'loop', model: null, topic: null }));
+  if (!m) return hlCard('weakest', 'Weakest topic', '—',
+    'No model has been judged yet — Loop ▸ Sit the exam.', toLoop);
+  const exam = (DATA.judged || {}).exam || [];
+  const xs = Object.entries(m.judge.tasks).filter(([t]) => t.startsWith('exam_'))
+    .map(([t, v]) => ({ t, v: pubScore(v) })).filter(x => x.v != null).sort((a, b) => a.v - b.v);
+  if (!xs.length) return hlCard('weakest', 'Weakest topic', '—',
+    `${m.name} has no report-half score yet.`, toLoop);
+  const w = xs[0];
+  // one model's own topic, so it is not a ranking — and no area mean
+  return hlCard('weakest', 'Weakest topic', `${frName(w.t)} · ${num(w.v, 2)} / 4`,
+    `${m.name}, ${xs.length} of ${exam.length} topics judged — ${whyProvisional(m)}.`,
+    hlLink('Open the topic →', () => navigate({ topic: w.t.replace(/^exam_/, ''), model: null })));
+}
+
+function hlLoop() {
+  const exam = new Set((DATA.judged || {}).exam || []);
+  const done = new Set(DATA.models.flatMap(m => Object.entries((m.judge || {}).tasks || {})
+    .filter(([t, v]) => exam.has(t) && pubScore(v) != null).map(([t]) => t)));
+  const m = loopModel();
+  const at = m ? Math.max(0, ...Object.values(m.judge.tasks).map(v => v.judged_at || 0)) : 0;
+  return hlCard('loop', 'The loop', `${done.size} / ${exam.size} topics judged`,
+    m ? `Last judged ${m.name}` + (at ? ` ${rel(at)} ago.` : '.')
+      : 'Nothing judged yet — sit a model on a topic from the Loop.',
+    hlLink('Open the Loop →', () => navigate({ tab: 'loop', model: null, topic: null })));
+}
+
+function hlJudge() {
+  const m = loopModel();
+  const toProv = hlLink('Provenance →', () => navigate({ tab: 'provenance', model: null, topic: null }));
+  const cn = m && (m.judge || {}).canary;
+  const cal = (DATA.judged || {}).calibration;
+  const calWords = cal && cal.calibrated ? `Calibrated: κ ${cal.kappa}.` : 'Not calibrated yet.';
+  if (!cn) return hlCard('judge', 'Judge steadiness', '—',
+    (m ? 'No canary on file for this judge. ' : 'No judged run yet. ') + calWords, toProv);
+  return hlCard('judge', 'Judge steadiness',
+    `${cn.graded} / ${cn.n} ${cn.drifted ? 'moved' : 'steady'}`,
+    `${cn.n} fixed scripts re-graded: ${cn.mad_vs_human} from the human marks`
+      + (cn.mad_vs_previous != null ? `, ${cn.mad_vs_previous} from the last run `
+         + `(limit ${cn.threshold})` : ', the first run for this judge') + `. ${calWords}`, toProv);
+}
+
+function highlightsCard(ranked) {
+  return el('div', { class: 'card', 'data-highlights': '1' },
+    el('h2', { text: 'Highlights' }),
+    el('div', { class: 'hlgrid' }, hlBest(ranked), LIVE ? [hlWeakest(), hlLoop(), hlJudge()] : ''));
+}
+
 // The loop on the first tab: how many topics have been judged, each judged
 // model's weakest topic one click away, and the last judged run and when. The
 // newest work on the server had no presence on the page people open first.
@@ -4829,17 +5035,30 @@ function proposeDialog({ model, topic, gate, returnTo, onDone }) {
 }
 
 function lbMini(rows) {
-  const tb = el('tbody', {}, rows.map((m, i) => el('tr', {},
-    el('td', { text: String(i + 1) }),
-    el('td', { 'data-model': m.id }, m.name,
-      ckBadge(m) || (m.kind === 'instruct'
-        ? el('span', { class: 'badge instruct', text: 'instruct' }) : '')),
-    el('td', { class: 'num', text: P(m.params) }),
-    el('td', { class: 'num best', text: pct(officialAvg(m)) }))));
-  return el('table', {},
+  // the tint is the rank among every ranked model on the board, as on the
+  // Leaderboard, so the top five read the same in both places
+  const pool = DATA.models.filter(m => officialAvg(m) != null && !m.duplicateOf)
+    .sort((a, b) => officialAvg(b) - officialAvg(a));
+  const step = m => { const i = pool.findIndex(x => x.id === m.id);
+    return i < 0 ? null : 5 - Math.floor(i * 5 / pool.length); };
+  const tb = el('tbody', {}, rows.map(m => { const r = rankOf(m), se = officialSe(m);
+    return el('tr', { 'data-top-row': m.id },
+      el('td', { class: 'num mono se', text: r ? String(r.n) : '—' }),
+      el('td', { class: 'model', 'data-model': m.id, style: `--fam:${famColor(m)}` },
+        el('a', { href: '#model=' + encodeURIComponent(m.id), class: 'mlink', text: m.name }),
+        ckBadge(m) || (m.kind === 'instruct'
+          ? el('span', { class: 'badge instruct', text: 'instruct' }) : '')),
+      el('td', { class: 'num', text: P(m.params) }),
+      el('td', { class: 'num tcell' + (r && r.n === 1 ? ' best' : ''), 'data-step': String(step(m)),
+          style: `background:var(--heat-${step(m)})` },
+        el('b', { text: (100 * officialAvg(m)).toFixed(1) }),
+        se != null ? el('span', { class: 'se', text: ` ±${(100 * se).toFixed(1)}` }) : '')); }));
+  return el('table', { class: 'lb mini-lb tinted' },
     el('thead', {}, el('tr', {},
-      el('th', { text: '#' }), el('th', { text: 'model' }),
-      el('th', { class: 'num', text: 'params' }), el('th', { class: 'num', text: 'avg' }))), tb);
+      el('th', { class: 'num', text: '#' }), el('th', { text: 'model' }),
+      el('th', { class: 'num', text: 'params' }),
+      el('th', { class: 'num' }, 'avg', el('span', { class: 'unit',
+        text: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' })))), tb);
 }
 
 // ---------- capability profile: the radar ----------
@@ -9282,7 +9501,7 @@ function numberSections() {
   if (!view) return;
   let n = 0;
   for (const card of view.querySelectorAll(':scope > .card')) {
-    const h2 = card.querySelector(':scope > h2');
+    const h2 = card.querySelector(':scope > h2, :scope > .sechead > h2');
     if (!h2 || !h2.textContent.trim()) continue;
     // the index is drawn, not written into the heading: a section's name is
     // its own, and a screen reader reads "Top models", not "02 Top models"
@@ -9338,6 +9557,7 @@ function render() {
     requestAnimationFrame(settleAgain);
   }
   numberSections();
+  if (state.model) watchSections();
   // an open popover keeps its panel, its scroll and its focus across a render;
   // only its button is a new node
   popReanchor();

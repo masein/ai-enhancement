@@ -847,6 +847,34 @@ cards and the model page.
   - The Models tab's filters are the same pills: `Kind`, `Source`, `Family`,
     and `Show:` (judged / tainted / preliminary, which combine).
 
+- **11d — Overview and the model page.**
+  - **Overview**: the hero (11b), then the four stat tiles as one mono line
+    ("10 models · 8 tasks · 137 of 273 gaps are real · 4.62 h of evaluation ·
+    …"), then **01 Highlights** — four cards, each a value and one sentence
+    derived from the data: BEST MODEL (its lead over the next, in the z-test's
+    words — "within noise" or "a real gap (z = 3.8)"), and on a live page
+    WEAKEST TOPIC (the model judged last, its own weakest topic, "k of 37
+    topics judged — provisional, local judge"; not a ranking, no area mean),
+    THE LOOP ("7 / 37 topics judged", last judged when) and JUDGE STEADINESS
+    (the canary: "30 / 30 steady", its deviations and the calibration). "Best
+    official average" folded into BEST MODEL. **02 Top models** is the table
+    component with `#` and the tint, "See the leaderboard →", and the biggest
+    real gap as a mono line under it. **03 The loop** as before.
+  - **The model page**: a hero — an eyebrow `MODEL · BASE · #3 OF 9`, the name
+    as the h1, the id in mono, three cards (Parameters — with the compute
+    estimate when known —, the average with its verdict against the next
+    model, Tasks) and the sentence underneath. The section nav is sticky mono
+    chips under the bar, numbered 01–06, and the one in view is lit
+    (IntersectionObserver). The judged topics are grouped under the 8 areas —
+    "k of n topics judged", an area mean only for a judge whose scores count,
+    never while provisional — weakest first inside each; "the judged suite is
+    preliminary" is said **once** above the table instead of on every row; the
+    row's action is a small "Propose →". **Score against answer length** is one
+    row per topic with a column per length (`0.87 · 86`, mean · items, a
+    neutral grey by the mean — not a rank tint — and "few" under five items),
+    folded behind "Show the table" past ten topics. The topic page has no such
+    table.
+
 **Deploy steps**, after each phase-11 PR merges. This phase has no data
 migration: it changes code (11c also adds `scripts/areas.yaml`).
 
@@ -872,6 +900,12 @@ sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "
    its focus plan on the Review card before you press it, and the toast when
    the batch finishes says how many documents came back and why any are
    missing.
+5. After 11b: a 56px sticky bar with `● LIVE · <time>`, numbered sections,
+   one-line 44px table rows. After 11c: the Leaderboard's one toolbar strip,
+   tinted rows that open in place, Insights under the table, and Judged
+   topics disabled with its reason while the local judge is uncalibrated.
+   After 11d: the Overview's stat line and four highlight cards with their
+   verdicts, and the model page's hero and numbered section chips.
 
 ---
 

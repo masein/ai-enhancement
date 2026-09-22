@@ -359,8 +359,8 @@ def test_the_model_page_leads_with_numbers(live, page):
         page.wait_for_function("document.querySelectorAll('[data-criteria-table]').length === 1 "
                                "&& document.querySelector('select[data-topic-switch]').value === "
                                f"'{second}'")
-        # no "Training compute: Unknown" tile
-        assert "Training compute" not in page.locator(".tiles").first.text_content()
+        # no "Training compute: Unknown" — the hero's cards (11d) say it only when known
+        assert "Training compute" not in page.locator("[data-model-hero]").text_content()
         # last evaluated counts the judged run
         assert "Last evaluated 2026-09-21" in page.locator("#view").text_content()
         assert page.errors == []
