@@ -91,7 +91,9 @@ def test_the_data_and_the_labels_are_mono(live, page):
               footer: isMono(fam(document.querySelector('footer'))),
               live: one('#liveBadge'),
               prose: isMono(fam(document.querySelector('#view p.sub')))}; }""")
-    assert mono["th"] and mono["num"] and mono["status"] and mono["footer"] and mono["live"]
+    # 11h: the status line and the footer are words, so sans
+    assert mono["th"] and mono["num"] and mono["live"]
+    assert mono["status"] is False and mono["footer"] is False
     assert mono["badge"] in (True, None)
     assert mono["prose"] is False                 # prose stays in the sans face
     assert page.errors == []
@@ -121,8 +123,8 @@ def test_the_live_badge_says_the_state_and_only_a_live_page_has_one(live, page, 
     page.wait_for_selector("#liveBadge[data-fresh='ok'] .dot.ok")
     assert badge.text_content().startswith("LIVE · ")
     assert badge.is_visible()
-    # the refresh time in full is on the badge, for anyone who wants the date
-    assert "refreshed" in badge.get_attribute("title")
+    # when the data last changed is on the badge, for anyone who wants it (11h)
+    assert "data last changed" in badge.get_attribute("title")
     # a frozen report is not live, and says nothing about being live
     page.goto(tree["report"].as_uri())
     page.wait_for_selector("#view .card")

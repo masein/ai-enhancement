@@ -398,9 +398,9 @@ def topic_gate(task: str, t: dict, state: dict | None, caution: str | None,
     n = a.get("n") or 0
     blank = (a.get("empty", 0) + a.get("short", 0))
     if n_rep < PROPOSE_MIN_N:
-        hard.append({"why": f"{n_rep} report-half questions in this topic — under the "
-                            f"{PROPOSE_MIN_N} floor, so the score is noise. Write more questions "
-                            f"on the Exam tab",
+        hard.append({"why": f"{n_rep} hidden questions in this topic — under the "
+                            f"{PROPOSE_MIN_N} a topic needs, so its score is noise. Write more on "
+                            f"the Exam tab",
                      "short": f"under the {PROPOSE_MIN_N}-question floor — write more on the "
                               f"Exam tab"})
     if n and blank / n >= EMPTY_SHARE:
@@ -1856,7 +1856,7 @@ html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *
 /* the checks: the pill lives in the bar, its list opens just under the bar */
 .bar-checks details.checks { position:static; margin:0; }
 .bar-checks > details > summary { display:inline-flex; align-items:center; gap:6px;
-  white-space:nowrap; font-family:var(--font-mono); font-size:var(--fs-1); font-weight:600;
+  white-space:nowrap; font-family:var(--font-sans); font-size:var(--fs-1); font-weight:600;
   border:1px solid var(--border); border-radius:var(--r-1); padding:var(--sp-1) var(--sp-3);
   min-height:32px; box-sizing:border-box; background:var(--surface-1);
   color:var(--text-primary); cursor:pointer; list-style:none; }
@@ -1894,19 +1894,30 @@ html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *
   .tabs button { padding:8px 10px; }
 }
 /* the hero, on Overview only */
-.pagehero { margin:22px 0 4px; }
-.hero-acts { margin-top:14px; display:flex; gap:10px; flex-wrap:wrap; }
+.pagehero { margin:18px 0 0; display:grid; grid-template-columns:minmax(0, 1fr) auto;
+  grid-template-areas:"eb acts" "sub acts" "chips acts"; column-gap:24px; align-items:center; }
+.pagehero > #heroEyebrow { grid-area:eb; margin:0; }
+.pagehero > #pageSub { grid-area:sub; margin:4px 0 0; white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis; }
+.pagehero > h1 { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0);
+  white-space:nowrap; }
+.hero-acts { grid-area:acts; display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
 .hero-acts:empty { display:none; }
 .pagehero[hidden] { display:none; }
-.meta-chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.meta-chips { grid-area:chips; display:flex; gap:14px; flex-wrap:wrap; margin-top:6px; }
+.meta-chips a.chip { border:0; background:none; padding:0; font-size:var(--fs-2); color:var(--accent); }
+.meta-chips a.chip:hover { text-decoration:underline; }
+@media (max-width:720px) { .pagehero { grid-template-columns:minmax(0, 1fr);
+  grid-template-areas:"eb" "sub" "chips" "acts"; }
+  .pagehero > #pageSub { white-space:normal; } .hero-acts { justify-content:flex-start; margin-top:10px; } }
 /* back to top: a mono pill, after two screens of scrolling */
-.totop { position:fixed; right:18px; bottom:18px; z-index:45; font-family:var(--font-mono);
+.totop { position:fixed; right:18px; bottom:18px; z-index:45; font-family:var(--font-sans);
   font-size:var(--fs-1); border-radius:999px; padding:6px 13px; background:var(--surface-1);
   box-shadow:0 6px 18px rgba(0,0,0,.12); }
 .totop[hidden] { display:none; }
 @media print { .totop { display:none; } }
 .chip { display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-1);
-  font-family:var(--font-mono);
+  font-family:var(--font-sans);
   color:var(--text-secondary); background:var(--surface-1); border:1px solid var(--border);
   border-radius:999px; padding:3px 10px; }
 .chip .mono { font-size:var(--fs-1); }
@@ -1967,7 +1978,7 @@ tbody tr.open { background:var(--accent-soft); }
 .planbox .plan { margin:0; color:var(--text-primary); }
 .planbox label.spread { display:inline-flex; align-items:center; gap:6px; }
 /* ---- 11d: Overview ------------------------------------------------------- */
-.statline { font-size:var(--fs-1); color:var(--muted); margin:6px 0 2px; }
+.statline { font-size:var(--fs-2); color:var(--muted); margin:6px 0 2px; font-family:var(--font-sans); }
 /* 11e: the hero's "Submit a model" and the stats line under it: 12px */
 .pagehero:not([hidden]) + #view > .statline[data-statline] { margin-top:12px; }
 .pagehero:not([hidden]) { margin-bottom:0; }
@@ -1976,16 +1987,23 @@ tbody tr.open { background:var(--accent-soft); }
   margin-top:10px; }
 .hcard { border:1px solid var(--border); border-radius:var(--r-2); padding:14px 16px;
   display:flex; flex-direction:column; gap:6px; background:var(--surface-1); }
-.hcard-v { font-family:var(--font-mono); font-size:var(--fs-5); font-weight:700;
-  letter-spacing:-0.02em; line-height:1.15;
+.hcard-v { font-family:var(--font-sans); font-size:var(--fs-5); font-weight:700;
+  font-variant-numeric:tabular-nums; letter-spacing:-0.02em; line-height:1.15;
   color:var(--text-primary); overflow-wrap:anywhere; }
 .hcard-v { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.hcard-name { font-size:var(--fs-3); font-weight:600; color:var(--text-primary);
+.hcard-name { font-size:var(--fs-2); font-weight:600; color:var(--text-primary);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-.hcard-verdict { margin:0; font-size:var(--fs-2); color:var(--text-secondary); }
-.hcard-link { margin-top:auto; font-size:var(--fs-1); font-family:var(--font-mono); }
+.hcard-verdict { margin:0; font-size:var(--fs-2); color:var(--muted); }
+.hcard-link { margin-top:auto; padding-top:4px; font-size:var(--fs-2); font-family:var(--font-sans);
+  color:var(--accent); text-decoration:none; }
+.hcard-link:hover, .hcard-link:focus-visible { text-decoration:underline; }
+.hlgrid { align-items:stretch; }
 table.mini-lb td.model { position:static; box-shadow:inset 3px 0 0 var(--fam, var(--axis));
-  padding-left:12px; }
+  padding-left:12px; background:none; }
+/* 11h: Top models — the hover is the whole row */
+table.mini-lb tbody tr:hover > td { background-color:var(--accent-soft); }
+table.mini-lb tbody tr:hover > td[data-lead] { background-image:linear-gradient(var(--accent-soft),
+  var(--accent-soft)); }
 /* ---- 11d: the model page -------------------------------------------------- */
 .mhero .mhead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-top:4px; }
 .mhero h1.mtitle { font-size:var(--fs-5); font-weight:800; letter-spacing:-0.025em; margin:0; }
@@ -1993,10 +2011,11 @@ table.mini-lb td.model { position:static; box-shadow:inset 3px 0 0 var(--fam, va
 .mprose { color:var(--muted); font-size:var(--fs-2); max-width:72ch; margin:14px 0 0; }
 nav.modelnav { position:sticky; top:var(--bar-h); z-index:6; display:flex; gap:6px; flex-wrap:wrap;
   padding:8px 0; margin:var(--sp-4) 0 0; background:var(--plane); }
-.navchip { font-family:var(--font-mono); font-size:var(--fs-1); text-decoration:none;
+.navchip { font-family:var(--font-sans); font-size:var(--fs-1); text-decoration:none;
   border:1px solid var(--border); border-radius:999px; padding:3px 11px; color:var(--text-secondary);
   background:var(--surface-1); }
-.navchip::before { content:attr(data-ix); color:var(--accent); margin-right:6px; font-weight:600; }
+.navchip::before { content:attr(data-ix); color:var(--accent); margin-right:6px; font-weight:600;
+  font-family:var(--font-mono); }
 .navchip[aria-current="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
 .navchip[aria-current="true"]::before { color:#fff; }
 [id^="sec-"] { scroll-margin-top:calc(var(--bar-h) + 52px); }
@@ -2004,7 +2023,7 @@ tr.arearow td { background:var(--plane); height:auto; padding-top:8px; padding-b
 table[data-judged-topics] td.num { white-space:nowrap; }
 /* the row's action is a small text button: it goes to the topic page */
 table[data-judged-topics] a.propose { border:0; background:none; padding:0; min-height:0;
-  font-family:var(--font-mono); font-size:var(--fs-1); font-weight:600; color:var(--accent);
+  font-family:var(--font-sans); font-size:var(--fs-1); font-weight:600; color:var(--accent);
   text-decoration:none; }
 table[data-judged-topics] a.propose:hover { text-decoration:underline; }
 td.lencell { font-family:var(--font-mono); color:var(--text-primary); }
@@ -2015,7 +2034,7 @@ details.lenfold > summary { cursor:pointer; font-size:var(--fs-1); color:var(--a
 .lbbar .chips, .lbbar .pills { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 .lbbar .pills { margin-left:auto; }
 .lbbar .propwhy { flex-basis:100%; }
-.chip-btn, .pill { font-family:var(--font-mono); font-size:var(--fs-1); border-radius:999px;
+.chip-btn, .pill { font-family:var(--font-sans); font-size:var(--fs-1); border-radius:999px;
   padding:4px 12px; min-height:28px; border:1px solid var(--border); background:var(--surface-1);
   color:var(--text-secondary); white-space:nowrap; }
 .chip-btn:hover, .pill:hover { color:var(--text-primary); border-color:var(--axis); }
@@ -2048,7 +2067,7 @@ table.lb thead th[data-tip]:hover .hname, table.lb thead th[data-tip]:focus-visi
 table.lb td.tcell { font-weight:400; }
 table.lb td.tcell.lead b { font-weight:700; }
 table.lb td.tcell:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
-.lbcap { font-family:var(--font-mono); font-size:var(--fs-1); color:var(--muted); margin:8px 0 0; }
+.lbcap { font-family:var(--font-sans); font-size:var(--fs-1); color:var(--muted); margin:8px 0 0; }
 /* one line per row */
 table.lb td { white-space:nowrap; }
 table.lb td.tcell b { font-family:var(--font-mono); }
@@ -2072,7 +2091,7 @@ table.lb .mcell .duptoggle { flex:none; padding:0 2px; min-height:0; }
   background:linear-gradient(to right, transparent, var(--surface-1)); }
 .hfade[data-more="1"]::after { opacity:1; }
 .hfade .scrollhint { display:none; position:absolute; top:0; right:0; z-index:7;
-  pointer-events:none; font-family:var(--font-mono); font-size:var(--fs-1);
+  pointer-events:none; font-family:var(--font-sans); font-size:var(--fs-1);
   height:24px; line-height:24px; color:var(--text-secondary); background:var(--surface-1);
   padding:0 2px 0 8px; box-shadow:-10px 0 8px var(--surface-1); }
 .hfade[data-more="1"] .scrollhint { display:block; }
@@ -2103,6 +2122,7 @@ table.lb td.model .mname { display:inline-block; max-width:190px; overflow:hidde
 table.lb th.model { position:sticky; left:32px; z-index:3; }
 /* the rank and the model stay put while the scores scroll sideways */
 table.lb .rank { white-space:nowrap; color:var(--muted); position:sticky; left:0; z-index:2;
+  text-align:left;
   background:var(--surface-1); width:32px; min-width:32px; max-width:32px;
   padding-left:4px; padding-right:4px; }
 table.lb tbody tr.open td.rank { background:color-mix(in srgb, var(--accent) 8%, var(--surface-1)); }
@@ -2161,7 +2181,7 @@ table.lb td[data-lead] .se { color:var(--text-secondary); }
 table.mini { width:auto; }
 table.mini td, table.mini th { height:auto; padding:3px 10px 3px 0; border-bottom:1px solid var(--border); }
 .minibars { display:flex; flex-direction:column; gap:4px; }
-.minibar { display:grid; grid-template-columns:150px 1fr 34px; gap:8px; align-items:center;
+.minibar { display:grid; grid-template-columns:minmax(0, 150px) 1fr 40px; gap:8px; align-items:center;
   font-size:var(--fs-1); }
 .minibar .mb-t { height:8px; background:var(--grid); border-radius:4px; overflow:hidden; }
 .minibar .mb-f { display:block; height:100%; background:var(--accent); }
@@ -2183,7 +2203,7 @@ a.tchip { text-decoration:none; }
 .mlist [role=menuitem] { border:0; background:none; text-align:left; padding:5px 8px; }
 .famdot { width:8px; height:8px; border-radius:50%; display:inline-block; flex:none; }
 details.howto { margin-top:14px; border-top:1px solid var(--border); padding-top:10px; }
-details.howto > summary { cursor:pointer; font-family:var(--font-mono); font-size:var(--fs-1);
+details.howto > summary { cursor:pointer; font-family:var(--font-sans); font-size:var(--fs-1);
   color:var(--text-secondary); list-style:none; }
 details.howto > summary::-webkit-details-marker { display:none; }
 details.howto .about { margin-top:12px; }
@@ -2215,7 +2235,7 @@ svg .fpt { cursor:pointer; }
 svg .fpt:focus { outline:none; stroke:var(--accent); stroke-width:3; }
 svg .wbar:focus rect { stroke:var(--accent); stroke-width:2; }
 .rchips { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:6px 0; }
-.mchip { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono);
+.mchip { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-sans);
   font-size:var(--fs-1); border:1px solid var(--border); border-radius:999px; padding:2px 4px 2px 10px; }
 details.astable > summary { cursor:pointer; font-size:var(--fs-1); color:var(--accent); }
 @media (max-width:720px) { .igrid { grid-template-columns:1fr; } .lbbar .pills { margin-left:0; } }
@@ -2286,7 +2306,7 @@ h2[data-ix]::before { content:attr(data-ix); font-family:var(--font-mono);
   color:var(--accent); letter-spacing:.06em; }
 .sechead .acts { margin-left:auto; display:flex; gap:8px; align-items:center; }
 /* the one-line status above a big table */
-.statusline { font-family:var(--font-mono); font-size:var(--fs-1); color:var(--muted);
+.statusline { font-family:var(--font-sans); font-size:var(--fs-1); color:var(--muted);
   margin:8px 0 6px; }
 .legend { display:flex; gap:14px; flex-wrap:wrap; margin:6px 0 10px; }
 .legend span { display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-1);
@@ -2546,7 +2566,7 @@ pre.mono { background:var(--plane); border:1px solid var(--border); border-radiu
 /* 11b: one tooltip, inverted so it reads in every theme */
 #tip { position:fixed; pointer-events:none; opacity:0; transition:opacity .08s;
   background:var(--text-primary); color:var(--surface-1); border-radius:var(--r-1);
-  padding:7px 10px; font-family:var(--font-mono); font-size:var(--fs-1);
+  padding:7px 10px; font-family:var(--font-sans); font-size:var(--fs-1);
   box-shadow:0 4px 16px rgba(0,0,0,.22); z-index:70; max-width:280px; }
 #tip .v { font-size:var(--fs-1); font-weight:700; color:var(--surface-1); }
 #tip .l { color:var(--surface-1); opacity:.85; }
@@ -2559,7 +2579,7 @@ svg text { font-family:system-ui,-apple-system,sans-serif; }
 .dimmed text.blab:not(.hot) { opacity:0.35; }
 a { color:var(--accent); }
 footer { margin-top:28px; font-size:var(--fs-1); color:var(--muted);
-  font-family:var(--font-mono); }
+  font-family:var(--font-sans); }
 /* ---- phase 9a: buttons that say what they are ---- */
 button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
 button.primary:hover { filter:brightness(1.07); background:var(--accent); }
@@ -2573,6 +2593,25 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .badge.over { color:var(--warning-text); border-color:var(--warning); }
 /* ---- the pager ---- */
 .pager { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:10px 0 2px; }
+/* 11h: a phone — the chips one row that scrolls, the pills behind Filters ▾,
+   and the pager on one line */
+.lbbar.narrow { display:block; }
+.lbbar.narrow .chiprow { display:flex; gap:8px; align-items:center; }
+.lbbar.narrow .chips { flex:1; min-width:0; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+.lbbar.narrow .chips::-webkit-scrollbar { display:none; }
+.lbbar.narrow .chips .chip-btn { flex:none; }
+.lbbar.narrow .chiprow > .pill { flex:none; }
+.fsheet { position:fixed; left:0; right:0; bottom:0; z-index:55; max-height:70vh; overflow:auto;
+  background:var(--surface-1); border-top:1px solid var(--border); border-radius:var(--r-2) var(--r-2) 0 0;
+  box-shadow:0 -12px 32px rgba(0,0,0,.18); padding:12px 16px 20px; }
+.fsheet-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.fsheet .pills { display:flex; flex-direction:column; align-items:stretch; gap:8px; margin:0; }
+.fsheet .pills .pill { width:100%; text-align:left; justify-content:space-between; }
+@media (max-width:720px) {
+  .pager { flex-wrap:nowrap; gap:4px; overflow-x:auto; scrollbar-width:none; }
+  .pager button { padding:3px 6px; }
+  .pager .count-note { white-space:nowrap; }
+}
 .pager select { font:inherit; font-size:var(--fs-1); color:var(--text-primary);
   background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-1); padding:3px 6px; }
 .pager button { padding:3px 9px; font-size:var(--fs-1); }
@@ -2637,9 +2676,9 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 }
 /* ---- phase 9b: the header, the tabs, the checks ---- */
 .topright { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
-button.who { font-weight:600; font-family:var(--font-mono); font-size:var(--fs-1);
+button.who { font-weight:600; font-family:var(--font-sans); font-size:var(--fs-1);
   white-space:nowrap; }
-#themeBtn { white-space:nowrap; font-family:var(--font-mono); font-size:var(--fs-1);
+#themeBtn { white-space:nowrap; font-family:var(--font-sans); font-size:var(--fs-1);
   font-weight:600; }
 .bar-right button, .bar-right summary { min-height:32px; box-sizing:border-box; }
 button.who.ask { border-color:var(--warning);
@@ -2759,6 +2798,14 @@ button.secondary { background:var(--surface-1); }
 .lb-wrap.stick table.lb thead tr.grp + tr.names th { position:sticky; top:calc(var(--bar-h) + 24px);
   z-index:3; background:var(--surface-1); box-shadow:0 1px 0 var(--border); }
 .lb-wrap.stick table.lb thead tr.grp + tr.names th.model { z-index:4; }
+/* 11h: wider than its card, at any width: the same as narrow below */
+.lb-wrap.stick.hscroll { overflow-x:auto; }
+.lb-wrap.stick.hscroll thead tr th,
+.lb-wrap.stick.hscroll thead tr:first-child th,
+.lb-wrap.stick.hscroll table.lb thead tr:first-child th,
+.lb-wrap.stick.hscroll table.lb thead tr.grp + tr.names th { position:static; top:auto; }
+.lb-wrap.stick.hscroll table.lb thead tr.names th.rank,
+.lb-wrap.stick.hscroll table.lb thead tr.names th.model { position:sticky; top:auto; }
 /* narrow: the table scrolls sideways in its own box, so a header cannot also
    stick to the page — only the rank and the model stay put, sideways */
 @media (max-width:900px) { .lb-wrap.stick { overflow-x:auto; }
@@ -3256,9 +3303,9 @@ const prelimBadge = m => m.official ? null
 const tName = t => ((DATA.judged || {}).topics || {})[t] || t;
 const taintBadge = m => (m.tainted || []).length
   ? el('span', { class: 'badge taint',
-      title: `trained on data derived from the diagnosis half of ${m.tainted.map(tName).join(', ')}`
-        + ' — that score is shown per model and never ranked',
-      text: 'trained on ' + m.tainted.map(tName).join(', ') + ' diagnostics' }) : null;
+      title: `trained on the practice questions of ${m.tainted.map(tName).join(', ')}`
+        + ' — that score is shown for this model and never ranked',
+      text: 'trained on ' + m.tainted.map(tName).join(', ') + ' practice data' }) : null;
 // one warning badge per row: trained-on-it outranks preliminary, and the
 // other one rides in its tooltip rather than as a second amber chip
 const warnBadge = m => {
@@ -3757,7 +3804,7 @@ function dxSlots(s) {
 
 function dxExamples(ex) {
   const wrap = el('details', { class: 'dxex' },
-    el('summary', { text: 'Show the items it got wrong (diagnosis half only)' }));
+    el('summary', { text: 'Show the items it got wrong (practice half only)' }));
   for (const [k, label] of BUCKETS.map(x => [x[0], x[1]])) {
     const items = ex[k];
     if (!items || k === 'right') continue;
@@ -3832,7 +3879,7 @@ function dxCategories(mid, t, v, atChance) {
         el('span', { class: 'se', text: `${g.n_report} items`
           + (dim ? ` · under ${CAT_MIN_N}, noise` : '') }),
         cmp ? el('span', { class: 'se taintdelta', title: 'change against the parent model, '
-          + 'leaderboard half (never in the training data) and diagnosis half',
+          + 'on the hidden half (never in the training data) and the practice half',
           text: `vs parent: lb ${dpts(cmp.dReport)} · dx ${cmp.dDiagnose == null ? '—' : dpts(cmp.dDiagnose)}` }) : '',
         dxBar(g.buckets || {}, g.n || 1, true)));
     if (subs.length)
@@ -3935,9 +3982,9 @@ function vDiagnose(m) {
     el('p', { class: 'sub', text: 'The second opinion, free: why the multiple-choice score is what it is, read off the per-item '
       + 'log. The finding is the cause, not the list of missed questions — most of what '
       + 'a score hides is not a knowledge gap, and the two want opposite responses.' }),
-    el('p', { class: 'note', text: 'Every item is assigned by a hash of its own content '
-      + 'to a leaderboard half or a diagnosis half, identically for every model and every '
-      + 'run. Only the diagnosis half is shown or exported here. A model retrained on '
+    el('p', { class: 'note', text: 'Every item is split, by a hash of its content, into a '
+      + 'hidden half (the score) and a practice half. The split is the same for every model '
+      + 'and every run. Only the practice half is shown here. A model retrained on '
       + 'anything below therefore still has an honest leaderboard number — and if the two '
       + 'halves start to diverge, that divergence is the alarm.' }));
 
@@ -3976,8 +4023,8 @@ function vDiagnose(m) {
     for (const c of causes[t])
       body.append(el('p', { class: 'dxlead calm', text: c.text }));
     body.append(el('p', { class: 'small', style: 'margin:10px 0 0' },
-      `${n} items in the log · leaderboard half ${v.n_report} `
-      + `(${pct(v.score_report)}) · diagnosis half ${v.n_diagnose} `
+      `${n} items in the log · hidden half ${v.n_report} `
+      + `(${pct(v.score_report)}) · practice half ${v.n_diagnose} `
       + `(${pct(v.score_diagnose)})`));
     const c0 = cell(t, m.id);
     if (c0 && c0.n != null && Math.abs(c0.n - n) > Math.max(2, 0.02 * c0.n))
@@ -4086,7 +4133,7 @@ function vEarlier(m) {
       + 'toward anything on this board.' }),
     el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
       el('thead', {}, el('tr', {}, el('th', { text: 'topic' }),
-        el('th', { class: 'num', text: 'score (report half)' }),
+        el('th', { class: 'num', text: 'score (hidden questions)' }),
         el('th', { class: 'num', text: 'items' }), el('th', { text: 'judged' }),
         el('th', { text: 'judge' }))),
       el('tbody', {}, h.map(e => el('tr', { class: 'dim', 'data-earlier-task': e.task },
@@ -4110,12 +4157,15 @@ function vJudged(m) {
   const prov = !!(m.judge && m.judge.judge && m.judge.judge.provisional);
   const card = el('div', { class: 'card' },
     el('h2', { text: 'Judged free response — the exam' }),
-    el('p', { class: 'sub', text: 'Open questions per topic, answered in writing, graded 0–4 '
-      + (prov ? 'against a written rubric by a local model whose id cannot be pinned — '
-              : 'against a written rubric by an API judge pinned to a dated model id — ')
-      + 'single answers, never pairwise. Length is in the rubric and reported below; a '
-      + 'thirty-script canary is re-graded every run so a change to the model behind the id '
-      + 'would show.' }),
+    // 11h: say what it is, then how it works behind a click
+    el('p', { class: 'sub', text: 'Open questions per topic, answered in writing and graded 0–4 '
+      + 'against a written rubric.' }),
+    el('details', { class: 'howto small', 'data-how-judged': '1' },
+      el('summary', { text: 'How this works ▸' }),
+      el('p', { class: 'small', text: (prov ? 'The judge is a local model whose id cannot be '
+        + 'pinned. ' : 'The judge is an API model pinned to a dated id. ')
+        + 'It grades single answers, never pairs. Length is in the rubric and reported below. '
+        + 'Thirty fixed scripts are graded again every run, so a change to the judge would show.' })),
     // 11g: the judge runs and the judge file behind these numbers, in the reader
     LIVE && m.judge ? el('p', { class: 'small', 'data-how-graded': m.id },
       readLink({ kind: 'provenance', id: 'judge:' + m.id }, 'How this was graded ▸')) : '');
@@ -4128,18 +4178,19 @@ function vJudged(m) {
   };
   const standing = el('p', { class: ok ? 'note' : 'warn', 'data-judge-state': ok ? 'counts' : 'prelim' },
     el('b', { text: ok ? 'Counts. ' : 'Preliminary. ' }),
-    cal ? `Cohen's κ ${cal.kappa} against a human grader over ${cal.n} answers `
-        + `(line at ${J.kappaMin})` + (cal.judge_id ? `, for judge ${cal.judge_id}` : '') + '. '
+    cal ? `Agreement with a person: ${cal.kappa} over ${cal.n} answers `
+        + `(the bar is ${J.kappaMin}).` + ' '
         : 'No calibration on file for this judge yet. ',
     ok ? 'Topic scores may enter the separate judged average; they never enter the '
        + 'multiple-choice average.'
        : st.reasons.length ? 'Shown, never ranked, never averaged: ' + st.reasons.join('; ') + '.'
        : 'Shown, never ranked, never averaged.');
   if (ok) card.append(standing);
-  else caveat(cal ? 'below the κ line' : 'not calibrated', standing, { 'data-caveat': 'calibration' });
+  else caveat(cal ? 'below the agreement bar' : 'not checked by a person', standing,
+    { 'data-caveat': 'calibration' });
   const j = m.judge;
-  if (!j) { card.append(note('Not judged: this model has no judge.json on file. Submit it with '
-    + 'suite=judged, or run scripts/judge.py over its fr_* answers.')); return card; }
+  if (!j) { card.append(note('Not judged yet. Sit the exam from the Queue, with the judged '
+    + 'suite.')); return card; }
   if (j.skipped) { card.append(note(j.skipped + '. A judge scores its own family higher; the '
     + 'cell stays empty rather than flattering.')); return card; }
   if (!Object.keys(j.tasks || {}).length) { card.append(note('Not judged on the current exam: '
@@ -4186,7 +4237,7 @@ function vJudged(m) {
     .sort((a, b) => pubScore(j.tasks[a]) - pubScore(j.tasks[b]));
   if (cats.length) {
     card.append(el('div', { class: 'dxh', text: 'By topic (0–4), weakest first within each area — '
-      + 'report half' + (prov ? ' · provisional, not ranked' : '') }));
+      + 'hidden questions' + (prov ? ' · demo only, not ranked' : '') }));
     // what is true of every row is said once, above the table: a soft gate
     // (the judged suite is preliminary) used to repeat on each one
     const soft = cats.some(t => { const g = j.tasks[t].propose;
@@ -4203,8 +4254,8 @@ function vJudged(m) {
       const tainted = (m.tainted || []).includes(t);
       return el('tr', { class: prov || nr < CAT_MIN_N ? 'dim' : null, 'data-topic': frName(t) },
         el('td', {}, frName(t), tainted ? el('span', { class: 'badge taint',
-          title: 'this model trained on data derived from this topic\'s diagnosis half — the '
-            + 'score is shown and is not a ranking claim',
+          title: 'this model trained on this topic\'s practice data — the score is shown, and '
+            + 'it is not a ranking',
           text: 'trained on it' }) : ''),
         el('td', { class: 'num', text: `${num(pubScore(v), 2)} / 4` }),
         el('td', { class: 'num se', text: k ? String(k.kappa) : '—',
@@ -4232,20 +4283,20 @@ function vJudged(m) {
     }
     card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-judged-topics': '1' },
       el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { class: 'num', text: 'score' }),
-        el('th', { class: 'num', text: 'κ' }), el('th', { class: 'num', text: 'items (report half)' }),
+        el('th', { class: 'num', text: 'agreement' }),
+        el('th', { class: 'num', text: 'hidden questions' }),
         el('th', { text: 'score distribution 0 → 4 (all items)' }),
         LIVE ? el('th', { text: 'what to do' }) : '')),
       el('tbody', {}, body))));
     if (m.judgedAvg != null)
       card.append(el('p', { class: 'small', text: `Judged average ${num(m.judgedAvg, 2)} / 4 over `
-        + `${cats.filter(t => !(m.tainted || []).includes(t)).length} topics, report half`
+        + `${cats.filter(t => !(m.tainted || []).includes(t)).length} topics, hidden questions`
         + ((m.tainted || []).some(t => cats.includes(t))
            ? `, excluding ${(m.tainted || []).filter(t => cats.includes(t)).map(frName).join(', ')} `
              + '— this model trained on data derived from that topic' : '')
         + (ok ? '.' : ' — preliminary until the judge is calibrated.') }));
-    card.append(el('p', { class: 'small', text: `Topics under ${CAT_MIN_N} report-half questions `
-      + 'are greyed: the exam bank is still being written (Exam tab). The diagnose half of each '
-      + 'topic is what a proposal may read; it is never the score.' }));
+    card.append(el('p', { class: 'small', text: `A topic with under ${CAT_MIN_N} hidden questions `
+      + 'is greyed. Its bank is still being written, on the Exam tab.' }));
     // score vs length: one row per topic, a column per length (11d) — the
     // row-per-bucket table was 148 rows for 37 topics
     const LEN = [['≤20 words', '≤ 20'], ['21–50', '21–50'], ['51–120', '51–120'], ['>120', '> 120']];
@@ -4410,7 +4461,7 @@ function vJudged(m) {
           el('td', { class: 'num', text: String(v.mc_wrong) }),
           el('td', { class: 'num', text: String(v.knew) }),
           el('td', { class: 'num', text: String(v.didnt) })))))));
-    card.append(el('p', { class: 'small', text: `Diagnosis-half MMLU items only, asked without `
+    card.append(el('p', { class: 'small', text: `MMLU practice-half items only, asked without `
       + `their options and graded against the gold option's text; "knew it" is a rubric score of `
       + `${j.correct_at} or more.` + (s.tot.unjoined ? ` ${s.tot.unjoined} items had no MMLU run to `
       + 'join to.' : '') }));
@@ -4439,8 +4490,8 @@ function vTaint(m) {
   if (!tc || !Object.keys(tc).length) return null;
   const card = el('div', { class: 'card' },
     el('h2', { text: 'What the training taught' }),
-    el('p', { class: 'sub', text: 'This model trained on data derived from the diagnosis half '
-      + 'of an exam topic or a benchmark. The report half was never touched by that data, so '
+    el('p', { class: 'sub', text: 'This model trained on the practice half of an exam topic '
+      + 'or a benchmark. The hidden half was never in that data, so '
       + 'it is the honest test: if the training taught the skill, both halves move together; '
       + 'if it taught the test, only the half the generator\'s spec came from moves.' }));
   // the trail backwards: which run, which dataset, which proposal. Every step
@@ -4485,10 +4536,10 @@ function vTaint(m) {
         el('th', { class: 'num', text: rubric ? 'Δ rubric' : 'Δ points' }),
         el('th', { class: 'num', text: 'moved by' }))),
       el('tbody', {},
-        half(rubric ? 'report half (the published score, never in the training data)'
-                    : 'leaderboard half (never in the training data)',
+        half(rubric ? 'hidden questions (the published score, never in the training data)'
+                    : 'hidden half (never in the training data)',
              c.before.report, c.after.report, c.dReport, c.seReport),
-        half('diagnosis half (the spec came from here)', c.before.diagnose, c.after.diagnose, c.dDiagnose, c.seDiagnose)))));
+        half('practice half (the missing skill came from here)', c.before.diagnose, c.after.diagnose, c.dDiagnose, c.seDiagnose)))));
     if (rubric && c.judge) card.append(el('p', { class: 'small',
       text: `Both sides graded by ${c.judge}; a comparison across two judges is two `
         + 'instruments, and the card says so instead of drawing it.' }));
@@ -4496,16 +4547,16 @@ function vTaint(m) {
     card.append(el('p', { class: warn ? 'warn' : 'dxlead calm', 'data-verdict': c.verdict },
       el('b', { text: VERDICT[c.verdict] + '. ' }), c.text.replace(/^The training taught the (skill|test)\. |^Nothing measurable changed\. |^An unusual pattern[^:]*: /, '')));
     if (c.ratio != null && c.verdict === 'test')
-      card.append(el('p', { class: 'small', text: 'Ratio of the two deltas (diagnosis / '
-        + `report): ${num(c.ratio, 1)}.` }));
+      card.append(el('p', { class: 'small', text: 'Ratio of the two changes (practice / '
+        + `hidden): ${num(c.ratio, 1)}.` }));
     const cats = Object.entries(c.categories || {})
       .sort((x, y) => (y[1].dDiagnose ?? 0) - (x[1].dDiagnose ?? 0));
     if (cats.length) {
       card.append(el('div', { class: 'dxh', text: 'By category — the half we never touched' }));
       card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
         el('thead', {}, el('tr', {}, el('th', { text: 'category' }),
-          el('th', { class: 'num', text: 'leaderboard half before → after' }), el('th', { class: 'num', text: 'Δ' }),
-          el('th', { class: 'num', text: 'diagnosis half before → after' }), el('th', { class: 'num', text: 'Δ' }),
+          el('th', { class: 'num', text: 'hidden half before → after' }), el('th', { class: 'num', text: 'Δ' }),
+          el('th', { class: 'num', text: 'practice half before → after' }), el('th', { class: 'num', text: 'Δ' }),
           el('th', { class: 'num', text: 'items (lb half)' }))),
         el('tbody', {}, cats.map(([name, v]) => el('tr', {
             class: (v.after.n_report || 0) < CAT_MIN_N ? 'dim' : null },
@@ -4557,7 +4608,7 @@ function vModel() {
     el('p', { class: 'eyebrow', 'data-model-eyebrow': '1', text: eyebrow }),
     el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
       warnBadge(m) || '', dupBadge(m) || ''),
-    el('p', { class: 'sub mono', text: m.id }),
+    el('p', { class: 'sub mono mid', 'data-model-id': m.id, text: m.id }),
     el('div', { class: 'hlgrid' },
       hlCard('params', 'Parameters', m.params ? P(m.params) : 'Unknown',
         (a.active_params ? `${P(a.active_params)} active · ${a.experts} experts, `
@@ -4628,7 +4679,7 @@ function vModel() {
     el('p', { class: 'sub', text: 'What produced these numbers. Two runs whose '
       + 'template id or harness differ are not comparable, whatever the scores say.' }),
     el('dl', { class: 'provlist' }, prov.flatMap(([k, v]) =>
-      [el('dt', { text: k }), el('dd', { class: 'mono', text: String(v) })])));
+      [el('dt', { text: k }), el('dd', { text: String(v) })])));
 
   // The exam leads: it is the instrument the loop steers by. The
   // multiple-choice results and the per-item diagnosis follow as the free
@@ -4733,7 +4784,7 @@ function vOverview(ms) {
   const hours = DATA.meta.hours >= 1 ? `${DATA.meta.hours} h` : `${Math.round(DATA.meta.hours * 60)} min`;
   const dates = DATA.meta.dates[0]
     ? `${String(DATA.meta.dates[0]).slice(0, 10)} → ${String(DATA.meta.dates[1]).slice(0, 10)}` : null;
-  frag.push(el('p', { class: 'statline mono', 'data-statline': '1' }, [
+  frag.push(el('p', { class: 'statline', 'data-statline': '1' }, [
     `${ms.length} model${ms.length === 1 ? '' : 's'}`
       + (ms.length !== DATA.models.length ? ` of ${DATA.models.length}` : ''),
     `${DATA.accTasks.length + DATA.pplTasks.length} tasks`,
@@ -4748,7 +4799,7 @@ function vOverview(ms) {
     if (big) {
       const an = DATA.models.find(m => m.id === big.a), bn = DATA.models.find(m => m.id === big.b);
       const [win, lose] = big.diff > 0 ? [an, bn] : [bn, an];
-      gap = el('p', { class: 'statline mono', 'data-biggest-gap': '1',
+      gap = el('p', { class: 'statline', 'data-biggest-gap': '1',
         text: `Biggest real gap · ${big.t}: ${win.name} over ${lose.name} by `
           + `${(100 * Math.abs(big.diff)).toFixed(1)} points (z = ${Math.abs(big.z).toFixed(1)}) · `
           + `${pairs - real} of ${pairs} pairs are inside the noise` });
@@ -4848,7 +4899,7 @@ function hlWeakest() {
   const xs = Object.entries(m.judge.tasks).filter(([t]) => t.startsWith('exam_'))
     .map(([t, v]) => ({ t, v: pubScore(v) })).filter(x => x.v != null).sort((a, b) => a.v - b.v);
   if (!xs.length) return hlCard('weakest', 'Weakest topic', '—',
-    `${m.name} has no report-half score yet.`, toLoop);
+    `${m.name} has no score on the hidden questions yet.`, toLoop);
   const w = xs[0];
   // one model's own topic, so it is not a ranking — and no area mean
   return hlCard('weakest', 'Weakest topic', `${(+w.v).toFixed(2)} / 4`,
@@ -4875,7 +4926,8 @@ function hlJudge() {
   const toProv = hlLink('Provenance →', () => navigate({ tab: 'provenance', model: null, topic: null }));
   const cn = m && (m.judge || {}).canary;
   const cal = (DATA.judged || {}).calibration;
-  const calWords = cal && cal.calibrated ? `Calibrated: κ ${cal.kappa}.` : 'Not calibrated yet.';
+  const calWords = cal && cal.calibrated ? `Agreement with a person: ${cal.kappa}.`
+    : 'No person has checked the judge yet.';
   if (!cn) return hlCard('judge', 'Judge steadiness', '—',
     (m ? 'No canary on file for this judge. ' : 'No judged run yet. ') + calWords, toProv);
   const r2 = x => x == null ? '—' : (+x).toFixed(2);
@@ -5280,7 +5332,7 @@ function statusLine(pg, noun, extra) {
   const bits = [`Showing ${pg.from}–${pg.to} of ${pg.total} ${noun}`];
   for (const x of [].concat(extra || [])) if (x) bits.push(x);
   const line = el('p', { class: 'statusline', 'data-statusline': noun }, bits.join(' · '));
-  if (LIVE && DATA) line.append(' · ', el('span', { class: 'dot ok' }), `live ${refreshedAt()}`);
+  if (LIVE && DATA) line.append(' · ', el('span', { class: 'dot ok' }), `live ${checkedAt()}`);
   return line;
 }
 
@@ -6061,6 +6113,11 @@ function staleSentence(ms) {
 
 // MMLU by area: the leaderboard-half items of every MMLU subject mapped to an
 // area's topics, pooled — a mean weighted by item count
+// 11h: one scale for an area's number, wherever it is — the column, the
+// opened row's bars and the radar all follow the Scale pill (the table said
+// 44.7 raw and the row 26 above chance, for the same number)
+const areaScaled = v => state.avgMode === 'raw' ? v : Math.max(0, (v - 0.25) / 0.75);
+const scaleWords = () => state.avgMode === 'raw' ? 'raw accuracy' : 'above chance';
 function areaMmlu(m, area) {
   const cats = mmluCats(m);
   if (!cats || diagStale(m)) return null;
@@ -6115,16 +6172,16 @@ function lbColumns(ms) {
       key: 'j:' + t, label: frName(t), num: true, judged: t, optional: true,
       group: 'Judged · ' + (Object.entries(DATA.meta.areas || {})
         .find(([, ts]) => ts.includes(frName(t))) || ['topics'])[0],
-      unit: 'κ ' + ((((DATA.judged.calibration || {}).per_category || {})[frName(t)] || {}).kappa
+      unit: 'agreement ' + ((((DATA.judged.calibration || {}).per_category || {})[frName(t)] || {}).kappa
                    ?? (DATA.judged.calibration || {}).kappa) + ' · 0–4' }));
   const cats = lbCategoryCols(ms).map(c => ({ ...c, label: c.cat, optional: true,
-    group: 'MMLU by topic', unit: 'report half · %' }));
+    group: 'MMLU by topic', unit: 'hidden questions · %' }));
   // 11f: the judged average is a column only while some model on the page
   // has one — a column of dashes says nothing
   const javg = ms.some(m => m.judgedAvg != null)
     ? [{ key: 'javg', num: true, judged: 'avg', group: 'Judged', short: 'Judged',
          label: 'Judged avg', unit: judgedCalibrated()
-           ? `κ ${DATA.judged.calibration.kappa} · 0–4` : 'rubric 0–4' }] : [];
+           ? `agreement ${DATA.judged.calibration.kappa} · 0–4` : 'rubric 0–4' }] : [];
   const lead = [
     { key: 'rank', label: '#', group: '', nosort: true },
     { key: 'name', label: 'Model', group: '' },
@@ -6147,7 +6204,7 @@ function lbColumns(ms) {
     mid = [...(CATS.find(([g]) => g === 'knowledge')[1]).filter(t => DATA.accTasks.includes(t))
              .map(task),
            ...areasHere.map(a => ({ key: 'area:' + a, label: a, num: true, area: a,
-             group: 'MMLU by area', unit: 'report half · %' })),
+             group: 'MMLU by area', unit: 'hidden questions · %' })),
            ...cats];
   } else if (L.chip === 'judged') {
     mid = judgedCalibrated()
@@ -6182,9 +6239,9 @@ function lbColTip(c) {
       ...(info.control ? ['CONTROL — never in Avg'] : []),
       ...[info.domain, info.desc].filter(Boolean)];
   }
-  if (c.area) return [`${c.area} — MMLU, report half, %`,
+  if (c.area) return [`${c.area} — MMLU, % ${scaleWords()}`, 'the hidden questions of each topic',
     'pooled over ' + ((DATA.meta.areas || {})[c.area] || []).join(', ')];
-  if (c.cat) return [`MMLU ${c.cat} — report half, %`];
+  if (c.cat) return [`MMLU ${c.cat} — hidden questions, %`];
   if (c.jarea) return [`${c.jarea} — judged mean, rubric 0–4`, 'never part of Avg'];
   if (c.judged === 'avg') return ['Judged — mean rubric score 0–4 over the judged topics',
     'from the calibrated judge — never part of Avg'];
@@ -6407,7 +6464,7 @@ function vLeaderboard(ms) {
       visCols.map(c => {
         if (c.key === 'rank') {
           const r = rankOf(m);
-          return el('td', { class: 'rank pin0' },
+          return el('td', { class: 'rank pin0 num' },
             // 11f: one chevron that turns; it starts unturned when this
             // render is the one that opens the row, so the turn is seen
             el('button', { class: 'disclose' + (open && state.lbAnim === m.id ? ' pre' : ''),
@@ -6448,7 +6505,8 @@ function vLeaderboard(ms) {
           const short = da ? `${+da} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug',
             'Sep', 'Oct', 'Nov', 'Dec'][+mo - 1]}`
             + (+y !== new Date().getFullYear() ? ` ${y}` : '') : '—';
-          return el('td', { class: 'small nowrap mono', title: d.replace('T', ' '), text: short });
+          return el('td', { class: 'num small nowrap', 'data-date': d.slice(0, 10),
+            title: d.replace('T', ' '), text: short });
         }
         if (c.key === 'avg') {
           const a = officialAvg(m);
@@ -6482,8 +6540,9 @@ function vLeaderboard(ms) {
         if (c.area) {
           const r = areaMmlu(m, c.area);
           if (!r) return el('td', { class: 'num se', text: '—' });
-          return one(c, m, r.v, (100 * r.se).toFixed(1), pctn,
-            { title: `${r.n} leaderboard-half items` });
+          const k = state.avgMode === 'raw' ? 1 : 1 / 0.75;
+          return one(c, m, areaScaled(r.v), (100 * r.se * k).toFixed(1), pctn,
+            { title: `${r.n} questions · % ${scaleWords()}`, 'data-area-cell': c.area });
         }
         if (c.cat) {
           const g = (mmluCats(m) || {})[c.cat];
@@ -6514,7 +6573,8 @@ function vLeaderboard(ms) {
         `sorted by ${lbSortLabel(cols)}`,
         L.chip !== 'all' ? (LB_CHIPS.find(([v]) => v === L.chip) || [])[1] : null]),
       lbPg.pager,
-      hfade('lb', el('div', { class: 'lb-wrap stick', 'data-hkeep': 'lb' }, table)),
+      hfade('lb', el('div', { class: 'lb-wrap stick' + (state.lbWide ? ' hscroll' : ''),
+        'data-hkeep': 'lb' }, table)),
       el('p', { class: 'lbcap', 'data-lb-caption': '1', text: 'Bold = best in the column or '
         + 'within its noise · hover a score for its ± error · hover a column name for its setup' }),
       lbHowTo(ms)),
@@ -6531,6 +6591,15 @@ function hfadeUpdate(root) {
   (root || document).querySelectorAll('[data-hfade]').forEach(box => {
     const sc = box.firstElementChild;
     if (!sc) return;
+    // 11h: a table wider than its card scrolls in its own box at every
+    // width — the Knowledge chip pushed the whole page sideways at 1,512px.
+    // Only then does its header give up sticking to the page
+    const t = sc.dataset.hkeep === 'lb' && sc.querySelector('table');
+    if (t) {
+      const wide = t.offsetWidth > sc.clientWidth + 1;
+      sc.classList.toggle('hscroll', wide);
+      state.lbWide = wide;
+    }
     const upd = () => {
       const ov = getComputedStyle(sc).overflowX;
       box.dataset.more = (ov === 'auto' || ov === 'scroll')
@@ -6636,12 +6705,35 @@ function lbToolbar(ms, cols, shown, nHidden) {
     lbModelsPill(ms),
     pillMenu('scale', 'Scale', [['chance', 'above chance'], ['raw', 'raw accuracy']],
       state.avgMode, v => { state.avgMode = v; render(); }));
+  const note = calOk ? '' : el('p', { class: 'chipnote', id: 'why-judged-chip', role: 'note',
+    'data-why': 'judged-chip', hidden: state.lbChipWhy ? null : '', text: judgedOffWhy() });
+  // 11h: on a phone the six pills are one "Filters ▾" beside the chips, and
+  // open as a sheet from the bottom; the chips are one row that scrolls
+  if (narrowLb()) {
+    const set = [L.kind !== LB_DEFAULTS.kind, L.size !== LB_DEFAULTS.size,
+      L.status !== LB_DEFAULTS.status, !!L.models, state.avgMode === 'raw'].filter(Boolean).length;
+    const open = !!state.lbFilters;
+    const toggle = el('button', { class: 'pill' + (set ? ' on' : ''), 'data-filters': String(set),
+      'aria-expanded': String(open), 'aria-controls': 'filter-sheet',
+      text: `Filters${set ? ` · ${set}` : ''} ▾`,
+      onclick: () => { state.lbFilters = !open; render(); } });
+    return el('div', { class: 'lbbar narrow' },
+      el('div', { class: 'chiprow' }, chips, toggle), note,
+      open ? el('div', { class: 'fsheet', id: 'filter-sheet', role: 'dialog', 'aria-label': 'filters',
+          'data-filter-sheet': '1',
+          onkeydown: e => { if (e.key === 'Escape' && !POP.panel) { state.lbFilters = false; render(); } } },
+        el('div', { class: 'fsheet-head' }, el('b', { text: 'Filters' }),
+          el('button', { class: 'ghost', text: 'Done', 'data-filters-done': '1',
+            onclick: () => { state.lbFilters = false; render(); } })),
+        pills) : '');
+  }
   // the note sits right under the chips, where the click was
-  return el('div', { class: 'lbbar' }, chips,
-    calOk ? '' : el('p', { class: 'chipnote', id: 'why-judged-chip', role: 'note',
-      'data-why': 'judged-chip', hidden: state.lbChipWhy ? null : '', text: judgedOffWhy() }),
-    pills);
+  return el('div', { class: 'lbbar' }, chips, note, pills);
 }
+const narrowLb = () => matchMedia('(max-width:720px)').matches;
+// crossing 720px changes what the toolbar is made of: draw it again
+matchMedia('(max-width:720px)').addEventListener('change', () => {
+  state.lbFilters = false; if (DATA) render(); });
 
 // Columns · 4 hidden ▾ — the current chip's columns, Show all, and the tint
 function lbColumnsPill(cols, shown, nHidden) {
@@ -6789,22 +6881,24 @@ function lbDetail(m, dups) {
         el('span', { class: 'tl-r se', text: `#${r}/${pool.length}`
           + (best && best.id === m.id ? ' · best' : row && !row[4] ? ' · tied with best' : '') }));
     }))));
-  // MMLU BY AREA: eight mini bars above chance
+  // MMLU BY AREA: eight mini bars, on the Scale pill's scale (11h)
   const areas = Object.keys(DATA.meta.areas || {}).filter(a => areaMmlu(m, a));
   if (mmluCats(m) && diagStale(m)) {
     out.push(block('MMLU by area', el('p', { class: 'small', 'data-stale-diag': m.id,
       text: staleSentence([m]) })));
   } else if (mmluCats(m) && areas.length) {
-    out.push(block('MMLU by area', el('div', { class: 'minibars' }, areas.map(a => {
+    out.push(block('MMLU by area', el('p', { class: 'small se', 'data-bars-scale': state.avgMode,
+        text: `% ${scaleWords()} — the Scale pill switches it` }),
+      el('div', { class: 'minibars' }, areas.map(a => {
       const r = areaMmlu(m, a);
-      const above = r ? Math.max(0, (r.v - 0.25) / 0.75) : null;
-      return el('div', { class: 'minibar', tabindex: '0',
-          'data-tip': JSON.stringify([a, r ? `${(100 * r.v).toFixed(1)}% · ${r.n} items` : 'no items',
-            'topics: ' + ((DATA.meta.areas || {})[a] || []).join(', ')]) },
+      const v = r ? areaScaled(r.v) : null;
+      return el('div', { class: 'minibar', tabindex: '0', 'data-area-bar': a,
+          'data-tip': JSON.stringify([a, r ? `${(100 * v).toFixed(1)}% ${scaleWords()} · ${r.n} questions`
+            : 'no questions', 'topics: ' + ((DATA.meta.areas || {})[a] || []).join(', ')]) },
         el('span', { class: 'mb-l', text: a }),
         el('span', { class: 'mb-t' }, el('span', { class: 'mb-f',
-          style: `width:${above == null ? 0 : (100 * above).toFixed(1)}%` })),
-        el('span', { class: 'mb-v mono', text: above == null ? '—' : (100 * above).toFixed(0) }));
+          style: `width:${v == null ? 0 : (100 * v).toFixed(1)}%` })),
+        el('span', { class: 'mb-v mono', text: v == null ? '—' : (100 * v).toFixed(1) }));
     }))));
   }
   // JUDGED TOPICS: report half only, by area, weakest first
@@ -6858,7 +6952,7 @@ function insightsCard(ms) {
     el('h2', { text: 'Insights' }),
     el('p', { class: 'sub', text: 'What the table says at a glance: which models are the best '
       + 'for their size, where one model is weakest, and how a handful of models compare shape '
-      + 'for shape. Every judged number here is a report-half number.' }),
+      + 'for shape. Every judged number here is a score on the hidden questions.' }),
     el('div', { class: 'igrid', style: 'margin-top:var(--sp-4)' },
       frontierChart(ms), weakestChart(), radarBlock(ms)));
 }
@@ -7007,7 +7101,7 @@ function weakestChart() {
     const y = 4 + i * rowH, w = (x.v / 4) * (x1 - x0);
     const a = el('svg:a', { href: '#topic=' + x.t.replace(/^exam_/, ''), class: 'wbar',
       'data-weak-topic': x.t,
-      'data-tip': JSON.stringify([frName(x.t), `${num(x.v, 2)} / 4 · report half`
+      'data-tip': JSON.stringify([frName(x.t), `${num(x.v, 2)} / 4 · hidden questions`
         + (ok ? '' : ' · provisional'), 'Open the topic →']) },
       el('svg:text', { x: x0 - 8, y: y + 16, 'text-anchor': 'end', 'font-size': 12,
         fill: 'var(--text-secondary)', text: frName(x.t) }),
@@ -7025,7 +7119,7 @@ function weakestChart() {
       hfade('weakest', el('div', { class: 'chartscroll', 'data-hkeep': 'weakest' }, svg))),
     el('div', { class: 'wrows', 'data-weak-rows': m.id }, xs.map(x => el('a', { class: 'wrow',
         href: '#topic=' + x.t.replace(/^exam_/, ''), 'data-weak-row': x.t,
-        title: `${frName(x.t)} · ${num(x.v, 2)} / 4 · report half` + (ok ? '' : ' · provisional') },
+        title: `${frName(x.t)} · ${num(x.v, 2)} / 4 · hidden questions` + (ok ? '' : ' · demo only') },
       el('span', { class: 'wname', text: frName(x.t) }),
       el('span', { class: 'wtrack' }, el('span', { class: 'wfill' + (ok ? '' : ' hatch'),
         style: `width:${Math.max(1, 100 * x.v / 4).toFixed(1)}%` })),
@@ -7033,9 +7127,9 @@ function weakestChart() {
     all.length > 12 ? el('button', { class: 'quiet', 'data-weak-all': '1',
       text: L.weakAll ? 'Show the twelve weakest' : `Show all ${all.length} topics`,
       onclick: () => lbSet({ weakAll: !L.weakAll }) }) : '',
-    el('p', { class: 'small', text: `${m.name}'s own topics, weakest first — the report half, on `
-      + 'the 0–4 rubric. This orders one model\'s topics; it does not rank models.'
-      + (ok ? '' : ' Provisional: a local or uncalibrated judge, so no number here is ranked.') }),
+    el('p', { class: 'small', text: `${m.name}'s own topics, weakest first, on the hidden `
+      + 'questions (0–4). This orders one model\'s topics; it does not rank models.'
+      + (ok ? '' : ' Demo only: the judge is not checked by a person, so nothing here is ranked.') }),
     el('details', { class: 'astable' }, el('summary', { text: 'Show as table' }),
       el('table', { class: 'mini' }, el('tbody', {}, all.map(x => el('tr', {},
         el('td', {}, el('a', { href: '#topic=' + x.t.replace(/^exam_/, ''), text: frName(x.t) })),
@@ -7048,8 +7142,8 @@ function radarSource() {
   const L = lbS();
   const areas = Object.keys(DATA.meta.areas || {});
   if (L.radarSrc === 'areas') return areas.map(a => ({ key: a, label: a,
-    get: m => { const r = areaMmlu(m, a); return r ? { n: Math.max(0, (r.v - 0.25) / 0.75),
-      rows: [`${(100 * r.v).toFixed(1)}% raw · ${r.n} items`] } : null; } }));
+    get: m => { const r = areaMmlu(m, a); return r ? { n: areaScaled(r.v),
+      rows: [`${(100 * areaScaled(r.v)).toFixed(1)}% ${scaleWords()} · ${r.n} questions`] } : null; } }));
   if (L.radarSrc === 'judged' && judgedCalibrated()) return areas.map(a => ({ key: a, label: a,
     get: m => { const r = areaJudged(m, a); return r.v == null ? null
       : { n: r.v / 4, rows: [`${num(r.v, 2)} / 4 · ${r.k} of ${r.n} topics`] }; } }));
@@ -9373,11 +9467,11 @@ function rvFindings(p) {
   const out = [el('div', { class: 'kvs' },
     el('span', {}, el('b', { text: p.category + ' ' }),
       ev.topic_score_report != null ? `${num(ev.topic_score_report, 2)} / 4` : '—',
-      el('span', { class: 'se', text: ` on ${ev.topic_n_report ?? '—'} report-half questions` })),
-    el('span', {}, el('b', { text: 'diagnosis half ' }),
+      el('span', { class: 'se', text: ` on ${ev.topic_n_report ?? '—'} hidden questions` })),
+    el('span', {}, el('b', { text: 'practice questions ' }),
       ev.topic_score_diagnose != null ? `${num(ev.topic_score_diagnose, 2)} / 4` : '—',
       el('span', { class: 'se', text: ` on ${ev.topic_n_diagnose ?? '—'} answers · `
-        + `${ev.diagnose_weak ?? '—'} fell short` })),
+        + `${ev.diagnose_weak ?? '—'} scored below 3 of 4` })),
     el('span', {}, el('b', { text: 'judge ' }), ev.judge_id || '—'))];
   const caution = (t && t.propose && t.propose.caution) || ev.mmlu_caution;
   if (caution)
@@ -9396,8 +9490,8 @@ function rvExamples(ev) {
   const ex = ev.examples || [];
   if (!ex.length) return '';
   const det = el('details', {}, el('summary', { class: 'small', style: 'cursor:pointer',
-    text: `Show ${ex.length} of the ${ev.n_shown} judge assessments the LLM saw — diagnosis `
-      + 'half only, question text removed' }));
+    text: `Show ${ex.length} of the ${ev.n_shown} judge comments the AI read — practice `
+      + 'questions only, their wording taken out' }));
   det.append(el('div', { style: 'margin-top:8px' }, ex.map(e => el('div', { class: 'ex' },
     el('div', { text: e.justification }),
     el('div', { class: 'kv' }, el('b', { text: `scored ${e.score} of 4` }),
@@ -9426,20 +9520,20 @@ function rvJust(mid, topic) {
   const key = mid + '|' + topic;
   const j = state.rv.just[key];
   const det = el('details', { class: 'dxex', open: state.rv.justOpen === key ? '' : null },
-    el('summary', { text: 'What the judge wrote about the answers that fell short '
-      + '(diagnosis half only, question text removed)',
+    el('summary', { text: 'What the judge wrote about the answers that scored below 3 of 4 '
+      + '(practice questions only, their wording taken out)',
       onclick: () => { state.rv.justOpen = state.rv.justOpen === key ? '' : key;
                        loadJust(mid, topic); } }));
   if (state.rv.justOpen !== key) return det;
   if (!j || j.loading) { det.append(el('p', { class: 'small', text: 'loading…' })); return det; }
   if (j.error || !(j.items || []).length) {
     det.append(el('p', { class: 'small', text: j.error
-      || 'The judge wrote no assessment of a diagnosis-half answer that fell short here.' }));
+      || 'The judge wrote no comment on a practice answer that scored below 3 of 4 here.' }));
     return det;
   }
   det.append(el('p', { class: 'small', text: `${j.counts.diagnose_weak} of `
-    + `${j.counts.diagnose_items} diagnosis-half answers scored below 3 of 4; the first `
-    + `${j.items.length} are shown. This is exactly what a proposal would be built from.` }));
+    + `${j.counts.diagnose_items} practice answers scored below 3 of 4. The first `
+    + `${j.items.length} are shown. A proposal is built from exactly these.` }));
   det.append(el('ul', {}, j.items.map(it => el('li', {},
     el('span', { class: 'q', text: it.justification }),
     el('span', { class: 'kv' }, el('b', { text: `scored ${it.score} of 4` }),
@@ -9463,14 +9557,13 @@ function rvTopicPicker() {
       note('No model has sat the exam yet. Write the bank on the Exam tab, then submit a '
         + 'model with suite=judged.'));
   const card = el('div', { class: 'card' }, el('h2', { text: 'Pick a topic' }),
-    el('p', { class: 'sub', text: 'The exam is the instrument: it says, per topic, how good '
-      + 'each model is and why. Weakest first, on the report half — the diagnosis half is '
-      + 'what a proposal may read and is never the score.' }),
+    el('p', { class: 'sub', text: 'Each topic\'s weakest model, weakest first, on the hidden '
+      + 'questions. A proposal reads only the practice questions; they are never the score.' }),
     el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
       el('thead', {}, el('tr', {}, el('th', { text: 'topic' }),
         el('th', { class: 'num', text: 'weakest model' }), el('th', { class: 'num', text: 'its score' }),
         el('th', { class: 'num', text: 'models judged' }),
-        el('th', { class: 'num', text: 'report-half questions' }), el('th', { text: '' }))),
+        el('th', { class: 'num', text: 'hidden questions' }), el('th', { text: '' }))),
       el('tbody', {}, rows.map(r => {
         const nr = r.weakest.t.n_report ?? r.weakest.t.n;
         return el('tr', { class: (state.rv.topic === r.topic ? 'domrow' : null)
@@ -9509,8 +9602,8 @@ function rvTopicDetail(llmOk) {
       el('div', { class: 'mhead' },
         el('h3', {}, el('a', { class: 'mlink', text: m.name,
           href: '#model=' + encodeURIComponent(m.id) })),
-        el('span', { class: 'small', text: `${num(v, 2)} / 4 on ${nr} report-half questions `
-          + `· ${num(t.score_diagnose, 2)} / 4 on ${t.n_diagnose} diagnosis-half`
+        el('span', { class: 'small', text: `${num(v, 2)} / 4 on ${nr} hidden questions `
+          + `· ${num(t.score_diagnose, 2)} / 4 on ${t.n_diagnose} practice`
           + ((m.tainted || []).includes(task) ? ' · trained on this topic' : '') })),
       el('div', { class: 'frm' }, g ? proposeBtn(m.id, topic, g) : '', proposeWhy(g),
         g && g.caution ? el('span', { class: 'propwhy', text: 'caution — MMLU: ' + g.caution }) : ''),
@@ -9523,7 +9616,7 @@ function rvTopicDetail(llmOk) {
 function rvProposal(p, llmOk) {
   const ev = p.evidence || {};
   const head = el('div', { class: 'mhead' },
-    el('h3', { text: `#${p.id} · ${p.model} · ${p.task} · ${p.category}` }),
+    el('h3', { title: p.task, text: `#${p.id} · ${p.model} · ${p.category}` }),
     el('span', {}, overBadge(p.override), ' ',
       el('span', { class: stClass(p.status === 'proposed' ? 'queued' : p.status === 'pending'
         ? 'running' : p.status === 'approved' ? 'done' : p.status), text: p.status })));
@@ -9536,8 +9629,8 @@ function rvProposal(p, llmOk) {
   const card = el('div', { class: 'rv' + (state.rv.landed === p.id ? ' landed' : ''),
     'data-proposal': p.id }, head, meta);
   if (p.status === 'pending')
-    card.append(el('p', { class: 'small', text: 'Waiting for the LLM batch to complete '
-      + `(batch ${p.batch_id}). Batches take minutes to hours; this page polls.` }));
+    card.append(el('p', { class: 'small', title: `batch ${p.batch_id}`, text: 'Waiting for the AI '
+      + 'to answer. That takes minutes to hours; this page checks by itself.' }));
   if (p.error) card.append(el('p', { class: 'warn', text: p.error }));
   if (p.override) card.append(el('p', { class: 'warn', 'data-over-provisional': 'proposal' },
     el('b', { text: 'Proposed over a provisional judge. ' }),
@@ -9548,14 +9641,14 @@ function rvProposal(p, llmOk) {
     el('b', { text: 'Provisional. ' }), `${upFirst(ev.provisional_reason)}: ${ev.served_model} at `
     + `${ev.base_url}` + (ev.weights ? ` (weights ${ev.weights})` : '') + '.'));
   if (p.spec_text) {
-    card.append(el('div', { class: 'dxh', text: 'Proposed skill spec (the LLM\'s words)' }));
+    card.append(el('div', { class: 'dxh', text: 'The missing skill, in the AI\'s words' }));
     card.append(el('p', { class: 'spec', text: p.spec_text }));
     card.append(el('div', { class: 'kvs' },
       ev.share_explained != null ? el('span', {}, el('b', { text: 'explains ' }),
         pct(ev.share_explained, 0) + ' of the failures shown') : '',
       el('span', {}, el('b', { text: 'failures ' }),
-        `${ev.diagnose_wrong ?? '—'} of ${ev.diagnose_items ?? '—'} diagnosis-half items in `
-        + `${p.category}; ${ev.n_shown ?? '—'} shown to the LLM`)));
+        `${ev.diagnose_weak ?? '—'} of ${ev.diagnose_items ?? '—'} practice answers in `
+        + `${p.category} scored below 3 of 4; the AI read ${ev.n_shown ?? '—'} of them`)));
     if ((ev.patterns || []).length)
       card.append(el('ul', { class: 'small', style: 'margin:4px 0 6px' },
         ev.patterns.map(x => el('li', { text: x }))));
@@ -9564,7 +9657,7 @@ function rvProposal(p, llmOk) {
     card.append(el('div', { class: 'dxh', text: 'Approved as edited' }));
     card.append(el('p', { class: 'spec', text: p.edited_text }));
   }
-  card.append(el('div', { class: 'dxh', text: 'What the diagnosis says about this task' }));
+  card.append(el('div', { class: 'dxh', text: 'What the judge found on this topic' }));
   card.append(rvFindings(p));
   card.append(rvExamples(ev));
   if (p.status === 'proposed') {
@@ -9629,18 +9722,17 @@ function rvProposal(p, llmOk) {
       if (n >= 1 && n <= 1000) fillFocus(p, n, planP); });
     fillFocus(p, +count.value, planP);
     card.append(el('div', { class: 'dxh', text: 'Generate' }),
-      el('p', { class: 'small', text: 'The generator receives the approved spec above, the '
-        + 'topic, the count, the format and a style constraint. No benchmark item and no exam '
-        + 'question, in any form. Documents are the default: prose a person could learn from, '
-        + 'because question-and-answer pairs shaped like the exam are the most direct route to '
-        + 'teaching the test there is. Every document then passes the 13-gram contamination '
-        + 'gate against both halves of every benchmark AND every exam question. Today: '
-        + `${usage.usage_today ?? '—'} ${usage.daily_cap == null ? 'batch items used (no daily limit on '
-            + (usage.provider || 'this provider') + ')' : `of ${usage.daily_cap} batch items used`}.` }),
+      el('p', { class: 'small', text: 'The AI that writes documents gets the approved missing '
+        + 'skill, the topic, the count, the format and a style rule — never an exam question. '
+        + 'Documents are the default: prose a person could learn from. Every document then '
+        + 'passes the copy check: no document may copy 13 words in a row from any exam or '
+        + 'benchmark question. Today: '
+        + `${usage.usage_today ?? '—'} ${usage.daily_cap == null ? 'AI requests used (no daily limit on '
+            + (usage.provider || 'this provider') + ')' : `of ${usage.daily_cap} AI requests used`}.` }),
       planP,
       el('div', { class: 'frm' }, count, fmt,
         el('button', { class: 'primary', text: 'Generate data', disabled: llmOk ? null : '',
-          title: llmOk ? '' : (usage.reason || 'LLM not configured'),
+          title: llmOk ? '' : (usage.reason || 'no AI is set up here to write documents'),
           onclick: () => rvPost(`api/proposals/${p.id}/generate`,
             { requester: whoName(), count: +count.value, fmt: fmt.value }) }),
         // disabled says why, beside it, not only on hover
@@ -9725,7 +9817,7 @@ function rvDataset(d) {
   const g = pv.gate || {};
   const det = el('details', { class: 'rv', 'data-dataset': d.id },
     el('summary', { style: 'cursor:pointer' },
-      el('b', { text: `dataset #${d.id}` }), ` · ${d.model || '—'} · ${d.task || '—'} · `
+      el('b', { text: `dataset #${d.id}` }), ` · ${d.model || '—'} · `
       + `${d.category || '—'} · ${d.fmt} · `,
       el('span', { class: stClass(d.status === 'ready' ? 'done' : d.status === 'pending'
         ? 'running' : 'failed'), text: d.status }),
@@ -9792,14 +9884,12 @@ function vReview() {
   const llmOk = !!llm.configured && underCap(llm);
   const llmCard = el('div', { class: 'card' },
     el('h2', { text: 'Review' }),
-    el('p', { class: 'sub', text: 'The human in the loop. An LLM reads the judge\'s written '
-      + 'assessments of one model\'s DIAGNOSIS-half answers on one weak exam topic and '
-      + 'proposes the skill that is missing; you approve, edit or reject that sentence; only '
-      + 'the approved text reaches a generator, which never sees an exam question. Every '
-      + 'decision is recorded under the name you type — the tailnet is the auth boundary, so '
-      + 'that name is the record.' }),
+    el('p', { class: 'sub', text: 'The AI reads what the judge wrote about one model\'s '
+      + 'practice answers on a weak topic, and names the skill that is missing. You approve, '
+      + 'edit or reject it. Only the approved text reaches the AI that writes documents. '
+      + 'Every decision is recorded under your name.' }),
     el('div', { class: 'kvs' },
-      el('span', {}, el('b', { text: 'LLM ' }), llm.configured
+      el('span', {}, el('b', { text: 'the AI ' }), llm.configured
         ? `${llm.provider}/${llm.model || '—'}` : 'not configured'),
       llm.configured ? usageLine(llm) : '',
       llm.datasets_quota_bytes ? el('span', {}, el('b', { text: 'dataset storage ' }),
@@ -9868,7 +9958,7 @@ function modelAnswers(m, cats) {
   }
   const rep = j.report_half || {};
   wrap.append(el('p', { class: 'note', 'data-report-half': '1' },
-    el('b', { text: 'The report half. ' }),
+    el('b', { text: 'The hidden questions. ' }),
     `${rep.n ?? 0} questions, mean ${num(rep.mean, 2)} / 4`
     + (Object.entries(rep.flags || {}).filter(([, n]) => n).length
        ? ' · ' + Object.entries(rep.flags).filter(([, n]) => n)
@@ -9877,7 +9967,7 @@ function modelAnswers(m, cats) {
   const rows = ansVisible(j);
   wrap.append(ansFilters(j));
   wrap.append(el('p', { class: 'small', 'data-answer-count': String(rows.length),
-    text: `${rows.length} of ${j.n_diagnose} diagnosis-half answers` }));
+    text: `${rows.length} of ${j.n_diagnose} practice answers` }));
   const pg = paged('answers', rows,
     JSON.stringify([a.model, a.topic, a.acuity, a.flag, a.score, a.crit, a.sort]));
   wrap.append(pg.pager);
@@ -10066,7 +10156,7 @@ function proposeControl(r) {
                line: `Proposal #${j.id} requested for ${model}. It lands on the Review tab when `
                  + 'the batch completes.' };
     }, { ...attrs, class: 'primary', 'data-gate': 'ok',
-         title: `ask the LLM what skill ${model} is missing on ${r.topic}` }), actNote(slot));
+         title: `ask the AI what skill ${model} is missing on ${r.topic}` }), actNote(slot));
   if (gate.overridable)
     return el('div', {}, el('button', { ...attrs, class: 'secondary dot-warn',
       'data-gate': 'overridable', text: 'Propose…', title: gate.why,
@@ -10180,7 +10270,7 @@ function vLoop() {
         : 'no questions yet',
         r.bank.accepted && r.bank.under_floor
           ? el('div', { class: 'se', 'data-under-floor': '1',
-              text: `under ${r.bank.floor} report-half questions` }) : '',
+              text: `under ${r.bank.floor} hidden questions` }) : '',
         r.bank.awaiting ? el('div', { class: 'se', text: `${r.bank.awaiting} awaiting curation` }) : ''),
       el('td', { class: 'small' },
         el('a', { href: '#tab=exam', 'data-fallback': r.rubric.fallback ? '1' : null,
@@ -10193,7 +10283,7 @@ function vLoop() {
           ? el('div', { class: 'se', text: `${r.rubric.criteria_count} criteria` }) : ''),
       el('td', { class: 'small', 'data-loop-score': last ? last.model : '' }, last
         ? el('span', {}, `${num(last.score_report, 2)} / 4 `,
-            el('span', { class: 'se', text: `(${last.n_report ?? 0} report-half) ` }),
+            el('span', { class: 'se', text: `(${last.n_report ?? 0} hidden) ` }),
             ...judgedBadges(last), ' ',
             el('a', { href: '#topic=' + r.slug, 'data-read': r.slug, text: 'read the results',
               onclick: e => { e.preventDefault(); loopGo(r, 'read'); } }))
@@ -10276,8 +10366,8 @@ function vTopic() {
           `${r.rubric.criteria_count} criteria`, { 'data-read-criteria': r.rubric.name })] : ''),
       el('span', {}, el('b', { text: 'next ' }), st.label)),
     r.bank.under_floor && r.bank.accepted ? el('p', { class: 'warn', text:
-      `${r.bank.report} report-half questions — under the ${r.bank.floor} this topic needs `
-      + 'before anything may be proposed from it. Import or write more on the Exam tab.' }) : '',
+      `${r.bank.report} hidden questions — under the ${r.bank.floor} a topic needs before `
+      + 'anything is proposed from it. Import or write more on the Exam tab.' }) : '',
     el('div', { class: 'frm' },
       r.next.step === 'propose' ? proposeControl(r) : loopBtn(r)),
     judgingLine(r),
@@ -10383,7 +10473,7 @@ function loopSitPanel(r) {
     el('h2', { text: 'Sit the exam' }),
     el('p', { class: 'sub', text: 'One model, this topic — the same judged suite, narrowed to '
       + 'the tasks you tick. The answers are graded by the pinned judge when the run finishes; '
-      + 'nothing here touches the report half except the judge.' }),
+      + 'only the judge sees the hidden questions.' }),
     state.loop.blocked ? el('p', { class: 'warn', 'data-sit-blocked': '1',
       text: state.loop.blocked }) : '',
     el('div', { class: 'frm' },
@@ -10552,9 +10642,9 @@ function loopAnswersPanel(r) {
   const models = ansJudgedModels(r.task);
   const card = el('div', { class: 'card', 'data-panel': 'answers' },
     el('h2', { text: 'The answers' }),
-    el('p', { class: 'sub', text: 'What the model actually wrote on this topic\'s DIAGNOSIS '
-      + 'half, and what the judge made of each answer. The report half is the published '
-      + 'score: it appears below as one line and never as a row — not its questions, not '
+    el('p', { class: 'sub', text: 'What the model wrote on this topic\'s practice questions, '
+      + 'and what the judge made of each answer. The hidden questions are the score: they '
+      + 'appear below as one line and never as a row — not their questions, not '
       + 'its answers, not its qids.' }));
   if (!models.length) {
     card.append(empty('No model has been judged on this topic yet.', 'Sit the exam', () => {
@@ -10594,7 +10684,7 @@ function loopAnswersPanel(r) {
   }
   const rep = j.report_half || {};
   card.append(el('p', { class: 'note', 'data-report-half': '1' },
-    el('b', { text: 'The report half. ' }),
+    el('b', { text: 'The hidden questions. ' }),
     `${rep.n ?? 0} questions, mean ${num(rep.mean, 2)} / 4`
     // the flags OF THIS HALF: the whole-bank count under this heading would
     // be a claim about the published score that is not true of it
@@ -10610,7 +10700,7 @@ function loopAnswersPanel(r) {
   const rows = ansVisible(j);
   card.append(ansFilters(j));
   card.append(el('p', { class: 'small', 'data-answer-count': String(rows.length),
-    text: `${rows.length} of ${j.n_diagnose} diagnosis-half answers` }));
+    text: `${rows.length} of ${j.n_diagnose} practice answers` }));
   const pg = paged('answers', rows,
     JSON.stringify([a.model, a.topic, a.acuity, a.flag, a.score, a.crit, a.sort]));
   card.append(pg.pager);
@@ -10728,7 +10818,7 @@ function exCandidate(c) {
     el('div', { class: 'dxh', text: 'Reference (what a full-marks answer must contain)' }), ref,
     el('p', { class: 'small', text: 'Edit freely — the text you accept is what gets hashed, and '
       + 'the hash decides which half it lands in. You will not see it again if it lands in '
-      + 'the report half.' }),
+      + 'the hidden half.' }),
     el('div', { class: 'frm' },
       el('button', { class: 'primary', text: 'Accept into the bank', onclick: () => exPost(
         `api/exam/candidates/${c.cid}/accept`, { approver: whoName(), prompt: prompt.value,
@@ -10748,8 +10838,8 @@ function vExam() {
   const pending = topics.reduce((a, t) => a + (sum[t].pending || 0), 0);
   const head = el('div', { class: 'card' },
     el('h2', {}, 'Exam', infoTip('The instrument. One question bank across the topics; a person '
-      + 'imports a bank, or an LLM drafts candidates and a person accepts, edits or rejects each '
-      + 'one here. Every accepted question is split by the hash of its text into a report half — '
+      + 'imports a bank, or the AI drafts candidates and a person accepts, edits or rejects each '
+      + 'one here. Every accepted question is split by the hash of its text into a hidden half — '
       + 'the published per-topic score — and a diagnose half — the only half a proposal may '
       + 'read. That split is what lets the loop train on what the exam finds and still have an '
       + 'honest number.')),
@@ -10932,7 +11022,7 @@ function exImportPreview(p) {
     p.invalid ? el('p', { class: 'warn' }, el('b', { text: 'Unusable: ' }),
       (p.invalid_items || []).map(x => `#${x.index + 1}${x.id != null ? ` (id ${x.id})` : ''}`)
         .join(', ') + ' — no prompt, or shorter than 15 characters. They are skipped.') : '',
-    el('p', { class: 'small', text: `${p.report} of these land in the report half and are not `
+    el('p', { class: 'small', text: `${p.report} of these land in the hidden half and are not `
       + 'shown below, here or anywhere else — that is the split, and it applies to a bank you '
       + 'wrote yourself.' }),
     el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
@@ -11264,7 +11354,8 @@ function render() {
   } else if (_settle) {
     requestAnimationFrame(settleAgain);
   }
-  for (const [k, x] of hkeep) {
+  hfadeUpdate(view);                     // decides which boxes scroll…
+  for (const [k, x] of hkeep) {          // …so the old sideways scroll can come back
     const e = view.querySelector(`[data-hkeep="${k}"]`);
     if (e) e.scrollLeft = x;
   }
@@ -11543,10 +11634,7 @@ function renderTabs() {
         'aria-label': 'more tabs' },
       more.map(([id, label]) => el('button', { role: 'menuitem', 'data-tab': id,
         'aria-current': (state.model ? '' : state.tab) === id ? 'page' : null,
-        text: label, onclick: () => { popClose(); go(id); } })),
-      LIVE && DATA && DATA.demo ? el('a', { role: 'menuitem', class: 'menulink', id: 'demoItem',
-        href: DATA.demo.href, 'data-demo': 'link', text: 'Sandbox run',
-        title: 'a demo run\'s own page — provisional, not the board' }) : ''),
+        text: label, onclick: () => { popClose(); go(id); } }))),
       { key: 'more' });
     tabs.replaceChildren(...main.map(([id, label]) =>
       el('button', { role: 'tab', 'data-tab': id, onclick: () => go(id), text: label })),
@@ -11644,25 +11732,29 @@ function renderFresh() {
   // a static report is not live and says nothing about being live: no badge
   if (!LIVE) { chip.hidden = true; return; }
   chip.hidden = false;
-  const stale = NET.fails > 0 && NET.lastOk;
+  // 11h: the time is the last check that worked, so it moves with every
+  // poll — the data's own time ("17:29" at 17:45) looked frozen. Checks that
+  // fail for more than two intervals turn it amber: STALE, at the last good one
+  const stale = NET.fails > 0 && NET.lastOk && Date.now() - NET.lastOk > 2 * POLL_MS;
   // the live dot covers the judge too: a board that refreshes while nothing
   // can grade is not all green
   const judge = judgeDown();
   chip.dataset.fresh = stale ? 'stale' : judge ? 'judge-offline' : 'ok';
-  // 11b: the badge is the whole state. "LIVE · 12:33" when the polls land,
-  // and the same words as before when they do not
-  const at = refreshedAt();
-  chip.title = judge ? judgeWhy() : `refreshed ${DATA.generated}`;
+  const at = checkedAt();
+  const ago = NET.lastOk ? Math.max(0, Math.round((Date.now() - NET.lastOk) / 1000)) : null;
+  chip.title = (judge ? judgeWhy() + '\n' : '') + `data last changed ${refreshedAt() || '—'}`
+    + (ago != null ? ` · checked ${ago < 60 ? ago + ' s' : Math.round(ago / 60) + ' min'} ago` : '');
   chip.replaceChildren(el('span', { class: 'dot ' + (stale || judge ? 'warn' : 'ok') }),
-    stale ? `last update ${rel(NET.lastOk / 1000)} ago — retrying`
-          : judge ? `refreshed ${at} · judge offline` : `LIVE · ${at}`);
+    stale ? `STALE · ${at}` : judge ? `LIVE · ${at} · judge offline` : `LIVE · ${at}`);
 }
+// the last check that worked, as the clock on the wall reads it
+const checkedAt = () => NET.lastOk ? new Date(NET.lastOk).toTimeString().slice(0, 5) : refreshedAt();
+const POLL_MS = 5000;
 
 // static shell bits (rendered whenever a payload arrives)
 function renderStatic() {
   if (LIVE) document.getElementById('pageSub').textContent =
-    'Live team benchmark: submit models, track training runs, compare results — '
-    + 'updates as work finishes.';
+    'Submit models, follow training runs and compare the results. It updates as work finishes.';
   renderWarnings();
   // the model filters moved into the Models tab, where what they filter is on
   // screen beneath them; each one carries its own count there
@@ -11901,7 +11993,7 @@ if (LIVE) {
     // /api/loop, so a board whose first load failed stayed empty for as long
     // as the tab was open — which is exactly what happened on the live tree
     if (state.tab === 'loop' || state.topic) loadLoop();
-  }, 5000);
+  }, POLL_MS);
 } else {
   initData(DATA);
 }

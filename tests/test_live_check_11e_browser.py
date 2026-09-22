@@ -207,15 +207,17 @@ def test_every_tab_is_itself_at_its_centre_and_the_strip_never_scrolls(live, pag
 # ---------------------------------------------------------------------------
 
 def test_the_live_badge_and_the_status_line_show_the_refresh_time(live, page):
+    """11e: a time, not a timezone. 11h: the time of the last check, and the
+    data's own time in the badge's title."""
     served(page, lambda b: b.update(generated="2026-09-22 15:17 +04"))
     open_lb(page, live["base"])
-    page.wait_for_function("() => liveBadge.textContent.includes('15:17')")
+    page.wait_for_function("() => /\\d\\d:\\d\\d/.test(liveBadge.textContent)")
+    now = page.evaluate("new Date(NET.lastOk).toTimeString().slice(0, 5)")
     badge = page.locator("#liveBadge").text_content()
-    assert "15:17" in badge and "+04" not in badge
-    if page.locator("#liveBadge").get_attribute("data-fresh") == "ok":
-        assert badge.strip() == "LIVE · 15:17"
+    assert now in badge and "+04" not in badge
+    assert "data last changed 15:17" in page.locator("#liveBadge").get_attribute("title")
     line = page.locator(".statusline").first.text_content()
-    assert "live 15:17" in line and "+04" not in line
+    assert f"live {now}" in line and "+04" not in line
     assert page.errors == []
 
 
@@ -452,7 +454,8 @@ def test_every_highlight_value_is_one_line(live, page, width):
     for v in vals:
         assert v["h"] < 1.5 * v["lh"], v
         assert not v["clipped"], v
-        assert v["fs"] == "28px" and "mono" in v["ff"].lower(), v
+        # 11h: 28px, in the sans face with tabular figures
+        assert v["fs"] == "28px" and "mono" not in v["ff"].lower(), v
     by = {v["k"]: v["t"] for v in vals}
     assert re.fullmatch(r"\d+\.\d", by["best"])
     assert re.fullmatch(r"\d\.\d\d / 4", by["weakest"])
@@ -462,7 +465,8 @@ def test_every_highlight_value_is_one_line(live, page, width):
     name = page.locator("[data-hl-name='best']")
     assert name.text_content() == "qwen35-delta-moe-7d560104-step945-v2"
     look = name.evaluate("e => [getComputedStyle(e).fontSize, getComputedStyle(e).textOverflow, e.title]")
-    assert look[0] == "16px" and look[1] == "ellipsis" and look[2].startswith("fx/")
+    # 11h: the name line is 14px, weight 600
+    assert look[0] == "14px" and look[1] == "ellipsis" and look[2].startswith("fx/")
     # the canary: two decimals
     v = page.locator("[data-verdict='judge']").text_content()
     for x in re.findall(r"(\d+\.\d+) from the (?:human marks|last run)", v):
@@ -627,8 +631,10 @@ def test_the_spacing_the_badge_and_the_links(live, page):
     page.set_viewport_size({"width": 1512, "height": 900})
     page.goto(live["base"] + "/")
     page.wait_for_selector("[data-statline]")
+    # 11h: Submit a model is on the hero's right now; the stats line sits
+    # 12px under the whole hero
     gap = page.evaluate("""() => document.querySelector('[data-statline]').getBoundingClientRect().top
-      - document.querySelector('[data-submit-model]').getBoundingClientRect().bottom""")
+      - document.getElementById('pagehero').getBoundingClientRect().bottom""")
     assert abs(gap - 12) <= 1, gap
     open_lb(page, live["base"], "&open=" + TOP)
     ins = page.evaluate("""() => { const c = document.querySelector('[data-insights]');

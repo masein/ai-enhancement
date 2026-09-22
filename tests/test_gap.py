@@ -122,7 +122,7 @@ def test_topic_gate_refuses_a_preliminary_suite_and_an_empty_writer(tree):
     assert bad["ok"] is False and "preliminary" in bad["why"] and "0.4" in bad["why"]
     assert rep.topic_gate(TASK, good, None, None)["ok"] is False
     thin = rep.topic_gate(TASK, {**good, "n_report": 12}, ok_state, None)
-    assert "12 report-half questions" in thin["why"]
+    assert "12 hidden questions" in thin["why"]              # 11h: plain words
     empty = rep.topic_gate(TASK, {"n_report": 40, "answers": {"n": 40, "empty": 18, "short": 4,
                                                               "distinct": 20}}, ok_state, None)
     assert "wrote nothing usable on 22 of 40" in empty["why"] and "multiple choice" in empty["why"]

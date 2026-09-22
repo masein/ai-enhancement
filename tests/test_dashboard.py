@@ -123,7 +123,7 @@ def test_model_page_shows_the_diagnose_card(surface, diag):
     tvd = diag["fx/skewed-360m"]["tasks"]["mmlu"]["answers"]["pick_skew"]
     assert abs(float(m.group(1)) - 100 * (1 - tvd)) < 0.15
     # the examples are labelled as the diagnosis half, and there are some
-    assert mmlu.locator("details.dxex summary").text_content().endswith("(diagnosis half only)")
+    assert mmlu.locator("details.dxex summary").text_content().endswith("(practice half only)")
     assert mmlu.locator("details.dxex li").count() > 0
     assert surface.errors == []
 
@@ -293,14 +293,15 @@ def test_judged_section_and_the_control_sentence(surface, tree):
     card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
     assert card.count() == 1
     text = card.text_content()
-    assert "Counts." in text and "Cohen's κ" in text and "for judge stub/overlap-v1" in text
+    # 11h: plain words — κ is "agreement with a person"
+    assert "Counts." in text and "Agreement with a person:" in text and "stub/overlap-v1" in text
     assert "Canary steady." in text and "fixed scripts re-graded" in text
     assert card.locator("[data-canary='steady']").count() == 1
     assert "STUB grader" in text                                  # never mistaken for a judgement
     assert "Knew it, couldn't pick it" in text
     m = re.search(r"of the (\d+) control items this model got wrong as multiple choice, it answered (\d+)", text)
     assert m and int(m.group(2)) / int(m.group(1)) >= 0.5
-    assert "By topic (0–4), weakest first within each area — report half" in text
+    assert "By topic (0–4), weakest first within each area — hidden questions" in text
     assert "Score against answer length" in text and "Economics" in text
     # topics, score-vs-length, the control — plus one per-criterion table for
     # every topic graded criterion by criterion, and one breakdown table per
@@ -333,7 +334,7 @@ def test_judged_columns_appear_once_calibrated(surface):
     heads = [h for h, _ in ths]
     judged = [(h, tip) for h, tip in ths if "0–4" in tip]
     assert len(judged) >= 4 and any(h == "Judged" for h, _ in judged)
-    assert any(h.startswith("Economics") and "κ" in tip for h, tip in judged)
+    assert any(h.startswith("Economics") and "agreement" in tip for h, tip in judged)
     assert not any(h.startswith(("fr_", "exam_")) for h in heads)   # never as a task column
     row = pg.locator("table.lb tbody tr[data-lb-row='fx/good-750m']")
     assert float(row.locator("[data-judged-avg]").text_content()) >= 0
@@ -346,10 +347,10 @@ def test_what_the_training_taught(surface, tree):
     assert card.count() == 1
     text = card.text_content()
     assert "before — good-750m" in text and "after — good-750m-tuned-test" in text
-    assert "leaderboard half (never in the training data)" in text
+    assert "hidden half (never in the training data)" in text
     v = card.locator("[data-verdict]")
     assert v.get_attribute("data-verdict") == "test" and "warn" in v.get_attribute("class")
-    assert "The training taught the test" in text and "Ratio of the two deltas" in text
+    assert "The training taught the test" in text and "Ratio of the two changes" in text
     assert "By category — the half we never touched" in text
     assert card.locator("table.jd").nth(1).locator("tbody tr").count() >= 4
     # the category rows in Diagnose carry the same deltas
@@ -443,7 +444,8 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
         assert banner.count() == 1
         text = banner.text_content()
         assert text.startswith("Provisional. Graded by a local model — not a pinned benchmark")
-        assert "whose id cannot be pinned" in card.locator("p.sub").text_content()
+        # 11h: the card says what it is in one line; how it works is behind a click
+        assert "whose id cannot be pinned" in card.locator("[data-how-judged]").text_content()
         assert "chat at http://localhost:8000/v1 (weights google/gemma-4-E4B-it)" in text
         assert "Preliminary." in card.text_content() and "Judged average" not in card.text_content()
         # the second stamp, independent of the judge: a rubric its author has

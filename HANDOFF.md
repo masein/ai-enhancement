@@ -1176,6 +1176,71 @@ sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "
 6. A Queue row's `⋯` › Log opens the reader and follows a running job.
 7. Every reader's link, pasted into a new tab, opens it; Back closes it.
 
+### 11h — the first page, and the 11e findings
+
+Brief: `docs/prompts/phase-11g-read-and-first-page.md`, 11h. One PR.
+
+- **One font rule** for the board. Mono is for numbers in tables, cards and
+  charts, column headers, eyebrows and section numbers, badges, model ids
+  (`.mid`), the LIVE badge and the log reader. Everything read as words —
+  pills and buttons, chips, the stats and status lines, captions, card
+  links, the footer, the tooltip — is sans.
+- **The Overview**: a compact hero on one row (the eyebrow, one line, the
+  two guide links; **Submit a model** on the right), no second title (the
+  bar has it; the `h1` stays for screen readers only), the stats line in
+  sans 14px under it. The highlight cards: the value in sans 28px bold
+  with tabular figures, the name 14px on one line, the verdict muted, the
+  link in the accent with no underline until hover; four cards of one
+  height with their links on one line. The hover on a Top models row
+  covers the whole row.
+- **One scale**: an area's MMLU number follows the **Scale** pill in its
+  column, in the opened row's bars and on the radar (`areaScaled`); the
+  column's tooltip and the bars' caption say which scale.
+- **No page scrolls sideways**: a Leaderboard wider than its card scrolls in
+  its own box at any width (`.hscroll`, decided after each render), with #
+  and Model pinned and the fade and "scroll →" on the right; only then does
+  its header stop sticking to the page.
+- **The phone**: below 720px the six pills are one **Filters ▾** (with a
+  count when any is set, e.g. "Filters · 2") that opens a sheet from the
+  bottom; the chips are one row that scrolls; the pager is one line.
+- **LIVE** shows the time of the last check that worked, so it moves with
+  every poll; the tooltip says "data last changed 17:29 · checked 12 s
+  ago"; after two missed intervals it turns amber: `STALE · 17:29`.
+- **Plain words** (§7) on every main tab: "hidden questions" for the report
+  half, "practice questions" for the diagnose half, "the AI", "the missing
+  skill", "agreement with a person" for κ, "scored below 3 of 4", "the copy
+  check". Task ids, judge.json and fingerprints moved to tooltips, Details
+  and the Provenance tab. The propose gate's own reasons follow suit. The
+  Review card's blank failure count (`ev.diagnose_wrong`) now reads
+  `diagnose_weak`.
+- **"Sandbox run" is gone**: the menu item, `GET /demo`, `payload["demo"]`
+  and its cache stamp. `scripts/demo_loop.py` and `DEMO.md` stay, as a
+  command-line tool; DEMO.md says the dashboard no longer links to it.
+- 11h §6 (the opened row's Tasks list) needed nothing: 11f's list is one
+  line a task at 1,280px.
+
+**Deploy steps, after 11h merges.** Code only, no data step.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+```
+
+**Expected output:**
+
+1. `up -d --build` ends with the container healthy; the image build prints
+   `image files OK`.
+2. The log grep prints `no errors`.
+3. The Overview: one compact hero row with **Submit a model** on the right,
+   no second title, four cards with a sans number, and Top models visible
+   without scrolling at 1,280px and up.
+4. The Knowledge chip at 1,512px: the page does not scroll sideways; the
+   table does, in its own box. Its area numbers match the opened row's bars
+   under both scales.
+5. At 400px the Leaderboard table starts near the top, behind **Filters ▾**.
+6. The LIVE badge's time moves with each check.
+7. More ▾ has no "Sandbox run", and `/demo` is a 404.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

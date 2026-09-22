@@ -9,6 +9,9 @@ do, what came back, and where it landed.
 python3 scripts/demo_loop.py --topics Economics --model EleutherAI/pythia-160m
 ```
 
+The dashboard no longer links to the demo tree (11h): its page is in
+`$BENCH_ROOT/demo/report.html`, to open by hand.
+
 It is for comprehension. Nothing it writes goes near the live board: it works
 in `$BENCH_ROOT/demo/` — its own exam bank, results tree, datasets, database
 and batch state — everything it records is stamped `demo`, and the tree is

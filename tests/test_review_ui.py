@@ -173,14 +173,14 @@ def test_the_review_tab_starts_from_a_topic(live, page):
     assert "across the board" in detail.text_content()
     assert detail.locator("[data-topic-model]").count() >= 3
     first = detail.locator("[data-topic-model]").first
-    assert "report-half questions" in first.text_content()
+    assert "hidden questions" in first.text_content()
     # the judge's own words, fetched on demand and labelled
     first.locator("details.dxex summary").click()
     page.wait_for_selector("[data-topic-model] details.dxex li", timeout=15000)
     li = first.locator("details.dxex li").first
     assert "scored" in li.text_content()
-    assert "question text removed" in first.text_content()
-    assert "diagnosis-half answers scored below 3 of 4" in first.text_content()
+    assert "wording taken out" in first.text_content()
+    assert "practice answers scored below 3 of 4" in first.text_content()
     # and the propose button for the model that can be proposed from
     good = detail.locator("[data-topic-model='fx/good-750m']")
     assert good.locator("a.propose").count() == 1               # to the topic page
@@ -199,7 +199,8 @@ def test_review_flow_in_the_browser(live, page):
     # the LLM card says what is configured and what today has cost
     page.goto(base + "/#tab=review")
     page.wait_for_selector(".card h2:has-text('Review')")
-    assert "fake/fake-1" in page.locator("#view").text_content()
+    # the AI's line fills in when the service answers
+    page.wait_for_function("document.querySelector('#view').textContent.includes('fake/fake-1')")
     assert "Nothing waiting" in page.locator("#view").text_content()
     # a name, once, in the header: every decision on the page records it
     set_name(page, "Omar")
@@ -223,9 +224,10 @@ def test_review_flow_in_the_browser(live, page):
     card.locator("textarea").wait_for(timeout=E2E_MS)         # the poller and the 5 s poll
     text = card.text_content()
     assert "introductory Economics" in text                      # the topic as stored
-    assert "judge assessments the LLM saw" in text and "question text removed" in text
-    assert "report-half questions" in text and "fell short" in text
-    assert "fx/good-750m · exam_economics · Economics" in text
+    # 11h: plain words on the card; the task id is its title's tooltip
+    assert "judge comments the AI read" in text and "wording taken out" in text
+    assert "hidden questions" in text and "scored below 3 of 4" in text
+    assert "fx/good-750m · Economics" in text
     assert "judge stub/overlap-v1" in text
     card.locator("details summary").first.click()
     # every one it saw, up to the eight shown: graded by Economics' own
@@ -276,7 +278,8 @@ def test_review_flow_in_the_browser(live, page):
     page.wait_for_selector("table.lb")
     row = page.locator("table.lb tbody tr",
                        has=page.locator("a.mname", has_text=re.compile(r"^good-750m$"))).first
-    assert "trained on Economics diagnostics" in row.locator(".badge.taint").text_content()
+    # 11h: "trained on this topic's practice data", in plain words
+    assert "trained on Economics practice data" in row.locator(".badge.taint").text_content()
     page.goto(model_url(base, "fx/good-750m"))
     page.wait_for_selector(".backlink")
     head = page.locator("#view .card").first.text_content()
@@ -569,7 +572,7 @@ def test_the_topic_page_shows_the_answers_and_never_the_report_half(live, page):
     assert rows.count() == page.locator("[data-answer][data-half='diagnose']").count()
     # the published half is a sentence, and the only sentence
     line = page.locator("[data-report-half]").first.text_content()
-    assert "The report half." in line and "published score" in line
+    assert "The hidden questions." in line and "published score" in line
     # and no report-half question is anywhere in the document
     bank = eb.load_bank(root / "exam")["Medicine & Clinical Health"]
     report = [b for b in bank if eb.half_of(b["qid"]) == "report"]

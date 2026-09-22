@@ -230,7 +230,7 @@ def test_no_average_of_provisional_scores_appears_anywhere(live, page):
     text = page.locator("#view").text_content()
     assert page.locator("[data-area-mean]").count() == 0
     assert "Judged average" not in text
-    assert "provisional, not ranked" in text
+    assert "demo only, not ranked" in text
     # the Overview: the weakest-topic card is one model's own topic, labelled
     # provisional, and no card holds an area mean
     page.goto(live["base"] + "/")

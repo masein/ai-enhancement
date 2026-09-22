@@ -301,29 +301,22 @@ def test_the_run_ends_with_its_own_page(demo):
     assert "exam_economics" in html
 
 
-def test_the_service_serves_the_demo_page_apart_from_the_board(tmp_path, monkeypatch):
+def test_the_board_no_longer_serves_or_links_the_demo(tmp_path, monkeypatch):
+    """11h: "Sandbox run" is gone. The loop runs live, and a link to a practice
+    tree only confused people. The demo still writes its own page, for a
+    person to open by hand."""
     from conftest import make_service
     from service import config
     client, appmod, _ = make_service(tmp_path, monkeypatch)
     try:
-        # nothing has run yet: a page that says so, and how to run one
-        r = client.get("/demo")
-        assert r.status_code == 404
-        assert "No demo run yet" in r.text and "demo_loop.py" in r.text
-        assert "DEMO RUN" not in client.get("/").text        # the board is the board
-        fresh(appmod)
-        assert client.get("/api/results").json()["demo"] is None
-        # a run leaves a page behind, and the board grows one link to it
         page = config.BENCH_ROOT / "demo" / "report.html"
         page.parent.mkdir(parents=True, exist_ok=True)
         page.write_text("<html><body>DEMO RUN — a page</body></html>", encoding="utf-8")
-        assert "DEMO RUN — a page" in client.get("/demo").text
+        assert client.get("/demo").status_code == 404
         fresh(appmod)
-        demo = client.get("/api/results").json()["demo"]
-        assert demo["href"] == "/demo" and demo["at"] > 0
-        # ...without a restart: the file is part of the payload's cache key
-        assert appmod.demo_report_stamp() > 0
-        assert appmod.demo_report_stamp() in appmod._tree_key()
+        assert "demo" not in client.get("/api/results").json()
+        board = client.get("/").text
+        assert "Sandbox run" not in board and "DEMO RUN" not in board
     finally:
         client.__exit__(None, None, None)
 

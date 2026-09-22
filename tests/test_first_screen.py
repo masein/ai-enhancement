@@ -298,13 +298,14 @@ def test_freshness_turns_amber_when_the_polls_stop(browser, payload):
         pg = s.open()
         stamp = pg.locator("[data-stamp]")
         pg.wait_for_selector("[data-stamp][data-fresh='ok'] .dot.ok")
-        # 11b: the chip is the bar's LIVE badge — "● LIVE · 12:33", with the
-        # refresh time in full in its title
+        # 11b: the chip is the bar's LIVE badge — "● LIVE · 12:33"; 11h: the
+        # time is the last check that worked, and the data's own time is in
+        # its title
         assert re.fullmatch(r"LIVE · \d\d:\d\d", stamp.text_content())
-        assert "refreshed" in stamp.get_attribute("title")
+        assert "data last changed" in stamp.get_attribute("title")
         s.fail = True
-        pg.wait_for_selector("[data-stamp][data-fresh='stale'] .dot.warn", timeout=20000)
-        assert re.search(r"last update \d+[smh] ago — retrying", stamp.text_content())
+        pg.wait_for_selector("[data-stamp][data-fresh='stale'] .dot.warn", timeout=30000)
+        assert re.fullmatch(r"STALE · \d\d:\d\d", stamp.text_content())
         s.fail = False
         pg.wait_for_selector("[data-stamp][data-fresh='ok']", timeout=40000)
     finally:
