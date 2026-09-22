@@ -23,6 +23,7 @@ import pytest
 
 import exam_build as eb
 import judge as jd
+from conftest import assert_no_report_half_text
 
 REPO = Path(__file__).resolve().parents[1]
 RUBRICS = REPO / "eval_tasks" / "fr" / "rubrics"
@@ -365,9 +366,10 @@ def test_no_report_half_question_of_any_bank_leaves_it(five, tmp_path, monkeypat
             rows = eb.load_bank(root)[topic]
             report = [r for r in rows if eb.half_of(r["qid"]) == "report"]
             assert report, topic
-            for r in report:
-                assert r["prompt"] not in sent and r["prompt"][:60] not in sent
-                assert r["qid"] not in sent
+            # every free text of a report-half item, under any name: the
+            # 37-topic banks' `intent` is a sentence per question, and the
+            # audience line carried four of them until 10b
+            assert assert_no_report_half_text(sent, rows) >= len(report), topic
 
 
 # ---------------------------------------------------------------------------

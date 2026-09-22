@@ -15,7 +15,7 @@ import exam_build as eb
 import judge as jd
 import report_lm_eval as report
 from service import proposals as prop_mod
-from conftest import fresh, make_service
+from conftest import assert_no_report_half_text, fresh, make_service
 from service import contamination as ct
 from service import llm, llm_poller, runner
 
@@ -191,6 +191,7 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
     assert halves == {"report", "diagnose"}               # both are on file…
     for b in bank:                                       # …and neither is in the request
         assert b["prompt"] not in body, b["qid"]
+    assert assert_no_report_half_text(body, bank)          # nor anything else of the report half
     assert TOPIC in body and "rubric the judge graded against" in body
     assert p["prompt_sha"] == llm.prompt_sha(req["system"], req["user"])
 
@@ -228,6 +229,7 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
         assert ix.hits(body) == [], "a generation request carries benchmark text"
         assert not any(d["q"] in body for docs in tree["docs"].values() for d in docs if d["q"])
         assert "fx/good-750m" not in body and "doc_hash" not in body
+        assert_no_report_half_text(body, bank)
         assert "doc_hashes" not in q["meta"]
     assert client.get(f"/api/datasets/{did}/items.jsonl").status_code == 409   # not yet
 

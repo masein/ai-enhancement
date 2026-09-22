@@ -13,7 +13,7 @@ import pytest
 
 import diagnose as dx
 import exam_build as eb
-from conftest import make_service
+from conftest import assert_no_report_half_text, make_service
 from service import llm, llm_poller
 from service import proposals as prop
 
@@ -115,6 +115,7 @@ def test_a_quoted_question_never_reaches_the_request(gap):
         assert q not in body
     for frag in (" ".join(report_q.split()[:6]), " ".join(diagnose_q.split()[:6])):
         assert frag not in body
+    assert assert_no_report_half_text(body, eb.load_bank(tree["judged"]["exam_root"])[TOPIC])
     assert body.count(prop.REDACTED) == 2
     assert "The answer ignores the question" in body and "it answered neither" in body
     # and the reviewer sees the same redacted text, never the question

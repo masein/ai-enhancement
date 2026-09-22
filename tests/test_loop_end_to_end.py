@@ -20,7 +20,7 @@ import exam_build as eb
 import judge as jd
 import make_fixture
 import report_lm_eval as report
-from conftest import fresh, make_service
+from conftest import assert_no_report_half_text, fresh, make_service
 from service import llm, llm_poller
 from service import proposals as prop
 
@@ -90,6 +90,8 @@ def test_the_whole_loop(tmp_path, monkeypatch):
         assert all(dx.split_of(q) == "diagnose" for q in req["meta"]["qids"])
         for b in eb.load_bank(exam_root)[TOPIC]:              # THE RULE, both halves
             assert b["prompt"] not in body
+        # and nothing else a report-half question carries, under any name
+        assert assert_no_report_half_text(body, eb.load_bank(exam_root)[TOPIC])
         # and a question that was IMPORTED rather than drafted is no different:
         # a report-half question is a report-half question however it arrived
         imported = [b for b in eb.load_bank(exam_root)[make_fixture.IMPORT_TOPIC]
@@ -114,6 +116,7 @@ def test_the_whole_loop(tmp_path, monkeypatch):
             assert edited in gbody and "fx/good-750m" not in gbody
             for b in eb.load_bank(exam_root)[TOPIC] + imported:
                 assert b["prompt"] not in gbody
+            assert_no_report_half_text(gbody, eb.load_bank(exam_root)[TOPIC] + imported)
         assert llm_poller.tick() == 1
 
         # 9. GATE AND PROVENANCE

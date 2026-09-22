@@ -16,7 +16,7 @@ import pytest
 
 import exam_build as eb
 import judge as jd
-from conftest import make_service
+from conftest import assert_no_report_half_text, make_service
 from service import proposals as prop
 
 REPO = Path(__file__).resolve().parents[1]
@@ -213,9 +213,52 @@ def test_the_audience_reaches_both_requests_and_nothing_else_does(svc):
     assert sent.count("Audience: members of the public") == 2      # both requests
     assert "Register for documents:" in sent
     assert "Who asks the questions on this topic:" in sent         # the proposal's heading
-    for r in eb.load_bank(config.EXAM_DIR)[TOPIC]:
+    rows = eb.load_bank(config.EXAM_DIR)[TOPIC]
+    for r in rows:
         assert r["prompt"] not in sent and r["prompt"][:60] not in sent
         assert r["qid"] not in sent
+    # and nothing else a report-half question carries, whatever it is called
+    assert assert_no_report_half_text(sent, rows)
+
+
+def test_no_report_half_field_reaches_propose_or_generate_whatever_it_is_called(svc):
+    """The leak 10b found went through the audience line: a per-question
+    `intent` sentence, report half included, in every proposal and
+    generation request — and the leak tests looked only for prompts, over
+    requests built without the audience line. This one goes through the
+    endpoints, with a delivered bank whose intents are sentences, and checks
+    every free-text field of every report-half item against every body."""
+    client, _, tree = svc
+    import make_fixture
+    from service import config, llm, llm_poller
+    eb.import_bank(config.EXAM_DIR, LAW, "Law", "masein", "law_v1")
+    eb.build(tree["out_dir"], config.EXAM_DIR)
+    # its questions changed, so the judged models sit it again (10b)
+    make_fixture.sit_again(config.EXAM_DIR.parent, tree["out_dir"], ["exam_law"])
+    rows = eb.load_bank(config.EXAM_DIR)["Law"]
+    report = [r for r in rows if eb.half_of(r["qid"]) == "report"]
+    sentences = [r for r in report if " " in str((r.get("meta") or {}).get("intent") or "")]
+    assert len(sentences) > 30                   # the field that leaked is on file
+    r = client.post("/api/proposals", json={"model": "fx/good-750m", "topic": "Law",
+                                            "requested_by": "tester"})
+    assert r.status_code == 200, r.text
+    pid = r.json()["id"]
+    assert llm_poller.tick() == 1
+    assert client.post(f"/api/proposals/{pid}/approve",
+                       json={"approver": "Omar", "edited_text": ""}).status_code == 200
+    did = client.post(f"/api/proposals/{pid}/generate",
+                      json={"requester": "Omar", "count": 4}).json()["dataset_id"]
+    sent = [q for q in llm.client().recorded()
+            if q["custom_id"] == f"proposal:{pid}" or q["custom_id"].startswith(f"gen:{did}:")]
+    assert len(sent) >= 2
+    for q in sent:
+        body = q["system"] + "\n" + q["user"]
+        assert "Audience: people learning or practising the subject" in body   # the channel is open
+        assert assert_no_report_half_text(body, rows) >= 3 * len(report)       # prompt, reference, intent
+    # and the check is not vacuous: one report-half intent in a body fails it
+    leak = "Audience: " + sentences[0]["meta"]["intent"]
+    with pytest.raises(AssertionError, match="meta.intent"):
+        assert_no_report_half_text(leak, rows)
 
 
 def test_the_generation_prompt_asks_for_something_a_person_would_read():

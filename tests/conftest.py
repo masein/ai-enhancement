@@ -234,3 +234,49 @@ def all_rows(page, key: str, n: int = 100) -> None:
         sel.select_option(str(n))
         page.wait_for_function(f"document.querySelector(\"[data-pager='{key}'] "
                                f"[data-page-range]\").dataset.pageRange.startsWith('1-')")
+
+
+# ---------------------------------------------------------------------------
+# The split's rule, over the bodies actually sent. A report-half question may
+# reach the judge and nothing else — and a question is more than its prompt:
+# the 37-topic banks' `intent` is a sentence describing the question, and in
+# 10b four of them were going into every proposal and generation request
+# while the leak tests looked only for prompts. So these look for every free
+# text a report-half row carries, under whatever name its author gave it.
+# ---------------------------------------------------------------------------
+
+REPORT_TEXT_MIN = 12          # "yes no" is not a question's; a phrase of this length is
+
+
+def report_half_text(rows: list[dict]) -> list[tuple[str, str, str]]:
+    """(qid, field, text) for every free-text value a report-half row
+    carries: its prompt, its reference line, its notes, and each metadata
+    value that is a phrase rather than a label — `intent`, `domain`, or a
+    field no bank has used yet. A phrase that a diagnose-half row carries too
+    is not the report half's own, and is left out."""
+    import exam_build as eb
+
+    def texts(r):
+        vals = {"prompt": r.get("prompt"), "reference": r.get("reference"),
+                "notes": r.get("notes")}
+        vals.update({f"meta.{k}": v for k, v in (r.get("meta") or {}).items()})
+        return {k: v.strip() for k, v in vals.items()
+                if isinstance(v, str) and len(v.strip()) >= REPORT_TEXT_MIN
+                and any(c.isspace() for c in v.strip())}
+    shared = {t for r in rows if eb.half_of(r["qid"]) == "diagnose" for t in texts(r).values()}
+    return [(r["qid"], k, t) for r in rows if eb.half_of(r["qid"]) == "report"
+            for k, t in texts(r).items() if t not in shared]
+
+
+def assert_no_report_half_text(body: str, rows: list[dict]) -> int:
+    """Nothing of any report-half row in `body`: no qid, and none of its free
+    text, whole or its first sixty characters. Returns how many texts were
+    checked, so a test can say it checked something."""
+    import exam_build as eb
+    fields = report_half_text(rows)
+    leaked = [(q[:12], f, t[:70]) for q, f, t in fields
+              if t in body or (len(t) > 60 and t[:60] in body)]
+    assert not leaked, f"report-half text reached a request: {leaked[:5]}"
+    qids = [r["qid"] for r in rows if eb.half_of(r["qid"]) == "report" and r["qid"] in body]
+    assert not qids, f"report-half qids reached a request: {qids[:5]}"
+    return len(fields)

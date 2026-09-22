@@ -22,6 +22,7 @@ import pytest
 import exam_build as eb
 import judge as jd
 from service import llm
+from conftest import assert_no_report_half_text
 
 REPO = Path(__file__).resolve().parents[1]
 RETIRED = REPO / "eval_tasks" / "fr" / "retired"
@@ -292,8 +293,8 @@ def test_both_delivered_banks_keep_their_report_half_out_of_every_request(bank, 
         rows = eb.load_bank(root)[topic]
         report = [r for r in rows if eb.half_of(r["qid"]) == "report"]
         assert report, f"the split put nothing in the report half of {topic}"
-        for r in report:
-            assert r["prompt"] not in sent and r["prompt"][:60] not in sent
+        # the prompt, the reference line and any phrase in its metadata
+        assert assert_no_report_half_text(sent, rows) >= len(report)
         assert any(r["prompt"] in sent for r in rows if eb.half_of(r["qid"]) == "diagnose")
 
 
@@ -316,8 +317,6 @@ def test_an_imported_report_half_question_never_leaves_the_bank(bank, tmp_path, 
                                                                                   "escalation"}],
                                        {"diagnose_items": 1, "diagnose_weak": 1}, "rubric")])
     sent = "\n".join(r["system"] + "\n" + r["user"] for r in fake.recorded())
-    for r in report:
-        assert r["prompt"] not in sent
-        assert r["prompt"][:60] not in sent
+    assert assert_no_report_half_text(sent, rows) >= len(report)
     # the diagnose half is what may be shown as an example, and is
     assert any(r["prompt"] in sent for r in rows if eb.half_of(r["qid"]) == "diagnose")

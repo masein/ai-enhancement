@@ -19,7 +19,7 @@ import pytest
 
 import exam_build as eb
 import judge as jd
-from conftest import make_service
+from conftest import assert_no_report_half_text, make_service
 
 REPO = Path(__file__).resolve().parents[1]
 RETIRED = REPO / "eval_tasks" / "fr" / "retired"
@@ -315,8 +315,9 @@ def test_a_page_imported_report_half_question_never_leaves_the_bank(svc, tmp_pat
                                          "justification": "vague on escalation"}],
                                        {"diagnose_items": 1, "diagnose_weak": 1}, "rubric")])
     sent = "\n".join(r["system"] + "\n" + r["user"] for r in fake.recorded())
-    for r in report:
-        assert r["prompt"] not in sent and r["prompt"][:60] not in sent
+    # every free text a report-half row carries, not only its prompt: the
+    # reference line built from its metadata is one per question too
+    assert assert_no_report_half_text(sent, rows) >= len(report)
     # what the page itself serves for this topic is withheld the same way
     # the topic name carries "&", so it goes in the query string encoded — and
     # the check below means something only if the whole topic came back
