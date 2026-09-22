@@ -260,7 +260,9 @@ def test_no_tab_scrolls_sideways(live, browser, width):
             go_tab(pg, label)
             pg.wait_for_selector("#view > *")
             t = pg.locator(sel)
-            if t.count():
+            # an empty queue hides its table: nothing to measure, and a hidden
+            # parent has no width, which reads as nan
+            if t.count() and t.first.is_visible():
                 ok = t.first.evaluate("t => t.parentElement.scrollWidth <= t.parentElement.clientWidth + 1")
                 assert ok, f"{label}'s table is wider than its card at {width}px"
                 # and with room to spare: the narrowest the table can be, at most 95%
@@ -308,9 +310,10 @@ def test_the_leaderboard_shows_six_task_columns_and_says_how_many_are_hidden(bro
         assert pg.locator(f"tr[data-lb-row='{ranked[1]['id']}']").count() == 0
         pg.locator(f"[data-dup-toggle='{ranked[0]['id']}']").click()
         pg.wait_for_selector(f"tr.duprow[data-lb-row='{ranked[1]['id']}']")
-        # density, and the Columns menu brings a column back
-        pg.get_by_role("button", name="compact").click()
-        assert "dense" in pg.locator("table[data-lb-table]").get_attribute("class")
+        # 11b removed the comfortable/compact switch: the one-line row IS the
+        # compact one, so there is nothing left to choose between
+        assert pg.get_by_role("button", name="compact").count() == 0
+        # the Columns menu brings a column back
         pg.locator("[data-columns-menu] summary").click()
         pg.get_by_role("button", name="show all").click()
         pg.wait_for_function("!document.querySelector('[data-hidden-tasks]')")

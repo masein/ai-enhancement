@@ -757,6 +757,41 @@ cards and the model page.
     version. It uses `rubricVersion()` now — "rubrics no version", or "v2,
     no version" for a mix.
 
+- **11b — the visual system.** One set of tokens, one type scale, one bar and
+  one table component.
+  - **Tokens.** A pale blue-grey page (`--plane` #F6F8FC), white cards, ink
+    #14213D and one saturated accent (#2F54EB, 5.9:1 on white). New:
+    `--live-text` / `--live-dot` for the status badge, `--bar-bg` for the
+    translucent bar, and `--heat-1` … `--heat-5`, five steps of the accent
+    mixed into the card surface for 11c's rank tint. Dark and dim keep their
+    surfaces and take the lighter accent #7C9BFF with stronger heat steps.
+    `--font-sans` and `--font-mono` are tokens now; no web font, as before.
+  - **Type.** Prose in the sans face; data and labels in mono — column
+    headers, numbers (tabular figures), chips, badges, the status line, the
+    footer and the eyebrow. The title is 28px/800 with tight tracking; a
+    section title is 20px/700 after a mono index.
+  - **The sticky bar.** 56px, translucent with a blur and a hairline under it:
+    the title and the `● LIVE · 12:33` badge on the left, the tabs in the
+    middle, and the checks pill, the name and Theme ▾ on the right. The badge
+    took over every state the old "live · refreshed" chip had (stale, judge
+    offline), and a static report has no badge at all. At 720px the title
+    shortens and the tabs drop to a second row in the same sticky block.
+  - **The checks** are a pill in the bar; their list opens just under it. Still
+    on every tab, still never dismissed.
+  - **Sections are numbered** 01, 02, … down each tab, drawn from the DOM so a
+    card that moves takes its place in the count.
+  - **One table component**: mono uppercase sticky headers, 44px one-line rows,
+    hairline separators, `--accent-soft` on hover, a 3px accent bar on an
+    opened row, right-aligned mono numbers, and a `pin` class for the first
+    column (11c pins the model column at phone width).
+  - **A status line** above the big tables: "Showing 1–25 of 32 models · 15
+    ranked · sorted by Avg ▼ · ● live 12:33".
+  - **Back to top**, a mono pill after two screens, which moves focus to the
+    bar; **one tooltip**, inverted (ink background, surface text), mono, at
+    most 280px, on hover and on focus, wired with `aria-describedby`.
+  - **Removed: the comfortable/compact density switch** — the one-line row is
+    the compact one. `test_every_action_answers.py` no longer clicks it.
+
 **Deploy steps**, after each phase-11 PR merges. This phase has no data
 migration: it changes code (11c also adds `scripts/areas.yaml`).
 

@@ -646,7 +646,9 @@ def test_the_tabs_are_named_once_and_ordered_by_how_often_they_are_opened(live, 
     # the header says what it is, and the theme button says what it does
     page.goto(base + "/")
     page.wait_for_selector("[data-stamp]")
-    assert "live · refreshed" in page.locator("[data-stamp]").text_content()
+    # 11b: the live chip is the bar's badge now — "● LIVE · 12:33"
+    assert re.fullmatch(r"LIVE · \d\d:\d\d",
+                        page.locator("[data-stamp]").text_content())
     assert page.locator("[data-stamp] .dot.ok").count() == 1
     assert page.locator("#themeBtn").text_content().startswith("Theme")
     assert ":" not in page.locator("#themeBtn").text_content()
@@ -781,15 +783,16 @@ def test_typing_survives_the_poll(live, page):
     base = live["base"]
     page.goto(base + "/#tab=loop")
     page.wait_for_selector("table.jd[data-loop-table] tbody tr")
-    who = page.locator("#who")
-    if who.locator("button[data-who]").count():
-        who.locator("button[data-who]").click()
-    name = who.locator("input")
+    # 11b: the name is one control in the sticky bar, and its box is the
+    # popover's — a poll rebuilds the button, never the open panel
+    page.locator("#who button[data-who]").click()
+    page.wait_for_selector("#pop-who input")
+    name = page.locator("#pop-who input")
     name.fill("")
     name.type("Omar")
     page.evaluate("refreshResults()")              # a results refresh redraws the header
     page.wait_for_timeout(6500)                    # and two polls land here
-    assert page.evaluate("document.activeElement === document.querySelector('#who input')")
+    assert page.evaluate("document.activeElement === document.querySelector('#pop-who input')")
     name.type(" Affifi")
     assert name.input_value() == "Omar Affifi"
     name.press("Enter")

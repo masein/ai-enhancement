@@ -1509,14 +1509,30 @@ CSS = r"""
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
   --fs-1:12px; --fs-2:14px; --fs-3:16px; --fs-4:20px; --fs-5:28px;
   --r-1:6px; --r-2:10px;
-  --surface-1:#fcfcfb; --plane:#f9f9f7; --text-primary:#0b0b0b; --text-secondary:#52514e;
-  --muted:#6f6d68; --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+  /* phase 11b: prose in the system sans, data and labels in the system mono.
+     No web font: the page has to work on a server with no internet. */
+  --font-sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  /* 11b: a pale blue-grey page, white cards, one saturated accent. Contrast
+     against the page (#F6F8FC): ink 15.0:1, secondary 8.8:1, muted 5.1:1. */
+  --surface-1:#ffffff; --plane:#f6f8fc; --text-primary:#14213d; --text-secondary:#3d4b66;
+  --muted:#5a6b85; --grid:#e4e9f2; --axis:#c9d2e3; --border:#e4e9f2;
   --good:#0ca30c; --critical:#d03b3b; --warning:#fab219; --success-text:#006300;
   /* the warning and danger tones as TEXT: amber on white is 1.8:1, so text
      that must be read gets a darker amber; 4.5:1 or better on every surface */
   --warning-text:#8a5b00; --critical-text:#c23030;
-  /* the accent is also the link colour: #2a78d6 was 4.2:1 on the page */
-  --accent:#236bc4; --accent-soft:rgba(35,107,196,0.10);
+  /* the accent is also the link colour: 5.9:1 on white, 5.5:1 on the page */
+  --accent:#2f54eb; --accent-soft:rgba(47,84,235,0.08);
+  /* live: the text tone is read, the dot tone is never text (2.6:1) */
+  --live-text:#0b7a5a; --live-dot:#12b886;
+  --bar-bg:rgba(246,248,252,0.86);
+  /* the rank tint, five steps of the accent mixed into the card surface. Text
+     on the strongest step is ink at 11.1:1 — never the accent, which is 4.1:1 */
+  --heat-1:color-mix(in srgb, var(--accent) 3.5%, var(--surface-1));
+  --heat-2:color-mix(in srgb, var(--accent) 7%, var(--surface-1));
+  --heat-3:color-mix(in srgb, var(--accent) 11.5%, var(--surface-1));
+  --heat-4:color-mix(in srgb, var(--accent) 17%, var(--surface-1));
+  --heat-5:color-mix(in srgb, var(--accent) 24%, var(--surface-1));
   --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
   --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
 }
@@ -1525,7 +1541,13 @@ CSS = r"""
     color-scheme: dark;
     --surface-1:#1a1a19; --plane:#0d0d0d; --text-primary:#fff; --text-secondary:#c3c2b7;
     --muted:#898781; --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
-    --success-text:#0ca30c; --accent:#3987e5; --accent-soft:rgba(57,135,229,0.16);
+    --success-text:#0ca30c; --accent:#7c9bff; --accent-soft:rgba(124,155,255,0.16);
+    --live-text:#2fd39a; --live-dot:#12b886; --bar-bg:rgba(13,13,13,0.80);
+    --heat-1:color-mix(in srgb, var(--accent) 6%, var(--surface-1));
+    --heat-2:color-mix(in srgb, var(--accent) 11%, var(--surface-1));
+    --heat-3:color-mix(in srgb, var(--accent) 17%, var(--surface-1));
+    --heat-4:color-mix(in srgb, var(--accent) 25%, var(--surface-1));
+    --heat-5:color-mix(in srgb, var(--accent) 34%, var(--surface-1));
     --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
     --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
   --warning-text:#fab219; --critical-text:#ef6b6b;
@@ -1535,7 +1557,13 @@ CSS = r"""
   color-scheme: dark;
   --surface-1:#1a1a19; --plane:#0d0d0d; --text-primary:#fff; --text-secondary:#c3c2b7;
   --muted:#898781; --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
-  --success-text:#0ca30c; --accent:#3987e5; --accent-soft:rgba(57,135,229,0.16);
+  --success-text:#0ca30c; --accent:#7c9bff; --accent-soft:rgba(124,155,255,0.16);
+  --live-text:#2fd39a; --live-dot:#12b886; --bar-bg:rgba(13,13,13,0.80);
+  --heat-1:color-mix(in srgb, var(--accent) 6%, var(--surface-1));
+  --heat-2:color-mix(in srgb, var(--accent) 11%, var(--surface-1));
+  --heat-3:color-mix(in srgb, var(--accent) 17%, var(--surface-1));
+  --heat-4:color-mix(in srgb, var(--accent) 25%, var(--surface-1));
+  --heat-5:color-mix(in srgb, var(--accent) 34%, var(--surface-1));
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
   --warning-text:#fab219; --critical-text:#ef6b6b;
@@ -1547,26 +1575,93 @@ CSS = r"""
   color-scheme: dark;
   --surface-1:#1c2333; --plane:#141a26; --text-primary:#e6edf3; --text-secondary:#b6c2d1;
   --muted:#8b98a8; --grid:#2b3546; --axis:#3a465a; --border:rgba(230,237,243,0.11);
-  --success-text:#3fb950; --accent:#58a6ff; --accent-soft:rgba(88,166,255,0.16);
+  --success-text:#3fb950; --accent:#7c9bff; --accent-soft:rgba(124,155,255,0.16);
+  --live-text:#2fd39a; --live-dot:#12b886; --bar-bg:rgba(20,26,38,0.82);
+  --heat-1:color-mix(in srgb, var(--accent) 6%, var(--surface-1));
+  --heat-2:color-mix(in srgb, var(--accent) 11%, var(--surface-1));
+  --heat-3:color-mix(in srgb, var(--accent) 17%, var(--surface-1));
+  --heat-4:color-mix(in srgb, var(--accent) 25%, var(--surface-1));
+  --heat-5:color-mix(in srgb, var(--accent) 34%, var(--surface-1));
   --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
   --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
   --warning-text:#fab219; --critical-text:#ef6b6b;
 }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--plane); color:var(--text-primary);
-  font-family:system-ui,-apple-system,"Segoe UI",sans-serif; font-size:var(--fs-2); line-height:1.5; }
-.wrap { max-width:1320px; margin:0 auto; padding:26px 22px 70px; }
-h1 { font-size:var(--fs-4); font-weight:650; margin:0; letter-spacing:-0.01em; }
-h2 { font-size:var(--fs-3); font-weight:600; margin:0 0 3px; }
+  font-family:var(--font-sans); font-size:var(--fs-2); line-height:1.5; }
+.wrap { max-width:1320px; margin:0 auto; padding:0 22px 70px; }
+@media (max-width:720px) { .wrap { padding:0 16px 70px; } }
+/* 11b: a heavy, tight title; the section title after its mono index */
+h1 { font-size:var(--fs-5); font-weight:800; margin:0; letter-spacing:-0.025em; line-height:1.15; }
+h2 { font-size:var(--fs-4); font-weight:700; margin:0 0 3px; letter-spacing:-0.01em; }
+/* prose stays in the sans face and stops at a readable measure */
+.sub, .note, .warn, p.small { max-width:72ch; }
 .sub { color:var(--text-secondary); font-size:var(--fs-2); margin:2px 0 0; }
-.topbar { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
-.meta-chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+/* ---- 11b: the sticky bar ------------------------------------------------
+   56px, translucent with a blur, a hairline under it. Title and status badge
+   on the left, the tabs in the middle, the checks pill, the name and the
+   theme on the right. At 720px the title shortens and the tabs drop to a
+   second row inside the same sticky block. */
+.bar { position:sticky; top:0; z-index:50; background:var(--bar-bg);
+  backdrop-filter:blur(8px) saturate(1.4); -webkit-backdrop-filter:blur(8px) saturate(1.4);
+  border-bottom:1px solid var(--border); }
+.bar-in { position:relative; max-width:1320px; margin:0 auto; padding:0 22px;
+  height:56px; display:flex; align-items:center; gap:14px; }
+.bar-title { font-size:var(--fs-3); font-weight:800; letter-spacing:-0.02em;
+  white-space:nowrap; }
+.bar-title .t-short { display:none; }
+.bar-right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+.livebadge { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono);
+  font-size:var(--fs-1); font-weight:600; text-transform:uppercase; letter-spacing:.04em;
+  color:var(--live-text); border:1px solid var(--live-dot); border-radius:var(--r-1);
+  padding:2px 8px; white-space:nowrap; }
+.livebadge[hidden] { display:none; }
+.livebadge[data-fresh="stale"], .livebadge[data-fresh="judge-offline"] {
+  color:var(--warning-text); border-color:var(--warning); text-transform:none;
+  letter-spacing:0; }
+.livebadge .dot { animation:livepulse 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .livebadge .dot { animation:none; } }
+@keyframes livepulse { 0%,100% { opacity:1; } 50% { opacity:.45; } }
+/* the checks: the pill lives in the bar, its list opens just under the bar */
+.bar-checks details.checks { position:static; }
+.bar-checks > details > summary { display:flex; align-items:center; gap:6px;
+  white-space:nowrap; font-family:var(--font-mono); font-size:var(--fs-1);
+  border:1px solid var(--border); border-radius:999px; padding:3px 10px;
+  background:var(--surface-1); cursor:pointer; list-style:none; }
+.bar-checks > details > summary::-webkit-details-marker { display:none; }
+.bar-checks .checklist { position:absolute; left:0; right:0; top:100%;
+  background:var(--surface-1); border-bottom:1px solid var(--border);
+  box-shadow:0 10px 28px rgba(0,0,0,.10); padding:10px 22px; margin:0;
+  max-height:min(60vh,520px); overflow:auto; z-index:59; }
+/* the pill stays short enough that the tabs are not pushed off the bar */
+@media (max-width:1200px) { .bar-checks .checks-judged { display:none; } }
+@media (max-width:1000px) { .bar-checks .showhide { display:none; } }
+@media (max-width:720px) {
+  .bar-in { height:auto; padding:8px 16px; flex-wrap:wrap; row-gap:4px; }
+  .bar-title .t-full { display:none; }
+  .bar-title .t-short { display:inline; }
+  .bar-in .tabs { order:3; flex-basis:100%; margin:0; }
+}
+/* the hero, on Overview only */
+.pagehero { margin:22px 0 4px; }
+.hero-acts { margin-top:14px; display:flex; gap:10px; flex-wrap:wrap; }
+.hero-acts:empty { display:none; }
+.pagehero[hidden] { display:none; }
+.meta-chips { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+/* back to top: a mono pill, after two screens of scrolling */
+.totop { position:fixed; right:18px; bottom:18px; z-index:45; font-family:var(--font-mono);
+  font-size:var(--fs-1); border-radius:999px; padding:6px 13px; background:var(--surface-1);
+  box-shadow:0 6px 18px rgba(0,0,0,.12); }
+.totop[hidden] { display:none; }
+@media print { .totop { display:none; } }
 .chip { display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-1);
+  font-family:var(--font-mono);
   color:var(--text-secondary); background:var(--surface-1); border:1px solid var(--border);
   border-radius:999px; padding:3px 10px; }
 .chip .mono { font-size:var(--fs-1); }
 .card { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2);
-  padding:var(--sp-4) var(--sp-5); margin:var(--sp-4) 0; }
+  padding:var(--sp-5); margin:var(--sp-4) 0; }
+@media (max-width:720px) { .card { padding:var(--sp-4); } }
 button, .btn { font:inherit; font-size:var(--fs-2); color:var(--text-primary); background:var(--surface-1);
   border:1px solid var(--border); border-radius:var(--r-1); padding:var(--sp-1) var(--sp-3);
   min-height:32px; cursor:pointer; }
@@ -1581,11 +1676,12 @@ input[type=search]:focus { outline:2px solid var(--accent-soft); border-color:va
 .seg button + button { border-left:1px solid var(--border); }
 .seg button[aria-pressed="true"] { background:var(--accent-soft); color:var(--text-primary); font-weight:600; }
 .count-note { font-size:var(--fs-1); color:var(--muted); }
-.tabs { display:flex; gap:2px; border-bottom:1px solid var(--axis); margin:10px 0 0;
-  overflow-x:auto; }
-.tabs button { border:0; background:none; border-radius:var(--r-1) 8px 0 0; padding:8px 13px;
+.tabs { display:flex; gap:2px; margin:0; overflow-x:auto; scrollbar-width:none;
+  align-self:stretch; align-items:stretch; flex:1 1 auto; min-width:0; }
+.tabs::-webkit-scrollbar { display:none; }
+.tabs button { border:0; background:none; border-radius:0; padding:8px 13px;
   color:var(--text-secondary); white-space:nowrap; }
-.tabs button:hover { background:var(--surface-1); }
+.tabs button:hover { color:var(--text-primary); }
 .tabs button[aria-selected="true"] { color:var(--text-primary); font-weight:600;
   box-shadow:inset 0 -2px 0 var(--accent); }
 .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
@@ -1598,12 +1694,30 @@ input[type=search]:focus { outline:2px solid var(--accent-soft); border-color:va
 @media (max-width:800px){ .hero-row { grid-template-columns:1fr; } }
 .hero { font-size:var(--fs-5); font-weight:700; letter-spacing:-0.02em; line-height:1.15; }
 table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
-th { text-align:left; font-size:var(--fs-1); text-transform:none; letter-spacing:0;
-  color:var(--muted); font-weight:600; padding:var(--sp-2) var(--sp-2); border-bottom:1px solid var(--border);
+/* 11b: one table component. Mono uppercase headers, one-line rows of 44px,
+   hairline separators, numbers right-aligned in mono with tabular figures. */
+th { text-align:left; font-family:var(--font-mono); font-size:var(--fs-1);
+  text-transform:uppercase; letter-spacing:.03em;
+  color:var(--muted); font-weight:600; padding:var(--sp-2) var(--sp-3); border-bottom:1px solid var(--border);
   white-space:nowrap; }
-td { padding:var(--sp-2) var(--sp-2); height:40px; box-sizing:border-box;
+th .unit { display:block; font-weight:400; text-transform:none; letter-spacing:0; }
+td { padding:10px var(--sp-3); height:44px; box-sizing:border-box;
   border-bottom:1px solid var(--border); font-size:var(--fs-2); }
 td.num, th.num { text-align:right; }
+td.num { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+tbody tr:hover { background:var(--accent-soft); }
+/* an opened or selected row carries a 3px accent bar on its left */
+tbody tr.open > td:first-child, tbody tr[aria-selected="true"] > td:first-child {
+  box-shadow:inset 3px 0 0 var(--accent); }
+tbody tr.open { background:var(--accent-soft); }
+/* a table that scrolls sideways can pin its first column (11c uses it) */
+td.pin, th.pin { position:sticky; left:0; background:var(--surface-1); z-index:1; }
+/* the Leaderboard carries a dozen numeric columns: it keeps the 44px row and
+   takes its breathing room from the gutters instead (11c narrows the cells
+   themselves, to one line each) */
+table.lb td, table.lb th { padding-left:var(--sp-2); padding-right:var(--sp-2); }
+tbody tr.open td.pin, tbody tr:hover td.pin {
+  background:color-mix(in srgb, var(--accent) 8%, var(--surface-1)); }
 tr:last-child td { border-bottom:none; }
 .lb-wrap { overflow-x:auto; }
 th.sortable { cursor:pointer; user-select:none; }
@@ -1637,7 +1751,8 @@ select { max-width:100%; }
 .lb .se { color:var(--muted); font-size:var(--fs-1); }
 .best { font-weight:650; }
 .best::after { content:"\2009\25CF"; color:var(--accent); font-size:8px; vertical-align:2px; }
-.badge { display:inline-block; font-size:var(--fs-1); border:1px solid var(--border);
+.badge { display:inline-block; font-size:var(--fs-1); font-family:var(--font-mono);
+  border:1px solid var(--border);
   border-radius:var(--r-1); padding:0 5px; margin-left:6px; color:var(--text-secondary);
   vertical-align:1px; }
 /* three tones and no others (9d): "instruct" is information, so neutral —
@@ -1647,8 +1762,22 @@ select { max-width:100%; }
 .badge.prelim { color:var(--warning-text); border-color:var(--warning); }
 .tiebest { font-weight:650; }
 .tiebest::after { content:"\2009\2248"; color:var(--muted); font-size:9px; vertical-align:1px; }
-.mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:var(--fs-1);
+.mono { font-family:var(--font-mono); font-size:var(--fs-1);
   color:var(--text-secondary); }
+/* 11b: the eyebrow — mono, uppercase, letter-spaced, in the accent */
+.eyebrow { font-family:var(--font-mono); font-size:var(--fs-1); font-weight:600;
+  text-transform:uppercase; letter-spacing:.16em; color:var(--accent); }
+h2[data-ix]::before { content:attr(data-ix); font-family:var(--font-mono);
+  font-size:var(--fs-1); font-weight:600; color:var(--accent); letter-spacing:.06em;
+  vertical-align:2px; margin-right:8px; }
+/* the section index that runs 01, 02, … down each tab */
+.sechead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:0 0 2px; }
+.sechead .ix { font-family:var(--font-mono); font-size:var(--fs-1); font-weight:600;
+  color:var(--accent); letter-spacing:.06em; }
+.sechead .acts { margin-left:auto; display:flex; gap:8px; align-items:center; }
+/* the one-line status above a big table */
+.statusline { font-family:var(--font-mono); font-size:var(--fs-1); color:var(--muted);
+  margin:8px 0 6px; }
 .legend { display:flex; gap:14px; flex-wrap:wrap; margin:6px 0 10px; }
 .legend span { display:inline-flex; align-items:center; gap:6px; font-size:var(--fs-1);
   color:var(--text-secondary); }
@@ -1910,12 +2039,13 @@ pre.mono { background:var(--plane); border:1px solid var(--border); border-radiu
   text-align:center; font-size:var(--fs-2); cursor:default; }
 .mx td.self { background:none; }
 .mx td:hover { outline:2px solid var(--accent-soft); }
+/* 11b: one tooltip, inverted so it reads in every theme */
 #tip { position:fixed; pointer-events:none; opacity:0; transition:opacity .08s;
-  background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-1);
-  padding:7px 10px; font-size:var(--fs-1); box-shadow:0 4px 16px rgba(0,0,0,.16); z-index:50;
-  max-width:320px; }
-#tip .v { font-size:var(--fs-2); font-weight:650; color:var(--text-primary); }
-#tip .l { color:var(--text-secondary); }
+  background:var(--text-primary); color:var(--surface-1); border-radius:var(--r-1);
+  padding:7px 10px; font-family:var(--font-mono); font-size:var(--fs-1);
+  box-shadow:0 4px 16px rgba(0,0,0,.22); z-index:70; max-width:280px; }
+#tip .v { font-size:var(--fs-1); font-weight:700; color:var(--surface-1); }
+#tip .l { color:var(--surface-1); opacity:.85; }
 #tip .k { display:inline-block; width:10px; border-top:3px solid; border-radius:2px;
   margin-right:6px; vertical-align:3px; }
 svg text { font-family:system-ui,-apple-system,sans-serif; }
@@ -1924,7 +2054,8 @@ svg text { font-family:system-ui,-apple-system,sans-serif; }
 .dimmed .bar:not(.hot) { opacity:0.3; }
 .dimmed text.blab:not(.hot) { opacity:0.35; }
 a { color:var(--accent); }
-footer { margin-top:28px; font-size:var(--fs-1); color:var(--muted); }
+footer { margin-top:28px; font-size:var(--fs-1); color:var(--muted);
+  font-family:var(--font-mono); }
 /* ---- phase 9a: buttons that say what they are ---- */
 button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
 button.primary:hover { filter:brightness(1.07); background:var(--accent); }
@@ -2002,7 +2133,10 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 }
 /* ---- phase 9b: the header, the tabs, the checks ---- */
 .topright { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
-button.who { font-weight:600; }
+button.who { font-weight:600; font-family:var(--font-mono); font-size:var(--fs-1);
+  white-space:nowrap; }
+button.who.ask { border-color:var(--warning);
+  outline:2px solid color-mix(in srgb, var(--warning) 35%, transparent); }
 .who-edit { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
 .who-edit input { font:inherit; font-size:var(--fs-2); color:var(--text-primary); background:var(--surface-1);
   border:1px solid var(--border); border-radius:var(--r-1); padding:5px 9px; width:150px; }
@@ -2069,7 +2203,6 @@ td.rowacts { white-space:nowrap; }
 table.lb th.model, table.lb td.model { position:sticky; left:0; z-index:1;
   background:var(--surface-1); box-shadow:1px 0 0 var(--grid); }
 table.lb td.num .se { display:block; font-size:var(--fs-1); line-height:1.15; }
-table.lb.dense td { padding-top:2px; padding-bottom:2px; height:32px; }
 table.lb th.cmp { text-align:center; }
 table.lb thead tr:first-child th.sortable:not(.model) { white-space:normal; vertical-align:bottom; }
 tr.duprow td { background:var(--plane); }
@@ -2438,18 +2571,29 @@ function placeTip(x, y) {
   if (top + h > innerHeight) top = y - h - p;
   tip.style.left = left + 'px'; tip.style.top = top + 'px';
 }
+// what the tooltip is currently describing, so a screen reader is told the
+// same thing the pointer is shown (11b)
+let _tipFor = null;
+function tipFor(t) {
+  if (_tipFor === t) return;
+  if (_tipFor && _tipFor.getAttribute('aria-describedby') === 'tip')
+    _tipFor.removeAttribute('aria-describedby');
+  _tipFor = t;
+  if (t) t.setAttribute('aria-describedby', 'tip');
+}
+function hideTip() { tip.style.opacity = 0; tipFor(null); }
 document.addEventListener('pointermove', e => {
   const t = e.target.closest('[data-tip]');
-  if (!t || !fillTip(t)) { tip.style.opacity = 0; return; }
-  tip.style.opacity = 1; placeTip(e.clientX, e.clientY);
+  if (!t || !fillTip(t)) { hideTip(); return; }
+  tip.style.opacity = 1; tipFor(t); placeTip(e.clientX, e.clientY);
 });
 document.addEventListener('focusin', e => {
   const t = e.target.closest('[data-tip]');
   if (!t || !fillTip(t)) return;
   const r = t.getBoundingClientRect();
-  tip.style.opacity = 1; placeTip(r.right, r.bottom);
+  tip.style.opacity = 1; tipFor(t); placeTip(r.right, r.bottom);
 });
-document.addEventListener('focusout', () => { tip.style.opacity = 0; });
+document.addEventListener('focusout', hideTip);
 
 // hover-sync: pointing at a model anywhere highlights it everywhere in the view
 document.addEventListener('pointerover', e => {
@@ -3790,10 +3934,6 @@ function vOverview(ms) {
     const top = ranked[0];
     frag.push(el('div', { class: 'hero-row' },
       el('div', { class: 'card' },
-        LIVE ? el('button', { class: 'primary', style: 'float:right', 'data-submit-model': '1',
-          text: 'Submit a model', onclick: () => {
-            state.after = { focus: '[data-ms="submit"] input' };
-            navigate({ tab: 'queue', model: null, topic: null }); } }) : '',
         el('p', { class: 'sub', text: `Best official average — all ${top.nreq} required `
           + `tasks, ${state.avgMode === 'raw' ? 'raw accuracy' : 'scaled above chance'}` }),
         el('div', { class: 'hero', text: pct(officialAvg(top)) }),
@@ -4147,13 +4287,32 @@ function pageNumbers(cur, n) {
 // of the smallest size holds everything). `live`: one pager node for the
 // life of the page, updated in place (livePager) — for a table a poll
 // redraws while someone is clicking it
+// what the table is sorted by, in the words of its own header
+function lbSortLabel(cols) {
+  const c = (cols || []).find(x => x.key === state.sort.key);
+  return `${c ? (c.label || c.key) : state.sort.key} ${state.sort.dir > 0 ? '▲' : '▼'}`;
+}
+
+// 11b: one mono line above a big table — what is on screen, out of what, and
+// how it is sorted. "Showing 1–25 of 32 models · 15 ranked · sorted by Avg ▼".
+function statusLine(pg, noun, extra) {
+  const bits = [`Showing ${pg.from}–${pg.to} of ${pg.total} ${noun}`];
+  for (const x of [].concat(extra || [])) if (x) bits.push(x);
+  const line = el('p', { class: 'statusline', 'data-statusline': noun }, bits.join(' · '));
+  if (LIVE && DATA) line.append(' · ', el('span', { class: 'dot ok' }),
+    `live ${String(DATA.generated || '').split(' ').pop()}`);
+  return line;
+}
+
 function paged(key, rows, sig, redraw, dflt = 25, live = false) {
   const p = pgState(key, dflt);
   if (p.sig !== sig) { p.sig = sig; p.page = 1; }
   const pages = Math.max(1, Math.ceil(rows.length / p.size));
   if (p.page > pages) p.page = pages;
   const start = (p.page - 1) * p.size;
-  return { rows: rows.slice(start, start + p.size),
+  const shown = rows.slice(start, start + p.size);
+  return { rows: shown, total: rows.length,
+           from: rows.length ? start + 1 : 0, to: start + shown.length,
            pager: (live ? livePager : pager)(key, rows.length, redraw) };
 }
 
@@ -4877,7 +5036,10 @@ function vModels() {
     c.label + (f.sort.key === c.key ? (f.sort.dir > 0 ? ' ▲' : ' ▼') : ''));
   const pg = paged('models', ms, JSON.stringify([f.q, f.kind, f.src, f.family, f.judgedOnly,
                                                  f.taintedOnly, f.prelimOnly, f.sort]));
-  const table = el('div', { class: 'card' }, pg.pager,
+  const table = el('div', { class: 'card' },
+    statusLine(pg, 'models', [`sorted by ${(MCOLS.find(c => c.key === f.sort.key) || {}).label
+      || f.sort.key} ${f.sort.dir > 0 ? '▲' : '▼'}`]),
+    pg.pager,
     el('div', { class: 'lb-wrap stick' }, el('table', { class: 'jd', 'data-models-table': '1' },
       el('thead', {}, el('tr', {}, MCOLS.map(th), el('th', { text: 'flags' }))),
       el('tbody', {}, pg.rows.map(m => {
@@ -5164,14 +5326,13 @@ function vLeaderboard(ms) {
       lbColumnsMenu(allTaskCols, shownTasks),
       nHidden ? el('span', { class: 'count-note', 'data-hidden-tasks': String(nHidden),
         text: `${nHidden} task${nHidden > 1 ? 's' : ''} hidden` }) : '',
-      el('span', { class: 'small', style: 'margin-left:12px', text: 'Rows' }),
-      el('div', { class: 'seg', role: 'group', 'aria-label': 'row density' },
-        [[false, 'comfortable'], [true, 'compact']].map(([v, l]) =>
-          el('button', { 'aria-pressed': String(!!state.lbDense === v), text: l,
-            onclick: () => { state.lbDense = v; render(); } })))),
+      ),
     state.lbView === 'cats' ? lbCategoryTable(ms)
-      : [lbPg.pager, el('div', { class: 'lb-wrap stick' }, el('table', {
-          class: 'lb' + (state.lbDense ? ' dense' : ''), 'data-lb-table': '1' }, thead, tbody))]),
+      : [statusLine(lbPg, 'models',
+            [`${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
+             `sorted by ${lbSortLabel(cols)}`]),
+         lbPg.pager, el('div', { class: 'lb-wrap stick' }, el('table', {
+          class: 'lb', 'data-lb-table': '1' }, thead, tbody))]),
     radarCard(ms) || '',
     aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
 }
@@ -6722,34 +6883,18 @@ function renderWho(force = false) {
   if (!force && box.contains(document.activeElement)
       && document.activeElement.tagName === 'INPUT') return;
   const name = whoName();
-  if (!name) {                     // no name yet: the box is in the header itself
-    const input = el('input', { type: 'text', value: name, 'aria-label': 'your name',
-      placeholder: 'your name', 'data-who-input': '1', autocomplete: 'name',
-      onkeydown: e => {
-        if (e.key === 'Enter') { e.preventDefault(); save(); }
-        if (e.key === 'Escape' && whoName()) renderWho(true);
-      } });
-    const save = () => {
-      const v = input.value.trim();
-      if (!v) { input.focus(); return; }
-      // no render(): every action reads the name when it runs, and rebuilding
-      // the view here would throw away a question someone is half-way through
-      // editing on the Exam tab
-      setWho(v); state.whoAsk = false; renderWho(true);
-    };
-    box.replaceChildren(el('div', { class: 'who-edit' + (state.whoAsk ? ' ask' : ''),
-        'data-who-prompt': name ? null : '1' },
-      el('span', { class: 'small', text: name ? 'your name' : 'Who are you? Recorded on what you do here:' }),
-      input, el('button', { class: 'primary', text: 'Save', onclick: save })));
-    return;
-  }
-  // a panel on the shared popover, not an input that grows out of the header:
-  // it is never clipped, it survives a poll, and Esc gives the button back
-  const btn = el('button', { class: 'who', 'data-who': name,
-    title: 'the name recorded on anything you start, approve or import here — click to change',
-    'aria-label': `your name: ${name} — change`, text: `${name} ▾` });
+  // one control in the bar, whatever the state: a button that opens the same
+  // panel. It is never clipped, it survives a poll, and Esc gives it back.
+  const btn = el('button', { class: 'who' + (name ? '' : ' ask'), 'data-who': name,
+    'data-who-prompt': name ? null : '1',
+    title: name
+      ? 'the name recorded on anything you start, approve or import here — click to change'
+      : 'the name recorded on anything you start, approve or import here',
+    'aria-label': name ? `your name: ${name} — change` : 'who are you?',
+    text: name ? `${name} ▾` : 'Who are you? ▾' });
   box.replaceChildren(popover(btn, () => {
     const input = el('input', { type: 'text', value: name, 'aria-label': 'your name',
+      'data-keep': 'whoname',
       placeholder: 'your name', 'data-who-input': '1', autocomplete: 'name',
       onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); save(); } } });
     const save = () => {
@@ -6757,8 +6902,10 @@ function renderWho(force = false) {
       if (!v) { input.focus(); return; }
       setWho(v); state.whoAsk = false; popClose(); renderWho(true);
     };
-    return el('div', { class: 'moremenu whopop', id: 'pop-who', 'aria-label': 'your name' },
-      el('p', { class: 'small', text: 'Recorded on anything you start, approve or import here.' }),
+    return el('div', { class: 'moremenu whopop' + (state.whoAsk ? ' ask' : ''),
+        id: 'pop-who', 'aria-label': 'your name' },
+      el('p', { class: 'small', text: 'Recorded on anything you start, approve or import '
+        + 'here — this tailnet has no login, so the name you type is the record.' }),
       el('div', { class: 'frm' }, input,
         el('button', { class: 'primary', 'data-who-save': '1', text: 'Save', onclick: save })));
   }, { key: 'who', menu: false, placement: 'bottom-end' }));
@@ -8505,13 +8652,33 @@ const TAB_ALIASES = {
   runs: 'provenance', evals: 'provenance', submit: 'queue', 'submit-queue': 'queue',
   models_tab: 'models', ppl: 'perplexity', 'perplexity-loss': 'perplexity',
 };
+// 11b: the cards of a tab are its sections, numbered 01, 02, … in the order
+// they are read. The index is drawn from the DOM rather than written into
+// twenty view functions, so a card that moves takes its place in the count.
+function numberSections() {
+  const view = document.getElementById('view');
+  if (!view) return;
+  let n = 0;
+  for (const card of view.querySelectorAll(':scope > .card')) {
+    const h2 = card.querySelector(':scope > h2');
+    if (!h2 || !h2.textContent.trim()) continue;
+    // the index is drawn, not written into the heading: a section's name is
+    // its own, and a screen reader reads "Top models", not "02 Top models"
+    h2.dataset.ix = String(++n).padStart(2, '0');
+  }
+}
+
 function render() {
   // full rebuild: drop the in-place refreshers so a poll can never touch the
   // DOM of a tab that just got torn down — the mounted tab re-registers its own
   state.trRedraw = state.queueRedraw = null;
-  renderWarnings();                 // full on the board, folded elsewhere
+  renderWarnings();                 // one line, in the bar, on every tab
   const ms = visible();
   renderTabs();
+  // 11b: the hero belongs to Overview. Every other tab starts straight at its
+  // first numbered section.
+  const hero = document.getElementById('pagehero');
+  if (hero) hero.hidden = !!(state.model || state.topic || state.tab !== 'overview');
   const view = document.getElementById('view');
   view.classList.remove('dimmed');
   // a poll rebuilds the view every few seconds. Whatever the person is typing
@@ -8548,6 +8715,7 @@ function render() {
   } else if (_settle) {
     requestAnimationFrame(settleAgain);
   }
+  numberSections();
   // an open popover keeps its panel, its scroll and its focus across a render;
   // only its button is a new node
   popReanchor();
@@ -8617,6 +8785,8 @@ function popPlace() {
   // its button has scrolled out of the window: there is nothing to hang from
   if (r.bottom < 0 || r.top > innerHeight) { popClose(); return; }
   panel.style.maxHeight = '';
+  // never wider than the window it has to sit 8px inside
+  panel.style.maxWidth = `${Math.max(160, innerWidth - 2 * POP_EDGE)}px`;
   const pr = panel.getBoundingClientRect();
   const below = innerHeight - r.bottom - 4, above = r.top - 4;
   const flip = pr.height > below && above > below;
@@ -8705,6 +8875,26 @@ document.addEventListener('keydown', e => {
 addEventListener('scroll', () => popPlace(), true);
 addEventListener('resize', () => popPlace());
 
+// ---------------------------------------------------------------------------
+// Back to top (11b): a mono pill after two screens of scrolling. It moves
+// focus to the bar, so the keyboard lands where the eye does.
+// ---------------------------------------------------------------------------
+function toTopWatch() {
+  const btn = document.getElementById('toTop');
+  if (!btn) return;
+  btn.hidden = scrollY < innerHeight * 2;
+}
+addEventListener('scroll', toTopWatch, { passive: true });
+addEventListener('resize', toTopWatch);
+document.addEventListener('click', e => {
+  if (!e.target.closest('#toTop')) return;
+  scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches
+    ? 'auto' : 'smooth' });
+  const bar = document.getElementById('bar');
+  const first = bar && bar.querySelector('button, a, [tabindex]');
+  if (first) first.focus({ preventScroll: true });
+});
+
 function moreMenu(open) {                  // kept for the call sites that toggle it
   const btn = document.getElementById('moreBtn');
   if (!btn) return;
@@ -8778,8 +8968,9 @@ function renderWarnings() {
       ontoggle: e => { state.checksOpen = e.target.open; } },
     el('summary', { 'data-warn-summary': String(cs.length) },
       el('span', { class: 'dot ' + worst }),
-      `${cs.length} check${cs.length > 1 ? 's' : ''}`
-      + (judged ? ` · ${judged} about the judged suite` : ''),
+      `${cs.length} check${cs.length > 1 ? 's' : ''}`,
+      judged ? el('span', { class: 'checks-judged',
+        text: ` · ${judged} about the judged suite` }) : '',
       el('span', { class: 'showhide' })),
     el('ul', { class: 'checklist' }, cs.map(c => el('li', { class: 'check warnrow',
         'data-check': c.key, 'data-severity': c.severity },
@@ -8799,16 +8990,22 @@ function renderWarnings() {
 // shows ten-minute-old numbers looks exactly like one that is current.
 function renderFresh() {
   const chip = document.querySelector('[data-stamp]');
-  if (!chip || !LIVE || !DATA) return;
+  if (!chip || !DATA) return;
+  // a static report is not live and says nothing about being live: no badge
+  if (!LIVE) { chip.hidden = true; return; }
+  chip.hidden = false;
   const stale = NET.fails > 0 && NET.lastOk;
   // the live dot covers the judge too: a board that refreshes while nothing
   // can grade is not all green
   const judge = judgeDown();
   chip.dataset.fresh = stale ? 'stale' : judge ? 'judge-offline' : 'ok';
-  chip.title = judge ? judgeWhy() : '';
+  // 11b: the badge is the whole state. "LIVE · 12:33" when the polls land,
+  // and the same words as before when they do not
+  const at = String(DATA.generated || '').split(' ').pop();
+  chip.title = judge ? judgeWhy() : `refreshed ${DATA.generated}`;
   chip.replaceChildren(el('span', { class: 'dot ' + (stale || judge ? 'warn' : 'ok') }),
     stale ? `last update ${rel(NET.lastOk / 1000)} ago — retrying`
-          : `live · refreshed ${DATA.generated}` + (judge ? ' · judge offline' : ''));
+          : judge ? `refreshed ${at} · judge offline` : `LIVE · ${at}`);
 }
 
 // static shell bits (rendered whenever a payload arrives)
@@ -8819,9 +9016,13 @@ function renderStatic() {
   renderWarnings();
   // the model filters moved into the Models tab, where what they filter is on
   // screen beneath them; each one carries its own count there
+  const eyebrow = document.getElementById('heroEyebrow');
+  const topics = ((DATA.judged || {}).exam || []).length;
+  if (eyebrow) eyebrow.textContent = LIVE
+    ? `team benchmark${topics ? ` · ${topics} topics` : ''} · ${DATA.models.length} models`
+    : `report · ${DATA.models.length} models · ${DATA.tasks.length} tasks`;
   document.getElementById('metaChips').replaceChildren(
-    el('span', { class: 'chip', 'data-stamp': '1',
-      text: LIVE ? `live · refreshed ${DATA.generated}` : `generated ${DATA.generated}` }),
+    LIVE ? '' : el('span', { class: 'chip', text: `generated ${DATA.generated}` }),
     LIVE ? el('a', { class: 'chip', href: 'guide', target: '_blank', rel: 'noopener',
                      style: 'text-decoration:none', text: '📖 guide for new users' }) : '',
     LIVE ? el('a', { class: 'chip', href: 'guide#the-loop', target: '_blank', rel: 'noopener',
@@ -8829,6 +9030,13 @@ function renderStatic() {
     // the harness build and the transformers version are provenance: they
     // live on that tab now, not on every tab's first line
     DATA.meta.anyLimit ? el('span', { class: 'chip', text: '⚠ smoke data (--limit)' }) : '');
+  // the page's own action, where the page introduces itself (11b)
+  const acts = document.getElementById('heroActs');
+  if (acts) acts.replaceChildren(LIVE
+    ? el('button', { class: 'primary', 'data-submit-model': '1', text: 'Submit a model',
+        onclick: () => { state.after = { focus: '[data-ms="submit"] input' };
+          navigate({ tab: 'queue', model: null, topic: null }); } })
+    : '');
   renderFresh();
   renderWho();
 }
@@ -9029,24 +9237,34 @@ TEMPLATE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>__TITLE__</title><style>__CSS__</style></head>
-<body class="viz-root"><div id="tip" role="status"></div><div class="wrap">
-__BANNER__
-  <div class="topbar">
-    <div>
-      <h1>__TITLE__</h1>
-      <p class="sub" id="pageSub">lm-evaluation-harness results, one self-contained
-      file — data embedded, charts drawn locally, nothing fetched.</p>
-      <div class="meta-chips" id="metaChips"></div>
+<body class="viz-root"><div id="tip" role="status"></div>
+<header class="bar" id="bar">
+  <div class="bar-in">
+    <span class="bar-title"><span class="t-full">__TITLE__</span><span class="t-short">Benchmark</span></span>
+    <span class="livebadge" id="liveBadge" data-stamp="1" hidden></span>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="bar-right">
+      <div id="warnings" class="bar-checks"></div>
+      <div id="who"></div>
+      <button id="themeBtn" title="cycle auto / light / dark / dim — remembered in this browser">Theme &#9662;</button>
     </div>
-    <div class="topright"><div id="who"></div>
-    <button id="themeBtn" title="cycle auto / light / dark / dim — remembered in this browser">Theme &#9662;</button></div>
   </div>
+</header>
+<div class="wrap">
+__BANNER__
   <div id="netstatus"></div>
-  <div id="warnings"></div>
-  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="pagehero" id="pagehero">
+    <p class="eyebrow" id="heroEyebrow"></p>
+    <h1>__TITLE__</h1>
+    <p class="sub" id="pageSub">lm-evaluation-harness results, one self-contained
+    file — data embedded, charts drawn locally, nothing fetched.</p>
+    <div class="meta-chips" id="metaChips"></div>
+    <div class="hero-acts" id="heroActs"></div>
+  </div>
   <div id="view"></div>
-  <footer>Every score carries its standard error; differences are z-tested before
-  they are called wins; provenance is in the Provenance tab. Scores are only comparable to
+  <button class="totop" id="toTop" hidden>&#8593; Top</button>
+  <footer>Every score carries its standard error · differences are z-tested before
+  they are called wins · provenance is in the Provenance tab · scores are only comparable to
   published numbers when n-shot, prompt template and metric all match.</footer>
 </div>
 <script id="data" type="application/json">__DATA__</script>
