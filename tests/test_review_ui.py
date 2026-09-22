@@ -41,12 +41,12 @@ def open_topics(pg, base, mid):
 
 def test_propose_buttons_carry_their_reasons(live, page):
     """The action is on the exam topic, and every refusal says why on the row.
-    Phase 9a: the model page links to the topic page, where Propose lives —
-    one entry point — and keeps the reason in words beside the link."""
+    Phase 9a: one entry point, with the reason in words beside it. 11k: that
+    entry point is the New proposal dialog, opened where the person is."""
     base = live["base"]
     card = open_topics(page, base, "fx/good-750m")
     econ = card.locator("tr[data-topic='Economics']")
-    assert econ.locator("a.propose").count() == 1
+    assert econ.locator(".propose").count() == 1
     assert econ.locator(".propwhy").count() == 0
     law = card.locator("tr[data-topic='Law']")
     assert "under the 30" in law.locator(".propwhy").first.text_content()
@@ -58,13 +58,19 @@ def test_propose_buttons_carry_their_reasons(live, page):
     # MMLU's finding for the same category rides along as a caution, not a gate
     card = open_topics(page, base, "fx/skewed-360m")
     econ = card.locator("tr[data-topic='Economics']")
-    assert econ.locator("a.propose").count() == 1
+    assert econ.locator(".propose").count() == 1
     assert "caution — MMLU for this category" in econ.text_content()
     assert "answer positions" in econ.locator(".propwhy").first.text_content()
-    # the link opens the topic page on this model's answers
-    econ.locator("a.propose").click()
-    page.wait_for_selector("[data-topic-page='economics']")
-    page.wait_for_selector("[data-propose='economics'][data-propose-model='fx/skewed-360m']")
+    # 11k: it opens the dialog here, with this model and topic in it, instead
+    # of sending the person to a topic page with nothing to do
+    econ.locator(".propose").click()
+    dlg = page.locator("[data-dialog='propose']")
+    dlg.wait_for()
+    assert dlg.locator("[data-combobox='model']").get_attribute("data-value") == "fx/skewed-360m"
+    assert dlg.locator("[data-np-topic='Economics'] input").is_checked()
+    assert page.evaluate("location.hash").startswith("#model=")
+    page.keyboard.press("Escape")
+    page.wait_for_selector("[data-dialog='propose']", state="detached")
     # and the Diagnose section no longer offers one: MMLU does not pick the topic
     det = open_mmlu(page, base, "fx/good-750m")
     assert det.locator("button.propose, a.propose").count() == 0
@@ -173,19 +179,15 @@ def test_review_flow_in_the_browser(live, page):
     # a name, once, in the header: every decision on the page records it
     set_name(page, "Omar")
 
-    # the model page sends you to the topic page, and Propose is there
+    # 11k: Propose → on the model page opens the dialog over it
     card = open_topics(page, base, "fx/good-750m")
-    card.locator("tr[data-topic='Economics'] a.propose").click()
-    btn = page.locator("[data-propose='economics'][data-propose-model='fx/good-750m']")
-    btn.wait_for()
-    assert btn.get_attribute("data-gate") == "ok"          # a calibrated judge: no warning
-    # the answers panel's own fetch re-renders the page when it lands; a click
-    # in that window goes to a button that is being replaced. Click once the
-    # page has settled — the answers are on screen.
-    page.wait_for_selector("[data-answers-table] [data-answer]", timeout=E2E_MS)
-    btn.click()
-    page.wait_for_selector("[data-action-ok='propose:economics']", timeout=E2E_MS)
-    assert "Proposal #" in page.locator("[data-action-ok='propose:economics']").text_content()
+    card.locator("tr[data-topic='Economics'] .propose").click()
+    dlg = page.locator("[data-dialog='propose']")
+    dlg.wait_for()
+    assert dlg.locator("[data-np-topic='Economics'] input").is_checked()
+    dlg.locator("[data-dialog-go]").click()
+    page.wait_for_selector("[data-toast='propose']", timeout=E2E_MS)
+    assert "Proposal #" in page.locator("[data-toast='propose']").text_content()
     # 11j: the tab lists it in To review, and it opens as a card in the sheet
     page.goto(base + "/#tab=review")
     page.wait_for_selector("[data-review-head]")

@@ -170,8 +170,9 @@ def test_the_preliminary_note_appears_exactly_once(live, page):
     assert card.get_by_text("the topic page says what proposing would mean").count() == 1
     # the row's action is a small text button, one per row
     rows = card.locator("[data-judged-topics] tbody tr[data-topic]").count()
-    assert card.locator("[data-judged-topics] a.propose").count() == rows
-    assert card.locator("[data-judged-topics] a.propose").first.text_content() == "Propose →"
+    # 11k: it opens the New proposal dialog in place, so it is a button now
+    assert card.locator("[data-judged-topics] .propose").count() == rows
+    assert card.locator("[data-judged-topics] .propose").first.text_content() == "Propose →"
     assert page.errors == []
 
 

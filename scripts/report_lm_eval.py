@@ -1621,6 +1621,10 @@ CSS = r"""
 body { margin:0; background:var(--plane); color:var(--text-primary);
   font-family:var(--font-sans); font-size:var(--fs-2); line-height:1.5; }
 .wrap { max-width:1320px; margin:0 auto; padding:0 22px 70px; }
+/* 11k: whatever a card holds, the page itself never slides sideways. clip,
+   not auto: it makes no scroller, so a sticky header still sticks to the
+   page and a popover still lives on the body */
+#view, .wrap, .card { overflow-x:clip; }
 @media (max-width:720px) { .wrap { padding:0 16px 70px; } }
 /* 11b: a heavy, tight title; the section title after its mono index */
 h1 { font-size:var(--fs-5); font-weight:800; margin:0; letter-spacing:-0.025em; line-height:1.15; }
@@ -2022,10 +2026,12 @@ nav.modelnav { position:sticky; top:var(--bar-h); z-index:6; display:flex; gap:6
 tr.arearow td { background:var(--plane); height:auto; padding-top:8px; padding-bottom:6px; }
 table[data-judged-topics] td.num { white-space:nowrap; }
 /* the row's action is a small text button: it goes to the topic page */
-table[data-judged-topics] a.propose { border:0; background:none; padding:0; min-height:0;
+table[data-judged-topics] a.propose, table[data-judged-topics] button.propose {
+  border:0; background:none; padding:0; min-height:0;
   font-family:var(--font-sans); font-size:var(--fs-1); font-weight:600; color:var(--accent);
   text-decoration:none; }
-table[data-judged-topics] a.propose:hover { text-decoration:underline; }
+table[data-judged-topics] a.propose:hover,
+table[data-judged-topics] button.propose:hover { text-decoration:underline; }
 td.lencell { font-family:var(--font-mono); color:var(--text-primary); }
 td.lencell.few { color:var(--muted); }
 details.lenfold > summary { cursor:pointer; font-size:var(--fs-1); color:var(--accent); margin:4px 0; }
@@ -2201,6 +2207,17 @@ a.tchip { text-decoration:none; }
 .mlist { display:flex; flex-direction:column; gap:2px; max-height:280px; overflow:auto; }
 .mlist .mrow { display:flex; align-items:center; gap:4px; white-space:nowrap; }
 .mlist [role=menuitem] { border:0; background:none; text-align:left; padding:5px 8px; }
+/* 11k: inside a list, nothing is bordered or underlined; the chosen row is
+   tinted and ticked, and the keyboard's row carries the ring */
+.moremenu [role=menuitem], .moremenu [role=menuitemradio], .mlist [role=menuitem] {
+  border:0; border-bottom:0; text-decoration:none; }
+.moremenu [role=menuitem][aria-current="true"], .mlist [role=menuitem][aria-current="true"],
+.moremenu [role=menuitemradio][aria-checked="true"] { background:var(--accent-soft); }
+.moremenu [role=menuitem][aria-current="true"]::after,
+.mlist [role=menuitem][aria-current="true"]::after,
+.moremenu [role=menuitemradio][aria-checked="true"]::after {
+  content:"✓"; color:var(--accent); margin-left:auto; padding-left:8px; }
+.mlist [role=menuitem] { display:flex; align-items:center; }
 .famdot { width:8px; height:8px; border-radius:50%; display:inline-block; flex:none; }
 details.howto { margin-top:14px; border-top:1px solid var(--border); padding-top:10px; }
 details.howto > summary { cursor:pointer; font-family:var(--font-sans); font-size:var(--fs-1);
@@ -2706,6 +2723,9 @@ table.rvlist tr.clickrow:hover > td { background:var(--accent-soft); }
   border:1px solid var(--border); border-radius:999px; padding:2px 10px; margin:0 6px 6px 0;
   color:var(--muted); }
 .focuschips { display:flex; flex-wrap:wrap; align-items:baseline; gap:0 4px; margin:6px 0 2px; }
+.rd-skill > summary { cursor:pointer; font-weight:600; font-size:var(--fs-2); }
+.rd-skill > summary::-webkit-details-marker { display:none; }
+.rd-skill > .spec { margin:6px 0 0; font-size:var(--fs-2); line-height:1.5; }
 .rd-spec { width:100%; box-sizing:border-box; min-height:150px; font:inherit;
   font-size:var(--fs-3); line-height:1.45; color:var(--text-primary); background:var(--plane);
   border:1px solid var(--border); border-radius:var(--r-1); padding:10px 12px; margin:4px 0; }
@@ -2718,7 +2738,10 @@ table.rvlist tr.clickrow:hover > td { background:var(--accent-soft); }
 .rd-alist li { padding-bottom:10px; border-bottom:1px solid var(--border); }
 .rd-alist p { margin:0 0 4px; font-size:var(--fs-2); }
 .rd-alist .rd-q { color:var(--text-primary); }
-.rd-alist .rd-a { color:var(--muted); }
+.rd-alist .rd-a { color:var(--muted); margin:0 0 4px; font-size:var(--fs-2); }
+.rd-alist .rd-atext { display:inline; }
+.rd-alist .rd-atext.clamp3 { display:-webkit-box; }
+.rd-alist .rd-more { padding:2px 0; font-size:12px; display:block; }
 .rd-det { margin-top:14px; }
 .rd-det > summary { cursor:pointer; font-size:var(--fs-1); color:var(--muted); }
 .npdlg { max-width:640px; }
@@ -2857,6 +2880,8 @@ details.caveat-why[open] { display:block; flex-basis:100%; }
 /* ---- phase 9d: one visual system ---- */
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
   outline:2px solid var(--accent); outline-offset:2px; }
+/* the ring a pointer never asked for (11k) */
+[data-noring]:focus, [data-noring]:focus-visible { outline:none; }
 button.secondary { background:var(--surface-1); }
 .badge.warn { padding:0 5px; margin:0 0 0 6px; border-width:1px; border-style:solid;
   max-width:none; font-size:var(--fs-1); }
@@ -3412,11 +3437,16 @@ function fillTip(target) {
   for (const r of rows.slice(1)) tip.append(el('div', { class: 'l', text: String(r) }));
   return true;
 }
+// 11k: it flips to the other side when it would run off, and then stays 8px
+// inside the window whatever happens — a tooltip cut off at the right edge
+// is a tooltip nobody can read
 function placeTip(x, y) {
-  const p = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+  const p = 14, m = 8, w = tip.offsetWidth, h = tip.offsetHeight;
   let left = x + p, top = y + p;
-  if (left + w > innerWidth) left = x - w - p;
-  if (top + h > innerHeight) top = y - h - p;
+  if (left + w > innerWidth - m) left = x - w - p;
+  if (top + h > innerHeight - m) top = y - h - p;
+  left = Math.min(Math.max(m, left), Math.max(m, innerWidth - w - m));
+  top = Math.min(Math.max(m, top), Math.max(m, innerHeight - h - m));
   tip.style.left = left + 'px'; tip.style.top = top + 'px';
 }
 // what the tooltip is currently describing, so a screen reader is told the
@@ -3914,14 +3944,38 @@ const CAT_MIN_N = 30;
 // about. Disabled WITH the reason on the row: a preliminary judged suite, a
 // topic under the noise floor, or a model that wrote nothing must say so and
 // never quietly offer data instead.
+// 11k: one entry point, and it is the dialog — from the model page, the Loop
+// board or the topic page. Until now this link sent the person to the topic
+// page, which has had no Propose of its own since 11j moved it into the
+// dialog: they landed on a page with nothing to do.
+const taskOfTopic = topic => {
+  const e = Object.entries(((DATA.judged || {}).topics) || {}).find(([, v]) => v === topic);
+  return e ? e[0] : null;
+};
+const RV_OPEN = ['proposed', 'pending', 'approved'];
+function openProposalFor(mid, topic) {
+  const task = taskOfTopic(topic);
+  return (state.rv.proposals || []).find(p => p.model === mid && RV_OPEN.includes(p.status)
+    && (p.task === task || p.category === topic)) || null;
+}
+// the proposals are the Review tab's, and these rows are not on it: ask once
+function rvNeeded() {
+  if (LIVE && !state.rv.loaded && netReady()) loadReview();
+}
 function proposeBtn(mid, topic, gate) {
-  // one entry point: proposing happens on the topic page, where the answers
-  // are and where the one copy of the gate is; this row says where to go
-  const slug = slugOfTopic(topic);
-  return el('a', { class: 'propose', href: '#topic=' + slug, 'data-propose-link': topic,
-    text: 'Propose →', title: 'proposing happens on the topic page, where the answers are',
-    onclick: e => { e.preventDefault(); state.ans.model = mid; state.ans.rows = null;
-      navigate({ topic: slug, model: null }); } });
+  rvNeeded();
+  const open = openProposalFor(mid, topic);
+  if (open) return el('a', { class: 'propose', 'data-review-link': String(open.id),
+    href: '#tab=review&read=proposal:' + open.id, text: 'Review it →',
+    title: `proposal #${open.id} is ${rvStatusWords(open.status).toLowerCase()}`,
+    onclick: e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+      e.preventDefault();
+      openReader({ kind: 'proposal', id: String(open.id) },
+        `[data-review-link="${open.id}"]`); } });
+  return el('button', { class: 'propose', 'data-propose-link': topic,
+    'data-propose-model': mid, text: 'Propose →',
+    onclick: () => npDialog({ model: mid, topic, stay: true,
+      returnTo: `[data-propose-link="${CSS.escape(topic)}"]` }) });
 }
 
 // the payload's copy of the gate, in words for a row that links to the topic
@@ -4850,7 +4904,8 @@ function vModelRuns(m) {
       el('td', { class: 'num se', text: '#' + r.id }),
       el('td', { class: 'small se', text: r.created_at ? rel(r.created_at) + ' ago' : '—' }),
       el('td', { class: 'small' }, suiteCell(r, 'm')),
-      el('td', {}, el('span', { class: stClass(r.status), text: r.status })),
+      el('td', {}, (() => { const st = runStage(r);
+        return el('span', { class: stClass(st.cls), 'data-stage': st.key, text: st.text }); })()),
       el('td', { class: 'small se', text: r.error || r.progress || '' }),
       el('td', {}, el('a', { href: `api/runs/${r.id}/log`, target: '_blank', rel: 'noopener',
         class: 'small', text: 'log' }))))))));
@@ -6631,18 +6686,23 @@ function hfade(key, scroller) {
     el('span', { class: 'scrollhint', 'aria-hidden': 'true', text: 'scroll →' }));
 }
 function hfadeUpdate(root) {
+  // 11k: the Queue's table painted across its card at 1,512px — .stick left
+  // the scroller with overflow:visible, so only the Leaderboard clipped. Now
+  // every sticky table does, and gives up its page-sticky header while it
+  // scrolls, exactly as the Leaderboard's does
+  (root || document).querySelectorAll('.lb-wrap.stick').forEach(sc => {
+    const t = sc.querySelector('table');
+    if (!t) return;
+    const wide = t.offsetWidth > sc.clientWidth + 1;
+    sc.classList.toggle('hscroll', wide);
+    if (sc.dataset.hkeep === 'lb') state.lbWide = wide;
+  });
   (root || document).querySelectorAll('[data-hfade]').forEach(box => {
     const sc = box.firstElementChild;
     if (!sc) return;
     // 11h: a table wider than its card scrolls in its own box at every
     // width — the Knowledge chip pushed the whole page sideways at 1,512px.
     // Only then does its header give up sticking to the page
-    const t = sc.dataset.hkeep === 'lb' && sc.querySelector('table');
-    if (t) {
-      const wide = t.offsetWidth > sc.clientWidth + 1;
-      sc.classList.toggle('hscroll', wide);
-      state.lbWide = wide;
-    }
     const upd = () => {
       const ov = getComputedStyle(sc).overflowX;
       box.dataset.more = (ov === 'auto' || ov === 'scroll')
@@ -7124,6 +7184,8 @@ function weakestChart() {
     const fill = q => list.replaceChildren(...judged.filter(x => !q
         || x.name.toLowerCase().includes(q.toLowerCase()))
       .map(x => el('button', { role: 'menuitem', text: x.name, 'data-weak-pick': x.id,
+        // 11k: the one it is showing is ticked, not bordered
+        'aria-current': x.id === m.id ? 'true' : null,
         onclick: () => { popClose(true); lbSet({ weak: x.id }); } })));
     fill('');
     return el('div', { class: 'moremenu', id: 'pop-weak', 'aria-label': 'judged models' },
@@ -8603,8 +8665,13 @@ function readDataset(wrap, r, data, got) {
       text: `requested ${page.requested} · kept ${page.kept} · missing ${missing}`
         + (pv.focus_mode ? ` · spread ${pv.focus_mode === 'concept' ? 'by concept'
           : pv.focus_mode === 'area' ? 'by area' : 'not spread'}` : '') }),
-    pv.approved_spec ? el('details', { class: 'rd-spec' },
-      el('summary', { text: 'The missing skill ▸' }), el('p', { text: pv.approved_spec })) : '',
+    // 11k: it was an empty grey box — 11j's textarea took its class name,
+    // and a dataset whose provenance predates the frozen spec had nothing to
+    // show. The proposal's own words are the fallback
+    el('details', { class: 'rd-skill', 'data-dataset-spec': String(head.id) },
+      el('summary', { text: 'The missing skill ▸' }),
+      el('p', { class: 'spec', text: pv.approved_spec || head.spec_text
+        || 'no spec recorded' })),
     el('div', { class: 'frm' },
       readLink({ kind: 'provenance', id: 'dataset:' + head.id }, 'Provenance ▸',
         { class: 'small', 'data-dataset-provenance': String(head.id) })));
@@ -9165,6 +9232,21 @@ async function copyText(t, what) {
   toast(`Copied ${what || t}`, { key: 'copy' });
 }
 
+// 11k: the stage, not the table's column. #58 said "done" for several
+// minutes while the judge was still grading 240 of 570 answers, with an
+// empty action cell: it looked as if nothing was happening.
+const stillGrading = r => r.suite === 'judged' && r.judge && r.judge.status !== 'done'
+  && !r.judge_failed;
+function runStage(r) {
+  if (r.status === 'done' && stillGrading(r))
+    return { key: 'grading', cls: 'running', text: 'grading ' + judgeCount(r.judge) };
+  if (r.status === 'running') {
+    const m = /^(\d+)\s*\/\s*(\d+)/.exec(r.progress || '');
+    return { key: 'running', cls: 'running', text: m ? `running ${m[1]}/${m[2]}` : 'running' };
+  }
+  return { key: r.status, cls: r.status, text: r.status };
+}
+
 function queueActions(r) {
   const id = String(r.id);
   // 11g: the log opens in the reader; the raw text is one item further down
@@ -9216,9 +9298,12 @@ function queueActions(r) {
     return cell(ghost('data-row-resubmit', 'Resubmit', () => queueResubmit(r),
       { title: `the same model, suite${r.suite === 'judged' ? ' and topics' : ''}, queued again` }));
   if (r.status === 'done') {
-    const judgedDone = r.suite !== 'judged' || (r.judge && r.judge.status === 'done');
-    return cell(judgedDone ? ghost('data-row-open', 'Open results', () => queueOpen(r)) : '',
-      resubmit);
+    // never an empty cell: while the judge works, the row says so
+    if (stillGrading(r))
+      return cell(el('span', { class: 'badge', 'data-grading': id,
+        title: 'the answers are in; the judge is grading them',
+        text: `Grading… ${judgeCount(r.judge)}` }), resubmit);
+    return cell(ghost('data-row-open', 'Open results', () => queueOpen(r)), resubmit);
   }
   return cell('');
 }
@@ -9316,7 +9401,8 @@ function vQueue() {
     // a judged row says what it sat, in one line: the list is behind ▸ (11i)
     el('td', { class: 'small' }, suiteCell(r, 'q')),
     el('td', { text: r.submitter || '—' }),
-    el('td', { 'data-watch': `q|${r.id}|status` }, el('span', { class: stClass(r.status), text: r.status })),
+    el('td', { 'data-watch': `q|${r.id}|status` }, (() => { const st = runStage(r);
+      return el('span', { class: stClass(st.cls), 'data-stage': st.key, text: st.text }); })()),
     el('td', { class: 'small', text: r.progress || '', 'data-watch': `q|${r.id}|progress` },
       // the GPU half finishing is not the job finishing: the judge batch is
       // still out, and the row says how far it is
@@ -9457,7 +9543,10 @@ function vQueue() {
 // eight diagnosis-half items the LLM saw, labelled as such. Approve (edited or
 // not) under a typed name, or reject with a reason. Only an approved spec can
 // be sent to the generator, and only the spec text goes.
+let _rvInFlight = false;
 async function loadReview() {
+  if (_rvInFlight) return;
+  _rvInFlight = true;
   try {
     const [llm, props, ds] = await Promise.all([
       api('api/llm'), api('api/proposals'), api('api/datasets')]);
@@ -9482,7 +9571,12 @@ async function loadReview() {
       if (now && JSON.stringify(now) !== JSON.stringify(had)) readFetch(open);
     }
     if (changed && state.tab === 'review' && !state.model) render();
+    // 11k: a Propose row on another page waits for this list to know whether
+    // a proposal is already open
+    else if (changed && (state.model || state.topic)) render();
+    if (state.read && state.read.kind === 'proposal') renderReader();
   } catch (e) { /* server briefly away */ }
+  finally { _rvInFlight = false; }
 }
 
 async function rvPost(path, body) {
@@ -9781,7 +9875,7 @@ async function loadRvAnswers(pid) {
   renderReader();
 }
 
-function rvAnswersBlock(p, ev) {
+function rvAnswersBlock(p, ev, redraw) {
   const open = state.rv.answersOpen === p.id;
   const det = el('details', { class: 'rd-answers', 'data-answers-read': String(p.id),
     open: open ? '' : null },
@@ -9796,13 +9890,30 @@ function rvAnswersBlock(p, ev) {
   const a = state.rv.answers[p.id];
   if (!a || a.loading) { det.append(skeleton(3, { 'data-loading': 'answers-read' })); return det; }
   if (a.error) { det.append(el('p', { class: 'warn', text: a.error })); return det; }
+  // 11k: 33 answers in full was one 14,000px scroll. Ten at a time, each
+  // answer clamped to three lines until it is asked for — the question and
+  // the judge's comment stay whole
+  const items = a.items || [];
+  const pg = paged('rv-answers', items, `${p.id}:${items.length}`, redraw || render, 10);
   det.append(el('p', { class: 'small se', 'data-answers-count': String(a.n),
-    text: `${a.n} practice answers` + (a.gone ? `, ${a.gone} no longer on file` : '') + '.' }));
-  det.append(el('ol', { class: 'rd-alist' }, (a.items || []).map(it =>
-    el('li', { 'data-answer-qid': String(it.qid) },
+    text: `${a.n} practice answers` + (a.gone ? `, ${a.gone} no longer on file` : '')
+      + (items.length > pg.rows.length ? ` · ${pg.from}–${pg.to} below` : '') + '.' }));
+  det.append(el('ol', { class: 'rd-alist', start: String(pg.from || 1) }, pg.rows.map(it => {
+    const shown = !!(state.rv.answersShown || {})[it.qid];
+    const text = it.answer || '(the model wrote nothing)';
+    const long = text.length > 200;
+    return el('li', { 'data-answer-qid': String(it.qid) },
       el('p', { class: 'rd-q' }, el('b', { text: 'The question. ' }), it.question || '—'),
-      el('p', { class: 'rd-a' }, el('b', { text: 'Its answer. ' }), it.answer || '—'),
-      el('p', { class: 'small' }, el('b', { text: `Scored ${it.score} of 4. ` }), it.comment)))));
+      el('div', { class: 'rd-a' }, el('b', { text: 'Its answer. ' }),
+        el('div', { class: shown || !long ? 'rd-atext' : 'rd-atext clamp3',
+          'data-answer-text': String(it.qid), text }),
+        long ? el('button', { class: 'quiet rd-more', 'data-answer-toggle': String(it.qid),
+          'aria-expanded': String(shown), text: shown ? 'Show less' : 'Show the whole answer',
+          onclick: () => { state.rv.answersShown = { ...(state.rv.answersShown || {}),
+            [it.qid]: !shown }; (redraw || render)(); } }) : ''),
+      el('p', { class: 'small' }, el('b', { text: `Scored ${it.score} of 4. ` }), it.comment));
+  })));
+  if (pg.pager) det.append(pg.pager);
   return det;
 }
 
@@ -9843,7 +9954,7 @@ function readProposal(wrap, r, p) {
         + (ev.topic_score_report != null ? `${num(ev.topic_score_report, 2)} / 4` : '—')
         + ` (hidden questions)` }));
     // 3. the answers it read
-    body.push(rvAnswersBlock(p, ev));
+    body.push(rvAnswersBlock(p, ev, paint));
     // 4. where the documents go
     const chips = el('div', { class: 'focuschips', 'data-focus-plan': String(p.id),
       'data-plan-stage': p.status === 'proposed' ? 'decide' : 'generate' });
@@ -10367,16 +10478,23 @@ function proposeControl(r) {
   const slot = 'propose:' + r.slug;
   const attrs = { 'data-propose': r.slug, 'data-propose-model': model };
   const done = j => `Proposal #${j.id} requested — ${r.topic}`;
+  rvNeeded();
+  const open = openProposalFor(model, r.topic);
+  if (open)
+    return el('div', {}, el('a', { ...attrs, class: 'propose', 'data-gate': 'open',
+      'data-review-link': String(open.id), href: '#tab=review&read=proposal:' + open.id,
+      text: 'Review it →', title: `proposal #${open.id} is `
+        + rvStatusWords(open.status).toLowerCase(),
+      onclick: e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+        e.preventDefault();
+        openReader({ kind: 'proposal', id: String(open.id) },
+          `[data-review-link="${open.id}"]`); } }), actNote(slot));
+  // 11k: one dialog, here too — it opens over this page and does not leave it
   if (gate.ok)
-    return el('div', {}, actButton(slot, 'Propose', async () => {
-      if (!whoName()) throw new Error(askName());
-      const j = await post('api/proposals', { model, topic: r.topic, requested_by: whoName() });
-      state.loop.loaded = false; state.rv.loaded = false; loadLoop();
-      return { key: 'propose', toast: done(j), go: goReview, link: 'Review',
-               line: `Proposal #${j.id} requested for ${model}. It lands on the Review tab when `
-                 + 'the batch completes.' };
-    }, { ...attrs, class: 'primary', 'data-gate': 'ok',
-         title: `ask the AI what skill ${model} is missing on ${r.topic}` }), actNote(slot));
+    return el('div', {}, el('button', { ...attrs, class: 'primary', 'data-gate': 'ok',
+      text: 'Propose', title: `ask the AI what skill ${model} is missing on ${r.topic}`,
+      onclick: () => npDialog({ model, topic: r.topic, stay: true,
+        returnTo: `[data-propose="${r.slug}"]` }) }), actNote(slot));
   if (gate.overridable)
     return el('div', {}, el('button', { ...attrs, class: 'secondary dot-warn',
       'data-gate': 'overridable', text: 'Propose…', title: gate.why,
@@ -10832,7 +10950,9 @@ function examPicker(st, mid, key, onChange) {
       box.checked = open > 0 && on === open;
       box.indeterminate = on > 0 && on < open;
       box.disabled = !open;
-      count.textContent = `${on} of ${ts.length}`;
+      // 11k: "0 of 5" read as "0 of 5 judged"; it means ticked. Say both
+      count.textContent = `${on} ticked · ${ts.filter(t => statusOf(t).k === 'judged').length}`
+        + ` of ${ts.length} judged`;
     }
     for (const [t, n] of notes) n.hidden = !st.tasks.includes(t);
     summary.textContent = examSummary(st.tasks, !!st.control, statusOf);
@@ -12019,6 +12139,24 @@ function popPlace() {
   panel.style.maxHeight = `${room}px`;
 }
 
+// 11k: a mouse click left a thick ring on the checks pill, because closing
+// a popover gives focus back to its button and Chrome calls that focus
+// visible. The ring is for people who are moving by keyboard: we remember
+// which it was, and mark the button so the ring stays off for a pointer.
+let _byPointer = false;
+addEventListener('pointerdown', () => { _byPointer = true; }, true);
+addEventListener('keydown', () => { _byPointer = false; }, true);
+function refocus(el) {
+  if (!el || !el.isConnected) return;
+  if (_byPointer) {
+    el.dataset.noring = '1';
+    const off = () => { delete el.dataset.noring;
+      el.removeEventListener('blur', off); el.removeEventListener('keydown', off); };
+    el.addEventListener('blur', off); el.addEventListener('keydown', off);
+  }
+  el.focus();
+}
+
 function popClose(backToButton = false) {
   const { panel, anchor } = POP;
   if (!panel) return;
@@ -12036,7 +12174,7 @@ function popClose(backToButton = false) {
   }
   if (anchor && anchor.isConnected) anchor.setAttribute('aria-expanded', 'false');
   POP.key = POP.panel = POP.anchor = POP.opts = POP.build = null;
-  if (backToButton && anchor && anchor.isConnected) anchor.focus();
+  if (backToButton) refocus(anchor);
 }
 
 function popOpen(key, anchor, panel, opts = {}) {

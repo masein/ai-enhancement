@@ -320,7 +320,7 @@ def test_the_answers_it_read_lists_every_one_with_its_practice_question(live, pa
 
 
 @pytest.mark.dashboard
-def test_the_list_holds_all_of_them_where_the_old_card_stopped_at_eight(live, page):
+def test_the_list_holds_all_of_them_ten_at_a_time(live, page):
     import exam_build as _eb
     model, topic, j = many_read(live["base"])
     pid = plant("proposed", topic=topic, task=_eb.topic_task(topic), model=model,
@@ -337,7 +337,19 @@ def test_the_list_holds_all_of_them_where_the_old_card_stopped_at_eight(live, pa
         assert det.locator("summary").text_content() == f"The answers it read ({read['n']}) ▸"
         det.locator("summary").click()
         page.wait_for_selector("[data-answers-count]")
-        assert det.locator("[data-answer-qid]").count() == read["n"]
+        # 11k: ten at a time, and the pager reaches the rest — the whole list
+        # in one scroll was 14,000px
+        assert det.locator("[data-answer-qid]").count() == 10
+        pager = det.locator("[data-pager='rv-answers']")
+        assert pager.count() == 1
+        assert pager.locator("[data-page-range]").get_attribute("data-page-range") == "1-10"
+        seen = set(det.locator("[data-answer-qid]").evaluate_all(
+            "xs => xs.map(x => x.dataset.answerQid)"))
+        while pager.locator("[data-page-next]").is_enabled():
+            pager.locator("[data-page-next]").click()
+            seen |= set(det.locator("[data-answer-qid]").evaluate_all(
+                "xs => xs.map(x => x.dataset.answerQid)"))
+        assert len(seen) == read["n"] == len({str(i["qid"]) for i in read["items"]})
         assert page.errors == []
     finally:
         clear_proposals()

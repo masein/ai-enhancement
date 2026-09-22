@@ -1975,6 +1975,10 @@ def _dataset_view(d: dict, props: dict[int, dict]) -> dict:
     p = props.get(d["proposal_id"]) or {}
     out.update({"model": p.get("model"), "task": p.get("task"), "category": p.get("category"),
                 "over_provisional_judge": prop.override_of(p),
+                # 11k: what was approved, for the reader's "The missing skill"
+                # — a dataset made before the spec was frozen into provenance
+                # still has the proposal's own words
+                "spec_text": p.get("edited_text") or p.get("spec_text"),
                 "download": f"/api/datasets/{d['id']}/items.jsonl" if d["status"] == "ready"
                 else None})
     return out

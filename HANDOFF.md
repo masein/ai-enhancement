@@ -1380,6 +1380,60 @@ sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "
 5. The Datasets view lists #1–#8, each with **Read** and **Use in training
    ⧉**; the tab is under 1,600 px tall at 1,512 px.
 
+### 11k — the 11f–11j live check
+
+Brief: `docs/prompts/phase-11k-live-check-fixes.md`. One PR. The nine things
+masein and I found on the board on the evening of 22 Sep.
+
+- **Propose → opens the New proposal dialog**, filled in, from the model
+  page, the Loop board and the topic page; it opens over the page and never
+  navigates. Until now it linked to the topic page, which has had no Propose
+  of its own since 11j moved proposing into the dialog. Where a proposal for
+  that model and topic is already open, the row reads **Review it →** and
+  opens that proposal's card. The tooltip flips side and stays 8 px inside
+  the window.
+- **A run says the stage it is at**: `queued` → `running 2/4` →
+  `grading 240/570` → `done`. `done` waits for the grades. While the judge
+  works the action cell holds a quiet **Grading… 240/570** chip instead of
+  nothing, and `⋯` keeps Log throughout.
+- **The dataset reader's "The missing skill"** shows the approved spec again
+  (11j's textarea took its class name), falls back to the proposal's own
+  words, and says "no spec recorded" when there are none. Closed, it is one
+  line tall.
+- **Every sticky table clips and scrolls inside its own card** — not only
+  the Leaderboard's. The Queue's painted across its card at 1,512 px.
+- **Nothing slides the page sideways**: `#view`, `.wrap` and `.card` clip on
+  the x axis (`overflow-x: clip`, which makes no scroller, so page-sticky
+  headers and body popovers are untouched).
+- **Sit the exam's area headings** read "0 ticked · 2 of 5 judged".
+- **The answers a proposal read** come ten at a time, with the pager, and
+  each answer is clamped to three lines behind **Show the whole answer**.
+  The question and the judge's comment stay whole. It was one 14,000 px
+  scroll.
+- **The focus ring is the keyboard's**: closing a popover with the mouse
+  gives the button its focus back without a ring; a Tab still shows one.
+- **A list row is a row**: no borders or underlines inside a menu, and the
+  chosen one is tinted and ticked.
+
+**Deploy steps, after 11k merges.** Code only, no data step.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+```
+
+**Expected output:**
+
+1. `up -d --build` ends with the container healthy; the image build prints
+   `image files OK`.
+2. The log grep prints `no errors`.
+3. A model page's **Propose →** opens the dialog over that page; a topic
+   with an open proposal reads **Review it →**.
+4. A judged run shows `grading k/n` and a **Grading…** chip while the judge
+   works, and `done` with **Open results** after.
+5. Dataset #6's reader shows the missing skill; no table paints over its
+   card at 1,280–1,920 px; no page slides sideways at 400 px.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

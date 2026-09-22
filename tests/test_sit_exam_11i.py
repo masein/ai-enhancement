@@ -280,7 +280,9 @@ def test_each_quick_pick_ticks_exactly_its_set_and_the_summary_follows(live, pag
     area.locator("[data-area-box]").check()
     inside = area.locator("input[data-exam-task]:not([disabled])")
     assert all(inside.nth(i).is_checked() for i in range(inside.count()))
-    assert area.locator(".excount").text_content().startswith(f"{inside.count()} of ")
+    # 11k: "0 of 5" read as judged; the heading says both now
+    assert area.locator(".excount").text_content() == (
+        f"{inside.count()} ticked · 0 of {area.locator('[data-exam-topic]').count()} judged")
     # the control is off by default, and its own box
     ctl = panel.locator("[data-exam-control]")
     if ctl.count():

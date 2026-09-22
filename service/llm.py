@@ -538,8 +538,17 @@ class FakeBatches(Backend):
         with open(self.log, "a", encoding="utf-8") as fh:
             for row in rows:
                 fh.write(json.dumps(row) + "\n")
-        (self.dir / f"{bid}.json").write_text(json.dumps({"requests": rows, "polls": 0}))
+        self._save(bid, {"requests": rows, "polls": 0})
         return bid
+
+    # the service's poller thread and a test's own tick() both poll, and a
+    # poll writes: a reader caught a half-written file and raised where the
+    # LLM's own errors are reported. Written aside and moved into place
+    def _save(self, bid: str, state: dict) -> None:
+        p = self.dir / f"{bid}.json"
+        tmp = p.with_suffix(f".json.{os.getpid()}.{threading.get_ident()}.tmp")
+        tmp.write_text(json.dumps(state))
+        os.replace(tmp, p)
 
     def _load(self, bid: str) -> dict:
         p = self.dir / f"{bid}.json"
@@ -550,7 +559,7 @@ class FakeBatches(Backend):
     def status(self, batch_id: str) -> tuple[str, str]:
         b = self._load(batch_id)
         b["polls"] += 1
-        (self.dir / f"{batch_id}.json").write_text(json.dumps(b))
+        self._save(batch_id, b)
         n = len(b["requests"])
         if b["polls"] >= self.polls_to_done:
             return "done", _counted({"succeeded": n, "total": n})
