@@ -237,7 +237,9 @@ def test_propose_approve_generate_gate_provenance_taint(gap):
     d = client.get(f"/api/datasets/{did}").json()
     assert d["status"] == "ready", d["error"]
     pv = d["provenance"]
-    assert pv["items"] == {"generated": 6, "dropped": 0, "kept": 6}
+    # every document asked for is accounted for (11a): six asked, six kept
+    assert pv["items"] == {"requested": 6, "generated": 6, "dropped": 0, "kept": 6,
+                           "missing": []}
     assert pv["format"] == "doc"
     assert pv["gate"]["rejected"] is False and pv["gate"]["ngram"] == 13
     assert pv["approver"] == "Omar" and pv["requester"] == "Omar"
@@ -424,7 +426,11 @@ def test_dataset_echoing_the_benchmark_is_rejected(gap, monkeypatch):
     g = d["provenance"]["gate"]
     assert g["rejected"] is True and g["dropped_benchmark"] == 10 and g["offending_ngrams"]
     assert g["exam_questions"] > 0                     # the exam is indexed too
-    assert d["provenance"]["items"] == {"generated": 100, "dropped": 100, "kept": 0}
+    it = d["provenance"]["items"]
+    assert (it["requested"], it["generated"], it["dropped"], it["kept"]) == (100, 100, 100, 0)
+    # the ten the gate dropped one by one are named; the rest went with the
+    # whole batch, which the error above says in words
+    assert [m["why"] for m in it["missing"]] == ["dropped by the gate: benchmark"] * 10
     assert not (tree["root"] / "datasets" / str(did) / "items.jsonl").exists()
     assert client.get(f"/api/datasets/{did}/items.jsonl").status_code == 409
     # a single echo in fifty is dropped, recorded, and the rest kept
@@ -434,7 +440,9 @@ def test_dataset_echoing_the_benchmark_is_rejected(gap, monkeypatch):
     llm_poller.tick()
     d2 = client.get(f"/api/datasets/{did2}").json()
     assert d2["status"] == "ready"
-    assert d2["provenance"]["items"] == {"generated": 50, "dropped": 1, "kept": 49}
+    it2 = d2["provenance"]["items"]
+    assert (it2["requested"], it2["generated"], it2["dropped"], it2["kept"]) == (50, 50, 1, 49)
+    assert [m["why"] for m in it2["missing"]] == ["dropped by the gate: benchmark"]
     assert d2["provenance"]["gate"]["dropped_benchmark"] == 1
 
 

@@ -194,13 +194,17 @@ def go_tab(page, label: str) -> None:
 
 
 def set_name(page, name: str) -> None:
-    """The one name, in the header, that every action records (phase 9b)."""
+    """The one name, in the header, that every action records (phase 9b).
+    With a name already set the box is a popover on the body (11a), not an
+    input inside the header."""
     who = page.locator("#who")
     who.wait_for()
     if not who.locator("input").count():
         who.locator("button[data-who]").click()
-    who.locator("input").fill(name)
-    who.locator("input").press("Enter")
+        page.wait_for_selector("#pop-who input")
+    box = page.locator("#pop-who") if page.locator("#pop-who input").count() else who
+    box.locator("input").fill(name)
+    box.locator("input").press("Enter")
     page.wait_for_selector(f"#who button[data-who='{name}']")
 
 
@@ -306,3 +310,37 @@ def arts_without_rubric(monkeypatch, tmp_path):
     """without_its_own_rubric for Arts, as a fixture: the repo copy the judge
     reads, less arts.md and arts.criteria.json."""
     return without_its_own_rubric(monkeypatch, tmp_path, "arts")
+
+
+# ---------------------------------------------------------------------------
+# A topic whose questions carry domain labels. The 37-topic banks label every
+# question with one — Physics & Astronomy has twelve — and that is what the
+# focus plan spreads documents over (11a). The fixture's drafted questions
+# carry no metadata at all, so a test that needs labels writes them on.
+# ---------------------------------------------------------------------------
+
+DOMAIN_LABELS = ("Market Structure", "Trade and Money", "Growth and Development")
+
+
+def label_domains(exam_root, topic: str, labels=DOMAIN_LABELS):
+    """Put a `domain` from a small closed set on every question of `topic`,
+    round-robin. Returns (path, original bytes) so a test running against the
+    shared tree can put the bank back. Every label lands in both halves, as a
+    real bank's does — a label only the report half carries would be report-
+    half text, and no request may hold it."""
+    import json as _json
+
+    import categories as _categories
+    import exam_build as eb
+    p = eb.bank_dir(Path(exam_root)) / f"{_categories.topic_slug(topic)}.jsonl"
+    was = p.read_bytes()
+    rows = [_json.loads(x) for x in was.decode("utf-8").splitlines() if x.strip()]
+    for i, r in enumerate(rows):
+        r.setdefault("meta", {})["domain"] = labels[i % len(labels)]
+    p.write_text("".join(_json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
+                 encoding="utf-8")
+    seen = {}
+    for r in rows:
+        seen.setdefault(r["meta"]["domain"], set()).add(eb.half_of(r["qid"]))
+    assert all(h == {"report", "diagnose"} for h in seen.values()), seen
+    return p, was

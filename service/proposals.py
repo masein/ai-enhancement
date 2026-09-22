@@ -281,6 +281,102 @@ def register_for(rows: list[dict], counts: dict) -> tuple[str, str]:
     return EXPLAINER_WHO, EXPLAINER_REGISTER
 
 
+# ---------------------------------------------------------------------------
+# Where the documents go. Dataset #2 (Physics & Astronomy) asked for 20 and
+# 11 of the 18 it got were about relativistic momentum: every request in a
+# batch is identical but for a style seed, so a small generator writes the
+# same document again. The bank already says what each question is about —
+# its `domain` — so the documents are spread over the domains whose
+# DIAGNOSE-half answers failed, and each request carries one domain's name.
+# Nothing else of the bank travels: no count, no score, no qid, no question.
+# ---------------------------------------------------------------------------
+
+DOMAIN_MAX_DISTINCT = 15         # more than this is not a closed set of labels
+DOMAIN_MIN_ITEMS = 2             # a value on one item is that question's, not a label
+DOMAIN_MAX_CHARS = 64
+DOMAIN_MAX_WORDS = 8
+
+
+def is_domain_label_set(counts) -> bool:
+    """Whether a topic's `domain` values are a closed set of labels — a name
+    many questions share — rather than a sentence per question. Stricter than
+    is_label_set (which guards the audience line and rightly refuses any
+    whitespace): a domain is a phrase, like "Classical Mechanics"."""
+    return bool(counts) and len(counts) <= DOMAIN_MAX_DISTINCT and all(
+        n >= DOMAIN_MIN_ITEMS and len(v) <= DOMAIN_MAX_CHARS
+        and len(v.split()) <= DOMAIN_MAX_WORDS and not set(v) & set(".?!")
+        for v, n in counts.items())
+
+
+def failing_domains(model_dir: Path, task: str, topic: str,
+                    root: Path | None = None) -> dict[str, int]:
+    """domain -> how many of this model's graded DIAGNOSE-half answers on
+    this topic did not land. The report half is never read, by the same rule
+    as justifications_for. {} when the topic's domains are not labels."""
+    import collections
+    rows = _exam.load_bank(root or config.EXAM_DIR).get(topic) or []
+    all_counts = collections.Counter(str((r.get("meta") or {}).get("domain") or "").strip()
+                                     for r in rows)
+    all_counts.pop("", None)
+    if not is_domain_label_set(all_counts):
+        return {}
+    of_qid = {r["qid"]: str((r.get("meta") or {}).get("domain") or "").strip() for r in rows}
+    j = _judge_file(model_dir)
+    if not j or j.get("skipped"):
+        return {}
+    out: collections.Counter = collections.Counter()
+    for it in ((j.get("tasks") or {}).get(task) or {}).get("items") or []:
+        if it.get("half") != "diagnose" or not it.get("graded"):
+            continue                          # the whole safety property, again
+        if it.get("score") is None or it["score"] >= WEAK_SCORE:
+            continue
+        d = of_qid.get(it.get("qid"))
+        if d:
+            out[d] += 1
+    return dict(out)
+
+
+def allocate(counts: dict[str, int], n: int) -> list[tuple[str, int]]:
+    """`n` documents over the failing domains, in proportion to the failures,
+    by largest remainder — and, while n allows, at least one each. Worst
+    first, then by name, so the split is the same every time."""
+    order = sorted(counts, key=lambda d: (-counts[d], d))
+    if n <= 0 or not order:
+        return []
+    if n <= len(order):
+        return [(d, 1) for d in order[:n]]
+    total = sum(counts.values()) or 1
+    base, rem = {}, {}
+    for d in order:
+        exact = n * counts[d] / total
+        base[d] = max(1, int(exact))
+        rem[d] = exact - int(exact)
+    over = sum(base.values()) - n
+    for d in sorted(order, key=lambda d: (rem[d], -counts[d], d)):
+        while over > 0 and base[d] > 1:
+            base[d] -= 1
+            over -= 1
+    left = n - sum(base.values())
+    while left > 0:
+        for d in sorted(order, key=lambda d: (-rem[d], -counts[d], d)):
+            if left <= 0:
+                break
+            base[d] += 1
+            left -= 1
+    return [(d, base[d]) for d in order]
+
+
+def focus_plan(model_dir: Path, task: str, topic: str, count: int,
+               root: Path | None = None) -> list[dict]:
+    """[{domain, failing_diagnose, documents}] — what the Review card shows
+    before Generate, what the requests carry, and what provenance records.
+    Empty when the topic has no domain labels or nothing failed: then the
+    batch is what it was before."""
+    counts = failing_domains(model_dir, task, topic, root)
+    return [{"domain": d, "failing_diagnose": counts[d], "documents": k}
+            for d, k in allocate(counts, count)]
+
+
 def justifications_for(model_dir: Path, task: str,
                        limit: int = MAX_JUSTIFICATIONS) -> tuple[list[dict], dict]:
     """The judge's written reasoning for this topic's DIAGNOSE-half answers
@@ -450,30 +546,56 @@ def items_per_request(fmt: str, provider: str | None = None) -> int:
     return ITEMS_PER_REQUEST.get(fmt, GEN_ITEMS_PER_REQUEST)
 
 
+def focus_chunks(plan: list[dict], per: int, count: int) -> list[tuple[str | None, int]]:
+    """(domain, how many documents) per request: each request covers ONE
+    domain, and the requests go round-robin over the domains, so a batch cut
+    short still covers the spread. No plan: no domain, chunked as before."""
+    if not plan:
+        return [(None, min(per, count - start)) for start in range(0, count, per)]
+    per_domain = [[(p["domain"], min(per, p["documents"] - s))
+                   for s in range(0, p["documents"], per)] for p in plan]
+    out: list[tuple[str | None, int]] = []
+    for i in range(max(len(x) for x in per_domain)):
+        out += [x[i] for x in per_domain if i < len(x)]
+    return out
+
+
 def generation_requests(did: int, spec_text: str, category: str, count: int,
-                        fmt: str, seed: int, audience: str = "") -> list[llm.Request]:
+                        fmt: str, seed: int, audience: str = "",
+                        plan: list[dict] | None = None) -> list[llm.Request]:
     """One request per few items. Contains the approved spec, the topic, the
-    count, the format, a style constraint and the audience labels — and no
-    benchmark item, no exam question, no hash, no model name and no score, in
-    any form."""
+    count, the format, a style constraint, the audience labels and — when the
+    topic's questions carry domain labels — the one domain this request is
+    for. No benchmark item, no exam question, no hash, no model name, no
+    score and no failure count, in any form."""
     per = items_per_request(fmt)
     reqs = []
-    for k, start in enumerate(range(0, count, per)):
-        n = min(per, count - start)
+    start = 0
+    for k, (focus, n) in enumerate(focus_chunks(plan or [], per, count)):
         what = ("document" if fmt == "doc" else "item") + ("" if n == 1 else "s")
         user = (f"Skill specification:\n{spec_text.strip()}\n\n"
                 + (f"{audience.strip()}\n\n" if audience else "")
-                + f"Topic: {category}\nFormat: {fmt}\nWrite {n} {what}.\n{STYLE[fmt]}\n"
+                + f"Topic: {category}\n"
+                # the label, and only the label: which corner of the topic this
+                # set is for, so twenty documents are not twenty of one thing
+                + (f"Focus: {focus}\n" if focus else "")
+                + f"Format: {fmt}\nWrite {n} {what}.\n{STYLE[fmt]}\n"
                 + f"Style seed {seed}-{k}: make this set differ in scenario, register and "
                 + "phrasing from any other set you might write for the same specification.")
         reqs.append(llm.Request(
             custom_id=f"gen:{did}:{k}", system=GEN_SYSTEM, user=user, max_tokens=8192, json=True,
             meta={"kind": "generation", "dataset_id": did, "count": n, "start": start,
-                  "format": fmt}))
+                  "format": fmt, **({"focus": focus} if focus else {})}))
+        start += n
     return reqs
 
 
-def parse_items(text: str, fmt: str) -> list[dict]:
+def read_reply(text: str, fmt: str, expected: int = 1) -> tuple[list[dict], list[str]]:
+    """(the items in this reply, why each document that did not arrive is not
+    here) — one reason per missing document, so a batch can account for every
+    request. Dataset #2 asked for 20 and wrote 18, and nothing said why."""
+    if not str(text or "").strip():
+        return [], ["empty reply"] * expected
     arr = llm.extract_array(text)
     if arr is None:
         # a request for ONE item — what a local generator gets, since its
@@ -483,27 +605,40 @@ def parse_items(text: str, fmt: str) -> list[dict]:
         obj = llm.extract_json(text)
         arr = [obj] if isinstance(obj, dict) else None
     if arr is None:
-        return []
-    out = []
+        return [], ["reply not JSON"] * expected
+    out: list[dict] = []
+    why: list[str] = []
     for o in arr:
         if not isinstance(o, dict):
+            why.append("reply not JSON")
             continue
         if fmt == "doc":
             title = str(o.get("title") or "").strip()
             body = str(o.get("text") or o.get("body") or "").strip()
             # a title alone, or a paragraph too short to teach anything, is not
             # a training document — and neither is a quiz wearing prose
-            if not title or len(body.split()) < DOC_MIN_WORDS:
-                continue
-            out.append({"title": title[:300], "text": body})
+            if not title:
+                why.append("no title")
+            elif len(body.split()) < DOC_MIN_WORDS:
+                why.append(f"too short ({len(body.split())} words)")
+            else:
+                out.append({"title": title[:300], "text": body})
             continue
         q = str(o.get("question") or "").strip()
         a = str(o.get("answer") or "").strip()
         r = str(o.get("rationale") or "").strip()
         if not q or not a:
+            why.append("no question or no answer")
             continue
         out.append({"question": q, "answer": a, "rationale": r})
-    return out
+    # asked for two, sent one: the other is missing with no reason of its own
+    why += ["not in the reply"] * max(0, expected - len(out) - len(why))
+    return out, why
+
+
+def parse_items(text: str, fmt: str) -> list[dict]:
+    """The items in one reply. read_reply also says what is not there."""
+    return read_reply(text, fmt)[0]
 
 
 # ---------------------------------------------------------------------------
@@ -583,9 +718,10 @@ def local_marks(generator_id: str, prop: dict) -> dict:
 
 def provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash: str,
                gate: dict, sha: str, n_generated: int, n_kept: int,
-               audience: str = "") -> dict:
+               audience: str = "", missing: list[dict] | None = None,
+               focus: list[dict] | None = None) -> dict:
     out = _provenance(prop, ds, backend_id, batch_id, prompt_hash, gate, sha, n_generated,
-                      n_kept, audience=audience)
+                      n_kept, audience=audience, missing=missing, focus=focus)
     local = local_marks(backend_id, prop)
     if local:                     # always, when any of them was local — there is no flag
         out["provisional"] = True
@@ -614,8 +750,11 @@ def override_of(prop: dict) -> dict | None:
 
 def _provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash: str,
                 gate: dict, sha: str, n_generated: int, n_kept: int,
-                audience: str = "") -> dict:
+                audience: str = "", missing: list[dict] | None = None,
+                focus: list[dict] | None = None) -> dict:
     return {
+        # which corner of the topic each request was for (focus_plan)
+        "focus_plan": list(focus or []),
         # the labels the generator was given about who asks these questions,
         # recorded beside the spec because they shaped the documents too
         "audience": audience or audience_for(prop["category"], prop["task"]),
@@ -640,7 +779,11 @@ def _provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_has
         "prompt_sha256": prompt_hash,
         "format": ds["fmt"],
         "count_requested": ds["count"],
-        "items": {"generated": n_generated, "dropped": n_generated - n_kept, "kept": n_kept},
+        # every document asked for is accounted for: kept, dropped by the
+        # gate, or missing with the reason it never arrived
+        "items": {"requested": ds["count"], "generated": n_generated,
+                  "dropped": n_generated - n_kept, "kept": n_kept,
+                  "missing": list(missing or [])},
         "gate": gate,
         "items_sha256": sha,
         "timestamps": {"proposed": prop["created_at"], "approved": prop["approved_at"],
@@ -668,10 +811,13 @@ def provenance_complete(p: dict) -> list[str]:
     # identity may legitimately be unconfigured, and False is a value.
     # audience is empty for a topic whose bank says nothing about who asks —
     # the legacy `other` items carry no style or subject at all
+    # focus_plan is empty for a topic with no domain labels, and a batch where
+    # every document arrived has nothing missing — both are records, not holes
     return [h for h in holes if h not in ("edited_text", "gate.offending_ngrams",
-                                          "audience",
+                                          "audience", "focus_plan", "items.missing",
                                           "identities.exam_writer", "identities.judge",
-                                          "identities.single_provider_loop")]
+                                          "identities.single_provider_loop")
+            and not h.startswith("gate.dropped")]
 
 
 def slug(s: str) -> str:

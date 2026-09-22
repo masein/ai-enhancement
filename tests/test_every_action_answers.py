@@ -384,15 +384,17 @@ def test_the_theme_is_a_menu(live, page):
     page.goto(live["base"] + "/")
     btn = page.locator("#themeBtn")
     btn.click()
-    items = page.locator("#themeMenu [role=menuitemradio]")
+    # on the shared popover since 11a: the panel is on the body, keyed pop-theme
+    items = page.locator("#pop-theme [role=menuitemradio]")
     assert items.count() == 4
     assert [i.get_attribute("aria-checked") for i in items.all()].count("true") == 1
-    page.locator("#themeMenu [data-theme='dark']").click()
+    page.locator("#pop-theme [data-theme='dark']").click()
     assert page.evaluate("document.documentElement.getAttribute('data-theme')") == "dark"
     btn.click()
-    assert page.locator("#themeMenu [data-theme='dark']").get_attribute("aria-checked") == "true"
+    assert page.locator("#pop-theme [data-theme='dark']").get_attribute("aria-checked") == "true"
     page.keyboard.press("Escape")
-    assert page.locator("#themeMenu").is_hidden()
+    assert page.locator("#pop-theme").count() == 0
+    assert page.evaluate("document.activeElement.id") == "themeBtn"   # Esc gives it back
     assert page.errors == []
 
 

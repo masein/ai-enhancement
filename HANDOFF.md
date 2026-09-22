@@ -691,6 +691,100 @@ their fingerprints do not move, so no answer on them is set aside.
 
 ---
 
+## 10d. Phase 11 — the LiveBench look
+
+Brief: `docs/prompts/phase-11-livebench-look.md` (four PRs: 11a–11d). masein
+pointed at LiveBench and Artificial Analysis for the feel of the page; we
+take the ideas and write them ourselves — no code, stylesheet, font, logo,
+name or wording from either site. 11a is the five findings of the 37-topic
+live check; 11b the visual system; 11c the Leaderboard; 11d the Overview
+cards and the model page.
+
+- **11a — the five findings of the live check (2026-09-22).**
+  - **One popover component**, for More ▾, Theme ▾ and the name menu (and
+    11c's popovers later). The panel is appended to `document.body` and
+    placed from its button's rect, because `div.morewrap` sits inside
+    `#tabs`, which scrolls sideways: the menu was clipped to 37 px and
+    almost nothing in it could be clicked. It flips above the button when
+    there is no room below, stays 8 px inside the window, follows scroll and
+    resize, closes on an outside mousedown, on Tab and when its button
+    scrolls out of view, and carries the ARIA menu-button keyboard pattern
+    (↓/Enter/Space open and focus the current or first item, ↑↓ wrap, Home
+    and End, Esc closes and gives the button back). It survives a poll: the
+    panel is not inside `#view`, and `popReanchor()` finds the button again
+    by `data-pop-anchor` after every render.
+  - **Documents are spread over the areas whose answers failed.** Dataset #2
+    asked for 20 documents and wrote 11 of the 18 about relativistic
+    momentum, because every request was identical but for the style seed.
+    Now `focus_plan()` counts the **diagnose-half** graded answers below
+    `WEAK_SCORE` per `domain` (the label comes from the bank, by qid — the
+    report half is never read), allocates the documents by largest remainder
+    with at least one each while the count allows, and orders the requests
+    round-robin so a batch cut short still covers the spread. Each request
+    carries one line, `Focus: <label>` — the label only, no count, no score,
+    no qid, no question text. A topic's domains are used only when they are
+    a closed set of labels (`is_domain_label_set()`: at most 15 distinct,
+    each on at least 2 items, at most 64 characters and 8 words, no `.?!`);
+    otherwise there is no `Focus:` line, which is what happened before. The
+    plan is on the proposal's Review card **before** Generate, on the
+    dataset card, and in provenance as `focus_plan`.
+  - **Every document asked for is accounted for.** `parse_items()` dropped an
+    item without a title, under 120 words, or in a reply that was not JSON,
+    and said nothing; `_finish_generation()` reported an error only when
+    every request failed. Provenance now carries `items.requested` and
+    `items.missing: [{request, focus, why}]`, with `why` one of `error: …`,
+    `reply not JSON`, `no title`, `too short (<n> words)`, `empty reply`,
+    `not in the reply` or `dropped by the gate: benchmark|exam|duplicate`.
+    The card and the toast say the line — "10 of 12 documents · 2 missing —
+    2 too short (60 words)" — and a disclosure lists each missing document
+    with the area it was meant to cover. A dataset made before 11a says
+    "reasons not recorded (made before 11a)" rather than leaving a blank.
+    **No automatic retry**: the local GPU is shared.
+  - **A `local/` model whose weights are not on this server.** #53 picked
+    `local/qwen35-delta-moe-7d560104-step945` from the search — it is on the
+    board because its results came from elsewhere — and the run failed at
+    start, after the wait. `suggest.local_candidates()` now sets
+    `weights: bool` for every `local/` id; the search greys such an item,
+    labels it "results only — weights not on the server", marks it
+    `aria-disabled` and skips it with the arrow keys; the submit form shows
+    the same sentence and disables **Queue this run**; and `POST
+    /api/submissions` refuses with 422 before anything is queued: "local/<name>
+    has results on this board but no weights on this server — upload it first
+    (POST /api/artifacts/<name>) to run it here." An id that is not on the
+    board either is refused in preflight's own words.
+  - **"rubrics v?"** on the model page: the judged header built its rubric
+    list with `` `v${r.version}` ``, and no author-written rubric carries a
+    version. It uses `rubricVersion()` now — "rubrics no version", or "v2,
+    no version" for a mix.
+
+**Deploy steps**, after each phase-11 PR merges. This phase has no data
+migration: it changes code (11c also adds `scripts/areas.yaml`).
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+```
+
+**Expected output:**
+
+1. `up -d --build` rebuilds the image and ends with the container healthy;
+   the image build prints `image files OK` (the 111 delivered files).
+2. The log grep prints `no errors`. (`grep` exits 1 when it matches nothing,
+   so the `|| echo` is the pass case.)
+3. On the page, after a hard reload (11a): More ▾ opens fully at 1,280 px
+   and at 400 px and Esc returns focus to the button; a model page judged on
+   the 37-topic exam reads "rubrics no version", never "v?"; searching for
+   `qwen35-delta-moe` shows the checkpoint greyed as "results only — weights
+   not on the server", and
+   `curl -s -XPOST localhost:8000/api/submissions -H 'Content-Type: application/json' -d '{"hf_id":"local/qwen35-delta-moe-7d560104-step945","suite":"quick"}'`
+   returns the 422 sentence with nothing queued.
+4. The next Generate on a topic whose questions carry domain labels shows
+   its focus plan on the Review card before you press it, and the toast when
+   the batch finishes says how many documents came back and why any are
+   missing.
+
+---
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

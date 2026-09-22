@@ -173,6 +173,23 @@ def judge_health(force: bool = False) -> dict:
     return v
 
 
+@app.get("/api/proposals/{pid}/focus")
+def proposal_focus(pid: int, count: int = 20):
+    """Where `count` documents would go: the domains whose diagnose-half
+    answers failed, largest first. The Review card shows this before anyone
+    presses Generate, so the spread is a decision, not a surprise."""
+    r = db.proposal_get(pid)
+    if not r:
+        raise HTTPException(404, f"no proposal {pid}")
+    if not 1 <= count <= 1000:
+        raise HTTPException(422, "count must be between 1 and 1000")
+    model_dir = config.OUT_DIR / r["model"].replace("/", "__")
+    plan = prop.focus_plan(model_dir, r["task"], r["category"], count)
+    return {"proposal_id": pid, "count": count, "plan": plan,
+            "why": "" if plan else ("this topic's questions carry no domain labels, so the "
+                                    "documents are not spread by area")}
+
+
 @app.get("/api/judge/health")
 def judge_health_endpoint():
     """For the header's live dot and the judged controls: cheap to poll, the
@@ -358,6 +375,20 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         if blocked:
             raise HTTPException(403, f"remote code is not available: {blocked}. "
                                      f"See SERVICE.md § custom model code.")
+    if hf_id.startswith("local/") and not (
+            config.ARTIFACTS_DIR / hf_id.split("/", 1)[1]).is_dir():
+        # on the board is not on this server: #53 queued a checkpoint whose
+        # results came from elsewhere, and the run failed at start, after the
+        # person had waited for it. Nothing is queued now instead — and a
+        # checkpoint that is not on the board either is refused in preflight's
+        # own words, so the two never disagree
+        name = hf_id.split("/", 1)[1]
+        if (config.OUT_DIR / hf_id.replace("/", "__")).is_dir():
+            raise HTTPException(422, f"local/{name} has results on this board but no weights "
+                                     f"on this server — upload it first "
+                                     f"(POST /api/artifacts/{name}) to run it here.")
+        raise HTTPException(422, f"no uploaded artifact named {name!r} — upload it first "
+                                 f"(POST /api/artifacts/{name}) or check the name.")
     for row in db.recent(200):
         if row["hf_id"] != hf_id or row["status"] not in ACTIVE:
             continue
@@ -1760,8 +1791,12 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
     did = db.dataset_create(pid, g.fmt, g.count, who, {})
     # the audience travels with the topic: a spec alone never said who asks
     audience = prop.audience_for(r["category"], r["task"])
+    # and so does the corner of the topic each request is for: the documents
+    # are spread over the domains whose diagnose-half answers failed
+    plan = prop.focus_plan(config.OUT_DIR / r["model"].replace("/", "__"), r["task"],
+                           r["category"], g.count)
     reqs = prop.generation_requests(did, spec, r["category"], g.count, g.fmt, seed=did,
-                                    audience=audience)
+                                    audience=audience, plan=plan)
     sha = llm.prompt_sha(*[q.system + "\n" + q.user for q in reqs])
     try:
         bid = backend.submit(reqs)
@@ -1771,8 +1806,13 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
     db.batch_add(bid, "generation", did, len(reqs), backend.name, backend.model)
     # what the generator was actually told about its reader, kept for the
     # poller: recomputing it later would read a bank that may have moved
-    db.dataset_update(did, batch_id=bid,
-                      provenance=json.dumps({"prompt_sha256": sha, "audience": audience}))
+    # what the generator was told, and what each request was asked for: the
+    # poller accounts for every document against this, and recomputing it
+    # later would read a bank that may have moved
+    db.dataset_update(did, batch_id=bid, provenance=json.dumps(
+        {"prompt_sha256": sha, "audience": audience, "focus_plan": plan,
+         "requests": [{"k": k, "count": q.meta.get("count"), "focus": q.meta.get("focus")}
+                      for k, q in enumerate(reqs)]}))
     return {"dataset_id": did, "status": "pending", "batch_id": bid, "items": len(reqs)}
 
 

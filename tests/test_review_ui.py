@@ -245,7 +245,13 @@ def test_review_flow_in_the_browser(live, page):
     ds = page.locator(".rv[data-dataset]").first
     ds.locator("summary").click()
     dtext = ds.text_content()
-    assert "20 kept of 20 generated" in dtext and "Contamination gate" in dtext
+    # 11a: every document asked for is accounted for, so the summary counts
+    # what the dataset HOLDS against what was asked for — and none of these
+    # twenty went astray, so the line stops there
+    assert "Contamination gate" in dtext
+    did_attr = ds.get_attribute("data-dataset")
+    assert page.locator(f"[data-doc-line='{did_attr}']").text_content() == "20 of 20 documents"
+    assert page.locator(f"[data-missing='{did_attr}']").count() == 0
     assert "Provenance, in full" in dtext and "approver" in dtext and "items_sha256" in dtext
     href = ds.locator("a:has-text('items.jsonl')").get_attribute("href")
     with urllib.request.urlopen(f"{base}/{href}") as r:
@@ -616,10 +622,12 @@ def test_the_tabs_are_named_once_and_ordered_by_how_often_they_are_opened(live, 
     more = page.locator("#moreBtn")
     assert more.text_content() == "More ▾" and more.get_attribute("aria-haspopup") == "menu"
     more.click()
-    items = page.locator("#moreMenu [role=menuitem]:not([hidden])").all_text_contents()
+    # the panel lives on the body now (11a's popover), so the tab strip's own
+    # sideways scroller cannot clip it
+    items = page.locator("#pop-more [role=menuitem]").all_text_contents()
     assert items[:6] == ["Exam", "Review", "Training", "Tasks", "Perplexity & Loss", "Provenance"]
     page.keyboard.press("Escape")
-    assert page.locator("#moreMenu").is_hidden()
+    assert page.locator("#pop-more").count() == 0
     # the hash is the label, and the page said so in SERVICE.md
     for label, want in (("Loop", "loop"), ("Models", "models"),
                         ("Queue", "queue"), ("Provenance", "provenance"), ("Exam", "exam")):

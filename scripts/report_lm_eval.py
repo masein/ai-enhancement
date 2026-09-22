@@ -1954,6 +1954,9 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
   font-size:var(--fs-2); }
 .ms-item.active, .ms-item:hover { background:var(--accent-soft); }
 .ms-item.over { opacity:.6; }
+/* on the board, but its weights are not here: listed, greyed, and it says so */
+.ms-item.noweights { color:var(--muted); }
+.ms-item.noweights .mono { text-decoration:line-through; }
 .ms-sep { padding:6px 11px 2px; font-size:var(--fs-1); font-weight:600; color:var(--muted);
   text-transform:uppercase; letter-spacing:.05em; }
 .ms-foot { padding:6px 11px; font-size:var(--fs-1); color:var(--warning-text); border-top:1px solid var(--grid); }
@@ -2005,10 +2008,15 @@ button.who { font-weight:600; }
   border:1px solid var(--border); border-radius:var(--r-1); padding:5px 9px; width:150px; }
 .who-edit.ask input { border-color:var(--warning); outline:2px solid color-mix(in srgb, var(--warning) 35%, transparent); }
 .morewrap { position:relative; display:inline-block; }
-.moremenu { position:absolute; top:calc(100% + 2px); left:0; z-index:45; min-width:200px;
+.moremenu { min-width:200px;
   background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2); padding:4px;
   box-shadow:0 10px 28px rgba(0,0,0,.16); display:flex; flex-direction:column; }
 .moremenu[hidden] { display:none; }
+/* a popover panel lives on the body, so no scroller can clip it — #tabs
+   scrolls sideways on a phone, and that clipped More ▾ to 37 px */
+.pop { position:fixed; z-index:60; overflow:auto; overscroll-behavior:contain; }
+.pop.whopop { min-width:260px; gap:8px; padding:12px; }
+.pop.whopop p { margin:0; color:var(--text-secondary); }
 .moremenu [role=menuitem] { border:0; background:none; text-align:left; border-radius:var(--r-1);
   padding:7px 10px; color:var(--text-primary); font-size:var(--fs-2); text-decoration:none; }
 .moremenu [role=menuitem]:hover, .moremenu [role=menuitem]:focus { background:var(--accent-soft); }
@@ -2148,7 +2156,7 @@ const state = {
   lbAbout: false,                      // "about these benchmarks" panel open
   lbView: 'tasks',                     // leaderboard columns: 'tasks' | 'cats' (MMLU by category)
   rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '',
-        topic: '', just: {}, justOpen: '' },                               // Review tab
+        topic: '', just: {}, justOpen: '', focus: {}, watch: new Set() },  // Review tab
   ex: { status: null, candidates: [], loaded: false, msg: '', topic: '' },   // Exam tab
   topic: null,                         // open topic page, by slug (hash-routed)
   loop: { rows: null, blocked: '', msg: '', loaded: false, q: '' },          // Loop tab
@@ -3507,7 +3515,8 @@ function vJudged(m) {
     + (j.judge.batch_id ? ` · batch ${String(j.judge.batch_id).slice(0, 18)}` : '')
     + (j.judge.weights_sha256 ? ` · weights ${String(j.judge.weights_sha256).slice(0, 12)}` : '')
     + ` · prompt v${j.judge.prompt_version} ${String(j.judge.prompt_sha256 || '').slice(0, 12)} · rubrics `
-    + [...new Set(Object.values(j.judge.rubrics || {}).map(r => `v${r.version}`))].join(', ')
+    + [...new Set(Object.values(j.judge.rubrics || {}).map(r => rubricVersion(r.version)))]
+        .join(', ')
     + (st.current ? '' : ` · not the judge this server runs now${J.current ? ` (${J.current.id})` : ''}`)));
   return card;
 }
@@ -4267,6 +4276,10 @@ function msQuery(key, q) {
       const j = await api('api/models/suggest?q=' + encodeURIComponent(q.trim()));
       if (seq !== s.seq) return;                  // a newer keystroke already asked
       s.items = j.items || []; s.footer = j.footer || '';
+      for (const it of s.items) {
+        if (it.weights === false) state.noWeights.add(it.id);
+        else if (it.weights === true) state.noWeights.delete(it.id);
+      }
       s.open = true; s.active = -1;
     } catch (e) {
       if (seq !== s.seq) return;
@@ -4290,13 +4303,25 @@ function msPick(key, i) {
 function msKey(key, e) {
   const s = msState(key);
   const n = s.items.length;
+  // the arrows skip a model that cannot run here; it is still listed, and it
+  // still says why
+  const step = (from, d) => {
+    let i = from;
+    while (true) {
+      const next = i + d;
+      // nothing further this server can run: the selection stays where it was
+      if (next < 0 || next > s.items.length - 1) return from;
+      i = next;
+      if (!msNoWeights(s.items[i])) return i;
+    }
+  };
   if (e.key === 'ArrowDown') {
     e.preventDefault();
     if (!s.open && n) s.open = true;
-    s.active = Math.min(s.active + 1, n - 1);
+    s.active = step(s.active, 1);
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
-    s.active = Math.max(s.active - 1, 0);
+    s.active = step(s.active, -1);
   } else if (e.key === 'Enter') {
     if (s.open && s.active >= 0) { e.preventDefault(); msPick(key, s.active); }
     return;
@@ -4309,6 +4334,18 @@ function msKey(key, e) {
   msPaint(key);
 }
 
+// a local/ id whose results are on this board but whose weights are not on
+// this server: #53 picked one from the search and the run failed at start
+const msNoWeights = it => it.weights === false;
+const NO_WEIGHTS = 'results only — weights not on the server';
+// every id the search has said that about, so a form can refuse before the
+// API does — in the API's own words
+state.noWeights = new Set();
+const noWeightsWhy = id =>
+  `${id} has results on this board but no weights on this server — upload it first `
+  + `(POST /api/artifacts/${String(id).replace(/^local\//, '')}) to run it here.`;
+const cannotRun = id => state.noWeights.has(String(id || '').trim());
+
 function msItem(key, it, i, active) {
   const bits = [];
   if (it.params) bits.push(P(it.params));
@@ -4318,9 +4355,12 @@ function msItem(key, it, i, active) {
   if (it.queued) bits.push('in the queue');
   if (it.artifact) bits.push('uploaded checkpoint');
   if (it.over_cap) bits.push('over the size cap');
+  if (msNoWeights(it)) bits.push(NO_WEIGHTS);
   return el('li', { id: `ms-${key}-${i}`, role: 'option', class: 'ms-item'
-      + (i === active ? ' active' : '') + (it.over_cap ? ' over' : ''),
-    'aria-selected': String(i === active), 'data-ms-item': it.id,
+      + (i === active ? ' active' : '') + (it.over_cap ? ' over' : '')
+      + (msNoWeights(it) ? ' noweights' : ''),
+    'aria-selected': String(i === active),
+    'aria-disabled': msNoWeights(it) ? 'true' : null, 'data-ms-item': it.id,
     onmousedown: e => { e.preventDefault(); msPick(key, i); } },
     el('span', { class: 'mono', text: it.id }),
     bits.length ? el('span', { class: 'se', text: bits.join(' · ') }) : '');
@@ -6435,7 +6475,7 @@ function vQueue() {
   const topicBoxes = sf.suite === 'judged' && built.length ? el('div', { 'data-submit-topics': '1' },
     el('p', { class: 'small', text: 'topics in this run:' }), topicPicker(sf, built, 'submit')) : '';
   f.suite.addEventListener('change', () => render());
-  const judgedOff = () => sf.suite === 'judged' && judgeDown();
+  const judgedOff = () => (sf.suite === 'judged' && judgeDown()) || cannotRun(sf.hf_id);
   const btn = el('button', { class: 'primary', text: 'Submit model', onclick: async () => {
     const body = { hf_id: sf.hf_id.trim(), kind: sf.kind, suite: sf.suite,
                    submitter: whoName(), note: sf.note };
@@ -6444,6 +6484,7 @@ function vQueue() {
       if (sf.tasks.length < built.length) body.tasks = sf.tasks;
     }
     if (!body.hf_id) { state.qmsg = 'enter a Hugging Face model id first'; render(); return; }
+    if (cannotRun(body.hf_id)) { state.qmsg = noWeightsWhy(body.hf_id); render(); return; }
     if (judgedOff()) { state.qmsg = judgeWhy(); render(); return; }
     btn.disabled = true;
     try {
@@ -6572,7 +6613,8 @@ function vQueue() {
   }
   state.queueRedraw = rebuildQueue;
   rebuildQueue();
-  if (judgedOff()) { btn.disabled = true; btn.title = judgeWhy(); }
+  if (judgedOff()) { btn.disabled = true;
+    btn.title = cannotRun(sf.hf_id) ? noWeightsWhy(sf.hf_id.trim()) : judgeWhy(); }
   return [
     el('div', { class: 'card' },
       el('h2', { text: 'Submit a model' }),
@@ -6582,7 +6624,10 @@ function vQueue() {
         + 'resubmitting a finished model costs nothing, and a quick run upgrades to full by '
         + 'running only the missing tasks. Results land on this leaderboard automatically.' }),
       el('div', { class: 'frm' }, f.hf_id, f.kind, f.suite, f.note, btn,
-        sf.suite === 'judged' && judgeDown()
+        cannotRun(sf.hf_id)
+          ? el('span', { class: 'propwhy', 'data-why': 'weights',
+                         text: noWeightsWhy(sf.hf_id.trim()) })
+          : sf.suite === 'judged' && judgeDown()
           ? el('span', { class: 'propwhy', 'data-why': 'submit', text: judgeWhy() }) : ''),
       topicBoxes,
       state.qmsg ? el('p', { class: 'small', style: 'margin-top:8px', text: state.qmsg }) : ''),
@@ -6604,6 +6649,16 @@ async function loadReview() {
       api('api/llm'), api('api/proposals'), api('api/datasets')]);
     const changed = !state.rv.loaded || JSON.stringify([llm, props, ds])
       !== JSON.stringify([state.rv.llm, state.rv.proposals, state.rv.datasets]);
+    // a batch that finished while this page was open says what it holds and
+    // what never arrived — the same line the card carries
+    const was = new Map((state.rv.datasets || []).map(d => [d.id, d.status]));
+    for (const d of ds) {
+      if (d.status === 'pending') continue;
+      // one this browser asked for, or one that was running when we looked
+      if (!state.rv.watch.has(d.id) && !(state.rv.loaded && was.get(d.id) === 'pending')) continue;
+      state.rv.watch.delete(d.id);
+      toast(`Dataset #${d.id}: ${docLine(d)}`, { key: `dataset-${d.id}`, ms: 12000 });
+    }
     Object.assign(state.rv, { llm, proposals: props, datasets: ds, loaded: true });
     if (changed && state.tab === 'review' && !state.model) render();
   } catch (e) { /* server briefly away */ }
@@ -6619,6 +6674,8 @@ async function rvPost(path, body) {
   const j = r ? await r.json().catch(() => ({})) : {};
   state.rv.msg = r && r.ok ? '' : 'refused: ' + (j.detail || (r ? r.status : 'server unreachable'));
   const pid = (/proposals\/(\d+)\//.exec(path) || [])[1];
+  // what this browser asked for, so the toast lands when the batch finishes
+  if (r && r.ok && j.dataset_id) state.rv.watch.add(j.dataset_id);
   if (r && r.ok) toast(/approve$/.test(path) ? `Approved the spec of proposal #${pid}`
     : /reject$/.test(path) ? 'Rejected' : /generate$/.test(path)
       ? `Dataset #${j.dataset_id} requested — it appears here when the batch completes` : 'Done',
@@ -6649,9 +6706,12 @@ function setWho(v) {
 // an action that records a name, when there is none: open the header box
 // and say so there, instead of a refusal three panels away
 function askName() {
-  state.whoEdit = true; state.whoAsk = true; renderWho();
-  const i = document.querySelector('#who input');
-  if (i) i.focus();
+  state.whoAsk = true;
+  renderWho(true);
+  const btn = document.querySelector('#who [data-pop-anchor="who"]');
+  if (btn && POP.key !== 'who') btn.click();
+  const i = document.querySelector('#pop-who input, #who input');
+  if (i) { i.focus(); i.select(); }
   return 'your name is recorded on this — type it at the top of the page first';
 }
 
@@ -6662,12 +6722,12 @@ function renderWho(force = false) {
   if (!force && box.contains(document.activeElement)
       && document.activeElement.tagName === 'INPUT') return;
   const name = whoName();
-  if (!name || state.whoEdit) {
+  if (!name) {                     // no name yet: the box is in the header itself
     const input = el('input', { type: 'text', value: name, 'aria-label': 'your name',
       placeholder: 'your name', 'data-who-input': '1', autocomplete: 'name',
       onkeydown: e => {
         if (e.key === 'Enter') { e.preventDefault(); save(); }
-        if (e.key === 'Escape' && whoName()) { state.whoEdit = false; renderWho(true); }
+        if (e.key === 'Escape' && whoName()) renderWho(true);
       } });
     const save = () => {
       const v = input.value.trim();
@@ -6675,7 +6735,7 @@ function renderWho(force = false) {
       // no render(): every action reads the name when it runs, and rebuilding
       // the view here would throw away a question someone is half-way through
       // editing on the Exam tab
-      setWho(v); state.whoEdit = false; state.whoAsk = false; renderWho(true);
+      setWho(v); state.whoAsk = false; renderWho(true);
     };
     box.replaceChildren(el('div', { class: 'who-edit' + (state.whoAsk ? ' ask' : ''),
         'data-who-prompt': name ? null : '1' },
@@ -6683,11 +6743,25 @@ function renderWho(force = false) {
       input, el('button', { class: 'primary', text: 'Save', onclick: save })));
     return;
   }
-  box.replaceChildren(el('button', { class: 'who', 'data-who': name,
+  // a panel on the shared popover, not an input that grows out of the header:
+  // it is never clipped, it survives a poll, and Esc gives the button back
+  const btn = el('button', { class: 'who', 'data-who': name,
     title: 'the name recorded on anything you start, approve or import here — click to change',
-    'aria-label': `your name: ${name} — change`, text: `${name} ▾`,
-    onclick: () => { state.whoEdit = true; renderWho();
-      const i = document.querySelector('#who input'); if (i) { i.focus(); i.select(); } } }));
+    'aria-label': `your name: ${name} — change`, text: `${name} ▾` });
+  box.replaceChildren(popover(btn, () => {
+    const input = el('input', { type: 'text', value: name, 'aria-label': 'your name',
+      placeholder: 'your name', 'data-who-input': '1', autocomplete: 'name',
+      onkeydown: e => { if (e.key === 'Enter') { e.preventDefault(); save(); } } });
+    const save = () => {
+      const v = input.value.trim();
+      if (!v) { input.focus(); return; }
+      setWho(v); state.whoAsk = false; popClose(); renderWho(true);
+    };
+    return el('div', { class: 'moremenu whopop', id: 'pop-who', 'aria-label': 'your name' },
+      el('p', { class: 'small', text: 'Recorded on anything you start, approve or import here.' }),
+      el('div', { class: 'frm' }, input,
+        el('button', { class: 'primary', 'data-who-save': '1', text: 'Save', onclick: save })));
+  }, { key: 'who', menu: false, placement: 'bottom-end' }));
 }
 
 // kept for the call sites that used to place a box: they place nothing now
@@ -6918,6 +6992,25 @@ function rvProposal(p, llmOk) {
                                  ['free', 'question and answer (comparison only)']],
       'doc', () => {});
     const usage = state.rv.llm || {};
+    // where those documents would go, before anyone presses Generate: the
+    // spread is a decision, not a surprise
+    const planP = el('p', { class: 'small', 'data-focus-plan': String(p.id) });
+    let planSeq = 0;
+    const fillPlan = async n => {
+      const key = `${p.id}:${n}`, seen = state.rv.focus[key];
+      const say = f => { planP.textContent = focusLine(f.plan, 'Documents will cover')
+        || f.why || ''; };
+      if (seen) { say(seen); return; }
+      const mine = ++planSeq;
+      try {
+        const f = await api(`api/proposals/${p.id}/focus?count=${n}`);
+        state.rv.focus[key] = f;
+        if (mine === planSeq) say(f);
+      } catch (e) { /* server briefly away; the line stays as it was */ }
+    };
+    count.addEventListener('input', () => { const n = +count.value;
+      if (n >= 1 && n <= 1000) fillPlan(n); });
+    fillPlan(+count.value);
     card.append(el('div', { class: 'dxh', text: 'Generate' }),
       el('p', { class: 'small', text: 'The generator receives the approved spec above, the '
         + 'topic, the count, the format and a style constraint. No benchmark item and no exam '
@@ -6927,6 +7020,7 @@ function rvProposal(p, llmOk) {
         + 'gate against both halves of every benchmark AND every exam question. Today: '
         + `${usage.usage_today ?? '—'} ${usage.daily_cap == null ? 'batch items used (no daily limit on '
             + (usage.provider || 'this provider') + ')' : `of ${usage.daily_cap} batch items used`}.` }),
+      planP,
       el('div', { class: 'frm' }, count, fmt,
         el('button', { class: 'primary', text: 'Generate data', disabled: llmOk ? null : '',
           title: llmOk ? '' : (usage.reason || 'LLM not configured'),
@@ -6944,6 +7038,34 @@ function rvProposal(p, llmOk) {
   return card;
 }
 
+// Where the documents go: the domains whose diagnose-half answers failed,
+// biggest share first. Labels and counts only — no question text ever.
+function focusLine(plan, lead) {
+  const p = (plan || []).filter(x => (x.documents || 0) > 0);
+  if (!p.length) return '';
+  return `${lead} ${p.length} ${p.length === 1 ? 'area' : 'areas'}: `
+    + p.map(x => `${x.domain} ${x.documents}`).join(' · ');
+}
+
+// "18 of 20 documents · 2 missing — 1 too short (87 words), 1 reply not JSON".
+// Every document asked for is accounted for: held, or missing with its reason.
+// A dataset made before 11a recorded no reasons, and says that rather than
+// leaving the gap unexplained.
+function docLine(d) {
+  const pv = d.provenance || {}, it = pv.items || {};
+  const kept = it.kept ?? d.kept ?? 0;
+  const req = it.requested ?? pv.count_requested ?? d.count ?? kept;
+  const missing = Array.isArray(it.missing) ? it.missing : null;
+  const gap = missing ? missing.length : Math.max(0, req - kept);
+  let line = `${kept} of ${req} documents`;
+  if (!gap) return line;
+  line += ` · ${gap} missing — `;
+  if (!missing) return line + 'reasons not recorded (made before 11a)';
+  const by = new Map();
+  for (const m of missing) by.set(m.why, (by.get(m.why) || 0) + 1);
+  return line + [...by].map(([why, n]) => `${n} ${why}`).join(', ');
+}
+
 function rvDataset(d) {
   const pv = d.provenance || {};
   const g = pv.gate || {};
@@ -6953,11 +7075,20 @@ function rvDataset(d) {
       + `${d.category || '—'} · ${d.fmt} · `,
       el('span', { class: stClass(d.status === 'ready' ? 'done' : d.status === 'pending'
         ? 'running' : 'failed'), text: d.status }),
-      pv.items ? ` · ${pv.items.kept} kept of ${pv.items.generated} generated` : '',
+      pv.items || d.count != null ? ' · ' + docLine(d) : '',
       pv.provisional ? ' · provisional' : '', ' ',
       overBadge(pv.proposed_over_provisional_judge || d.over_provisional_judge),
       d.download ? [' · ', el('a', { href: d.download.replace(/^\//, ''), text: 'items.jsonl' })] : ''));
   if (d.error) det.append(el('p', { class: 'warn', text: d.error }));
+  det.append(el('p', { class: 'small', 'data-doc-line': String(d.id), text: docLine(d) }));
+  const fl = focusLine(pv.focus_plan, 'Documents cover');
+  if (fl) det.append(el('p', { class: 'small', 'data-dataset-focus': String(d.id), text: fl }));
+  const miss = Array.isArray((pv.items || {}).missing) ? pv.items.missing : [];
+  if (miss.length) det.append(el('details', { class: 'rv', 'data-missing': String(d.id) },
+    el('summary', { style: 'cursor:pointer',
+      text: `${miss.length} missing ${miss.length === 1 ? 'document' : 'documents'}, one line each` }),
+    el('ol', { class: 'small' }, miss.map(m => el('li', {},
+      `request ${m.request ?? '—'} · ${m.focus || 'no area'} · ${m.why}`)))));
   if (pv.provisional) det.append(el('p', { class: 'warn', 'data-provisional': 'dataset' },
     el('b', { text: 'Provisional. ' }), upFirst(pv.provisional_reason) + ': '
     + Object.entries(pv.local_models || {}).map(([role, s]) => `${role} ${s.served_model} at `
@@ -6972,9 +7103,12 @@ function rvDataset(d) {
       + (g.offending_ngrams && g.offending_ngrams.length ? ' First offending n-gram: “'
         + g.offending_ngrams[0] + '”.' : '') }));
   const rows = [];
+  // a list of records — the focus plan, the missing documents — is printed as
+  // records, not as [object Object]
+  const one = x => x && typeof x === 'object' ? JSON.stringify(x) : String(x);
   const walk = (o, pre) => { for (const [k, v] of Object.entries(o || {}))
     if (v && typeof v === 'object' && !Array.isArray(v)) walk(v, pre + k + '.');
-    else rows.push([pre + k, Array.isArray(v) ? v.join(', ')
+    else rows.push([pre + k, Array.isArray(v) ? v.map(one).join(' · ')
       : pre === 'timestamps.' && v ? absT(v) : String(v)]); };
   walk(pv, '');
   if (rows.length) det.append(el('div', { class: 'dxh', text: 'Provenance, in full' }),
@@ -7591,12 +7725,17 @@ function loopSitPanel(r) {
         ['auto', 'base', 'instruct'].map(v => el('option', { value: v,
           selected: s.kind === v ? '' : null, text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
       rvNameInput(),
-      el('button', { 'data-sit': '1', disabled: (state.loop.blocked || s.busy || judgeDown())
+      el('button', { 'data-sit': '1',
+        disabled: (state.loop.blocked || s.busy || judgeDown() || cannotRun(s.model))
           ? '' : null,
-        title: judgeDown() ? judgeWhy() : '',
+        title: cannotRun(s.model) ? noWeightsWhy(s.model.trim())
+          : judgeDown() ? judgeWhy() : '',
         text: s.busy ? 'queueing…' : 'Queue this run', onclick: go }),
       // disabled says why, beside it, not only on hover
-      judgeDown() ? el('span', { class: 'propwhy', 'data-why': 'sit', text: judgeWhy() }) : ''),
+      cannotRun(s.model)
+        ? el('span', { class: 'propwhy', 'data-why': 'weights',
+                       text: noWeightsWhy(s.model.trim()) })
+        : judgeDown() ? el('span', { class: 'propwhy', 'data-why': 'sit', text: judgeWhy() }) : ''),
     el('p', { class: 'small', text: 'topics in this run:' }), pick,
     s.msg ? el('p', { class: 'small', 'data-sit-msg': '1', text: s.msg }) : '',
     el('p', { class: 'small' }, 'The queue is on ',
@@ -8409,6 +8548,9 @@ function render() {
   } else if (_settle) {
     requestAnimationFrame(settleAgain);
   }
+  // an open popover keeps its panel, its scroll and its focus across a render;
+  // only its button is a new node
+  popReanchor();
 }
 
 // how long a row or card a button took you to stays marked
@@ -8445,13 +8587,129 @@ function settleAgain() {
 // selection. Six tabs; the rest under More ▾, a real menu.
 let _tabsBuilt = false;
 
-function moreMenu(open) {
-  const btn = document.getElementById('moreBtn'), menu = document.getElementById('moreMenu');
-  if (!btn || !menu) return;
-  menu.hidden = !open;
-  btn.setAttribute('aria-expanded', String(open));
-  if (open) (menu.querySelector('[role=menuitem][aria-current]')
-             || menu.querySelector('[role=menuitem]')).focus();
+// ---------------------------------------------------------------------------
+// One popover, for every menu on the page.
+//
+// The More ▾ menu lived inside #tabs, which scrolls sideways on a phone
+// (overflow-x:auto), so the panel was clipped to the height of the tab strip:
+// 37 px, with almost nothing in it reachable. A panel that has to escape its
+// scroller belongs on document.body, placed from its button's rect. So this
+// is the component for More ▾, Theme ▾ and the name menu — and for the
+// Leaderboard's popovers later.
+//
+// It survives a render because the panel is NOT inside the view: render()
+// rebuilds #view and the header, and the panel keeps its DOM, its scroll and
+// its focus. Only the button is found again, by data-pop-anchor.
+// ---------------------------------------------------------------------------
+
+const POP = { key: null, panel: null, anchor: null, opts: null };
+const POP_EDGE = 8;             // never closer than this to the window's edge
+
+function popItems() {
+  return POP.panel ? [...POP.panel.querySelectorAll(
+    '[role=menuitem]:not([hidden]):not([disabled]),[role=menuitemradio]:not([hidden])')] : [];
+}
+
+function popPlace() {
+  const { panel, anchor, opts } = POP;
+  if (!panel || !anchor || !anchor.isConnected) return;
+  const r = anchor.getBoundingClientRect();
+  // its button has scrolled out of the window: there is nothing to hang from
+  if (r.bottom < 0 || r.top > innerHeight) { popClose(); return; }
+  panel.style.maxHeight = '';
+  const pr = panel.getBoundingClientRect();
+  const below = innerHeight - r.bottom - 4, above = r.top - 4;
+  const flip = pr.height > below && above > below;
+  const room = Math.max(120, (flip ? above : below) - POP_EDGE);
+  const top = flip ? Math.max(POP_EDGE, r.top - 4 - Math.min(pr.height, room)) : r.bottom + 4;
+  let left = (opts || {}).placement === 'bottom-end' ? r.right - pr.width : r.left;
+  left = Math.min(Math.max(POP_EDGE, left), Math.max(POP_EDGE, innerWidth - POP_EDGE - pr.width));
+  panel.style.top = `${Math.min(top, innerHeight - POP_EDGE - Math.min(pr.height, room))}px`;
+  panel.style.left = `${left}px`;
+  panel.style.maxHeight = `${room}px`;
+}
+
+function popClose(backToButton = false) {
+  const { panel, anchor } = POP;
+  if (!panel) return;
+  panel.remove();
+  if (anchor && anchor.isConnected) anchor.setAttribute('aria-expanded', 'false');
+  POP.key = POP.panel = POP.anchor = POP.opts = null;
+  if (backToButton && anchor && anchor.isConnected) anchor.focus();
+}
+
+function popOpen(key, anchor, panel, opts = {}) {
+  const again = POP.key === key;
+  popClose();
+  if (again) return;                       // a second click on the button closes it
+  POP.key = key; POP.panel = panel; POP.anchor = anchor; POP.opts = opts;
+  panel.dataset.pop = key;
+  panel.classList.add('pop');
+  if (opts.menu !== false) panel.setAttribute('role', 'menu');
+  document.body.append(panel);
+  anchor.setAttribute('aria-expanded', 'true');
+  popPlace();
+  const first = panel.querySelector('[aria-current],[aria-checked=true]') || popItems()[0]
+    || panel.querySelector('input,select,textarea,button');
+  if (first) first.focus();
+}
+
+// a button that owns a popover: the ARIA menu-button pattern, and the key
+// the panel is found again by after a render
+function popover(btn, build, opts = {}) {
+  const key = opts.key || btn.id || 'pop';
+  btn.setAttribute('aria-haspopup', opts.menu === false ? 'dialog' : 'menu');
+  btn.setAttribute('aria-expanded', String(POP.key === key));
+  btn.setAttribute('aria-controls', 'pop-' + key);
+  btn.dataset.popAnchor = key;
+  btn.addEventListener('click', e => { e.preventDefault(); popOpen(key, btn, build(), opts); });
+  btn.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      if (POP.key === key) return;
+      e.preventDefault();
+      // …and this keystroke opened the menu: it does not also move inside it
+      e.stopPropagation();
+      popOpen(key, btn, build(), opts);
+    }
+  });
+  return btn;
+}
+
+// after every render: the button is a new node, the panel is not
+function popReanchor() {
+  if (!POP.key) return;
+  const a = document.querySelector(`[data-pop-anchor="${POP.key}"]`);
+  if (!a) { popClose(); return; }          // its button is gone: so is the menu
+  POP.anchor = a;
+  a.setAttribute('aria-expanded', 'true');
+  popPlace();
+}
+
+document.addEventListener('mousedown', e => {
+  if (!POP.panel) return;
+  if (POP.panel.contains(e.target) || (POP.anchor && POP.anchor.contains(e.target))) return;
+  popClose();
+});
+document.addEventListener('keydown', e => {
+  if (!POP.panel) return;
+  const list = popItems();
+  const i = list.indexOf(document.activeElement);
+  if (e.key === 'Escape') { e.preventDefault(); popClose(true); return; }
+  if (e.key === 'Tab' && (POP.opts || {}).menu !== false) { popClose(); return; }
+  if (!list.length || !POP.panel.contains(document.activeElement)) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); list[(i + 1) % list.length].focus(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+  else if (e.key === 'Home') { e.preventDefault(); list[0].focus(); }
+  else if (e.key === 'End') { e.preventDefault(); list[list.length - 1].focus(); }
+});
+addEventListener('scroll', () => popPlace(), true);
+addEventListener('resize', () => popPlace());
+
+function moreMenu(open) {                  // kept for the call sites that toggle it
+  const btn = document.getElementById('moreBtn');
+  if (!btn) return;
+  if (!open) popClose();
+  else if (POP.key !== 'more') btn.click();
 }
 
 function renderTabs() {
@@ -8460,33 +8718,21 @@ function renderTabs() {
   const go = id => navigate({ tab: id, model: null, topic: null });
   if (!_tabsBuilt) {
     _tabsBuilt = true;
-    const items = [...more.map(([id, label]) => el('button', { role: 'menuitem', 'data-tab': id,
-      tabindex: '-1', text: label, onclick: () => { moreMenu(false); go(id); } })),
-      // the sandbox's own page: not a status chip in the header any more
-      LIVE ? el('a', { role: 'menuitem', class: 'menulink', id: 'demoItem', href: 'demo',
-        tabindex: '-1', hidden: '', 'data-demo': 'link', text: 'Sandbox run',
-        title: 'a demo run\'s own page — provisional, not the board' }) : ''];
-    const menu = el('div', { class: 'moremenu', role: 'menu', id: 'moreMenu', hidden: '',
-      'aria-label': 'more tabs',
-      onkeydown: e => {
-        const list = [...menu.querySelectorAll('[role=menuitem]:not([hidden])')];
-        const i = list.indexOf(document.activeElement);
-        if (e.key === 'ArrowDown') { e.preventDefault(); list[(i + 1) % list.length].focus(); }
-        else if (e.key === 'ArrowUp') { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
-        else if (e.key === 'Escape') { e.preventDefault(); moreMenu(false);
-                                       document.getElementById('moreBtn').focus(); }
-        else if (e.key === 'Tab') moreMenu(false);
-      } }, items);
-    const moreBtn = el('button', { role: 'tab', id: 'moreBtn', 'data-tab': 'more',
-      'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': 'moreMenu',
-      onclick: () => moreMenu(menu.hidden),
-      onkeydown: e => { if (e.key === 'ArrowDown') { e.preventDefault(); moreMenu(true); } } });
+    const moreBtn = el('button', { role: 'tab', id: 'moreBtn', 'data-tab': 'more' });
+    // the panel is built on open and lives on the body (popover): inside the
+    // tab strip, which scrolls sideways, it was clipped to 37 px
+    popover(moreBtn, () => el('div', { class: 'moremenu', id: 'pop-more',
+        'aria-label': 'more tabs' },
+      more.map(([id, label]) => el('button', { role: 'menuitem', 'data-tab': id,
+        'aria-current': (state.model ? '' : state.tab) === id ? 'page' : null,
+        text: label, onclick: () => { popClose(); go(id); } })),
+      LIVE && DATA && DATA.demo ? el('a', { role: 'menuitem', class: 'menulink', id: 'demoItem',
+        href: DATA.demo.href, 'data-demo': 'link', text: 'Sandbox run',
+        title: 'a demo run\'s own page — provisional, not the board' }) : ''),
+      { key: 'more' });
     tabs.replaceChildren(...main.map(([id, label]) =>
       el('button', { role: 'tab', 'data-tab': id, onclick: () => go(id), text: label })),
-      el('div', { class: 'morewrap' }, moreBtn, menu));
-    document.addEventListener('mousedown', e => {
-      if (!menu.hidden && !e.target.closest('.morewrap')) moreMenu(false);
-    });
+      el('div', { class: 'morewrap' }, moreBtn));
   }
   const sel = state.model ? '' : state.tab;
   for (const b of tabs.querySelectorAll('button[role=tab][data-tab]'))
@@ -8495,11 +8741,6 @@ function renderTabs() {
   const moreBtn = document.getElementById('moreBtn');
   moreBtn.textContent = (inMore ? inMore[1] : 'More') + ' ▾';
   moreBtn.setAttribute('aria-selected', String(!!inMore));
-  for (const it of tabs.querySelectorAll('[role=menuitem][data-tab]'))
-    if (it.dataset.tab === sel) it.setAttribute('aria-current', 'page');
-    else it.removeAttribute('aria-current');
-  const demo = document.getElementById('demoItem');
-  if (demo) { demo.hidden = !(DATA && DATA.demo); if (DATA && DATA.demo) demo.href = DATA.demo.href; }
 }
 
 // The board's checks: one line on every tab — "6 checks · 3 about the
@@ -8733,38 +8974,16 @@ function applyTheme(t) {
   try { localStorage.setItem('bench-theme', t); } catch (e) { /* private mode etc. */ }
 }
 // "Theme ▾" promised a menu and cycled on click. A menu: Auto, Light, Dark,
-// Dim, the current one ticked
+// Dim, the current one ticked — on the shared popover, so it is never clipped
 (() => {
   const btn = document.getElementById('themeBtn');
   const labels = { auto: 'Auto (follow the system)', light: 'Light', dark: 'Dark', dim: 'Dim' };
-  const menu = el('div', { class: 'moremenu themes', role: 'menu', id: 'themeMenu', hidden: '',
-      'aria-label': 'theme',
-      onkeydown: e => {
-        const list = [...menu.querySelectorAll('[role=menuitemradio]')];
-        const i = list.indexOf(document.activeElement);
-        if (e.key === 'ArrowDown') { e.preventDefault(); list[(i + 1) % list.length].focus(); }
-        else if (e.key === 'ArrowUp') { e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
-        else if (e.key === 'Escape') { e.preventDefault(); open(false); btn.focus(); }
-        else if (e.key === 'Tab') open(false);
-      } },
-    THEMES.map(t => el('button', { role: 'menuitemradio', 'data-theme': t, tabindex: '-1',
-      'aria-checked': 'false', text: labels[t],
-      onclick: () => { themeIdx = THEMES.indexOf(t); applyTheme(t); open(false); btn.focus(); } })));
-  const open = on => {
-    menu.hidden = !on; btn.setAttribute('aria-expanded', String(on));
-    if (on) (menu.querySelector('[aria-checked=true]') || menu.firstChild).focus();
-  };
-  btn.setAttribute('aria-haspopup', 'menu');
-  btn.setAttribute('aria-expanded', 'false');
-  btn.setAttribute('aria-controls', 'themeMenu');
-  const wrap = el('span', { class: 'morewrap themewrap' });
-  btn.replaceWith(wrap);
-  wrap.append(btn, menu);
-  btn.addEventListener('click', () => open(menu.hidden));
-  btn.addEventListener('keydown', e => { if (e.key === 'ArrowDown') { e.preventDefault(); open(true); } });
-  document.addEventListener('mousedown', e => {
-    if (!menu.hidden && !e.target.closest('.themewrap')) open(false);
-  });
+  popover(btn, () => el('div', { class: 'moremenu themes', id: 'pop-theme',
+      'aria-label': 'theme' },
+    THEMES.map(t => el('button', { role: 'menuitemradio', 'data-theme': t,
+      'aria-checked': String(THEMES[themeIdx] === t), text: labels[t],
+      onclick: () => { themeIdx = THEMES.indexOf(t); applyTheme(t); popClose(true); } }))),
+    { key: 'theme', placement: 'bottom-end' });
 })();
 let themeIdx = 0;
 try {   // remembered per browser — the dashboard is a page people leave open

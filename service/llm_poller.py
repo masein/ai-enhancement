@@ -51,28 +51,53 @@ def _finish_generation(row: dict, results: dict[str, llm.Result], backend: llm.B
     did = row["ref_id"]
     ds = db.dataset_get(did)
     prop = db.proposal_get(ds["proposal_id"])
+    prov_stub = json.loads(ds["provenance"] or "{}")
+    # what each request was asked for, recorded when the batch was submitted:
+    # every document asked for is accounted for against it
+    plan = {int(q["k"]): q for q in (prov_stub.get("requests") or [])}
     items: list[dict] = []
+    origin: list[dict] = []               # per parsed item: which request it came from
+    missing: list[dict] = []
     errors = []
-    for cid, res in sorted(results.items()):
+    for cid, res in sorted(results.items(), key=lambda kv: _req_k(kv[0])):
         if not cid.startswith(f"gen:{did}:"):
             continue
+        k = _req_k(cid)
+        asked = int((plan.get(k) or {}).get("count") or 1)
+        focus = (plan.get(k) or {}).get("focus")
         if res.error:
             errors.append(res.error)
+            missing += [{"request": k, "focus": focus, "why": f"error: {res.error[:160]}"}] * asked
             continue
-        items.extend(proposals.parse_items(res.text, ds["fmt"]))
+        got, why = proposals.read_reply(res.text, ds["fmt"], asked)
+        items += got
+        origin += [{"request": k, "focus": focus}] * len(got)
+        missing += [{"request": k, "focus": focus, "why": w} for w in why]
     if not items:
         db.dataset_update(did, status="failed", finished_at=time.time(),
+                          # the same accounting a ready dataset carries: every
+                          # document asked for, and why none of them arrived
+                          provenance=json.dumps({**prov_stub, "items": {
+                              "requested": ds["count"], "generated": 0, "dropped": 0,
+                              "kept": 0, "missing": missing}}),
                           error=("the generator returned no parseable items"
                                  + (f"; errors: {errors[0]}" if errors else ""))[:400])
         return
     ix = contamination.index(config.OUT_DIR, config.EXAM_DIR)
     gate = contamination.check(items, ix)
-    prov_stub = json.loads(ds["provenance"] or "{}")
+    # a document the gate dropped is missing too, and says which gate dropped it
+    for d in gate.get("dropped") or []:
+        src = d.get("source") if d.get("reason") == "benchmark" else None
+        o = origin[d["index"]] if d.get("index", -1) < len(origin) else {}
+        missing.append({"request": o.get("request"), "focus": o.get("focus"),
+                        "why": f"dropped by the gate: {src or d.get('reason')}"})
     prompt_hash = prov_stub.get("prompt_sha256", "")
+    focus_plan = prov_stub.get("focus_plan") or []
     if gate["report"]["rejected"]:
         prov = proposals.provenance(prop, ds, backend.id, row["batch_id"], prompt_hash,
                                     gate["report"], sha="", n_generated=len(items), n_kept=0,
-                                    audience=prov_stub.get("audience", ""))
+                                    audience=prov_stub.get("audience", ""),
+                                    missing=missing, focus=focus_plan)
         db.dataset_update(did, status="rejected", finished_at=time.time(),
                           provenance=json.dumps(prov),
                           error=f"{gate['report']['share_dropped_benchmark']:.1%} of items "
@@ -87,7 +112,8 @@ def _finish_generation(row: dict, results: dict[str, llm.Result], backend: llm.B
     path, sha = proposals.write_items(did, gate["kept"])
     prov = proposals.provenance(prop, ds, backend.id, row["batch_id"], prompt_hash,
                                 gate["report"], sha, len(items), len(gate["kept"]),
-                                audience=prov_stub.get("audience", ""))
+                                audience=prov_stub.get("audience", ""),
+                                missing=missing, focus=focus_plan)
     holes = proposals.provenance_complete(prov)
     if holes:                      # a dataset with an unaccountable field is not ready
         db.dataset_update(did, status="failed", finished_at=time.time(),
@@ -96,6 +122,14 @@ def _finish_generation(row: dict, results: dict[str, llm.Result], backend: llm.B
     (path.parent / "provenance.json").write_text(json.dumps(prov, indent=2), encoding="utf-8")
     db.dataset_update(did, status="ready", finished_at=time.time(),
                       provenance=json.dumps(prov))
+
+
+def _req_k(cid: str) -> int:
+    """The request's number inside its batch (gen:<dataset>:<k>)."""
+    try:
+        return int(str(cid).rsplit(":", 1)[1])
+    except (ValueError, IndexError):
+        return 0
 
 
 def _finish_judge(row: dict, results: dict[str, llm.Result]) -> None:

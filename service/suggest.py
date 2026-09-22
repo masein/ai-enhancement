@@ -81,24 +81,33 @@ def hub(q: str) -> tuple[list[dict], bool]:
 
 
 def local_candidates(payload: dict, queue: list[dict], artifacts: list[str]) -> list[dict]:
-    """Every model this board knows, with what it knows about each."""
+    """Every model this board knows, with what it knows about each — and, for
+    a `local/` id, whether its weights are on THIS server. #53 picked
+    local/qwen35-delta-moe-…-step945 from the search: it is on the board
+    because its results came from elsewhere, and the run failed at start
+    because nothing here can load it."""
+    have = set(artifacts or [])
+
+    def weights(mid: str) -> dict:
+        return {"weights": mid.split("/", 1)[1] in have} if mid.startswith("local/") else {}
+
     seen: dict[str, dict] = {}
     for m in payload.get("models") or []:
         judged = [t for t in ((m.get("judge") or {}).get("tasks") or {})
                   if t.startswith("exam_")]
         seen[m["id"]] = {"id": m["id"], "params": m.get("params"), "kind": m.get("kind"),
-                         "on_board": True, "judged": len(judged)}
+                         "on_board": True, "judged": len(judged), **weights(m["id"])}
     for r in queue:
         hid = r.get("hf_id") or ""
         if hid and hid not in seen:
             kind = r.get("kind") if r.get("kind") in ("base", "instruct") else None
             seen[hid] = {"id": hid, "params": r.get("params"), "kind": kind,
-                         "on_board": False, "judged": 0, "queued": True}
+                         "on_board": False, "judged": 0, "queued": True, **weights(hid)}
     for name in artifacts:
         mid = f"local/{name}"
         if mid not in seen:
             seen[mid] = {"id": mid, "params": None, "kind": None, "on_board": False,
-                         "judged": 0, "artifact": True}
+                         "judged": 0, "artifact": True, "weights": True}
     return list(seen.values())
 
 
