@@ -18,7 +18,7 @@ import pytest
 
 import exam_build as eb
 import judge as jd
-from conftest import fresh, make_service
+from conftest import choose, fresh, make_service
 
 REPO = Path(__file__).resolve().parents[1]
 MODEL = "fx/good-750m"
@@ -319,7 +319,7 @@ class Served:
     def __init__(self, browser, client, appmod):
         self.client, self.appmod = client, appmod
         self.fail_results, self.failed = 0, []
-        self.ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+        self.ctx = browser.new_context(viewport={"width": 1240, "height": 900}, reduced_motion="reduce")
         self.page = self.ctx.new_page()
         self.loads, self.errors = [], []
         self.page.on("load", lambda _: self.loads.append(1))
@@ -409,27 +409,30 @@ def test_an_open_topic_page_lists_a_model_judged_while_it_was_open(svc, monkeypa
     s = Served(browser, client, appmod)
     try:
         pg = s.open("#topic=economics")
-        sel = pg.locator("[data-panel='answers'] select[aria-label='model']")
+        sel = pg.locator("[data-panel='answers'] [aria-label='model']")
         sel.wait_for(timeout=20000)
-        assert [o.get_attribute("value") for o in sel.locator("option").all()] == [MODEL]
-        assert re.search(r"good-750m — \d(\.\d\d?)? / 4",
-                         sel.locator("option").first.text_content())
+        # 11f: the model list is a Combobox: its options are there when it is open
+        sel.click()
+        opts = pg.locator("#pop-cb-answers-model [role=option]")
+        assert [o.get_attribute("data-value") for o in opts.all()] == [MODEL]
+        assert re.search(r"good-750m.*\d(\.\d\d?)? / 4", opts.first.text_content())
+        pg.keyboard.press("Escape")
         sid = client.post("/api/submissions", json={"hf_id": other, "suite": "judged",
                                                     "tasks": [ECON]}).json()["id"]
         run_judged(monkeypatch, sid)
         assert llm_poller.tick() == 1
         # the runner and the judge both finish between two polls: the page first
         # sees this row already judged, and that counts as a run landing too
-        pg.wait_for_function(
-            "document.querySelectorAll(\"[data-panel='answers'] select[aria-label='model'] "
-            "option\").length === 2", timeout=40000)
-        values = sorted(o.get_attribute("value") for o in sel.locator("option").all())
+        pg.wait_for_function("document.querySelector('[data-new-model]')", timeout=40000)
+        sel.click()
+        values = sorted(o.get_attribute("data-value") for o in opts.all())
         assert values == sorted([MODEL, other])
+        pg.keyboard.press("Escape")
         new = pg.locator("[data-new-model]")
         assert new.get_attribute("data-new-model") == other
         assert "new: " + other in new.text_content()
         # used once, it goes
-        sel.select_option(other)
+        choose(sel, other)
         pg.wait_for_selector("[data-new-model]", state="detached")
         assert len(s.loads) == 1 and s.errors == []
     finally:

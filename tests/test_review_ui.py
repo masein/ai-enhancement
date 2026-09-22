@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 import pytest
 
-from conftest import all_rows, go_tab, set_name
+from conftest import all_rows, choose, go_tab, set_name
 
 
 pytestmark = pytest.mark.dashboard
@@ -93,7 +93,8 @@ def test_exam_curation_in_the_browser(live, page):
     # delivered empty, which folds into the one row that names it (9b-7)
     all_rows(page, "rubrics")                        # 25 a page since 36 topics (10c)
     assert rows.count() == len(eb.TOPICS) - 1 == 36
-    assert "General & Multidisciplinary" in text and "Economics" in text
+    rtext = page.locator("[data-panel='rubrics']").text_content()
+    assert "General & Multidisciplinary" in rtext and "Economics" in rtext
     # filter to one topic by clicking it
     page.locator("[data-panel='rubrics'] a[data-filter-topic='Law']").click()
     page.wait_for_selector(".card h2:has-text('Awaiting curation — Law')")
@@ -334,7 +335,7 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     page.wait_for_selector("[data-panel='import']")
     panel = page.locator("[data-panel='import']")
     upload(page, "questions file", "medicine_v2.json", "application/json", raw)
-    panel.get_by_label("topic").select_option(topic)
+    choose(panel.get_by_label("topic"), topic)
     panel.get_by_label("written by").fill("Dr. Hossein")
     # the source is the file's own name, shown as text; "change" opens a box (9c-4)
     assert panel.locator("[data-source]").get_attribute("data-source") == "medicine_v2"
@@ -421,7 +422,7 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page,
         row.get_by_role("link", name="replace").click()
         page.wait_for_selector(f"[data-upload='{slug}']")
         up = page.locator(f"[data-upload='{slug}']")
-        up.get_by_label("which file").select_option("criteria")
+        choose(up.get_by_label("which file"), "criteria")
         spec = json.loads(jd.rubric_path(slug, ".criteria.json").read_text("utf-8"))
         spec["flags"][0]["effect"] = "melt_the_score"
         spec["criteria"][0]["id"] = "Relevance"
@@ -435,7 +436,7 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page,
         assert "an id is lower-case letters" in problems
         assert up.locator("button[data-commit='rubric']").count() == 0
         # the prose rubric, signed off: valid, changed, and the page says the cost
-        up.get_by_label("which file").select_option("rubric")
+        choose(up.get_by_label("which file"), "rubric")
         text = jd.rubric_path(slug).read_text(encoding="utf-8")
         signed = text.split(", DRAFT")[0] + ")" + text.split(")", 1)[1]
         assert signed != text and "DRAFT" not in signed.split("\n", 1)[0]
@@ -582,7 +583,7 @@ def test_the_topic_page_shows_the_answers_and_never_the_report_half(live, page):
     assert "/ 4" in first.text_content() or "unreadable" in first.text_content()
     # filters narrow it without a reload
     before = int(page.locator("[data-answer-count]").first.get_attribute("data-answer-count"))
-    page.get_by_label("score filter").select_option("weak")
+    choose(page.get_by_label("score filter"), "weak")
     page.wait_for_function(
         "n => +document.querySelector('[data-answer-count]').dataset.answerCount <= n",
         arg=before)
@@ -604,10 +605,12 @@ def test_sitting_one_topic_from_its_page(live, page):
     assert panel.locator("button[data-sit]").is_disabled()
     # the queue's suite drop-down offers judged all the same, disabled with the reason
     page.goto(base + "/#tab=queue")
-    page.wait_for_selector("select")
-    opt = page.locator("option[value='judged']")
-    assert opt.count() == 1 and opt.is_disabled()
+    suite = page.get_by_label("suite")
+    suite.click()
+    opt = page.locator("#pop-sel-submit-suite [role=option][data-value='judged']")
+    assert opt.count() == 1 and opt.get_attribute("aria-disabled") == "true"
     assert "unavailable" in opt.text_content()
+    page.keyboard.press("Escape")
     assert page.errors == []
 
 
@@ -864,7 +867,7 @@ def test_a_refusal_replaces_the_last_success_rather_than_sitting_under_it(live, 
     # a good import first
     upload(page, "questions file", "computer_science_v1.json", "application/json",
            (RETIRED / "computer_science_v1.json").read_text(encoding="utf-8"))
-    panel.get_by_label("topic").select_option("Computer Science")
+    choose(panel.get_by_label("topic"), "Computer Science")
     panel.get_by_role("button", name="Preview").click()
     page.wait_for_selector("[data-action-ok='eximport']", timeout=30000)
     panel.locator("button[data-commit='import']").click()
@@ -901,7 +904,7 @@ def test_the_page_imports_the_wrapped_file_the_author_sent(live, page):
     panel.get_by_label("written by").fill("Dr. Hossein")
     upload(page, "questions file", "physics_engineering_v1.json", "application/json",
            PHYSICS_FILE.read_text(encoding="utf-8"))
-    panel.get_by_label("topic").select_option("Physics & Astronomy")
+    choose(panel.get_by_label("topic"), "Physics & Astronomy")
     # the file's own name is the source already — nothing to type
     assert panel.locator("[data-source]").get_attribute("data-source") == "physics_engineering_v1"
     panel.get_by_role("button", name="Preview").click()

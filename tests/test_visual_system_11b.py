@@ -45,7 +45,7 @@ def paint(page, keys):
 
 @pytest.mark.parametrize("theme", ["light", "dark", "dim"])
 def test_the_tokens_are_the_new_palette(live, browser, theme):
-    ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+    ctx = browser.new_context(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
     ctx.add_init_script(f"localStorage.setItem('bench-theme', '{theme}');")
     pg = ctx.new_page()
     try:

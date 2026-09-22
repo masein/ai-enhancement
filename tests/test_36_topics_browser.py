@@ -74,17 +74,21 @@ def test_the_topic_boxes_filter_tick_all_or_none_and_say_what_they_cost(live, pa
     assert page.errors == []
 
 
-def test_the_model_page_picks_a_judged_topic_from_a_searchable_select(live, page):
+def test_the_model_page_picks_a_judged_topic_from_a_searchable_list(live, page):
+    """11f: one Combobox — grouped by the 8 areas, weakest first inside each,
+    with the score — replaced the select and the "find a topic" box."""
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
-    sel = page.locator("select[data-topic-switch]")
-    sel.wait_for()
-    assert sel.locator("option").count() >= 30
-    labels = sel.locator("option").all_text_contents()
-    scores = [_score(t.split(" — ")[-1]) for t in labels]
-    assert scores == sorted(scores)                           # weakest first, with the score
-    page.get_by_label("find a judged topic").fill("law")
-    page.wait_for_function("document.querySelector('select[data-topic-switch]').options.length <= 3")
-    sel.select_option("exam_law")
+    box = page.locator("[data-topic-switch]")
+    box.wait_for()
+    box.click()
+    opts = page.locator("#pop-cb-mdl-topic [role=option]")
+    assert opts.count() >= 30
+    for g in page.locator("#pop-cb-mdl-topic [role=group]").all():
+        scores = [_score(t) for t in g.locator(".cb-r").all_text_contents()]
+        assert scores == sorted(scores)                       # weakest first, with the score
+    box.fill("law")
+    page.wait_for_function("document.querySelectorAll('#pop-cb-mdl-topic [role=option]').length <= 3")
+    page.locator("#pop-cb-mdl-topic [role=option][data-value='exam_law']").click()
     page.wait_for_selector("table[data-criteria-table='Law']")
     assert page.errors == []
 
@@ -98,9 +102,9 @@ def test_the_leaderboard_shows_the_judged_average_and_hides_the_topic_columns(li
     assert not any(c.startswith("cat:") for c in cols)            # categories: hidden
     assert not any(c.startswith("j:") for c in cols)              # topics: hidden
     avg = page.locator("table.lb tbody tr[data-lb-row='fx/good-750m'] [data-judged-avg]")
-    # 11c: one line per cell — the 0–4 unit is in the header, not in the cell
+    # 11c: one line per cell; 11f: the 0–4 scale is the column name's tooltip
     assert avg.count() == 1 and float(avg.text_content()) >= 0
-    assert "0–4" in page.locator("table.lb thead th[data-col='javg']").text_content()
+    assert "0–4" in page.locator("table.lb thead th[data-col='javg']").get_attribute("data-tip")
     page.locator("[data-columns-menu]").click()
     menu = page.locator("#pop-columns")
     assert menu.locator("[data-column-group='judged']").count() == 1

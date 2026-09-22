@@ -172,7 +172,11 @@ def browser():
 
 @pytest.fixture
 def page(browser):
-    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+    # 11f gave the board motion; a test about what a page says or does runs
+    # with reduced motion, so a panel that is still sliding in is never "not
+    # stable" to a click. The motion itself is tested with it switched on
+    # (test_masein_seven_11f.py), in contexts of its own.
+    ctx = browser.new_context(viewport={"width": 1240, "height": 900}, reduced_motion="reduce")
     pg = ctx.new_page()
     errors = []
     pg.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
@@ -235,22 +239,39 @@ def show_all_columns(page) -> None:
     page.keyboard.press("Escape")
 
 
+def choose(ctl, value) -> None:
+    """Pick a value in the board's Select or Combobox (11f: no native <select>
+    is left in the view) the way a person does: open it, click the option."""
+    page = ctl.page
+    ctl.click()
+    opt = page.locator(f"[role=listbox] [role=option][data-value={json.dumps(str(value))}]").first
+    opt.wait_for()
+    opt.click()
+    page.wait_for_function("([el, v]) => (el.dataset.value || '') === v || !el.isConnected",
+                           arg=[ctl.element_handle(), str(value)])
+
+
+def choice(ctl) -> str:
+    """What a Select or Combobox holds now."""
+    return ctl.get_attribute("data-value") or ""
+
+
 def pick_topic(page, task: str) -> None:
     """The model page shows one judged topic's tables at a time (phase 9c),
-    chosen in a select since there are thirty-six of them (10c)."""
-    sel = page.locator("select[data-topic-switch]")
-    if sel.count():
-        sel.select_option(task)
-        page.wait_for_function("document.querySelector('select[data-topic-switch]').value === "
+    chosen in a searchable list since there are thirty-six of them (10c, 11f)."""
+    box = page.locator("[data-topic-switch]")
+    if box.count():
+        choose(box, task)
+        page.wait_for_function("document.querySelector('[data-topic-switch]').dataset.value === "
                                f"'{task}'")
 
 
 def all_rows(page, key: str, n: int = 100) -> None:
     """A table behind the shared pager (25 a page since 36 topics, 10c), all
     on one page: for a test about what the whole table holds."""
-    sel = page.locator(f"[data-pager='{key}'] select[aria-label='rows per page']")
-    if sel.count():
-        sel.select_option(str(n))
+    sel = page.locator(f"[data-pager='{key}'] [aria-label='rows per page']")
+    if sel.count() and sel.is_visible():
+        choose(sel, str(n))
         page.wait_for_function(f"document.querySelector(\"[data-pager='{key}'] "
                                f"[data-page-range]\").dataset.pageRange.startsWith('1-')")
 

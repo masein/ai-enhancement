@@ -148,7 +148,7 @@ def test_every_action_is_reachable_from_the_keyboard(live, page):
 
 @pytest.mark.parametrize("theme", ["light", "dark", "dim"])
 def test_the_text_reads_in_every_theme(live, browser, theme):
-    ctx = browser.new_context(viewport={"width": 1512, "height": 900})
+    ctx = browser.new_context(viewport={"width": 1512, "height": 900}, reduced_motion="reduce")
     ctx.add_init_script(f"localStorage.setItem('bench-theme', '{theme}');")
     pg = ctx.new_page()
     try:

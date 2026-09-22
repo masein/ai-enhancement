@@ -70,7 +70,7 @@ class Surface:
 @pytest.fixture
 def surface(browser, tree, request):
     width = getattr(request, "param", 1240)
-    ctx = browser.new_context(viewport={"width": width, "height": 900})
+    ctx = browser.new_context(viewport={"width": width, "height": 900}, reduced_motion="reduce")
     s = Surface(ctx.new_page(), tree["report"].as_uri())
     yield s
     ctx.close()
@@ -258,7 +258,7 @@ def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
     pg.wait_for_selector("table.lb thead th[data-col='cat:Economics']")
     pg.keyboard.press("Escape")
     table = pg.locator("table.lb")
-    assert table.locator("td.dim").count() > 0 and table.locator("td.best").count() > 0
+    assert table.locator("td.dim").count() > 0 and table.locator("td.lead").count() > 0
     # a model without a diagnosis on file has no area to show, and says so with a dash
     rows = pg.evaluate("""() => [...document.querySelectorAll('table.lb tbody tr[data-lb-row]')]
       .filter(tr => !mmluCats(DATA.models.find(m => m.id === tr.dataset.lbRow))).length""")
@@ -267,7 +267,7 @@ def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
     pg.locator("[data-chip='all']").click()
     show_all_columns(pg)                             # six task columns by default (9c)
     th = pg.locator("table.lb thead th[data-task='mmlu_perm']")
-    assert "CONTROL" in th.get_attribute("title")
+    assert "CONTROL" in th.get_attribute("data-tip")          # 11f: the name's tooltip
     assert surface.errors == []
 
 
@@ -326,13 +326,14 @@ def test_judged_section_and_the_control_sentence(surface, tree):
 def test_judged_columns_appear_once_calibrated(surface):
     pg = surface.open("#tab=leaderboard")
     show_all_columns(pg)
-    # 11c: the names are the second header row, under their groups; the κ and
-    # the 0–4 scale are on each judged column's unit line
-    heads = pg.locator("table.lb thead tr:not(.grp) th").all_text_contents()
-    judged = [h for h in heads if "κ" in h]
-    assert len(judged) >= 4 and any(h.startswith("Judged avg") for h in judged)
-    assert any(h.startswith("Economics") for h in judged)
-    assert all("0–4" in h for h in judged)
+    # 11f: one line of names; the κ and the 0–4 scale are each judged
+    # column's tooltip
+    ths = pg.locator("table.lb thead tr.names th").evaluate_all(
+        "ts => ts.map(t => [t.textContent.trim(), t.dataset.tip || ''])")
+    heads = [h for h, _ in ths]
+    judged = [(h, tip) for h, tip in ths if "0–4" in tip]
+    assert len(judged) >= 4 and any(h == "Judged" for h, _ in judged)
+    assert any(h.startswith("Economics") and "κ" in tip for h, tip in judged)
     assert not any(h.startswith(("fr_", "exam_")) for h in heads)   # never as a task column
     row = pg.locator("table.lb tbody tr[data-lb-row='fx/good-750m']")
     assert float(row.locator("[data-judged-avg]").text_content()) >= 0
@@ -433,7 +434,7 @@ def local_judged(tmp_path_factory) -> Path:
 
 
 def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged):
-    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+    ctx = browser.new_context(viewport={"width": 1240, "height": 900}, reduced_motion="reduce")
     s = Surface(ctx.new_page(), local_judged.as_uri())
     try:
         pg = s.open(model_link("fx/good-750m"))
@@ -478,7 +479,7 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
 
 
 def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browser, local_judged):
-    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+    ctx = browser.new_context(viewport={"width": 1240, "height": 900}, reduced_motion="reduce")
     s = Surface(ctx.new_page(), local_judged.as_uri())
     try:
         pg = s.open(model_link("fx/good-750m"))
@@ -561,7 +562,7 @@ def demo_report(tmp_path_factory) -> Path:
 def test_the_demo_page_says_what_it_is_and_shows_the_criteria(browser, demo_report):
     """P5a: the first time a person can open what the demo produced. The
     judged section has to hold up on the page, not only in judge.json."""
-    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+    ctx = browser.new_context(viewport={"width": 1240, "height": 900}, reduced_motion="reduce")
     s = Surface(ctx.new_page(), demo_report.as_uri())
     try:
         pg = s.open()
@@ -762,7 +763,7 @@ def zero_criterion(tmp_path_factory) -> Path:
 def test_a_criterion_that_scored_zero_says_zero(browser, zero_criterion):
     """It rendered as an empty cell — and weakest-first put that empty row at
     the top of the table, so the worst finding looked like a missing one."""
-    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+    ctx = browser.new_context(viewport={"width": 1240, "height": 900}, reduced_motion="reduce")
     s = Surface(ctx.new_page(), zero_criterion.as_uri())
     try:
         pg = s.open(model_link("fx/good-750m"))

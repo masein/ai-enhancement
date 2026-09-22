@@ -1535,6 +1535,11 @@ CSS = r"""
   --fs-1:12px; --fs-2:14px; --fs-3:16px; --fs-4:20px; --fs-5:28px;
   --r-1:6px; --r-2:10px;
   --bar-h:57px;                  /* the sticky bar and its hairline */
+  /* 11f: one motion system. Hover and press; popovers, expanding and the tab
+     underline; toasts and view changes. The opened row takes 200ms and its
+     chevron 150ms. All of it is 0 under reduced motion. */
+  --dur-1:120ms; --dur-2:180ms; --dur-3:240ms; --dur-row:200ms; --dur-chev:150ms;
+  --ease:cubic-bezier(.2, .8, .2, 1);
   /* phase 11b: prose in the system sans, data and labels in the system mono.
      No web font: the page has to work on a server with no internet. */
   --font-sans:system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -1647,6 +1652,93 @@ h2 { font-size:var(--fs-4); font-weight:700; margin:0 0 3px; letter-spacing:-0.0
   letter-spacing:0; }
 .livebadge .dot { animation:livepulse 2.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .livebadge .dot { animation:none; } }
+/* 11f: under reduced motion every duration is 0 — nothing moves */
+@media (prefers-reduced-motion: reduce) {
+  .viz-root { --dur-1:0ms; --dur-2:0ms; --dur-3:0ms; --dur-row:0ms; --dur-chev:0ms; } }
+/* buttons, chips, pills and tabs: their colours ease; a press gives a little */
+button, .btn, .pill, .chip-btn { transition:background-color var(--dur-1) var(--ease),
+  border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease),
+  transform var(--dur-1) var(--ease); }
+button:active:not(:disabled):not([aria-disabled="true"]) { transform:scale(.98); }
+/* the tab underline: one element, moved by a transform */
+.tabs { position:relative; }
+.tab-ink { position:absolute; left:0; bottom:0; width:1px; height:2px; background:var(--accent);
+  transform-origin:0 0; pointer-events:none;
+  transition:transform var(--dur-2) var(--ease), opacity var(--dur-2) var(--ease); }
+.tab-ink.still { transition:none; }
+/* popovers come 4px from the side away from their button, and leave in half the time */
+.pop { transition:opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease); }
+.pop.pop-in { opacity:0; transform:translateY(4px); }
+.pop.flip.pop-in { transform:translateY(-4px); }
+.pop.pop-out { opacity:0; transform:translateY(4px); pointer-events:none;
+  transition-duration:calc(var(--dur-2) / 2); }
+.pop.flip.pop-out { transform:translateY(-4px); }
+/* 11f: Select and Combobox — 36px, radius 6, the border, the accent ring */
+button.sel { display:inline-flex; align-items:center; justify-content:space-between; gap:10px;
+  height:36px; min-height:36px; border-radius:6px; border:1px solid var(--border);
+  background:var(--surface-1); padding:0 10px 0 12px; font-size:var(--fs-2); max-width:100%;
+  text-align:left; white-space:nowrap; }
+button.sel .sel-v { overflow:hidden; text-overflow:ellipsis; }
+button.sel .sel-c { color:var(--muted); font-size:var(--fs-1); }
+button.sel[aria-expanded="true"] { border-color:var(--accent); }
+input.cbox { font:inherit; font-size:var(--fs-2); height:36px; box-sizing:border-box;
+  border:1px solid var(--border); border-radius:6px; padding:0 12px; min-width:220px;
+  background:var(--surface-1); color:var(--text-primary); }
+input.cbox:focus { outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent); }
+.listbox [role=option] { display:flex; align-items:center; gap:8px; padding:7px 10px;
+  border-radius:var(--r-1); cursor:pointer; font-size:var(--fs-2); color:var(--text-primary); }
+.listbox [role=option]:hover, .listbox [role=option]:focus, .listbox [role=option].active {
+  background:var(--accent-soft); outline:none; }
+.listbox [role=option][aria-selected="true"] { font-weight:600; }
+.listbox [role=option][aria-selected="true"]::before { content:"✓"; color:var(--accent); width:12px; }
+.listbox [role=option][aria-selected="false"]::before { content:""; width:12px; }
+.listbox [role=option][aria-disabled="true"] { color:var(--muted); cursor:not-allowed; }
+.cblist { min-width:320px; max-width:min(440px, calc(100vw - 16px)); }
+.cbgroup + .cbgroup { margin-top:4px; }
+.cbhead { font-family:var(--font-mono); font-size:var(--fs-1); text-transform:uppercase;
+  letter-spacing:.06em; color:var(--muted); padding:6px 10px 2px; }
+.cb-t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cb-r { font-family:var(--font-mono); font-size:var(--fs-1); color:var(--text-secondary); }
+.cb-b { width:36px; height:4px; background:var(--grid); border-radius:2px; overflow:hidden; flex:none; }
+.cb-b > span { display:block; height:100%; background:var(--accent); opacity:.75; }
+.cbnone { padding:8px 10px; }
+/* 11f: one action cell for every table with actions */
+.actcell { display:flex; justify-content:flex-end; align-items:center; gap:8px; white-space:nowrap; }
+.actcell > button, .actcell > a.btn, .actcell .confirm > button { height:32px; min-height:32px;
+  border-radius:6px; padding:0 12px; font-size:var(--fs-2); box-sizing:border-box; }
+.actcell > a.btn { display:inline-flex; align-items:center; text-decoration:none; }
+a.btn.ghost { background:none; border:1px solid var(--border); color:var(--accent); }
+a.btn.ghost:hover { background:var(--accent-soft); border-color:var(--accent); }
+.actcell .confirm { display:inline-flex; align-items:center; gap:8px; }
+.actcell > button.rowmenu { width:32px; padding:0; font-size:var(--fs-3); line-height:1;
+  color:var(--text-secondary); }
+button.ghost { background:none; border:1px solid var(--border); color:var(--accent); }
+button.ghost:hover { background:var(--accent-soft); border-color:var(--accent); }
+td.rowacts { width:1%; text-align:right; }
+table[data-queue-table] td.rowacts { min-width:170px; }
+td.nowrap, .nowrap { white-space:nowrap; }
+/* a long failure: two lines, the rest a click away */
+.clamp { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden;
+  overflow-wrap:anywhere; }
+.clamp.open { display:block; -webkit-line-clamp:unset; white-space:pre-wrap; }
+button.clampbtn { padding:0; min-height:0; border:0; background:none; font-size:var(--fs-1);
+  color:var(--accent); }
+/* a toast rises 8px as it comes, and fades as it goes */
+.toast { animation:toastIn var(--dur-3) var(--ease);
+  transition:opacity var(--dur-3) var(--ease), transform var(--dur-3) var(--ease); }
+.toast.out { opacity:0; transform:translateY(8px); pointer-events:none; }
+@keyframes toastIn { from { opacity:0; transform:translateY(8px); } }
+/* a new view — after a navigation, never a poll — fades in and rises 6px */
+#view.view-enter { animation:viewIn var(--dur-3) var(--ease); }
+@keyframes viewIn { from { opacity:0; transform:translateY(6px); } }
+/* a value a poll changed: a soft wash that fades over 1.2s */
+.changed { animation:changed 1.2s var(--ease); }
+@keyframes changed { from { background-color:var(--accent-soft); } }
+@media (prefers-reduced-motion: reduce) { .changed, .toast, #view.view-enter { animation:none; } }
+/* a theme change: the colours cross-fade for 250ms, then the class goes */
+html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *::after {
+  transition:background-color 250ms var(--ease), color 250ms var(--ease),
+    border-color 250ms var(--ease) !important; }
 @keyframes livepulse { 0%,100% { opacity:1; } 50% { opacity:.45; } }
 /* the checks: the pill lives in the bar, its list opens just under the bar */
 .bar-checks details.checks { position:static; margin:0; }
@@ -1729,8 +1821,7 @@ input[type=search]:focus { outline:2px solid var(--accent-soft); border-color:va
 .tabs button { border:0; background:none; border-radius:0; padding:8px 13px;
   color:var(--text-secondary); white-space:nowrap; }
 .tabs button:hover { color:var(--text-primary); }
-.tabs button[aria-selected="true"] { color:var(--text-primary); font-weight:600;
-  box-shadow:inset 0 -2px 0 var(--accent); }
+.tabs button[aria-selected="true"] { color:var(--text-primary); font-weight:600; }
 .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; }
 .tile { background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2);
   padding:13px 16px; }
@@ -1822,16 +1913,32 @@ details.lenfold > summary { cursor:pointer; font-size:var(--fs-1); color:var(--a
 .lbbar .chipnote[hidden] { display:none; }
 .pill.on { border-color:var(--accent); color:var(--text-primary); }
 .pill[aria-expanded="true"] { border-color:var(--accent); }
-/* two header rows: the group over its columns, the unit under a name */
-table.lb thead tr.grp th { font-size:var(--fs-1); color:var(--accent); border-bottom:0;
-  padding-bottom:0; letter-spacing:.08em; text-align:center; }
+/* 11f: a quiet group row over one line of names. The group is muted, with a
+   hairline bracket across its columns: a line, and a short tick at each end */
+table.lb thead tr.grp th { font-size:var(--fs-1); color:var(--muted); font-weight:500;
+  border-bottom:0; padding:0 6px 7px; letter-spacing:.08em; text-align:center; height:24px;
+  box-sizing:border-box; }
 table.lb thead tr.grp th.nogrp { color:transparent; }
-table.lb thead tr.grp th:not(.nogrp) { box-shadow:inset 0 -2px 0 var(--accent-soft); }
-table.lb th .unit { font-size:var(--fs-1); color:var(--muted); }
+table.lb thead tr.grp th:not(.nogrp) {
+  background:
+    linear-gradient(var(--axis), var(--axis)) left 8px bottom 3px / calc(100% - 16px) 1px no-repeat,
+    linear-gradient(var(--axis), var(--axis)) left 8px bottom 0 / 1px 4px no-repeat,
+    linear-gradient(var(--axis), var(--axis)) right 8px bottom 0 / 1px 4px no-repeat,
+    var(--surface-1); }
 table.lb th .dir { color:var(--accent); }
+/* the setup is the name's tooltip: the name says so on hover and focus */
+table.lb thead th[data-tip] { cursor:help; }
+table.lb thead th.sortable { cursor:pointer; }
+table.lb thead th[data-tip]:hover .hname, table.lb thead th[data-tip]:focus-visible .hname {
+  text-decoration:underline dotted; text-underline-offset:3px; }
+/* the cells: plain, and the leaders bold (their wash is --heat-3, inline) */
+table.lb td.tcell { font-weight:400; }
+table.lb td.tcell.lead b { font-weight:700; }
+table.lb td.tcell:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.lbcap { font-family:var(--font-mono); font-size:var(--fs-1); color:var(--muted); margin:8px 0 0; }
 /* one line per row */
 table.lb td { white-space:nowrap; }
-table.lb td.tcell b { font-family:var(--font-mono); font-weight:700; }
+table.lb td.tcell b { font-family:var(--font-mono); }
 table.lb td.tcell .se { font-family:var(--font-mono); display:inline; }
 table.lb td.model { position:sticky; left:32px; background:var(--surface-1); z-index:1;
   padding-left:12px; max-width:280px; }
@@ -1859,15 +1966,15 @@ table.lb .mcell .duptoggle { flex:none; padding:0 2px; min-height:0; }
 /* a phone: the rank and the model together take at most 45% of the scroller,
    the name ellipsises, and of the badges only "prelim" stays — the scores
    are what the table is for */
+/* the Leaderboard's scroller is a query container: the opened panel and, on
+   a phone, the pinned columns are sized by what is visible, not the table */
+.lb-wrap.stick[data-hkeep="lb"] { container-type:inline-size; }
 @media (max-width:600px) {
-  .lb-wrap.stick[data-hkeep="lb"] { container-type:inline-size; }
   table.lb td.model { padding-left:6px; padding-right:4px; }
   table.lb .mcell { max-width:calc(45cqi - 42px); }
   table.lb .mcell .badge:not(.prelim), table.lb .mcell .duptoggle { display:none; }
   /* the active parameters stay in the tooltip: Params is one short number */
   table.lb td .act { display:none; }
-  /* a unit wraps under its name rather than widening its column */
-  table.lb thead th .unit { white-space:normal; }
   table.lb .mcell .badge.prelim { flex:0 1 auto; min-width:0; overflow:hidden;
     text-overflow:ellipsis; }
 }
@@ -1888,15 +1995,54 @@ table.lb .rank { white-space:nowrap; color:var(--muted); position:sticky; left:0
 table.lb tbody tr.open td.rank { background:color-mix(in srgb, var(--accent) 8%, var(--surface-1)); }
 table.lb .rank .disclose { border:0; background:none; min-height:0; padding:0 3px 0 0;
   color:var(--accent); font-size:var(--fs-1); }
-table.lb tbody tr { cursor:pointer; }
-table.lb tbody tr.detail { cursor:auto; background:var(--plane); }
-table.lb tbody tr.detail:hover { background:var(--plane); }
-table.lb tbody tr.detail > td { white-space:normal; padding:14px 16px 18px; height:auto; }
+/* 11f: one chevron, turned a quarter when the row is open */
+table.lb .disclose .chev { display:inline-block; transition:transform var(--dur-chev) var(--ease); }
+table.lb .disclose[aria-expanded="true"] .chev { transform:rotate(90deg); }
+table.lb .disclose.pre[aria-expanded="true"] .chev { transform:none; }
+/* it should be obvious a row opens: the wash, the pointer, the chevron in ink */
+table.lb tbody tr[data-lb-row] { cursor:pointer; }
+table.lb tbody tr[data-lb-row]:hover { background:var(--accent-soft); }
+table.lb tbody tr[data-lb-row]:hover .disclose { color:var(--text-primary); }
+/* the pinned cells are opaque (they slide over the scores): the same wash,
+   laid over their own surface, so the whole row reads as one */
+table.lb tbody tr[data-lb-row]:hover > td.rank, table.lb tbody tr[data-lb-row]:hover > td.model,
+table.lb tbody tr.open > td.rank, table.lb tbody tr.open > td.model {
+  background:linear-gradient(var(--accent-soft), var(--accent-soft)), var(--surface-1); }
+/* the opened panel: the row's own continuation — no hairline between them,
+   the row's 3px bar down its left edge, a faint wash, 16px in, rounded below */
+table.lb tbody tr.open > td { border-bottom-color:transparent; }
+table.lb tbody tr.detail { cursor:auto; background:none; }
+table.lb tbody tr.detail:hover { background:none; }
+table.lb tbody tr.detail > td { white-space:normal; padding:0; height:auto; }
+.dwrap { display:grid; grid-template-rows:1fr; }
+.dwrap > .dinner { min-height:0; overflow:hidden; }
+.dwrap .dpad { position:sticky; left:0; max-width:100cqi; box-sizing:border-box;
+  padding:16px; margin:0 0 10px;
+  background:color-mix(in srgb, var(--accent) 5%, var(--surface-1));
+  box-shadow:inset 3px 0 0 var(--accent); border-radius:0 0 var(--r-2) var(--r-2); }
+.dwrap.anim { transition:grid-template-rows var(--dur-row) var(--ease); }
+.dwrap.anim .dpad { transition:opacity var(--dur-row) var(--ease), transform var(--dur-row) var(--ease); }
+.dwrap.closed { grid-template-rows:0fr; }
+.dwrap.closed .dpad { opacity:0; transform:translateY(-4px); }
+.dwrap .dclose { position:absolute; top:8px; right:10px; min-height:28px; padding:2px 8px;
+  font-size:var(--fs-1); z-index:1; }
+.dwrap .dgrid { padding-right:72px; }
+/* the Tasks list: one line each */
+.tlist { display:flex; flex-direction:column; }
+.tl { display:grid; grid-template-columns:minmax(0, 1fr) auto 56px auto; gap:10px; align-items:center;
+  min-height:26px; border-bottom:1px solid var(--grid); font-size:var(--fs-2); white-space:nowrap; }
+.tl:last-child { border-bottom:0; }
+.tl .tl-n { overflow:hidden; text-overflow:ellipsis; }
+.tl .tl-v { font-family:var(--font-mono); text-align:right; }
+.tl .tl-b { height:4px; background:var(--grid); border-radius:2px; overflow:hidden; }
+.tl .tl-f { display:block; height:100%; background:var(--accent); opacity:.7; }
+.tl .tl-r { font-size:var(--fs-1); }
+.tl .se { color:var(--muted); font-size:var(--fs-1); }
 table.lb tbody tr.open td.model { background:color-mix(in srgb, var(--accent) 8%, var(--surface-1)); }
 /* a tinted cell's text is ink, never the accent — its error too, in the
    secondary ink, which holds 4.5:1 on the strongest step in every theme */
-table.lb.tinted td[data-step] { color:var(--text-primary); }
-table.lb.tinted td[data-step] .se { color:var(--text-secondary); }
+table.lb td[data-lead] { color:var(--text-primary); }
+table.lb td[data-lead] .se { color:var(--text-secondary); }
 .dgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px 22px; }
 .dblock .eyebrow { margin-bottom:6px; }
 table.mini { width:auto; }
@@ -2044,9 +2190,7 @@ h2[data-ix]::before { content:attr(data-ix); font-family:var(--font-mono);
    whether it separates anything, where the ceiling is. Every chip carries the
    long version in its title, so the row stays short. */
 /* "about these benchmarks" */
-.lb th.hasinfo { cursor:help; }
-.lb th.hasinfo::after { content:"\2009\24D8"; font-size:9px; color:var(--muted);
-  vertical-align:1px; }
+
 .about { padding:0; }
 .about-toggle { font:inherit; font-size:var(--fs-2); font-weight:600; width:100%; text-align:left;
   background:none; border:0; color:var(--text-primary); padding:12px 16px; cursor:pointer;
@@ -2458,7 +2602,7 @@ td.rowacts { white-space:nowrap; }
 table.lb th.model, table.lb td.model { position:sticky; left:32px; z-index:1;
   background:var(--surface-1); }
 table.lb td.num .se { display:inline; font-size:var(--fs-1); }
-table.lb thead tr:not(.grp) th.sortable:not(.model) { white-space:normal; vertical-align:bottom; }
+table.lb thead tr.names th { white-space:nowrap; vertical-align:bottom; }
 tr.duprow td { background:var(--plane); }
 tr.duprow td.model { background:var(--plane); padding-left:22px; }
 button.duptoggle { display:inline; padding:0 4px; font-size:var(--fs-1); }
@@ -2499,17 +2643,18 @@ button.secondary { background:var(--surface-1); }
 /* the Leaderboard has two header rows: the group row is a fixed height, and
    the names row sticks just under it — both under the page's own bar */
 .lb-wrap.stick table.lb thead tr.grp th { height:24px; box-shadow:none; }
-.lb-wrap.stick table.lb thead tr:nth-child(2) th { position:sticky; top:calc(var(--bar-h) + 24px);
+.lb-wrap.stick table.lb thead tr.grp + tr.names th { position:sticky; top:calc(var(--bar-h) + 24px);
   z-index:3; background:var(--surface-1); box-shadow:0 1px 0 var(--border); }
-.lb-wrap.stick table.lb thead tr:nth-child(2) th.model { z-index:4; }
+.lb-wrap.stick table.lb thead tr.grp + tr.names th.model { z-index:4; }
 /* narrow: the table scrolls sideways in its own box, so a header cannot also
    stick to the page — only the rank and the model stay put, sideways */
 @media (max-width:900px) { .lb-wrap.stick { overflow-x:auto; }
   .lb-wrap.stick thead tr th,
+  .lb-wrap.stick thead tr:first-child th,
   .lb-wrap.stick table.lb thead tr:first-child th,
-  .lb-wrap.stick table.lb thead tr:nth-child(2) th { position:static; top:auto; }
-  .lb-wrap.stick table.lb thead tr:nth-child(2) th.rank,
-  .lb-wrap.stick table.lb thead tr:nth-child(2) th.model { position:sticky; top:auto; }
+  .lb-wrap.stick table.lb thead tr.grp + tr.names th { position:static; top:auto; }
+  .lb-wrap.stick table.lb thead tr.names th.rank,
+  .lb-wrap.stick table.lb thead tr.names th.model { position:sticky; top:auto; }
   /* the table scrolls sideways here anyway: a name on one line keeps the
      header two lines tall instead of five */
   table.lb thead tr:not(.grp) th.sortable:not(.model) { white-space:nowrap; } }
@@ -2520,7 +2665,7 @@ button.secondary { background:var(--surface-1); }
 .skeleton { display:flex; flex-direction:column; gap:var(--sp-3); padding:var(--sp-3) 0; }
 .sk-row { height:14px; border-radius:var(--r-1);
   background:linear-gradient(90deg, var(--plane) 0%, var(--border) 50%, var(--plane) 100%);
-  background-size:200% 100%; animation:sk 1.4s ease-in-out infinite; }
+  background-size:200% 100%; animation:sk 2.4s ease-in-out infinite; }
 @keyframes sk { from { background-position:200% 0; } to { background-position:-200% 0; } }
 @media (prefers-reduced-motion: reduce) { .sk-row { animation:none; } }
 @media print { .filters, .tabs, button { display:none !important; }
@@ -2622,12 +2767,203 @@ const cell = (t, m) => (DATA.cells[t] || {})[m];
 const natCmp = (a, b) =>
   String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
 // a <select> whose change handler gets the picked value — toolbar shorthand
-function mkSel(label, opts, cur, onpick) {
-  const s = el('select', { 'aria-label': label },
-    opts.map(([v, l]) => el('option', { value: v, text: l,
-                                        selected: cur === v ? '' : null })));
-  s.addEventListener('change', e => onpick(e.target.value));
-  return s;
+// 11f: a short fixed list is a Select — the old native <select> is gone
+function mkSel(label, opts, cur, onpick) { return Select(label, opts, cur, onpick); }
+
+// ---------------------------------------------------------------------------
+// 11f: two dropdowns, both on the shared popover. After this there is no
+// native <select> in the view.
+//
+// Select, for short fixed lists: a button that shows its value and a chevron
+// and opens a listbox — ↑ ↓, Home, End, typeahead, Enter, Esc. 36px, radius 6.
+// Combobox, for long lists (topics, models): a search field that opens a
+// grouped list as you type — the ARIA combobox pattern, aria-activedescendant.
+// Both answer the code around them the way the select did: .value, and a
+// 'change' event.
+// ---------------------------------------------------------------------------
+function listKeys(e, box, pick) {
+  const opts = [...box.querySelectorAll('[role=option]:not([aria-disabled=true])')];
+  if (!opts.length) return;
+  const i = opts.indexOf(document.activeElement);
+  const go = j => { e.preventDefault(); opts[(j + opts.length) % opts.length].focus(); };
+  if (e.key === 'ArrowDown') go(i + 1);
+  else if (e.key === 'ArrowUp') go(i < 0 ? opts.length - 1 : i - 1);
+  else if (e.key === 'Home') go(0);
+  else if (e.key === 'End') go(opts.length - 1);
+  else if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault(); if (i >= 0) pick(opts[i].dataset.value); }
+  else if (e.key === 'Tab') popClose();
+  else if (e.key.length === 1 && /\S/.test(e.key)) {
+    // typeahead: the letters typed in the last half second
+    box._ta = (Date.now() - (box._taAt || 0) < 500 ? box._ta || '' : '') + e.key.toLowerCase();
+    box._taAt = Date.now();
+    const hit = opts.find(o => o.textContent.trim().toLowerCase().startsWith(box._ta));
+    if (hit) { e.preventDefault(); hit.focus(); }
+  }
+}
+
+function Select(label, opts, cur, onpick, attrs = {}) {
+  const { key: k, ...rest } = attrs;
+  const key = 'sel-' + (k || label).replace(/[^a-z0-9]+/gi, '-');
+  let list = opts, value = String(cur ?? (opts[0] || [''])[0]);
+  const labelOf = v => (list.find(o => String(o[0]) === v) || [, v])[1];
+  const shown = el('span', { class: 'sel-v' });
+  const btn = el('button', { class: 'sel', type: 'button', 'aria-label': label, 'data-select': label,
+    ...rest }, shown, el('span', { class: 'sel-c', 'aria-hidden': 'true', text: '▾' }));
+  const show = () => { btn.dataset.value = value; shown.textContent = labelOf(value); };
+  Object.defineProperty(btn, 'value', { get: () => value, set: v => { value = String(v); show(); } });
+  btn.setOptions = o => { list = o; show(); };
+  show();
+  const pick = v => {
+    const o = list.find(x => String(x[0]) === v);
+    if (!o || (o[2] || {}).disabled) return;
+    const moved = v !== value;
+    value = v; show(); popClose(true);
+    if (moved) { btn.dispatchEvent(new Event('change', { bubbles: true })); if (onpick) onpick(v); }
+  };
+  popover(btn, () => {
+    const box = el('div', { class: 'moremenu listbox', role: 'listbox', id: 'pop-' + key,
+      'aria-label': label }, list.map(([v, l, o = {}], i) => el('div', { role: 'option',
+        id: `${key}-o${i}`, tabindex: '-1', 'data-value': String(v), text: l, title: o.title || null,
+        'aria-selected': String(String(v) === value), 'aria-disabled': o.disabled ? 'true' : null,
+        onclick: () => pick(String(v)) })));
+    box.addEventListener('keydown', e => listKeys(e, box, pick));
+    return box;
+  }, { key, menu: false, focus: '[role=option][aria-selected=true], [role=option]' });
+  btn.setAttribute('aria-haspopup', 'listbox');
+  return btn;
+}
+
+// groups: [{ label, options: [{ value, text, right, bar, mark, search }] }]
+function Combobox(label, groups, cur, onpick, attrs = {}) {
+  const { key: k, placeholder, ...rest } = attrs;
+  const key = 'cb-' + (k || label).replace(/[^a-z0-9]+/gi, '-');
+  const all = groups.flatMap(g => g.options);
+  const textOf = v => (all.find(o => o.value === v) || {}).text || '';
+  const input = el('input', { type: 'text', class: 'cbox', role: 'combobox', autocomplete: 'off',
+    'aria-label': label, 'aria-autocomplete': 'list', 'aria-expanded': 'false',
+    'aria-controls': 'pop-' + key, 'data-combobox': label, 'data-value': cur || '',
+    'data-keep': key, placeholder: placeholder || 'search…', value: textOf(cur), ...rest });
+  input.dataset.popAnchor = key;              // a render finds the open list again
+  const panel = () => (POP.key === key ? POP.panel : null);
+  const matches = q => {
+    q = q.trim().toLowerCase();
+    // a field showing the chosen value is not a search: everything is offered
+    if (q === textOf(input.dataset.value).toLowerCase()) q = '';
+    return groups.map(g => ({ ...g, options: g.options.filter(o => !q
+      || (o.search || o.text).toLowerCase().includes(q)) })).filter(g => g.options.length);
+  };
+  const setActive = o => {
+    const p = panel(); if (!p) return;
+    p.querySelectorAll('[role=option].active').forEach(x => x.classList.remove('active'));
+    if (!o) { input.removeAttribute('aria-activedescendant'); return; }
+    o.classList.add('active');
+    input.setAttribute('aria-activedescendant', o.id);
+    o.scrollIntoView({ block: 'nearest' });
+  };
+  const pick = v => {
+    input.dataset.value = v;
+    input.value = textOf(v);
+    close();
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    if (onpick) onpick(v);
+  };
+  const build = () => {
+    const found = matches(input.value);
+    let i = 0;
+    const box = el('div', { class: 'moremenu listbox cblist', role: 'listbox', id: 'pop-' + key,
+      'aria-label': label,
+      // the field keeps the focus: a press on the list must not take it away
+      onmousedown: e => e.preventDefault() },
+      found.length ? found.map(g => el('div', { role: 'group', class: 'cbgroup',
+          'aria-label': g.label || null },
+        g.label ? el('div', { class: 'cbhead', 'aria-hidden': 'true', text: g.label }) : '',
+        g.options.map(o => el('div', { role: 'option', id: `${key}-o${i++}`, 'data-value': o.value,
+            'aria-selected': String(o.value === input.dataset.value),
+            onclick: () => pick(o.value) },
+          el('span', { class: 'cb-t', text: o.text }),
+          o.mark ? el('span', { class: 'badge warn', text: o.mark }) : '',
+          o.right ? el('span', { class: 'cb-r', text: o.right }) : '',
+          o.bar != null ? el('span', { class: 'cb-b' }, el('span', {
+            style: `width:${(100 * Math.max(0, Math.min(1, o.bar))).toFixed(0)}%` })) : ''))))
+      : el('div', { class: 'cbnone small se', text: 'nothing matches' }));
+    return box;
+  };
+  const open = () => {
+    if (panel()) { panel().replaceChildren(...build().childNodes); }
+    else { popOpen(key, input, build(), { menu: false }); input.focus(); }
+    input.setAttribute('aria-expanded', 'true');
+    const p = panel();
+    setActive(p && (p.querySelector('[role=option][aria-selected=true]')
+      || p.querySelector('[role=option]')));
+  };
+  function close() {
+    if (panel()) popClose();
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+  }
+  input.addEventListener('input', open);
+  input.addEventListener('click', () => { if (!panel()) { input.select(); open(); } });
+  input.addEventListener('keydown', e => {
+    const p = panel();
+    const opts = p ? [...p.querySelectorAll('[role=option]')] : [];
+    const i = opts.findIndex(o => o.classList.contains('active'));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!p) { open(); return; }
+      if (!opts.length) return;
+      setActive(opts[(i + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length]);
+    } else if (e.key === 'Home' && p && opts.length) { e.preventDefault(); setActive(opts[0]); }
+    else if (e.key === 'End' && p && opts.length) { e.preventDefault(); setActive(opts[opts.length - 1]); }
+    else if (e.key === 'Enter') {
+      if (p && i >= 0) { e.preventDefault(); pick(opts[i].dataset.value); }
+    } else if (e.key === 'Escape') {
+      if (p) { e.preventDefault(); e.stopPropagation(); close();
+        input.value = textOf(input.dataset.value); }
+    } else if (e.key === 'Tab') close();
+  });
+  input.addEventListener('blur', () => setTimeout(() => {
+    // a render replaced this field: the new one owns the list now
+    if (!input.isConnected) return;
+    if (document.activeElement !== input && !(panel() && panel().contains(document.activeElement))) {
+      close(); input.value = textOf(input.dataset.value); }
+  }, 120));
+  return input;
+}
+
+// a model list, as the Combobox shows it: the id, and on the right its
+// parameters and how many topics it has been judged on (like the phase-9 search)
+function modelGroups(rows) {
+  return [{ label: '', options: rows.map(r => {
+    const m = DATA.models.find(x => x.id === r.id) || {};
+    const k = r.judged ?? Object.keys((m.judge || {}).tasks || {})
+      .filter(t => t.startsWith('exam_')).length;
+    return { value: r.id, text: r.id, search: `${r.id} ${m.name || ''}`,
+             right: r.right || [m.params ? P(m.params) : null, k ? `${k} judged` : null]
+               .filter(Boolean).join(' · ') };
+  }) }];
+}
+
+// the topic list, as the Combobox shows it: grouped by the 8 areas, weakest
+// first within each, the score in mono on the right with a tiny bar, and
+// "provisional" where the judge's scores are
+function topicGroups(topics, scoreOf, provisional) {
+  const areas = Object.entries(DATA.meta.areas || {});
+  const inArea = new Set();
+  const opt = t => { const v = scoreOf ? scoreOf(t) : null;
+    return { value: t, text: frName(t), search: frName(t) + ' ' + t,
+             right: v != null ? `${(+v).toFixed(2)} / 4` : '', bar: v != null ? v / 4 : null,
+             mark: v != null && provisional ? 'provisional' : '' }; };
+  const byScore = (a, b) => ((scoreOf && scoreOf(a)) ?? 9) - ((scoreOf && scoreOf(b)) ?? 9)
+    || frName(a).localeCompare(frName(b));
+  const out = areas.map(([a, ts]) => {
+    const here = topics.filter(t => ts.includes(frName(t)));
+    here.forEach(t => inArea.add(t));
+    return { label: a, options: here.sort(byScore).map(opt) };
+  }).filter(g => g.options.length);
+  const rest = topics.filter(t => !inArea.has(t));
+  if (rest.length) out.push({ label: 'Other', options: rest.sort(byScore).map(opt) });
+  return out;
 }
 // The option count rides on the name as a superscript — mmlu⁴, piqa². It is
 // derived from the chance level rather than hand-kept (a task HAS a chance level
@@ -3839,19 +4175,13 @@ function vJudged(m) {
     const crit = cats.filter(t => j.tasks[t].criteria_mean);
     const pick = crit.includes((state.mdlTopic || {})[m.id]) ? state.mdlTopic[m.id] : crit[0];
     if (crit.length > 1) {
-      const tq = (state.mdlTopicQ || '').trim().toLowerCase();
-      const opts = crit.filter(t => t === pick || !tq || frName(t).toLowerCase().includes(tq));
+      // 11f: one searchable control, grouped by the 8 areas, weakest first in
+      // each — it replaced a native select and the "find a topic" box beside it
       card.append(el('div', { class: 'ctrl', style: 'margin-top:14px;flex-wrap:wrap' },
         el('label', { class: 'small', for: 'mdlTopic', text: 'topic' }),
-        el('select', { id: 'mdlTopic', 'aria-label': 'judged topic', 'data-topic-switch': '1',
-            onchange: e => { state.mdlTopic = state.mdlTopic || {};
-              state.mdlTopic[m.id] = e.target.value; render(); } },
-          opts.map(t => el('option', { value: t, 'data-topic-pick': t,
-            selected: t === pick ? '' : null,
-            text: `${frName(t)} — ${num(pubScore(j.tasks[t]), 2)} / 4` }))),
-        el('input', { type: 'search', placeholder: 'find a topic', 'aria-label': 'find a judged topic',
-          'data-keep': 'mdl-topic-q', value: state.mdlTopicQ || '', style: 'min-width:140px',
-          oninput: e => { state.mdlTopicQ = e.target.value; render(); } }),
+        Combobox('judged topic', topicGroups(crit, t => pubScore(j.tasks[t]), !judgedOkM(m)), pick,
+          v => { state.mdlTopic = state.mdlTopic || {}; state.mdlTopic[m.id] = v; render(); },
+          { key: 'mdl-topic', id: 'mdlTopic', 'data-topic-switch': '1', placeholder: 'find a topic' }),
         el('span', { class: 'count-note', text: `${crit.length} topics, weakest first` })));
     }
     for (const t of crit.filter(t => t === pick)) {
@@ -4081,7 +4411,7 @@ function vModel() {
   const m = DATA.models.find(x => x.id === state.model);
   if (!m) return [note('No such model.')];
   const a = m.archinfo || {}, r = rankOf(m), avg = officialAvg(m), comp = computeOf(m);
-  const back = el('a', { class: 'backlink', href: '#tab=' + state.tab,
+  const back = el('a', { class: 'backlink', href: '#tab=' + state.tab, onclick: backTo(state.tab),
     text: '← Back to ' + (TABS.find(([id]) => id === state.tab) || [, 'the board'])[1] });
 
   // 11d: the hero — an eyebrow, the name, the id, three highlight cards, and
@@ -4537,23 +4867,89 @@ function navigate(patch) {
   // one — even a failure — is
   if (patch.tab === 'queue' && (state.tab !== 'queue' || state.model || state.topic)
       && state.pg.queue) state.pg.queue.page = 1;
+  const from = location.hash;
   Object.assign(state, patch);
   const want = hashFor();
   // push history, then paint. Painting here rather than leaving it to the
   // hashchange handler is deliberate: that handler ignores a hash which already
   // agrees with state (it is our own write echoing back), so relying on it to
   // render meant a tab click updated the URL and nothing else.
-  if (location.hash.slice(1) !== want) location.hash = want;
+  // 11f: the entry being left keeps where it was scrolled to, for Back; the
+  // new one remembers where it came from, for "← Back to …"
+  if (location.hash.slice(1) !== want) {
+    clearTimeout(_saveT); saveScroll();
+    history.pushState({ from, y: 0 }, '', '#' + want);
+  }
+  _navigated = true;
   render();
 }
 
 window.addEventListener('hashchange', () => {
   // a hash that already matches state is our own write echoing back; anything
-  // else is the user pressing Back or Forward, and we adopt it
+  // else is the user pressing Back or Forward, and we adopt it — at the
+  // scroll they left that view at (11f)
   if (location.hash.slice(1) === hashFor()) return;
   routeFromHash();
+  _restore = { y: (history.state || {}).y || 0, until: Date.now() + 3000 };
+  _navigated = true;
   render();
 });
+
+// ---- 11f: a new page starts at the top; Back returns to where you were -----
+// The browser cannot restore a view this page rebuilds from state, so the
+// page does it: every entry keeps its scrollY in history.state (saved as the
+// person scrolls, and on the way out), and a view that changes by
+// navigation starts at 0 unless a button aimed it at a section.
+try { history.scrollRestoration = 'manual'; } catch (e) { /* an old browser */ }
+const viewKey = () => state.model ? 'model:' + state.model
+  : state.topic ? 'topic:' + state.topic : 'tab:' + state.tab;
+let _lastView = null, _restore = null, _navigated = false, _saveT = null;
+function saveScroll() {
+  try { history.replaceState({ ...(history.state || {}), y: Math.round(scrollY) }, ''); }
+  catch (e) { /* a sandboxed frame */ }
+}
+// a save belongs to the entry that was scrolled: one still waiting when Back
+// or Forward lands must not write this entry's scroll into the other one
+window.addEventListener('scroll', () => {
+  clearTimeout(_saveT);
+  const at = location.hash;
+  _saveT = setTimeout(() => { if (location.hash === at) saveScroll(); }, 150);
+}, { passive: true });
+window.addEventListener('popstate', () => clearTimeout(_saveT));
+// the person scrolling or typing ends a restore that is still waiting for
+// the page to grow tall enough
+for (const ev of ['wheel', 'touchstart', 'keydown'])
+  window.addEventListener(ev, () => { _restore = null; }, { passive: true, capture: true });
+
+// a plain link to a view on this page ("#model=…", "#topic=…") is a
+// navigation like any other: it pushes an entry that knows where it came
+// from and saves the scroll of the one it leaves. A link with a job of its
+// own (it called preventDefault) keeps it
+document.addEventListener('click', e => {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const a = e.target.closest && e.target.closest('a[href^="#"]');
+  if (!a || a.target || a.hasAttribute('download')) return;
+  const h = a.getAttribute('href');
+  if (h.length < 2 || h === location.hash) return;
+  e.preventDefault();
+  const from = location.hash;
+  clearTimeout(_saveT); saveScroll();
+  history.pushState({ from, y: 0 }, '', h);
+  routeFromHash();
+  _navigated = true;
+  render();
+});
+
+// "← Back to …" is Back when the entry before this one is the view it names
+function backTo(tab) {
+  return e => {
+    const from = (history.state || {}).from;
+    if (from == null || /[#&](model|topic)=/.test(from)) return;
+    if (new URLSearchParams(from.replace(/^#/, '')).get('tab') !== tab) return;
+    e.preventDefault();
+    history.back();
+  };
+}
 
 // FLOP with a readable exponent — 6ND spans twenty orders of magnitude across a
 // board that holds both a 14M probe and a 750M checkpoint
@@ -4672,16 +5068,23 @@ function toast(text, opts = {}) {
   const t = el('div', { class: 'toast', 'data-toast': opts.key || '1' },
     el('span', { class: 'toast-text', text }),
     opts.go ? el('a', { href: opts.href || '#', 'data-toast-link': '1', text: opts.link || 'open',
-      onclick: e => { e.preventDefault(); t.remove(); opts.go(); } }) : '',
+      onclick: e => { e.preventDefault(); drop(); opts.go(); } }) : '',
     opts.action ? el('button', { class: 'quiet', 'data-toast-action': '1', text: opts.action.label,
-      onclick: async () => { t.remove(); await opts.action.run(); } }) : '',
-    el('button', { class: 'xbtn', 'aria-label': 'dismiss', text: '×', onclick: () => t.remove() }));
+      onclick: async () => { drop(); await opts.action.run(); } }) : '',
+    el('button', { class: 'xbtn', 'aria-label': 'dismiss', text: '×', onclick: () => drop() }));
+  // 11f: it fades out; what fades has no key, so nothing finds a gone toast
+  function drop() {
+    if (!t.isConnected || t.classList.contains('out')) return;
+    t.removeAttribute('data-toast');
+    t.classList.add('out');
+    setTimeout(() => t.remove(), motionOff() ? 0 : 240);
+  }
   box.append(t);
   // the clock runs only while nobody is on it: hover or focus stops it, and
   // leaving gives the full time back rather than whatever was left
   const ms = opts.ms || (opts.action ? TOAST_ACTION_MS : opts.go ? TOAST_LINK_MS : TOAST_MS);
   let timer = null;
-  const arm = () => { clearTimeout(timer); timer = setTimeout(() => t.remove(), ms); };
+  const arm = () => { clearTimeout(timer); timer = setTimeout(drop, ms); };
   const hold = () => { clearTimeout(timer); timer = null; };
   const busy = () => t.matches(':hover') || t.contains(document.activeElement);
   t.addEventListener('mouseenter', hold);
@@ -4783,7 +5186,7 @@ function livePager(key, total, redraw) {
   if (!nav) {
     nav = _livePagers[key] = el('nav', { class: 'pager', 'data-pager': key, 'aria-label': 'pages' });
     nav._note = el('span', { class: 'count-note' });
-    nav._size = el('select', { 'aria-label': 'rows per page' });
+    nav._size = Select('rows per page', [], '', null, { key: 'size-' + key });
     nav._prev = el('button', { class: 'quiet', text: '‹ Prev', 'data-page-prev': '1' });
     nav._nums = el('span', { class: 'pgnums', style: 'display:contents' });
     nav._next = el('button', { class: 'quiet', text: 'Next ›', 'data-page-next': '1' });
@@ -4811,8 +5214,7 @@ function livePager(key, total, redraw) {
   nav._note.dataset.pageRange = `${from}-${to}`;
   nav._note.textContent = `${from}–${to} of ${total}`;
   const sizes = [...new Set([...PAGE_SIZES, p.dflt])].sort((a, b) => a - b).map(String);
-  if ([...nav._size.options].map(o => o.value).join() !== sizes.join())
-    nav._size.replaceChildren(...sizes.map(n => el('option', { value: n, text: `${n} per page` })));
+  nav._size.setOptions(sizes.map(n => [n, `${n} per page`]));
   nav._size.value = String(p.size);
   nav._prev.disabled = p.page <= 1;
   nav._next.disabled = p.page >= pages;
@@ -5150,13 +5552,16 @@ function proposeDialog({ model, topic, gate, returnTo, onDone }) {
 }
 
 function lbMini(rows) {
-  // the tint is the rank among every ranked model on the board, as on the
-  // Leaderboard, so the top five read the same in both places
+  // 11f: the Leaderboard's rule — the leaders of the whole board (the best
+  // average and every one the z-test cannot tell from it) are bold and
+  // tinted, the rest plain, and the ± is the cell's tooltip
   const pool = DATA.models.filter(m => officialAvg(m) != null && !m.duplicateOf)
     .sort((a, b) => officialAvg(b) - officialAvg(a));
-  const step = m => { const i = pool.findIndex(x => x.id === m.id);
-    return i < 0 ? null : 5 - Math.floor(i * 5 / pool.length); };
+  const best = pool[0];
+  const lead = m => !!best && (m.id === best.id || tiedWithBest({ key: 'avg' }, m,
+    { id: best.id, v: officialAvg(best) }, null));
   const tb = el('tbody', {}, rows.map(m => { const r = rankOf(m), se = officialSe(m);
+    const v = (100 * officialAvg(m)).toFixed(1), on = pool.length > 1 && lead(m);
     return el('tr', { 'data-top-row': m.id },
       el('td', { class: 'num mono se', text: r ? String(r.n) : '—' }),
       el('td', { class: 'model', 'data-model': m.id, style: `--fam:${famColor(m)}` },
@@ -5164,16 +5569,19 @@ function lbMini(rows) {
         ckBadge(m) || (m.kind === 'instruct'
           ? el('span', { class: 'badge instruct', text: 'instruct' }) : '')),
       el('td', { class: 'num', text: P(m.params) }),
-      el('td', { class: 'num tcell' + (r && r.n === 1 ? ' best' : ''), 'data-step': String(step(m)),
-          style: `background:var(--heat-${step(m)})` },
-        el('b', { text: (100 * officialAvg(m)).toFixed(1) }),
-        se != null ? el('span', { class: 'se', text: ` ±${(100 * se).toFixed(1)}` }) : '')); }));
+      el('td', { class: 'num tcell' + (on ? ' lead' : ''), 'data-lead': on ? '1' : null,
+          style: on ? 'background:var(--heat-3)' : null, tabindex: '0',
+          'data-tip': JSON.stringify([v + (se != null ? ` ± ${(100 * se).toFixed(1)}` : ''),
+            `${m.name} · Avg`, ...(on ? [m.id === best.id ? 'best on the board'
+              : 'within the noise of the best'] : [])]) },
+        on ? el('b', { text: v }) : v)); }));
   return el('table', { class: 'lb mini-lb tinted' },
-    el('thead', {}, el('tr', {},
-      el('th', { class: 'num', text: '#' }), el('th', { text: 'model' }),
-      el('th', { class: 'num', text: 'params' }),
-      el('th', { class: 'num' }, 'avg', el('span', { class: 'unit',
-        text: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' })))), tb);
+    el('thead', {}, el('tr', { class: 'names' },
+      el('th', { class: 'num', text: '#' }), el('th', { text: 'Model' }),
+      el('th', { class: 'num', text: 'Params' }),
+      el('th', { class: 'num', 'data-tip': JSON.stringify([`Avg — mean of the required tasks, % `
+        + (state.avgMode === 'raw' ? 'raw accuracy' : 'above chance')]), tabindex: '0',
+        text: 'Avg' }))), tb);
 }
 
 // ---------- capability profile: the radar ----------
@@ -5442,6 +5850,7 @@ function lbS() {
     try {
       tint = localStorage.getItem('bench-lb-tint') !== 'off';
       howto = localStorage.getItem('bench-lb-howto') === 'open';
+      state.lbSe = localStorage.getItem('bench-lb-se') === 'on';
     } catch (e) { /* private mode: the defaults */ }
     state.lb = { ...LB_DEFAULTS, open: [], models: null, tint, howto, shown: {},
                  focus: null, weak: null, radarSrc: 'tasks' };
@@ -5472,7 +5881,7 @@ function lbFromHash(rest) {
 function lbSet(patch) {
   Object.assign(lbS(), patch);
   const want = hashFor();
-  if (location.hash.slice(1) !== want) history.replaceState(null, '', '#' + want);
+  if (location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
   render();
 }
 
@@ -5575,7 +5984,8 @@ function lbColumns(ms) {
   };
   const task = t => {
     const lower = DATA.pplTasks.includes(t);
-    return { key: t, label: t, num: true, task: t, lower, group: groupOf(t),
+    return { key: t, label: t, short: LB_SHORT[t] || t, num: true, task: t, lower,
+             group: groupOf(t), shot: shot(t),
              unit: lower ? (DATA.tasks[t] || {}).metric : [shot(t), '%'].filter(Boolean).join(' · ') };
   };
   const judgedCols = () => (DATA.judged && DATA.judged.exam || [])
@@ -5587,9 +5997,10 @@ function lbColumns(ms) {
                    ?? (DATA.judged.calibration || {}).kappa) + ' · 0–4' }));
   const cats = lbCategoryCols(ms).map(c => ({ ...c, label: c.cat, optional: true,
     group: 'MMLU by topic', unit: 'report half · %' }));
-  const javg = DATA.models.some(m => Object.keys((m.judge || {}).tasks || {})
-    .some(t => t.startsWith('exam_')))
-    ? [{ key: 'javg', num: true, judged: 'avg', group: 'Judged',
+  // 11f: the judged average is a column only while some model on the page
+  // has one — a column of dashes says nothing
+  const javg = ms.some(m => m.judgedAvg != null)
+    ? [{ key: 'javg', num: true, judged: 'avg', group: 'Judged', short: 'Judged',
          label: 'Judged avg', unit: judgedCalibrated()
            ? `κ ${DATA.judged.calibration.kappa} · 0–4` : 'rubric 0–4' }] : [];
   const lead = [
@@ -5598,7 +6009,7 @@ function lbColumns(ms) {
     { key: 'params', label: 'Params', num: true, group: '' },
     { key: 'avg', label: 'Avg', num: true, group: '',
       unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' }];
-  const tail = [{ key: 'date', label: 'Last eval', group: '' }];
+  const tail = [{ key: 'date', label: 'Updated', group: '' }];
   // an area with no number for any model here is not a column (11e)
   const areasHere = areas.filter(a => ms.some(m => areaMmlu(m, a)));
   let mid;
@@ -5626,6 +6037,37 @@ function lbColumns(ms) {
       .filter(t => DATA.accTasks.includes(t)).map(task);
   }
   return [...lead, ...mid, ...tail];
+}
+
+// 11f: one word per column name; the long ones are the tooltip's
+const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'TruthfulQA' };
+
+// A column's setup, in words — its tooltip, and its accessible name. The
+// header shows only the name; this is where the n-shot, the unit and the
+// scale went (11f).
+function lbColTip(c) {
+  const scale = state.avgMode === 'raw' ? 'raw accuracy' : 'above chance';
+  if (c.key === 'rank') return ['# — rank among the ranked models on this board'];
+  if (c.key === 'name') return ['Model — sort by name'];
+  if (c.key === 'params') return ['Params — parameter count, from the harness config or the name'];
+  if (c.key === 'date') return ['Updated — when the model was last evaluated'];
+  if (c.key === 'avg') return [`Avg — mean of the required tasks, % ${scale}`,
+    'the Scale pill switches it'];
+  if (c.task) {
+    const info = DATA.tasks[c.task] || {};
+    return [c.lower ? `${c.task} — ${c.unit}, lower is better`
+                    : `${c.task} — ${c.shot || 'n-shot unknown'}, % accuracy`,
+      ...(info.control ? ['CONTROL — never in Avg'] : []),
+      ...[info.domain, info.desc].filter(Boolean)];
+  }
+  if (c.area) return [`${c.area} — MMLU, report half, %`,
+    'pooled over ' + ((DATA.meta.areas || {})[c.area] || []).join(', ')];
+  if (c.cat) return [`MMLU ${c.cat} — report half, %`];
+  if (c.jarea) return [`${c.jarea} — judged mean, rubric 0–4`, 'never part of Avg'];
+  if (c.judged === 'avg') return ['Judged — mean rubric score 0–4 over the judged topics',
+    'from the calibrated judge — never part of Avg'];
+  if (c.judged) return [`${c.label} — rubric 0–4, ${c.unit}`, 'never part of Avg'];
+  return [c.label];
 }
 
 // which optional columns show, per chip: All tasks keeps its remembered six
@@ -5679,10 +6121,11 @@ function pillMenu(key, label, opts, cur, pick, attrs = {}) {
       onclick: () => { popClose(true); pick(v); } }))), { key });
 }
 
-// the rank tint: each column's rank among every row that has the cell, over
-// the whole board — so a filter never changes a colour — in five steps. A
-// cell the z-test cannot tell from the column's best shares the top step.
-function lbTints(cols, val) {
+// 11f: each column's LEADERS — its best score, and every score the z-test
+// cannot tell from it — over the whole board, so a filter never changes them.
+// They are bold, and (with Tint on) tinted; every other cell is plain. This
+// replaced five rank steps, which painted the top of a 14-model board one slab.
+function lbLeaders(cols, val) {
   const out = {};
   for (const c of cols) {
     if (!c.num || c.key === 'params') continue;
@@ -5695,9 +6138,13 @@ function lbTints(cols, val) {
       .map(m => ({ id: m.id, v: val(m, c) })).filter(x => x.v != null);
     if (pool.length < 2) continue;
     pool.sort((a, b) => c.lower ? a.v - b.v : b.v - a.v);
-    const steps = {};
-    pool.forEach((x, i) => { steps[x.id] = 5 - Math.floor(i * 5 / pool.length); });
-    out[c.key] = { steps, best: pool[0] };
+    const best = pool[0];
+    // a lower-is-better column has no standard error: within 1% (floor
+    // 0.005) of the best is inside the noise, as the Perplexity tab says
+    const band = Math.max(0.005, 0.01 * Math.abs(best.v));
+    const lead = new Set(pool.filter(x => x.id === best.id || (c.lower ? x.v <= best.v + band
+      : tiedWithBest(c, DATA.models.find(m => m.id === x.id), best, val))).map(x => x.id));
+    out[c.key] = { best, lead };
   }
   return out;
 }
@@ -5765,10 +6212,12 @@ function vLeaderboard(ms) {
   const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
     state.src, state.avgMode, L.chip, L.kind, L.size, L.status, L.models]));
   const rows = lbPg.rows.flatMap(m => [m, ...((state.lbDupOpen || {})[m.id] ? dupsOf[m.id] || [] : [])]);
-  const tints = L.tint ? lbTints(visCols, val) : {};
-  const pplBand = lead => Math.max(0.005, 0.01 * Math.abs(lead));
+  // the leaders are bold whatever the Tint switch says; Tint only adds the wash
+  const leaders = lbLeaders(visCols, val);
 
-  // ---- header: two rows, the group over its columns, the unit under a name
+  // ---- header (11f): one line of one-word names. The setup — n-shot, unit,
+  // scale — is the name's tooltip, not three more lines; the group row is
+  // quiet, and only on All tasks, where there is more than one group
   const groups = [];
   for (const c of visCols) {
     const g = c.group || '';
@@ -5776,46 +6225,47 @@ function vLeaderboard(ms) {
     else groups.push({ g, n: 1 });
   }
   const thead = el('thead', {},
-    el('tr', { class: 'grp' }, groups.map(({ g, n }) => el('th', { colspan: String(n),
-      class: g ? 'grp' : 'grp nogrp', scope: 'colgroup', text: g }))),
-    el('tr', {}, visCols.map(c => {
+    L.chip === 'all' ? el('tr', { class: 'grp' }, groups.map(({ g, n }) => el('th', {
+      colspan: String(n), class: g ? 'grp' : 'grp nogrp', scope: 'colgroup', text: g }))) : '',
+    el('tr', { class: 'names' }, visCols.map(c => {
+      const tipRows = lbColTip(c);
       if (c.nosort) return el('th', { class: 'rank pin0', scope: 'col', 'data-col': c.key,
-        text: c.label });
-      const info = c.task ? DATA.tasks[c.task] || {} : {};
+        'data-tip': JSON.stringify(tipRows), text: c.label });
       return el('th', { 'data-col': c.key, 'data-task': c.task || null, 'data-area': c.area || null,
         'data-jarea': c.jarea || null,
         class: (c.num ? 'num ' : '') + 'sortable' + (c.key === 'name' ? ' model pin' : '')
-          + (c.judged || c.jarea ? ' judged' : '') + (info.desc ? ' hasinfo' : ''),
-        scope: 'col',
-        title: c.judged || c.jarea ? 'rubric score 0–4 from the calibrated judge — never part of Avg'
-          : c.task ? [info.control ? 'CONTROL — never in Avg' : null, info.domain, info.desc]
-              .filter(Boolean).join(' — ') || null
-          : c.area ? `MMLU, pooled over ${((DATA.meta.areas || {})[c.area] || []).join(', ')}`
-          : null,
+          + (c.judged || c.jarea ? ' judged' : ''),
+        scope: 'col', 'data-tip': JSON.stringify(tipRows),
+        'aria-label': tipRows.join(' — '),
         'aria-sort': state.sort.key === c.key ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none',
         onclick: () => { state.sort = { key: c.key,
           dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
           render(); } },
-        ...(c.task ? String(c.label).split('_').flatMap((w, i, a) =>
-              i < a.length - 1 ? [w + '_', el('wbr')] : [w]) : [c.label]),
-        state.sort.key === c.key ? el('span', { class: 'dir', text: state.sort.dir > 0 ? ' ▲' : ' ▼' }) : '',
-        c.unit ? el('span', { class: 'unit', text: c.unit }) : '');
+        el('span', { class: 'hname', text: c.short || c.label }),
+        state.sort.key === c.key ? el('span', { class: 'dir', text: state.sort.dir > 0 ? ' ▲' : ' ▼' }) : '');
     })));
 
-  // ---- a cell: one line, the number in bold mono and its error beside it
+  // ---- a cell (11f): the number only. A leader — the column's best, or
+  // inside its noise — is bold, and tinted with Tint on; nothing else is.
+  // The ± is the cell's tooltip (hover or focus), in the opened row, and on
+  // every cell with "Show ± errors"
   const one = (c, m, v, se, fmt, extra = {}) => {
-    const t = tints[c.key];
-    const step = t && v != null ? t.steps[m.id] : null;
-    const isBest = t && t.best.id === m.id;
-    const tied = !isBest && t && v != null && tiedWithBest(c, m, t.best, val);
-    const pplTie = c.lower && t && v != null && !isBest && v <= t.best.v + pplBand(t.best.v);
-    return el('td', { class: 'num tcell' + (isBest ? ' best' : tied || pplTie ? ' tiebest' : ''),
-        style: step ? `background:var(--heat-${tied || isBest ? 5 : step})` : null,
-        'data-step': step ? String(tied || isBest ? 5 : step) : null, ...extra },
-      el('b', { text: v == null ? '—' : fmt(v) }),
-      // a thin space: the error belongs to the number, and a dozen columns
-      // have to fit the card
-      se != null ? el('span', { class: 'se', text: `\u2009±${se}` }) : '');
+    const t = leaders[c.key];
+    const lead = !!(t && v != null && t.lead.has(m.id));
+    const txt = v == null ? '—' : fmt(v);
+    const { title, ...rest } = extra;
+    return el('td', { class: 'num tcell' + (lead ? ' lead' : ''),
+        style: lead && L.tint ? 'background:var(--heat-3)' : null,
+        'data-lead': lead ? '1' : null, tabindex: v != null ? '0' : null,
+        'data-watch': `lb|${m.id}|${c.key}`,
+        'data-tip': v == null ? null : JSON.stringify([txt + (se != null ? ` ± ${se}` : ''),
+          `${m.name} · ${c.short || c.label}`,
+          ...(lead ? [t.best.id === m.id ? 'best in the column' : 'within the noise of the best']
+            : []), ...(title ? [title] : [])]),
+        ...rest },
+      lead ? el('b', { text: txt }) : txt,
+      // a thin space: the error belongs to the number
+      se != null && state.lbSe ? el('span', { class: 'se', text: `\u2009±${se}` }) : '');
   };
   const pctn = v => (100 * v).toFixed(1);
   const ncols = visCols.length;
@@ -5829,15 +6279,20 @@ function vLeaderboard(ms) {
         // links, buttons, checkboxes and badges with a job of their own keep it
         if (e.target.closest('a, button, input, select, label, .badge[title]')) return;
         lbToggle(m.id);
-      } },
+      },
+      // Esc on an opened row closes it, and the chevron has the focus back
+      onkeydown: e => { if (e.key === 'Escape' && open) { e.preventDefault(); lbToggle(m.id, true); } } },
       visCols.map(c => {
         if (c.key === 'rank') {
           const r = rankOf(m);
           return el('td', { class: 'rank pin0' },
-            el('button', { class: 'disclose', 'aria-expanded': String(open),
+            // 11f: one chevron that turns; it starts unturned when this
+            // render is the one that opens the row, so the turn is seen
+            el('button', { class: 'disclose' + (open && state.lbAnim === m.id ? ' pre' : ''),
+              'aria-expanded': String(open),
               'aria-controls': did, 'data-open-row': m.id,
               'aria-label': (open ? 'close ' : 'open ') + m.name,
-              text: open ? '▾' : '▸', onclick: () => lbToggle(m.id) }),
+              onclick: () => lbToggle(m.id) }, el('span', { class: 'chev', text: '▸' })),
             el('span', { class: 'mono', text: r ? String(r.n) : '—',
               title: r ? `rank ${r.n} of ${r.of} ranked models on this board`
                        : 'preliminary — not ranked' }));
@@ -5867,8 +6322,10 @@ function vLeaderboard(ms) {
         if (c.key === 'date') {
           const d = String(lastEval(m) || '');
           const [y, mo, da] = d.slice(0, 10).split('-');
+          // 11f: "15 Sep"; the year only when it is not this one
           const short = da ? `${+da} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug',
-            'Sep', 'Oct', 'Nov', 'Dec'][+mo - 1]} ${y.slice(2)}` : '—';
+            'Sep', 'Oct', 'Nov', 'Dec'][+mo - 1]}`
+            + (+y !== new Date().getFullYear() ? ` ${y}` : '') : '—';
           return el('td', { class: 'small nowrap mono', title: d.replace('T', ' '), text: short });
         }
         if (c.key === 'avg') {
@@ -5920,8 +6377,7 @@ function vLeaderboard(ms) {
           c.lower ? x => num(x, 3) : pctn);
       }));
     tbody.append(tr);
-    if (open) tbody.append(el('tr', { class: 'detail', id: did, 'data-lb-detail': m.id },
-      el('td', { colspan: String(ncols) }, lbDetail(m, dupsOf[m.id]))));
+    if (open) tbody.append(lbDetailRow(m, did, ncols, dupsOf[m.id]));
   });
 
   const table = el('table', { class: 'lb' + (L.tint ? ' tinted' : ''), 'data-lb-table': '1' },
@@ -5937,6 +6393,8 @@ function vLeaderboard(ms) {
         L.chip !== 'all' ? (LB_CHIPS.find(([v]) => v === L.chip) || [])[1] : null]),
       lbPg.pager,
       hfade('lb', el('div', { class: 'lb-wrap stick', 'data-hkeep': 'lb' }, table)),
+      el('p', { class: 'lbcap', 'data-lb-caption': '1', text: 'Bold = best in the column or '
+        + 'within its noise · hover a score for its ± error · hover a column name for its setup' }),
       lbHowTo(ms)),
     insightsCard(ms)];
 }
@@ -5972,9 +6430,63 @@ function dupToggle(m, dups) {
       state.lbDupOpen[m.id] = !open; render(); } });
 }
 
-function lbToggle(id) {
+// 11f: a row opens and closes as one motion — the height from 0fr to 1fr,
+// the content fading in and rising 4px — only when a person toggles it. A
+// row already open (a poll, a sort, a pasted link) is drawn open, still.
+function motionOff() { return matchMedia('(prefers-reduced-motion: reduce)').matches; }
+
+function lbToggle(id, refocus) {
   const L = lbS();
-  lbSet({ open: L.open.includes(id) ? L.open.filter(x => x !== id) : [...L.open, id] });
+  const back = () => { if (refocus) state.after = {
+    focus: `button[data-open-row="${CSS.escape(id)}"]` }; };
+  if (!L.open.includes(id)) {
+    state.lbAnim = motionOff() ? null : id;
+    lbSet({ open: [...L.open, id] });
+    return;
+  }
+  const wrap = document.querySelector(`[data-dwrap="${CSS.escape(id)}"]`);
+  // the state closes now, so a poll in the middle does not open it again
+  L.open = L.open.filter(x => x !== id);
+  if (!wrap || motionOff()) { back(); lbSet({}); return; }
+  const btn = document.querySelector(`button[data-open-row="${CSS.escape(id)}"]`);
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+  wrap.classList.add('anim');
+  requestAnimationFrame(() => wrap.classList.add('closed'));
+  let done = false;
+  const fin = () => { if (done) return; done = true; back(); lbSet({}); };
+  wrap.addEventListener('transitionend', e => {
+    if (e.target === wrap && e.propertyName === 'grid-template-rows') fin(); });
+  setTimeout(fin, 400);        // a transition that never ends still ends
+}
+
+// the opened row: the row's own continuation — its accent bar down the left,
+// a faint wash, ✕ Close at the top right — in a wrapper that can move
+function lbDetailRow(m, did, ncols, dups) {
+  const anim = state.lbAnim === m.id;
+  const wrap = el('div', { class: 'dwrap' + (anim ? ' anim closed' : ''), 'data-dwrap': m.id },
+    el('div', { class: 'dinner' }, el('div', { class: 'dpad' },
+      el('button', { class: 'quiet dclose', 'data-detail-close': m.id,
+        'aria-label': 'close ' + m.name, text: '✕ Close', onclick: () => lbToggle(m.id, true) }),
+      lbDetail(m, dups))));
+  if (anim) {
+    state.lbAnim = null;                 // consumed: the next render draws it still
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      wrap.classList.remove('closed');
+      const b = document.querySelector(`button.disclose.pre[data-open-row="${CSS.escape(m.id)}"]`);
+      if (b) b.classList.remove('pre');
+    }));
+    wrap.addEventListener('transitionend', e => {
+      if (e.target !== wrap || e.propertyName !== 'grid-template-rows') return;
+      wrap.classList.remove('anim');
+      // the panel ends below the screen: just enough scroll to show it
+      const tr = wrap.closest('tr');
+      if (tr) tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+  }
+  return el('tr', { class: 'detail', id: did, 'data-lb-detail': m.id,
+      onkeydown: e => { if (e.key === 'Escape' && !e.target.closest('[data-pop]')) {
+        e.preventDefault(); e.stopPropagation(); lbToggle(m.id, true); } } },
+    el('td', { colspan: String(ncols) }, wrap));
 }
 
 // ---- the toolbar: one row ---------------------------------------------------
@@ -6052,7 +6564,15 @@ function lbColumnsPill(cols, shown, nHidden) {
             try { localStorage.setItem('bench-lb-tint', e.target.checked ? 'on' : 'off'); }
             catch (x) { /* private */ }
             lbSet({ tint: e.target.checked }); } }),
-        ' Tint cells by rank'));
+        ' Tint the leaders'),
+      // 11f: the ± is a hover away by default; this puts it on every cell
+      el('label', { class: 'small tintsw' },
+        el('input', { type: 'checkbox', 'data-show-se': '1', checked: state.lbSe ? '' : null,
+          onchange: e => {
+            try { localStorage.setItem('bench-lb-se', e.target.checked ? 'on' : 'off'); }
+            catch (x) { /* private */ }
+            state.lbSe = e.target.checked; render(); } }),
+        ' Show ± errors'));
   }, { key: 'columns', menu: false, rebuild: true });
 }
 
@@ -6119,12 +6639,15 @@ function lbDetail(m, dups) {
   const block = (eyebrow, ...kids) => el('div', { class: 'dblock' },
     el('div', { class: 'eyebrow', text: eyebrow }), ...kids);
   const out = [];
-  // TASKS: every task, its error, its n-shot and its rank among the board
-  out.push(block('Tasks', el('table', { class: 'mini' }, el('tbody', {},
+  // TASKS (11f): a compact list, one line each — the name, the score, a thin
+  // bar on the column's scale, the rank; the n-shot and the ± muted
+  out.push(block('Tasks', el('div', { class: 'tlist', role: 'list' },
     [...DATA.accTasks, ...DATA.pplTasks].map(t => {
       const c = cell(t, m.id);
-      if (!c) return el('tr', {}, el('td', { text: t }), el('td', { class: 'num se', text: '—' }),
-        el('td'), el('td'));
+      const name = el('span', { class: 'tl-n', title: t }, LB_SHORT[t] || t,
+        c && c.shots != null ? el('span', { class: 'se', text: ` ${c.shots}-shot` }) : '');
+      if (!c) return el('div', { class: 'tl', role: 'listitem', 'data-task-line': t }, name,
+        el('span', { class: 'tl-v se', text: '—' }), el('span'), el('span'));
       const lower = DATA.pplTasks.includes(t);
       const pool = DATA.models.map(x => ({ id: x.id, c: cell(t, x.id) })).filter(x => x.c)
         .sort((a, b) => lower ? a.c.v - b.c.v : b.c.v - a.c.v);
@@ -6132,13 +6655,18 @@ function lbDetail(m, dups) {
       const best = pool[0];
       const row = best && best.id !== m.id && !lower ? (DATA.sig[t] || []).find(([a, b]) =>
         (a === best.id && b === m.id) || (a === m.id && b === best.id)) : null;
-      return el('tr', {}, el('td', { text: t }),
-        el('td', { class: 'num' }, el('b', { text: lower ? num(c.v, 3) : (100 * c.v).toFixed(1) }),
+      // the column's scale: 0–100% for accuracy; best to worst on the board
+      // for a lower-is-better task
+      const lo = lower ? pool[pool.length - 1].c.v : 0, hi = lower ? pool[0].c.v : 1;
+      const fill = lower ? (lo === hi ? 1 : (lo - c.v) / (lo - hi)) : c.v;
+      return el('div', { class: 'tl', role: 'listitem', 'data-task-line': t }, name,
+        el('span', { class: 'tl-v' }, el('b', { text: lower ? num(c.v, 3) : (100 * c.v).toFixed(1) }),
           c.se && !lower ? el('span', { class: 'se', text: ` ±${(100 * c.se).toFixed(1)}` }) : ''),
-        el('td', { class: 'se', text: c.shots != null ? `${c.shots}-shot` : '' }),
-        el('td', { class: 'se', text: `#${r}/${pool.length}`
+        el('span', { class: 'tl-b' }, el('span', { class: 'tl-f',
+          style: `width:${(100 * Math.max(0, Math.min(1, fill))).toFixed(1)}%` })),
+        el('span', { class: 'tl-r se', text: `#${r}/${pool.length}`
           + (best && best.id === m.id ? ' · best' : row && !row[4] ? ' · tied with best' : '') }));
-    })))));
+    }))));
   // MMLU BY AREA: eight mini bars above chance
   const areas = Object.keys(DATA.meta.areas || {}).filter(a => areaMmlu(m, a));
   if (mmluCats(m) && diagStale(m)) {
@@ -7567,6 +8095,18 @@ const ACTIVE_STATUS = new Set(['preflight', 'waiting_gpu', 'waiting_lock', 'runn
 const stClass = s => s === 'done' ? 'st st-done' : s === 'failed' ? 'st st-failed'
                    : ACTIVE_STATUS.has(s) ? 'st st-active' : 'st st-muted';
 
+// A long failure is two lines, and "details ▸" for the rest (11f): it used
+// to push a Queue row to five lines. Open or not lives in state, for polls.
+function clampText(text, key) {
+  state.clampOpen = state.clampOpen || {};
+  const open = !!state.clampOpen[key];
+  const body = el('div', { class: 'down clamp' + (open ? ' open' : ''), text });
+  const btn = el('button', { class: 'quiet clampbtn', 'data-clamp': key,
+    'aria-expanded': String(open), text: open ? 'less ▾' : 'details ▸',
+    onclick: () => { state.clampOpen[key] = !open; (state.queueRedraw || render)(); } });
+  return el('div', { 'data-clamped': key }, body, text.length > 90 || text.includes('\n') ? btn : '');
+}
+
 // What a row can do, by what it is. Queued: Cancel. Running: Log and Cancel,
 // which asks first. Failed or canceled: the reason is in the row, and
 // Resubmit is one click — same model, suite and topics. Done: Open results —
@@ -7610,40 +8150,82 @@ function queueOpen(r) {
   toast(`${r.hf_id} is not on the board yet — its results land on the next refresh`);
 }
 
-function queueActions(r) {
-  const log = el('a', { href: `api/runs/${r.id}/log`, target: '_blank', rel: 'noopener',
-                        class: 'small', text: 'Log' });
-  const small = { style: 'padding:2px 9px;font-size:12px' };
-  if (r.status === 'queued')
-    return [el('button', { ...small, 'data-row-cancel': String(r.id), text: 'Cancel',
-      onclick: () => queueCancel(r) })];
-  if (ACTIVE_STATUS.has(r.status)) {
-    if (state.qConfirm === r.id)
-      return [log, el('span', { class: 'small', text: ' Stop this run? ' }),
-        el('button', { ...small, class: 'danger', 'data-row-stop': String(r.id), text: 'Stop it',
-          onclick: () => queueCancel(r) }),
-        el('button', { ...small, class: 'quiet', text: 'Keep it',
-          onclick: () => { state.qConfirm = null; (state.queueRedraw || render)(); } })];
-    return [log, ' ', el('button', { ...small, 'data-row-cancel': String(r.id), text: 'Cancel',
-      onclick: () => { state.qConfirm = r.id; (state.queueRedraw || render)(); } })];
+// ---------------------------------------------------------------------------
+// 11f: one action cell, for every table with actions. The row's next step is
+// its one visible button — a ghost, except a step that needs a person, which
+// is filled — and everything else is in a ⋯ menu on the shared popover.
+// Right-aligned, 8px apart, every button 32px tall with radius 6.
+// ---------------------------------------------------------------------------
+function actCell(key, main, items, attrs = {}) {
+  const more = (items || []).filter(Boolean);
+  const menu = more.length ? popover(el('button', { class: 'ghost rowmenu', 'data-row-menu': key,
+      'aria-label': 'more actions', title: 'more actions', text: '⋯' }),
+    () => el('div', { class: 'moremenu', id: 'pop-' + key, 'aria-label': 'row actions' },
+      more.map(it => it.href
+        ? el('a', { role: 'menuitem', class: 'menulink', href: it.href, 'data-act': it.act || null,
+            target: it.blank ? '_blank' : null, rel: it.blank ? 'noopener' : null, text: it.label,
+            onclick: () => popClose() })
+        : el('button', { role: 'menuitem', 'data-act': it.act || null, text: it.label,
+            onclick: () => { popClose(); it.run(); } }))),
+    { key, placement: 'bottom-end' }) : '';
+  return el('div', { class: 'actcell', ...attrs }, main || '', menu);
+}
+
+// a small copy, with a fallback where the clipboard API is not allowed
+async function copyText(t, what) {
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) {
+    const ta = el('textarea', { style: 'position:fixed;opacity:0' });
+    ta.value = t; document.body.append(ta); ta.select();
+    try { document.execCommand('copy'); } catch (x) { /* nothing else to try */ }
+    ta.remove();
   }
-  if (r.status === 'canceling') return [log, el('span', { class: 'small se', text: ' stopping…' })];
+  toast(`Copied ${what || t}`, { key: 'copy' });
+}
+
+function queueActions(r) {
+  const id = String(r.id);
+  const log = { label: 'Log', act: 'log', href: `api/runs/${r.id}/log`, blank: true };
+  const resubmit = { label: 'Resubmit', act: 'resubmit', run: () => queueResubmit(r) };
+  const copy = { label: 'Copy id', act: 'copy-id', run: () => copyText(id, '#' + id) };
+  const page = DATA.models.some(m => m.id === r.hf_id)
+    ? { label: 'Open model page', act: 'model', run: () => navigate({ model: r.hf_id, topic: null }) }
+    : null;
+  const ghost = (attr, text, run, extra = {}) => el('button', { class: 'ghost', [attr]: id, text,
+    onclick: run, ...extra });
+  const cell = (main, ...menu) => actCell('q' + id, main, [log, ...menu, copy, page]);
+  if (r.status === 'queued')
+    return cell(ghost('data-row-cancel', 'Cancel', () => queueCancel(r)));
+  if (ACTIVE_STATUS.has(r.status)) {
+    // Cancel on a running job asks first, in its own place: the question and
+    // its answer replace the button until one is chosen
+    if (state.qConfirm === r.id)
+      return actCell('q' + id, el('span', { class: 'confirm' },
+        el('span', { class: 'small', text: 'Stop this run?' }),
+        el('button', { class: 'danger', 'data-row-stop': id, text: 'Stop it',
+          onclick: () => queueCancel(r) }),
+        el('button', { class: 'ghost', text: 'Keep it',
+          onclick: () => { state.qConfirm = null; (state.queueRedraw || render)(); } })), []);
+    return cell(ghost('data-row-cancel', 'Cancel',
+      () => { state.qConfirm = r.id; (state.queueRedraw || render)(); }));
+  }
+  if (r.status === 'canceling') return cell(el('span', { class: 'small se', text: 'stopping…' }));
   // only the grading failed: the answers are on disk, and a retry re-grades
-  // them — 10b's resume answers nothing again, so it costs no GPU
+  // them — 10b's resume answers nothing again, so it costs no GPU. It is the
+  // one filled button: it needs a person
   if (r.judge_failed)
-    return [log, ' ', el('button', { ...small, class: 'primary', 'data-row-regrade': String(r.id),
-      text: 'Retry grading', title: 'queue this run again: the answers it wrote are kept and '
-        + 'graded again — no GPU', onclick: () => queueResubmit(r, true) })];
+    return cell(el('button', { class: 'primary', 'data-row-regrade': id, text: 'Retry grading',
+      title: 'queue this run again: the answers it wrote are kept and graded again — no GPU',
+      onclick: () => queueResubmit(r, true) }), resubmit);
   if (r.status === 'failed' || r.status === 'canceled')
-    return [log, ' ', el('button', { ...small, 'data-row-resubmit': String(r.id), text: 'Resubmit',
-      title: `the same model, suite${r.suite === 'judged' ? ' and topics' : ''}, queued again`,
-      onclick: () => queueResubmit(r) })];
+    return cell(ghost('data-row-resubmit', 'Resubmit', () => queueResubmit(r),
+      { title: `the same model, suite${r.suite === 'judged' ? ' and topics' : ''}, queued again` }));
   if (r.status === 'done') {
     const judgedDone = r.suite !== 'judged' || (r.judge && r.judge.status === 'done');
-    return [judgedDone ? el('button', { ...small, class: 'secondary', 'data-row-open': String(r.id),
-      text: 'Open results', onclick: () => queueOpen(r) }) : '', ' ', log];
+    return cell(judgedDone ? ghost('data-row-open', 'Open results', () => queueOpen(r)) : '',
+      resubmit);
   }
-  return [log];
+  return cell('');
 }
 
 function vQueue() {
@@ -7658,34 +8240,30 @@ function vQueue() {
       it => { sf.hf_id = it.id; if (it.kind) sf.kind = it.kind; render(); },
       { 'aria-label': 'model id',
         placeholder: 'search: org/model on the Hub, or local/<name> for an uploaded artifact' }),
-    kind: el('select', { 'aria-label': 'kind', onchange: e => { sf.kind = e.target.value; } },
-      ['auto', 'base', 'instruct'].map(v => el('option', { value: v,
-        selected: sf.kind === v ? '' : null,
-        text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
+    kind: Select('kind', [['auto', 'kind: auto-detect'], ['base', 'kind: base'],
+      ['instruct', 'kind: instruct']], sf.kind || 'auto', v => { sf.kind = v; },
+      { key: 'submit-kind' }),
     // judged is offered even when it cannot run: an option that is simply
     // absent tells a person nothing, and 'why is there no judged suite?' was
     // the first question asked of this page
-    suite: el('select', { 'aria-label': 'suite', onchange: e => { sf.suite = e.target.value; } },
-      el('option', { value: 'full', text: 'full — all tasks, comparable' }),
-      el('option', { value: 'quick', text: 'quick — hellaswag + arc_easy + ppl, minutes' }),
-      el('option', { value: 'control', text: 'control — mmlu_perm only: MMLU with the '
-        + 'options rotated (the position-bias experiment), ~a fifth of a full MMLU' }),
-      el('option', { value: 'judged', disabled: state.loop.blocked ? '' : null,
-        title: state.loop.blocked || '',
-        text: 'judged — the written exam, graded by the judge'
-          + (state.loop.blocked ? ' (unavailable)' : '') })),
+    suite: Select('suite', [['full', 'full — all tasks, comparable'],
+      ['quick', 'quick — hellaswag + arc_easy + ppl, minutes'],
+      ['control', 'control — mmlu_perm only: MMLU with the options rotated (the position-bias '
+        + 'experiment), ~a fifth of a full MMLU'],
+      ['judged', 'judged — the written exam, graded by the judge'
+        + (state.loop.blocked ? ' (unavailable)' : ''),
+        { disabled: !!state.loop.blocked, title: state.loop.blocked || '' }]],
+      sf.suite || 'full', v => { sf.suite = v; render(); }, { key: 'submit-suite' }),
     note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px',
       'aria-label': 'note', 'data-keep': 'submit-note', value: sf.note,
       oninput: e => { sf.note = e.target.value; } }),
   };
-  for (const o of f.suite.options) o.selected = o.value === sf.suite;
   // judged: the same topic boxes as the topic page. All ticked is the whole
   // exam; one ticked is the loop's usual unit of work
   const built = (state.loop.built || []);
   if (sf.tasks == null && built.length) sf.tasks = [...built];
   const topicBoxes = sf.suite === 'judged' && built.length ? el('div', { 'data-submit-topics': '1' },
     el('p', { class: 'small', text: 'topics in this run:' }), topicPicker(sf, built, 'submit')) : '';
-  f.suite.addEventListener('change', () => render());
   const judgedOff = () => (sf.suite === 'judged' && judgeDown()) || cannotRun(sf.hf_id);
   const btn = el('button', { class: 'primary', text: 'Submit model', onclick: async () => {
     const body = { hf_id: sf.hf_id.trim(), kind: sf.kind, suite: sf.suite,
@@ -7733,8 +8311,8 @@ function vQueue() {
         return t.length ? el('div', { class: 'se', 'data-row-tasks': '1',
           text: t.map(frName).join(', ') }) : ''; })()),
     el('td', { text: r.submitter || '—' }),
-    el('td', {}, el('span', { class: stClass(r.status), text: r.status })),
-    el('td', { class: 'small', text: r.progress || '' },
+    el('td', { 'data-watch': `q|${r.id}|status` }, el('span', { class: stClass(r.status), text: r.status })),
+    el('td', { class: 'small', text: r.progress || '', 'data-watch': `q|${r.id}|progress` },
       // the GPU half finishing is not the job finishing: the judge batch is
       // still out, and the row says how far it is
       r.judge && !r.judge_failed ? el('div', { class: 'se', 'data-judge-progress': judgeCount(r.judge),
@@ -7749,8 +8327,9 @@ function vQueue() {
         el('details', { class: 'small' }, el('summary', { text: 'details' }),
           el('div', { class: 'se', style: 'white-space:pre-wrap;overflow-wrap:anywhere',
             text: [r.error, r.judge && r.judge.error].filter(Boolean).join('\n') })))
-        : r.error ? el('div', { class: 'down', text: r.error }) : ''),
-    el('td', { class: 'num', text: r.gpu_seconds ? Math.round(r.gpu_seconds / 60) + ' min' : '—' }),
+        : r.error ? clampText(r.error, 'q' + r.id) : ''),
+    el('td', { class: 'num nowrap', text: r.gpu_seconds
+      ? Math.max(1, Math.round(r.gpu_seconds / 60)) + '\u00a0min' : '—' }),
     el('td', { class: 'rowacts' }, queueActions(r)));
   // ---- queue filter + sort: a long shared queue needs "my jobs, failures first" ----
   const QCOLS = [
@@ -7820,7 +8399,10 @@ function vQueue() {
     const pg = paged('queue', rs, JSON.stringify([state.qQ, state.qStatus, state.qSort]),
                      rebuildQueue, 25, true);
     if (pg.pager.parentNode !== qPager) qPager.replaceChildren(pg.pager);
+    const was = snapWatch(qTbody);
     qTbody.replaceChildren(...pg.rows.map(qrow));
+    markChanged(qTbody, was);
+    if (qTbody.isConnected) popReanchor();     // an open ⋯ hangs from the new button
   }
   state.queueRedraw = rebuildQueue;
   rebuildQueue();
@@ -8168,8 +8750,9 @@ function rvProposal(p, llmOk) {
   if (p.status === 'proposed') {
     const ta = el('textarea', { 'aria-label': 'skill spec to approve' });
     ta.value = p.spec_text;
-    const reason = el('input', { type: 'text', placeholder: 'reason (for reject)',
-      style: 'flex:1;min-width:160px', 'aria-label': 'reject reason' });
+    const reason = el('input', { type: 'text', placeholder: 'why reject it?',
+      style: 'flex:1;min-width:160px', 'aria-label': 'reject reason',
+      'data-reject-reason': String(p.id), 'data-keep': 'reject-' + p.id });
     // 11e: the plan is part of what is approved, so it is shown beside the
     // spec — and Approve freezes it. The box survives a poll: it lives in state
     state.rv.spread = state.rv.spread || {};
@@ -8194,13 +8777,22 @@ function rvProposal(p, llmOk) {
       ta,
       el('div', { class: 'planbox', 'data-plan-decide': String(p.id) },
         el('div', { class: 'eyebrow', text: 'Where the documents go' }), planP, boxLabel),
-      el('div', { class: 'frm' },
+      // 11f: the decide row is one action cell — Approve, and Reject behind
+      // ⋯, which asks for its reason in place
+      el('div', { class: 'decide' }, actCell('rv-' + p.id,
         el('button', { class: 'primary', text: 'Approve this spec', onclick: () => rvPost(
           `api/proposals/${p.id}/approve`, { approver: whoName(), edited_text: ta.value,
             spread: state.rv.spread[p.id] !== false && !box.disabled }) }),
+        [{ label: 'Reject…', act: 'reject', run: () => {
+          state.rv.rejecting = { ...(state.rv.rejecting || {}), [p.id]: true };
+          state.after = { focus: `[data-reject-reason="${p.id}"]` }; render(); } }],
+        { style: 'justify-content:flex-start' })),
+      (state.rv.rejecting || {})[p.id] ? el('div', { class: 'frm', 'data-reject-form': String(p.id) },
         reason,
-        el('button', { text: 'Reject', onclick: () => rvPost(
-          `api/proposals/${p.id}/reject`, { approver: whoName(), reason: reason.value }) })));
+        el('button', { class: 'danger', text: 'Reject', onclick: () => rvPost(
+          `api/proposals/${p.id}/reject`, { approver: whoName(), reason: reason.value }) }),
+        el('button', { class: 'ghost', text: 'Cancel', onclick: () => {
+          state.rv.rejecting[p.id] = false; render(); } })) : '');
   }
   if (p.status === 'approved') {
     const count = el('input', { type: 'number', value: '20', min: '1', max: '1000',
@@ -8436,8 +9028,11 @@ function modelAnswers(m, cats) {
   const wrap = el('div', { 'data-panel': 'model-answers' },
     el('div', { class: 'dxh', text: 'The answers, topic by topic' }),
     el('div', { class: 'frm' },
-      mkSel('answers topic', topics.map(t => [t, t]), topic,
-        v => { state.ans.topic = v; state.ans.rows = null; render(); }),
+      Combobox('answers topic', topicGroups(topics, t => {
+          const x = Object.entries((m.judge || {}).tasks || {}).find(([k]) => frName(k) === t);
+          return x ? pubScore(x[1]) : null; }, !judgedOkM(m)), topic,
+        v => { state.ans.topic = v; state.ans.rows = null; render(); },
+        { key: 'answers-topic', placeholder: 'find a topic' }),
       el('a', { class: 'small', href: '#topic=' + slugOfTopic(topic),
         text: 'this topic\u2019s page in the loop',
         onclick: e => { e.preventDefault(); navigate({ topic: slugOfTopic(topic), model: null }); } })));
@@ -8606,7 +9201,13 @@ function loopBtn(r) {
     class: st.ok ? (st.label.endsWith('…') ? 'secondary dot-warn' : 'primary') : null,
     title: st.ok ? '' : st.why, text: st.label,
     onclick: () => loopGo(r, st.step) });
-  return el('div', {}, b,
+  // 11f: the one action cell — the next step, and the rest behind ⋯
+  const items = [
+    { label: 'Open the topic', act: 'topic', run: () => loopGo(r, 'topic') },
+    r.last_judged ? { label: 'Read the results', act: 'read', run: () => loopGo(r, 'read') } : null,
+    r.proposal ? { label: `Open proposal #${r.proposal.id}`, act: 'proposal', run: () => {
+      state.rv.topic = r.topic; navigate({ tab: 'review', topic: null }); } } : null];
+  return el('div', {}, actCell('loop-' + r.slug, b, items),
     st.ok ? '' : el('div', { class: 'propwhy', 'data-why': st.step,
       title: st.why, text: st.short || st.why || '' }));
 }
@@ -8708,9 +9309,10 @@ function vLoop() {
       + 'the API\'s own, in its words — this table asks, it does not decide.')),
     el('div', { class: 'frm' },
       el('label', { class: 'small', for: 'loopModel' }, el('b', { text: 'Results for ' })),
-      models.length ? mkSel('results for', models.map(m => [m.id,
-          `${m.name} — ${m.topics} topic${m.topics > 1 ? 's' : ''}`]), state.loop.model,
-        v => { state.loop.model = v; state.loop.loaded = false; _loopSig = null; loadLoop(); })
+      models.length ? Combobox('results for', modelGroups(models.map(m => ({ id: m.id,
+          judged: m.topics }))), state.loop.model,
+        v => { state.loop.model = v; state.loop.loaded = false; _loopSig = null; loadLoop(); },
+        { key: 'loop-model', placeholder: 'find a model' })
         : el('span', { class: 'se', text: 'no model has sat the exam yet' }),
       el('a', { class: 'small', href: 'guide#the-loop', target: '_blank', rel: 'noopener',
         text: 'what the loop is and whose job each step is' })),
@@ -8719,7 +9321,7 @@ function vLoop() {
     judgeOfflineLine(),
     state.loop.msg ? el('p', { class: 'small', 'data-loop-msg': '1', text: state.loop.msg }) : '',
     loopFailure(), loopCaveats(rows));
-  const sel = head.querySelector('select[aria-label="results for"]');
+  const sel = head.querySelector('[aria-label="results for"]');
   if (sel) sel.id = 'loopModel';
   if (!state.loop.loaded)
     return [head, el('div', { class: 'card' }, el('p', { class: 'small',
@@ -8785,7 +9387,7 @@ function vLoop() {
       el('td', { class: 'small' }, r.datasets.length
         ? r.datasets.map(d => el('div', { class: 'se', text: `#${d.id} ${d.status}` }))
         : el('span', { class: 'se', text: '—' })),
-      el('td', {}, loopBtn(r)));
+      el('td', { class: 'rowacts' }, loopBtn(r)));
   };
   const fold = empty.length ? el('tr', { 'data-empty-topics': String(empty.length) },
     el('td', { colspan: '6', class: 'small' },
@@ -8961,9 +9563,8 @@ function loopSitPanel(r) {
       modelBox('sit', s.model, v => { s.model = v; },
         it => { s.model = it.id; if (it.kind) s.kind = it.kind; render(); },
         { 'aria-label': 'model id', placeholder: 'search: org/model, or local/<name>' }),
-      el('select', { 'aria-label': 'kind', onchange: e => { s.kind = e.target.value; } },
-        ['auto', 'base', 'instruct'].map(v => el('option', { value: v,
-          selected: s.kind === v ? '' : null, text: v === 'auto' ? 'kind: auto-detect' : 'kind: ' + v }))),
+      Select('kind', [['auto', 'kind: auto-detect'], ['base', 'kind: base'],
+        ['instruct', 'kind: instruct']], s.kind || 'auto', v => { s.kind = v; }, { key: 'sit-kind' }),
       rvNameInput(),
       el('button', { 'data-sit': '1',
         disabled: (state.loop.blocked || s.busy || judgeDown() || cannotRun(s.model))
@@ -9151,8 +9752,9 @@ function loopAnswersPanel(r) {
     return t && pubScore(t) != null ? ` — ${num(pubScore(t), 2)} / 4` : ''; };
   card.append(el('div', { class: 'frm' },
     el('span', { 'data-answers-model': '1' },
-      mkSel('model', models.map(m => [m, m + scoreOf(m)]), want,
-        v => { state.ans.model = v; state.ans.rows = null; a.fresh[r.task] = []; render(); })),
+      Combobox('model', modelGroups(models.map(id => ({ id, right: scoreOf(id).replace(/^ — /, '') }))),
+        want, v => { state.ans.model = v; state.ans.rows = null; a.fresh[r.task] = []; render(); },
+        { key: 'answers-model', placeholder: 'find a model' })),
     fresh.length ? el('span', { class: 'badge new', 'data-new-model': fresh.join(','),
       text: 'new: ' + fresh.join(', ') }) : '',
     el('a', { class: 'small', href: '#model=' + encodeURIComponent(want),
@@ -9220,7 +9822,7 @@ function loopOutputPanel(r) {
     card.append(el('div', { class: 'dxh', text: 'Datasets from this topic' }));
     card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-datasets-table': '1' },
       el('thead', {}, el('tr', {}, el('th', { text: 'dataset' }), el('th', { class: 'num', text: 'documents' }),
-        el('th', { text: 'hand to training' }))),
+        el('th', { text: 'hand to training' }), el('th', { class: 'num', text: '' }))),
       el('tbody', {}, ready.map(d => el('tr', { 'data-dataset': String(d.id) },
         el('td', {}, el('a', { href: `api/datasets/${d.id}`, target: '_blank', rel: 'noopener',
           text: `#${d.id}` }), ' ', overBadge(d.over_provisional_judge),
@@ -9232,7 +9834,14 @@ function loopOutputPanel(r) {
         el('td', { class: 'num', text: String(d.kept ?? d.count) }),
         el('td', {}, el('code', { class: 'mono', text: `--gap-dataset ${d.id}` }),
           el('div', { class: 'se', text: 'the training run that consumes it registers it, and '
-            + 'its checkpoints carry the taint badge on this topic' }))))))));
+            + 'its checkpoints carry the taint badge on this topic' })),
+        el('td', { class: 'rowacts' }, actCell('ds-' + d.id,
+          el('a', { class: 'btn ghost', 'data-ds-download': String(d.id), text: 'Download',
+            href: `api/datasets/${d.id}/items.jsonl`, download: '' }),
+          [{ label: 'Copy the training flag', act: 'copy-flag',
+             run: () => copyText(`--gap-dataset ${d.id}`) },
+           { label: 'Copy dataset id', act: 'copy-id', run: () => copyText(String(d.id), '#' + d.id) }]))
+        ))))));
   } else if (r.datasets.length) {
     card.append(note('A dataset for this topic is being generated — it appears here when the '
       + 'batch completes and the contamination gate has run.'));
@@ -9371,12 +9980,10 @@ function eximpState() {
 
 function exImport() {
   const s = eximpState();
-  const topicSel = el('select', { 'aria-label': 'topic', onchange: e => {
-    s.topic = e.target.value; s.preview = null; render(); } },
-    el('option', { value: '', text: 'topic…' }),
-    // the topic list is categories.yaml's, the same spine the bank uses
-    ...Object.values((DATA.judged || {}).topics || {}).map(t =>
-      el('option', { value: t, text: t, selected: s.topic === t ? '' : null })));
+  // the topic list is categories.yaml's, the same spine the bank uses
+  const topicSel = Combobox('topic', topicGroups(Object.values((DATA.judged || {}).topics || {})),
+    s.topic || '', v => { s.topic = v; s.preview = null; render(); },
+    { key: 'import-topic', placeholder: 'topic…' });
   const fileIn = el('input', { type: 'file', accept: '.json,application/json',
     'aria-label': 'questions file', 'data-keep': 'import-file', onchange: async e => {
       const f = e.target.files[0]; if (!f) return;
@@ -9634,10 +10241,9 @@ function exRubricUpload(st) {
   const p = st.preview;
   return el('div', { style: 'margin-top:10px', 'data-upload': st.name },
     el('div', { class: 'frm' },
-      el('select', { 'aria-label': 'which file', onchange: e => {
-        st.kind = e.target.value; st.preview = null; render(); } },
-        el('option', { value: 'rubric', text: `${st.name}.md (prose)` }),
-        el('option', { value: 'criteria', text: `${st.name}.criteria.json` })),
+      Select('which file', [['rubric', `${st.name}.md (prose)`],
+        ['criteria', `${st.name}.criteria.json`]], st.kind || 'rubric',
+        v => { st.kind = v; st.preview = null; render(); }, { key: 'upload-' + st.name }),
       el('input', { type: 'file', accept: '.md,.json,text/markdown,application/json',
         'aria-label': 'new file', onchange: async e => {
           const f = e.target.files[0]; if (!f) return;
@@ -9782,6 +10388,14 @@ function render() {
   // in — and where their caret is — comes back afterwards, or the field is
   // unusable on a live page: this is the same bug as the tab bar's, one layer
   // down, and the cure is the same one (never lose what the DOM was holding).
+  // 11f: did this render change the view (a tab, a model, a topic)? Only a
+  // navigation moves the scroll or plays the entrance; a poll never does
+  const vk = viewKey(), changed = _lastView != null && vk !== _lastView;
+  const nav = _navigated && changed;
+  _lastView = vk; _navigated = false;
+  const aimed = !!(state.after && state.after.scroll);
+  // a value a poll changed is marked for a moment: what the view said before
+  const was = changed ? null : snapWatch(view);
   const live = document.activeElement;
   const keep = live && live.dataset && live.dataset.keep && view.contains(live)
     ? { key: live.dataset.keep, value: live.value,
@@ -9819,11 +10433,39 @@ function render() {
     if (e) e.scrollLeft = x;
   }
   hfadeUpdate(view);
+  if (was) markChanged(view, was);
+  if (nav) {
+    view.classList.remove('view-enter');
+    void view.offsetWidth;                     // restart the entrance
+    view.classList.add('view-enter');
+    view.addEventListener('animationend', function done(ev) {
+      if (ev.target !== view) return;
+      view.classList.remove('view-enter'); view.removeEventListener('animationend', done); });
+  }
+  if (_restore) {
+    const r = _restore;
+    scrollTo(0, r.y);
+    if (Math.abs(scrollY - r.y) < 2 || Date.now() > r.until) _restore = null;
+  } else if (changed && !aimed) scrollTo(0, 0);
   numberSections();
   if (state.model) watchSections();
   // an open popover keeps its panel, its scroll and its focus across a render;
   // only its button is a new node
   popReanchor();
+}
+
+// 11f: a value a poll changed — a score, a status, a count — is washed for a
+// moment. What the view said before, keyed by data-watch, against what it says now
+const snapWatch = root => new Map([...root.querySelectorAll('[data-watch]')]
+  .map(e => [e.dataset.watch, e.textContent]));
+function markChanged(root, was) {
+  if (!was || !was.size) return;
+  for (const e of root.querySelectorAll('[data-watch]')) {
+    const before = was.get(e.dataset.watch);
+    if (before == null || before === e.textContent) continue;
+    e.classList.add('changed');
+    e.addEventListener('animationend', () => e.classList.remove('changed'), { once: true });
+  }
 }
 
 // how long a row or card a button took you to stays marked
@@ -9899,6 +10541,7 @@ function popPlace() {
   const top = flip ? Math.max(POP_EDGE, r.top - 4 - Math.min(pr.height, room)) : r.bottom + 4;
   let left = (opts || {}).placement === 'bottom-end' ? r.right - pr.width : r.left;
   left = Math.min(Math.max(POP_EDGE, left), Math.max(POP_EDGE, innerWidth - POP_EDGE - pr.width));
+  panel.classList.toggle('flip', flip);        // it comes in from the side away from its button
   panel.style.top = `${Math.min(top, innerHeight - POP_EDGE - Math.min(pr.height, room))}px`;
   panel.style.left = `${left}px`;
   panel.style.maxHeight = `${room}px`;
@@ -9907,7 +10550,18 @@ function popPlace() {
 function popClose(backToButton = false) {
   const { panel, anchor } = POP;
   if (!panel) return;
-  panel.remove();
+  // 11f: it leaves in half the time it came. What fades is a ghost — no
+  // key, no ids, inert — so nothing can find or click a closed panel
+  if (motionOff()) panel.remove();
+  else {
+    panel.removeAttribute('data-pop');
+    for (const e of [panel, ...panel.querySelectorAll('[id]')]) e.removeAttribute('id');
+    for (const a of ['role', 'aria-label']) panel.removeAttribute(a);
+    panel.setAttribute('aria-hidden', 'true');
+    panel.inert = true;
+    panel.classList.add('pop-out');
+    setTimeout(() => panel.remove(), 150);
+  }
   if (anchor && anchor.isConnected) anchor.setAttribute('aria-expanded', 'false');
   POP.key = POP.panel = POP.anchor = POP.opts = POP.build = null;
   if (backToButton && anchor && anchor.isConnected) anchor.focus();
@@ -9920,11 +10574,14 @@ function popOpen(key, anchor, panel, opts = {}) {
   POP.key = key; POP.panel = panel; POP.anchor = anchor; POP.opts = opts;
   panel.dataset.pop = key;
   panel.classList.add('pop');
+  if (!motionOff()) panel.classList.add('pop-in');
   if (opts.menu !== false) panel.setAttribute('role', 'menu');
   document.body.append(panel);
   anchor.setAttribute('aria-expanded', 'true');
   popPlace();
-  const first = panel.querySelector('[aria-current],[aria-checked=true]') || popItems()[0]
+  requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.remove('pop-in')));
+  const first = (opts.focus && panel.querySelector(opts.focus))
+    || panel.querySelector('[aria-current],[aria-checked=true]') || popItems()[0]
     || panel.querySelector('input,select,textarea,button');
   if (first) first.focus();
 }
@@ -10002,7 +10659,11 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'Home') { e.preventDefault(); list[0].focus(); }
   else if (e.key === 'End') { e.preventDefault(); list[list.length - 1].focus(); }
 });
-addEventListener('scroll', () => popPlace(), true);
+// the page scrolling moves the button, so the panel follows; the panel's own
+// scroll does not — measured at full height mid-scroll, it would flip above
+addEventListener('scroll', e => {
+  if (POP.panel && e.target instanceof Node && POP.panel.contains(e.target)) return;
+  popPlace(); }, true);
 addEventListener('resize', () => popPlace());
 
 // ---------------------------------------------------------------------------
@@ -10052,7 +10713,10 @@ function renderTabs() {
       { key: 'more' });
     tabs.replaceChildren(...main.map(([id, label]) =>
       el('button', { role: 'tab', 'data-tab': id, onclick: () => go(id), text: label })),
-      el('div', { class: 'morewrap' }, moreBtn));
+      el('div', { class: 'morewrap' }, moreBtn),
+      // 11f: one underline, which slides from the old tab to the new one
+      el('span', { class: 'tab-ink still', id: 'tabInk', 'aria-hidden': 'true' }));
+    window.addEventListener('resize', () => placeInk(true));
   }
   const sel = state.model ? '' : state.tab;
   for (const b of tabs.querySelectorAll('button[role=tab][data-tab]'))
@@ -10061,6 +10725,20 @@ function renderTabs() {
   const moreBtn = document.getElementById('moreBtn');
   moreBtn.textContent = (inMore ? inMore[1] : 'More') + ' ▾';
   moreBtn.setAttribute('aria-selected', String(!!inMore));
+  placeInk();
+}
+
+function placeInk(still) {
+  const ink = document.getElementById('tabInk');
+  const b = document.querySelector('#tabs [role=tab][aria-selected=true]');
+  if (!ink) return;
+  if (!b) { ink.style.opacity = '0'; return; }
+  if (still) ink.classList.add('still');
+  ink.style.opacity = '1';
+  ink.style.transform = `translateX(${b.offsetLeft}px) scaleX(${b.offsetWidth})`;
+  // the first placement (and a resize) jumps; every move after that slides
+  if (ink.classList.contains('still'))
+    requestAnimationFrame(() => requestAnimationFrame(() => ink.classList.remove('still')));
 }
 
 // The board's checks: one line on every tab — "6 checks · 3 about the
@@ -10319,6 +10997,14 @@ async function loadQueue() {
 }
 
 const THEMES = ['auto', 'light', 'dark', 'dim'];
+// 11f: the colours cross-fade for 250ms on a person's change, never at load
+function themeFade() {
+  if (motionOff()) return;
+  const r = document.documentElement;
+  r.classList.add('theme-fade');
+  clearTimeout(themeFade._t);
+  themeFade._t = setTimeout(() => r.classList.remove('theme-fade'), 260);
+}
 function applyTheme(t) {
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', t);
@@ -10338,7 +11024,7 @@ function applyTheme(t) {
       'aria-label': 'theme' },
     THEMES.map(t => el('button', { role: 'menuitemradio', 'data-theme': t,
       'aria-checked': String(THEMES[themeIdx] === t), text: labels[t],
-      onclick: () => { themeIdx = THEMES.indexOf(t); applyTheme(t); popClose(true); } }))),
+      onclick: () => { themeIdx = THEMES.indexOf(t); themeFade(); applyTheme(t); popClose(true); } }))),
     { key: 'theme', placement: 'bottom-end' });
 })();
 let themeIdx = 0;

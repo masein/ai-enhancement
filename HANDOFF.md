@@ -1007,6 +1007,97 @@ sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "
 6. At 400 px: the Leaderboard shows the Avg column, the header is two rows,
    and the chart text is readable.
 
+### 11f — masein's seven
+
+Brief: the second half of `docs/prompts/phase-11e-live-check.md`. One PR.
+**The one rule changed on purpose:** the ± error is no longer on every cell.
+It is the cell's tooltip (hover or focus), it is in the opened row, and
+**Columns ▾ › Show ± errors** (off by default, remembered in this browser)
+puts it on every cell. Bold keeps its meaning — best in the column or within
+its noise — and no provisional score is bold, tinted, averaged or ranked.
+
+- **The Leaderboard header** is one line of one-word names (`ARC-C`,
+  `TRUTHFULQA`, `JUDGED`, `UPDATED`…) under a muted group row with a hairline
+  bracket, and the group row is only on **All tasks**. The n-shot, the unit
+  and the scale are each name's tooltip (focusable, dotted underline on
+  hover); the ⓘ icons are gone. The JUDGED column is there only while some
+  model on the page has a judged average. Dates read `15 Sep`, with the year
+  only when it is not this one. One mono caption under the table says what
+  bold means.
+- **Cells** hold the number. `lbLeaders()` replaced the five rank-fifth
+  tint steps: a column's leaders — its best, and every score the z-test
+  cannot tell from it (1% band for a lower-is-better column) — are bold and
+  tinted `--heat-3`; every other cell is plain. Computed over the whole
+  board, so a filter never changes them. The ●/≈ glyphs are gone from the
+  Leaderboard and Top models, which follows the same rule.
+- **Opening a row** is one motion: `grid-template-rows` 0fr→1fr, a fade and
+  a 4px rise, 200ms, only when a person toggles it (`state.lbAnim`, used
+  once). A poll, a sort or a pasted link draws it open, still. The chevron
+  turns 90° over 150ms. Closing plays it back; the row leaves the DOM after
+  `transitionend`. The panel reads as the row's continuation (its accent bar,
+  a faint wash, rounded below), with **✕ Close**; Esc on the row or ✕ gives
+  the chevron the focus back. **Tasks** is a compact list — name, score, a
+  thin bar on the column's scale, rank — and **Links** a list of link
+  buttons.
+- **A new page starts at the top.** `navigate()` and every in-page `#…`
+  link push an entry that remembers where it came from; each entry keeps its
+  `scrollY` in `history.state`. Back/Forward restore it (retrying while the
+  view loads, until the person scrolls); "← Back to …" is Back when the entry
+  before is that view. Sorting, paging, chips, opening a row and polls never
+  move the scroll; a button aimed at a section still lands on it.
+- **One motion system:** `--dur-1/2/3` (120/180/240ms), `--ease`, all 0
+  under reduced motion. Button colours ease and a press scales to .98; one
+  tab underline slides; popovers come in 4px from the side away from their
+  button and leave in half the time (a keyless, inert ghost fades, so
+  nothing finds a closed panel); toasts rise and fade; a new view — after a
+  navigation, never a poll — fades up 6px; a value a poll changed
+  (`data-watch`: Leaderboard cells, Queue status and progress) gets a 1.2s
+  wash; a theme change cross-fades for 250ms. Transitions touch only
+  opacity, transform, grid rows and colours.
+- **One action cell** (`actCell`) for every table with actions: the row's
+  next step as its one button — a ghost, except **Retry grading**, which is
+  filled — and the rest in a `⋯` menu on the shared popover (Log, Resubmit,
+  Copy id, Open model page). Used by the Queue, the Loop board, the topic
+  page's datasets and the Review card's decide row (**Reject…** is in its
+  `⋯` and asks for its reason in place). The GPU cell never wraps; a long
+  failure is two lines and "details ▸".
+- **No native `<select>` in the view.** `Select` (short lists: a button and
+  a listbox — ↑↓, Home/End, typeahead, Enter, Esc) and `Combobox` (topics and
+  models: a search field over a grouped list, `aria-activedescendant`).
+  Topics are grouped by the 8 areas, weakest first, with the score and a
+  tiny bar; the model page's picker replaced a select and its "find a topic"
+  box. Both keep `.value` and fire `change`, so the code around them did not
+  change shape. Tests pick with `conftest.choose()` and read with `choice()`.
+- Found on the way: a sticky table header sat over the first row inside the
+  sideways scroller below 900px, and scrolling inside a tall popover flipped
+  it up under the bar. Both fixed.
+- The browser tests run with **reduced motion** by default (`page` fixture);
+  the motion is tested with it on, in contexts of their own.
+
+**Deploy steps, after 11f merges.** Code only, no data step.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+```
+
+**Expected output:**
+
+1. `up -d --build` ends with the container healthy; the image build prints
+   `image files OK`.
+2. The log grep prints `no errors`.
+3. After a hard reload, at 1,512 px: the Leaderboard header is one line of
+   names under a quiet group row; cells hold only numbers; the leaders are
+   bold and tinted and there is no blue slab. Opening a row glides open in
+   about 0.2s and closes the same way; a poll never replays it.
+4. Scroll down any page and open another: it starts at the top, and Back
+   returns to where you were.
+5. Every Queue row shows one tidy button and `⋯`, and no GPU cell wraps.
+   There are no native dropdowns; the model page's topic picker is a
+   searchable list grouped by area.
+6. With macOS reduced motion on (System Settings › Accessibility › Display),
+   nothing moves.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

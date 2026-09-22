@@ -13,7 +13,7 @@ import pytest
 
 import exam_build as eb
 import report_lm_eval as report
-from conftest import fresh, go_tab, make_service, set_name
+from conftest import choice, choose, fresh, go_tab, make_service, set_name
 from test_page_recovery import Live
 
 MODEL = "fx/good-750m"
@@ -93,7 +93,7 @@ def test_the_next_step_is_the_same_for_everyone(svc):
 # ---------------------------------------------------------------------------
 
 def routed(browser, payload, width=1512, height=900):
-    ctx = browser.new_context(viewport={"width": width, "height": height})
+    ctx = browser.new_context(viewport={"width": width, "height": height}, reduced_motion="reduce")
     return ctx, Live(ctx, payload, fail=False)
 
 
@@ -203,13 +203,13 @@ def test_the_loop_board_shows_one_model_and_what_it_has_not_sat(live, page):
     app._cache.update(key=None, payload=None, at=0.0)
     try:
         page.goto(base + "/#tab=loop")
-        sel = page.locator("select[aria-label='results for']")
+        sel = page.locator("[aria-label='results for']")
         sel.wait_for()
-        default = sel.input_value()
+        default = choice(sel)
         for cell in page.locator("[data-loop-score]").all():
             v = cell.get_attribute("data-loop-score")
             assert v in ("", default)
-        sel.select_option("fx/chance-160m")
+        choose(sel, "fx/chance-160m")
         page.wait_for_function("state.loop.model === 'fx/chance-160m' && state.loop.loaded")
         # weakest first: a topic this model has not sat comes after every one it
         # has, on the second page of 36 — the search finds it (10c)
@@ -261,7 +261,7 @@ def test_empty_topics_fold_and_import_carries_the_topic(live, page):
         # chosen, the file picker focused
         row.locator("button[data-step='import']").click()
         page.wait_for_selector("[data-panel='import']")
-        assert page.locator("[data-panel='import'] select[aria-label='topic']").input_value() \
+        assert choice(page.locator("[data-panel='import'] [aria-label='topic']")) \
             == "Mathematics & Statistics"
         page.wait_for_function("document.activeElement && document.activeElement.type === 'file'")
         assert page.errors == []

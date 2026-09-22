@@ -480,6 +480,7 @@ def test_every_highlight_value_is_one_line(live, page, width):
 @pytest.fixture
 def phone(browser):
     ctx = browser.new_context(viewport={"width": 400, "height": 860}, device_scale_factor=2,
+                              reduced_motion="reduce",
                               is_mobile=True, has_touch=True)
     pg = ctx.new_page()
     errors = []

@@ -65,10 +65,8 @@ def test_a_chip_shows_exactly_its_groups_columns(live, page, chip, want):
       .map(t => t.dataset.task)""")
     have = page.evaluate("DATA.accTasks")
     assert tasks == [t for t in want if t in have]
-    # the group sits over its columns, in the first header row
-    grp = page.locator(f"{LB} thead tr.grp th:not(.nogrp)").all_text_contents()
-    assert grp == [{"commonsense": "Commonsense", "reasoning": "Reasoning", "math": "Math",
-                    "truthfulness": "Truthfulness"}[chip]] if tasks else True
+    # 11f: a chip is one group, so it has no group row — that row is All tasks'
+    assert page.locator(f"{LB} thead tr.grp").count() == 0
     assert f"chip={chip}" in page.evaluate("location.hash")
     assert page.errors == []
 
@@ -140,42 +138,41 @@ def test_judged_topics_is_disabled_and_says_why_while_provisional(live, page):
 # the rank tint
 # ---------------------------------------------------------------------------
 
-def steps(page, col):
+def leads(page, col):
+    """11f: which rows lead a column — its best, or inside its noise."""
     return page.evaluate(f"""() => Object.fromEntries([...document.querySelectorAll(
       '{LB} tbody tr[data-lb-row]')].map(tr => {{
-        const i = [...tr.parentElement.closest('table').querySelectorAll('thead tr:not(.grp) th')]
+        const i = [...tr.parentElement.closest('table').querySelectorAll('thead tr.names th')]
           .findIndex(th => th.dataset.col === '{col}');
         const td = tr.children[i];
-        return [tr.dataset.lbRow, td ? td.dataset.step || null : null]; }}))""")
+        return [tr.dataset.lbRow, !!(td && td.dataset.lead)]; }}))""")
 
 
-def test_the_tint_is_the_whole_boards_rank_and_a_filter_never_changes_it(live, page):
+def test_the_leaders_are_the_whole_boards_and_a_filter_never_changes_them(live, page):
     open_lb(page, live["base"])
-    before = steps(page, "avg")
-    ranked = [k for k, v in before.items() if v]
-    assert len(ranked) >= 5
-    assert before[TOP] == "5"                              # the leader is the top step
-    assert set(before.values()) - {None} <= {"1", "2", "3", "4", "5"}
-    # narrow the rows to the bottom of the board: the colours stay
+    before = leads(page, "hellaswag")
+    assert before[TOP] and 1 <= sum(before.values()) < len(before)
+    # narrow the rows to the bottom of the board: nobody there becomes a leader
     page.locator("#pill-size").click()
     page.locator("#pop-size [data-choice='s']").click()
     page.wait_for_selector("#pill-size[data-value='s']")
-    after = steps(page, "avg")
+    after = leads(page, "hellaswag")
     assert after and all(before[k] == v for k, v in after.items())
     assert TOP not in after
     assert "size=s" in page.evaluate("location.hash")
     assert page.errors == []
 
 
-def test_a_cell_the_z_test_cannot_tell_from_the_best_shares_the_top_step(live, page):
+def test_a_cell_the_z_test_cannot_tell_from_the_best_is_a_leader_too(live, page):
     open_lb(page, live["base"])
     found = page.evaluate(f"""() => {{
       const out = [];
-      for (const td of document.querySelectorAll('{LB} tbody td.tiebest[data-step]'))
-        out.push([td.dataset.step, getComputedStyle(td.querySelector('b')).fontWeight]);
+      for (const td of document.querySelectorAll('{LB} tbody td.lead[data-tip]'))
+        if (JSON.parse(td.dataset.tip).includes('within the noise of the best'))
+          out.push([(td.getAttribute('style') || ''), getComputedStyle(td.querySelector('b')).fontWeight]);
       return out; }}""")
     assert found, "the fixture has a pair inside the noise at the top of a column"
-    assert all(s == "5" and int(w) >= 700 for s, w in found)
+    assert all("--heat-3" in st and int(w) >= 700 for st, w in found)
     # and the z-test agrees: the pair is in DATA.sig as not significant
     assert page.evaluate("""() => DATA.accTasks.some(t => (DATA.sig[t] || []).some(r => !r[4]))""")
     assert page.errors == []
@@ -189,7 +186,7 @@ def test_no_provisional_cell_is_ever_tinted(live, page):
         page.wait_for_selector(f"[data-chip='{chip}'][aria-pressed='true']")
         tinted = page.evaluate(f"""() => [...document.querySelectorAll(
           '{LB} tbody td[data-judged-avg], {LB} tbody td[data-jarea-cell]')]
-          .filter(td => td.dataset.step).length""")
+          .filter(td => td.dataset.lead || (td.getAttribute('style') || '').includes('--heat')).length""")
         assert tinted == 0
     # no judged average exists for a provisional judge at all: judged_avg()
     assert page.evaluate("DATA.models.every(m => m.judgedAvg == null)")

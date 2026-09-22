@@ -8,6 +8,7 @@ import re
 
 import pytest
 
+from conftest import choice, choose
 from test_the_five_asks import PROVISIONAL, make_provisional
 
 pytestmark = pytest.mark.dashboard
@@ -45,7 +46,7 @@ def test_a_keyboard_pick_fills_the_box_and_sets_the_kind(live, page, monkeypatch
     box.press("Enter")
     page.wait_for_selector("#ms-list-sit[hidden]", state="attached")
     assert page.locator("[data-ms='sit'] input").input_value() == "fx/good-750m-tuned-skill"
-    assert page.get_by_label("kind", exact=True).first.input_value() == "base"
+    assert choice(page.get_by_label("kind", exact=True).first) == "base"
     # a Hub model with an instruct name: picked with Tab, the kind follows its name
     box = page.locator("[data-ms='sit'] input")
     box.fill("")
@@ -55,7 +56,7 @@ def test_a_keyboard_pick_fills_the_box_and_sets_the_kind(live, page, monkeypatch
     box.press("Tab")
     assert page.locator("[data-ms='sit'] input").input_value() == \
         "HuggingFaceTB/SmolLM2-135M-Instruct"
-    assert page.get_by_label("kind", exact=True).first.input_value() == "instruct"
+    assert choice(page.get_by_label("kind", exact=True).first) == "instruct"
     assert page.errors == []
 
 
@@ -117,7 +118,7 @@ def test_submit_has_the_same_search(live, page):
 @pytest.mark.parametrize("width", [1280, 1512])
 @pytest.mark.parametrize("slug,criteria", [("medicine_clinical_health", 20), ("law", 20)])
 def test_the_answers_never_scroll_sideways(live, browser, width, slug, criteria):
-    ctx = browser.new_context(viewport={"width": width, "height": 900})
+    ctx = browser.new_context(viewport={"width": width, "height": 900}, reduced_motion="reduce")
     pg = ctx.new_page()
     try:
         pg.goto(f"{live['base']}/#topic={slug}")
@@ -145,7 +146,7 @@ def test_the_answers_never_scroll_sideways(live, browser, width, slug, criteria)
 
 
 def test_under_800_px_the_score_drops_below_the_text(live, browser):
-    ctx = browser.new_context(viewport={"width": 700, "height": 900})
+    ctx = browser.new_context(viewport={"width": 700, "height": 900}, reduced_motion="reduce")
     pg = ctx.new_page()
     try:
         pg.goto(f"{live['base']}/#topic=law")
@@ -165,8 +166,11 @@ def test_a_criterion_below_half_is_a_filter(live, page):
     page.wait_for_selector("[data-answers-table] [data-answer]")
     before = int(page.locator("[data-answer-count]").first.get_attribute("data-answer-count"))
     sel = page.get_by_label("criterion filter")
-    assert "any criterion below 0.5" in sel.text_content()
-    sel.select_option("any")
+    sel.click()
+    assert "any criterion below 0.5" in page.locator(
+        "[role=listbox][aria-label='criterion filter']").text_content()
+    page.keyboard.press("Escape")
+    choose(sel, "any")
     page.wait_for_function("n => +document.querySelector('[data-answer-count]').dataset.answerCount <= n",
                            arg=before)
     assert page.errors == []
@@ -226,8 +230,8 @@ def test_it_never_reloads_while_someone_is_typing(live, page):
 
 def open_topic_for(page, base, slug, model=MODEL):
     page.goto(f"{base}/#topic={slug}")
-    page.wait_for_selector("[data-panel='answers'] select[aria-label='model']")
-    page.locator("[data-panel='answers'] select[aria-label='model']").select_option(model)
+    page.wait_for_selector("[data-panel='answers'] [aria-label='model']")
+    choose(page.locator("[data-panel='answers'] [aria-label='model']"), model)
     # picking a model re-fetches its answers, and their landing re-renders the
     # page: wait for that, or a click can land on a button being replaced
     page.wait_for_function("m => state.ans.model === m && state.ans.rows && !state.ans.loading",
@@ -325,7 +329,7 @@ def test_the_queue_pages_and_a_poll_keeps_the_page(live, page):
                            timeout=20000)
     assert page.locator("[data-pager='queue'] [aria-current='page']").text_content() == "2"
     # a filter is a different list: back to page 1
-    page.get_by_label("status filter").select_option("done")
+    choose(page.get_by_label("status filter"), "done")
     page.wait_for_function("document.querySelector('[data-queue-table] tbody tr')")
     assert page.locator("[data-pager='queue'] [aria-current='page']").count() == 1
     assert page.locator("[data-pager='queue'] [aria-current='page']").text_content() == "1"

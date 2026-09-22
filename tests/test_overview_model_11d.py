@@ -121,7 +121,9 @@ def test_the_live_cards_are_derived_from_the_board(live, page):
     assert page.locator(".tiles").count() == 0
     # Top models: the table component, the rank, the tint, and a way on
     top = page.locator("[data-top-models]")
-    assert top.locator("td[data-step]").count() == top.locator("tbody tr").count()
+    # 11f: the Leaderboard's rule — the leaders bold and tinted, the rest plain
+    assert 1 <= top.locator("td[data-lead]").count() < top.locator("tbody tr").count()
+    assert top.locator("td[data-lead] b").count() == top.locator("td[data-lead]").count()
     assert top.locator("[data-see-leaderboard]").count() == 1
     assert page.locator("[data-biggest-gap]").count() in (0, 1)
     # the sections run 01 Highlights, 02 Top models, 03 The loop

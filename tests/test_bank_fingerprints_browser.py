@@ -11,6 +11,8 @@ import urllib.request
 
 import pytest
 
+from conftest import choose
+
 pytestmark = pytest.mark.dashboard
 
 MODEL = "fx/good-750m"
@@ -83,9 +85,9 @@ def test_review_the_spec_lands_on_the_proposal_and_marks_it(live, page):
     assert _get(base, f"/api/proposals/{pid}")["status"] == "proposed"
     page.set_viewport_size({"width": 1240, "height": 700})
     page.goto(base + "/#tab=loop")
-    sel = page.locator("select[aria-label='results for']")
+    sel = page.locator("[aria-label='results for']")
     sel.wait_for()
-    sel.select_option(model)
+    choose(sel, model)
     btn = page.locator("tr[data-loop-row='economics'] button[data-step='review']")
     btn.wait_for()
     btn.click()

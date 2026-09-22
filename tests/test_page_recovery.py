@@ -74,7 +74,7 @@ class Live:
 
 @pytest.fixture
 def live(browser, payload):
-    ctx = browser.new_context(viewport={"width": 1240, "height": 900})
+    ctx = browser.new_context(viewport={"width": 1240, "height": 900}, reduced_motion="reduce")
     yield lambda **kw: Live(ctx, payload, **kw)
     ctx.close()
 

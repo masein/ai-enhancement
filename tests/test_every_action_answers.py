@@ -17,7 +17,7 @@ import time
 
 import pytest
 
-from conftest import go_tab, make_service, set_name
+from conftest import choose, go_tab, make_service, set_name
 from test_page_recovery import Live
 
 MODEL = "fx/good-750m"
@@ -184,7 +184,7 @@ def test_a_judged_submit_chooses_its_topics(live, page, monkeypatch):
     monkeypatch.setattr(config, "JUDGE_MODEL", "stub")         # the judged suite is on
     page.goto(live["base"] + "/#tab=queue")
     set_name(page, "Omar")
-    page.get_by_label("suite").select_option("judged")
+    choose(page.get_by_label("suite"), "judged")
     boxes = page.locator("[data-submit-topics] input[data-submit-task]")
     boxes.first.wait_for()
     assert all(boxes.nth(i).is_checked() for i in range(boxes.count()))   # the whole exam
@@ -221,7 +221,7 @@ def test_the_import_panel_labels_its_fields_and_says_when_nothing_is_new(live, p
                     "buffer": json.dumps(content).encode()}])
         page.wait_for_selector("[data-source='law_v2']")
     upload(items)
-    panel.get_by_label("topic").select_option("Law")
+    choose(panel.get_by_label("topic"), "Law")
     panel.get_by_role("button", name="Preview").click()
     page.wait_for_selector("[data-panel='import'] [data-commit='import']")
     btn = panel.locator("[data-commit='import']")
@@ -241,7 +241,7 @@ def test_the_import_panel_labels_its_fields_and_says_when_nothing_is_new(live, p
 @pytest.mark.dashboard
 @pytest.mark.parametrize("width", [1280, 1512])
 def test_no_tab_scrolls_sideways(live, browser, width):
-    ctx = browser.new_context(viewport={"width": width, "height": 900})
+    ctx = browser.new_context(viewport={"width": width, "height": 900}, reduced_motion="reduce")
     pg = ctx.new_page()
     try:
         pg.goto(live["base"] + "/")
@@ -281,7 +281,7 @@ def test_the_leaderboard_shows_six_task_columns_and_says_how_many_are_hidden(bro
     ranked = sorted((m for m in p["models"] if m.get("avg") is not None), key=lambda m: -m["avg"])
     ranked[1].update(duplicateOf=ranked[0]["id"], duplicateOfName=ranked[0]["name"],
                      duplicateWhy="every score and item count is identical")
-    ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+    ctx = browser.new_context(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
     s = Live(ctx, p, fail=False)
     try:
         pg = s.open()
@@ -350,14 +350,19 @@ def test_the_model_page_leads_with_numbers(live, page):
         assert not card.locator("[data-provisional='judge']").is_visible()   # behind "why?"
         why.locator("summary").click()
         assert card.locator("[data-provisional='judge']").is_visible()
-        # one topic's tables at a time, picked from a select (10c: 36 of them)
-        sw = card.locator("select[data-topic-switch] option")
+        # one topic's tables at a time, picked from a searchable list (10c: 36
+        # of them; 11f: a Combobox)
+        box = card.locator("[data-topic-switch]")
+        box.click()
+        sw = page.locator("#pop-cb-mdl-topic [role=option]")
         assert sw.count() >= 2
         assert card.locator("[data-criteria-table]").count() == 1
-        second = sw.nth(1).get_attribute("value")
-        card.locator("select[data-topic-switch]").select_option(second)
+        second = [o.get_attribute("data-value") for o in sw.all()
+                  if o.get_attribute("aria-selected") != "true"][0]
+        page.keyboard.press("Escape")
+        choose(box, second)
         page.wait_for_function("document.querySelectorAll('[data-criteria-table]').length === 1 "
-                               "&& document.querySelector('select[data-topic-switch]').value === "
+                               "&& document.querySelector('[data-topic-switch]').dataset.value === "
                                f"'{second}'")
         # no "Training compute: Unknown" — the hero's cards (11d) say it only when known
         assert "Training compute" not in page.locator("[data-model-hero]").text_content()
