@@ -361,7 +361,7 @@ asserts every delivered file still normalises.
 **The question floor is cleared.** Every topic with questions is at 100,
 about 50 report-half each (the smallest has 40), over the 30 a topic needs
 before anything may be proposed from it. The demo says so rather than asking
-for more. That was true of the two banks here, and it is true of the 36 of
+for more. That was true of the two banks here, and it is true of the 37 of
 §10c.
 
 **What is open with him, and the first is a blocker for calling any score on
@@ -369,7 +369,7 @@ these topics a result:**
 
 1. **Rubric sign-off.** *(moot since phase 10)* The two prose rubrics said
    DRAFT: their 0–4 anchors were derived from his criteria and he had not
-   reviewed them. Both are retired now; none of the 36 rubrics of the
+   reviewed them. Both are retired now; none of the 37 rubrics of the
    37-topic exam says DRAFT. The rule stands for any rubric that does: until
    the word is removed, every judged score for the topic is stamped draft on
    the page, and removing it changes the rubric's hash, which is correct —
@@ -535,8 +535,9 @@ for a person on the box.
 Brief: `docs/prompts/phase-10-knowledge-classification.md` (three PRs:
 10a–10c). Omar's decision (2026-09-21): the 37 folders of
 `docs/Knowledge Classification/` become the exam's topics, named exactly as
-the folders are; 36 hold 100 questions, a criteria file and a prose rubric
-each, written by masein; Arts is empty. The five topics the exam had —
+the folders are; 36 held 100 questions, a criteria file and a prose rubric
+each, written by masein, and Arts was empty — its three files arrived on
+2026-09-22, so all 37 hold them now. The five topics the exam had —
 medicine & health, law, economics, computer science, physics & engineering —
 are retired: their files and judged runs stay, as history.
 
@@ -594,9 +595,10 @@ are retired: their files and judged runs stay, as history.
 
 - **10c — a board with 36 topics, and the phase-9 findings.** The Loop board
   sorts weakest first for the model in "Results for", has a search box and
-  the shared pager at 25; Arts folds into the "topics without questions"
-  line. The Sit panel and Queue → judged share one topic picker: a filter,
-  All / None over what it shows, and "12 of 36 topics · about 1,200 answers ·
+  the shared pager at 25; a topic without questions folds into the "topics
+  without questions" line (Arts did, until its bank arrived). The Sit panel
+  and Queue → judged share one topic picker: a filter,
+  All / None over what it shows, and "12 of 37 topics · about 1,200 answers ·
   about 25 min" — the minutes from the last judged runs (`/api/loop` →
   `pace`: GPU plus judge time per graded item over the last five), never a
   constant. The model page picks a judged topic from a searchable select,
@@ -633,7 +635,7 @@ sudo docker compose exec -T bench python3 scripts/exam_build.py --root /home/mas
 topics at 100 rows each, and the tasks an earlier build wrote for them):
 
 1. `up -d --build` ends with the container healthy. The image build prints
-   `image files OK` — the startup check now covers all 108 delivered files.
+   `image files OK` — the startup check now covers all 111 delivered files.
 2. `retire`, one line per topic. If a bank has more rows under a topic than
    the 100 delivered (questions drafted and accepted there), the counts say
    so; a second run says `retired 0 of 100 rows (100 already retired)`:
@@ -646,18 +648,21 @@ topics at 100 rows each, and the tasks an earlier build wrote for them):
    ```
    A name no row carries is refused with the names the bank holds, and
    exit code 2.
-3. `import-dir`, 36 lines and a total (a second run: `imported 0`, `skipped
-   3600`):
+3. `import-dir`, 37 lines and a total (a second run: `imported 0`, `skipped
+   3700`):
    ```
    Agriculture                                  imported 100  skipped   0  (report 55 / diagnose 45)  source agriculture_v1
    AI & Machine Learning                        imported 100  skipped   0  (report 49 / diagnose 51)  source ai_machine_learning_v1
+   Anthropology & Human Geography               imported 100  skipped   0  (report 49 / diagnose 51)  source anthropology_human_geography_v1
+   Architecture & Built Environment             imported 100  skipped   0  (report 44 / diagnose 56)  source architecture_built_environment_v1
+   Arts                                         imported 100  skipped   0  (report 56 / diagnose 44)  source arts_v1
    …
    Law                                          imported 100  skipped   0  (report 62 / diagnose 38)  source law_v1
    …
    Technology                                   imported 100  skipped   0  (report 49 / diagnose 51)  source technology_v1
-   total: 36 topics, imported 3600, skipped 0 already in the bank — report 1772 / diagnose 1828 · written by masein
+   total: 37 topics, imported 3700, skipped 0 already in the bank — report 1828 / diagnose 1872 · written by masein
    ```
-4. `build`: 36 `exam_*` tasks of 100 items, then the control set and what it
+4. `build`: 37 `exam_*` tasks of 100 items, then the control set and what it
    removed:
    ```
    exam_agriculture                                 100 items  (report 55, diagnose 45)
@@ -665,7 +670,7 @@ topics at 100 rows each, and the tasks an earlier build wrote for them):
    exam_general_multidisciplinary                   100 items  (report 47, diagnose 53)
    fr_control_mmlu                                  240 items  (report 0, diagnose 240)
 
-   36 exam topics built; no questions yet, so no task: Arts
+   37 exam topics built
    MMLU control set: 240 items — up to 10 from each of the 24 topics with MMLU subjects (the old 15-category exam built 150); the other 13 topics have no MMLU subjects
    removed 2 task(s) no longer in the exam: exam_medicine_health, exam_physics_engineering
    ```
@@ -673,9 +678,16 @@ topics at 100 rows each, and the tasks an earlier build wrote for them):
    place with the new questions. If the bank still had the old `other` topic,
    `exam_other` is removed too, and its 40 migrated skill items stay in
    `bank/other.jsonl`, unread.)
-5. `summary`: 37 lines, 36 at `accepted 100` with their halves as in step 3,
-   and `Arts  accepted   0 (report   0 / diagnose   0)`. The retired five do
-   not appear.
+5. `summary`: 37 lines, all at `accepted 100` with their halves as in step 3
+   (`Arts  accepted 100 (report  56 / diagnose  44)`). The retired five do not
+   appear.
+
+**If the deploy steps already ran before Arts arrived**, the same commands add
+it and nothing else: after the pull and `up -d --build`, skip the `retire`
+loop (a second run changes nothing anyway); `import-dir` says `Arts … imported
+100` and `skipped 100` for the other 36 (`total: 37 topics, imported 100,
+skipped 3600`); `build` adds `exam_arts` and rebuilds the rest unchanged —
+their fingerprints do not move, so no answer on them is set aside.
 
 ---
 

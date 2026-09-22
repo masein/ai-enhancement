@@ -54,17 +54,17 @@ def rows_on_disk(root: Path, slug: str) -> list[dict]:
 # the files
 # ---------------------------------------------------------------------------
 
-def test_36_topics_arrived_with_three_files_each_and_arts_with_none():
+def test_37_topics_arrived_with_three_files_each():
+    """36 on 2026-09-21; Arts, delivered empty then, on 2026-09-22."""
     slugs = {categories.topic_slug(t) for t in eb.TOPICS}
     banks = sorted(p.name for p in BANKS.glob("*"))
-    assert len(banks) == 36 and all(b.endswith("_v1.json") for b in banks)
-    assert {b[:-len("_v1.json")] for b in banks} == slugs - {"arts"}
+    assert len(banks) == 37 and all(b.endswith("_v1.json") for b in banks)
+    assert {b[:-len("_v1.json")] for b in banks} == slugs
     for b in banks:
         s = b[:-len("_v1.json")]
         assert (RUBRICS / f"{s}.criteria.json").is_file() and (RUBRICS / f"{s}.md").is_file()
         items = json.loads((BANKS / b).read_text(encoding="utf-8"))
         assert isinstance(items, list) and len(items) == 100, b      # a bare array of 100
-    assert not (RUBRICS / "arts.md").exists()
     assert not (REPO / "docs" / "Knowledge Classification").exists()
     # the retired five, whole, outside every path the service reads
     assert sorted(p.name for p in RETIRED.glob("*.json")) == sorted(OLD.values())
@@ -77,7 +77,7 @@ def test_no_new_question_repeats_an_old_one():
            for it in eb.unwrap_items(json.loads((RETIRED / name).read_text("utf-8")))[0]}
     new = [eb.qid_of(it["prompt"]) for b in BANKS.glob("*.json")
            for it in json.loads(b.read_text("utf-8"))]
-    assert len(new) == len(set(new)) == 3600
+    assert len(new) == len(set(new)) == 3700
     assert not old & set(new)
 
 
@@ -89,8 +89,9 @@ CRITERIA = sorted(RUBRICS.glob("*.criteria.json")) + sorted((RETIRED / "rubrics"
     "*.criteria.json"))
 
 
-def test_all_41_criteria_files_normalise_to_one_shape():
-    assert len(CRITERIA) == 41
+def test_all_42_criteria_files_normalise_to_one_shape():
+    """The 37 of the exam and the 5 retired ones."""
+    assert len(CRITERIA) == 42
     for p in CRITERIA:
         raw = json.loads(p.read_text(encoding="utf-8"))
         assert jd.validate_criteria(raw) == [], p.name
@@ -166,13 +167,12 @@ def test_acuity_reads_from_emergency_down_and_a_constant_one_is_still_a_sentence
 # import-dir
 # ---------------------------------------------------------------------------
 
-def test_import_dir_on_the_real_folder_is_36_topics_of_100(tmp_path):
+def test_import_dir_on_the_real_folder_is_37_topics_of_100(tmp_path):
     root = tmp_path / "exam"
     done = eb.import_dir(root, BANKS, "masein")
-    assert len(done) == 36 and all(r["imported"] == 100 for r in done)
+    assert len(done) == 37 and all(r["imported"] == 100 for r in done)
     bank = eb.load_bank(root)
-    assert {t: len(r) for t, r in bank.items()} == {
-        t: (0 if t == "Arts" else 100) for t in eb.TOPICS}
+    assert {t: len(r) for t, r in bank.items()} == {t: 100 for t in eb.TOPICS}
     for t, rows in bank.items():
         for r in rows:
             assert r["topic"] == t and r["accepted_by"] == "masein"
@@ -180,10 +180,10 @@ def test_import_dir_on_the_real_folder_is_36_topics_of_100(tmp_path):
             assert "imported_by" not in r
     # the halves come from the qid, as for every question: about 50/50
     s = eb.summary(root)
-    assert all(35 <= s[t]["report"] <= 65 for t in eb.TOPICS if t != "Arts")
+    assert all(35 <= s[t]["report"] <= 65 for t in eb.TOPICS)
     # idempotent, like import
     again = eb.import_dir(root, BANKS, "masein")
-    assert sum(r["imported"] for r in again) == 0 and sum(r["skipped"] for r in again) == 3600
+    assert sum(r["imported"] for r in again) == 0 and sum(r["skipped"] for r in again) == 3700
 
 
 def test_import_dir_refuses_a_file_no_topic_owns_by_name_and_writes_nothing(tmp_path):
@@ -209,11 +209,11 @@ def test_the_cli_prints_a_line_per_topic_then_a_total(tmp_path):
                           "masein"], capture_output=True, text=True, cwd=REPO)
     assert out.returncode == 0, out.stderr
     lines = out.stdout.splitlines()
-    assert sum(1 for ln in lines if " imported 100 " in ln) == 36
+    assert sum(1 for ln in lines if " imported 100 " in ln) == 37
     assert any(ln.startswith("Medicine & Clinical Health ") and "source medicine_clinical_"
                "health_v1" in ln for ln in lines)
     total = next(ln for ln in lines if ln.startswith("total:"))
-    assert "36 topics, imported 3600" in total and "written by masein" in total
+    assert "37 topics, imported 3700" in total and "written by masein" in total
 
 
 # ---------------------------------------------------------------------------
@@ -293,7 +293,7 @@ def test_retired_rows_are_out_of_the_counts_the_imports_and_the_provenance(tmp_p
                if x["topic"] == "law")
 
 
-def test_the_deploy_steps_build_exactly_the_36_new_banks_and_the_control(tree, tmp_path):
+def test_the_deploy_steps_build_exactly_the_37_new_banks_and_the_control(tree, tmp_path):
     """The brief's deploy sequence, on a bank shaped like the box's: the five
     old topics (and the tasks an earlier build wrote for them), retired by
     name, then the folder imported, then a build."""
@@ -309,8 +309,8 @@ def test_the_deploy_steps_build_exactly_the_36_new_banks_and_the_control(tree, t
     eb.import_dir(root, BANKS, "masein")
     m = eb.build(tree["out_dir"], root)
     exam = sorted(t for t in m["tasks"] if t != eb.CONTROL_TASK)
-    assert exam == sorted(eb.topic_task(t) for t in eb.TOPICS if t != "Arts")
-    assert len(exam) == 36
+    assert exam == sorted(eb.topic_task(t) for t in eb.TOPICS)
+    assert len(exam) == 37
     assert all(m["tasks"][t]["items"] == 100 for t in exam)
     assert sorted(p.stem for p in tasks.glob("*.yaml")) == sorted(exam + [eb.CONTROL_TASK])
     assert m["removed"] == ["exam_medicine_health", "exam_other", "exam_physics_engineering"]
@@ -319,14 +319,14 @@ def test_the_deploy_steps_build_exactly_the_36_new_banks_and_the_control(tree, t
            for it in eb.unwrap_items(json.loads((RETIRED / name).read_text("utf-8")))[0]}
     built = {json.loads(ln)["qid"] for t in exam
              for ln in (tasks / f"{t}.jsonl").read_text("utf-8").splitlines()}
-    assert len(built) == 3600 and not built & old
+    assert len(built) == 3700 and not built & old
     # the control set: only topics MMLU has subjects for, ten at most each
     ctl = m["tasks"][eb.CONTROL_TASK]
     assert set(ctl["per_category"]) <= set(categories.with_subjects())
     assert all(n <= eb.CONTROL_PER_CATEGORY for n in ctl["per_category"].values())
     # and the summary is the 37 topics, the old five nowhere
     s = eb.summary(root)
-    assert list(s) == eb.TOPICS and s["Arts"]["accepted"] == 0
+    assert list(s) == eb.TOPICS and all(s[t]["accepted"] == 100 for t in eb.TOPICS)
     assert not set(OLD) & set(s)
 
 

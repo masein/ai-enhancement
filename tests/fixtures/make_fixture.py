@@ -32,8 +32,8 @@ halves — "the training taught the skill". The frozen report carries their
 taint the way the service would compute it from the run/dataset join.
 
 Three models (good, skewed, chance) also sit the exam: a bank drafted by the
-fake exam writer across every topic in categories.yaml but Arts (empty, as it
-was delivered) and accepted by the fixture (approver "fixture"), the four
+fake exam writer across every topic in categories.yaml but Arts (left empty,
+so the empty-topic paths stay covered) and accepted by the fixture (approver "fixture"), the four
 skill suites' 40 items migrated in under General & Multidisciplinary, and the
 MMLU control set exam_build builds from the diagnose
 half of this very tree. Every question is split by qid. Their
@@ -600,7 +600,9 @@ EXAM_PER_TOPIC = 6          # drafted candidates per topic in the fixture bank
 # one topic carries enough questions for its report half to clear the 30-item
 # floor, so the gate that guards a proposal has a case that passes
 BIG_TOPIC = "Economics"
-# delivered with no questions (phase 10): the fixture leaves it that way
+# one topic with no questions, so the board's empty-topic fold and a topic
+# nobody can sit stay covered. Arts: delivered empty in phase 10, and the last
+# to arrive (2026-09-22) — the fixture still leaves it without questions
 EMPTY_TOPIC = "Arts"
 EXAM_BIG_EXTRA = 70
 

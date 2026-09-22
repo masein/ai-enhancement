@@ -90,12 +90,12 @@ def test_the_file_that_broke_the_live_build_would_now_ship():
     assert not in_image("DEMO.md") and not in_image(".env")
 
 
-def test_all_108_delivered_files_are_on_the_list_and_in_the_image():
-    """The 37-topic exam's 36 banks, criteria files and rubrics — every one,
+def test_all_111_delivered_files_are_on_the_list_and_in_the_image():
+    """The 37-topic exam's 37 banks, criteria files and rubrics — every one,
     and exactly the ones in the checkout, so a 37th file cannot arrive and
     ship without anyone adding it here."""
     files = startup.DELIVERED_TOPIC_FILES
-    assert len(files) == 108 == len(set(files))
+    assert len(files) == 111 == len(set(files))
     assert set(files) <= set(startup.REQUIRED_REPO_FILES)
     on_disk = {f"eval_tasks/fr/banks/{p.name}" for p in (REPO / "eval_tasks/fr/banks").glob("*")}
     on_disk |= {f"eval_tasks/fr/rubrics/{p.name}"

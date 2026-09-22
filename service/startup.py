@@ -18,14 +18,14 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 
-# The 36 topics delivered with the 37-topic exam (2026-09-21), by slug. Arts,
-# the 37th, arrived empty. Each has three files in the image:
+# The 37 topics of the exam, by slug: 36 delivered on 2026-09-21, and Arts,
+# empty then, on 2026-09-22. Each has three files in the image:
 #   eval_tasks/fr/banks/<slug>_v1.json        exam_build.py import-dir reads it (the deploy step)
 #   eval_tasks/fr/rubrics/<slug>.criteria.json   judge.py grades the topic against it
 #   eval_tasks/fr/rubrics/<slug>.md           …and puts its prose and anchors in the prompt
 DELIVERED_TOPIC_SLUGS = [
     "agriculture", "ai_machine_learning", "anthropology_human_geography",
-    "architecture_built_environment", "biology_life_sciences", "business_management",
+    "architecture_built_environment", "arts", "biology_life_sciences", "business_management",
     "chemistry_materials_science", "computer_science", "data_information_science", "design",
     "earth_environmental_sciences", "economics", "education", "engineering", "ethics_religion",
     "finance_accounting", "food_veterinary_sciences", "general_multidisciplinary",

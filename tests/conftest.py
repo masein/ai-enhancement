@@ -280,3 +280,29 @@ def assert_no_report_half_text(body: str, rows: list[dict]) -> int:
     qids = [r["qid"] for r in rows if eb.half_of(r["qid"]) == "report" and r["qid"] in body]
     assert not qids, f"report-half qids reached a request: {qids[:5]}"
     return len(fields)
+
+
+def without_its_own_rubric(monkeypatch, tmp_path, slug: str = "arts"):
+    """Every topic now has its own rubric — Arts, the last, arrived on
+    2026-09-22 — but a topic without one is still graded by the shared
+    exam.md, and the page still says so. A test about that path takes one
+    topic's two files out of the repo copy the judge reads (a copy, never the
+    checkout). Arts by default: the fixture leaves its bank empty too."""
+    import shutil
+
+    import exam_build
+    import judge
+    d = tmp_path / f"repo-rubrics-without-{slug}"
+    if not d.exists():
+        shutil.copytree(judge.RUBRIC_DIR, d,
+                        ignore=shutil.ignore_patterns(f"{slug}.md", f"{slug}.criteria.json"))
+    monkeypatch.setattr(judge, "RUBRIC_DIR", d)
+    monkeypatch.setattr(exam_build, "RUBRIC_DIR", d)
+    return d
+
+
+@pytest.fixture
+def arts_without_rubric(monkeypatch, tmp_path):
+    """without_its_own_rubric for Arts, as a fixture: the repo copy the judge
+    reads, less arts.md and arts.criteria.json."""
+    return without_its_own_rubric(monkeypatch, tmp_path, "arts")

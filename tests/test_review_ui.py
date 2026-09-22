@@ -369,7 +369,8 @@ def test_a_bank_arrives_from_the_page_with_its_report_half_withheld(live, page):
     make_fixture.sit_again(root, root / "results" / "full", [eb.topic_task(topic)])
 
 
-def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page):
+def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page,
+                                                                    arts_without_rubric):
     """The file that grades a topic, changed by the person who wrote it: a bad
     criteria file cannot be committed at all, and a good one is committed only
     after the page has said the sha it is recorded under changes."""
@@ -402,8 +403,9 @@ def test_a_rubric_is_replaced_from_the_page_and_says_what_that_costs(live, page)
         assert row.locator(".badge.taint", has_text="DRAFT").count() == 1
         # a topic without a rubric of its own says which one grades it instead —
         # once, in words; the file's name and sha in the tooltip (phase 9b-9).
-        # Arts is the one topic delivered without its files, and without
-        # questions, so its row is behind the empty-topics fold
+        # Arts, with its files hidden for this test (every topic has its own
+        # since 2026-09-22) and no questions in the fixture, so its row is
+        # behind the empty-topics fold
         panel.locator("tr[data-empty-topics] [data-show-empty]").click()
         arts = panel.locator("tr[data-rubric-row='Arts'] [data-fallback]")
         arts.wait_for()
@@ -667,11 +669,12 @@ def test_the_loop_tab_says_what_failed_instead_of_loading_forever(live, page):
     assert all("500" in e for e in page.errors), page.errors
 
 
-def test_a_topic_on_the_shared_rubric_says_so_on_both_boards(live, page):
-    """Thirteen topics had no rubric of their own; of the 37, Arts has none,
-    and the page says which file grades it rather than implying each has one.
-    Arts was delivered without questions too, so on both boards its row is
-    behind the empty-topics fold."""
+def test_a_topic_on_the_shared_rubric_says_so_on_both_boards(live, page, arts_without_rubric):
+    """Thirteen topics had no rubric of their own; of the 37 none has now, so
+    this one takes Arts' files out of the repo copy the judge reads — and the
+    page says which file grades it rather than implying each has one. The
+    fixture leaves Arts without questions, so on both boards its row is behind
+    the empty-topics fold."""
     base = live["base"]
     page.goto(base + "/#tab=loop")
     page.wait_for_selector("table.jd[data-loop-table] tbody tr")

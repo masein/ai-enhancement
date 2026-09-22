@@ -31,7 +31,9 @@ LAW_V2 = RETIRED / "law_v2.json"
 TOPIC = "Medicine & Clinical Health"
 TASK = "exam_medicine_clinical_health"
 LAW = "Law"
-NO_RUBRIC = "exam_arts"          # the one topic delivered without a rubric of its own
+# the topic whose files the tests of the shared-rubric path hide
+# (conftest.arts_without_rubric): every topic has its own since 2026-09-22
+NO_RUBRIC = "exam_arts"
 
 
 @pytest.fixture
@@ -196,7 +198,7 @@ def test_a_report_half_import_is_as_withheld_as_any_other_question(bank):
 # a rubric per topic
 # ---------------------------------------------------------------------------
 
-def test_the_rubric_follows_the_topic_and_falls_back(tmp_path):
+def test_the_rubric_follows_the_topic_and_falls_back(tmp_path, arts_without_rubric):
     slug = "medicine_clinical_health"
     assert eb.task_slug(TASK) == slug == eb.topic_task(TOPIC)[len("exam_"):]
     assert jd.rubric_name(TASK) == slug
@@ -235,8 +237,10 @@ def test_judge_json_records_which_rubric_graded_each_task(tree, tmp_path, monkey
     reqs, plan = jd.plan_requests(d, "claude")
     plan["tasks"][TASK] = [{"cid": "judge:x", "qid": "a" * 64, "half": "diagnose",
                             "doc_hash": "h", "id": "i", "category": TOPIC, "answer_words": 10}]
-    # every topic the fixture sits has a rubric of its own; Arts, delivered
-    # empty, is the one that would be graded by the shared file
+    # every topic has a rubric of its own; Arts, with its files hidden, is the
+    # one graded by the shared file
+    from conftest import without_its_own_rubric
+    without_its_own_rubric(monkeypatch, tmp_path, "arts")
     other = NO_RUBRIC
     plan["tasks"][other] = [{"cid": "judge:y", "qid": "b" * 64, "half": "diagnose",
                              "doc_hash": "h2", "id": "j", "category": "Arts",

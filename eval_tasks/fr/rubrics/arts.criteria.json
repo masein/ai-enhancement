@@ -1,0 +1,183 @@
+{
+  "domain": "Arts",
+  "scoring_scale": {
+    "min": 0,
+    "max": 4
+  },
+  "criteria": [
+    {
+      "id": "relevance",
+      "name": "Relevance",
+      "definition": "Directly addresses the specific Arts question, its requested task, medium, and supplied evidence without drifting into unrelated biography, trivia, or generic art commentary.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "arts_accuracy",
+      "name": "Arts Accuracy",
+      "definition": "Uses accurate artistic, historical, musical, theatrical, cinematic, design, material, and technical concepts; avoids major medium misunderstandings, false chronology, invented evidence, and conflation of provenance, attribution, and authenticity.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "formal_analysis",
+      "name": "Formal Analysis",
+      "definition": "When relevant, identifies observable formal features and explains relationships among line, shape, form, color, value, texture, space, scale, composition, rhythm, balance, emphasis, movement, and perceptual effect rather than merely naming elements.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "visual_and_material_reasoning",
+      "name": "Visual and Material Reasoning",
+      "definition": "When relevant, connects medium, material, process, support, surface, scale, site, and technique to artistic possibilities, limitations, perception, and interpretation.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "art_historical_reasoning",
+      "name": "Art-Historical Reasoning",
+      "definition": "When relevant, integrates chronology, regional specificity, patronage, institutions, technology, trade, markets, reception, and documentary evidence without teleological or Eurocentric universalization.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "contextual_and_cultural_reasoning",
+      "name": "Contextual and Cultural Reasoning",
+      "definition": "When relevant, relates works to cultural, social, religious, political, economic, colonial, community, or ritual contexts while preserving regional specificity and avoiding cultural generalization or ranking traditions by Western conventions.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "interpretive_reasoning",
+      "name": "Interpretive Reasoning",
+      "definition": "Distinguishes description from interpretation, supports meaning claims with formal or contextual evidence, separates artist intention from work effects and reception, and accepts multiple well-supported readings.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "evidence_use",
+      "name": "Evidence Use",
+      "definition": "When relevant, identifies what is directly supplied, observable, documented, technically measured, or inferential; does not invent central visual, musical, theatrical, cinematic, archival, or contextual evidence.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "music_reasoning",
+      "name": "Music Reasoning",
+      "definition": "When relevant, accurately analyzes supplied rhythm, meter, melody, harmony, texture, timbre, dynamics, form, performance, improvisation, and technology using a framework appropriate to the musical tradition.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "theatre_dance_and_performance_reasoning",
+      "name": "Theatre, Dance, and Performance Reasoning",
+      "definition": "When relevant, distinguishes text, score, choreography, event, documentation, and staging; analyzes body, voice, gesture, space, time, rhythm, performer choices, audience relation, and valid performance variability.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "film_and_media_reasoning",
+      "name": "Film and Media Reasoning",
+      "definition": "When relevant, accurately integrates shot content, framing, cinematography, editing, sound, mise-en-scène, performance, sequence, animation, documentary selection, and media-specific structure.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "design_and_visual_communication_reasoning",
+      "name": "Design and Visual Communication Reasoning",
+      "definition": "When relevant, evaluates purpose, audience, hierarchy, legibility, readability, image-text relations, materials, usability, accessibility, constraints, and communication rather than subjective preference.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "technical_conservation_and_provenance_reasoning",
+      "name": "Technical, Conservation, and Provenance Reasoning",
+      "definition": "When relevant, distinguishes stabilization, restoration, later alteration, material evidence, ownership history, authorship, authenticity, and attribution; recognizes reversibility, destructive risk, documentation gaps, and legitimate uncertainty.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "comparative_and_cross_media_reasoning",
+      "name": "Comparative and Cross-Media Reasoning",
+      "definition": "When relevant, selects meaningful comparable dimensions, preserves cultural context, explains medium-specific effects, and avoids assuming that visual or formal similarity implies shared meaning.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "aesthetic_and_critical_reasoning",
+      "name": "Aesthetic and Critical Reasoning",
+      "definition": "When relevant, distinguishes descriptive, interpretive, and evaluative claims and justifies criticism with explicit criteria rather than taste, price, popularity, virtuosity, or canonical status alone.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "assumptions_alternatives_and_uncertainty",
+      "name": "Assumptions, Alternatives, and Uncertainty",
+      "definition": "When relevant, surfaces assumptions, considers credible alternatives, calibrates confidence, and recognizes evidential limits, performance variability, attribution uncertainty, and conservation or curatorial trade-offs.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "quantitative_and_proportional_reasoning",
+      "name": "Quantitative and Proportional Reasoning",
+      "definition": "When relevant, correctly handles scale, proportion, dimensions, spacing, ratios, rhythmic duration, meter, tempo, edition size, frame rate, or similar quantities and connects the calculation to an artistic conclusion.",
+      "weight": 0.05,
+      "conditional": true
+    },
+    {
+      "id": "completeness",
+      "name": "Completeness",
+      "definition": "Covers the material parts of the task and includes enough analysis, evidence, context, and qualification to support the conclusion without unnecessary length.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Maintains internally consistent terminology, chronology, claims, assumptions, and conclusions; does not contradict supplied evidence or its own earlier reasoning.",
+      "weight": 0.05,
+      "conditional": false
+    },
+    {
+      "id": "clarity",
+      "name": "Clarity",
+      "definition": "Presents a coherent, precise, and readable explanation with disciplinary terms used to advance reasoning rather than as unsupported jargon.",
+      "weight": 0.05,
+      "conditional": false
+    }
+  ],
+  "critical_error_flag": {
+    "id": "critical_arts_error",
+    "condition": "A materially false central formal, historical, technical, musical, performance, cinematic, conservation, attribution, provenance, or interpretive claim that fundamentally invalidates the answer or reverses the substantive conclusion.",
+    "effect": "score=0",
+    "examples": [
+      "Describes a central visual feature opposite to the supplied description or invents a central visual detail not present.",
+      "Claims linear perspective when the supplied evidence explicitly establishes flattened non-perspectival space and the mistake drives the interpretation.",
+      "Fundamentally conflates attribution, provenance, and authenticity.",
+      "Asserts certain authorship despite supplied technical or provenance evidence directly contradicting it.",
+      "Assigns a symbolic meaning as fact when the supplied context documents a different meaning.",
+      "Places a work in a substantially wrong historical period when chronology drives the analysis.",
+      "Treats a cultural tradition as inherently deficient because it differs from Western academic conventions.",
+      "Fundamentally misreads a supplied rhythm, meter, chord sequence, texture, or formal structure.",
+      "Applies an explicitly inapplicable tonal framework as if universal.",
+      "Confuses script content with staging when that distinction determines the answer.",
+      "Reverses the function of a film edit, shot sequence, or central sound relationship.",
+      "Recommends a materially destructive and irreversible conservation action when safer preservation is the task.",
+      "Claims restoration must always return an object to an imagined original appearance.",
+      "Ignores decisive ownership evidence while making a categorical provenance claim.",
+      "Treats one aesthetic judgment as objective fact without criteria when multiple defensible evaluations are allowed.",
+      "Claims artist intention conclusively determines meaning despite contradictory formal or reception evidence.",
+      "Makes a major quantitative error in scale, duration, proportion, or rhythm that reverses the artistic conclusion."
+    ],
+    "not_critical_examples": [
+      "Minor terminology errors.",
+      "Different legitimate interpretations.",
+      "Reasonable disagreements about aesthetic evaluation.",
+      "Valid alternative staging or performance choices.",
+      "Small chronological imprecision that does not affect reasoning.",
+      "Minor formal-analysis omissions.",
+      "Cautious uncertainty or legitimate attribution uncertainty.",
+      "Differences in curatorial judgment or stylistic preference."
+    ]
+  }
+}

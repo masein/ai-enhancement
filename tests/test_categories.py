@@ -111,7 +111,7 @@ def test_the_topics_are_the_37_folders_and_the_mapping_is_the_briefs():
     import os
     delivered = {f[:-len("_v1.json")] for f in os.listdir(
         Path(__file__).resolve().parents[1] / "eval_tasks" / "fr" / "banks")}
-    assert delivered == {categories.topic_slug(c) for c in CATEGORIES} - {"arts"}
+    assert delivered == {categories.topic_slug(c) for c in CATEGORIES}
     assert categories.topic_slug("Medicine & Clinical Health") == "medicine_clinical_health"
     assert categories.topic_slug("IT") == "it"
     assert categories.category_order()[-1] == categories.OTHER

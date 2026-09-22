@@ -42,7 +42,9 @@ LAW = jd.normalise_criteria(json.loads(LAW_FILE.read_text(encoding="utf-8")), LA
 LAW_PROSE = (RETIRED / "law.md").read_text(encoding="utf-8")
 IDS = jd.criteria_ids(SPEC)
 FLAGS = jd.flag_ids(SPEC)
-NO_TOPIC = "exam_arts"          # the one topic delivered without a rubric of its own
+# the topic whose files the shared-rubric tests hide (conftest.arts_without_rubric):
+# every topic has its own since Arts arrived, 2026-09-22
+NO_TOPIC = "exam_arts"
 
 
 def reply(spec=SPEC, **over) -> str:
@@ -57,7 +59,7 @@ def reply(spec=SPEC, **over) -> str:
 # the author's schema, loaded as delivered
 # ---------------------------------------------------------------------------
 
-def test_both_delivered_files_load_and_say_what_they_grade():
+def test_both_delivered_files_load_and_say_what_they_grade(arts_without_rubric):
     assert jd.validate_criteria(SPEC) == [] and jd.validate_criteria(NEW_LAW) == []
     assert len(IDS) == 20 and len(set(IDS)) == 20
     assert len(jd.criteria_ids(NEW_LAW)) == 20
@@ -73,6 +75,7 @@ def test_both_delivered_files_load_and_say_what_they_grade():
     assert jd.rubric_name(TASK) == "medicine_clinical_health"
     assert jd.rubric_name(LAW_TASK) == "law"
     assert jd.rubric_for(NO_TOPIC).criteria is None      # no file, no criteria path
+    assert jd.rubric_for(NO_TOPIC).fallback is True
     for r in (jd.rubric_for(TASK), jd.rubric_for(LAW_TASK)):
         assert len(r.criteria_sha256) == 64
         # the author wrote these anchors himself: nothing is stamped DRAFT
@@ -149,7 +152,7 @@ def test_a_criterion_and_a_flag_may_share_an_id_and_stay_apart():
     assert g.flags["fabricated_authority"] is True
 
 
-def test_the_criteria_prompt_carries_every_criterion_and_every_flag():
+def test_the_criteria_prompt_carries_every_criterion_and_every_flag(arts_without_rubric):
     text = jd.build_criteria_prompt(jd.rubric_for(TASK).text, SPEC, "Chest pain since when?",
                                     "Acuity: emergency. Domain: cardiovascular.", "take an aspirin")
     for c in SPEC["criteria"]:

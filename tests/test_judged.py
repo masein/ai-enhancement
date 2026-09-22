@@ -107,18 +107,23 @@ def test_rubrics_have_anchors_and_a_length_clause():
     """Five anchors and something about length, however the author writes
     them: ours use "- **3** —", his own use a "### 3" heading. The sha is the
     identity; a version in the heading is a convenience he need not carry."""
-    # every task the exam builds, so every rubric as delivered: the 36 topics'
-    # own ("### 3", no version), the shared exam.md Arts falls back to and the
-    # control's factual one (both "- **3** —")
+    # every task the exam builds, so every rubric as delivered: the 37 topics'
+    # own ("### 3", no version) and the control's factual one ("- **3** —")
     for task in fr_build.ALL_TASKS:
         r = jd.rubric_for(task)
         assert re.fullmatch(r"[0-9]+|\?", r.version) and re.fullmatch(r"[0-9a-f]{64}", r.sha256)
         for s in range(5):
             assert re.search(rf"^(?:- \*\*{s}\*\*|#+ {s}\b)", r.text, re.M), (task, s)
         assert re.search(r"length", r.text, re.I), task
-    # a topic with no rubric of its own shares the exam one; the control keeps
-    # the factual one; a topic with its own is graded by its own. Arts is the
-    # one topic delivered without a rubric
+    # every topic is graded by its own — Arts too, since 2026-09-22 — and the
+    # control keeps the factual one
+    assert [t for t in fr_build.exam_tasks() if jd.rubric_for(t).fallback] == []
+    assert jd.rubric_for(fr_build.CONTROL_TASK).name == "factual_accuracy"
+
+
+def test_a_topic_without_its_own_rubric_shares_the_exam_one(arts_without_rubric):
+    """No topic is missing its files now, and the path is still the code's:
+    a topic without them is graded by exam.md, never by nothing."""
     shared = (REPO / "eval_tasks" / "fr" / "rubrics" / "exam.md").read_text(encoding="utf-8")
     assert [t for t in fr_build.exam_tasks() if jd.rubric_for(t).fallback] == ["exam_arts"]
     assert jd.rubric_for("exam_arts").text == shared

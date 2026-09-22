@@ -73,7 +73,7 @@ service/
   make_ppl_task.py    any corpus -> pinned perplexity task (records a sha256)
 eval_tasks/
   mmlu_perm/          the permutation control: MMLU with the options rotated (suite=control)
-  fr/                 the exam: banks/ (36 topics x 100), rubrics/, retired/ (the old five),
+  fr/                 the exam: banks/ (37 topics x 100), rubrics/, retired/ (the old five),
                       the migrated skill items, AUTHORING.md (suite=judged)
 scripts/
   demo_loop.py        the whole loop in one narrated command, against the local model (DEMO.md)

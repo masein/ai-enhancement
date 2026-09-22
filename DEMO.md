@@ -90,10 +90,10 @@ drafting so you can curate on the Exam tab; `--sit stub` skips the GPU.
 
 ### A human-written bank
 
-The 37-topic exam (phase 10) is 36 human-written banks of 100 questions, each
+The 37-topic exam (phase 10) is 37 human-written banks of 100 questions, each
 with its own criteria file and prose rubric, in `eval_tasks/fr/banks/` and
-`eval_tasks/fr/rubrics/`; Arts arrived empty. Any of them is one run — the
-author is recorded on every item:
+`eval_tasks/fr/rubrics/` — 36 delivered together, and Arts a day later. Any of
+them is one run — the author is recorded on every item:
 
 ```bash
 python3 scripts/demo_loop.py --topic "Medicine & Clinical Health" \

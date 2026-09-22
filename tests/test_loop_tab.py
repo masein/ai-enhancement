@@ -53,8 +53,8 @@ def test_the_board_has_a_row_per_topic_with_its_bank_rubric_and_last_run(svc):
     # the delivered rubric's heading carries no DRAFT, so nothing stamps it one
     assert last["judge_id"] == "stub/overlap-v1" and last["draft_rubric"] is False
     assert set(last["flags"]) == {"critical_medicine_clinical_health_error"}
-    # a topic with no rubric of its own says which one grades it instead
-    assert rows(client)["Arts"]["rubric"]["name"] == "exam"
+    # every topic is graded by its own — Arts too, since 2026-09-22
+    assert rows(client)["Arts"]["rubric"]["name"] == "arts"
 
 
 
@@ -267,10 +267,11 @@ def test_the_queue_row_carries_the_judge_batch(svc, monkeypatch):
 # a topic with no rubric of its own, and a board that survives it
 # ---------------------------------------------------------------------------
 
-def test_a_topic_without_its_own_rubric_is_graded_by_the_shared_one(svc):
-    """Arts arrived with no rubric file of its own, as thirteen of the first
-    fifteen topics did. The fallback is rubrics/exam.md, as P4a specified —
-    not rubrics/<slug>.md, which does not exist, and which took both of these
+def test_a_topic_without_its_own_rubric_is_graded_by_the_shared_one(svc, arts_without_rubric):
+    """Arts arrived without its files, as thirteen of the first fifteen topics
+    did; it has them now, so this test takes them out of the repo copy the
+    judge reads. The fallback is rubrics/exam.md, as P4a specified — not
+    rubrics/<slug>.md, which does not exist, and which took both of these
     endpoints down on the live tree the moment anyone opened them."""
     client, _, _ = svc
     rubrics = client.get("/api/exam/rubrics")

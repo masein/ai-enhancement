@@ -8,8 +8,9 @@ checkpoint sits the whole exam; a judge grades every answer 0–4 against the
 topic's own rubric (`rubrics/<slug>.md`, or `rubrics/exam.md` for a topic
 without one); the per-topic score is what picks the next thing to train.
 
-36 of the topics arrived with 100 questions each (`banks/<slug>_v1.json`),
-written by masein, and a criteria file and rubric each. Arts arrived empty.
+All 37 topics have 100 questions each (`banks/<slug>_v1.json`), written by
+masein, and a criteria file and rubric each: 36 arrived on 2026-09-21, and
+Arts, empty then, on 2026-09-22.
 The five topics the exam had before — medicine & health, law, economics,
 computer science, physics & engineering — are **retired**: their files are in
 `retired/`, their rows stay in the bank marked `retired_at`, and their judged

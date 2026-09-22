@@ -145,7 +145,7 @@ def test_what_the_import_refuses(svc):
 # the rubric and the criteria file
 # ---------------------------------------------------------------------------
 
-def test_the_page_says_which_rubric_grades_each_topic(svc):
+def test_the_page_says_which_rubric_grades_each_topic(svc, monkeypatch, tmp_path):
     client, _ = svc
     r = client.get("/api/exam/rubrics").json()
     rows = {t["topic"]: t for t in r["topics"]}
@@ -155,10 +155,15 @@ def test_the_page_says_which_rubric_grades_each_topic(svc):
     assert med["status"] == "" and med["scoring"] == "criteria"
     assert med["criteria_count"] == 20 and len(med["criteria_sha256"]) == 64
     assert rows["Law"]["name"] == "law" and rows["Law"]["criteria_count"] == 20
-    # Arts arrived with no files: the one topic the shared rubric grades
+    # every topic has its own now — Arts, the last, since 2026-09-22
+    assert all(t["own"] for t in rows.values()) and len(rows) == len(eb.TOPICS)
+    assert r["store"] and isinstance(r["in_repo"], bool)
+    # and a topic without its files is graded by the shared rubric, and says so
+    from conftest import without_its_own_rubric
+    without_its_own_rubric(monkeypatch, tmp_path, "arts")
+    rows = {t["topic"]: t for t in client.get("/api/exam/rubrics").json()["topics"]}
     assert rows["Arts"]["name"] == "exam" and rows["Arts"]["own"] is False
     assert rows["Arts"]["scoring"] == "single"
-    assert r["store"] and isinstance(r["in_repo"], bool)
     # and both files come back whole
     rubrics = REPO / "eval_tasks" / "fr" / "rubrics"
     md = client.get(f"/api/exam/rubrics/{SLUG}")
@@ -280,22 +285,24 @@ def test_the_store_is_the_checkout_when_it_can_be_written_and_bench_root_otherwi
 
 
 def test_an_uploaded_rubric_beats_the_repo_copy(svc):
-    """A topic with no rubric of its own gains one from outside the repo, and
-    the judge reads it without the checkout being touched."""
+    """A rubric sent from the page is what the judge reads, ahead of the one
+    in the image, and the checkout is not touched: Arts' delivered rubric
+    stays byte for byte what arrived."""
     client, _ = svc
     from service import config
-    assert jd.rubric_name("exam_arts") == "exam"
+    repo_md = REPO / "eval_tasks" / "fr" / "rubrics" / "arts.md"
+    delivered = repo_md.read_bytes()
+    assert jd.rubric_name("exam_arts") == "arts"
+    assert jd.rubric_for("exam_arts").path == str(repo_md)
     body = "# Rubric — Arts (version 9)\n" + "".join(
         f"- **{i}** — anchor {i}\n" for i in range(5)) + "\nLength: short.\n"
     r = post(client, "/api/exam/rubrics", name="arts", kind="rubric", content=body,
              approver="Dr. Hossein")
     assert r.status_code == 200, r.text
     assert str(config.BENCH_ROOT) in r.json()["written"]
-    # Arts had no rubric of its own; now it does, from outside the repo
-    assert jd.rubric_name("exam_arts") == "arts"
     got = jd.rubric_for("exam_arts")
-    assert got.version == "9" and got.text == body
-    assert (REPO / "eval_tasks" / "fr" / "rubrics" / "arts.md").exists() is False
+    assert got.version == "9" and got.text == body and got.path != str(repo_md)
+    assert repo_md.read_bytes() == delivered
 
 
 def test_a_page_imported_report_half_question_never_leaves_the_bank(svc, tmp_path):

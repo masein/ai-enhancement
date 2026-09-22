@@ -1,9 +1,9 @@
 # The criteria file, as this platform reads it
 
 *Internal. Decided 2026-09-20 (Omar): we do not ask the author to change how
-he writes these files. Four deliveries have arrived — the last one 36 files at
-once, for the 37-topic exam — and every file grades; whatever arrives next,
-the loader learns it.*
+he writes these files. Five deliveries have arrived — 36 files at once for the
+37-topic exam, and Arts' a day later — and every file grades; whatever
+arrives next, the loader learns it.*
 
 A criteria file sits beside a topic's prose rubric —
 `eval_tasks/fr/rubrics/<slug>.criteria.json` — and turns the judge's 0–4 into
@@ -30,9 +30,10 @@ prompt builder, the fold, `judge.json`, the page and the demo all see:
 The whole file's sha256 is recorded in every `judge.json`, so the *delivered*
 bytes are the provenance — normalising changes what we read, never what we
 record. Anything the file carries that this table does not name is passed
-through untouched — `benchmark`, `task`, `topic`, `scale`, `score_scale`,
-`score_range`, `scoring_range`, `score_anchors`: informational, ignored by the
-loader, part of the file's sha like every other byte.
+through untouched — `benchmark`, `task`, `topic`, `domain`, `scale`,
+`score_scale`, `scoring_scale`, `score_range`, `scoring_range`,
+`score_anchors`: informational, ignored by the loader, part of the file's sha
+like every other byte.
 
 The criteria files of the five retired topics live in
 `eval_tasks/fr/retired/rubrics/`, outside every path the judge reads; they
@@ -43,12 +44,12 @@ history someone may want to re-read.
 
 | In the file | Seen in | Read as |
 |---|---|---|
-| `criteria[].id` is a slug, `name` is a label | medicine, law, computer science, economics; the 36 topics | `id` = the slug, `name` = the label |
+| `criteria[].id` is a slug, `name` is a label | medicine, law, computer science, economics; the 37 topics | `id` = the slug, `name` = the label |
 | `criteria[].id` is a row number (`1`, `2`, …) and `name` is the slug | physics & engineering | `id` = `name`, label derived from it ("Relevance") |
 | `criteria[].name` absent | medicine, law | label derived from the id |
 | `flags` as a list | medicine, law | the list, unchanged |
 | `critical_flag` as a single object | computer science, physics & engineering | a one-item list |
-| `critical_error_flag` as a single object | economics; 30 of the 36 topics | a one-item list |
+| `critical_error_flag` as a single object | economics; 31 of the 37 topics | a one-item list |
 | `critical_error` as a single object | Architecture & Built Environment, Language & Literature, Mathematics & Statistics, Political Science & International Relations | a one-item list |
 | `critical_flags` as a list | Biology & Life Sciences, Public Health & Wellness | the list, unchanged |
 | `effect: "zero_score"` / `"score=0"` | law, medicine / the three new topics | `zero_score` — the score becomes 0 |
@@ -56,10 +57,11 @@ history someone may want to re-read.
 | `effect: "score=2"` | (not yet) | `set_at_2_of_4` — the score becomes 2 |
 | `examples` on a flag | the three new topics | prompt: "counts as `<flag>`: …" |
 | `not_critical` / `do_not_classify_as_critical` | physics & engineering / economics | prompt: "does NOT count as `<flag>`: …" |
-| `evaluation_principles` at the top level | physics & engineering; 4 of the 36 | prompt: a "how this topic is graded" block above the criteria |
+| `evaluation_principles` at the top level | physics & engineering; 4 of the 37 | prompt: a "how this topic is graded" block above the criteria |
 | `principles` / `important_evaluation_principles` at the top level | Engineering / Psychology & Cognitive Sciences | the same block |
 | a principle as an object — `{name, statement}`, `{name, principle}`, `{title, text}` | Computer Science, Food & Veterinary Sciences, Psychology & Cognitive Sciences | one sentence: "Heading: text" |
 | `weights: "equal"`, or a `weight` per criterion, or neither | all | equal unless a criterion says otherwise; `0.05 × 20` is equal |
+| top-level `domain` (the topic's name) and `scoring_scale` (`{"min": 0, "max": 4}`) | Arts | informational: passed through, never read — the file's name decides the task, and the scale is always 0–4 |
 | `breakdowns` naming metadata fields | (not yet) | those tables instead of the chosen ones |
 
 An effect the judge cannot apply **refuses to load**, naming the file and the
@@ -74,8 +76,8 @@ Extend `normalise_criteria` (and, for a new effect, `normalise_effect` and
 `fold`), add the row above, and add the file to the loader test that asserts
 every real criteria file in the repo normalises to this shape. The tests are
 `tests/test_criteria_schema.py::test_every_delivered_file_normalises_to_one_shape`
-and `tests/test_37_topics.py::test_all_41_criteria_files_normalise_to_one_shape`
-(the 36 current files and the 5 retired ones).
+and `tests/test_37_topics.py::test_all_42_criteria_files_normalise_to_one_shape`
+(the 37 current files and the 5 retired ones).
 
 ## Acuity
 

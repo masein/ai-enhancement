@@ -431,7 +431,7 @@ def test_a_blocked_identity_stops_at_preflight(tmp_path):
 
 
 def test_the_demo_doc_carries_every_delivered_bank():
-    """Thirty-six banks now; each is one command, and all of them clear the
+    """Thirty-seven banks now; each is one command, and all of them clear the
     floor. The doc shows two and gives the rule for the rest, so the rule
     has to reach every file that was delivered."""
     import exam_build as eb
@@ -442,10 +442,10 @@ def test_the_demo_doc_carries_every_delivered_bank():
         assert f"--import eval_tasks/fr/banks/{stem}.json" in doc, stem
         assert f"--source {stem}" in doc, stem
     assert "`banks/<slug>_v1.json`" in doc
-    assert "36 human-written banks of 100 questions" in doc and "Arts arrived empty" in doc
+    assert "37 human-written banks of 100 questions" in doc and "Arts a day later" in doc
     banks = sorted((REPO / "eval_tasks" / "fr" / "banks").glob("*.json"))
     assert sorted(b.name for b in banks) == sorted(
-        f"{topic_slug(t)}_v1.json" for t in eb.TOPICS if t != "Arts")
+        f"{topic_slug(t)}_v1.json" for t in eb.TOPICS)
     # "every bank clears it": the report half of each, split by qid as the
     # import splits it, is at or above the floor
     assert "the 30-question floor.\nEvery bank clears it" in doc

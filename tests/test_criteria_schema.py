@@ -6,8 +6,9 @@ reads them. So the test is: every delivered file, in whatever shape, comes
 out of the loader in ONE internal shape, and that shape is what the prompt,
 the fold and the page are built from. docs/CRITERIA-SCHEMA.md is the table.
 
-Phase 10 delivered 36 topics at once and retired the five before them. The
-36 are what the judge reads now; the retired five are kept whole in
+Phase 10 delivered 36 topics at once and retired the five before them; Arts,
+the 37th, followed a day later. The 37 are what the judge reads now; the
+retired five are kept whole in
 eval_tasks/fr/retired/, and they are still the only files with some of the
 layouts the loader learned — a criterion numbered by its row, a flag list
 with a cap in it, a bank wrapped in {"questions": [...]} — so the tests of
@@ -28,9 +29,9 @@ from conftest import assert_no_report_half_text
 REPO = Path(__file__).resolve().parents[1]
 RUBRICS = REPO / "eval_tasks" / "fr" / "rubrics"
 RETIRED = REPO / "eval_tasks" / "fr" / "retired"
-# every topic but Arts arrived with a rubric and a criteria file
-DELIVERED = [t for t in eb.TOPICS if t != "Arts"]
-# the 36 the judge reads, then the 5 it no longer does
+# every topic arrived with a rubric and a criteria file — Arts last, 2026-09-22
+DELIVERED = list(eb.TOPICS)
+# the 37 the judge reads, then the 5 it no longer does
 CRITERIA = sorted(RUBRICS.glob("*.criteria.json")) + sorted(
     (RETIRED / "rubrics").glob("*.criteria.json"))
 
@@ -44,7 +45,7 @@ def retired(slug: str) -> dict:
 # the files, as delivered
 # ---------------------------------------------------------------------------
 
-def test_the_topics_slugs_reach_the_delivered_file_names():
+def test_the_topics_slugs_reach_the_delivered_file_names(monkeypatch, tmp_path):
     """The file name is how a rubric finds its topic; if these disagree the
     topic is silently graded by the shared rubric."""
     # the names with capitals, "&" and an acronym in them, spelled out by hand
@@ -54,7 +55,7 @@ def test_the_topics_slugs_reach_the_delivered_file_names():
                         ("Political Science & International Relations",
                          "political_science_international_relations")):
         assert eb.task_slug(eb.topic_task(topic)) == slug
-    # every delivered file belongs to a topic, and every topic but Arts has one
+    # every delivered file belongs to a topic, and every topic has one
     stems = {p.name[:-len(".criteria.json")] for p in RUBRICS.glob("*.criteria.json")}
     assert stems == {eb.task_slug(eb.topic_task(t)) for t in DELIVERED}
     for topic in DELIVERED:
@@ -62,10 +63,14 @@ def test_the_topics_slugs_reach_the_delivered_file_names():
         assert (RUBRICS / f"{slug}.md").is_file()
         r = jd.rubric_for(eb.topic_task(topic))
         assert r.name == slug and r.fallback is False and r.criteria is not None, topic
+    # and a topic whose files are missing is graded by the shared rubric, not
+    # by nothing and not by a stale name
+    from conftest import without_its_own_rubric
+    without_its_own_rubric(monkeypatch, tmp_path, "arts")
     assert jd.rubric_for(eb.topic_task("Arts")).fallback is True
 
 
-def test_the_36_new_rubrics_are_the_authors_own_and_not_drafts():
+def test_the_37_new_rubrics_are_the_authors_own_and_not_drafts():
     """He wrote the 0–4 anchors, so nothing is stamped DRAFT."""
     for topic in DELIVERED:
         r = jd.rubric_for(eb.topic_task(topic))
@@ -75,11 +80,11 @@ def test_the_36_new_rubrics_are_the_authors_own_and_not_drafts():
 
 
 def test_every_delivered_file_normalises_to_one_shape():
-    """The table in docs/CRITERIA-SCHEMA.md, asserted row by row over all 41
+    """The table in docs/CRITERIA-SCHEMA.md, asserted row by row over all 42
     files: whatever layout a file arrived in, what the loader reads is what
     the file said. (tests/test_37_topics.py checks the same files come out
     carrying every key of the one shape; this checks the values are his.)"""
-    assert len(CRITERIA) == 41
+    assert len(CRITERIA) == 42
     layouts: dict[str, int] = {}
     for p in CRITERIA:
         where = p.relative_to(REPO)
@@ -120,8 +125,8 @@ def test_every_delivered_file_normalises_to_one_shape():
             assert spec[k] == raw[k], (where, k)
     # the "seen in" column: medicine and law (retired) wrote a list; computer
     # science and physics (retired) `critical_flag`; economics (retired) and
-    # 30 of the 36 `critical_error_flag`; the other six the two new layouts
-    assert layouts == {"flags": 2, "critical_flag": 2, "critical_error_flag": 31,
+    # 31 of the 37 `critical_error_flag`; the other six the two new layouts
+    assert layouts == {"flags": 2, "critical_flag": 2, "critical_error_flag": 32,
                        "critical_error": 4, "critical_flags": 2}
 
 
@@ -218,7 +223,7 @@ def test_the_authors_calibration_travels_in_the_request():
         for cid in sorted(cond)[:3]:
             line = next(x for x in text.splitlines() if x.startswith(cid + " — "))
             assert "Return null for it when it does not apply" in line
-    # principles arrived in six of the 36, under three names
+    # principles arrived in six of the 37, under three names
     assert len(with_principles) == 6
 
 
@@ -340,7 +345,7 @@ def test_the_reference_line_carries_what_the_judge_must_read(five):
 
 
 def test_no_report_half_question_of_any_bank_leaves_it(five, tmp_path, monkeypatch):
-    """Every bank delivered — the five retired ones and the 36 of the exam
+    """Every bank delivered — the five retired ones and the 37 of the exam
     now — one rule, over the bodies actually sent."""
     from service import config, llm, proposals as prop
     current = tmp_path / "exam"
@@ -350,7 +355,7 @@ def test_no_report_half_question_of_any_bank_leaves_it(five, tmp_path, monkeypat
         # the audience line is counted from whichever bank is the service's
         monkeypatch.setattr(config, "EXAM_DIR", root)
         topics = [t for t, rows in eb.load_bank(root).items() if rows]
-        assert len(topics) == (5 if root == five else 36)
+        assert len(topics) == (5 if root == five else 37)
         fake = llm.FakeBatches("fake-exam", tmp_path / f"fake-{len(topics)}")
         for topic in topics:
             task = eb.topic_task(topic)

@@ -1,0 +1,1002 @@
+[
+  {
+    "id": 1,
+    "prompt": "A painted figure is centered, occupies roughly twice the height of surrounding figures, and is framed by two vertical architectural elements. Distinguish observation from interpretation, then explain how scale and placement could structure visual hierarchy without assuming a symbolic meaning not supplied by the evidence.",
+    "intent": "Distinguish description from interpretation and analyze hierarchy.",
+    "domain": "Foundations of Art Analysis",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "formal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 2,
+    "prompt": "A composition uses a limited palette of muted blue-gray tones except for one small saturated orange shape near the upper right. Explain how hue, saturation, contrast, and placement work together to direct attention. Do not assign a universal symbolic meaning to orange.",
+    "intent": "Analyze color relationships and focal emphasis.",
+    "domain": "Color",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "visual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 3,
+    "prompt": "A drawing consists of broad gestural charcoal arcs over a few sharply defined contour lines. The subject is a standing human body in motion. Explain how contour and gesture perform different functions and how their interaction can suggest both structure and movement.",
+    "intent": "Relate line types to structure and movement.",
+    "domain": "Drawing",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "formal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 4,
+    "prompt": "A relief sculpture projects only a few centimeters from a flat backing, but overlapping figures and changing depth create a strong sense of recession. Explain the difference between physical depth and represented depth in this work.",
+    "intent": "Distinguish physical and represented space.",
+    "domain": "Sculpture",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "visual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 5,
+    "prompt": "A picture shows a road narrowing toward a single vanishing point, distant forms becoming paler and less distinct, and foreground objects overlapping those behind them. Identify the different depth cues and explain how they reinforce one another.",
+    "intent": "Analyze multiple spatial depth cues.",
+    "domain": "Space and Perspective",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "formal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 6,
+    "prompt": "A mural is 9 meters wide and installed above eye level in a civic hall. A reproduction of the same image appears as a 20-centimeter book illustration. Compare how scale, viewing distance, bodily relation, and setting can change the experience and meaning of the image even when its depicted content is unchanged.",
+    "intent": "Compare effects of scale and site.",
+    "domain": "Scale and Proportion",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 7,
+    "prompt": "A still life includes imported citrus fruit, a silver vessel, a cracked ceramic bowl, and wilted flowers. The painting gives equal visual emphasis to all four objects. Explain which claims are directly observable and which possible interpretations about trade, wealth, mortality, or domestic life would require contextual evidence.",
+    "intent": "Separate evidence from interpretive inference.",
+    "domain": "Still Life",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 8,
+    "prompt": "Two compositions use identical shapes. Version A distributes them symmetrically around the center; Version B clusters most forms on the left while a single dark form on the right visually counterbalances them. Compare how symmetry and asymmetrical balance organize attention and stability.",
+    "intent": "Compare compositional balance systems.",
+    "domain": "Composition",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "formal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 9,
+    "prompt": "A nonrepresentational painting contains repeated diagonal bands that increase in width from left to right, interrupted by one vertical band. Explain how rhythm, repetition, directional movement, and interruption can create structure without recognizable subject matter.",
+    "intent": "Analyze abstraction as structured form.",
+    "domain": "Abstraction",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "formal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 10,
+    "prompt": "An artist states, 'I intended this work to feel calm.' Viewers consistently describe the dense overlapping forms and abrupt contrasts as agitated. Explain how the artist statement, formal evidence, and reception should be weighed without treating intention as the sole determinant of meaning.",
+    "intent": "Integrate intention, formal evidence, and reception.",
+    "domain": "Artistic Intention",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "interpretation_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 11,
+    "prompt": "A watercolor landscape has transparent washes, untouched white paper for highlights, and soft edges where wet areas merge. Explain how the material properties of watercolor enable these effects and what limitations they impose compared with opaque paint.",
+    "intent": "Connect medium properties to visual effects.",
+    "domain": "Painting",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "material_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 12,
+    "prompt": "An oil painting is built from a dark underlayer, several thin translucent glazes, and small opaque highlights. Explain how glazing can produce luminosity and depth differently from thick impasto.",
+    "intent": "Explain painting technique and surface effects.",
+    "domain": "Painting",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "technical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 13,
+    "prompt": "A painter deliberately leaves thick ridges of visible brushwork across the surface, including over areas representing smooth skin. Analyze how this visible process changes the relationship between depicted subject and painted surface.",
+    "intent": "Analyze impasto and visibility of process.",
+    "domain": "Painting",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "formal_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 14,
+    "prompt": "A sculptor begins with a solid stone block and removes material to produce a figure whose arms remain attached to the torso by stone bridges. Compare the artistic and structural implications of carving with a modeled clay process in which material is added and can later be cast.",
+    "intent": "Compare sculptural processes and constraints.",
+    "domain": "Sculpture",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "material_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 15,
+    "prompt": "A freestanding metal sculpture appears visually top-heavy, but its lower elements spread widely across the floor and several openings cut through the mass. Explain how mass, negative space, weight, and balance contribute to both physical stability and perceived movement.",
+    "intent": "Analyze sculptural balance and negative space.",
+    "domain": "Sculpture",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "technical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 16,
+    "prompt": "A relief print is made from a matrix in which the raised areas receive ink, producing a reversed image on paper. Explain how matrix, reversal, reproducibility, and editioning shape both the making and circulation of the work.",
+    "intent": "Explain printmaking logic and reproducibility.",
+    "domain": "Printmaking",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "technical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 17,
+    "prompt": "Two impressions from the same print matrix differ because one uses a lighter inking and the artist wipes selected areas before printing. Explain why reproducibility does not necessarily imply visual identity across an edition.",
+    "intent": "Analyze variation within reproducible media.",
+    "domain": "Printmaking",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "material_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 18,
+    "prompt": "A photograph of a demonstration is tightly cropped around three shouting participants, excluding a larger peaceful crowd visible in another frame from the same sequence. Explain how framing and selection affect documentary claims without implying that photography is pure fabrication.",
+    "intent": "Analyze photographic framing and evidentiary limits.",
+    "domain": "Photography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 19,
+    "prompt": "A portrait photograph uses shallow depth of field so the sitter's eyes are sharp while background objects are unreadable. Explain how focus, depth of field, framing, and lighting can shape attention and social representation without allowing a diagnosis of personality.",
+    "intent": "Analyze photographic form and portrait representation.",
+    "domain": "Photography",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "visual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 20,
+    "prompt": "A digital artwork generates a new geometric pattern each time a visitor moves across the room. The artist defines the rules, but no two visitors see exactly the same sequence. Analyze authorship, audience interaction, temporality, and the role of the algorithm as artistic structure rather than merely software choice.",
+    "intent": "Analyze interactive and generative medium structure.",
+    "domain": "Digital and New Media Art",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mixed_evidence",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 21,
+    "prompt": "An installation fills a narrow corridor with suspended translucent sheets, low blue light, and directional sound that becomes louder as visitors approach the exit. Explain how site, movement, sound, light, and duration make the viewer's path part of the work.",
+    "intent": "Analyze spatial and temporal viewer experience.",
+    "domain": "Installation Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 22,
+    "prompt": "A performance lasted two hours and involved an artist repeatedly carrying stones across a gallery. Later, the museum displays five photographs and a one-minute video excerpt. Explain what evidence the documentation preserves and what aspects of duration, bodily effort, and audience experience it cannot fully reproduce.",
+    "intent": "Distinguish performance event from documentation.",
+    "domain": "Performance Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 23,
+    "prompt": "A contemporary artist reconstructs a 1970s performance using the original instructions but different performers, a different venue, and a live stream. Analyze which elements support continuity with the earlier work and which create a new realization.",
+    "intent": "Analyze reconstruction and performance variability.",
+    "domain": "Performance Art",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "interpretation_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 24,
+    "prompt": "A woven ceremonial textile is also used as a functional garment. Its pattern encodes status distinctions recognized within the community. Explain why classifying it only as 'craft' or only as 'fine art' would obscure its function, material practice, and social meaning.",
+    "intent": "Challenge simplistic art/craft boundaries.",
+    "domain": "Craft and Material Practice",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 25,
+    "prompt": "A ceramic vessel has a fully functional interior but an intentionally unstable-looking exterior formed from irregular hand-built coils. Analyze how utility, bodily handling, surface, and sculptural form can coexist rather than cancel one another out.",
+    "intent": "Analyze functional and sculptural dimensions.",
+    "domain": "Ceramics",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "material_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 26,
+    "prompt": "A public monument places an enlarged bronze figure on a tall pedestal in the center of a government square. Explain how hierarchical scale, site, material durability, and civic visibility can contribute to claims of authority, while noting that later audiences may interpret the monument differently.",
+    "intent": "Analyze monument form, function, and reception.",
+    "domain": "Public Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "art_historical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 27,
+    "prompt": "A devotional object was originally handled during ritual but is now displayed behind glass in a museum. Compare how original function and museum display organize different forms of attention, access, and meaning.",
+    "intent": "Compare ritual function and museum reception.",
+    "domain": "Art and Function",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 28,
+    "prompt": "An image contains a figure holding a set of scales, but the prompt supplies no tradition, title, or historical context. Explain what can safely be described, what iconographic hypotheses are possible, and why assigning a single symbolic identity would be premature.",
+    "intent": "Calibrate iconographic interpretation under uncertainty.",
+    "domain": "Iconography",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 29,
+    "prompt": "A palace mural repeatedly depicts a ruler larger than attendants and positioned beneath a solar disk identified by an inscription as a sign of divine legitimacy. Explain how iconographic evidence, scale, patronage, and institutional context can be integrated without reducing the mural to propaganda alone.",
+    "intent": "Integrate form, iconography, and power.",
+    "domain": "Iconology and Cultural Interpretation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "iconographic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 30,
+    "prompt": "An Indigenous community's carved wooden mask was made for performance and is now shown in a gallery without information about dance, music, costume, land/place, or community use. Identify what kinds of contextual evidence would be needed to interpret it responsibly, explain why museum display alone is insufficient, and avoid treating Indigenous artistic practice as timeless or homogeneous.",
+    "intent": "Identify evidentiary needs for context-sensitive interpretation.",
+    "domain": "Indigenous Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 31,
+    "prompt": "A historian argues that a painting was made for private devotion because it is small, portable, and repeatedly shows signs of handling at its edges. What kind of claim is being made, what evidence supports it, and what additional archival or comparative evidence would strengthen it?",
+    "intent": "Assess art-historical claim and evidence.",
+    "domain": "Art Historical Method",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 32,
+    "prompt": "A temple relief from an ancient society shows rulers, workers, animals, and offerings arranged in registers with different figure scales. Analyze how hierarchical scale and register structure can communicate social and ritual order without treating naturalistic perspective as the only valid system.",
+    "intent": "Analyze an ancient visual system without teleology.",
+    "domain": "Ancient Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "art_historical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 33,
+    "prompt": "An ancient funerary object combines durable stone, repeated protective motifs, and inscriptions naming the deceased. Explain how material, ritual function, and iconography can work together, and separate what is directly evidenced from claims about individual belief.",
+    "intent": "Integrate ritual, material, and evidence.",
+    "domain": "Ancient Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mixed_evidence",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 34,
+    "prompt": "A manuscript page from a post-classical court tradition uses flattened gold background, patterned textiles, and scale to emphasize rank. Explain how these choices can be purposeful and sophisticated even though they do not create Renaissance-style linear perspective.",
+    "intent": "Analyze post-classical representation on its own terms.",
+    "domain": "Medieval and Post-Classical Art",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "art_historical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 35,
+    "prompt": "A mosque interior uses repeating geometric ornament, calligraphic bands, and changing light across tiled surfaces. Explain how pattern, text, architecture, and sensory experience can organize meaning without assuming that figural representation is the standard measure of artistic complexity.",
+    "intent": "Analyze ornament and spatial experience in context.",
+    "domain": "Medieval and Post-Classical Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 36,
+    "prompt": "An early modern print circulated an image derived from a painting to viewers who could never see the original. Analyze how reproduction could alter audience, scale, access, and interpretation while also promoting the source image.",
+    "intent": "Analyze circulation through print culture.",
+    "domain": "Early Modern Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "art_historical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 37,
+    "prompt": "An early modern still life depicts imported ceramics, spices, and textiles from several trade networks. Explain how close formal analysis and knowledge of global exchange can be integrated without reducing the work to a simple illustration of commerce.",
+    "intent": "Integrate formal and global historical context.",
+    "domain": "Early Modern Art",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mixed_evidence",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 38,
+    "prompt": "A modern urban painting fragments figures into angular planes while advertisements and mechanical forms crowd the background. Analyze how formal fragmentation and the experience of industrialized city life might be related, while distinguishing evidence from broader historical interpretation.",
+    "intent": "Relate modern form to context cautiously.",
+    "domain": "Modern Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "interpretation_comparison",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 39,
+    "prompt": "A contemporary installation uses discarded consumer packaging collected locally and invites visitors to rearrange the objects. Explain how material, participation, authorship, consumption, and institutional setting contribute to meaning.",
+    "intent": "Analyze contemporary participatory practice.",
+    "domain": "Contemporary Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "mixed_evidence",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 40,
+    "prompt": "Two masks from different cultural traditions share an elongated face and high-contrast surface pattern, but their documented uses differ: one is danced in a funerary ceremony and the other is made for tourist sale. Compare them without assuming shared meaning from visual similarity alone.",
+    "intent": "Compare similar forms across different cultural systems.",
+    "domain": "Global Art History",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 41,
+    "prompt": "A court patron commissions a portrait specifying costume and insignia, while correspondence shows the artist negotiated the pose and background. Explain why the finished work should not be treated as either pure patron control or pure artist autonomy.",
+    "intent": "Analyze patronage and artistic agency.",
+    "domain": "Patronage",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "art_historical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 42,
+    "prompt": "A museum label describes a ceremonial object only through formal style and omits its community function and colonial-era collecting history. Identify the interpretive consequences of the label's choices and propose two evidence-based additions that would broaden understanding without dictating one response.",
+    "intent": "Evaluate museum interpretation and labeling.",
+    "domain": "Museums and Galleries",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "curatorial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 43,
+    "prompt": "A curator has three works about migration: a small fragile drawing requiring low light, a large sound installation audible across rooms, and a participatory wall where visitors add notes. Propose a sequence and spatial arrangement that balances thematic coherence, accessibility, sound bleed, conservation, and audience pacing. Multiple solutions are possible; justify yours.",
+    "intent": "Make and justify a curatorial arrangement.",
+    "domain": "Curatorial Reasoning",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "creative_decision",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 44,
+    "prompt": "An exhibition compares luxury objects and mass-produced versions of similar forms. Explain how layout, sight lines, labels, and object pairing could help visitors compare material, labor, access, and cultural value without implying that higher price equals higher artistic quality.",
+    "intent": "Design an evidence-based exhibition experience.",
+    "domain": "Exhibition Design",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "curatorial_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 45,
+    "prompt": "An object has documented ownership from 1880 to 1938, no records from 1938 to 1952, and complete documentation thereafter. Explain what the gap does and does not establish about provenance, and identify what evidence would be needed before making a claim of wartime displacement.",
+    "intent": "Reason about provenance gaps.",
+    "domain": "Provenance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "provenance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 46,
+    "prompt": "A painting is stylistically close to a master's accepted works. Infrared imaging shows an underdrawing unlike that master's usual practice; pigment analysis is historically compatible; provenance begins fifty years after the master's death; and the workshop is known to have produced close variants. Assess the attribution and calibrate confidence.",
+    "intent": "Integrate competing attribution evidence.",
+    "domain": "Attribution",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "attribution_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 47,
+    "prompt": "A signed sculpture is unquestionably from the artist's workshop, but records indicate that assistants fabricated most of it from the artist's design. Distinguish authorship, workshop production, authenticity, and artistic value rather than collapsing them into one question.",
+    "intent": "Distinguish authorship and authenticity concepts.",
+    "domain": "Authenticity",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "technical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 48,
+    "prompt": "A painted wooden panel is structurally stable but has a darkened varnish, old retouching, and a historically important inscription added a century after the original painting. Compare conservation options that prioritize legibility, reversibility, material stability, and preservation of later history.",
+    "intent": "Evaluate conservation trade-offs.",
+    "domain": "Conservation",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "conservation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 49,
+    "prompt": "A conservator finds that aggressive cleaning would reveal brighter original pigment but would also remove a thin, historically documented glaze added during a major nineteenth-century restoration. Explain why 'returning to the original' is not a neutral goal and propose a decision framework.",
+    "intent": "Analyze restoration ethics and historical layers.",
+    "domain": "Restoration",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "conservation_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 50,
+    "prompt": "X-radiography reveals a different earlier composition beneath a painting, while archival records mention the artist reworking the piece after a patron changed the commission. Explain what the technical evidence can establish, what the archive adds, and what neither source alone proves about artistic intention.",
+    "intent": "Integrate technical art history and archives.",
+    "domain": "Technical Art History",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mixed_evidence",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 51,
+    "prompt": "One critic calls a minimalist sculpture 'empty' because it lacks representation; another argues that its scale, reflective surface, and bodily relation create a demanding perceptual experience. Distinguish descriptive, interpretive, and evaluative claims, and state what criteria would be needed to assess either evaluation.",
+    "intent": "Distinguish claim types and critical criteria.",
+    "domain": "Aesthetics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "aesthetic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 52,
+    "prompt": "Two critics agree that a painting uses compressed space and harsh color but disagree on whether the result is effective. Explain how a strong art-critical response can evaluate the work without treating personal taste as evidence.",
+    "intent": "Explain criteria-based art criticism.",
+    "domain": "Art Criticism",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "aesthetic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 53,
+    "prompt": "A portrait depicts a merchant in expensive clothing beside account books and imported goods. Explain how costume, objects, setting, and patronage can construct social identity and status without allowing a direct inference about the sitter's personality.",
+    "intent": "Analyze social representation in portraiture.",
+    "domain": "Portraiture",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 54,
+    "prompt": "A nineteenth-century landscape foregrounds a fenced estate while laborers appear small in the distance. Explain how land ownership, labor, viewpoint, and picturesque composition might be related, while noting what further historical evidence is needed.",
+    "intent": "Integrate landscape form with class context.",
+    "domain": "Landscape",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mixed_evidence",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 55,
+    "prompt": "A colonial-era image represents a colonized population through repeated costume stereotypes, while contemporary artists from that community deliberately vary dress, pose, setting, and medium in acts of self-representation. Compare the representational strategies, relate them to colonial and postcolonial contexts, and avoid treating identity categories as fixed essences or assuming one postcolonial reading fits every work.",
+    "intent": "Compare stereotype and self-representation.",
+    "domain": "Colonial and Postcolonial Art",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 56,
+    "prompt": "An archive shows that women in an academy could exhibit finished paintings but were excluded from certain forms of life drawing. Explain how institutional access could affect artistic training and career paths without assuming that every artwork by a woman has the same meaning.",
+    "intent": "Analyze gender and institutional access.",
+    "domain": "Art and Gender",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "art_historical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 57,
+    "prompt": "A state-commissioned poster uses a monumental worker, upward diagonals, simplified text, and a limited red-black palette to mobilize public support for an industrial campaign. Analyze the formal strategy, intended audience, and persuasive function without endorsing or opposing the political message.",
+    "intent": "Analyze political imagery neutrally.",
+    "domain": "Art and Politics",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "visual_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 58,
+    "prompt": "A pilgrimage object is small enough to carry, made from durable metal, and worn smooth from repeated handling. Explain how portability, touch, material, and devotional use help account for its form and later museum interpretation.",
+    "intent": "Analyze religious function and material use.",
+    "domain": "Art and Religion",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "material_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 59,
+    "prompt": "An environmental artwork depicts a polluted river but is built from newly fabricated plastic components that cannot be recycled. Explain the difference between environmental subject matter and environmental practice, and identify the criteria needed for a careful evaluation.",
+    "intent": "Distinguish theme from material practice.",
+    "domain": "Art and Environment",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "aesthetic_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 60,
+    "prompt": "A work dismissed by contemporary critics later becomes central to museum collections and textbooks. Explain how reception, collecting, criticism, education, and institutional power can change canonical status without proving that the work's intrinsic properties changed.",
+    "intent": "Analyze reception and canon formation.",
+    "domain": "Reception and Canon Formation",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "art_historical_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 61,
+    "prompt": "A concert poster gives the venue name in the largest type, the performer name in medium type, and the date in tiny low-contrast text. For an audience trying to decide quickly whether to attend, analyze the hierarchy problem and propose a revision grounded in communication goals rather than taste.",
+    "intent": "Evaluate and revise visual hierarchy.",
+    "domain": "Graphic Design",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 62,
+    "prompt": "A museum wayfinding sign uses decorative condensed lettering with tightly spaced lines and low contrast against the wall. Explain how legibility, readability, spacing, scale, and contrast affect function, and identify which changes would likely improve access.",
+    "intent": "Analyze typography for function and access.",
+    "domain": "Typography",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 63,
+    "prompt": "An emergency-exit pictogram must be understood by visitors who speak different languages. Compare the roles of symbol simplification, contrast, directional cues, redundancy, and testing with users.",
+    "intent": "Analyze visual communication for diverse audiences.",
+    "domain": "Visual Communication",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 64,
+    "prompt": "A data poster uses many attractive colors but gives every value the same visual weight, so viewers cannot identify the main trend. Explain why aesthetic complexity and communicative effectiveness are distinct and propose a hierarchy strategy.",
+    "intent": "Improve information design hierarchy.",
+    "domain": "Visual Communication",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 65,
+    "prompt": "A reusable bottle is visually elegant but slippery when wet and difficult to open for users with limited grip strength. Analyze the relationship among form, material, user interaction, visual identity, and accessibility without turning the task into an engineering calculation.",
+    "intent": "Evaluate product design through human-centered criteria.",
+    "domain": "Product and Industrial Design as Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 66,
+    "prompt": "A chair uses inexpensive molded components but deliberately references the silhouette of an elite historical furniture type. Explain how material, visual quotation, production method, affordability, and cultural meaning can interact.",
+    "intent": "Analyze design quotation and social meaning.",
+    "domain": "Product and Industrial Design as Art",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 67,
+    "prompt": "A garment uses an exaggerated shoulder silhouette, reflective textile, and repeated geometric motifs that change when the wearer moves. Analyze how material, body, movement, and social presentation work together.",
+    "intent": "Analyze fashion as moving visual form.",
+    "domain": "Fashion and Textile Arts",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 68,
+    "prompt": "A textile pattern is adapted from a community-specific ceremonial motif for a mass-market fashion line without attribution. Explain what contextual questions about transformation, attribution, community significance, and power relations are needed before labeling the act influence, homage, or appropriation.",
+    "intent": "Analyze appropriation with contextual criteria.",
+    "domain": "Appropriation and Influence",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 69,
+    "prompt": "An advertisement places a product at the visual center, surrounds it with aspirational lifestyle imagery, and uses a slogan in the second-largest type. Explain how layout, image-text relationship, audience assumptions, and branding organize meaning.",
+    "intent": "Analyze advertising as visual culture.",
+    "domain": "Visual Culture",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "design_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 70,
+    "prompt": "A design team must fit the same exhibition text into a wall panel and a handheld brochure. Explain how reading distance, line length, type size, hierarchy, and pacing should change across the two formats while preserving content.",
+    "intent": "Compare typographic decisions across formats.",
+    "domain": "Design Foundations",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 71,
+    "prompt": "A melody uses the notes C4-D4-E4-G4, then repeats the same contour starting on D4: D4-E4-F#4-A4. Identify the relationship between the two phrases and explain how repetition with transposition can create coherence while changing pitch level.",
+    "intent": "Analyze melodic contour and sequence.",
+    "domain": "Melody",
+    "acuity": "routine",
+    "difficulty": 1,
+    "style": "music_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 72,
+    "prompt": "A four-bar rhythm in 4/4 places strong attacks on beat 1, the 'and' of beat 2, beat 4, and the 'and' of beat 1 in the next bar. Explain how syncopation differs from tempo and meter, and describe the resulting sense of displacement.",
+    "intent": "Distinguish rhythm, meter, and tempo.",
+    "domain": "Rhythm and Meter",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "music_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 73,
+    "prompt": "A passage alternates two measures of 3/4 and one measure of 2/4 while maintaining a constant eighth-note pulse. Explain how meter changes while tempo can remain stable, and calculate the total number of quarter-note beats across one three-measure cycle.",
+    "intent": "Connect meter analysis with duration counting.",
+    "domain": "Rhythm and Meter",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 74,
+    "prompt": "A chord progression moves from a stable tonic area to increasingly dissonant sonorities, pauses on an unresolved dominant-function chord, then returns to tonic. Explain how harmonic tension and release are created without claiming that consonance is inherently more expressive than dissonance.",
+    "intent": "Analyze harmonic function and tension.",
+    "domain": "Harmony",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "music_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 75,
+    "prompt": "Three singers perform the same melody simultaneously, but each adds different ornaments and slightly different timing. Explain why this texture is better described as heterophonic than unison monophony, and discuss how variation functions within the shared line.",
+    "intent": "Analyze musical texture.",
+    "domain": "Musical Texture",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "music_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 76,
+    "prompt": "A piece has the sequence A-B-A-C-A, where each return of A is shortened and reorchestrated. Explain why labeling it 'rondo-like' is only the start of the analysis, and discuss how repetition, contrast, and variation shape expectation.",
+    "intent": "Analyze musical form beyond label recall.",
+    "domain": "Musical Form",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "music_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 77,
+    "prompt": "The same melody is first played by solo flute in a high register, then by low strings and bass clarinet in octaves at a louder dynamic. Explain how register, instrumentation, density, and dynamics alter the perceived character while the pitches remain largely the same.",
+    "intent": "Analyze timbre and orchestration.",
+    "domain": "Timbre and Instrumentation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "music_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 78,
+    "prompt": "A live tradition is transmitted mainly through apprenticeship and performance rather than fixed notation. Musicians improvise within learned rhythmic cycles and melodic frameworks. Explain why absence of a full written score does not imply absence of structure or preparation.",
+    "intent": "Analyze transmission and improvisational structure.",
+    "domain": "Ethnomusicology",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 79,
+    "prompt": "Two jazz soloists improvise over the same chord sequence. One closely develops a short motive; the other uses longer lines that anticipate chord changes. Compare how constraint, interaction, stylistic knowledge, and spontaneous decision-making can yield different but valid performances.",
+    "intent": "Compare improvisational strategies.",
+    "domain": "Improvisation",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 80,
+    "prompt": "A recording is assembled from several studio takes, pitch correction, layered vocals, and sampled percussion. Analyze how recording technology changes the relation among composition, performance, editing, and authorship without assuming that studio mediation makes the result less musical.",
+    "intent": "Analyze music technology and authorship.",
+    "domain": "Music and Technology",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "mixed_evidence",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 81,
+    "prompt": "A script says only, 'She gives him the letter.' Production A stages the exchange slowly in silence; Production B has her toss it across the room while laughing. Explain how both can remain textually consistent while creating different subtext and audience expectations.",
+    "intent": "Distinguish dramatic text from performance realization.",
+    "domain": "Theatre Foundations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "theatre_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 82,
+    "prompt": "In a scene, an actor delivers a polite line while stepping backward, avoiding eye contact, and pausing before the final word. Explain how gesture, timing, voice, and movement can complicate the literal dialogue without diagnosing the character psychologically beyond the evidence.",
+    "intent": "Analyze acting choices and subtext.",
+    "domain": "Acting and Performance",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "performance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 83,
+    "prompt": "A director stages a confrontation with the two actors far apart and facing the audience rather than each other. Another staging places them close together in profile. Compare how spatial relationship, sight lines, and audience focus can produce different interpretations.",
+    "intent": "Compare directorial use of space.",
+    "domain": "Directing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "theatre_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 84,
+    "prompt": "A production uses an almost empty stage, harsh side lighting, and amplified footsteps in a scene about institutional surveillance. Explain how set, lighting, sound, and performer movement can support or complicate the interpretation rather than simply illustrate the script.",
+    "intent": "Integrate scenographic elements.",
+    "domain": "Scenography",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "theatre_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 85,
+    "prompt": "A dramaturg proposes cutting a historical reference that modern audiences may not understand, while the director wants to keep it and explain it in program notes. Identify the dramaturgical questions about structure, context, audience, and adaptation that should guide the decision.",
+    "intent": "Reason about dramaturgical adaptation.",
+    "domain": "Dramaturgy",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "theatre_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 86,
+    "prompt": "A dance phrase begins with a sustained reach upward, collapses quickly to the floor, pauses, then repeats traveling backward. Analyze time, weight, flow, direction, and repetition using the movement description only.",
+    "intent": "Analyze dance movement from text description.",
+    "domain": "Dance Foundations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "dance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 87,
+    "prompt": "Two choreographies use the same eight gestures. Version A places dancers in a tight unison line; Version B distributes them across the stage in staggered canon. Compare how spatial pattern, timing, group relation, and repetition change the formal effect.",
+    "intent": "Compare choreographic organization.",
+    "domain": "Choreography",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "dance_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 88,
+    "prompt": "A community dance is performed in a social gathering where participants rotate roles and spectators often join. Explain why analyzing it solely as a fixed stage composition would miss key aspects of participation, transmission, identity, and social function.",
+    "intent": "Analyze dance as cultural practice.",
+    "domain": "Dance and Cultural Context",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "contextualization",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 89,
+    "prompt": "A scene begins with a wide shot showing two characters at opposite ends of a room, then cuts to alternating close-ups as their argument intensifies. Explain how shot scale and editing jointly shift attention from spatial relation to facial performance.",
+    "intent": "Analyze cinematography and editing together.",
+    "domain": "Film and Cinema Foundations",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "film_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 90,
+    "prompt": "A character enters a dark room. The camera remains low and static while a doorway occupies most of the frame and the character appears small in the distance. Explain how angle, framing, depth, and lighting can shape spatial and narrative tension without assigning a single fixed meaning to the low angle.",
+    "intent": "Analyze cinematography contextually.",
+    "domain": "Cinematography",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "film_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 91,
+    "prompt": "Sequence: Shot 1 shows a worker starting a machine; Shot 2 shows spinning gears; Shot 3 shows a crowd moving quickly through a station; Shot 4 returns to the worker looking exhausted. Explain what meaning is produced by juxtaposition and rhythm that is not contained in any single shot.",
+    "intent": "Analyze montage and sequence meaning.",
+    "domain": "Film Editing",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "film_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 92,
+    "prompt": "A film alternates between a person running to a train station and a train preparing to depart, shortening shot duration as both sequences approach the same moment. Explain how cross-cutting and pacing create temporal expectation.",
+    "intent": "Analyze cross-cutting and editing rhythm.",
+    "domain": "Film Editing",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "film_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 93,
+    "prompt": "A scene shows an empty kitchen while a radio news report is audible from another room. A non-diegetic low drone slowly fades in beneath the broadcast. Explain how diegetic and non-diegetic sound layer different kinds of information and affect interpretation of the image.",
+    "intent": "Analyze film sound perspective and source.",
+    "domain": "Sound in Film",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "film_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 94,
+    "prompt": "A dinner scene places one character alone at the end of a long table, dresses the others in similar dark clothing, and lights the isolated character with a warmer pool of light. Explain how blocking, costume, setting, and lighting operate together as mise-en-scène.",
+    "intent": "Integrate mise-en-scène elements.",
+    "domain": "Mise-en-Scène",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "film_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 95,
+    "prompt": "A documentary argues that a redevelopment project displaced residents. It uses interviews with former residents, archival planning documents, and contemporary footage, but includes no interviews with planners and compresses events from ten years into fifteen minutes. Assess how source selection and editing affect the strength and limits of the evidentiary claim without assuming the claim is false.",
+    "intent": "Evaluate documentary evidence and selection.",
+    "domain": "Documentary",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "evidence_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 96,
+    "prompt": "An animation turns a drawn circle gradually into a face, then into a planet without any cut. Explain how frame-by-frame transformation enables forms of visual metamorphosis that would function differently in conventional live-action footage.",
+    "intent": "Analyze medium-specific animation possibilities.",
+    "domain": "Animation",
+    "acuity": "routine",
+    "difficulty": 2,
+    "style": "film_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 97,
+    "prompt": "Compare a static painting that implies a narrative by repeating the same figure at three positions within one image with a stage performance that presents three actions sequentially over five minutes. Explain how each medium constructs time using different resources.",
+    "intent": "Compare temporal construction across media.",
+    "domain": "Cross-Media Analysis",
+    "acuity": "routine",
+    "difficulty": 4,
+    "style": "comparative_analysis",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 98,
+    "prompt": "A gallery wall is 12 meters long. Three framed works are each 1.5 meters wide. The curator wants equal gaps between works and equal end margins, creating four equal spaces in total. Calculate the gap size, then explain how this spacing might affect visual pacing and whether equal spacing is necessarily the best curatorial choice.",
+    "intent": "Use quantitative spacing to support curatorial reasoning.",
+    "domain": "Quantitative Arts Reasoning",
+    "acuity": "routine",
+    "difficulty": 3,
+    "style": "quantitative",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 99,
+    "prompt": "A painting has a documented 17th-century core, a 19th-century overpaint that changed one figure's clothing, and a 20th-century cleaning that removed part of that overpaint. Contemporary viewers know the 19th-century version through reproductions. Assess how formal analysis, material history, reception, and conservation ethics should be integrated when interpreting and displaying the work. Multiple defensible conclusions are possible.",
+    "intent": "Synthesize material history, reception, and conservation.",
+    "domain": "Multi-Layer Arts Reasoning",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "mixed_evidence",
+    "jurisdiction_required": false
+  },
+  {
+    "id": 100,
+    "prompt": "A museum plans an exhibition comparing two visually similar geometric traditions from different regions. One set of works had a documented ritual function; the other emerged in a commercial modern-art market. Several objects are light-sensitive, one community requests restricted display of a ceremonial piece, and the exhibition must remain accessible to general audiences. Propose a curatorial approach that addresses formal comparison, cultural difference, community context, conservation, accessibility, and evidential limits without implying that visual similarity means shared meaning.",
+    "intent": "Integrate cross-cultural, curatorial, conservation, and interpretive constraints.",
+    "domain": "Multi-Layer Arts Reasoning",
+    "acuity": "routine",
+    "difficulty": 5,
+    "style": "curatorial_analysis",
+    "jurisdiction_required": false
+  }
+]
