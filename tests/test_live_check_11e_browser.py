@@ -92,28 +92,28 @@ def test_the_plan_is_shown_before_approve_and_approve_freezes_it(live, page):
         want = Counter(live_plan["labels"][:20])
 
         page.set_viewport_size({"width": 1280, "height": 900})
+        # 11j: the proposal opens as a card in the reader's sheet. The name
+        # goes in first — the sheet covers the header while it is open
         page.goto(base + "/#tab=review")
-        page.wait_for_selector(".card h2:has-text('Review')")
+        page.wait_for_selector("[data-review-head]")
         set_name(page, "Omar")
-        box = page.locator(f"[data-plan-decide='{pid}']")
-        box.wait_for(timeout=E2E_MS)
-        line = box.locator("[data-plan-stage='decide']")
-        page.wait_for_function("el => el.textContent.length > 0", arg=line.element_handle(),
-                               timeout=E2E_MS)
+        page.goto(base + f"/#tab=review&read=proposal:{pid}")
+        page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
+        line = page.locator(f"[data-focus-plan='{pid}'][data-plan-stage='decide']")
+        line.wait_for(timeout=E2E_MS)
+        page.wait_for_selector(f"[data-focus-plan='{pid}'] .chip-static", timeout=E2E_MS)
         # masein's condition: the spread is on the card before anyone approves
         text = line.text_content()
-        assert text.startswith(f"Documents will cover {len(want)} areas: ")
         for d, n in want.items():
             assert f"{d} {n}" in text
         assert line.get_attribute("data-focus-mode") == "area"
-        spread = box.locator(f"[data-spread='{pid}']")
+        spread = page.locator(f"[data-spread='{pid}']")
         assert spread.is_checked() and spread.is_enabled()
-        assert "Spread the documents over these" in box.text_content()
-        box.scroll_into_view_if_needed()
+        assert "Spread the documents over these" in page.locator("#reader").text_content()
         shot(page, "11e-1-plan-before-approve-1280-light.png")
 
         # approved as shown: the plan is frozen, exactly the one on the card
-        page.locator(f".rv[data-proposal='{pid}'] button:has-text('Approve this spec')").click()
+        page.locator(f"[data-approve='{pid}']").click()
         page.wait_for_selector(f"[data-focus-plan='{pid}'][data-plan-stage='generate']",
                                timeout=E2E_MS)
         frozen = api(base, f"/api/proposals/{pid}/focus?count=20")
@@ -132,15 +132,17 @@ def test_unticking_spread_approves_a_plan_with_no_focus(live, page):
                                            "requested_by": "Omar"})["id"]
         wait_proposed(page, base, pid)
         page.goto(base + "/#tab=review")
-        page.wait_for_selector(".card h2:has-text('Review')")
+        page.wait_for_selector("[data-review-head]")
         set_name(page, "Omar")
+        page.goto(base + f"/#tab=review&read=proposal:{pid}")
+        page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
         spread = page.locator(f"[data-spread='{pid}']")
         spread.wait_for(timeout=E2E_MS)
         page.wait_for_function("el => !el.disabled", arg=spread.element_handle(), timeout=E2E_MS)
         spread.uncheck()
         page.wait_for_timeout(5500)                          # a poll: the box stays unticked
         assert not page.locator(f"[data-spread='{pid}']").is_checked()
-        page.locator(f".rv[data-proposal='{pid}'] button:has-text('Approve this spec')").click()
+        page.locator(f"[data-approve='{pid}']").click()
         line = page.locator(f"[data-focus-plan='{pid}'][data-plan-stage='generate']")
         line.wait_for(timeout=E2E_MS)
         page.wait_for_function("el => el.textContent.length > 0", arg=line.element_handle(),
@@ -619,7 +621,9 @@ def test_a_dataset_from_before_11a_says_two_are_missing_on_the_topic_page(live, 
     page.goto(live["base"] + "/#topic=economics")
     line = page.locator("[data-datasets-table] [data-doc-line='2']")
     line.wait_for(timeout=E2E_MS)
-    assert line.text_content() == "18 of 20 documents · 2 missing — reasons not recorded (made before 11a)"
+    # 11j: the row is one line — "reasons not recorded (made before 11a)" is
+    # in the reader, where the documents are
+    assert line.text_content() == "18 of 20 · 2 missing"
     assert page.errors == []
 
 

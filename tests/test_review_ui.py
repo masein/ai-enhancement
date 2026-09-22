@@ -152,42 +152,6 @@ def test_exam_curation_in_the_browser(live, page):
     assert page.errors == []
 
 
-def test_the_review_tab_starts_from_a_topic(live, page):
-    """Pick a topic, see where every model stands on it, read what the judge
-    wrote about the diagnosis-half answers, then propose."""
-    base = live["base"]
-    page.goto(base + "/#tab=review")
-    page.wait_for_selector(".card h2:has-text('Pick a topic')")
-    picker = page.locator(".card", has=page.locator("h2", has_text="Pick a topic"))
-    rows = picker.locator("tbody tr")
-    assert rows.count() >= 10
-    # weakest first, and the weakest model on each topic is named
-    scores = [float(x.split("/")[0]) for x in
-              picker.locator("tbody tr td:nth-child(3)").all_text_contents()]
-    assert scores == sorted(scores)
-    econ = picker.locator("tr[data-pick='Economics']")
-    assert econ.locator("a.mlink").count() == 1
-    econ.get_by_role("button", name="choose").click()
-    detail = page.locator("[data-topic-detail='Economics']")
-    detail.wait_for()
-    assert "across the board" in detail.text_content()
-    assert detail.locator("[data-topic-model]").count() >= 3
-    first = detail.locator("[data-topic-model]").first
-    assert "hidden questions" in first.text_content()
-    # the judge's own words, fetched on demand and labelled
-    first.locator("details.dxex summary").click()
-    page.wait_for_selector("[data-topic-model] details.dxex li", timeout=15000)
-    li = first.locator("details.dxex li").first
-    assert "scored" in li.text_content()
-    assert "wording taken out" in first.text_content()
-    assert "practice answers scored below 3 of 4" in first.text_content()
-    # and the propose button for the model that can be proposed from
-    good = detail.locator("[data-topic-model='fx/good-750m']")
-    assert good.locator("a.propose").count() == 1               # to the topic page
-    assert "no proposal" not in good.text_content()
-    assert page.errors == []
-
-
 # propose → approve → generate → gate → ready is four batch round trips and
 # two poll intervals; on a loaded CI runner that is ordinary, not a flake, so
 # the waits below are generous on purpose rather than tight and re-run.
@@ -201,7 +165,11 @@ def test_review_flow_in_the_browser(live, page):
     page.wait_for_selector(".card h2:has-text('Review')")
     # the AI's line fills in when the service answers
     page.wait_for_function("document.querySelector('#view').textContent.includes('fake/fake-1')")
-    assert "Nothing waiting" in page.locator("#view").text_content()
+    # 11j: with nothing waiting it opens on Datasets, and every view is empty
+    assert page.locator("[data-rv-view='datasets'][aria-selected='true']").count() == 1
+    assert [b.text_content() for b in page.locator("[data-rv-view]").all()] == [
+        "To review (0)", "Ready to generate (0)", "Datasets (0)", "History (0)"]
+    assert "No datasets yet" in page.locator("#view").text_content()
     # a name, once, in the header: every decision on the page records it
     set_name(page, "Omar")
 
@@ -218,52 +186,66 @@ def test_review_flow_in_the_browser(live, page):
     btn.click()
     page.wait_for_selector("[data-action-ok='propose:economics']", timeout=E2E_MS)
     assert "Proposal #" in page.locator("[data-action-ok='propose:economics']").text_content()
+    # 11j: the tab lists it in To review, and it opens as a card in the sheet
     page.goto(base + "/#tab=review")
-    page.wait_for_selector(".card h2:has-text('Review')")
-    card = page.locator(".rv[data-proposal]").first
-    card.locator("textarea").wait_for(timeout=E2E_MS)         # the poller and the 5 s poll
+    page.wait_for_selector("[data-review-head]")
+    row = page.locator("[data-rv-row]").first
+    row.wait_for(timeout=E2E_MS)
+    pid = row.get_attribute("data-rv-row")
+    assert row.locator("td").first.text_content() == "Economics"
+    row.locator("[data-rv-open]").click()
+    page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
+    card = page.locator("#reader")
+    page.wait_for_selector(f"[data-spec-edit='{pid}']", timeout=E2E_MS)
     text = card.text_content()
-    assert "introductory Economics" in text                      # the topic as stored
-    # 11h: plain words on the card; the task id is its title's tooltip
-    assert "judge comments the AI read" in text and "wording taken out" in text
-    assert "hidden questions" in text and "scored below 3 of 4" in text
-    assert "fx/good-750m · Economics" in text
-    assert "judge stub/overlap-v1" in text
-    card.locator("details summary").first.click()
-    # every one it saw, up to the eight shown: graded by Economics' own
-    # criteria now, 6 of good-750m's 39 diagnosis-half answers fell short
-    assert card.locator(".ex").count() == 6
-    assert "scored" in card.locator(".ex").first.text_content()
+    # the missing skill is the editable box's own text while it is to review
+    assert "introductory Economics" in card.locator(f"[data-spec-edit='{pid}']").input_value()
+    assert card.locator(".rd-title").text_content() == "Economics · good-750m"
+    # 11h/11j: plain words, and the count that used to be blank
+    assert "practice answers scored below 3 of 4" in text and "hidden questions" in text
+    assert "—" not in card.locator(f"[data-why-line='{pid}']").text_content()
+    # the answers it read: every one, with the question the reviewer checks it
+    # against — graded by Economics' own criteria, 6 of good-750m's fell short
+    card.locator(f"[data-answers-read='{pid}'] summary").click()
+    page.wait_for_selector("[data-answers-count]", timeout=E2E_MS)
+    assert card.locator("[data-answer-qid]").count() == 6
+    assert "wording taken out" in card.text_content()
     # approve, edited
-    ta = card.locator("textarea")
+    ta = card.locator(f"[data-spec-edit='{pid}']")
     ta.fill(ta.input_value() + " Emphasise direction of effect.")
-    card.get_by_role("button", name="Approve this spec").click()
-    page.wait_for_selector(".rv[data-proposal] :text('Approved as edited')", timeout=E2E_MS)
-    card = page.locator(".rv[data-proposal]").first
-    assert "approved by Omar" in card.text_content()
+    card.locator(f"[data-approve='{pid}']").click()
+    page.wait_for_selector(f"#reader [data-generate='{pid}']", timeout=E2E_MS)
+    card.locator(f"[data-rv-details='{pid}'] summary").click()
+    assert "Omar" in card.locator(f"[data-rv-details='{pid}']").text_content()
+    assert "Approved as edited" in card.text_content()
     # generate
-    card.get_by_label("item count").fill("20")
-    card.get_by_role("button", name="Generate data").click()
-    page.wait_for_selector(".rv[data-dataset]:has-text('ready')", timeout=E2E_MS)
-    ds = page.locator(".rv[data-dataset]").first
-    ds.locator("summary").click()
-    dtext = ds.text_content()
-    # 11a: every document asked for is accounted for, so the summary counts
-    # what the dataset HOLDS against what was asked for — and none of these
-    # twenty went astray, so the line stops there
-    assert "Contamination gate" in dtext
-    did_attr = ds.get_attribute("data-dataset")
-    assert page.locator(f"[data-doc-line='{did_attr}']").text_content() == "20 of 20 documents"
-    assert page.locator(f"[data-missing='{did_attr}']").count() == 0
-    assert "Provenance, in full" in dtext and "approver" in dtext and "items_sha256" in dtext
-    # 11g: Read opens it in the page; the download beside it is the same file
-    assert ds.locator("[data-read-open^='dataset:']").count() == 1
-    href = ds.locator("a:has-text('Download')").get_attribute("href")
+    page.locator("#reader input[type=number]").fill("20")
+    card.locator(f"[data-generate='{pid}']").click()
+    page.wait_for_selector(f"#reader [data-rv-datasets='{pid}']", timeout=E2E_MS)
+    page.goto(base + "/#tab=review&view=datasets")
+    ds = page.locator("[data-ds-row]").first
+    ds.wait_for(timeout=E2E_MS)
+    did_attr = ds.get_attribute("data-ds-row")
+    page.wait_for_function("id => document.querySelector(`[data-doc-line='${id}']`)"
+                           ".textContent === '20 of 20'", arg=did_attr, timeout=E2E_MS)
+    # 11g: Read opens it in the page; the download is in the row's ⋯ menu, and
+    # it is the same file
+    assert ds.locator("[data-ds-read]").count() == 1
+    ds.locator("[data-row-menu]").click()
+    href = page.locator("[role=menuitem][data-act='download']").get_attribute("href")
+    page.keyboard.press("Escape")
     with urllib.request.urlopen(f"{base}/{href}") as r:
         items = [json.loads(x) for x in r.read().decode().splitlines()]
     assert len(items) == 20
+    # the whole provenance is in the reader, where the documents are
+    ds.locator("[data-row-menu]").click()
+    page.locator("[role=menuitem][data-act='provenance']").click()
+    page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
+    prov = page.locator("#reader").text_content()
+    assert "items_sha256" in prov and "approver" in prov
+    page.keyboard.press("Escape")
     # taint it through the API the way a training run would, then look at the board
-    did = int(re.search(r"dataset #(\d+)", dtext).group(1))
+    did = int(did_attr)
     req = urllib.request.Request(f"{base}/api/truns", data=json.dumps(
         {"name": "gap-run", "datasets": [did]}).encode(),
         headers={"Content-Type": "application/json"})
@@ -294,17 +276,8 @@ def test_review_flow_in_the_browser(live, page):
         page.emulate_media(color_scheme=scheme)
         for width in (1240, 430):
             page.set_viewport_size({"width": width, "height": 900})
-            page.goto(base + "/#tab=review")
-            page.wait_for_selector(".rv[data-dataset]")
-            # the button toggles, so only choose when it is not already chosen
-            if page.locator("[data-topic-detail='Economics']").count() == 0:
-                page.locator("tr[data-pick='Economics'] button").click()
-            page.wait_for_selector("[data-topic-detail='Economics']")
-            if page.locator("[data-topic-model] details.dxex[open]").count() == 0:
-                page.locator("[data-topic-model] details.dxex summary").first.click()
-                page.wait_for_selector("[data-topic-model] details.dxex li", timeout=15000)
-            if page.locator(".rv[data-dataset][open]").count() == 0:
-                page.locator(".rv[data-dataset] summary").first.click()
+            page.goto(base + "/#tab=review&view=datasets")
+            page.wait_for_selector("[data-ds-row]")
             page.screenshot(path=SCREENS / f"review-{scheme}-{width}.png", full_page=True)
             assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
             # the model page, exam first, with the before/after on the rubric scale

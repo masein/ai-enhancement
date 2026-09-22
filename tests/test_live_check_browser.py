@@ -224,18 +224,17 @@ def test_the_review_card_says_where_the_documents_go_and_what_went_missing(
         assert len(plan) >= 2
 
         page.set_viewport_size({"width": 1280, "height": 900})
+        # 11j: the name first — the card opens in the sheet, over the header
         page.goto(base + "/#tab=review")
-        page.wait_for_selector(".card h2:has-text('Review')")
+        page.wait_for_selector("[data-review-head]")
         set_name(page, "Omar")
-        card = page.locator(f".rv[data-proposal='{pid}']")
-        card.wait_for(timeout=E2E_MS)
+        page.goto(base + f"/#tab=review&read=proposal:{pid}")
+        page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
         line = page.locator(f"[data-focus-plan='{pid}'][data-plan-stage='generate']")
         line.wait_for(timeout=E2E_MS)
-        # the plan, before anyone presses Generate
-        page.wait_for_function("el => el.textContent.length > 0", arg=line.element_handle(),
-                               timeout=E2E_MS)
+        # the plan, as chips, before anyone presses Generate
+        page.wait_for_selector(f"[data-focus-plan='{pid}'] .chip-static", timeout=E2E_MS)
         text = line.text_content()
-        assert text.startswith(f"Documents will cover {len(plan20)} areas: ")
         for d, n in plan20.items():
             assert f"{d} {n}" in text
         assert not re.search(r"\bfail", text)
@@ -243,29 +242,28 @@ def test_the_review_card_says_where_the_documents_go_and_what_went_missing(
         page.screenshot(path=SCREENS / "11a-review-focus-plan-1280-light.png", full_page=True)
 
         # generate: the toast, when the batch finishes, says what came back
-        # a different count re-asks, and the line follows it
-        card.get_by_label("item count").fill("12")
+        # a different count re-asks, and the chips follow it
+        page.locator("#reader input[type=number]").fill("12")
         for d, n in plan.items():
             page.wait_for_function(
                 "want => document.querySelector(`[data-focus-plan='%s']`)"
                 ".textContent.includes(want)" % pid,
                 arg=f"{d} {n}", timeout=E2E_MS)
-        card.get_by_role("button", name="Generate data").click()
+        page.locator(f"[data-generate='{pid}']").click()
         page.wait_for_selector("[data-toast^='dataset-']", timeout=E2E_MS)
         toast = page.locator("[data-toast^='dataset-']").first.text_content()
         assert "10 of 12 documents · 2 missing — 2 too short (60 words)" in toast
-        # and so does the card, with a line for each missing document
-        ds = page.locator(".rv[data-dataset]").first
-        ds.locator("> summary").click()
-        did = ds.get_attribute("data-dataset")
-        assert page.locator(f"[data-doc-line='{did}']").text_content() == (
-            "10 of 12 documents · 2 missing — 2 too short (60 words)")
-        assert "Documents cover" in page.locator(
-            f"[data-dataset-focus='{did}']").text_content()
-        miss = page.locator(f"[data-missing='{did}']")
-        miss.locator("> summary").click()
-        rows = miss.locator("li").all_text_contents()
-        assert len(rows) == 2
+        # and so does its row, in one line — with the reasons in the reader
+        page.goto(base + "/#tab=review&view=datasets")
+        row = page.locator("[data-ds-row]").first
+        row.wait_for(timeout=E2E_MS)
+        did = row.get_attribute("data-ds-row")
+        assert page.locator(f"[data-doc-line='{did}']").text_content() == "10 of 12 · 2 missing"
+        row.locator("[data-ds-read]").click()
+        page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
+        gone = page.locator("#reader [data-missing-doc]")
+        assert gone.count() == 2
+        rows = gone.all_text_contents()
         assert all("too short (60 words)" in r for r in rows)
         # each names the area it was meant to cover, so the gap in the plan shows
         assert all(any(d in r for d in plan) for r in rows), rows
@@ -287,11 +285,11 @@ def test_a_dataset_from_before_this_pr_says_the_reasons_were_not_recorded(live, 
                            "items": {"generated": 18, "dropped": 0, "kept": 18}}}]
     page.route("**/api/datasets", lambda route: route.fulfill(
         status=200, content_type="application/json", body=json.dumps(old)))
-    page.goto(base + "/#tab=review")
-    page.wait_for_selector(".rv[data-dataset='99']")
-    line = page.locator("[data-doc-line='99']").text_content()
-    assert line == "18 of 20 documents · 2 missing — reasons not recorded (made before 11a)"
-    assert page.locator("[data-missing='99']").count() == 0
+    page.goto(base + "/#tab=review&view=datasets")
+    page.wait_for_selector("[data-ds-row='99']")
+    # 11j: one line on the row; "reasons not recorded (made before 11a)" is
+    # in the reader, where the documents are (11g)
+    assert page.locator("[data-doc-line='99']").text_content() == "18 of 20 · 2 missing"
     assert page.errors == []
 
 

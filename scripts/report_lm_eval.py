@@ -2690,7 +2690,44 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .dlg-field input { font:inherit; font-size:var(--fs-2); color:var(--text-primary); background:var(--plane);
   border:1px solid var(--border); border-radius:var(--r-1); padding:6px 10px; }
 .dlg-check { display:flex; gap:8px; align-items:center; font-weight:600; margin:10px 0; }
+/* a hidden row is hidden, whatever its class says */
+.dlg [hidden] { display:none; }
 .dlg-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+/* ---- 11j: the Review tab — four views, one-line rows, a card in the sheet ---- */
+.rvbar { display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+  flex-wrap:wrap; }
+.rvbar h2 { margin:0; }
+.rvbar .sub { margin:2px 0 0; }
+.rvviews { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+table.rvlist td { vertical-align:middle; }
+table.rvlist tr.clickrow { cursor:pointer; }
+table.rvlist tr.clickrow:hover > td { background:var(--accent-soft); }
+.chip-static { display:inline-block; font-family:var(--font-sans); font-size:var(--fs-1);
+  border:1px solid var(--border); border-radius:999px; padding:2px 10px; margin:0 6px 6px 0;
+  color:var(--muted); }
+.focuschips { display:flex; flex-wrap:wrap; align-items:baseline; gap:0 4px; margin:6px 0 2px; }
+.rd-spec { width:100%; box-sizing:border-box; min-height:150px; font:inherit;
+  font-size:var(--fs-3); line-height:1.45; color:var(--text-primary); background:var(--plane);
+  border:1px solid var(--border); border-radius:var(--r-1); padding:10px 12px; margin:4px 0; }
+.reader .spec { font-size:var(--fs-3); line-height:1.5; margin:4px 0 10px; }
+.rd-acts-row { margin:10px 0 4px; }
+.rd-answers { margin:10px 0; }
+.rd-answers > summary { cursor:pointer; font-weight:600; font-size:var(--fs-2); }
+.rd-answers > summary::-webkit-details-marker { display:none; }
+.rd-alist { margin:8px 0 0; padding-left:22px; display:flex; flex-direction:column; gap:12px; }
+.rd-alist li { padding-bottom:10px; border-bottom:1px solid var(--border); }
+.rd-alist p { margin:0 0 4px; font-size:var(--fs-2); }
+.rd-alist .rd-q { color:var(--text-primary); }
+.rd-alist .rd-a { color:var(--muted); }
+.rd-det { margin-top:14px; }
+.rd-det > summary { cursor:pointer; font-size:var(--fs-1); color:var(--muted); }
+.npdlg { max-width:640px; }
+.nptopics { max-height:46vh; overflow:auto; margin-top:4px; padding-right:4px;
+  grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); }
+.nptopics { row-gap:10px; }
+.nptopics .extopic { cursor:pointer; }
+.nptopics .exnote { padding-bottom:2px; }
+.nptopics .extopic.off { cursor:default; }
 /* ---- the answers, as cards: nothing sideways ---- */
 .anslist { display:flex; flex-direction:column; gap:10px; margin-top:8px; min-width:0; }
 .anscard { display:grid; grid-template-columns:minmax(0,1fr) 140px; gap:8px 16px;
@@ -2735,7 +2772,7 @@ button.who.ask { border-color:var(--warning);
 .moremenu[hidden] { display:none; }
 /* a popover panel lives on the body, so no scroller can clip it — #tabs
    scrolls sideways on a phone, and that clipped More ▾ to 37 px */
-.pop { position:fixed; z-index:60; overflow:auto; overscroll-behavior:contain; }
+.pop { position:fixed; z-index:100; overflow:auto; overscroll-behavior:contain; }
 .pop.whopop { min-width:260px; gap:8px; padding:12px; }
 .pop.whopop p { margin:0; color:var(--text-secondary); }
 .moremenu [role=menuitem] { border:0; background:none; text-align:left; border-radius:var(--r-1);
@@ -2907,7 +2944,9 @@ const state = {
   lbAbout: false,                      // "about these benchmarks" panel open
   lbView: 'tasks',                     // leaderboard columns: 'tasks' | 'cats' (MMLU by category)
   rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '',
-        topic: '', just: {}, justOpen: '', focus: {}, watch: new Set() },  // Review tab
+        // 11j: which of the four views, and the small per-proposal choices
+        view: '', focus: {}, watch: new Set(), answers: {}, answersOpen: 0,
+        spread: {}, count: {}, fmt: {}, rejecting: {}, landed: null },      // Review tab
   ex: { status: null, candidates: [], loaded: false, msg: '', topic: '' },   // Exam tab
   topic: null,                         // open topic page, by slug (hash-routed)
   loop: { rows: null, blocked: '', msg: '', loaded: false, q: '' },          // Loop tab
@@ -5056,7 +5095,10 @@ function overviewLoop() {
 const hashFor = () => (state.model ? 'model=' + encodeURIComponent(state.model)
                                   : state.topic ? 'topic=' + encodeURIComponent(state.topic)
                                   : 'tab=' + state.tab
-                                    + (state.tab === 'leaderboard' && lbHash() ? '&' + lbHash() : ''))
+                                    + (state.tab === 'leaderboard' && lbHash() ? '&' + lbHash() : '')
+                                    // 11j: which Review view, so a link opens it
+                                    + (state.tab === 'review' && state.rv.view
+                                       ? '&view=' + state.rv.view : ''))
   // 11g: an open reader rides along, so a pasted link opens it too
   + (state.read ? '&read=' + encRead(state.read) : '');
 
@@ -5081,6 +5123,11 @@ function routeFromHash() {
   const want = TAB_ALIASES[tab] || tab;
   if (TABS.some(([id]) => id === want)) state.tab = want;
   if (state.tab === 'leaderboard') lbFromHash(t[2] || '');
+  // 11j: "tab=review&view=datasets"
+  if (state.tab === 'review') {
+    const v = /(?:^|&)view=([^&]+)/.exec(t[2] || '');
+    state.rv.view = v && RV_VIEWS.some(([k]) => k === v[1]) ? v[1] : '';
+  }
 }
 
 // slug ↔ topic, from the same map the payload carries (exam_law ↔ law)
@@ -5721,71 +5768,6 @@ function buildBar() {
 // box to tick before "Propose anyway" can be pressed. Esc cancels; focus stays
 // inside and goes back to the button that opened it.
 // ---------------------------------------------------------------------------
-function proposeDialog({ model, topic, gate, returnTo, onDone }) {
-  const back = el('div', { class: 'dlg-back', 'data-dialog': 'propose' });
-  const name = el('input', { type: 'text', value: rememberedName(), 'aria-label': 'your name',
-    placeholder: 'your name (recorded)' });
-  const ack = el('input', { type: 'checkbox', id: 'dlg-ack', 'data-dialog-ack': '1' });
-  const go = el('button', { class: 'primary', text: 'Propose anyway', disabled: '',
-    'data-dialog-go': '1' });
-  const cancel = el('button', { text: 'Cancel', 'data-dialog-cancel': '1' });
-  const err = el('p', { class: 'warn', hidden: '', 'data-dialog-error': '1' });
-  const sync = () => { go.disabled = !(ack.checked && name.value.trim()); };
-  name.addEventListener('input', () => { setWho(name.value.trim()); renderWho(); sync(); });
-  ack.addEventListener('change', sync);
-  const box = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true',
-      'aria-labelledby': 'dlg-title' },
-    el('h2', { id: 'dlg-title', text: gate.provisional ? 'This judge is a small local model'
-                                                       : 'These grades are not evidence yet' }),
-    el('p', { class: 'small', text: `Proposing for ${model} on ${topic}. What is wrong with `
-      + 'the grades:' }),
-    el('ul', { 'data-dialog-reasons': '1' }, (gate.soft || []).map(r => el('li', { text: r }))),
-    el('p', {}, 'Anything proposed from these grades is marked ',
-      el('b', { text: 'proposed over a provisional judge' }),
-      ': the spec, the dataset, and any model trained on it. Use it for demos and trials, '
-      + 'not for results.'),
-    el('label', { class: 'dlg-field' }, el('span', { class: 'small', text: 'your name' }), name),
-    el('label', { class: 'dlg-check', for: 'dlg-ack' }, ack,
-      ' I understand these grades are not evidence'),
-    err,
-    el('div', { class: 'dlg-actions' }, cancel, go));
-  back.append(box);
-  const close = () => {
-    back.remove();
-    document.removeEventListener('keydown', onKey, true);
-    const again = returnTo && document.querySelector(returnTo);
-    if (again) again.focus();
-  };
-  const onKey = e => {
-    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
-    if (e.key !== 'Tab') return;
-    const f = [...box.querySelectorAll('input, button, a[href], select, textarea')]
-      .filter(x => !x.disabled && !x.hidden);
-    if (!f.length) return;
-    const i = f.indexOf(document.activeElement);
-    if (e.shiftKey && (i <= 0)) { e.preventDefault(); f[f.length - 1].focus(); }
-    else if (!e.shiftKey && (i === f.length - 1 || i < 0)) { e.preventDefault(); f[0].focus(); }
-  };
-  cancel.addEventListener('click', close);
-  back.addEventListener('mousedown', e => { if (e.target === back) close(); });
-  go.addEventListener('click', async () => {
-    go.disabled = true; go.textContent = 'Proposing…'; err.hidden = true;
-    try {
-      const j = await post('api/proposals', { model, topic, requested_by: name.value.trim(),
-                                              override_preliminary: true });
-      close();
-      onDone(j);
-    } catch (e) {
-      err.hidden = false;
-      err.replaceChildren(el('b', { text: 'Refused. ' }), String((e && e.message) || e));
-      go.textContent = 'Propose anyway'; sync();
-    }
-  });
-  document.addEventListener('keydown', onKey, true);
-  document.body.append(back);
-  (name.value.trim() ? ack : name).focus();
-}
-
 function lbMini(rows) {
   // 11f: the Leaderboard's rule — the leaders of the whole board (the best
   // average and every one the z-test cannot tell from it) are bold and
@@ -8374,7 +8356,8 @@ function vTraining() {
 // the bank reader asks for the practice half and a count, and the log
 // reader's lines come with any line that quotes one withheld.
 // ===========================================================================
-const READ_KINDS = ['dataset', 'rubric', 'criteria', 'bank', 'log', 'provenance'];
+const READ_KINDS = ['dataset', 'rubric', 'criteria', 'bank', 'log', 'provenance',
+                    'proposal'];
 
 function readStr(r) {
   return r ? [r.kind, r.id, r.n].filter(x => x != null && x !== '').join(':') : '';
@@ -8454,6 +8437,9 @@ async function readFetch(r, extra) {
       const tail = (state.readData[k] || {}).tail || 200;
       data = await api(`api/runs/${encodeURIComponent(r.id)}/lines?tail=${tail}`);
       put({ tail });
+    } else if (r.kind === 'proposal') {
+      // 11j: a proposal opens in the same sheet, as one short card
+      data = await api(`api/proposals/${r.id}`);
     } else if (r.kind === 'provenance') {
       const [what, id] = [r.id.split(':')[0], r.id.split(':').slice(1).join(':')];
       data = what === 'dataset' ? { kind: 'dataset', rec: await api(`api/datasets/${id}`) }
@@ -8551,7 +8537,7 @@ function renderReader() {
     return;
   }
   const build = { dataset: readDataset, rubric: readRubric, criteria: readCriteria, bank: readBank,
-                  log: readLog, provenance: readProvenance }[r.kind];
+                  log: readLog, provenance: readProvenance, proposal: readProposal }[r.kind];
   wrap._aside.onkeydown = null;
   build(wrap, r, got.data, got);
   wrap.dataset.ready = '1';
@@ -9488,6 +9474,13 @@ async function loadReview() {
       toast(`Dataset #${d.id}: ${docLine(d)}`, { key: `dataset-${d.id}`, ms: 12000 });
     }
     Object.assign(state.rv, { llm, proposals: props, datasets: ds, loaded: true });
+    // 11j: a card open in the sheet follows the record it shows
+    const open = state.read && state.read.kind === 'proposal' ? state.read : null;
+    if (changed && open) {
+      const now = props.find(x => String(x.id) === String(open.id));
+      const had = (state.readData[readKey(open)] || {}).data;
+      if (now && JSON.stringify(now) !== JSON.stringify(had)) readFetch(open);
+    }
     if (changed && state.tab === 'review' && !state.model) render();
   } catch (e) { /* server briefly away */ }
 }
@@ -9504,7 +9497,9 @@ async function rvPost(path, body) {
   const pid = (/proposals\/(\d+)\//.exec(path) || [])[1];
   // what this browser asked for, so the toast lands when the batch finishes
   if (r && r.ok && j.dataset_id) state.rv.watch.add(j.dataset_id);
-  if (r && r.ok) toast(/approve$/.test(path) ? `Approved the spec of proposal #${pid}`
+  // 11j: the card in the sheet is one of these records — reload it too
+  if (r && r.ok && state.read && state.read.kind === 'proposal') readFetch(state.read);
+  if (r && r.ok) toast(/approve$/.test(path) ? `Approved the missing skill of proposal #${pid}`
     : /reject$/.test(path) ? 'Rejected' : /generate$/.test(path)
       ? `Dataset #${j.dataset_id} requested — it appears here when the batch completes` : 'Done',
     { key: 'review' });
@@ -9581,339 +9576,6 @@ function renderWho(force = false) {
 // kept for the call sites that used to place a box: they place nothing now
 function rvNameInput() { return ''; }
 
-function rvFindings(p) {
-  const ev = p.evidence || {};
-  const m = DATA.models.find(x => x.id === p.model);
-  const t = m && m.judge && m.judge.tasks[p.task];
-  const out = [el('div', { class: 'kvs' },
-    el('span', {}, el('b', { text: p.category + ' ' }),
-      ev.topic_score_report != null ? `${num(ev.topic_score_report, 2)} / 4` : '—',
-      el('span', { class: 'se', text: ` on ${ev.topic_n_report ?? '—'} hidden questions` })),
-    el('span', {}, el('b', { text: 'practice questions ' }),
-      ev.topic_score_diagnose != null ? `${num(ev.topic_score_diagnose, 2)} / 4` : '—',
-      el('span', { class: 'se', text: ` on ${ev.topic_n_diagnose ?? '—'} answers · `
-        + `${ev.diagnose_weak ?? '—'} scored below 3 of 4` })),
-    el('span', {}, el('b', { text: 'judge ' }), ev.judge_id || '—'))];
-  const caution = (t && t.propose && t.propose.caution) || ev.mmlu_caution;
-  if (caution)
-    out.push(el('p', { class: 'small' }, el('b', { text: 'MMLU for this category: ' }), caution));
-  if (m && m.judgeState && !m.judgeState.ok)
-    out.push(el('p', { class: 'warn', text: 'This model\'s judged numbers are preliminary: '
-      + m.judgeState.reasons.join('; ') + '. Read the spec, but do not treat the topic score '
-      + 'as established.' }));
-  if (!t)
-    out.push(el('p', { class: 'small', text: 'The judged run this was proposed from is no longer '
-      + 'on the board (re-judged, or the model was removed).' }));
-  return el('div', {}, out);
-}
-
-function rvExamples(ev) {
-  const ex = ev.examples || [];
-  if (!ex.length) return '';
-  const det = el('details', {}, el('summary', { class: 'small', style: 'cursor:pointer',
-    text: `Show ${ex.length} of the ${ev.n_shown} judge comments the AI read — practice `
-      + 'questions only, their wording taken out' }));
-  det.append(el('div', { style: 'margin-top:8px' }, ex.map(e => el('div', { class: 'ex' },
-    el('div', { text: e.justification }),
-    el('div', { class: 'kv' }, el('b', { text: `scored ${e.score} of 4` }),
-      e.answer_words != null ? ` · the model wrote ${e.answer_words} words` : '',
-      e.qid ? ` · ${String(e.qid).slice(0, 10)}` : '')))));
-  return det;
-}
-
-// ---------- the Review tab starts from a topic ----------
-// Pick the topic the exam says is weakest, see where every model stands on it
-// and what the judge wrote about the diagnosis-half answers that fell short,
-// then propose. The order here is the loop's order.
-async function loadJust(mid, topic) {
-  const key = mid + '|' + topic;
-  if (state.rv.just[key]) return;
-  state.rv.just[key] = { loading: true, items: [] };
-  try {
-    const r = await fetch(`api/judge/justifications?model=${encodeURIComponent(mid)}`
-      + `&topic=${encodeURIComponent(topic)}`);
-    state.rv.just[key] = await r.json();
-  } catch (e) { state.rv.just[key] = { items: [], error: 'could not load' }; }
-  if (state.tab === 'review' && !state.model) render();
-}
-
-function rvJust(mid, topic) {
-  const key = mid + '|' + topic;
-  const j = state.rv.just[key];
-  const det = el('details', { class: 'dxex', open: state.rv.justOpen === key ? '' : null },
-    el('summary', { text: 'What the judge wrote about the answers that scored below 3 of 4 '
-      + '(practice questions only, their wording taken out)',
-      onclick: () => { state.rv.justOpen = state.rv.justOpen === key ? '' : key;
-                       loadJust(mid, topic); } }));
-  if (state.rv.justOpen !== key) return det;
-  if (!j || j.loading) { det.append(el('p', { class: 'small', text: 'loading…' })); return det; }
-  if (j.error || !(j.items || []).length) {
-    det.append(el('p', { class: 'small', text: j.error
-      || 'The judge wrote no comment on a practice answer that scored below 3 of 4 here.' }));
-    return det;
-  }
-  det.append(el('p', { class: 'small', text: `${j.counts.diagnose_weak} of `
-    + `${j.counts.diagnose_items} practice answers scored below 3 of 4. The first `
-    + `${j.items.length} are shown. A proposal is built from exactly these.` }));
-  det.append(el('ul', {}, j.items.map(it => el('li', {},
-    el('span', { class: 'q', text: it.justification }),
-    el('span', { class: 'kv' }, el('b', { text: `scored ${it.score} of 4` }),
-      it.answer_words != null ? ` · the model wrote ${it.answer_words} words` : '')))));
-  return det;
-}
-
-function rvTopicPicker() {
-  const J = DATA.judged || {};
-  const rows = [];
-  for (const task of (J.exam || [])) {
-    const on = DATA.models
-      .filter(m => m.judge && m.judge.tasks[task] && pubScore(m.judge.tasks[task]) != null)
-      .map(m => ({ m, v: pubScore(m.judge.tasks[task]), t: m.judge.tasks[task] }))
-      .sort((a, b) => a.v - b.v);
-    if (on.length) rows.push({ task, topic: frName(task), on, weakest: on[0] });
-  }
-  rows.sort((a, b) => a.weakest.v - b.weakest.v);
-  if (!rows.length)
-    return el('div', { class: 'card' }, el('h2', { text: 'Pick a topic' }),
-      note('No model has sat the exam yet. Write the bank on the Exam tab, then submit a '
-        + 'model with suite=judged.'));
-  const card = el('div', { class: 'card' }, el('h2', { text: 'Pick a topic' }),
-    el('p', { class: 'sub', text: 'Each topic\'s weakest model, weakest first, on the hidden '
-      + 'questions. A proposal reads only the practice questions; they are never the score.' }),
-    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
-      el('thead', {}, el('tr', {}, el('th', { text: 'topic' }),
-        el('th', { class: 'num', text: 'weakest model' }), el('th', { class: 'num', text: 'its score' }),
-        el('th', { class: 'num', text: 'models judged' }),
-        el('th', { class: 'num', text: 'hidden questions' }), el('th', { text: '' }))),
-      el('tbody', {}, rows.map(r => {
-        const nr = r.weakest.t.n_report ?? r.weakest.t.n;
-        return el('tr', { class: (state.rv.topic === r.topic ? 'domrow' : null)
-                            + (nr < CAT_MIN_N ? ' dim' : ''), 'data-pick': r.topic },
-          el('td', { text: r.topic }),
-          el('td', { class: 'num' }, el('a', { class: 'mlink', text: r.weakest.m.name,
-            href: '#model=' + encodeURIComponent(r.weakest.m.id) })),
-          el('td', { class: 'num', text: `${num(r.weakest.v, 2)} / 4` }),
-          el('td', { class: 'num se', text: String(r.on.length) }),
-          el('td', { class: 'num se', text: String(nr) + (nr < CAT_MIN_N ? ' · noise' : '') }),
-          el('td', {}, el('button', { class: 'tgl' + (state.rv.topic === r.topic ? ' on' : ''),
-            text: state.rv.topic === r.topic ? 'chosen' : 'choose',
-            onclick: () => { state.rv.topic = state.rv.topic === r.topic ? '' : r.topic;
-                             state.rv.justOpen = ''; render(); } })));
-      })))));
-  return card;
-}
-
-function rvTopicDetail(llmOk) {
-  const topic = state.rv.topic;
-  if (!topic) return '';
-  const task = 'exam_' + topic.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-  const on = DATA.models
-    .filter(m => m.judge && m.judge.tasks[task] && pubScore(m.judge.tasks[task]) != null)
-    .map(m => ({ m, v: pubScore(m.judge.tasks[task]), t: m.judge.tasks[task] }))
-    .sort((a, b) => a.v - b.v);
-  const card = el('div', { class: 'card', 'data-topic-detail': topic },
-    el('h2', { text: topic + ' — across the board' }),
-    el('p', { class: 'sub', text: 'Every model that has sat this topic, weakest first. Read '
-      + 'the judge before proposing: if the answers are empty or the suite is preliminary, '
-      + 'there is no topic gap to fix here.' }));
-  for (const { m, v, t } of on) {
-    const g = t.propose;
-    const nr = t.n_report ?? t.n;
-    const row = el('div', { class: 'rv', 'data-topic-model': m.id },
-      el('div', { class: 'mhead' },
-        el('h3', {}, el('a', { class: 'mlink', text: m.name,
-          href: '#model=' + encodeURIComponent(m.id) })),
-        el('span', { class: 'small', text: `${num(v, 2)} / 4 on ${nr} hidden questions `
-          + `· ${num(t.score_diagnose, 2)} / 4 on ${t.n_diagnose} practice`
-          + ((m.tainted || []).includes(task) ? ' · trained on this topic' : '') })),
-      el('div', { class: 'frm' }, g ? proposeBtn(m.id, topic, g) : '', proposeWhy(g),
-        g && g.caution ? el('span', { class: 'propwhy', text: 'caution — MMLU: ' + g.caution }) : ''),
-      rvJust(m.id, topic));
-    card.append(row);
-  }
-  return card;
-}
-
-function rvProposal(p, llmOk) {
-  const ev = p.evidence || {};
-  const head = el('div', { class: 'mhead' },
-    el('h3', { title: p.task, text: `#${p.id} · ${p.model} · ${p.category}` }),
-    el('span', {}, overBadge(p.override), ' ',
-      el('span', { class: stClass(p.status === 'proposed' ? 'queued' : p.status === 'pending'
-        ? 'running' : p.status === 'approved' ? 'done' : p.status), text: p.status })));
-  const meta = el('p', { class: 'small', text:
-    `requested ${p.created_at ? rel(p.created_at) + ' ago' : ''}`
-    + (p.requested_by ? ` by ${p.requested_by}` : '')
-    + (p.proposer ? ` · proposed by ${p.proposer}` : '')
-    + (p.approver ? ` · ${p.status} by ${p.approver}` : '')
-    + (p.prompt_sha ? ` · prompt ${p.prompt_sha.slice(0, 12)}` : '') });
-  const card = el('div', { class: 'rv' + (state.rv.landed === p.id ? ' landed' : ''),
-    'data-proposal': p.id }, head, meta);
-  if (p.status === 'pending')
-    card.append(el('p', { class: 'small', title: `batch ${p.batch_id}`, text: 'Waiting for the AI '
-      + 'to answer. That takes minutes to hours; this page checks by itself.' }));
-  if (p.error) card.append(el('p', { class: 'warn', text: p.error }));
-  if (p.override) card.append(el('p', { class: 'warn', 'data-over-provisional': 'proposal' },
-    el('b', { text: 'Proposed over a provisional judge. ' }),
-    `${p.override.by} proposed this although the grades were not evidence: `
-    + `${(p.override.reasons || []).join('; ')}. The spec, the dataset and any model trained `
-    + 'on it carry the same mark. For demos and trials, not for results.'));
-  if (ev.provisional) card.append(el('p', { class: 'warn', 'data-provisional': 'proposal' },
-    el('b', { text: 'Provisional. ' }), `${upFirst(ev.provisional_reason)}: ${ev.served_model} at `
-    + `${ev.base_url}` + (ev.weights ? ` (weights ${ev.weights})` : '') + '.'));
-  if (p.spec_text) {
-    card.append(el('div', { class: 'dxh', text: 'The missing skill, in the AI\'s words' }));
-    card.append(el('p', { class: 'spec', text: p.spec_text }));
-    card.append(el('div', { class: 'kvs' },
-      ev.share_explained != null ? el('span', {}, el('b', { text: 'explains ' }),
-        pct(ev.share_explained, 0) + ' of the failures shown') : '',
-      el('span', {}, el('b', { text: 'failures ' }),
-        `${ev.diagnose_weak ?? '—'} of ${ev.diagnose_items ?? '—'} practice answers in `
-        + `${p.category} scored below 3 of 4; the AI read ${ev.n_shown ?? '—'} of them`)));
-    if ((ev.patterns || []).length)
-      card.append(el('ul', { class: 'small', style: 'margin:4px 0 6px' },
-        ev.patterns.map(x => el('li', { text: x }))));
-  }
-  if (p.edited_text) {
-    card.append(el('div', { class: 'dxh', text: 'Approved as edited' }));
-    card.append(el('p', { class: 'spec', text: p.edited_text }));
-  }
-  card.append(el('div', { class: 'dxh', text: 'What the judge found on this topic' }));
-  card.append(rvFindings(p));
-  card.append(rvExamples(ev));
-  if (p.status === 'proposed') {
-    const ta = el('textarea', { 'aria-label': 'skill spec to approve' });
-    ta.value = p.spec_text;
-    const reason = el('input', { type: 'text', placeholder: 'why reject it?',
-      style: 'flex:1;min-width:160px', 'aria-label': 'reject reason',
-      'data-reject-reason': String(p.id), 'data-keep': 'reject-' + p.id });
-    // 11e: the plan is part of what is approved, so it is shown beside the
-    // spec — and Approve freezes it. The box survives a poll: it lives in state
-    state.rv.spread = state.rv.spread || {};
-    const on = state.rv.spread[p.id] !== false;
-    const planP = el('p', { class: 'small plan', 'data-focus-plan': String(p.id),
-      'data-plan-stage': 'decide' });
-    const box = el('input', { type: 'checkbox', 'data-spread': String(p.id),
-      checked: on ? '' : null,
-      onchange: e => { state.rv.spread[p.id] = e.target.checked; } });
-    const boxLabel = el('label', { class: 'small spread' }, box,
-      ' Spread the documents over these');
-    fillFocus(p, 20, planP, f => {
-      // no plan to spread over: the box has nothing to turn on
-      const none = !(f.labels || []).length;
-      box.disabled = none;
-      boxLabel.classList.toggle('dim', none);
-    });
-    card.append(el('div', { class: 'dxh', text: 'Decide' }),
-      el('p', { class: 'small', text: 'Edit the spec if it names the wrong skill or leaks a '
-        + 'question. Whatever text is in the box is what the generator will receive — and '
-        + 'the only thing it receives.' }),
-      ta,
-      el('div', { class: 'planbox', 'data-plan-decide': String(p.id) },
-        el('div', { class: 'eyebrow', text: 'Where the documents go' }), planP, boxLabel),
-      // 11f: the decide row is one action cell — Approve, and Reject behind
-      // ⋯, which asks for its reason in place
-      el('div', { class: 'decide' }, actCell('rv-' + p.id,
-        el('button', { class: 'primary', text: 'Approve this spec', onclick: () => rvPost(
-          `api/proposals/${p.id}/approve`, { approver: whoName(), edited_text: ta.value,
-            spread: state.rv.spread[p.id] !== false && !box.disabled }) }),
-        [{ label: 'Reject…', act: 'reject', run: () => {
-          state.rv.rejecting = { ...(state.rv.rejecting || {}), [p.id]: true };
-          state.after = { focus: `[data-reject-reason="${p.id}"]` }; render(); } }],
-        { style: 'justify-content:flex-start' })),
-      (state.rv.rejecting || {})[p.id] ? el('div', { class: 'frm', 'data-reject-form': String(p.id) },
-        reason,
-        el('button', { class: 'danger', text: 'Reject', onclick: () => rvPost(
-          `api/proposals/${p.id}/reject`, { approver: whoName(), reason: reason.value }) }),
-        el('button', { class: 'ghost', text: 'Cancel', onclick: () => {
-          state.rv.rejecting[p.id] = false; render(); } })) : '');
-  }
-  if (p.status === 'approved') {
-    const count = el('input', { type: 'number', value: '20', min: '1', max: '1000',
-      style: 'width:80px', 'aria-label': 'item count' });
-    const fmt = mkSel('format', [['doc', 'documents — prose that teaches the skill'],
-                                 ['free', 'question and answer (comparison only)']],
-      'doc', () => {});
-    const usage = state.rv.llm || {};
-    // the plan Approve froze, read-only: Generate with count N takes its
-    // first N labels (11e). A proposal approved before 11e says so
-    const planP = el('p', { class: 'small plan', 'data-focus-plan': String(p.id),
-      'data-plan-stage': 'generate' });
-    count.addEventListener('input', () => { const n = +count.value;
-      if (n >= 1 && n <= 1000) fillFocus(p, n, planP); });
-    fillFocus(p, +count.value, planP);
-    card.append(el('div', { class: 'dxh', text: 'Generate' }),
-      el('p', { class: 'small', text: 'The AI that writes documents gets the approved missing '
-        + 'skill, the topic, the count, the format and a style rule — never an exam question. '
-        + 'Documents are the default: prose a person could learn from. Every document then '
-        + 'passes the copy check: no document may copy 13 words in a row from any exam or '
-        + 'benchmark question. Today: '
-        + `${usage.usage_today ?? '—'} ${usage.daily_cap == null ? 'AI requests used (no daily limit on '
-            + (usage.provider || 'this provider') + ')' : `of ${usage.daily_cap} AI requests used`}.` }),
-      planP,
-      el('div', { class: 'frm' }, count, fmt,
-        el('button', { class: 'primary', text: 'Generate data', disabled: llmOk ? null : '',
-          title: llmOk ? '' : (usage.reason || 'no AI is set up here to write documents'),
-          onclick: () => rvPost(`api/proposals/${p.id}/generate`,
-            { requester: whoName(), count: +count.value, fmt: fmt.value }) }),
-        // disabled says why, beside it, not only on hover
-        llmOk ? '' : el('span', { class: 'propwhy', 'data-why': 'generate',
-          text: usage.reason || 'no generator is configured on this server' })));
-    if ((p.datasets || []).length)
-      card.append(el('p', { class: 'small', 'data-rv-datasets': String(p.id) }, 'datasets: ',
-        p.datasets.flatMap((d, i) => [i ? ' · ' : '', `#${d.id} ${d.status}`
-          + (d.error ? ' (' + d.error + ')' : ''),
-          d.status === 'ready' ? [' ', readLink({ kind: 'dataset', id: String(d.id) }, 'Read')] : ''])));
-  }
-  if (p.status === 'rejected' && p.reject_reason)
-    card.append(el('p', { class: 'small', text: 'reason: ' + p.reject_reason }));
-  return card;
-}
-
-// 11e: the plan in words, for the first n documents. Area: "Documents will
-// cover 8 areas: Algebra 3 · Probability 3 · …"; concept: "20 documents, one
-// per concept the model missed in the practice half: …"; or the true reason
-// there is none. Labels and counts only — no question text, ever.
-function planText(f, n) {
-  const labels = (f.labels || []).slice(0, n);
-  if (!labels.length) return f.reason ? `Not spread — ${f.reason}.` : '';
-  if (f.mode === 'concept') {
-    const distinct = [...new Set(labels)];
-    return `${labels.length} document${labels.length === 1 ? '' : 's'}, one per concept the `
-      + `model missed in the practice half: ${distinct.join(' · ')}`
-      + (distinct.length < labels.length ? ' — then round again' : '');
-  }
-  const counts = new Map();
-  for (const l of labels) counts.set(l, (counts.get(l) || 0) + 1);
-  return `Documents will cover ${counts.size} ${counts.size === 1 ? 'area' : 'areas'}: `
-    + [...counts].map(([l, k]) => `${l} ${k}`).join(' · ');
-}
-function fillFocus(p, n, into, done) {
-  const key = `${p.id}:${p.status}:${n}`, seen = state.rv.focus[key];
-  const say = f => { into.textContent = f.legacy
-      ? 'Approved before plans were shown — ' + (focusLine(f.plan, 'documents will cover')
-        || 'the documents are not spread by area') + '.'
-      : planText(f, n);
-    into.dataset.focusMode = f.mode || 'off';
-    if (done) done(f); };
-  if (seen) { say(seen); return; }
-  into._seq = (into._seq || 0) + 1;
-  const mine = into._seq;
-  api(`api/proposals/${p.id}/focus?count=${n}`).then(f => {
-    state.rv.focus[key] = f;
-    if (mine === into._seq) say(f);
-  }).catch(() => { /* server briefly away; the line stays as it was */ });
-}
-
-// Where the documents go: the domains whose diagnose-half answers failed,
-// biggest share first. Labels and counts only — no question text ever.
-function focusLine(plan, lead) {
-  const p = (plan || []).filter(x => (x.documents || 0) > 0);
-  if (!p.length) return '';
-  return `${lead} ${p.length} ${p.length === 1 ? 'area' : 'areas'}: `
-    + p.map(x => `${x.domain} ${x.documents}`).join(' · ');
-}
-
 // "18 of 20 documents · 2 missing — 1 too short (87 words), 1 reply not JSON".
 // Every document asked for is accounted for: held, or missing with its reason.
 // A dataset made before 11a recorded no reasons, and says that rather than
@@ -9933,58 +9595,6 @@ function docLine(d) {
   return line + [...by].map(([why, n]) => `${n} ${why}`).join(', ');
 }
 
-function rvDataset(d) {
-  const pv = d.provenance || {};
-  const g = pv.gate || {};
-  const det = el('details', { class: 'rv', 'data-dataset': d.id },
-    el('summary', { style: 'cursor:pointer' },
-      el('b', { text: `dataset #${d.id}` }), ` · ${d.model || '—'} · `
-      + `${d.category || '—'} · ${d.fmt} · `,
-      el('span', { class: stClass(d.status === 'ready' ? 'done' : d.status === 'pending'
-        ? 'running' : 'failed'), text: d.status }),
-      pv.items || d.count != null ? ' · ' + docLine(d) : '',
-      pv.provisional ? ' · provisional' : '', ' ',
-      overBadge(pv.proposed_over_provisional_judge || d.over_provisional_judge),
-      d.download ? [' · ', readLink({ kind: 'dataset', id: String(d.id) }, 'Read'), ' · ',
-        el('a', { href: d.download.replace(/^\//, ''), text: 'Download' })] : ''));
-  if (d.error) det.append(el('p', { class: 'warn', text: d.error }));
-  det.append(el('p', { class: 'small', 'data-doc-line': String(d.id), text: docLine(d) }));
-  const fl = focusLine(pv.focus_plan, 'Documents cover');
-  if (fl) det.append(el('p', { class: 'small', 'data-dataset-focus': String(d.id), text: fl }));
-  const miss = Array.isArray((pv.items || {}).missing) ? pv.items.missing : [];
-  if (miss.length) det.append(el('details', { class: 'rv', 'data-missing': String(d.id) },
-    el('summary', { style: 'cursor:pointer',
-      text: `${miss.length} missing ${miss.length === 1 ? 'document' : 'documents'}, one line each` }),
-    el('ol', { class: 'small' }, miss.map(m => el('li', {},
-      `request ${m.request ?? '—'} · ${m.focus || 'no area'} · ${m.why}`)))));
-  if (pv.provisional) det.append(el('p', { class: 'warn', 'data-provisional': 'dataset' },
-    el('b', { text: 'Provisional. ' }), upFirst(pv.provisional_reason) + ': '
-    + Object.entries(pv.local_models || {}).map(([role, s]) => `${role} ${s.served_model} at `
-      + `${s.base_url}` + (s.weights ? ` (weights ${s.weights})` : '')).join('; ') + '.'));
-  if (g.items_in != null)
-    det.append(el('p', { class: 'small', text: `Contamination gate: ${g.dropped_benchmark} of `
-      + `${g.items_in} items shared a ${g.ngram}-gram with something we evaluate on `
-      + `(${pct(g.share_dropped_benchmark)}, line at ${pct(g.max_share, 0)}`
-      + (g.dropped_exam ? `; ${g.dropped_exam} of them with an EXAM question` : '') + '); '
-      + `${g.dropped_duplicate} near-duplicates collapsed; checked against ${g.benchmark_docs} `
-      + `benchmark documents and ${g.exam_questions ?? 0} exam questions, both halves of each.`
-      + (g.offending_ngrams && g.offending_ngrams.length ? ' First offending n-gram: “'
-        + g.offending_ngrams[0] + '”.' : '') }));
-  const rows = [];
-  // a list of records — the focus plan, the missing documents — is printed as
-  // records, not as [object Object]
-  const one = x => x && typeof x === 'object' ? JSON.stringify(x) : String(x);
-  const walk = (o, pre) => { for (const [k, v] of Object.entries(o || {}))
-    if (v && typeof v === 'object' && !Array.isArray(v)) walk(v, pre + k + '.');
-    else rows.push([pre + k, Array.isArray(v) ? v.map(one).join(' · ')
-      : pre === 'timestamps.' && v ? absT(v) : String(v)]); };
-  walk(pv, '');
-  if (rows.length) det.append(el('div', { class: 'dxh', text: 'Provenance, in full' }),
-    el('dl', { class: 'provlist small' }, rows.flatMap(([k, v]) =>
-      [el('dt', { text: k }), el('dd', { class: 'mono', text: v })])));
-  return det;
-}
-
 // the daily limit is per provider (a paid API's, or LOCAL_DAILY_ITEM_CAP):
 // null is no limit, and the judge's spend is on the judge's line
 const underCap = u => u.daily_cap == null || (u.usage_today || 0) < u.daily_cap;
@@ -9998,56 +9608,544 @@ function usageLine(llm) {
       .join(' · '));
 }
 
+// ---------------------------------------------------------------------------
+// 11j: the Review tab, rebuilt. masein: "If I want to start a new review, or
+// want to review the pending ones, the approved ones and the generated
+// datasets — I think the UX is bad." Four views with their counts, one
+// compact line per row, + New proposal at the top, and a proposal that opens
+// as a short card in the reader's sheet — not a 1,300 px block on the page.
+// ---------------------------------------------------------------------------
+const RV_VIEWS = [['review', 'To review'], ['ready', 'Ready to generate'],
+                  ['datasets', 'Datasets'], ['history', 'History']];
+
+function rvLists() {
+  const props = state.rv.proposals || [];
+  const is = (p, ...s) => s.includes(p.status);
+  return { review: props.filter(p => is(p, 'proposed', 'pending')),
+           ready: props.filter(p => is(p, 'approved')),
+           datasets: state.rv.datasets || [],
+           history: props.filter(p => is(p, 'rejected', 'failed')) };
+}
+// it opens on what is waiting, and on the datasets when nothing is
+function rvView() {
+  if (RV_VIEWS.some(([k]) => k === state.rv.view)) return state.rv.view;
+  return rvLists().review.length ? 'review' : 'datasets';
+}
+
+// One badge, not four warning boxes. Its tooltip gives the reasons in plain
+// words: the server's own sentences are the record, and they live in Details.
+const DEMO_WORDS = [
+  [/stub/i, 'the grader is a stand-in, not a judge'],
+  [/calibrat|kappa|agreement|checked by a person|no person/i,
+   'no person has checked the judge yet'],
+  [/provider|more than one step/i, 'the same AI did more than one step'],
+  [/local|provisional|pinned/i, 'the judge is a small local AI'],
+];
+const demoWords = r => (DEMO_WORDS.find(([re]) => re.test(String(r))) || [, String(r)])[1];
+function demoReasons(p) {
+  const ev = p.evidence || {};
+  const raw = [...(((p.override || p.over_provisional_judge) || {}).reasons || []),
+               ...(ev.provisional ? [ev.provisional_reason || 'a local judge'] : [])];
+  const out = [];
+  for (const r of raw) if (!out.includes(demoWords(r))) out.push(demoWords(r));
+  return out;
+}
+function demoBadge(p, key) {
+  const why = demoReasons(p);
+  if (!why.length) return '';
+  return el('span', { class: 'badge taint', 'data-demo-only': String(key ?? p.id),
+    title: 'for demos and trials, not for results — ' + why.join('; '), text: 'Demo only' });
+}
+function dsDemoBadge(d) {
+  const pv = d.provenance || {};
+  return demoBadge({ id: d.id, override: pv.proposed_over_provisional_judge
+      || d.over_provisional_judge,
+    evidence: { provisional: pv.provisional, provisional_reason: pv.provisional_reason } },
+    'ds' + d.id);
+}
+
+const rvStatusWords = s => s === 'proposed' ? 'To review' : s === 'pending' ? 'Waiting for the AI'
+  : s === 'approved' ? 'Approved' : s === 'rejected' ? 'Rejected' : s === 'failed' ? 'Failed' : s;
+const rvStatusClass = s => s === 'proposed' ? 'queued' : s === 'pending' ? 'running'
+  : s === 'approved' ? 'done' : s;
+const rvStatusChip = p => el('span', { class: stClass(rvStatusClass(p.status)),
+  'data-rv-status': String(p.id), text: rvStatusWords(p.status) });
+const modelName = id => (DATA.models.find(x => x.id === id) || {}).name || id || '—';
+
+// "20 of 20", or "18 of 20 · 2 missing" — the reasons are in the reader
+function dsDocs(d) {
+  const it = (d.provenance || {}).items || {};
+  const kept = it.kept ?? d.kept ?? 0;
+  const req = it.requested ?? (d.provenance || {}).count_requested ?? d.count ?? kept;
+  const gap = Array.isArray(it.missing) ? it.missing.length : Math.max(0, req - kept);
+  return `${kept} of ${req}` + (gap ? ` · ${gap} missing` : '');
+}
+
+const GAP_TIP = 'Pass this to your training run. The run records the dataset, and the '
+  + 'checkpoints it makes are marked as trained on this topic\'s practice data.';
+function useInTraining(d) {
+  return el('button', { class: 'ghost', 'data-ds-flag': String(d.id), title: GAP_TIP,
+    text: 'Use in training ⧉', onclick: () => copyText(`--gap-dataset ${d.id}`) });
+}
+
+// one row for a dataset, here and on the topic page
+function dsRow(d) {
+  return el('tr', { 'data-ds-row': String(d.id) },
+    el('td', { class: 'num se', text: '#' + d.id }),
+    el('td', { text: d.category || '—' }),
+    el('td', { class: 'small', text: modelName(d.model) }),
+    el('td', { class: 'small num nowrap', 'data-doc-line': String(d.id),
+      text: d.status === 'ready' ? dsDocs(d) : rvStatusWords(d.status) }),
+    el('td', { class: 'small se', text: d.requester || '—' }),
+    el('td', { class: 'small se num nowrap',
+      text: d.created_at ? rel(d.created_at) + ' ago' : '—' }),
+    el('td', {}, dsDemoBadge(d)),
+    el('td', { class: 'rowacts' }, actCell('ds-' + d.id,
+      d.status === 'ready'
+        ? [readButton({ kind: 'dataset', id: String(d.id) }, 'Read', { 'data-ds-read': String(d.id) }),
+           useInTraining(d)]
+        : el('span', { class: 'small se', text: d.error ? 'failed' : 'being written' }),
+      [{ label: 'Provenance', act: 'provenance',
+         run: () => openReader({ kind: 'provenance', id: 'dataset:' + d.id }) },
+       d.download ? { label: 'Download', act: 'download',
+                      href: `api/datasets/${d.id}/items.jsonl` } : null,
+       { label: 'Copy the training flag', act: 'copy-flag',
+         run: () => copyText(`--gap-dataset ${d.id}`) },
+       { label: 'Copy dataset id', act: 'copy-id', run: () => copyText(String(d.id), '#' + d.id) }])));
+}
+
+// a proposal row opens the card in the sheet — the whole row, and the link in
+// it for the keyboard
+function rvRow(p) {
+  const key = readStr({ kind: 'proposal', id: String(p.id) });
+  return el('tr', { 'data-rv-row': String(p.id),
+      class: 'clickrow' + (state.rv.landed === p.id ? ' landed' : ''),
+      onclick: e => { if (e.target.closest('a, button')) return;
+        openReader({ kind: 'proposal', id: String(p.id) }, `[data-read-open="${CSS.escape(key)}"]`); } },
+    el('td', {}, readLink({ kind: 'proposal', id: String(p.id) }, p.category || p.task,
+      { 'data-rv-open': String(p.id) })),
+    el('td', { class: 'small', text: modelName(p.model) }),
+    el('td', { class: 'small' }, rvStatusChip(p)),
+    el('td', { class: 'small se', text: p.requested_by || '—' }),
+    el('td', { class: 'small se num nowrap',
+      text: p.created_at ? rel(p.created_at) + ' ago' : '—' }),
+    el('td', {}, demoBadge(p)));
+}
+
+function rvTable(cols, rows, emptyNode) {
+  if (!rows.length) return emptyNode;
+  return el('div', { class: 'lb-wrap' }, el('table', { class: 'jd rvlist' },
+    el('thead', {}, el('tr', {}, cols.map(c => el('th',
+      { class: /^(when|documents)$/.test(c) ? 'num' : null, text: c })))),
+    el('tbody', {}, rows)));
+}
+
+// the focus plan as chips: the first 8 areas, then "+12 more"
+function focusChips(p, n, box, done) {
+  const key = `${p.id}:${p.status}:${n}`;
+  const paint = f => {
+    const labels = (f.labels || []).slice(0, n);
+    box.dataset.focusMode = f.mode || 'off';
+    if (!labels.length) {
+      box.replaceChildren(el('span', { class: 'small se', text: f.legacy
+        ? 'Approved before plans were shown.'
+        : f.reason ? 'Not spread — ' + f.reason + '.' : 'Not spread over areas.' }));
+      if (done) done(f);
+      return;
+    }
+    const counts = new Map();
+    for (const l of labels) counts.set(l, (counts.get(l) || 0) + 1);
+    const all = [...counts];
+    box.replaceChildren(
+      ...all.slice(0, 8).map(([l, k]) => el('span', { class: 'chip-static', text: `${l} ${k}` })),
+      all.length > 8 ? el('span', { class: 'small se', 'data-focus-more': String(all.length - 8),
+        title: all.slice(8).map(([l, k]) => `${l} ${k}`).join(' · '),
+        text: `+${all.length - 8} more` }) : '');
+    if (done) done(f);
+  };
+  if (state.rv.focus[key]) { paint(state.rv.focus[key]); return; }
+  box.replaceChildren(el('span', { class: 'small se', text: 'loading…' }));
+  api(`api/proposals/${p.id}/focus?count=${n}`)
+    .then(f => { state.rv.focus[key] = f; paint(f); })
+    .catch(() => box.replaceChildren(el('span', { class: 'small se',
+      text: 'the plan could not be loaded' })));
+}
+
+// ---- the practice answers the AI read, for the reviewer ---------------------
+state.rv.answers = {};
+async function loadRvAnswers(pid) {
+  if (state.rv.answers[pid] && !state.rv.answers[pid].error) return;
+  state.rv.answers[pid] = { loading: true };
+  try { state.rv.answers[pid] = await api(`api/proposals/${pid}/answers`); }
+  catch (e) { state.rv.answers[pid] = { error: (e && e.message) || String(e) }; }
+  renderReader();
+}
+
+function rvAnswersBlock(p, ev) {
+  const open = state.rv.answersOpen === p.id;
+  const det = el('details', { class: 'rd-answers', 'data-answers-read': String(p.id),
+    open: open ? '' : null },
+    el('summary', { text: `The answers it read (${ev.n_shown ?? '—'}) ▸`,
+      onclick: () => { state.rv.answersOpen = open ? 0 : p.id;
+        if (!open) loadRvAnswers(p.id); } }));
+  if (!open) return det;
+  det.append(el('p', { class: 'small se', 'data-answers-note': '1',
+    text: 'The AI that wrote the missing skill saw only the judge\'s comments, with the '
+      + 'question wording taken out, so no exam wording can reach the training data. You see '
+      + 'the questions so you can check its reading. Practice questions only.' }));
+  const a = state.rv.answers[p.id];
+  if (!a || a.loading) { det.append(skeleton(3, { 'data-loading': 'answers-read' })); return det; }
+  if (a.error) { det.append(el('p', { class: 'warn', text: a.error })); return det; }
+  det.append(el('p', { class: 'small se', 'data-answers-count': String(a.n),
+    text: `${a.n} practice answers` + (a.gone ? `, ${a.gone} no longer on file` : '') + '.' }));
+  det.append(el('ol', { class: 'rd-alist' }, (a.items || []).map(it =>
+    el('li', { 'data-answer-qid': String(it.qid) },
+      el('p', { class: 'rd-q' }, el('b', { text: 'The question. ' }), it.question || '—'),
+      el('p', { class: 'rd-a' }, el('b', { text: 'Its answer. ' }), it.answer || '—'),
+      el('p', { class: 'small' }, el('b', { text: `Scored ${it.score} of 4. ` }), it.comment)))));
+  return det;
+}
+
+// ---- the card in the sheet --------------------------------------------------
+function readProposal(wrap, r, p) {
+  const paint = () => {
+    const ev = p.evidence || {};
+    const llm = state.rv.llm || {};
+    const llmOk = !!llm.configured && underCap(llm);
+    wrap._title.textContent = `${p.category || p.task} · ${modelName(p.model)}`;
+    wrap._src.replaceChildren(el('span', { class: 'se', text: `#${p.id}` }), ' ',
+      rvStatusChip(p), ' ', demoBadge(p), ' ',
+      el('span', { class: 'se', text: (p.requested_by ? `asked by ${p.requested_by}` : '')
+        + (p.created_at ? ` · ${rel(p.created_at)} ago` : '') }));
+    readActs(wrap, { copy: () => p.edited_text || p.spec_text || '' });
+    const body = [];
+    if (p.status === 'pending')
+      body.push(el('p', { class: 'small', text: 'Waiting for the AI to answer. That takes '
+        + 'minutes to hours; this page checks by itself.' }));
+    if (p.error) body.push(el('p', { class: 'warn', text: p.error }));
+    // 1. what is missing, editable while it is to review
+    const ta = el('textarea', { class: 'rd-spec', 'data-spec-edit': String(p.id),
+      'aria-label': 'the missing skill' });
+    ta.value = p.spec_text || '';
+    if (p.spec_text || p.edited_text) {
+      body.push(el('div', { class: 'dxh', text: 'What\'s missing' }));
+      body.push(p.status === 'proposed' ? ta
+        : el('p', { class: 'spec', 'data-spec': String(p.id),
+            text: p.edited_text || p.spec_text }));
+      if (p.edited_text && p.status !== 'proposed')
+        body.push(el('p', { class: 'small se', text: 'Approved as edited.' }));
+    }
+    // 2. why, in one line — this is the count that used to be blank
+    body.push(el('div', { class: 'dxh', text: 'Why' }));
+    body.push(el('p', { class: 'small', 'data-why-line': String(p.id),
+      text: `${ev.diagnose_weak ?? '—'} of ${ev.diagnose_items ?? '—'} practice answers scored `
+        + `below 3 of 4 · ${p.category} score `
+        + (ev.topic_score_report != null ? `${num(ev.topic_score_report, 2)} / 4` : '—')
+        + ` (hidden questions)` }));
+    // 3. the answers it read
+    body.push(rvAnswersBlock(p, ev));
+    // 4. where the documents go
+    const chips = el('div', { class: 'focuschips', 'data-focus-plan': String(p.id),
+      'data-plan-stage': p.status === 'proposed' ? 'decide' : 'generate' });
+    const spreadBox = el('input', { type: 'checkbox', 'data-spread': String(p.id),
+      checked: state.rv.spread[p.id] !== false ? '' : null,
+      onchange: e => { state.rv.spread[p.id] = e.target.checked; } });
+    const spreadLabel = el('label', { class: 'small spread' }, spreadBox,
+      ' Spread the documents over these');
+    const count = el('input', { type: 'number', value: String(state.rv.count[p.id] || 20),
+      min: '1', max: '1000', style: 'width:80px', 'aria-label': 'how many documents',
+      oninput: e => { const n = +e.target.value;
+        if (n >= 1 && n <= 1000) { state.rv.count[p.id] = n; focusChips(p, n, chips); } } });
+    if (p.status === 'proposed' || p.status === 'approved') {
+      body.push(el('div', { class: 'dxh', text: 'Documents will cover' }));
+      body.push(chips);
+      if (p.status === 'proposed') body.push(spreadLabel);
+      focusChips(p, p.status === 'proposed' ? 20 : (state.rv.count[p.id] || 20), chips, f => {
+        const none = !(f.labels || []).length;
+        spreadBox.disabled = none;
+        spreadLabel.classList.toggle('dim', none);
+      });
+    }
+    // 5. what this status can do
+    if (p.status === 'proposed') {
+      const reason = el('input', { type: 'text', placeholder: 'why reject it?',
+        style: 'flex:1;min-width:160px', 'aria-label': 'reject reason',
+        'data-reject-reason': String(p.id), 'data-keep': 'reject-' + p.id });
+      body.push(el('div', { class: 'frm rd-acts-row' },
+        el('button', { class: 'primary', 'data-approve': String(p.id), text: 'Approve',
+          onclick: () => rvPost(`api/proposals/${p.id}/approve`, { approver: whoName(),
+            edited_text: ta.value,
+            spread: state.rv.spread[p.id] !== false && !spreadBox.disabled }) }),
+        el('button', { class: 'ghost', 'data-reject-open': String(p.id), text: 'Reject…',
+          onclick: () => { state.rv.rejecting = { ...(state.rv.rejecting || {}), [p.id]: true };
+            paint();
+            const i = wrap._body.querySelector(`[data-reject-reason="${p.id}"]`);
+            if (i) i.focus(); } })));
+      if ((state.rv.rejecting || {})[p.id]) {
+        const go = el('button', { class: 'danger', 'data-reject': String(p.id), text: 'Reject',
+          disabled: '', onclick: () => rvPost(`api/proposals/${p.id}/reject`,
+            { approver: whoName(), reason: reason.value }) });
+        reason.addEventListener('input', () => { go.disabled = !reason.value.trim(); });
+        body.push(el('div', { class: 'frm', 'data-reject-form': String(p.id) }, reason, go,
+          el('button', { class: 'ghost', text: 'Cancel',
+            onclick: () => { state.rv.rejecting[p.id] = false; paint(); } })));
+      }
+    }
+    if (p.status === 'approved') {
+      const fmt = Select('format', [['doc', 'Documents'], ['free', 'Q&A (for comparison)']],
+        state.rv.fmt[p.id] || 'doc', v => { state.rv.fmt[p.id] = v; },
+        { key: 'rv-fmt-' + p.id });
+      body.push(el('div', { class: 'frm rd-acts-row' }, count, fmt,
+        el('button', { class: 'primary', 'data-generate': String(p.id), text: 'Generate',
+          disabled: llmOk ? null : '',
+          title: llmOk ? '' : (llm.reason || 'no AI is set up here to write documents'),
+          onclick: () => rvPost(`api/proposals/${p.id}/generate`, { requester: whoName(),
+            count: +count.value, fmt: state.rv.fmt[p.id] || 'doc' }) }),
+        llmOk ? '' : el('span', { class: 'propwhy', 'data-why': 'generate',
+          text: llm.reason || 'no AI is set up here to write documents' })));
+    }
+    if (p.status === 'rejected' && p.reject_reason)
+      body.push(el('p', { class: 'small', text: 'Rejected: ' + p.reject_reason }));
+    // 6. the datasets made from it
+    if ((p.datasets || []).length) {
+      body.push(el('div', { class: 'dxh', text: 'Datasets from this proposal' }));
+      body.push(el('p', { class: 'small', 'data-rv-datasets': String(p.id) },
+        p.datasets.flatMap((d, i) => [i ? ' · ' : '',
+          d.status === 'ready' ? readLink({ kind: 'dataset', id: String(d.id) }, '#' + d.id)
+            : el('span', { class: 'se', text: `#${d.id} ${rvStatusWords(d.status)}` })])));
+    }
+    // 7. everything a record needs and a reviewer does not
+    const usage = state.rv.llm || {};
+    const rows = [
+      ['asked by', (p.requested_by || '—') + (p.created_at ? ` · ${absT(p.created_at)}` : '')],
+      [p.status === 'rejected' ? 'rejected by' : 'approved by',
+        p.approver ? p.approver + (p.decided_at ? ` · ${absT(p.decided_at)}` : '') : '—'],
+      ['proposed by', p.proposer || '—'],
+      ['prompt fingerprint', p.prompt_sha ? String(p.prompt_sha).slice(0, 12) : '—'],
+      ['judge', (p.evidence || {}).judge_id || '—'],
+      ['the answers behind it', `${ev.n_shown ?? '—'} of ${ev.diagnose_weak ?? '—'} practice `
+        + `answers that scored below 3 of 4, of ${ev.diagnose_items ?? '—'} in the topic`],
+      ['the copy check', 'Every document a generator writes is checked against every exam and '
+        + 'benchmark question, both halves: no document may copy 13 words in a row from one.'],
+      ['today', (usage.usage || []).map(u => `${u.provider}: ` + (u.cap == null
+        ? `${u.items} AI requests, no daily limit` : `${u.items} of ${u.cap} AI requests`))
+        .join(' · ') || '—'],
+      ['the full reasons', [...(((p.override || {}).reasons) || []),
+        ...(ev.provisional ? [`${ev.provisional_reason}: ${ev.served_model} at ${ev.base_url}`]
+          : [])].join('; ') || 'none recorded'],
+      ['task', p.task],
+    ];
+    body.push(el('details', { class: 'rd-det', 'data-rv-details': String(p.id) },
+      el('summary', { text: 'Details ▸' }),
+      el('dl', { class: 'provlist small' }, rows.flatMap(([k, v]) =>
+        [el('dt', { text: k }), el('dd', { text: String(v) })]))));
+    wrap._body.replaceChildren(...body);
+  };
+  wrap._update = () => paint();
+  paint();
+}
+
+// ---- + New proposal ---------------------------------------------------------
+// One dialog, from the tab itself or from a topic page, with the model and
+// topic filled in. It asks the server's own gate about every topic, so a
+// blocked one says why instead of failing after the click.
+function npTopics(mid) {
+  const J = DATA.judged || {};
+  const m = DATA.models.find(x => x.id === mid);
+  const open = (state.rv.proposals || []).filter(p =>
+    ['proposed', 'pending', 'approved'].includes(p.status) && p.model === mid);
+  return (J.exam || []).map(task => {
+    const jt = m && m.judge && (m.judge.tasks || {})[task];
+    const score = jt ? pubScore(jt) : null;
+    const g = (jt || {}).propose;
+    const has = open.find(p => p.task === task);
+    let why = '';
+    if (!jt || score == null) why = 'not sat yet';
+    else if (has) why = `proposal #${has.id} is open`;
+    else if ((jt.n_report ?? jt.n ?? 0) < CAT_MIN_N)
+      why = `under ${CAT_MIN_N} hidden questions — its score is noise`;
+    else if (g && (g.hard || []).length) why = g.hard[0].short || g.why;
+    return { task, topic: frName(task), score, why, soft: (g && g.soft) || [],
+             overridable: !!(g && g.overridable) };
+  });
+}
+
+function npDialog(pre = {}) {
+  const st = { model: pre.model || '', topic: pre.topic || '', ack: false };
+  const back = el('div', { class: 'dlg-back', 'data-dialog': 'propose' });
+  const err = el('p', { class: 'warn', hidden: '', 'data-dialog-error': '1' });
+  const name = el('input', { type: 'text', value: rememberedName(), 'aria-label': 'your name',
+    placeholder: 'your name (recorded)' });
+  const ack = el('input', { type: 'checkbox', id: 'dlg-ack', 'data-dialog-ack': '1' });
+  const ackRow = el('label', { class: 'dlg-check', for: 'dlg-ack' }, ack,
+    ' I understand these grades are not evidence');
+  const demoNote = el('p', { class: 'small', 'data-dialog-demo': '1' });
+  const go = el('button', { class: 'primary', 'data-dialog-go': '1', text: 'Propose' });
+  const cancel = el('button', { 'data-dialog-cancel': '1', text: 'Cancel' });
+  const topicBox = el('div', { class: 'exareas nptopics', 'data-np-topics': '1' });
+  const judged = DATA.models.filter(m => m.judge && Object.keys(m.judge.tasks || {})
+    .some(t => t.startsWith('exam_')));
+  const sync = () => {
+    const t = st.model ? npTopics(st.model).find(x => x.topic === st.topic) : null;
+    const soft = t && !t.why && t.soft.length ? t.soft : [];
+    demoNote.replaceChildren(soft.length
+      ? el('span', { 'data-dialog-reasons': '1' }, el('b', { text: 'Demo only. ' }),
+        'These grades are not evidence yet — '
+        + demoReasons({ override: { reasons: soft } }).join('; ')
+        + '. Anything made from this proposal carries the same mark: the missing skill, the '
+        + 'dataset, and any model trained on it. For demos and trials, not for results.')
+      : '');
+    ackRow.hidden = !soft.length;
+    go.disabled = !(st.model && st.topic && name.value.trim() && (!soft.length || ack.checked));
+  };
+  const paintTopics = () => {
+    const rows = npTopics(st.model);
+    const byName = Object.fromEntries(rows.map(x => [x.topic, x]));
+    if (st.topic && (!byName[st.topic] || byName[st.topic].why)) st.topic = '';
+    const areas = Object.entries(DATA.meta.areas || {}).map(([a, names]) =>
+      [a, names.map(n => byName[n]).filter(Boolean)
+        .sort((x, y) => (x.score ?? 9) - (y.score ?? 9) || x.topic.localeCompare(y.topic))])
+      .filter(([, xs]) => xs.length);
+    topicBox.replaceChildren(...areas.map(([a, xs]) => el('div', { class: 'exarea',
+        role: 'group', 'aria-label': a },
+      el('div', { class: 'exhead' }, el('span', { text: a })),
+      xs.map(x => el('label', { class: 'extopic' + (x.why ? ' off' : ''),
+          'data-np-topic': x.topic, 'data-np-why': x.why || null },
+        el('input', { type: 'radio', name: 'np-topic', disabled: x.why ? '' : null,
+          checked: st.topic === x.topic ? '' : null,
+          onchange: () => { st.topic = x.topic; sync(); } }),
+        el('span', { class: 'exname', title: x.topic, text: x.topic }),
+        el('span', { class: 'exst', text: x.score != null ? `${num(x.score, 2)} / 4` : '' }),
+        // the name keeps its line; the reason goes under it
+        x.why ? el('span', { class: 'exnote', text: x.why }) : '')))));
+    // a topic filled in from a topic page is in view, not scrolled past
+    const on = topicBox.querySelector('input:checked');
+    if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+    sync();
+  };
+  const models = Combobox('model', modelGroups(judged.map(m => ({ id: m.id }))), st.model,
+    v => { st.model = v; paintTopics(); }, { key: 'np-model', placeholder: 'find a model' });
+  const box = el('div', { class: 'dlg npdlg', role: 'dialog', 'aria-modal': 'true',
+      'aria-labelledby': 'dlg-title' },
+    el('h2', { id: 'dlg-title', text: 'New proposal' }),
+    el('p', { class: 'small', text: 'The AI reads what the judge wrote about this model\'s '
+      + 'practice answers on the topic, and names the skill that is missing. It never sees a '
+      + 'question.' }),
+    el('label', { class: 'dlg-field' }, el('span', { class: 'small', text: 'model' }), models),
+    el('div', { class: 'dlg-field' }, el('span', { class: 'small', text: 'topic' }), topicBox),
+    demoNote, ackRow,
+    el('label', { class: 'dlg-field' }, el('span', { class: 'small', text: 'your name' }), name),
+    err,
+    el('div', { class: 'dlg-actions' }, cancel, go));
+  back.append(box);
+  const close = () => {
+    back.remove();
+    document.removeEventListener('keydown', onKey, true);
+    const again = pre.returnTo && document.querySelector(pre.returnTo);
+    if (again) again.focus();
+  };
+  const onKey = e => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab' || POP.panel) return;
+    const f = [...box.querySelectorAll('input:not([disabled]), button:not([disabled]), textarea')]
+      .filter(x => x.offsetParent);
+    if (!f.length) return;
+    const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && (i === f.length - 1 || i < 0)) { e.preventDefault(); f[0].focus(); }
+  };
+  name.addEventListener('input', () => { setWho(name.value.trim()); renderWho(); sync(); });
+  ack.addEventListener('change', sync);
+  cancel.addEventListener('click', close);
+  back.addEventListener('mousedown', e => { if (e.target === back) close(); });
+  go.addEventListener('click', async () => {
+    const t = npTopics(st.model).find(x => x.topic === st.topic) || {};
+    go.disabled = true; go.textContent = 'Proposing…'; err.hidden = true;
+    try {
+      const j = await post('api/proposals', { model: st.model, topic: st.topic,
+        requested_by: name.value.trim(),
+        ...(t.soft && t.soft.length ? { override_preliminary: true } : {}) });
+      close();
+      state.rv.loaded = false;
+      toast(`Proposal #${j.id} requested — ${st.topic}`
+        + (t.soft && t.soft.length ? ' · over a provisional judge' : ''),
+        { key: 'propose', go: goReview, link: 'Review' });
+      await loadReview();
+      // from a topic page, the person stays on it; from the tab, the new
+      // proposal is in To review
+      if (pre.stay) { state.loop.loaded = false; loadLoop(); render(); return; }
+      state.rv.view = 'review';
+      if (state.tab === 'review') render(); else navigate({ tab: 'review', topic: null, model: null });
+    } catch (e) {
+      err.hidden = false;
+      err.replaceChildren(el('b', { text: 'Refused. ' }), String((e && e.message) || e));
+      go.textContent = 'Propose'; sync();
+    }
+  });
+  document.addEventListener('keydown', onKey, true);
+  document.body.append(back);
+  if (st.model) paintTopics(); else sync();
+  (st.model && st.topic ? (name.value.trim() ? go : name) : models).focus();
+}
+
+// ---- the tab ----------------------------------------------------------------
 function vReview() {
-  if (!state.rv.loaded && netReady()) { loadReview(); }
+  if (!state.rv.loaded && netReady()) loadReview();
   rememberedName();
   const llm = state.rv.llm || {};
-  const llmOk = !!llm.configured && underCap(llm);
-  const llmCard = el('div', { class: 'card' },
-    el('h2', { text: 'Review' }),
-    el('p', { class: 'sub', text: 'The AI reads what the judge wrote about one model\'s '
-      + 'practice answers on a weak topic, and names the skill that is missing. You approve, '
-      + 'edit or reject it. Only the approved text reaches the AI that writes documents. '
-      + 'Every decision is recorded under your name.' }),
-    el('div', { class: 'kvs' },
-      el('span', {}, el('b', { text: 'the AI ' }), llm.configured
-        ? `${llm.provider}/${llm.model || '—'}` : 'not configured'),
+  const L = rvLists();
+  const view = rvView();
+  const howto = el('details', { class: 'howto small', 'data-how-review': '1' },
+    el('summary', { text: 'How this works ▸' }),
+    el('p', { class: 'small', text: 'A proposal reads what the judge wrote about one model\'s '
+      + 'practice answers on a weak topic — never the questions — and names the skill that is '
+      + 'missing. You approve, edit or reject that sentence, and only the approved words reach '
+      + 'the AI that writes documents. Every document is then checked against every exam and '
+      + 'benchmark question: none may copy 13 words in a row. Every decision is recorded under '
+      + 'your name.' }),
+    el('p', { class: 'small' }, el('b', { text: 'the AI ' }), llm.configured
+      ? `${llm.provider}/${llm.model || '—'}` : 'not set up here', ' · ',
       llm.configured ? usageLine(llm) : '',
-      llm.datasets_quota_bytes ? el('span', {}, el('b', { text: 'dataset storage ' }),
-        `${(llm.datasets_bytes / 1e6).toFixed(1)} MB of ${(llm.datasets_quota_bytes / 1e9).toFixed(0)} GB`) : ''),
+      llm.datasets_quota_bytes ? ` · storage ${(llm.datasets_bytes / 1e6).toFixed(1)} MB of `
+        + `${(llm.datasets_quota_bytes / 1e9).toFixed(0)} GB` : ''));
+  const head = el('div', { class: 'card', 'data-review-head': '1' },
+    el('div', { class: 'rvbar' },
+      el('div', {}, el('h2', { text: 'Review' }),
+        el('p', { class: 'sub', text: 'What the AI says each model is missing, and the data '
+          + 'made from it.' })),
+      el('button', { class: 'primary', 'data-new-proposal': '1', text: '+ New proposal',
+        onclick: () => npDialog({ returnTo: '[data-new-proposal]' }) })),
+    howto,
+    el('div', { class: 'rvviews', role: 'tablist', 'aria-label': 'review views' },
+      RV_VIEWS.map(([k, label]) => el('button', { class: 'chip-btn' + (k === view ? ' on' : ''),
+        role: 'tab', 'data-rv-view': k, 'aria-selected': String(k === view),
+        text: `${label} (${L[k].length})`,
+        onclick: () => { state.rv.view = k; navigate({ tab: 'review' }); } }))),
     !llm.configured && llm.reason ? el('p', { class: 'warn', text: llm.reason }) : '',
-    // the name every decision on this page — and every propose click — is
-    // recorded under. Remembered in this browser; there is no login to read it from
-    el('div', { class: 'frm', style: 'margin-top:8px' }, rvNameInput(),
-      el('span', { class: 'small', text: 'recorded on proposals you request and specs you '
-        + 'approve or reject' })),
     state.rv.msg ? el('p', { class: 'small', text: state.rv.msg }) : '');
-  const props = state.rv.proposals || [];
-  const waiting = props.filter(p => p.status === 'pending' || p.status === 'proposed');
-  const approved = props.filter(p => p.status === 'approved');
-  const closed = props.filter(p => p.status === 'rejected' || p.status === 'failed');
-  const sec = (title, sub, list, emptyNote) => el('div', { class: 'card' },
-    el('h2', { text: title }), el('p', { class: 'sub', text: sub }),
-    list.length ? list.map(p => rvProposal(p, llmOk)) : emptyNote);
-  return [llmCard, rvTopicPicker(), rvTopicDetail(llmOk),
-    sec('Awaiting review', 'Read the judged numbers first: if the suite is preliminary or the '
-      + 'model wrote nothing on this topic, the button that made this proposal should have '
-      + 'been disabled — reject it.', waiting,
-      empty('Nothing waiting — no proposals yet. A proposal starts on a topic page, from '
-        + 'what the judge wrote about the answers.', 'Propose from a topic page →',
-        () => navigate({ tab: 'loop', topic: null, model: null }))),
-    sec('Approved — ready to generate', 'The spec below is exactly what the generator '
-      + 'receives.', approved, empty('No approved specs yet. Approve one above, and it waits '
-        + 'here to be generated from.')),
-    el('div', { class: 'card' }, el('h2', { text: 'Datasets' }),
-      el('p', { class: 'sub', text: 'Generated, gated, and recorded. A training run that '
-        + 'consumes one registers it (datasets=[id] on the run), and every checkpoint of '
-        + 'that run then carries the taint badge and loses the task from its average.' }),
-      (state.rv.datasets || []).length ? (state.rv.datasets || []).map(rvDataset)
-        : empty('No datasets yet. Generate one from an approved spec above.')),
-    closed.length ? el('details', { class: 'card' },
-      el('summary', { style: 'cursor:pointer', text: `${closed.length} rejected or failed` }),
-      closed.map(p => rvProposal(p, llmOk))) : ''];
+  const PCOLS = ['topic', 'model', 'status', 'asked by', 'when', ''];
+  const body = el('div', { class: 'card', 'data-rv-list': view });
+  if (view === 'datasets') {
+    body.append(el('h2', { text: 'Datasets' }),
+      el('p', { class: 'sub', text: 'What the AI wrote, after the copy check. Read one here, '
+        + 'or hand it to a training run.' }),
+      rvTable(['#', 'topic', 'model', 'documents', 'made by', 'when', '', ''],
+        L.datasets.map(dsRow),
+        empty('No datasets yet. Approve a proposal, then generate from it.')));
+  } else {
+    const sub = { review: 'Proposals waiting for a person. Open one to read it.',
+      ready: 'Approved. Generate the documents when you are ready.',
+      history: 'Rejected and failed proposals.' }[view];
+    body.append(el('h2', { text: RV_VIEWS.find(([k]) => k === view)[1] }),
+      el('p', { class: 'sub', text: sub }),
+      rvTable(PCOLS, L[view].map(rvRow),
+        empty(view === 'review' ? 'Nothing waiting. Start one with + New proposal.'
+          : view === 'ready' ? 'Nothing approved yet. Approve one in To review.'
+          : 'Nothing rejected or failed.',
+          view === 'review' ? '+ New proposal' : '',
+          view === 'review' ? () => npDialog({ returnTo: '[data-new-proposal]' }) : null)));
+  }
+  return [head, body];
 }
 
 // The judged card's answers section on a model page: pick one of this model's
@@ -10204,14 +10302,13 @@ function loopGo(r, step) {
     return navigate({ tab: 'exam', topic: null, model: null });
   }
   if (step === 'review' || step === 'generate') {
-    state.rv.topic = r.topic; state.rv.loaded = false;
-    // to the proposal the step is about, marked — not the top of Review,
+    // 11j: to the proposal itself, open in the sheet — not the top of a tab
     // where the reader had to find it among every other proposal
+    state.rv.loaded = false;
     const pid = r.proposal && r.proposal.id;
-    if (pid) { state.rv.landed = pid; state.after = { scroll: `.rv[data-proposal="${pid}"]` };
-               setTimeout(() => { if (state.rv.landed === pid) { state.rv.landed = null; render(); } },
-                          LANDED_MS); }
-    return navigate({ tab: 'review', topic: null, model: null });
+    state.rv.view = step === 'generate' ? 'ready' : 'review';
+    return navigate({ tab: 'review', topic: null, model: null,
+                      read: pid ? { kind: 'proposal', id: String(pid) } : null });
   }
   if (step === 'sit') {
     state.loopSit.tasks = [r.task]; state.loopSit.page = r.task;
@@ -10241,8 +10338,8 @@ function loopBtn(r) {
   const items = [
     { label: 'Open the topic', act: 'topic', run: () => loopGo(r, 'topic') },
     r.last_judged ? { label: 'Read the results', act: 'read', run: () => loopGo(r, 'read') } : null,
-    r.proposal ? { label: `Open proposal #${r.proposal.id}`, act: 'proposal', run: () => {
-      state.rv.topic = r.topic; navigate({ tab: 'review', topic: null }); } } : null];
+    r.proposal ? { label: `Open proposal #${r.proposal.id}`, act: 'proposal',
+                   run: () => loopGo(r, 'review') } : null];
   return el('div', {}, actCell('loop-' + r.slug, b, items),
     st.ok ? '' : el('div', { class: 'propwhy', 'data-why': st.step,
       title: st.why, text: st.short || st.why || '' }));
@@ -10283,13 +10380,9 @@ function proposeControl(r) {
   if (gate.overridable)
     return el('div', {}, el('button', { ...attrs, class: 'secondary dot-warn',
       'data-gate': 'overridable', text: 'Propose…', title: gate.why,
-      onclick: () => proposeDialog({ model, topic: r.topic, gate,
-        returnTo: `[data-propose="${r.slug}"]`,
-        onDone: j => { toast(done(j) + ' — over a provisional judge',
-                         { key: 'propose', go: goReview, link: 'Review' });
-                       actState(slot).ok = `Proposal #${j.id} requested for ${model}. It is marked `
-                         + '"proposed over a provisional judge", and so is everything made from it.';
-                       state.loop.loaded = false; state.rv.loaded = false; loadLoop(); render(); } }) }),
+      // 11j: the same dialog the Review tab opens, with these two filled in
+      onclick: () => npDialog({ model, topic: r.topic, stay: true,
+        returnTo: `[data-propose="${r.slug}"]` }) }),
       el('div', { class: 'propwhy', 'data-why': 'propose', title: gate.why,
         text: 'the judge is provisional — Propose… says what that means' }), actNote(slot));
   return el('div', {}, el('button', { ...attrs, class: 'primary', disabled: '', 'data-gate': 'hard',
@@ -10421,9 +10514,9 @@ function vLoop() {
                 onclick: e => { e.preventDefault(); loopGo(r, 'sit'); } }))
           : el('span', { class: 'se', text: '—' })),
       el('td', { class: 'small' }, r.proposal
-        ? el('a', { href: '#tab=review', text: `#${r.proposal.id} ${r.proposal.status}`,
-            onclick: e => { e.preventDefault(); state.rv.topic = r.topic;
-              navigate({ tab: 'review', topic: null }); } })
+        ? el('a', { href: '#tab=review', text: `#${r.proposal.id} `
+              + rvStatusWords(r.proposal.status).toLowerCase(),
+            onclick: e => { e.preventDefault(); loopGo(r, 'review'); } })
         : el('span', { class: 'se', text: '—' })),
       el('td', { class: 'small' }, r.datasets.length
         ? r.datasets.map(d => el('div', { class: 'se', text: `#${d.id} ${d.status}` }))
@@ -11194,8 +11287,7 @@ function loopOutputPanel(r) {
       + (r.proposal.requested_by ? `, requested by ${r.proposal.requested_by}` : ''), ' ',
       overBadge(r.proposal.override), '. ',
       el('a', { href: '#tab=review', text: 'Review it',
-        onclick: e => { e.preventDefault(); state.rv.topic = r.topic;
-          navigate({ tab: 'review', topic: null }); } })));
+        onclick: e => { e.preventDefault(); loopGo(r, 'review'); } })));
   } else {
     card.append(el('p', { class: 'small' }, 'No open proposal. '
       + (r.next.step === 'propose' ? 'Propose from the top of this page.' : '')));
@@ -11203,32 +11295,18 @@ function loopOutputPanel(r) {
   const ready = (r.datasets || []).filter(d => d.status === 'ready');
   if (ready.length) {
     card.append(el('div', { class: 'dxh', text: 'Datasets from this topic' }));
-    card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-datasets-table': '1' },
-      el('thead', {}, el('tr', {}, el('th', { text: 'dataset' }), el('th', { class: 'num', text: 'documents' }),
-        el('th', { text: 'hand to training' }), el('th', { class: 'num', text: '' }))),
-      el('tbody', {}, ready.map(d => el('tr', { 'data-dataset': String(d.id) },
-        el('td', {}, el('a', { href: `api/datasets/${d.id}`, target: '_blank', rel: 'noopener',
-          text: `#${d.id}` }), ' ', overBadge(d.over_provisional_judge),
-          // 11e: what is missing and why, as on the Review card — and for a
-          // dataset made before 11a, that the reasons were not recorded
-          el('div', { class: 'se', 'data-doc-line': String(d.id), text: docLine({ ...d,
-            provenance: { items: { kept: d.kept ?? d.count, requested: d.count,
-              ...(Array.isArray(d.missing) ? { missing: d.missing } : {}) } } }) })),
-        el('td', { class: 'num', text: String(d.kept ?? d.count) }),
-        el('td', {}, el('code', { class: 'mono', text: `--gap-dataset ${d.id}` }),
-          el('div', { class: 'se', text: 'the training run that consumes it registers it, and '
-            + 'its checkpoints carry the taint badge on this topic' })),
-        el('td', { class: 'rowacts' }, actCell('ds-' + d.id,
-          // 11g: Read is the main action, and Download stays beside it
-          [readButton({ kind: 'dataset', id: String(d.id) }, 'Read', { 'data-ds-read': String(d.id) }),
-           el('a', { class: 'dllink small', 'data-ds-download': String(d.id), text: 'Download',
-             href: `api/datasets/${d.id}/items.jsonl`, download: '' })],
-          [{ label: 'Provenance', act: 'provenance',
-             run: () => openReader({ kind: 'provenance', id: 'dataset:' + d.id }) },
-           { label: 'Copy the training flag', act: 'copy-flag',
-             run: () => copyText(`--gap-dataset ${d.id}`) },
-           { label: 'Copy dataset id', act: 'copy-id', run: () => copyText(String(d.id), '#' + d.id) }]))
-        ))))));
+    // 11j: the same one-line row as the Review tab's Datasets view
+    card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd rvlist',
+      'data-datasets-table': '1' },
+      el('thead', {}, el('tr', {}, el('th', { text: '#' }), el('th', { text: 'topic' }),
+        el('th', { text: 'model' }), el('th', { class: 'num', text: 'documents' }),
+        el('th', { text: 'made by' }), el('th', { class: 'num', text: 'when' }),
+        el('th', { text: '' }), el('th', { text: '' }))),
+      el('tbody', {}, ready.map(d => dsRow({ ...d,
+        provenance: d.provenance || { items: { kept: d.kept ?? d.count, requested: d.count,
+          ...(Array.isArray(d.missing) ? { missing: d.missing } : {}) } },
+        category: d.category || r.topic, model: d.model || (r.last_judged || {}).model,
+        status: d.status, download: `api/datasets/${d.id}/items.jsonl` }))))));
   } else if (r.datasets.length) {
     card.append(note('A dataset for this topic is being generated — it appears here when the '
       + 'batch completes and the contamination gate has run.'));

@@ -9,7 +9,7 @@ import re
 import pytest
 
 from conftest import choice, choose
-from test_the_five_asks import PROVISIONAL, make_provisional
+from test_the_five_asks import make_provisional
 
 pytestmark = pytest.mark.dashboard
 MODEL = "fx/good-750m"
@@ -254,9 +254,14 @@ def test_propose_over_a_provisional_judge_asks_first_and_marks_it(live, page):
     dlg = page.locator("[role='dialog']")
     dlg.wait_for()
     assert dlg.get_attribute("aria-modal") == "true"
-    assert "This judge is a small local model" in dlg.text_content()
-    assert PROVISIONAL in dlg.locator("[data-dialog-reasons]").text_content()
-    assert "proposed over a provisional judge" in dlg.text_content()
+    # 11j: one dialog for every proposal, with this model and topic filled in,
+    # and the demo-only note in plain words instead of the server's sentences
+    assert "New proposal" in dlg.text_content()
+    assert dlg.locator("[data-combobox='model']").get_attribute("data-value") == MODEL
+    assert dlg.locator("[data-np-topic='Economics'] input").is_checked()
+    note = dlg.locator("[data-dialog-reasons]").text_content()
+    assert "the judge is a small local AI" in note
+    assert "carries the same mark" in note and "not for results" in note
     go = dlg.locator("[data-dialog-go]")
     assert go.is_disabled()
     # Esc cancels, and focus goes back to the button
@@ -275,9 +280,11 @@ def test_propose_over_a_provisional_judge_asks_first_and_marks_it(live, page):
     assert go.is_enabled()
     go.click()
     page.wait_for_selector("[role='dialog']", state="detached")
-    ok = page.locator("[data-action-ok='propose:economics']")
+    # 11j: a proposal made from a topic page leaves you on it, with the toast
+    ok = page.locator("[data-toast='propose']")
     ok.wait_for(timeout=20000)
     assert "Proposal #" in ok.text_content() and "provisional judge" in ok.text_content()
+    assert page.locator("[data-topic-page='economics']").count() == 1
     import urllib.request
     with urllib.request.urlopen(base + "/api/proposals") as r:
         props = json.loads(r.read())

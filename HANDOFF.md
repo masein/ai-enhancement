@@ -1313,6 +1313,73 @@ sudo docker compose exec -T bench python3 -c "import urllib.request as u; print(
    sat; **Queue this run** queues them, and their rows say `in the queue`.
 5. #56's Suite cell reads `judged · 37 topics + MMLU control ▸` on one line.
 
+### 11j — the Review tab, rebuilt
+
+Brief: `docs/prompts/phase-11g-read-and-first-page.md`, 11j. One PR.
+
+- **Four views, each with its count**, in one row at the top: **To review**,
+  **Ready to generate**, **Datasets**, **History** (rejected and failed) —
+  and **+ New proposal** on the right. The view lives in the hash
+  (`#tab=review&view=datasets`), so a link opens it; the tab opens on To
+  review when something is waiting, and on Datasets when nothing is.
+- **Each view is a compact list**, one line per row:
+  - proposals: topic · model · status · asked by · when · Demo only;
+  - datasets: # · topic · model · documents ("20 of 20", or "18 of 20 · 2
+    missing") · made by · when · Demo only · **Read** · **Use in training
+    ⧉**, which copies `--gap-dataset 8`; the sentence about training runs
+    is its tooltip now. The topic page's datasets use the same row.
+  - The explanation is one line plus **How this works ▸**, which also holds
+    the AI's name, today's usage and the storage line.
+  - "Pick a topic" is gone: the Loop board already is that table.
+- **A proposal opens as a card in the 11g reader's sheet** (`readProposal`,
+  `read=proposal:<id>`), so a pasted link opens it and Back closes it:
+  - the header is "Economics · good-750m", with `#8`, one status chip and
+    **one** Demo only badge whose tooltip gives the reasons in plain words;
+  - **What's missing**, in large type, editable while it is To review;
+  - **Why**, in one line: "36 of 44 practice answers scored below 3 of 4 ·
+    Arts score 1.46 / 4 (hidden questions)" — the count that read "—"
+    because the page looked for `diagnose_wrong` and the service sends
+    `diagnose_weak`;
+  - **The answers it read (33) ▸**: every one of them, not the first eight,
+    each with its practice question, the model's answer, the score and the
+    judge's comment, under one line saying the AI saw only the comments
+    with the question wording taken out;
+  - **Documents will cover**: the plan as chips, the first 8 then "+12
+    more", with the spread box;
+  - the actions for its status: Approve / Reject… with a reason, or count,
+    format and Generate;
+  - the datasets made from it, each opening the reader;
+  - **Details ▸**: who asked and approved, the AI and the prompt
+    fingerprint, the copy check, today's usage and the full reasons.
+- **+ New proposal** opens a dialog: a model, then the topics grouped by
+  area, weakest first, each with its score — and each blocked one disabled
+  with its reason ("not sat yet", "proposal #5 is open", "under 30 hidden
+  questions — its score is noise"). The topic page's **Propose…** opens the
+  same dialog with both filled in.
+- **New endpoint** `GET /api/proposals/{id}/answers`: the practice answers
+  the AI read, joined to their questions and the model's answers. Diagnose
+  half only, by the qids the proposal recorded when it was made.
+
+**Deploy steps, after 11j merges.** Code only, no data step.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+```
+
+**Expected output:**
+
+1. `up -d --build` ends with the container healthy; the image build prints
+   `image files OK`.
+2. The log grep prints `no errors`.
+3. The Review tab opens on **To review** or **Datasets**, with four counted
+   views and **+ New proposal**.
+4. Proposal #5 (Arts) opens as a card saying "36 of 44 practice answers
+   scored below 3 of 4", with all 33 answers behind **The answers it read**,
+   each with its practice question.
+5. The Datasets view lists #1–#8, each with **Read** and **Use in training
+   ⧉**; the tab is under 1,600 px tall at 1,512 px.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

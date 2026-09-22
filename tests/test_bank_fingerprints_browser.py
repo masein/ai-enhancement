@@ -91,12 +91,15 @@ def test_review_the_spec_lands_on_the_proposal_and_marks_it(live, page):
     btn = page.locator("tr[data-loop-row='economics'] button[data-step='review']")
     btn.wait_for()
     btn.click()
-    card = page.locator(f".rv[data-proposal='{pid}']")
-    card.wait_for()
-    page.wait_for_selector(f".rv.landed[data-proposal='{pid}']")
-    page.wait_for_function(f"""() => {{
-      const r = document.querySelector('.rv[data-proposal="{pid}"]').getBoundingClientRect();
-      return r.top >= -2 && r.top < innerHeight / 2; }}""")
-    # the mark is for finding it, not for keeping: it goes after a few seconds
-    page.wait_for_selector(f".rv.landed[data-proposal='{pid}']", state="detached", timeout=10000)
+    # 11j: the step opens that proposal's own card in the reader's sheet, and
+    # says so in the address — no hunting for it among the others
+    page.wait_for_selector("#reader[data-ready='1']")
+    assert page.locator("#reader").get_attribute("data-key") == f"proposal:{pid}"
+    assert page.evaluate("location.hash").endswith(f"read=proposal:{pid}")
+    assert f"#{pid}" in page.locator("#reader .rd-src").text_content()
+    assert page.locator(f"[data-why-line='{pid}']").count() == 1
+    # Esc closes it and the tab is behind it, on To review
+    page.keyboard.press("Escape")
+    page.wait_for_selector("#reader", state="detached")
+    assert page.locator("[data-rv-view='review'][aria-selected='true']").count() == 1
     assert page.errors == []

@@ -1728,6 +1728,9 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
         # what the reviewer sees of what the LLM saw — diagnosis half, with any
         # question text the judge quoted already stripped
         "examples": justifications[:prop.EXAMPLES_SHOWN],
+        # 11j: which practice answers it read, so the reviewer can see exactly
+        # those — diagnose-half qids, never the hidden half's
+        "qids_read": [f["qid"] for f in justifications],
     }
     pid = db.proposal_create(p.model, task, p.topic, p.requested_by.strip()[:80], evidence)
     if override:
@@ -1790,6 +1793,58 @@ def _name(s: str, what: str) -> str:
         raise HTTPException(422, f"{what} needs a name — the tailnet is the auth boundary, "
                                  f"so the record of who decided is the name you type")
     return s
+
+
+@app.get("/api/proposals/{pid}/answers")
+def proposal_answers(pid: int):
+    """The practice answers this proposal's AI read: the question, the model's
+    answer, its score and the judge's comment as the AI received it (any
+    question wording it quoted already taken out). The reviewer sees the
+    questions so they can check its reading; the AI never did.
+
+    Diagnose half only — the same rule as everywhere: no hidden question's
+    text, and no hidden qid, leaves the server."""
+    r = db.proposal_get(pid)
+    if not r:
+        raise HTTPException(404, "no such proposal")
+    try:
+        ev = json.loads(r.get("evidence") or "{}")
+    except (ValueError, TypeError):
+        ev = {}
+    model_dir = config.OUT_DIR / r["model"].replace("/", "__")
+    task = r["task"]
+    items, counts = prop.justifications_for(model_dir, task)
+    by_qid = {str(f["qid"]): f for f in items}
+    read = [str(q) for q in (ev.get("qids_read") or [])]
+    # exactly the ones it read, in the order it read them. A proposal made
+    # before 11j recorded no list: the same function is deterministic, so
+    # recomputing gives the same answers unless the model was judged again
+    chosen = [by_qid[q] for q in read if q in by_qid] if read \
+        else items[:ev.get("n_shown") or len(items)]
+    import judge as _judge
+    j, _earlier = judge_now(r["model"])
+    t = ((j or {}).get("tasks") or {}).get(task) or {}
+    meta = {str(it.get("qid")): it for it in (t.get("items") or [])
+            if it.get("half") == "diagnose"}          # the whole safety property
+    answers = {}
+    for rec in _judge._records(model_dir, task):
+        answers[rec.get("doc_hash")] = ((rec.get("doc") or {}), _judge._answer(rec))
+    out = []
+    for f in chosen:
+        it = meta.get(str(f["qid"]))
+        if not it:            # judged again since, on other questions
+            continue
+        doc, ans = answers.get(it.get("doc_hash"), ({}, ""))
+        out.append({"qid": f["qid"], "score": f["score"], "comment": f["justification"],
+                    "answer_words": f.get("answer_words"), "answer": ans,
+                    "question": doc.get("prompt") or "", "reference": doc.get("reference") or ""})
+    return {"proposal": pid, "model": r["model"], "topic": r["category"], "task": task,
+            "n": len(out), "n_read": len(read or chosen), "recomputed": not read,
+            "gone": len(read or chosen) - len(out),
+            "counts": {k: counts[k] for k in ("diagnose_items", "diagnose_weak")},
+            "items": out,
+            "note": "practice questions only — the AI read the comments with the question "
+                    "wording taken out"}
 
 
 @app.post("/api/proposals/{pid}/approve")
