@@ -162,6 +162,51 @@ def _code_shas(d: Path) -> list[str]:
     return out
 
 
+_ART_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._\-]{0,79}$")
+
+
+def remote_code_check(hf_id: str) -> dict:
+    """What an uploaded checkpoint's own model code means for queueing it,
+    read from its config.json BEFORE anything is queued (11i). #56 queued a
+    checkpoint with an auto_map on all 37 topics and learned at start that it
+    could not run; the page and the API now say so first, in these words.
+
+    {own_code: False} for anything without an auto_map (or not on this
+    server — the weights check says that). Otherwise {own_code, files:
+    [{file, sha}], user, why}: `why` is '' when the person may run it by
+    ticking the box, else the reason nobody can."""
+    name = hf_id[len(LOCAL_PREFIX):] if hf_id.startswith(LOCAL_PREFIX) else ""
+    # a name, never a path: "local/.." would otherwise hash every .py under
+    # the bench root for whoever asked
+    if not _ART_NAME.match(name):
+        return {"own_code": False}
+    d = config.ARTIFACTS_DIR / name
+    try:
+        cfg = json.loads((d / "config.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return {"own_code": False}
+    if not isinstance(cfg, dict) or not cfg.get("auto_map"):
+        return {"own_code": False}
+    files = [{"file": f, "sha": s} for f, s in (c.rsplit(":", 1) for c in _code_shas(d))]
+    blocked = config.remote_code_blocked()
+    why = ""
+    if blocked:
+        why = (f"{hf_id} ships its own model code, and this server does not run uploaded "
+               f"code: {blocked}. It needs ALLOW_REMOTE_CODE=1 and EVAL_USER set — see "
+               f"SERVICE.md § custom model code.")
+    elif not files:
+        why = (f"{hf_id} declares its own model code (an auto_map in config.json) but ships "
+               f"no .py files — the modules it points at are missing. Upload them with it.")
+    elif config.REMOTE_CODE_SHAS:
+        unknown = [f for f in files if f["sha"] not in config.REMOTE_CODE_SHAS]
+        if unknown:
+            why = (f"{hf_id} ships code that is not on this server's allowlist: "
+                   + ", ".join(f"{f['file']} (sha {f['sha']})" for f in unknown)
+                   + ". Read the file, then add "
+                   + ", ".join(f["sha"] for f in unknown) + " to REMOTE_CODE_SHAS.")
+    return {"own_code": True, "files": files, "user": config.EVAL_USER, "why": why}
+
+
 def _moe_params(cfg: dict, total: int | None) -> dict:
     """Total vs active-per-token parameters.
 

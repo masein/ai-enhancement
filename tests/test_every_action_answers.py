@@ -185,12 +185,12 @@ def test_a_judged_submit_chooses_its_topics(live, page, monkeypatch):
     page.goto(live["base"] + "/#tab=queue")
     set_name(page, "Omar")
     choose(page.get_by_label("suite"), "judged")
-    boxes = page.locator("[data-submit-topics] input[data-submit-task]")
+    # 11i: the model page's grouped picker; every topic with questions starts ticked
+    boxes = page.locator("[data-submit-topics] input[data-exam-task]:not([disabled])")
     boxes.first.wait_for()
     assert all(boxes.nth(i).is_checked() for i in range(boxes.count()))   # the whole exam
-    for i in range(boxes.count()):
-        if boxes.nth(i).get_attribute("data-submit-task") != "exam_law":
-            boxes.nth(i).uncheck()
+    page.locator("[data-exam-picker='submit'] [data-quick='none']").click()
+    page.locator("[data-exam-picker='submit'] input[data-exam-task='exam_law']").check()
     page.locator("[data-ms='submit'] input").fill("org/judged-law-only")
     page.get_by_role("button", name="Submit model").click()
     page.wait_for_selector("[data-toast='submit']")

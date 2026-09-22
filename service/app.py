@@ -28,7 +28,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from . import config, db, llm, llm_poller, startup, suggest, worker
+from . import config, db, hfmeta, llm, llm_poller, startup, suggest, worker
 from . import proposals as prop
 from . import reader
 
@@ -354,6 +354,21 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     elif s.tasks:
         raise HTTPException(422, "tasks narrows a judged run only; the other suites are "
                                  "fixed lists")
+    # 11i: a checkpoint that ships its own model code is answered HERE, before
+    # anything is queued, in the words the page shows beside its disabled
+    # button. #56 learned it at start, after the wait — and its Resubmit had
+    # no way to ask
+    code = hfmeta.remote_code_check(hf_id)
+    if code["own_code"]:
+        if code["why"]:
+            raise HTTPException(422, code["why"] + " Nothing was queued.")
+        if not s.allow_remote_code:
+            names = ", ".join(f"{f['file']} (sha {f['sha']})" for f in code["files"])
+            raise HTTPException(422, f"{hf_id} ships its own model code ({names}). Running "
+                                     f"it runs that Python, as the unprivileged "
+                                     f"{code['user']} user: tick \"Run this checkpoint's own "
+                                     f"model code\" (allow_remote_code=true) to queue it. "
+                                     f"Nothing was queued.")
     if s.allow_remote_code:
         # the flag is only meaningful for uploads, and only when the operator has
         # configured the server to run other people's code at all. Checked here
@@ -674,7 +689,28 @@ def models_suggest(q: str = ""):
         arts = sorted(d.name for d in config.ARTIFACTS_DIR.iterdir()
                       if d.is_dir() and not d.name.startswith("."))
     local = suggest.local_candidates(results_payload(), db.recent(500), arts)
-    return suggest.suggest(q[:100], local)
+    out = suggest.suggest(q[:100], local)
+    # 11i: an upload that ships its own model code says so in the list,
+    # before it is picked — and whether this server will run it
+    for it in out.get("items") or []:
+        if it.get("weights") and str(it.get("id", "")).startswith("local/"):
+            code = hfmeta.remote_code_check(it["id"])
+            if code["own_code"]:
+                it["own_code"] = {"runs": not code["why"]}
+    return out
+
+
+@app.get("/api/models/code")
+def model_code(id: str = ""):
+    """Whether a checkpoint ships its own model code, and whether this server
+    will run it (11i) — the page asks before it offers Queue this run. For
+    an upload, also whether its weights are here at all (11a)."""
+    hf_id = id.strip()
+    out = hfmeta.remote_code_check(hf_id)
+    name = hf_id[len("local/"):] if hf_id.startswith("local/") else ""
+    if name and _ART_NAME_RE.match(name) and not name.startswith("."):
+        out["weights"] = (config.ARTIFACTS_DIR / name).is_dir()
+    return out
 
 
 @app.get("/api/artifacts")

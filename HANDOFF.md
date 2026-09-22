@@ -1241,6 +1241,78 @@ sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "
 6. The LIVE badge's time moves with each check.
 7. More ▾ has no "Sandbox run", and `/demo` is a 404.
 
+### 11i — sit the exam from the model page
+
+Brief: `docs/prompts/phase-11g-read-and-first-page.md`, 11i. One PR.
+
+- **Sit the exam** in the model page's hero, beside the three cards, with
+  "34 of 37 topics judged" under it. It opens a panel on the model page and
+  scrolls to it. So do an opened Leaderboard row's **Run exam**, each model
+  row of the Overview's loop card, and a **Sit the exam ▸** beside the Loop
+  tab's "Results for".
+- **The panel** (`modelSitPanel`, `state.msit`): the 37 topics under the 8
+  areas, an area's box ticking the whole area. Each row says where this
+  model stands, from its judge file, its history and the queue:
+  - `not sat`;
+  - `0.79 / 4 · 22 Sep`, with `· provisional` when the judge's scores do not
+    count yet;
+  - `no hidden questions yet · 22 Sep` for a topic graded on practice
+    questions only;
+  - `on older questions` (10b's retired sets);
+  - `in the queue` or `running…`, with the box disabled;
+  - `no questions yet` for a topic with no bank, disabled.
+  Quick picks **Not sat yet (n)**, **All n**, **Weakest 5** (this model's own
+  judged topics) and **None** tick exactly their set. The **MMLU control**
+  has its own box, off by default. A ticked topic already judged on these
+  questions says "same questions — re-grade only, no GPU". The summary
+  follows the ticks: "12 topics · about 1,200 answers · about 25 min of
+  GPU, then grading · the GPU is shared", with "— consider a quiet time"
+  over 10. **Queue this run** is disabled with the reason beside it: the
+  judge offline, the weights not on this server, the checkpoint's own code.
+  It sends exactly the ticked `exam_*` tasks, and `fr_control_mmlu` only
+  when ticked. The rows turn to `in the queue`, then `running…`, as the
+  queue polls.
+- **One picker** (`examPicker`): the Queue form's judged suite uses it too,
+  every topic with questions ticked to begin with, the control off. It
+  sends the ticks as a list, not an empty "whole suite". The topic page
+  keeps its one-topic panel.
+- **Own model code, before queueing** (`hfmeta.remote_code_check`,
+  `GET /api/models/code`). The search says "ships its own model code", and
+  adds "— this server does not run it" when it will not. Where the server
+  runs it, the panel and the form show an unticked box ("Run this
+  checkpoint's own model code (`modeling_*.py`, sha `ab12…`) — as the
+  unprivileged `benchjob` user"). Queue needs it ticked, and it sends
+  `allow_remote_code: true`. Where the server does not, the button is
+  disabled with the reason, naming `ALLOW_REMOTE_CODE=1`, `EVAL_USER` and
+  `SERVICE.md § custom model code`. The API refuses with 422 before
+  queueing, in the same words, and never fails at start. A sha off
+  `REMOTE_CODE_SHAS` is named, with the sha to add. **Resubmit…** on a row
+  that failed for this reason opens the same box in a row under it.
+- **The Suite cell** is one line: `judged · 37 topics + MMLU control ▸`, and
+  ▸ opens the list grouped by area; one topic stays spelled out,
+  `judged · Arts`. It's the same on the model page's runs.
+
+**Deploy steps, after 11i merges.** Code only, no data step.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+sudo docker compose exec -T bench python3 -c "import urllib.request as u; print(u.urlopen('http://localhost:8899/api/models/code?id=local/qwen35-delta-moe-7d560104-step945-v2').read().decode())"
+```
+
+**Expected output:**
+
+1. `up -d --build` ends with the container healthy; the image build prints
+   `image files OK`.
+2. The log grep prints `no errors`.
+3. The last command prints `"own_code": true`, the checkpoint's `.py` files with
+   their shas, and a `why` naming `ALLOW_REMOTE_CODE=1` and `EVAL_USER`
+   unless both are set (then `why` is empty).
+4. A model page's **Sit the exam** opens the panel with 37 topics under 8
+   areas and this model's scores; **Not sat yet** ticks the ones it has not
+   sat; **Queue this run** queues them, and their rows say `in the queue`.
+5. #56's Suite cell reads `judged · 37 topics + MMLU control ▸` on one line.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

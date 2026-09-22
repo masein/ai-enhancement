@@ -345,6 +345,19 @@ root-run stock jobs keep working while every dropped-privilege job fails with
 `ENOSPC`. If custom-code submissions start failing and stock ones don't, run
 `df -h` before anything else.
 
+**Said before it is queued (11i).** The service reads the upload's
+`config.json` before anything is queued, and `GET /api/models/code?id=local/<name>`
+answers what it found: `{own_code, files: [{file, sha}], user, why}`. The
+dashboard asks it in the model search, the model page's Sit the exam panel and
+the Queue form. When the server runs such code it shows an unticked box — "Run
+this checkpoint's own model code (`modeling_*.py`, sha `ab12…`) — as the
+unprivileged `benchjob` user" — and sends `allow_remote_code: true` only when it
+is ticked. When the server does not, Queue this run is disabled with the reason.
+`POST /api/submissions` refuses with **422** before queueing, in the same words:
+without the two settings above, without `allow_remote_code`, or with a file whose
+sha is not in `REMOTE_CODE_SHAS` (the message gives the sha to add). A Resubmit
+on a row that failed for this reason offers the same box.
+
 What the gate actually buys, stated honestly:
 
 - the job runs as an unprivileged user, so a stray `rmtree` in someone's

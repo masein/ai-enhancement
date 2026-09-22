@@ -2424,6 +2424,47 @@ h2[data-ix]::before { content:attr(data-ix); font-family:var(--font-mono);
 .propose:disabled { border-color:var(--border); background:var(--plane);
   color:var(--muted); cursor:not-allowed; }
 .propwhy { flex-basis:100%; font-size:var(--fs-1); color:var(--muted); margin:0 0 4px 20px; }
+/* 11i: sit the exam from the model page — one grouped picker, and the
+   Suite cell that stays one line */
+.mcards { display:flex; gap:14px; align-items:stretch; }
+.mcards > .hlgrid { flex:1; min-width:0; }
+.msit-cta { display:flex; flex-direction:column; justify-content:center; align-items:flex-start;
+  gap:6px; flex:0 0 auto; }
+@media (max-width: 900px) { .mcards { flex-direction:column; } }
+.msit-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.msit-head h2 { margin:0; }
+.expick { margin-top:var(--sp-3); }
+.exquick { gap:8px; flex-wrap:wrap; }
+.exareas { display:grid; grid-template-columns:repeat(auto-fill, minmax(270px, 1fr));
+  gap:14px 24px; margin-top:12px; }
+.exarea { min-width:0; }
+.exhead { display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+  padding-bottom:4px; margin-bottom:4px; border-bottom:1px solid var(--border);
+  font-weight:600; font-size:var(--fs-1); }
+.exhead label { cursor:pointer; }
+.excount { font-weight:400; color:var(--muted); font-variant-numeric:tabular-nums; }
+.extopic { display:grid; grid-template-columns:auto minmax(0, 1fr) auto; column-gap:8px;
+  align-items:baseline; padding:3px 0; font-size:var(--fs-1); cursor:pointer; }
+.extopic.off { cursor:default; color:var(--muted); }
+.extopic .exname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.extopic .exst { color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.extopic[data-status="judged"] .exst { color:var(--text-primary); }
+.extopic .exprov { color:var(--muted); }
+.extopic .exnote { grid-column:2 / -1; font-size:12px; color:var(--muted); }
+.excontrol, .owncode { display:flex; gap:8px; align-items:baseline; margin-top:12px;
+  font-size:var(--fs-1); }
+.owncode code { font-size:12px; }
+.exsum { margin:12px 0 0; font-size:var(--fs-1); color:var(--muted);
+  font-variant-numeric:tabular-nums; }
+.msit-go { margin-top:12px; }
+.suitecell > summary { cursor:pointer; list-style:none; white-space:nowrap; }
+.suitecell > summary::-webkit-details-marker { display:none; }
+.suitelist { margin-top:4px; white-space:normal; min-width:260px; max-width:420px; }
+.owncode-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
+.owncode-row .owncode { margin-top:0; flex-basis:100%; }
+tr.owncode-tr > td { background:var(--accent-soft); padding:10px 12px 12px; }
+.suitelist > div { margin-top:2px; }
+.suitelist b { font-weight:600; }
 .rv { border:1px solid var(--border); border-radius:var(--r-2); padding:12px 14px; margin:10px 0; }
 .rv h3 { margin:0 0 4px; font-size:var(--fs-3); }
 .rv textarea { width:100%; box-sizing:border-box; min-height:70px; font:inherit;
@@ -4609,7 +4650,7 @@ function vModel() {
     el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
       warnBadge(m) || '', dupBadge(m) || ''),
     el('p', { class: 'sub mono mid', 'data-model-id': m.id, text: m.id }),
-    el('div', { class: 'hlgrid' },
+    el('div', { class: 'mcards' }, el('div', { class: 'hlgrid' },
       hlCard('params', 'Parameters', m.params ? P(m.params) : 'Unknown',
         (a.active_params ? `${P(a.active_params)} active · ${a.experts} experts, `
           + `${a.experts_per_tok} per token (${a.active_src}).`
@@ -4623,6 +4664,7 @@ function vModel() {
       hlCard('tasks', 'Tasks', `${m.nhave}/${m.nreq}`,
         (m.missing || []).length ? `Missing ${m.missing.join(', ')}.`
           : 'All required tasks' + (m.date ? `, evaluated ${String(m.date).slice(0, 10)}.` : '.'))),
+      sitCta(m)),
     el('p', { class: 'mprose', text: modelSentence(m) }));
 
   // results, grouped by domain the way the task panels are
@@ -4691,8 +4733,23 @@ function vModel() {
                     ['provenance', 'Provenance', provCard],
                     ['runs', 'Runs', LIVE ? vModelRuns(m) : null]];
   for (const [id, , node] of sections) if (node) node.id = 'sec-' + id;
-  return [back, head, modelNav(sections), ...sections.map(([, , n]) => n),
+  return [back, head, modelSitPanel(m), modelNav(sections), ...sections.map(([, , n]) => n),
           ].filter(Boolean);
+}
+
+// 11i: the model page is where a person is thinking about this model, so the
+// exam starts here — beside the three cards, with how far it has got
+function sitCta(m) {
+  if (!LIVE) return '';
+  const J = DATA.judged || {};
+  const n = Object.entries((m.judge || {}).tasks || {})
+    .filter(([t, v]) => (J.exam || []).includes(t) && pubScore(v) != null).length;
+  return el('div', { class: 'msit-cta' },
+    el('button', { class: 'primary', 'data-sit-open': m.id, text: 'Sit the exam',
+      'aria-expanded': String(state.msit.open && state.msit.model === m.id),
+      onclick: () => openSit(m.id) }),
+    el('span', { class: 'small se', 'data-sit-progress': String(n),
+      text: `${n} of ${(J.exam || []).length} topics judged` }));
 }
 
 // The model page is long, and since the judged section arrived the
@@ -4753,9 +4810,7 @@ function vModelRuns(m) {
     el('tbody', {}, rows.map(r => el('tr', { 'data-run': String(r.id) },
       el('td', { class: 'num se', text: '#' + r.id }),
       el('td', { class: 'small se', text: r.created_at ? rel(r.created_at) + ' ago' : '—' }),
-      el('td', { class: 'small' }, r.suite,
-        (() => { let t = []; try { t = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
-          return t.length ? el('div', { class: 'se', text: t.map(frName).join(', ') }) : ''; })()),
+      el('td', { class: 'small' }, suiteCell(r, 'm')),
       el('td', {}, el('span', { class: stClass(r.status), text: r.status })),
       el('td', { class: 'small se', text: r.error || r.progress || '' }),
       el('td', {}, el('a', { href: `api/runs/${r.id}/log`, target: '_blank', rel: 'noopener',
@@ -4985,7 +5040,10 @@ function overviewLoop() {
         text: `${frName(r.wt)} →`, onclick: () => {
           state.ans.model = r.m.id; state.ans.rows = null;
           state.after = { scroll: '[data-panel="answers"]' };
-          navigate({ topic: r.wt.replace(/^exam_/, ''), model: null }); } }))))))));
+          navigate({ topic: r.wt.replace(/^exam_/, ''), model: null }); } }),
+        // 11i: and the exam, on the model's page
+        el('button', { class: 'quiet', 'data-loop-sit': r.m.id, text: 'Sit the exam',
+          onclick: () => openSit(r.m.id) }))))))));
   return card;
 }
 
@@ -5545,6 +5603,9 @@ function msItem(key, it, i, active) {
   if (it.queued) bits.push('in the queue');
   if (it.artifact) bits.push('uploaded checkpoint');
   if (it.over_cap) bits.push('over the size cap');
+  // 11i: said in the list, before it is picked
+  if (it.own_code) bits.push(it.own_code.runs ? 'ships its own model code'
+    : 'ships its own model code — this server does not run it');
   if (msNoWeights(it)) bits.push(NO_WEIGHTS);
   return el('li', { id: `ms-${key}-${i}`, role: 'option', class: 'ms-item'
       + (i === active ? ' active' : '') + (it.over_cap ? ' over' : '')
@@ -6936,9 +6997,7 @@ function lbDetail(m, dups) {
         ? `the radar holds ${CMP_MAX} — remove one first` : null,
       onclick: () => cmpToggle(m.id, DATA.models) }),
     canRun ? el('button', { class: 'quiet', 'data-run-exam': m.id, text: 'Run exam',
-      onclick: () => { state.sub.hf_id = m.id; state.sub.suite = 'judged';
-        state.after = { focus: '[data-ms="submit"] input' };
-        navigate({ tab: 'queue', model: null, topic: null }); } }) : '')));
+      onclick: () => openSit(m.id) }) : '')));
   return el('div', { class: 'dgrid' }, out);
 }
 
@@ -9032,13 +9091,14 @@ async function queueCancel(r) {
   await loadQueue(); (state.queueRedraw || render)();
 }
 
-async function queueResubmit(r, regrade = false) {
+async function queueResubmit(r, regrade = false, extra = {}) {
   let tasks = [];
   try { tasks = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
+  state.qRc = null;
   try {
     const j = await post('api/submissions', { hf_id: r.hf_id, kind: r.kind || 'auto',
       suite: r.suite, note: r.note || '', submitter: whoName() || r.submitter || '',
-      ...(tasks.length ? { tasks } : {}) });
+      ...(tasks.length ? { tasks } : {}), ...extra });
     rememberQueued(j.id);
     markQueueRow(j.id);
     toast(j.note ? `#${j.id}: ${j.note}`
@@ -9046,6 +9106,31 @@ async function queueResubmit(r, regrade = false) {
       : `Queued #${j.id} again — ${r.hf_id}`, { key: regrade ? 'regrade' : 'resubmit' });
   } catch (e) { state.qmsg = `#${r.id}: ${e.message}`; }
   await loadQueue(); (state.queueRedraw || render)();
+}
+
+// the runner's own words when preflight met an auto_map without leave to run it
+const ownCodeFailure = r => /auto_map|own model code/.test(r.error || '');
+function ownCodeResubmit(r) {
+  const redraw = () => (state.queueRedraw || render)();
+  const info = codeInfo(r.hf_id, redraw);
+  const keep = el('button', { class: 'ghost', 'data-own-code-keep': String(r.id), text: 'Keep it',
+    onclick: () => { state.qRc = null; redraw(); } });
+  if (info === null) return el('div', { class: 'owncode-row' },
+    el('span', { class: 'small se', text: 'Checking the checkpoint…' }), keep);
+  const why = ownCodeWhy(info, true);
+  if (why || !info || !info.own_code) return el('div', { class: 'owncode-row' },
+    el('span', { class: 'small', 'data-own-code-why': String(r.id),
+      text: why || 'This checkpoint no longer ships its own model code.' }),
+    why ? '' : el('button', { class: 'ghost', text: 'Resubmit', onclick: () => queueResubmit(r) }),
+    keep);
+  const go = el('button', { class: 'primary', 'data-own-code-go': String(r.id), text: 'Resubmit',
+    disabled: state.qRcAllow ? null : '',
+    onclick: () => queueResubmit(r, false, { allow_remote_code: true }) });
+  return el('div', { class: 'owncode-row' },
+    el('span', { class: 'small', text: `#${r.id} stopped because this checkpoint ships its `
+      + 'own model code. Resubmit it with leave to run that code:' }),
+    ownCodeBox(info, state.qRcAllow, v => { state.qRcAllow = v; go.disabled = !v; }, 'q' + r.id),
+    go, keep);
 }
 
 function queueOpen(r) {
@@ -9131,6 +9216,16 @@ function queueActions(r) {
     return cell(el('button', { class: 'primary', 'data-row-regrade': id, text: 'Retry grading',
       title: 'queue this run again: the answers it wrote are kept and graded again — no GPU',
       onclick: () => queueResubmit(r, true) }), resubmit);
+  // 11i: it failed because the checkpoint ships its own model code. A plain
+  // Resubmit would fail the same way; this one asks first, with the box
+  if (r.status === 'failed' && ownCodeFailure(r)) {
+    return cell(ghost('data-row-resubmit', 'Resubmit…', () => {
+      state.qRc = state.qRc === r.id ? null : r.id; state.qRcAllow = false;
+      delete state.codeInfo[r.hf_id];
+      (state.queueRedraw || render)(); },
+      { title: 'this checkpoint ships its own model code — resubmitting asks first',
+        'aria-expanded': String(state.qRc === r.id) }));
+  }
   if (r.status === 'failed' || r.status === 'canceled')
     return cell(ghost('data-row-resubmit', 'Resubmit', () => queueResubmit(r),
       { title: `the same model, suite${r.suite === 'judged' ? ' and topics' : ''}, queued again` }));
@@ -9151,7 +9246,8 @@ function vQueue() {
   const sf = state.sub;
   const f = {
     hf_id: modelBox('submit', sf.hf_id, v => { sf.hf_id = v; },
-      it => { sf.hf_id = it.id; if (it.kind) sf.kind = it.kind; render(); },
+      it => { sf.hf_id = it.id; if (it.kind) sf.kind = it.kind; sf.allow = false;
+              delete state.codeInfo[it.id]; render(); },
       { 'aria-label': 'model id',
         placeholder: 'search: org/model on the Hub, or local/<name> for an uploaded artifact' }),
     kind: Select('kind', [['auto', 'kind: auto-detect'], ['base', 'kind: base'],
@@ -9172,23 +9268,35 @@ function vQueue() {
       'aria-label': 'note', 'data-keep': 'submit-note', value: sf.note,
       oninput: e => { sf.note = e.target.value; } }),
   };
-  // judged: the same topic boxes as the topic page. All ticked is the whole
-  // exam; one ticked is the loop's usual unit of work
+  // judged: 11i's grouped picker, the one the model page uses — every exam
+  // topic ticked to begin with, the MMLU control off. The ticks are sent as
+  // they are: the whole exam is 37 names, not an empty list
   const built = (state.loop.built || []);
-  if (sf.tasks == null && built.length) sf.tasks = [...built];
+  const J = DATA.judged || {};
+  if (sf.tasks == null && built.length) sf.tasks = built.filter(t => t !== J.control);
   const topicBoxes = sf.suite === 'judged' && built.length ? el('div', { 'data-submit-topics': '1' },
-    el('p', { class: 'small', text: 'topics in this run:' }), topicPicker(sf, built, 'submit')) : '';
+    el('p', { class: 'small', text: 'topics in this run:' }),
+    examPicker(sf, sf.hf_id.trim(), 'submit', () => gateSubmit())) : '';
   const judgedOff = () => (sf.suite === 'judged' && judgeDown()) || cannotRun(sf.hf_id);
+  // 11i: a picked checkpoint that ships its own model code says so here,
+  // before Submit — the box to allow it, or why this server will not
+  const info = codeInfo(sf.hf_id);
+  const ownWhy = el('span', { class: 'propwhy', 'data-why': 'own-code' });
   const btn = el('button', { class: 'primary', text: 'Submit model', onclick: async () => {
     const body = { hf_id: sf.hf_id.trim(), kind: sf.kind, suite: sf.suite,
                    submitter: whoName(), note: sf.note };
     if (sf.suite === 'judged') {
-      if (!(sf.tasks || []).length) { state.qmsg = 'pick at least one topic'; render(); return; }
-      if (sf.tasks.length < built.length) body.tasks = sf.tasks;
+      body.tasks = [...(sf.tasks || []), ...(sf.control && J.control ? [J.control] : [])];
+      if (!body.tasks.length) { state.qmsg = 'pick at least one topic'; render(); return; }
     }
     if (!body.hf_id) { state.qmsg = 'enter a Hugging Face model id first'; render(); return; }
     if (cannotRun(body.hf_id)) { state.qmsg = noWeightsWhy(body.hf_id); render(); return; }
     if (judgedOff()) { state.qmsg = judgeWhy(); render(); return; }
+    if (/^local\/[^/]+$/.test(body.hf_id)) {
+      const code = ownCodeWhy(await loadCodeInfo(body.hf_id), !!sf.allow);
+      if (code) { state.qmsg = code; render(); return; }
+      if (sf.allow && (state.codeInfo[body.hf_id] || {}).own_code) body.allow_remote_code = true;
+    }
     btn.disabled = true;
     try {
       const r = await fetch('api/submissions', { method: 'POST',
@@ -9201,7 +9309,7 @@ function vQueue() {
         toast(j.note ? `#${j.id}: ${j.note}` : `Queued #${j.id} — ${body.hf_id}`
               + (body.tasks ? ` · ${body.tasks.map(frName).join(', ')}` : ''),
               { key: 'submit', go: goQueue, link: 'see it' });
-        sf.hf_id = ''; sf.note = '';
+        sf.hf_id = ''; sf.note = ''; sf.allow = false;
       }
     } catch (e) { state.qmsg = 'submit failed — server unreachable?'; }
     await loadQueue(); render();
@@ -9219,11 +9327,8 @@ function vQueue() {
               return `\n${a.arch || ''} · hidden ${a.hidden ?? '—'} · layers ${a.layers ?? '—'} · vocab ${a.vocab ?? '—'}`; }
         catch { return ''; } })() : '') }, r.hf_id,
       el('span', { class: 'badge' + (r.kind === 'instruct' ? ' instruct' : ''), text: r.kind })),
-    el('td', { class: 'small' }, r.suite,
-      // a judged row says what it sat: one topic is now the usual unit
-      (() => { let t = []; try { t = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
-        return t.length ? el('div', { class: 'se', 'data-row-tasks': '1',
-          text: t.map(frName).join(', ') }) : ''; })()),
+    // a judged row says what it sat, in one line: the list is behind ▸ (11i)
+    el('td', { class: 'small' }, suiteCell(r, 'q')),
     el('td', { text: r.submitter || '—' }),
     el('td', { 'data-watch': `q|${r.id}|status` }, el('span', { class: stClass(r.status), text: r.status })),
     el('td', { class: 'small', text: r.progress || '', 'data-watch': `q|${r.id}|progress` },
@@ -9314,14 +9419,28 @@ function vQueue() {
                      rebuildQueue, 25, true);
     if (pg.pager.parentNode !== qPager) qPager.replaceChildren(pg.pager);
     const was = snapWatch(qTbody);
-    qTbody.replaceChildren(...pg.rows.map(qrow));
+    // 11i: a row whose Resubmit asks about its own model code opens a row
+    // of its own under it — the box is too long for the action cell
+    qTbody.replaceChildren(...pg.rows.flatMap(r => state.qRc === r.id && ownCodeFailure(r)
+      ? [qrow(r), el('tr', { class: 'owncode-tr', 'data-own-code-row': String(r.id) },
+          el('td', { colspan: String(QCOLS.length) }, ownCodeResubmit(r)))]
+      : [qrow(r)]));
     markChanged(qTbody, was);
     if (qTbody.isConnected) popReanchor();     // an open ⋯ hangs from the new button
   }
   state.queueRedraw = rebuildQueue;
   rebuildQueue();
-  if (judgedOff()) { btn.disabled = true;
-    btn.title = cannotRun(sf.hf_id) ? noWeightsWhy(sf.hf_id.trim()) : judgeWhy(); }
+  function gateSubmit() {
+    const code = info ? ownCodeWhy(info, !!sf.allow) : '';
+    const w = judgedOff() ? (cannotRun(sf.hf_id) ? noWeightsWhy(sf.hf_id.trim()) : judgeWhy())
+      : code || (sf.suite === 'judged' && built.length && !(sf.tasks || []).length
+                 && !sf.control ? 'Tick at least one topic.' : '');
+    btn.disabled = !!w;
+    btn.title = w;
+    ownWhy.textContent = judgedOff() ? '' : code;
+    ownWhy.hidden = !ownWhy.textContent;
+  }
+  gateSubmit();
   return [
     el('div', { class: 'card' },
       el('h2', { text: 'Submit a model' }),
@@ -9335,7 +9454,9 @@ function vQueue() {
           ? el('span', { class: 'propwhy', 'data-why': 'weights',
                          text: noWeightsWhy(sf.hf_id.trim()) })
           : sf.suite === 'judged' && judgeDown()
-          ? el('span', { class: 'propwhy', 'data-why': 'submit', text: judgeWhy() }) : ''),
+          ? el('span', { class: 'propwhy', 'data-why': 'submit', text: judgeWhy() }) : '',
+        ownWhy),
+      ownCodeBox(info, sf.allow, v => { sf.allow = v; gateSubmit(); }, 'submit'),
       topicBoxes,
       state.qmsg ? el('p', { class: 'small', style: 'margin-top:8px', text: state.qmsg }) : ''),
     el('div', { class: 'card' },
@@ -10014,6 +10135,7 @@ async function loadLoop() {
     // the Queue tab reads it too: whether the judged suite is on, and its topics
     if (changed && (state.tab === 'loop' || state.tab === 'queue' || state.topic)
         && !state.model) render();
+    else if (changed && state.model && state.msitRedraw) state.msitRedraw();
   } catch (e) {
     // netFail already put the banner up and set the backoff; the board itself
     // must also stop saying "Loading…" forever, which is what it did
@@ -10034,6 +10156,7 @@ function setJudgeHealth(h) {
   _judgeSig = sig;
   renderFresh();
   if ((state.tab === 'loop' || state.tab === 'queue' || state.topic) && !state.model) render();
+  else if (state.model && state.msitRedraw) state.msitRedraw();
 }
 async function loadJudgeHealth() {
   try { setJudgeHealth(await api('api/judge/health')); } catch (e) { /* the banner says it */ }
@@ -10227,6 +10350,11 @@ function vLoop() {
         v => { state.loop.model = v; state.loop.loaded = false; _loopSig = null; loadLoop(); },
         { key: 'loop-model', placeholder: 'find a model' })
         : el('span', { class: 'se', text: 'no model has sat the exam yet' }),
+      // 11i: the exam for this model starts on its page
+      state.loop.model && DATA.models.some(x => x.id === state.loop.model)
+        ? el('button', { class: 'quiet', 'data-loop-sit': state.loop.model, text: 'Sit the exam ▸',
+            title: 'choose its topics on the model\'s page', onclick: () => openSit(state.loop.model) })
+        : '',
       el('a', { class: 'small', href: 'guide#the-loop', target: '_blank', rel: 'noopener',
         text: 'what the loop is and whose job each step is' })),
     state.loop.blocked ? el('p', { class: 'warn', 'data-loop-blocked': '1' },
@@ -10502,6 +10630,344 @@ function loopSitPanel(r) {
       ' — a judged row says which topics it sat and how far the judge batch is.'));
 }
 
+// ---------------------------------------------------------------------------
+// 11i: sit the exam from the model page. masein: "it should be from the model
+// page, so I can click to start on all or some of the topics for a model."
+// One picker — the 37 topics under their 8 areas, each with where THIS model
+// stands on it — for the model page's panel and the Queue form's judged
+// suite. The topic page keeps its one-topic panel.
+// ---------------------------------------------------------------------------
+// "22 Sep", whatever the browser's locale would make of September
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const exDay = t => { if (!t) return ''; const d = new Date(t * 1000);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+
+// topic -> 'queued' | 'running' for this model's judged rows still in flight:
+// the topics a row sat, or every built one for a row that sat the whole exam.
+// A row whose answers are in and whose grades are not is still running.
+function examInFlight(mid) {
+  const out = {};
+  const built = state.loop.built || [];
+  for (const r of state.queue || []) {
+    if (!mid || r.hf_id !== mid || r.suite !== 'judged') continue;
+    const grading = r.status === 'done' && r.judge && r.judge.status !== 'done' && !r.judge_failed;
+    const st = r.status === 'running' || grading ? 'running'
+      : r.status === 'queued' || ACTIVE_STATUS.has(r.status) ? 'queued' : null;
+    if (!st) continue;
+    let ts = []; try { ts = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
+    for (const t of ts.length ? ts : built) if (out[t] !== 'running') out[t] = st;
+  }
+  return out;
+}
+
+// where one model stands on each topic: what its row says, and whether it
+// can be ticked. From the model's judge.json (the current questions), its
+// history (the retired ones, after 10b) and the queue.
+function examStatus(mid) {
+  const m = DATA.models.find(x => x.id === mid);
+  const fly = examInFlight(mid);
+  const built = state.loop.built || [];
+  const prov = m ? !judgedOkM(m) : false;
+  return t => {
+    if (!built.includes(t)) return { k: 'nobank', text: 'no questions yet', off: true };
+    if (fly[t]) return { k: fly[t], text: fly[t] === 'running' ? 'running…' : 'in the queue',
+                         off: true };
+    const v = m && m.judge && (m.judge.tasks || {})[t];
+    if (v) {
+      // sat on the current questions: its score is the hidden half's, and a
+      // topic with no hidden questions yet was graded on practice ones only
+      const sc = pubScore(v), day = v.judged_at ? ` · ${exDay(v.judged_at)}` : '';
+      return sc != null ? { k: 'judged', score: sc, prov, text: `${num(sc, 2)} / 4` + day }
+        : { k: 'judged', score: null, prov: false, text: 'no hidden questions yet' + day };
+    }
+    if (m && ((m.judge || {}).history || []).some(e => e && e.task === t))
+      return { k: 'older', text: 'on older questions' };
+    return { k: 'notsat', text: 'not sat' };
+  };
+}
+
+// "12 topics · about 1,200 answers · about 25 min of GPU, then grading · the
+// GPU is shared". A topic already judged on the same questions costs no GPU:
+// 10b's resume keeps its answers and only grades them again.
+function examSummary(ticked, control, statusOf) {
+  const J = DATA.judged || {}, items = state.loop.items || {}, pace = state.loop.pace;
+  if (!ticked.length && !control) return 'Tick the topics this model should sit.';
+  const regrade = ticked.filter(t => statusOf(t).k === 'judged');
+  const fresh = [...ticked.filter(t => !regrade.includes(t)), ...(control ? [J.control] : [])];
+  const n = fresh.reduce((a, t) => a + (items[t] || 0), 0);
+  const bits = [(ticked.length === 1 ? '1 topic' : `${ticked.length} topics`)
+    + (control ? ' + MMLU control' : '')];
+  if (regrade.length) bits.push(`${regrade.length} re-grade only`);
+  if (n) {
+    bits.push(`about ${roundAbout(n).toLocaleString('en')} answers`);
+    bits.push(pace && pace.sec_per_answer
+      ? `${durationWords(n * pace.sec_per_answer)} of GPU, then grading`
+      : 'no judged run yet to time the GPU by');
+    bits.push('the GPU is shared');
+  } else bits.push('no GPU, grading only');
+  return bits.join(' · ') + (ticked.length > 10 ? ' — consider a quiet time' : '');
+}
+
+// st: { tasks: [ticked exam tasks], control: bool }. Everything after the
+// first paint changes in place, so a tick never rebuilds the panel around it.
+function examPicker(st, mid, key, onChange) {
+  const J = DATA.judged || {};
+  const statusOf = examStatus(mid);
+  const byName = Object.fromEntries(Object.entries(J.topics || {}).map(([t, n]) => [n, t]));
+  const areas = Object.entries(DATA.meta.areas || {}).map(([a, names]) =>
+    [a, names.map(n => byName[n]).filter(Boolean)]).filter(([, ts]) => ts.length);
+  const placed = new Set(areas.flatMap(([, ts]) => ts));
+  const rest = (J.exam || []).filter(t => !placed.has(t));
+  if (rest.length) areas.push(['Other', rest]);
+  const all = areas.flatMap(([, ts]) => ts);
+  const can = t => !statusOf(t).off;
+  const judged = all.filter(t => can(t) && statusOf(t).score != null)
+    .sort((a, b) => statusOf(a).score - statusOf(b).score);
+  const sets = {
+    notsat: all.filter(t => can(t) && ['notsat', 'older'].includes(statusOf(t).k)),
+    all: all.filter(can),
+    weakest: judged.slice(0, 5),
+    none: [],
+  };
+  const boxes = new Map(), notes = new Map(), groups = [];
+  const summary = el('p', { class: 'exsum', 'data-exam-summary': key, 'aria-live': 'polite' });
+  const set = (next, quiet) => {
+    st.tasks = all.filter(t => next.includes(t) && can(t));
+    for (const [t, b] of boxes) b.checked = st.tasks.includes(t);
+    for (const { box, count, ts } of groups) {
+      const on = ts.filter(t => st.tasks.includes(t)).length, open = ts.filter(can).length;
+      box.checked = open > 0 && on === open;
+      box.indeterminate = on > 0 && on < open;
+      box.disabled = !open;
+      count.textContent = `${on} of ${ts.length}`;
+    }
+    for (const [t, n] of notes) n.hidden = !st.tasks.includes(t);
+    summary.textContent = examSummary(st.tasks, !!st.control, statusOf);
+    if (!quiet && onChange) onChange();
+  };
+  const quick = (k, label, extra = {}) => el('button', { class: 'chip-btn', type: 'button',
+    'data-quick': k, text: label, onclick: () => set(sets[k]), ...extra });
+  const body = areas.map(([a, ts]) => {
+    const box = el('input', { type: 'checkbox', 'data-area-box': a,
+      onchange: e => set(e.target.checked ? [...st.tasks, ...ts.filter(can)]
+                                          : st.tasks.filter(t => !ts.includes(t))) });
+    const count = el('span', { class: 'excount' });
+    groups.push({ box, count, ts });
+    return el('div', { class: 'exarea', role: 'group', 'aria-label': a, 'data-area': a },
+      el('div', { class: 'exhead' }, el('label', {}, box, ' ' + a), count),
+      ts.map(t => {
+        const s = statusOf(t);
+        const b = el('input', { type: 'checkbox', 'data-exam-task': t,
+          disabled: s.off ? '' : null,
+          onchange: e => set(e.target.checked ? [...st.tasks, t] : st.tasks.filter(x => x !== t)) });
+        boxes.set(t, b);
+        const note = s.k === 'judged' ? el('span', { class: 'exnote', 'data-regrade': t,
+          hidden: '', text: 'same questions — re-grade only, no GPU' }) : '';
+        if (note) notes.set(t, note);
+        return el('label', { class: 'extopic' + (s.off ? ' off' : ''), 'data-exam-topic': t,
+            'data-status': s.k },
+          b, el('span', { class: 'exname', title: frName(t), text: frName(t) }),
+          el('span', { class: 'exst', 'data-exam-status': t, text: s.text },
+            s.prov ? el('span', { class: 'exprov', text: ' · provisional' }) : ''),
+          note);
+      }));
+  });
+  // the control is its own question, off unless someone asks for it
+  const cs = J.control && (state.loop.built || []).includes(J.control) ? statusOf(J.control) : null;
+  if (!cs || cs.off) st.control = false;
+  const control = cs ? el('label', { class: 'excontrol', 'data-exam-control-row': '1' },
+    el('input', { type: 'checkbox', 'data-exam-control': '1', checked: st.control ? '' : null,
+      disabled: cs.off ? '' : null,
+      onchange: e => { st.control = e.target.checked; set(st.tasks); } }),
+    el('span', {}, el('b', { text: 'MMLU control (open-ended)' }),
+      ' — the MMLU questions this model got wrong as multiple choice, asked openly: was the '
+      + 'knowledge there under the format?' + (cs.off ? ` (${cs.text})` : ''))) : '';
+  const box = el('div', { class: 'expick', 'data-exam-picker': key },
+    el('div', { class: 'toolbar exquick' },
+      el('span', { class: 'small se', text: 'Quick picks' }),
+      quick('notsat', `Not sat yet (${sets.notsat.length})`,
+        sets.notsat.length ? {} : { disabled: '' }),
+      quick('all', `All ${sets.all.length}`, sets.all.length ? {} : { disabled: '' }),
+      quick('weakest', 'Weakest 5', judged.length ? { title: 'this model\'s five lowest judged '
+        + 'topics' } : { disabled: '', title: 'this model has no judged topics yet' }),
+      quick('none', 'None')),
+    el('div', { class: 'exareas' }, body),
+    control, summary);
+  set(st.tasks || [], true);
+  return box;
+}
+
+// ---------------------------------------------------------------------------
+// 11i: a checkpoint that ships its own model code (an auto_map in its
+// config.json) says so BEFORE it is queued. #56 learned it at start, after the
+// wait, and its Resubmit had no way to ask. The server reads the file; the
+// page offers an unticked box when the server may run it, and says why not
+// when it may not — in the words the API refuses with.
+// ---------------------------------------------------------------------------
+state.codeInfo = {};
+async function loadCodeInfo(mid) {
+  const c = state.codeInfo[mid];
+  if (c && c !== 'loading') return c;
+  state.codeInfo[mid] = 'loading';
+  try {
+    const j = await api('api/models/code?id=' + encodeURIComponent(mid));
+    state.codeInfo[mid] = j;
+    if (j.weights === false) state.noWeights.add(mid);
+    else if (j.weights === true) state.noWeights.delete(mid);
+  } catch (e) {
+    // the API still refuses in its own words at Queue; the page stops asking
+    state.codeInfo[mid] = { own_code: false, unknown: true };
+  }
+  return state.codeInfo[mid];
+}
+// false: nothing to ask (a Hub id never runs its own code here); null: being
+// asked; else the server's answer
+function codeInfo(mid, redraw) {
+  mid = String(mid || '').trim();
+  if (!LIVE || !/^local\/[^/]+$/.test(mid)) return false;
+  const c = state.codeInfo[mid];
+  if (c && c !== 'loading') return c;
+  if (!c) loadCodeInfo(mid).then(() => (redraw || render)());
+  return null;
+}
+function ownCodeBox(info, checked, onToggle, key) {
+  if (!info || !info.own_code || info.why) return '';
+  const f = info.files || [];
+  return el('label', { class: 'owncode', 'data-own-code': key },
+    el('input', { type: 'checkbox', 'data-own-code-box': key, checked: checked ? '' : null,
+      onchange: e => onToggle(e.target.checked) }),
+    el('span', {}, 'Run this checkpoint\'s own model code (',
+      el('code', { text: f.map(x => x.file).join(', ') }), ', sha ',
+      el('code', { title: f.map(x => `${x.file} ${x.sha}`).join('\n'),
+        text: f.map(x => x.sha.slice(0, 4) + '…').join(', ') }),
+      ') — as the unprivileged ', el('code', { text: info.user || 'benchjob' }), ' user'));
+}
+// why this run cannot be queued yet, or '' — the reason goes beside the button
+function ownCodeWhy(info, allowed) {
+  if (info === null) return 'Checking the checkpoint…';
+  if (!info || !info.own_code) return '';
+  if (info.why) return info.why;
+  return allowed ? '' : 'This checkpoint ships its own model code — tick the box to run it.';
+}
+
+// ---------------------------------------------------------------------------
+// The model page's panel. It opens from the hero's Sit the exam, from an
+// opened Leaderboard row's Run exam, and from the Loop — always here, and
+// scrolled to.
+// ---------------------------------------------------------------------------
+state.msit = { model: null, open: false, tasks: [], control: false, allow: false,
+               busy: false, msg: '' };
+state.msitRedraw = null;
+
+function openSit(mid) {
+  const s = state.msit;
+  if (s.model !== mid) Object.assign(s, { model: mid, tasks: [], control: false, allow: false,
+                                          msg: '' });
+  s.open = true;
+  delete state.codeInfo[mid];              // asked afresh each time it opens
+  if (!state.loop.loaded && netReady()) loadLoop();
+  state.after = { scroll: '[data-panel="msit"]' };
+  if (state.model !== mid || state.topic) navigate({ model: mid, topic: null });
+  else render();
+}
+
+function sitWhy(m, s, info) {
+  if (!state.loop.loaded) return 'Loading the exam…';
+  if (state.loop.blocked) return state.loop.blocked;
+  if (judgeDown()) return judgeWhy();
+  const code = ownCodeWhy(info, s.allow);
+  if (code === 'Checking the checkpoint…') return code;
+  if (cannotRun(m.id)) return noWeightsWhy(m.id);
+  if (code) return code;
+  if (!s.tasks.length && !s.control) return 'Tick at least one topic.';
+  return '';
+}
+
+async function sitGo(m, s) {
+  const J = DATA.judged || {};
+  const tasks = [...s.tasks, ...(s.control && J.control ? [J.control] : [])];
+  const body = { hf_id: m.id, kind: ['base', 'instruct'].includes(m.kind) ? m.kind : 'auto',
+                 suite: 'judged', submitter: whoName(), tasks,
+                 ...(s.allow ? { allow_remote_code: true } : {}) };
+  s.busy = true; s.msg = '';
+  if (state.msitRedraw) state.msitRedraw();
+  try {
+    const j = await post('api/submissions', body);
+    rememberQueued(j.id);
+    const n = s.tasks.length;
+    toast(j.note ? `#${j.id}: ${j.note}` : `Queued #${j.id} — ${m.name} · `
+      + (n === 1 ? frName(s.tasks[0]) : `${n} topics`) + (s.control ? ' + MMLU control' : ''),
+      { key: 'msit', go: goQueue, link: 'see the queue' });
+    Object.assign(s, { tasks: [], control: false, allow: false });
+    s.busy = false;
+    await loadQueue();
+  } catch (e) { s.msg = 'Refused: ' + e.message; }
+  s.busy = false;
+  if (state.msitRedraw) state.msitRedraw(); else render();
+}
+
+function modelSitPanel(m) {
+  const s = state.msit;
+  if (!LIVE || !s.open || s.model !== m.id) { state.msitRedraw = null; return null; }
+  if (!state.loop.loaded && netReady()) loadLoop();
+  const card = el('div', { class: 'card', 'data-panel': 'msit' });
+  const paint = () => {
+    const info = codeInfo(m.id, () => state.msitRedraw && state.msitRedraw());
+    const why = el('span', { class: 'propwhy', 'data-why': 'msit' });
+    const btn = el('button', { class: 'primary', 'data-msit-go': m.id,
+      text: s.busy ? 'Queueing…' : 'Queue this run', onclick: () => sitGo(m, s) });
+    const gate = () => {
+      const w = sitWhy(m, s, info);
+      btn.disabled = !!w || s.busy;
+      why.textContent = w;
+      why.hidden = !w;
+    };
+    card.replaceChildren(
+      el('div', { class: 'msit-head' },
+        el('h2', { text: 'Sit the exam' }),
+        el('button', { class: 'ghost', 'data-msit-close': '1', text: '✕ Close',
+          onclick: () => { s.open = false; render(); } })),
+      el('p', { class: 'sub', text: `${m.name}, on the topics you tick. The judge grades the `
+        + 'answers when the run finishes; only the judge sees the hidden questions.' }),
+      state.loop.loaded ? examPicker(s, m.id, 'msit', gate)
+        : skeleton(4, { 'data-loading': 'msit' }),
+      ownCodeBox(info, s.allow, v => { s.allow = v; gate(); }, 'msit'),
+      el('div', { class: 'frm msit-go' }, btn, why),
+      s.msg ? el('p', { class: 'small warn', 'data-msit-msg': '1', text: s.msg }) : '');
+    gate();
+  };
+  state.msitRedraw = () => { if (card.isConnected) paint(); };
+  paint();
+  return card;
+}
+
+// the Suite cell: one line whatever the run sat, and the list behind ▸,
+// grouped by area. #56's row listed 37 names and stood 650px tall.
+state.suiteOpen = new Set();
+function suiteCell(r, key) {
+  let ts = [];
+  try { ts = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
+  const J = DATA.judged || {};
+  if (r.suite !== 'judged') return el('span', { 'data-suite-cell': key, text: r.suite });
+  if (!ts.length) return el('span', { 'data-suite-cell': key, text: 'judged · the whole exam' });
+  const ex = ts.filter(t => t !== J.control), ctl = ts.includes(J.control);
+  const label = 'judged · ' + (ex.length === 1 ? frName(ex[0]) : ex.length
+    ? `${ex.length} topics` : '') + (ctl ? (ex.length ? ' + ' : '') + 'MMLU control' : '');
+  if (ex.length <= 1) return el('span', { 'data-suite-cell': key, text: label });
+  const byName = Object.fromEntries(Object.entries(J.topics || {}).map(([t, n]) => [n, t]));
+  const lines = Object.entries(DATA.meta.areas || {}).map(([a, names]) =>
+    [a, names.map(n => byName[n]).filter(t => ex.includes(t))]).filter(([, xs]) => xs.length);
+  const placed = new Set(lines.flatMap(([, xs]) => xs));
+  const other = ex.filter(t => !placed.has(t));
+  if (other.length) lines.push(['Other', other]);
+  const id = key + ':' + r.id;
+  return el('details', { class: 'suitecell', 'data-suite-cell': key,
+      open: state.suiteOpen.has(id) ? '' : null,
+      ontoggle: e => { if (e.target.open) state.suiteOpen.add(id); else state.suiteOpen.delete(id); } },
+    el('summary', { text: label + ' ▸' }),
+    el('div', { class: 'suitelist' }, lines.map(([a, xs]) => el('div', {},
+      el('b', { text: a + ': ' }), xs.map(frName).join(', ')))));
+}
 
 // ---------------------------------------------------------------------------
 // The answers, for the diagnosis half only. The report half is one aggregate
@@ -11925,6 +12391,8 @@ async function loadQueue() {
     state.queue = rows;
     if (justFinished) await refreshResults();       // new scores -> re-render everything
     else if (changed && state.tab === 'queue') (state.queueRedraw || render)();
+    // 11i: the model page's exam panel shows each topic's place in the queue
+    else if (changed && state.model && state.msitRedraw) state.msitRedraw();
   } catch (e) { /* netFail said so, and set how long to wait */ }
 }
 
@@ -11992,7 +12460,7 @@ if (LIVE) {
     // the Loop board and a topic page: without this nothing ever re-fetched
     // /api/loop, so a board whose first load failed stayed empty for as long
     // as the tab was open — which is exactly what happened on the live tree
-    if (state.tab === 'loop' || state.topic) loadLoop();
+    if (state.tab === 'loop' || state.topic || (state.model && state.msit.open)) loadLoop();
   }, POLL_MS);
 } else {
   initData(DATA);
