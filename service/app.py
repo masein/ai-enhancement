@@ -175,19 +175,29 @@ def judge_health(force: bool = False) -> dict:
 
 @app.get("/api/proposals/{pid}/focus")
 def proposal_focus(pid: int, count: int = 20):
-    """Where `count` documents would go: the domains whose diagnose-half
-    answers failed, largest first. The Review card shows this before anyone
-    presses Generate, so the spread is a decision, not a surprise."""
+    """Where the documents would go. Before Approve, the plan as it stands —
+    the proposal card shows it beside the spec, so the spread is part of what
+    is approved. After Approve, the plan Approve froze. A proposal approved
+    before 11e has no frozen plan, and says so: it keeps 11a's behaviour."""
     r = db.proposal_get(pid)
     if not r:
         raise HTTPException(404, f"no proposal {pid}")
     if not 1 <= count <= 1000:
         raise HTTPException(422, "count must be between 1 and 1000")
-    model_dir = config.OUT_DIR / r["model"].replace("/", "__")
-    plan = prop.focus_plan(model_dir, r["task"], r["category"], count)
-    return {"proposal_id": pid, "count": count, "plan": plan,
-            "why": "" if plan else ("this topic's questions carry no domain labels, so the "
-                                    "documents are not spread by area")}
+    base = {"proposal_id": pid, "count": count}
+    if r["status"] == "approved":
+        frozen = prop.frozen_focus(r)
+        if frozen is None:
+            plan = prop.focus_plan(config.OUT_DIR / r["model"].replace("/", "__"), r["task"],
+                                   r["category"], count)
+            return {**base, "frozen": False, "legacy": True, "mode": "area" if plan else "off",
+                    "labels": [f["domain"] for f in plan for _ in range(f["documents"])],
+                    "reason": "" if plan else prop.NO_LABELS, "plan": plan}
+        return {**base, "frozen": True, "legacy": False, "mode": frozen.get("mode") or "off",
+                "labels": frozen.get("labels") or [], "reason": frozen.get("reason") or ""}
+    f = _focus_live(r)
+    return {**base, "frozen": False, "legacy": False, "mode": f["mode"] or "off",
+            "labels": f["labels"], "reason": f["reason"], "failing": f["failing"]}
 
 
 @app.get("/api/judge/health")
@@ -740,6 +750,8 @@ class ProposalIn(BaseModel):
 class ApproveIn(BaseModel):
     approver: str
     edited_text: str = ""
+    # 11e: "Spread the documents over these", on by default
+    spread: bool = True
 
 
 class RejectIn(BaseModel):
@@ -1242,10 +1254,17 @@ def _last_judged(payload: dict, task: str, model: str | None = None) -> dict | N
 
 
 def _dataset_kept(d: dict) -> int | None:
+    return _dataset_items(d).get("kept")
+
+
+def _dataset_items(d: dict) -> dict:
+    """The accounting the poller wrote: requested, kept, missing. A dataset
+    made before 11a has no `missing`, and the page says its reasons were not
+    recorded rather than saying nothing."""
     try:
-        return ((json.loads(d.get("provenance") or "{}") or {}).get("items") or {}).get("kept")
+        return (json.loads(d.get("provenance") or "{}") or {}).get("items") or {}
     except ValueError:
-        return None
+        return {}
 
 
 def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
@@ -1310,6 +1329,8 @@ def _loop_row(topic: str, payload: dict, props: list[dict], sets: list[dict],
         # the only place that count is authoritative
         "datasets": [{"id": d["id"], "status": d.get("status"), "count": d.get("count"),
                       "kept": _dataset_kept(d), "created_at": d.get("created_at"),
+                      # the same line the Review card reads (11e): None before 11a
+                      "missing": _dataset_items(d).get("missing"),
                       "over_provisional_judge": prop.override_of(
                           next((q for q in mine if q["id"] == d.get("proposal_id")), {}))}
                      for d in ds],
@@ -1743,9 +1764,27 @@ def proposal_approve(pid: int, a: ApproveIn, x_token: str = Header(default="")):
     edited = a.edited_text.strip()[:2000]
     if edited == r["spec_text"].strip():
         edited = ""                                   # approved as written
+    # 11e: Approve freezes the plan the card showed, so what the approver saw
+    # is what the generator gets — whatever the bank or the judge does later
+    frozen = _focus_to_freeze(r, a.spread)
     db.proposal_update(pid, status="approved", approver=who, edited_text=edited,
-                       approved_at=time.time())
-    return {"id": pid, "status": "approved", "approver": who, "edited": bool(edited)}
+                       approved_at=time.time(), approved_focus=json.dumps(frozen))
+    return {"id": pid, "status": "approved", "approver": who, "edited": bool(edited),
+            "focus_mode": frozen["mode"]}
+
+
+def _focus_live(r: dict) -> dict:
+    return prop.focus_for(config.OUT_DIR / r["model"].replace("/", "__"), r["task"],
+                          r["category"])
+
+
+def _focus_to_freeze(r: dict, spread: bool) -> dict:
+    if not spread:
+        return {"mode": "off", "labels": [], "reason": prop.TURNED_OFF}
+    f = _focus_live(r)
+    if not f["labels"]:
+        return {"mode": "off", "labels": [], "reason": f["reason"]}
+    return {"mode": f["mode"], "labels": f["labels"], "reason": ""}
 
 
 @app.post("/api/proposals/{pid}/reject")
@@ -1791,12 +1830,27 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
     did = db.dataset_create(pid, g.fmt, g.count, who, {})
     # the audience travels with the topic: a spec alone never said who asks
     audience = prop.audience_for(r["category"], r["task"])
-    # and so does the corner of the topic each request is for: the documents
-    # are spread over the domains whose diagnose-half answers failed
-    plan = prop.focus_plan(config.OUT_DIR / r["model"].replace("/", "__"), r["task"],
-                           r["category"], g.count)
-    reqs = prop.generation_requests(did, spec, r["category"], g.count, g.fmt, seed=did,
-                                    audience=audience, plan=plan)
+    # and so does the corner of the topic each request is for. 11e: the first
+    # N labels of the plan Approve froze; a proposal approved before 11e keeps
+    # 11a's plan, computed now
+    frozen = prop.frozen_focus(r)
+    if frozen is not None:
+        mode = frozen.get("mode") or "off"
+        full = frozen.get("labels") or []
+        labels = [full[i % len(full)] for i in range(g.count)] if full else []
+        counts: dict[str, int] = {}
+        for lab in labels:
+            counts[lab] = counts.get(lab, 0) + 1
+        plan = [{"domain": lab, "documents": n} for lab, n in counts.items()]
+        reqs = prop.generation_requests(did, spec, r["category"], g.count, g.fmt, seed=did,
+                                        audience=audience, labels=labels or None)
+    else:
+        plan = prop.focus_plan(config.OUT_DIR / r["model"].replace("/", "__"), r["task"],
+                               r["category"], g.count)
+        mode = "area" if plan else "off"
+        labels = [f["domain"] for f in plan for _ in range(f["documents"])]
+        reqs = prop.generation_requests(did, spec, r["category"], g.count, g.fmt, seed=did,
+                                        audience=audience, plan=plan)
     sha = llm.prompt_sha(*[q.system + "\n" + q.user for q in reqs])
     try:
         bid = backend.submit(reqs)
@@ -1811,6 +1865,7 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
     # later would read a bank that may have moved
     db.dataset_update(did, batch_id=bid, provenance=json.dumps(
         {"prompt_sha256": sha, "audience": audience, "focus_plan": plan,
+         "focus_mode": mode, "focus_labels": labels,
          "requests": [{"k": k, "count": q.meta.get("count"), "focus": q.meta.get("focus")}
                       for k, q in enumerate(reqs)]}))
     return {"dataset_id": did, "status": "pending", "batch_id": bid, "items": len(reqs)}

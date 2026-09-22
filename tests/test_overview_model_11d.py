@@ -31,6 +31,11 @@ def ranked(body):
                   key=lambda m: -m["avg"])
 
 
+def ranked_names(page):
+    return page.evaluate("""() => DATA.models.filter(m => officialAvg(m) != null && !m.duplicateOf)
+      .sort((a, b) => officialAvg(b) - officialAvg(a)).map(m => m.name)""")
+
+
 def verdict(page, key):
     return page.locator(f"[data-verdict='{key}']").text_content()
 
@@ -49,7 +54,9 @@ def test_a_lead_inside_the_noise_says_so(live, page):
     page.wait_for_selector("[data-highlights]")
     v = verdict(page, "best")
     assert "by 0.7 points — within noise." in v and v.startswith("Leads ")
-    assert page.locator("[data-hl-value='best']").text_content().endswith("· 90.0")
+    # 11e: the value is the number; the name is its own line under it
+    assert page.locator("[data-hl-value='best']").text_content() == "90.0"
+    assert page.locator("[data-hl-name='best']").text_content() == ranked_names(page)[0]
     assert page.errors == []
 
 
@@ -77,7 +84,8 @@ def test_with_nothing_judged_the_cards_say_so(live, page):
     page.wait_for_selector("[data-highlights]")
     assert verdict(page, "weakest") == "No model has been judged yet — Loop ▸ Sit the exam."
     n = page.evaluate("DATA.judged.exam.length")
-    assert page.locator("[data-hl-value='loop']").text_content() == f"0 / {n} topics judged"
+    assert page.locator("[data-hl-value='loop']").text_content() == f"0 / {n}"
+    assert page.locator("[data-hl-name='loop']").text_content() == "topics judged"
     assert "No judged run yet." in verdict(page, "judge")
     assert page.errors == []
 
@@ -96,14 +104,17 @@ def test_the_live_cards_are_derived_from_the_board(live, page):
     facts = page.evaluate("""() => { const m = loopModel();
       const xs = Object.entries(m.judge.tasks).filter(([t]) => t.startsWith('exam_'))
         .map(([t, v]) => [t, pubScore(v)]).filter(x => x[1] != null).sort((a, b) => a[1] - b[1]);
-      return {name: m.name, weakest: frName(xs[0][0]), n: xs.length, exam: DATA.judged.exam.length,
+      return {name: m.name, weakest: frName(xs[0][0]), v: xs[0][1], n: xs.length,
+              exam: DATA.judged.exam.length,
               canary: m.judge.canary}; }""")
-    assert page.locator("[data-hl-value='weakest']").text_content().startswith(facts["weakest"])
+    assert page.locator("[data-hl-name='weakest']").text_content() == facts["weakest"]
+    assert page.locator("[data-hl-value='weakest']").text_content() == f"{facts['v']:.2f} / 4"
     assert verdict(page, "weakest").startswith(f"{facts['name']}, {facts['n']} of {facts['exam']} topics judged")
     assert verdict(page, "loop").startswith(f"Last judged {facts['name']}")
     cn = facts["canary"]
-    assert page.locator("[data-hl-value='judge']").text_content() == \
-        f"{cn['graded']} / {cn['n']} {'moved' if cn['drifted'] else 'steady'}"
+    assert page.locator("[data-hl-value='judge']").text_content() == f"{cn['graded']} / {cn['n']}"
+    assert page.locator("[data-hl-name='judge']").text_content() == \
+        ("moved" if cn["drifted"] else "steady")
     # the tiles are one line under the hero now
     line = page.locator("[data-statline]").text_content()
     assert "models · " in line and "gaps are real" in line and "of evaluation" in line

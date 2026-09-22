@@ -1649,23 +1649,44 @@ h2 { font-size:var(--fs-4); font-weight:700; margin:0 0 3px; letter-spacing:-0.0
 @media (prefers-reduced-motion: reduce) { .livebadge .dot { animation:none; } }
 @keyframes livepulse { 0%,100% { opacity:1; } 50% { opacity:.45; } }
 /* the checks: the pill lives in the bar, its list opens just under the bar */
-.bar-checks details.checks { position:static; }
-.bar-checks > details > summary { display:flex; align-items:center; gap:6px;
-  white-space:nowrap; font-family:var(--font-mono); font-size:var(--fs-1);
-  border:1px solid var(--border); border-radius:999px; padding:3px 10px;
-  background:var(--surface-1); cursor:pointer; list-style:none; }
+.bar-checks details.checks { position:static; margin:0; }
+.bar-checks > details > summary { display:inline-flex; align-items:center; gap:6px;
+  white-space:nowrap; font-family:var(--font-mono); font-size:var(--fs-1); font-weight:600;
+  border:1px solid var(--border); border-radius:var(--r-1); padding:var(--sp-1) var(--sp-3);
+  min-height:32px; box-sizing:border-box; background:var(--surface-1);
+  color:var(--text-primary); cursor:pointer; list-style:none; }
+.bar-checks > details > summary:hover { background:var(--plane); }
 .bar-checks > details > summary::-webkit-details-marker { display:none; }
 .bar-checks .checklist { position:absolute; left:0; right:0; top:100%;
   background:var(--surface-1); border-bottom:1px solid var(--border);
   box-shadow:0 10px 28px rgba(0,0,0,.10); padding:10px 22px; margin:0;
   max-height:min(60vh,520px); overflow:auto; z-index:59; }
-/* the pill stays short enough that the tabs are not pushed off the bar */
-@media (max-width:1400px) { .bar-checks .checks-judged, .bar-checks .showhide { display:none; } }
+/* the pill's panel: what kind of checks, then one line each */
+.bar-checks .checklist li.checks-judged { list-style:none; color:var(--text-secondary);
+  margin:0 0 6px; }
 @media (max-width:720px) {
   .bar-in { height:auto; padding:8px 16px; flex-wrap:wrap; row-gap:4px; }
   .bar-title .t-full { display:none; }
   .bar-title .t-short { display:inline; }
   .bar-in .tabs { order:3; flex-basis:100%; margin:0; }
+}
+/* 11e: on a phone the bar is two rows, at most 96px — the title, LIVE and
+   one ⋯ menu holding the checks, the name and the theme; then the tabs */
+.bar-more { display:none; }
+@media (max-width:600px) {
+  .bar-in { padding:6px 16px 0; row-gap:2px; }
+  .bar-more { display:inline-flex; align-items:center; justify-content:center; margin-left:auto;
+    min-height:32px; min-width:40px; padding:0 10px; font-size:var(--fs-3); line-height:1; }
+  .bar-right { display:none; position:absolute; right:16px; top:44px; z-index:60;
+    flex-direction:column; align-items:stretch; gap:8px; min-width:220px; max-width:calc(100vw - 32px);
+    background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2);
+    padding:10px; box-shadow:0 10px 28px rgba(0,0,0,.16); }
+  .bar[data-more="open"] .bar-right { display:flex; }
+  .bar-right > * { width:100%; }
+  .bar-right button, .bar-right summary { width:100%; justify-content:flex-start; text-align:left; }
+  .bar-checks .checklist { position:static; box-shadow:none; border:0; padding:6px 0 0 18px;
+    max-height:50vh; }
+  .tabs button { padding:8px 10px; }
 }
 /* the hero, on Overview only */
 .pagehero { margin:22px 0 4px; }
@@ -1736,8 +1757,16 @@ tbody tr:hover { background:var(--accent-soft); }
 tbody tr.open > td:first-child, tbody tr[aria-selected="true"] > td:first-child {
   box-shadow:inset 3px 0 0 var(--accent); }
 tbody tr.open { background:var(--accent-soft); }
+/* ---- 11e: the plan box on a proposal card -------------------------------- */
+.planbox { border:1px solid var(--border); border-radius:var(--r-2); padding:10px 14px;
+  margin:10px 0; background:var(--plane); display:flex; flex-direction:column; gap:4px; }
+.planbox .plan { margin:0; color:var(--text-primary); }
+.planbox label.spread { display:inline-flex; align-items:center; gap:6px; }
 /* ---- 11d: Overview ------------------------------------------------------- */
 .statline { font-size:var(--fs-1); color:var(--muted); margin:6px 0 2px; }
+/* 11e: the hero's "Submit a model" and the stats line under it: 12px */
+.pagehero:not([hidden]) + #view > .statline[data-statline] { margin-top:12px; }
+.pagehero:not([hidden]) { margin-bottom:0; }
 #view > .statline:first-child { margin-top:-2px; }
 .hlgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:14px;
   margin-top:10px; }
@@ -1746,6 +1775,9 @@ tbody tr.open { background:var(--accent-soft); }
 .hcard-v { font-family:var(--font-mono); font-size:var(--fs-5); font-weight:700;
   letter-spacing:-0.02em; line-height:1.15;
   color:var(--text-primary); overflow-wrap:anywhere; }
+.hcard-v { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hcard-name { font-size:var(--fs-3); font-weight:600; color:var(--text-primary);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
 .hcard-verdict { margin:0; font-size:var(--fs-2); color:var(--text-secondary); }
 .hcard-link { margin-top:auto; font-size:var(--fs-1); font-family:var(--font-mono); }
 table.mini-lb td.model { position:static; box-shadow:inset 3px 0 0 var(--fam, var(--axis));
@@ -1784,6 +1816,10 @@ details.lenfold > summary { cursor:pointer; font-size:var(--fs-1); color:var(--a
   color:var(--text-secondary); white-space:nowrap; }
 .chip-btn:hover, .pill:hover { color:var(--text-primary); border-color:var(--axis); }
 .chip-btn.on { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+.chip-btn[aria-disabled="true"], .chip-btn[aria-disabled="true"]:hover { opacity:.5;
+  cursor:not-allowed; color:var(--text-secondary); border-color:var(--border); background:none; }
+.lbbar .chipnote { flex-basis:100%; margin:0; font-size:var(--fs-1); color:var(--text-secondary); }
+.lbbar .chipnote[hidden] { display:none; }
 .pill.on { border-color:var(--accent); color:var(--text-primary); }
 .pill[aria-expanded="true"] { border-color:var(--accent); }
 /* two header rows: the group over its columns, the unit under a name */
@@ -1799,7 +1835,48 @@ table.lb td.tcell b { font-family:var(--font-mono); font-weight:700; }
 table.lb td.tcell .se { font-family:var(--font-mono); display:inline; }
 table.lb td.model { position:sticky; left:32px; background:var(--surface-1); z-index:1;
   padding-left:12px; max-width:280px; }
-table.lb td.model .badge { margin-left:4px; padding:0 4px; }
+table.lb td.model .badge { margin-left:0; padding:0 4px; }
+table.lb .mcell { display:flex; align-items:center; gap:4px; max-width:260px; overflow:hidden;
+  white-space:nowrap; }
+table.lb .mcell .mname { flex:0 3 auto; min-width:40px; max-width:none; overflow:hidden;
+  text-overflow:ellipsis; }
+/* a long badge ("duplicate of <name>") gives way too, after the name: every
+   child stays inside the cell. The short ones (base, prelim) keep their word */
+table.lb .mcell .badge { flex:none; white-space:nowrap; }
+table.lb .mcell .badge[data-duplicate], table.lb .mcell .badge[data-near-duplicate] {
+  flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+table.lb .mcell .duptoggle { flex:none; padding:0 2px; min-height:0; }
+.hfade { position:relative; min-width:0; }
+.hfade::after { content:""; position:absolute; top:0; right:0; bottom:0; width:32px; z-index:6;
+  pointer-events:none; opacity:0; transition:opacity .15s;
+  background:linear-gradient(to right, transparent, var(--surface-1)); }
+.hfade[data-more="1"]::after { opacity:1; }
+.hfade .scrollhint { display:none; position:absolute; top:0; right:0; z-index:7;
+  pointer-events:none; font-family:var(--font-mono); font-size:var(--fs-1);
+  height:24px; line-height:24px; color:var(--text-secondary); background:var(--surface-1);
+  padding:0 2px 0 8px; box-shadow:-10px 0 8px var(--surface-1); }
+.hfade[data-more="1"] .scrollhint { display:block; }
+/* a phone: the rank and the model together take at most 45% of the scroller,
+   the name ellipsises, and of the badges only "prelim" stays — the scores
+   are what the table is for */
+@media (max-width:600px) {
+  .lb-wrap.stick[data-hkeep="lb"] { container-type:inline-size; }
+  table.lb td.model { padding-left:6px; padding-right:4px; }
+  table.lb .mcell { max-width:calc(45cqi - 42px); }
+  table.lb .mcell .badge:not(.prelim), table.lb .mcell .duptoggle { display:none; }
+  /* the active parameters stay in the tooltip: Params is one short number */
+  table.lb td .act { display:none; }
+  /* a unit wraps under its name rather than widening its column */
+  table.lb thead th .unit { white-space:normal; }
+  table.lb .mcell .badge.prelim { flex:0 1 auto; min-width:0; overflow:hidden;
+    text-overflow:ellipsis; }
+}
+/* the opened row's blocks: each at least 300px (or the row), none painting
+   into the next — the Leaderboard's one-line rule stops at the detail */
+table.lb tr.detail .dgrid { grid-template-columns:repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+table.lb tr.detail .dblock { min-width:0; }
+table.lb tr.detail td td, table.lb tr.detail td th { white-space:normal; }
+table.lb tr.detail table.mini { width:100%; }
 table.lb tbody td.model { box-shadow:inset 3px 0 0 var(--fam, var(--axis)); }
 table.lb td.model .mname { display:inline-block; max-width:190px; overflow:hidden;
   text-overflow:ellipsis; vertical-align:bottom; }
@@ -1834,6 +1911,9 @@ table.mini td, table.mini th { height:auto; padding:3px 10px 3px 0; border-botto
 .tchip.grey { color:var(--text-secondary); background:var(--plane); border-color:var(--border); }
 a.tchip { text-decoration:none; }
 .dlinks { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+.dlinks button.quiet { padding:0; border:0; min-height:0; background:none; color:var(--accent);
+  font:inherit; text-align:left; cursor:pointer; }
+.dlinks button.quiet:hover:not(:disabled) { background:none; text-decoration:underline; }
 .colmenu-list .colgroup { margin:6px 0 8px; display:flex; flex-direction:column; gap:2px; }
 .colmenu-list.pop { min-width:260px; padding:10px 12px; gap:4px; }
 .colmenu-list .colgroup { max-height:260px; overflow:auto; }
@@ -1849,7 +1929,27 @@ details.howto > summary { cursor:pointer; font-family:var(--font-mono); font-siz
 details.howto > summary::-webkit-details-marker { display:none; }
 details.howto .about { margin-top:12px; }
 /* Insights */
-.igrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(460px, 1fr)); gap:22px 30px; }
+.igrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+  gap:22px 30px; }
+/* 11e: a chart is never drawn narrower than its viewBox, so its 12px text is
+   12px on the screen; on a phone it scrolls sideways in its own box */
+.chartscroll { overflow-x:auto; }
+.chartscroll > svg { display:block; max-width:680px; }
+/* Weakest topics on a phone: HTML rows, not a shrunken SVG */
+.wrows { display:none; }
+.wrow { display:grid; grid-template-columns:minmax(0, 1fr) 34% auto; gap:8px; align-items:center;
+  min-height:28px; color:var(--text-primary); text-decoration:none; font-size:var(--fs-2); }
+.wrow:hover { background:var(--plane); }
+.wrow .wname { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-secondary); }
+.wrow .wtrack { height:10px; border-radius:2px; background:var(--grid); overflow:hidden; }
+.wrow .wfill { height:100%; background:var(--accent); opacity:.75; }
+.wrow .wfill.hatch { background:repeating-linear-gradient(45deg, var(--axis) 0 2px, var(--grid) 2px 6px);
+  opacity:1; }
+.wrow .wv { font-family:var(--font-mono); font-size:var(--fs-1); }
+@media (max-width:600px) {
+  .ibox .weakest-svg { display:none; }
+  .wrows { display:block; }
+}
 .ibox { min-width:0; }
 .ihead .eyebrow { margin-bottom:2px; }
 svg .fpt { cursor:pointer; }
@@ -2118,6 +2218,7 @@ h2[data-ix]::before { content:attr(data-ix); font-family:var(--font-mono);
 @keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:1} }
 .st-active::before { content:'●'; margin-right:5px; animation:pulse 1.4s infinite; }
 .frm { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+.frm > .badge { align-self:center; margin-left:0; }
 .frm input, .frm select { font:inherit; font-size:var(--fs-2); color:var(--text-primary);
   background:var(--plane); border:1px solid var(--border); border-radius:var(--r-1);
   padding:6px 10px; }
@@ -2281,7 +2382,9 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .topright { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
 button.who { font-weight:600; font-family:var(--font-mono); font-size:var(--fs-1);
   white-space:nowrap; }
-#themeBtn { white-space:nowrap; }
+#themeBtn { white-space:nowrap; font-family:var(--font-mono); font-size:var(--fs-1);
+  font-weight:600; }
+.bar-right button, .bar-right summary { min-height:32px; box-sizing:border-box; }
 button.who.ask { border-color:var(--warning);
   outline:2px solid color-mix(in srgb, var(--warning) 35%, transparent); }
 .who-edit { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
@@ -2307,6 +2410,10 @@ button.who.ask { border-color:var(--warning);
   vertical-align:1px; flex:none; }
 .dot.ok { background:var(--good); }
 .dot.warn { background:var(--warning); }
+/* 11e: a warning dot and a warning badge are not a warning paragraph — the
+   paragraph's padding, margin and left rule made the checks pill 40px tall
+   and the "provisional" badge a 30px box */
+.dot.warn { padding:0; margin:0 7px 0 0; border:0; max-width:none; }
 .dot.info { background:var(--axis); }
 details.checks { margin:10px 0 0; font-size:var(--fs-2); }
 details.checks > summary { cursor:pointer; list-style:none; display:inline-flex; align-items:center;
@@ -2377,6 +2484,8 @@ details.caveat-why[open] { display:block; flex-basis:100%; }
 :where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
   outline:2px solid var(--accent); outline-offset:2px; }
 button.secondary { background:var(--surface-1); }
+.badge.warn { padding:0 5px; margin:0 0 0 6px; border-width:1px; border-style:solid;
+  max-width:none; font-size:var(--fs-1); }
 .badge.warn, .badge.taint, .badge.prelim, .badge.over {
   color:var(--warning-text); border-color:color-mix(in srgb, var(--warning) 70%, transparent);
   background:color-mix(in srgb, var(--warning) 10%, transparent); }
@@ -4236,9 +4345,13 @@ function vOverview(ms) {
 // z-test's verdict, not an adjective. Cards 2–4 are the loop's, so only a
 // live page has them.
 // ---------------------------------------------------------------------------
-const hlCard = (key, eyebrow, value, verdict, link) => el('div', { class: 'hcard', 'data-hl': key },
+// 11e: the value is the number only, on one line; what it is about — a model,
+// a topic — is its own 16px line, cut with an ellipsis, whole in the tooltip
+const hlCard = (key, eyebrow, value, verdict, link, name, full) => el('div', { class: 'hcard',
+    'data-hl': key },
   el('div', { class: 'eyebrow', text: eyebrow }),
   el('div', { class: 'hcard-v', 'data-hl-value': key, text: value }),
+  name ? el('div', { class: 'hcard-name', 'data-hl-name': key, title: full || name, text: name }) : '',
   el('p', { class: 'hcard-verdict', 'data-verdict': key, text: verdict }),
   link || '');
 const hlLink = (text, go) => el('a', { href: '#', class: 'hcard-link', text,
@@ -4276,7 +4389,7 @@ function hlBest(ranked) {
       verdict = lead + (Math.abs(z) > 1.96 ? `a real gap (z = ${z.toFixed(1)}).` : 'within noise.');
     }
   }
-  return hlCard('best', 'Best model', `${top.name} · ${(100 * av).toFixed(1)}`, verdict, toLb);
+  return hlCard('best', 'Best model', (100 * av).toFixed(1), verdict, toLb, top.name, top.id);
 }
 
 function hlWeakest() {
@@ -4291,9 +4404,10 @@ function hlWeakest() {
     `${m.name} has no report-half score yet.`, toLoop);
   const w = xs[0];
   // one model's own topic, so it is not a ranking — and no area mean
-  return hlCard('weakest', 'Weakest topic', `${frName(w.t)} · ${num(w.v, 2)} / 4`,
+  return hlCard('weakest', 'Weakest topic', `${(+w.v).toFixed(2)} / 4`,
     `${m.name}, ${xs.length} of ${exam.length} topics judged — ${whyProvisional(m)}.`,
-    hlLink('Open the topic →', () => navigate({ topic: w.t.replace(/^exam_/, ''), model: null })));
+    hlLink('Open the topic →', () => navigate({ topic: w.t.replace(/^exam_/, ''), model: null })),
+    frName(w.t));
 }
 
 function hlLoop() {
@@ -4302,10 +4416,11 @@ function hlLoop() {
     .filter(([t, v]) => exam.has(t) && pubScore(v) != null).map(([t]) => t)));
   const m = loopModel();
   const at = m ? Math.max(0, ...Object.values(m.judge.tasks).map(v => v.judged_at || 0)) : 0;
-  return hlCard('loop', 'The loop', `${done.size} / ${exam.size} topics judged`,
+  return hlCard('loop', 'The loop', `${done.size} / ${exam.size}`,
     m ? `Last judged ${m.name}` + (at ? ` ${rel(at)} ago.` : '.')
       : 'Nothing judged yet — sit a model on a topic from the Loop.',
-    hlLink('Open the Loop →', () => navigate({ tab: 'loop', model: null, topic: null })));
+    hlLink('Open the Loop →', () => navigate({ tab: 'loop', model: null, topic: null })),
+    'topics judged');
 }
 
 function hlJudge() {
@@ -4316,11 +4431,12 @@ function hlJudge() {
   const calWords = cal && cal.calibrated ? `Calibrated: κ ${cal.kappa}.` : 'Not calibrated yet.';
   if (!cn) return hlCard('judge', 'Judge steadiness', '—',
     (m ? 'No canary on file for this judge. ' : 'No judged run yet. ') + calWords, toProv);
-  return hlCard('judge', 'Judge steadiness',
-    `${cn.graded} / ${cn.n} ${cn.drifted ? 'moved' : 'steady'}`,
-    `${cn.n} fixed scripts re-graded: ${cn.mad_vs_human} from the human marks`
-      + (cn.mad_vs_previous != null ? `, ${cn.mad_vs_previous} from the last run `
-         + `(limit ${cn.threshold})` : ', the first run for this judge') + `. ${calWords}`, toProv);
+  const r2 = x => x == null ? '—' : (+x).toFixed(2);
+  return hlCard('judge', 'Judge steadiness', `${cn.graded} / ${cn.n}`,
+    `${cn.n} fixed scripts re-graded: ${r2(cn.mad_vs_human)} from the human marks`
+      + (cn.mad_vs_previous != null ? `, ${r2(cn.mad_vs_previous)} from the last run `
+         + `(limit ${cn.threshold})` : ', the first run for this judge') + `. ${calWords}`, toProv,
+    cn.drifted ? 'moved' : 'steady');
 }
 
 function highlightsCard(ranked) {
@@ -4639,8 +4755,7 @@ function statusLine(pg, noun, extra) {
   const bits = [`Showing ${pg.from}–${pg.to} of ${pg.total} ${noun}`];
   for (const x of [].concat(extra || [])) if (x) bits.push(x);
   const line = el('p', { class: 'statusline', 'data-statusline': noun }, bits.join(' · '));
-  if (LIVE && DATA) line.append(' · ', el('span', { class: 'dot ok' }),
-    `live ${String(DATA.generated || '').split(' ').pop()}`);
+  if (LIVE && DATA) line.append(' · ', el('span', { class: 'dot ok' }), `live ${refreshedAt()}`);
   return line;
 }
 
@@ -5380,6 +5495,9 @@ function famColor(m) {
 }
 
 const officialSe = m => state.avgMode === 'raw' ? m.avgRawSe : m.avgSe;
+// "2026-09-22 15:17 +04" -> "15:17": the clock, never the zone (11e)
+const refreshedAt = () => (String((DATA || {}).generated || '').match(/\b\d{1,2}:\d{2}\b/)
+  || [''])[0];
 const judgedCalibrated = () => !!(DATA.judged && DATA.judged.calibration
   && DATA.judged.calibration.calibrated && DATA.models.some(m => m.judgeState && m.judgeState.ok));
 const judgedOkM = m => !!(m.judgeState && m.judgeState.ok);
@@ -5392,11 +5510,29 @@ function judgedOffWhy() {
     + 'calibrated' + (cal ? '' : ' (no calibration on file)') + (local ? ', local judge' : '');
 }
 
+// a diagnosis made with the old categories (before the 37-topic exam) names
+// topics this board no longer has: its areas would all be empty (11e)
+function diagStale(m) {
+  const cats = mmluCats(m);
+  const now = new Set(DATA.meta.categories || []);
+  return !!cats && Object.keys(cats).some(k => !now.has(k));
+}
+function staleSentence(ms) {
+  const stale = ms.filter(diagStale);
+  if (!stale.length) return '';
+  const n = Math.max(...stale.map(m => Object.keys(mmluCats(m)).length));
+  return stale.length === 1 && ms.length === 1
+    ? `MMLU by area needs a fresh diagnosis — this one was made with the old ${n} categories.`
+    : `MMLU by area needs a fresh diagnosis — ${stale.length === ms.filter(mmluCats).length
+        ? 'the diagnoses on this board were' : `${stale.length} of them were`} made with the `
+      + `old ${n} categories.`;
+}
+
 // MMLU by area: the leaderboard-half items of every MMLU subject mapped to an
 // area's topics, pooled — a mean weighted by item count
 function areaMmlu(m, area) {
   const cats = mmluCats(m);
-  if (!cats) return null;
+  if (!cats || diagStale(m)) return null;
   let s = 0, n = 0;
   for (const t of (DATA.meta.areas || {})[area] || []) {
     const g = cats[t];
@@ -5463,6 +5599,8 @@ function lbColumns(ms) {
     { key: 'avg', label: 'Avg', num: true, group: '',
       unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' }];
   const tail = [{ key: 'date', label: 'Last eval', group: '' }];
+  // an area with no number for any model here is not a column (11e)
+  const areasHere = areas.filter(a => ms.some(m => areaMmlu(m, a)));
   let mid;
   if (L.chip === 'all') {
     // today's view: the harness tasks, six by default, the rest one tick away
@@ -5475,7 +5613,7 @@ function lbColumns(ms) {
   } else if (L.chip === 'knowledge') {
     mid = [...(CATS.find(([g]) => g === 'knowledge')[1]).filter(t => DATA.accTasks.includes(t))
              .map(task),
-           ...areas.map(a => ({ key: 'area:' + a, label: a, num: true, area: a,
+           ...areasHere.map(a => ({ key: 'area:' + a, label: a, num: true, area: a,
              group: 'MMLU by area', unit: 'report half · %' })),
            ...cats];
   } else if (L.chip === 'judged') {
@@ -5704,25 +5842,27 @@ function vLeaderboard(ms) {
               title: r ? `rank ${r.n} of ${r.of} ranked models on this board`
                        : 'preliminary — not ranked' }));
         }
+        // 11e: one clipped line — the name ellipsises, the badges and the
+        // duplicate toggle follow inside the cell's own width, and nothing
+        // paints into Params
         if (c.key === 'name') return el('td', { class: 'model pin', 'data-model': m.id,
             style: `--fam:${famColor(m)}`,
             title: modelSentence(m) + `\n\nfamily: ${famOf(m)}\n` + m.id },
-          el('a', { class: 'mname mlink', text: m.name, href: '#model=' + encodeURIComponent(m.id) }),
-          dupsOf[m.id] ? el('button', { class: 'quiet duptoggle', 'data-dup-toggle': m.id,
-            'aria-expanded': String(!!(state.lbDupOpen || {})[m.id]),
-            text: `${dupsOf[m.id].length} duplicate ${(state.lbDupOpen || {})[m.id] ? '▾' : '▸'}`,
-            onclick: e => { e.preventDefault(); state.lbDupOpen = state.lbDupOpen || {};
-              state.lbDupOpen[m.id] = !state.lbDupOpen[m.id]; render(); } }) : '',
-          ckBadge(m) || (m.kind === 'instruct'
-            ? el('span', { class: 'badge instruct', text: 'instruct' })
-            : el('span', { class: 'badge', text: 'base' })),
-          warnBadge(m) || '', dupBadge(m) || '');
+          el('div', { class: 'mcell' },
+            el('a', { class: 'mname mlink', text: m.name, href: '#model=' + encodeURIComponent(m.id) }),
+            ckBadge(m) || (m.kind === 'instruct'
+              ? el('span', { class: 'badge instruct', text: 'instruct' })
+              : el('span', { class: 'badge', text: 'base' })),
+            warnBadge(m) || '', dupBadge(m) || '',
+            dupsOf[m.id] ? dupToggle(m, dupsOf[m.id]) : ''));
         if (c.key === 'params') {
           const a = m.archinfo || {};
           return el('td', { class: 'num', title: (m.paramsSrc ? 'from ' + (m.paramsSrc === 'config'
               ? 'harness config' : 'model name') : '') + (a.active_params
-              ? `\n${a.experts} experts, ${a.experts_per_tok} per token` : '') },
-            P(m.params) + (a.active_params ? ` · ${P(a.active_params)} act` : ''));
+              ? `\n${P(a.active_params)} active · ${a.experts} experts, ${a.experts_per_tok} per token`
+              : '') },
+            P(m.params), a.active_params
+              ? el('span', { class: 'act', text: ` · ${P(a.active_params)} act` }) : '');
         }
         if (c.key === 'date') {
           const d = String(lastEval(m) || '');
@@ -5781,7 +5921,7 @@ function vLeaderboard(ms) {
       }));
     tbody.append(tr);
     if (open) tbody.append(el('tr', { class: 'detail', id: did, 'data-lb-detail': m.id },
-      el('td', { colspan: String(ncols) }, lbDetail(m))));
+      el('td', { colspan: String(ncols) }, lbDetail(m, dupsOf[m.id]))));
   });
 
   const table = el('table', { class: 'lb' + (L.tint ? ' tinted' : ''), 'data-lb-table': '1' },
@@ -5789,14 +5929,47 @@ function vLeaderboard(ms) {
   return [el('div', { class: 'card', 'data-lb-card': '1' },
       el('h2', { text: 'Leaderboard' }),
       lbToolbar(ms, cols, shown, nHidden),
+      L.chip === 'knowledge' && staleSentence(ms)
+        ? el('p', { class: 'warn', 'data-stale-diag': '1', text: staleSentence(ms) }) : '',
       statusLine(lbPg, 'models', [
         `${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
         `sorted by ${lbSortLabel(cols)}`,
         L.chip !== 'all' ? (LB_CHIPS.find(([v]) => v === L.chip) || [])[1] : null]),
       lbPg.pager,
-      el('div', { class: 'lb-wrap stick' }, table),
+      hfade('lb', el('div', { class: 'lb-wrap stick', 'data-hkeep': 'lb' }, table)),
       lbHowTo(ms)),
     insightsCard(ms)];
+}
+
+// A box that scrolls sideways, with a fade on its right edge and a small
+// "scroll →" while there is more to the right (11e)
+function hfade(key, scroller) {
+  return el('div', { class: 'hfade', 'data-hfade': key }, scroller,
+    el('span', { class: 'scrollhint', 'aria-hidden': 'true', text: 'scroll →' }));
+}
+function hfadeUpdate(root) {
+  (root || document).querySelectorAll('[data-hfade]').forEach(box => {
+    const sc = box.firstElementChild;
+    if (!sc) return;
+    const upd = () => {
+      const ov = getComputedStyle(sc).overflowX;
+      box.dataset.more = (ov === 'auto' || ov === 'scroll')
+        && sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 2 ? '1' : '0';
+    };
+    if (!sc._hfade) { sc._hfade = true; sc.addEventListener('scroll', upd, { passive: true }); }
+    upd();
+  });
+}
+window.addEventListener('resize', () => hfadeUpdate());
+
+// "1 duplicate ▸": on the row, and in the opened row where a phone can reach it
+function dupToggle(m, dups) {
+  const open = !!(state.lbDupOpen || {})[m.id];
+  return el('button', { class: 'quiet duptoggle', 'data-dup-toggle': m.id,
+    'aria-expanded': String(open),
+    text: `${dups.length} duplicate ${open ? '▾' : '▸'}`,
+    onclick: e => { e.preventDefault(); state.lbDupOpen = state.lbDupOpen || {};
+      state.lbDupOpen[m.id] = !open; render(); } });
 }
 
 function lbToggle(id) {
@@ -5811,10 +5984,15 @@ function lbToolbar(ms, cols, shown, nHidden) {
   const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'task groups' },
     LB_CHIPS.map(([v, t]) => {
       const off = v === 'judged' && !calOk;
+      // 11e: an unavailable chip still takes the click (aria-disabled, not
+      // disabled) — the click says why, in one line under the chips; the
+      // tooltip and the screen reader say it without one
       return el('button', { class: 'chip-btn' + (L.chip === v ? ' on' : ''), 'data-chip': v,
-        'aria-pressed': String(L.chip === v), disabled: off ? '' : null,
+        'aria-pressed': String(L.chip === v), 'aria-disabled': off ? 'true' : null,
+        'aria-describedby': off ? 'why-judged-chip' : null,
         title: off ? judgedOffWhy() : null, text: t,
-        onclick: () => { if (!off) lbSet({ chip: v }); } });
+        onclick: () => { if (!off) lbSet({ chip: v });
+          else { state.lbChipWhy = !state.lbChipWhy; render(); } } });
     }));
   const pills = el('div', { class: 'pills' },
     pillMenu('kind', 'Kind', LB_KINDS, L.kind, v => lbSet({ kind: v })),
@@ -5824,8 +6002,11 @@ function lbToolbar(ms, cols, shown, nHidden) {
     lbModelsPill(ms),
     pillMenu('scale', 'Scale', [['chance', 'above chance'], ['raw', 'raw accuracy']],
       state.avgMode, v => { state.avgMode = v; render(); }));
-  return el('div', { class: 'lbbar' }, chips, pills,
-    calOk ? '' : el('span', { class: 'propwhy', 'data-why': 'judged-chip', text: judgedOffWhy() }));
+  // the note sits right under the chips, where the click was
+  return el('div', { class: 'lbbar' }, chips,
+    calOk ? '' : el('p', { class: 'chipnote', id: 'why-judged-chip', role: 'note',
+      'data-why': 'judged-chip', hidden: state.lbChipWhy ? null : '', text: judgedOffWhy() }),
+    pills);
 }
 
 // Columns · 4 hidden ▾ — the current chip's columns, Show all, and the tint
@@ -5843,16 +6024,19 @@ function lbColumnsPill(cols, shown, nHidden) {
     return el('div', { class: 'moremenu colmenu-list', id: 'pop-columns', 'aria-label': 'columns' },
       opt.length ? tags.map(tag => {
         const cs = opt.filter(c => tagOf(c) === tag), keys = cs.map(c => c.key);
+        // what is shown NOW, read when a control is used: the panel outlives
+        // the render that built it (11e)
+        const now = () => lbShownFor(cols);
         return el('div', { class: 'colgroup', 'data-column-group': tag },
           el('div', { class: 'small se' }, heads[tag] + ' ',
             el('button', { class: 'quiet', text: 'all', 'data-column-group-all': tag,
-              onclick: () => lbSaveShown([...new Set([...shown, ...keys])]) }),
+              onclick: () => lbSaveShown([...new Set([...now(), ...keys])]) }),
             el('button', { class: 'quiet', text: 'none', 'data-column-group-none': tag,
-              onclick: () => lbSaveShown([...shown].filter(k => !keys.includes(k))) })),
+              onclick: () => lbSaveShown([...now()].filter(k => !keys.includes(k))) })),
           cs.map(c => el('label', { class: 'small' },
             el('input', { type: 'checkbox', 'data-column': c.key, checked: shown.has(c.key) ? '' : null,
-              onchange: e => lbSaveShown(e.target.checked ? [...shown, c.key]
-                                                          : [...shown].filter(k => k !== c.key)) }),
+              onchange: e => lbSaveShown(e.target.checked ? [...now(), c.key]
+                                                          : [...now()].filter(k => k !== c.key)) }),
             ' ' + c.label)));
       }) : el('p', { class: 'small', text: 'Every column of this group is shown.' }),
       el('div', { class: 'frm' },
@@ -5931,7 +6115,7 @@ function lbHowTo(ms) {
 }
 
 // ---- a row opened in place -------------------------------------------------
-function lbDetail(m) {
+function lbDetail(m, dups) {
   const block = (eyebrow, ...kids) => el('div', { class: 'dblock' },
     el('div', { class: 'eyebrow', text: eyebrow }), ...kids);
   const out = [];
@@ -5956,8 +6140,11 @@ function lbDetail(m) {
           + (best && best.id === m.id ? ' · best' : row && !row[4] ? ' · tied with best' : '') }));
     })))));
   // MMLU BY AREA: eight mini bars above chance
-  const areas = Object.keys(DATA.meta.areas || {});
-  if (mmluCats(m) && areas.length) {
+  const areas = Object.keys(DATA.meta.areas || {}).filter(a => areaMmlu(m, a));
+  if (mmluCats(m) && diagStale(m)) {
+    out.push(block('MMLU by area', el('p', { class: 'small', 'data-stale-diag': m.id,
+      text: staleSentence([m]) })));
+  } else if (mmluCats(m) && areas.length) {
     out.push(block('MMLU by area', el('div', { class: 'minibars' }, areas.map(a => {
       const r = areaMmlu(m, a);
       const above = r ? Math.max(0, (r.v - 0.25) / 0.75) : null;
@@ -5990,7 +6177,9 @@ function lbDetail(m) {
   }
   // LINKS
   const canRun = LIVE && (m.source === 'artifact' || !m.id.startsWith('local/'));
-  out.push(block('Links', el('p', { class: 'small', 'data-family': famOf(m) },
+  out.push(block('Links', dups && dups.length ? el('p', { class: 'small', 'data-dup-line': m.id },
+      `Same run as ${dups.map(d => d.name).join(', ')} `, dupToggle(m, dups)) : '',
+    el('p', { class: 'small', 'data-family': famOf(m) },
       el('span', { class: 'famdot', style: `background:${famColor(m)}` }),
       ` family: ${famOf(m)} · ${m.kind}` + (m.source === 'artifact' ? ' · uploaded checkpoint' : '')),
     el('div', { class: 'dlinks' },
@@ -6020,20 +6209,22 @@ function insightsCard(ms) {
     el('p', { class: 'sub', text: 'What the table says at a glance: which models are the best '
       + 'for their size, where one model is weakest, and how a handful of models compare shape '
       + 'for shape. Every judged number here is a report-half number.' }),
-    el('div', { class: 'igrid' }, frontierChart(ms), weakestChart(), radarBlock(ms)));
+    el('div', { class: 'igrid', style: 'margin-top:var(--sp-4)' },
+      frontierChart(ms), weakestChart(), radarBlock(ms)));
 }
 
 const logx = (v, lo, hi, a, b) => a + (Math.log10(v) - Math.log10(lo))
   / Math.max(1e-9, Math.log10(hi) - Math.log10(lo)) * (b - a);
 
-// A model is on the frontier when no SMALLER model beats it by a gap the
-// z-test calls real — the same test as the rest of the board, so a lead
-// inside the noise never draws the line. Without standard errors a lead
-// cannot be called real, and does not count.
+// A model is on the frontier when no model of the SAME SIZE OR SMALLER beats
+// it by a gap the z-test calls real — the same test as the rest of the board,
+// so a lead inside the noise never draws the line (11e: two 750M models ten
+// points apart are not both on it). Without standard errors a lead cannot be
+// called real, and does not count.
 function frontierOf(pts) {
   const real = (q, p) => q.se != null && p.se != null
     && (q.y - p.y) / Math.sqrt(q.se * q.se + p.se * p.se || 1e-12) > 1.96;
-  return pts.filter(p => !pts.some(q => q.x < p.x && q.y > p.y && real(q, p)));
+  return pts.filter(p => !pts.some(q => q !== p && q.x <= p.x && q.y > p.y && real(q, p)));
 }
 
 function frontierChart(ms) {
@@ -6044,29 +6235,30 @@ function frontierChart(ms) {
   const head = el('div', { class: 'ihead' },
     el('div', { class: 'eyebrow', text: 'Score against size' }),
     el('p', { class: 'small', text: `Ranked models only, parameters on a log scale. The dashed `
-      + `line is the frontier: models no smaller model beats by more than the noise.`
+      + `line is the frontier: models no model of the same size or smaller beats by more than the noise.`
       + (prelim ? ` ${prelim} preliminary not shown.` : '') }));
   if (pts.length < 2) return el('div', { class: 'ibox', 'data-frontier': '1' }, head,
     el('p', { class: 'small', text: 'Two ranked models are needed to draw this.' }));
   const front = new Set(frontierOf(pts).map(p => p.m.id));
-  const W = 560, H = 300, x0 = 46, x1 = W - 16, y0 = H - 34, y1 = 14;
+  const W = 520, H = 290, x0 = 46, x1 = W - 16, y0 = H - 34, y1 = 14;
   const lo = Math.min(...pts.map(p => p.x)) / 1.4, hi = Math.max(...pts.map(p => p.x)) * 1.4;
   const ymax = Math.min(1, Math.max(...pts.map(p => p.y + (p.se || 0))) * 1.1 || 1);
   const X = v => logx(v, lo, hi, x0, x1), Y = v => y0 - (v / ymax) * (y0 - y1);
   const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', class: 'frontier',
+    style: `min-width:${W}px`,
     role: 'img', 'aria-label': 'average score against parameter count',
     onclick: e => { if (!e.target.closest('.fpt') && L.focus) lbSet({ focus: null }); } });
   for (let k = 0; k <= 4; k++) {
     const v = ymax * k / 4;
     svg.append(el('svg:line', { x1: x0, x2: x1, y1: Y(v), y2: Y(v), stroke: 'var(--grid)' }),
-      el('svg:text', { x: x0 - 6, y: Y(v) + 4, 'text-anchor': 'end', 'font-size': 10,
+      el('svg:text', { x: x0 - 6, y: Y(v) + 4, 'text-anchor': 'end', 'font-size': 12,
         fill: 'var(--muted)', text: Math.round(100 * v) + '%' }));
   }
   for (let e = Math.ceil(Math.log10(lo)); e <= Math.floor(Math.log10(hi)); e++)
     for (const f of [1, 3]) {
       const v = f * Math.pow(10, e);
       if (v < lo || v > hi) continue;
-      svg.append(el('svg:text', { x: X(v), y: H - 12, 'text-anchor': 'middle', 'font-size': 10,
+      svg.append(el('svg:text', { x: X(v), y: H - 12, 'text-anchor': 'middle', 'font-size': 12,
         fill: 'var(--muted)', text: P(v) }));
     }
   const sel = L.focus && pts.find(p => p.m.id === L.focus);
@@ -6075,18 +6267,24 @@ function frontierChart(ms) {
     const worse = pts.filter(p => p.x > sel.x && p.y < sel.y);
     svg.append(el('svg:rect', { x: X(sel.x), y: Y(sel.y), width: Math.max(0, x1 - X(sel.x)),
       height: Math.max(0, y0 - Y(sel.y)), fill: 'var(--accent-soft)', 'data-shade': '1' }));
-    caption = `${worse.length} model${worse.length === 1 ? '' : 's'} here `
-      + `${worse.length === 1 ? 'is' : 'are'} bigger and score${worse.length === 1 ? 's' : ''} `
-      + `lower than ${sel.m.name}`;
+    caption = !worse.length ? `No model here is bigger and scores lower than ${sel.m.name}.`
+      : `${worse.length} model${worse.length === 1 ? '' : 's'} here `
+        + `${worse.length === 1 ? 'is' : 'are'} bigger and score${worse.length === 1 ? 's' : ''} `
+        + `lower than ${sel.m.name}.`;
   }
-  const fp = pts.filter(p => front.has(p.m.id)).sort((a, b) => a.x - b.x || a.y - b.y);
+  // the line runs through the frontier by size, and at any one size through
+  // the best point only: a tie inside the noise is marked, not jumped between
+  const bySize = new Map();
+  for (const p of pts.filter(p => front.has(p.m.id)))
+    if (!bySize.has(p.x) || bySize.get(p.x).y < p.y) bySize.set(p.x, p);
+  const fp = [...bySize.values()].sort((a, b) => a.x - b.x);
   if (fp.length > 1) {
     svg.append(el('svg:path', { d: 'M' + fp.map(p => `${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`)
       .join('L'), fill: 'none', stroke: 'var(--accent)', 'stroke-width': 1.5,
       'stroke-dasharray': '5 4', 'data-frontier-line': '1' }));
     const last = fp[fp.length - 1];
-    svg.append(el('svg:text', { x: Math.min(X(last.x) + 6, x1 - 40), y: Y(last.y) - 8,
-      'font-size': 10, fill: 'var(--accent)', text: 'frontier' }));
+    svg.append(el('svg:text', { x: Math.min(X(last.x) + 6, x1 - 52), y: Y(last.y) - 8,
+      'font-size': 12, fill: 'var(--accent)', text: 'frontier' }));
   }
   for (const p of pts) {
     const on = front.has(p.m.id), hot = sel && sel.m.id === p.m.id;
@@ -6096,7 +6294,7 @@ function frontierChart(ms) {
       'data-on-frontier': on ? '1' : null,
       'data-tip': JSON.stringify([p.m.name, `${P(p.x)} parameters`,
         `Avg ${(100 * p.y).toFixed(1)}%` + (p.se != null ? ` ± ${(100 * p.se).toFixed(1)}` : ''),
-        on ? 'on the frontier' : 'a smaller model beats it by more than the noise']),
+        on ? 'on the frontier' : 'a model its size or smaller beats it by more than the noise']),
       onclick: () => lbSet({ focus: hot ? null : p.m.id }),
       onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault(); lbSet({ focus: hot ? null : p.m.id }); } } }));
@@ -6110,7 +6308,8 @@ function frontierChart(ms) {
         el('td', { class: 'num', text: (100 * p.y).toFixed(1)
           + (p.se != null ? ` ±${(100 * p.se).toFixed(1)}` : '') }),
         el('td', { text: front.has(p.m.id) ? 'on it' : '—' }))))));
-  return el('div', { class: 'ibox', 'data-frontier': '1' }, head, svg,
+  return el('div', { class: 'ibox', 'data-frontier': '1' }, head,
+    hfade('frontier', el('div', { class: 'chartscroll', 'data-hkeep': 'frontier' }, svg)),
     el('p', { class: 'small', 'data-frontier-caption': '1', text: caption
       || 'Click a point to see which models are bigger and score lower.' }), table);
 }
@@ -6146,8 +6345,9 @@ function weakestChart() {
       el('input', { type: 'search', placeholder: 'judged models…', 'aria-label': 'search judged models',
         oninput: e => fill(e.target.value) }), list);
   }, { key: 'weak', menu: false });
-  const rowH = 22, W = 560, H = xs.length * rowH + 8, x0 = 250, x1 = W - 44;
+  const rowH = 24, W = 520, H = xs.length * rowH + 8, x0 = 230, x1 = W - 44;
   const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', class: 'weakest',
+    style: `min-width:${W}px`,
     role: 'img', 'aria-label': `${m.name}'s judged topics, weakest first` });
   if (!ok) svg.append(el('svg:defs', {}, el('svg:pattern', { id: 'hatch', width: 6, height: 6,
     patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' },
@@ -6159,11 +6359,11 @@ function weakestChart() {
       'data-weak-topic': x.t,
       'data-tip': JSON.stringify([frName(x.t), `${num(x.v, 2)} / 4 · report half`
         + (ok ? '' : ' · provisional'), 'Open the topic →']) },
-      el('svg:text', { x: x0 - 8, y: y + 14, 'text-anchor': 'end', 'font-size': 11,
+      el('svg:text', { x: x0 - 8, y: y + 16, 'text-anchor': 'end', 'font-size': 12,
         fill: 'var(--text-secondary)', text: frName(x.t) }),
-      el('svg:rect', { x: x0, y: y + 3, width: Math.max(1, w), height: rowH - 8, rx: 2,
+      el('svg:rect', { x: x0, y: y + 4, width: Math.max(1, w), height: rowH - 10, rx: 2,
         fill: ok ? 'var(--accent)' : 'url(#hatch)', 'fill-opacity': ok ? 0.75 : 1 }),
-      el('svg:text', { x: x0 + w + 6, y: y + 14, 'font-size': 11, fill: 'var(--text-primary)',
+      el('svg:text', { x: x0 + w + 6, y: y + 16, 'font-size': 12, fill: 'var(--text-primary)',
         class: 'mono', text: num(x.v, 2) }));
     svg.append(a);
   });
@@ -6171,7 +6371,15 @@ function weakestChart() {
     head, el('div', { class: 'frm' }, change,
       ok ? '' : el('span', { class: 'badge warn', 'data-provisional': 'weakest', text: 'provisional',
         title: ((m.judgeState || {}).reasons || []).join('; ') })),
-    svg,
+    el('div', { class: 'weakest-svg' },
+      hfade('weakest', el('div', { class: 'chartscroll', 'data-hkeep': 'weakest' }, svg))),
+    el('div', { class: 'wrows', 'data-weak-rows': m.id }, xs.map(x => el('a', { class: 'wrow',
+        href: '#topic=' + x.t.replace(/^exam_/, ''), 'data-weak-row': x.t,
+        title: `${frName(x.t)} · ${num(x.v, 2)} / 4 · report half` + (ok ? '' : ' · provisional') },
+      el('span', { class: 'wname', text: frName(x.t) }),
+      el('span', { class: 'wtrack' }, el('span', { class: 'wfill' + (ok ? '' : ' hatch'),
+        style: `width:${Math.max(1, 100 * x.v / 4).toFixed(1)}%` })),
+      el('span', { class: 'wv', text: num(x.v, 2) })))),
     all.length > 12 ? el('button', { class: 'quiet', 'data-weak-all': '1',
       text: L.weakAll ? 'Show the twelve weakest' : `Show all ${all.length} topics`,
       onclick: () => lbSet({ weakAll: !L.weakAll }) }) : '',
@@ -6250,11 +6458,11 @@ function radarBlock(ms) {
 }
 
 function radarSvg(axes, series) {
-  const W = 540, H = 380, cx = 270, cy = 195, R = 130, N = axes.length;
+  const W = 520, H = 340, cx = 260, cy = 172, R = 104, N = axes.length;
   const ang = i => -Math.PI / 2 + 2 * Math.PI * i / N;
   const pt = (i, r) => [cx + r * Math.cos(ang(i)), cy + r * Math.sin(ang(i))];
   const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', class: 'radar',
-    role: 'img', 'aria-label': 'model shapes' });
+    style: `min-width:${W}px`, role: 'img', 'aria-label': 'model shapes' });
   for (const f of [0.25, 0.5, 0.75, 1]) {
     svg.append(el('svg:polygon', {
       points: axes.map((_, i) => pt(i, f * R).map(v => v.toFixed(1)).join(',')).join(' '),
@@ -6263,8 +6471,8 @@ function radarSvg(axes, series) {
   axes.forEach((ax, i) => {
     const [x, y] = pt(i, R);
     svg.append(el('svg:line', { x1: cx, y1: cy, x2: x, y2: y, stroke: 'var(--grid)' }));
-    const [lx, ly] = pt(i, R + 16), c = Math.cos(ang(i));
-    svg.append(el('svg:text', { x: lx, y: ly + 4, 'font-size': 11, fill: 'var(--text-secondary)',
+    const [lx, ly] = pt(i, R + 14), c = Math.cos(ang(i));
+    svg.append(el('svg:text', { x: lx, y: ly + 4, 'font-size': 12, fill: 'var(--text-secondary)',
       'text-anchor': c > 0.15 ? 'start' : c < -0.15 ? 'end' : 'middle', text: ax.label }));
   });
   const hits = [];
@@ -6294,7 +6502,8 @@ function radarSvg(axes, series) {
       el('tbody', {}, axes.map(ax => el('tr', {}, el('td', { text: ax.label }),
         series.map(s => { const v = ax.get(s.m);
           return el('td', { class: 'num', text: v ? (100 * v.n).toFixed(0) : '—' }); }))))));
-  return el('div', {}, svg, table);
+  return el('div', {}, hfade('radar', el('div', { class: 'chartscroll', 'data-hkeep': 'radar' }, svg)),
+    table);
 }
 
 document.addEventListener('keydown', e => {
@@ -7961,14 +8170,34 @@ function rvProposal(p, llmOk) {
     ta.value = p.spec_text;
     const reason = el('input', { type: 'text', placeholder: 'reason (for reject)',
       style: 'flex:1;min-width:160px', 'aria-label': 'reject reason' });
+    // 11e: the plan is part of what is approved, so it is shown beside the
+    // spec — and Approve freezes it. The box survives a poll: it lives in state
+    state.rv.spread = state.rv.spread || {};
+    const on = state.rv.spread[p.id] !== false;
+    const planP = el('p', { class: 'small plan', 'data-focus-plan': String(p.id),
+      'data-plan-stage': 'decide' });
+    const box = el('input', { type: 'checkbox', 'data-spread': String(p.id),
+      checked: on ? '' : null,
+      onchange: e => { state.rv.spread[p.id] = e.target.checked; } });
+    const boxLabel = el('label', { class: 'small spread' }, box,
+      ' Spread the documents over these');
+    fillFocus(p, 20, planP, f => {
+      // no plan to spread over: the box has nothing to turn on
+      const none = !(f.labels || []).length;
+      box.disabled = none;
+      boxLabel.classList.toggle('dim', none);
+    });
     card.append(el('div', { class: 'dxh', text: 'Decide' }),
       el('p', { class: 'small', text: 'Edit the spec if it names the wrong skill or leaks a '
         + 'question. Whatever text is in the box is what the generator will receive — and '
         + 'the only thing it receives.' }),
       ta,
+      el('div', { class: 'planbox', 'data-plan-decide': String(p.id) },
+        el('div', { class: 'eyebrow', text: 'Where the documents go' }), planP, boxLabel),
       el('div', { class: 'frm' },
         el('button', { class: 'primary', text: 'Approve this spec', onclick: () => rvPost(
-          `api/proposals/${p.id}/approve`, { approver: whoName(), edited_text: ta.value }) }),
+          `api/proposals/${p.id}/approve`, { approver: whoName(), edited_text: ta.value,
+            spread: state.rv.spread[p.id] !== false && !box.disabled }) }),
         reason,
         el('button', { text: 'Reject', onclick: () => rvPost(
           `api/proposals/${p.id}/reject`, { approver: whoName(), reason: reason.value }) })));
@@ -7980,25 +8209,13 @@ function rvProposal(p, llmOk) {
                                  ['free', 'question and answer (comparison only)']],
       'doc', () => {});
     const usage = state.rv.llm || {};
-    // where those documents would go, before anyone presses Generate: the
-    // spread is a decision, not a surprise
-    const planP = el('p', { class: 'small', 'data-focus-plan': String(p.id) });
-    let planSeq = 0;
-    const fillPlan = async n => {
-      const key = `${p.id}:${n}`, seen = state.rv.focus[key];
-      const say = f => { planP.textContent = focusLine(f.plan, 'Documents will cover')
-        || f.why || ''; };
-      if (seen) { say(seen); return; }
-      const mine = ++planSeq;
-      try {
-        const f = await api(`api/proposals/${p.id}/focus?count=${n}`);
-        state.rv.focus[key] = f;
-        if (mine === planSeq) say(f);
-      } catch (e) { /* server briefly away; the line stays as it was */ }
-    };
+    // the plan Approve froze, read-only: Generate with count N takes its
+    // first N labels (11e). A proposal approved before 11e says so
+    const planP = el('p', { class: 'small plan', 'data-focus-plan': String(p.id),
+      'data-plan-stage': 'generate' });
     count.addEventListener('input', () => { const n = +count.value;
-      if (n >= 1 && n <= 1000) fillPlan(n); });
-    fillPlan(+count.value);
+      if (n >= 1 && n <= 1000) fillFocus(p, n, planP); });
+    fillFocus(p, +count.value, planP);
     card.append(el('div', { class: 'dxh', text: 'Generate' }),
       el('p', { class: 'small', text: 'The generator receives the approved spec above, the '
         + 'topic, the count, the format and a style constraint. No benchmark item and no exam '
@@ -8024,6 +8241,41 @@ function rvProposal(p, llmOk) {
   if (p.status === 'rejected' && p.reject_reason)
     card.append(el('p', { class: 'small', text: 'reason: ' + p.reject_reason }));
   return card;
+}
+
+// 11e: the plan in words, for the first n documents. Area: "Documents will
+// cover 8 areas: Algebra 3 · Probability 3 · …"; concept: "20 documents, one
+// per concept the model missed in the practice half: …"; or the true reason
+// there is none. Labels and counts only — no question text, ever.
+function planText(f, n) {
+  const labels = (f.labels || []).slice(0, n);
+  if (!labels.length) return f.reason ? `Not spread — ${f.reason}.` : '';
+  if (f.mode === 'concept') {
+    const distinct = [...new Set(labels)];
+    return `${labels.length} document${labels.length === 1 ? '' : 's'}, one per concept the `
+      + `model missed in the practice half: ${distinct.join(' · ')}`
+      + (distinct.length < labels.length ? ' — then round again' : '');
+  }
+  const counts = new Map();
+  for (const l of labels) counts.set(l, (counts.get(l) || 0) + 1);
+  return `Documents will cover ${counts.size} ${counts.size === 1 ? 'area' : 'areas'}: `
+    + [...counts].map(([l, k]) => `${l} ${k}`).join(' · ');
+}
+function fillFocus(p, n, into, done) {
+  const key = `${p.id}:${p.status}:${n}`, seen = state.rv.focus[key];
+  const say = f => { into.textContent = f.legacy
+      ? 'Approved before plans were shown — ' + (focusLine(f.plan, 'documents will cover')
+        || 'the documents are not spread by area') + '.'
+      : planText(f, n);
+    into.dataset.focusMode = f.mode || 'off';
+    if (done) done(f); };
+  if (seen) { say(seen); return; }
+  into._seq = (into._seq || 0) + 1;
+  const mine = into._seq;
+  api(`api/proposals/${p.id}/focus?count=${n}`).then(f => {
+    state.rv.focus[key] = f;
+    if (mine === into._seq) say(f);
+  }).catch(() => { /* server briefly away; the line stays as it was */ });
 }
 
 // Where the documents go: the domains whose diagnose-half answers failed,
@@ -8972,7 +9224,11 @@ function loopOutputPanel(r) {
       el('tbody', {}, ready.map(d => el('tr', { 'data-dataset': String(d.id) },
         el('td', {}, el('a', { href: `api/datasets/${d.id}`, target: '_blank', rel: 'noopener',
           text: `#${d.id}` }), ' ', overBadge(d.over_provisional_judge),
-          el('div', { class: 'se', text: `${d.kept ?? d.count} kept of ${d.count}` })),
+          // 11e: what is missing and why, as on the Review card — and for a
+          // dataset made before 11a, that the reasons were not recorded
+          el('div', { class: 'se', 'data-doc-line': String(d.id), text: docLine({ ...d,
+            provenance: { items: { kept: d.kept ?? d.count, requested: d.count,
+              ...(Array.isArray(d.missing) ? { missing: d.missing } : {}) } } }) })),
         el('td', { class: 'num', text: String(d.kept ?? d.count) }),
         el('td', {}, el('code', { class: 'mono', text: `--gap-dataset ${d.id}` }),
           el('div', { class: 'se', text: 'the training run that consumes it registers it, and '
@@ -9530,6 +9786,8 @@ function render() {
   const keep = live && live.dataset && live.dataset.keep && view.contains(live)
     ? { key: live.dataset.keep, value: live.value,
         start: live.selectionStart, end: live.selectionEnd } : null;
+  const hkeep = [...view.querySelectorAll('[data-hkeep]')]
+    .map(e => [e.dataset.hkeep, e.scrollLeft]).filter(([, x]) => x > 0);
   if (state.model) view.replaceChildren(...vModel());
   else if (state.topic) view.replaceChildren(...vTopic());
   else view.replaceChildren(...TABS.find(([id]) => id === state.tab)[2](ms));
@@ -9556,6 +9814,11 @@ function render() {
   } else if (_settle) {
     requestAnimationFrame(settleAgain);
   }
+  for (const [k, x] of hkeep) {
+    const e = view.querySelector(`[data-hkeep="${k}"]`);
+    if (e) e.scrollLeft = x;
+  }
+  hfadeUpdate(view);
   numberSections();
   if (state.model) watchSections();
   // an open popover keeps its panel, its scroll and its focus across a render;
@@ -9697,17 +9960,27 @@ function popReanchor() {
   POP.anchor = a;
   if (a._popBuild) POP.build = a._popBuild;
   a.setAttribute('aria-expanded', 'true');
-  // a panel whose choices apply at once (Columns) shows what is true now:
-  // its contents are built again, and the control that had focus keeps it
+  // a panel whose choices apply at once (Columns) shows what is true now.
+  // 11e: when it holds the same controls, their state is patched IN PLACE, so
+  // the control that has focus is still the same node and keeps it; only a
+  // different set of controls (another chip's) is built again
   if ((POP.opts || {}).rebuild && POP.build) {
-    const f = document.activeElement;
-    const id = f && POP.panel.contains(f) && ['column', 'choice', 'tint', 'showAll']
-      .map(k => f.dataset[k] != null ? `[data-${k.replace(/[A-Z]/g, c => '-' + c.toLowerCase())}="${f.dataset[k]}"]` : null)
-      .find(Boolean);
     const fresh = POP.build();
-    POP.panel.replaceChildren(...fresh.childNodes);
-    const again = id && POP.panel.querySelector(id);
-    if (again) again.focus();
+    const sig = root => [...root.querySelectorAll('input, button')].map(e => e.tagName + ':'
+      + (e.dataset.column || e.dataset.filter || e.dataset.tint || e.dataset.showAll
+         || e.dataset.columnGroupAll || e.dataset.columnGroupNone || e.textContent)).join('|');
+    if (sig(POP.panel) === sig(fresh)) {
+      const now = [...fresh.querySelectorAll('input')];
+      [...POP.panel.querySelectorAll('input')].forEach((e, i) => {
+        if (e.type === 'checkbox') e.checked = now[i].checked; });
+    } else {
+      const f = document.activeElement;
+      const key = f && POP.panel.contains(f) && (f.dataset.column || f.dataset.filter);
+      POP.panel.replaceChildren(...fresh.childNodes);
+      const again = key && POP.panel.querySelector(
+        `[data-column="${CSS.escape(key)}"], [data-filter="${CSS.escape(key)}"]`);
+      if (again) again.focus();
+    }
   }
   popPlace();
 }
@@ -9823,13 +10096,15 @@ function renderWarnings() {
   const fold = el('details', { class: 'checks', 'data-warnings': 'collapsed',
       open: state.checksOpen ? '' : null,
       ontoggle: e => { state.checksOpen = e.target.open; } },
+    // 11e: the pill says the count and nothing else — it is a button like its
+    // neighbours; what kind of checks they are is the first line of the panel
     el('summary', { 'data-warn-summary': String(cs.length) },
       el('span', { class: 'dot ' + worst }),
-      `${cs.length} check${cs.length > 1 ? 's' : ''}`,
-      judged ? el('span', { class: 'checks-judged',
-        text: ` · ${judged} about the judged suite` }) : '',
-      el('span', { class: 'showhide' })),
-    el('ul', { class: 'checklist' }, cs.map(c => el('li', { class: 'check warnrow',
+      `${cs.length} check${cs.length > 1 ? 's' : ''} ▾`),
+    el('ul', { class: 'checklist' },
+      judged ? el('li', { class: 'small checks-judged', 'data-checks-judged': String(judged),
+        text: `${judged} of ${cs.length} ${cs.length > 1 ? 'are' : 'is'} about the judged suite` }) : '',
+      cs.map(c => el('li', { class: 'check warnrow',
         'data-check': c.key, 'data-severity': c.severity },
       el('span', { class: 'dot ' + (c.severity === 'warning' ? 'warn' : 'info'),
         title: c.severity === 'warning' ? 'warning' : 'for information' }),
@@ -9858,7 +10133,7 @@ function renderFresh() {
   chip.dataset.fresh = stale ? 'stale' : judge ? 'judge-offline' : 'ok';
   // 11b: the badge is the whole state. "LIVE · 12:33" when the polls land,
   // and the same words as before when they do not
-  const at = String(DATA.generated || '').split(' ').pop();
+  const at = refreshedAt();
   chip.title = judge ? judgeWhy() : `refreshed ${DATA.generated}`;
   chip.replaceChildren(el('span', { class: 'dot ' + (stale || judge ? 'warn' : 'ok') }),
     stale ? `last update ${rel(NET.lastOk / 1000)} ago — retrying`
@@ -9898,8 +10173,24 @@ function renderStatic() {
   renderWho();
 }
 
+function barMoreInit() {
+  const bar = document.getElementById('bar'), btn = document.getElementById('barMore');
+  if (!bar || !btn || btn._init) return;
+  btn._init = true;
+  const set = open => { bar.dataset.more = open ? 'open' : '';
+    btn.setAttribute('aria-expanded', String(open)); };
+  btn.addEventListener('click', e => { e.stopPropagation(); set(bar.dataset.more !== 'open'); });
+  document.addEventListener('click', e => {
+    // a popover opened from inside the panel (the name, the theme) is part of it
+    if (bar.dataset.more === 'open' && !e.target.closest('#barRight, #barMore, [data-pop]'))
+      set(false); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && bar.dataset.more === 'open') { set(false); btn.focus(); } });
+}
+
 function initData(d) {
   DATA = d;
+  barMoreInit();
   renderStatic();
   // adopt the address bar before the first paint, so a shared #model= link opens
   // that model rather than the overview
@@ -10100,7 +10391,9 @@ TEMPLATE = """<!doctype html>
     <span class="bar-title"><span class="t-full">__TITLE__</span><span class="t-short">Benchmark</span></span>
     <span class="livebadge" id="liveBadge" data-stamp="1" hidden></span>
     <div class="tabs" role="tablist" id="tabs"></div>
-    <div class="bar-right">
+    <button class="bar-more" id="barMore" aria-expanded="false" aria-controls="barRight"
+      aria-label="checks, name and theme" title="checks, name and theme">&#8943;</button>
+    <div class="bar-right" id="barRight">
       <div id="warnings" class="bar-checks"></div>
       <div id="who"></div>
       <button id="themeBtn" title="cycle auto / light / dark / dim — remembered in this browser">Theme &#9662;</button>

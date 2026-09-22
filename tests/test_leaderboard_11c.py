@@ -79,7 +79,10 @@ def test_knowledge_shows_mmlu_and_mmlu_by_area(live, page):
     page.wait_for_selector(f"{LB} thead th[data-area]")
     areas = page.evaluate(f"""() => [...document.querySelectorAll('{LB} thead th[data-area]')]
       .map(t => t.dataset.area)""")
-    assert areas == list(page.evaluate("Object.keys(DATA.meta.areas)")) and len(areas) == 8
+    # 11e: an area with no number for any model on the page is not a column
+    # (the fixture's MMLU subjects reach five of the eight)
+    assert areas == page.evaluate("""() => Object.keys(DATA.meta.areas)
+      .filter(a => visible().some(m => areaMmlu(m, a)))""") and len(areas) >= 1
     assert page.locator(f"{LB} thead th[data-task='mmlu']").count() == 1
     # the 24 per-topic MMLU columns are one tick away under Columns
     page.locator("#pill-columns").click()
@@ -115,10 +118,13 @@ def test_judged_topics_is_disabled_and_says_why_while_provisional(live, page):
     uncalibrated(page)
     open_lb(page, live["base"])
     chip = page.locator("[data-chip='judged']")
-    assert chip.is_disabled()
+    # 11e: aria-disabled, so a click can say why; the reason is the tooltip,
+    # the description, and a note the click opens — not a permanent line
+    assert chip.get_attribute("aria-disabled") == "true"
     why = chip.get_attribute("title")
     assert "once a person has agreed with the judge" in why and "not calibrated" in why
     assert page.locator("[data-why='judged-chip']").text_content() == why
+    assert chip.get_attribute("aria-describedby") == "why-judged-chip"
     look = chip.evaluate("b => [getComputedStyle(b).cursor, +getComputedStyle(b).opacity]")
     assert look[0] == "not-allowed" and look[1] < 1
     # a pasted hash asking for it lands on All tasks, not on an empty table

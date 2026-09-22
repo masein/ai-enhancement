@@ -134,7 +134,10 @@ def test_the_next_step_walks_the_loop_in_order(svc, tmp_path, monkeypatch):
     assert med["next"]["step"] == "hand"
     assert med["datasets"][0] == {"id": did, "status": "ready", "count": 20, "kept": 18,
                                   "created_at": med["datasets"][0]["created_at"],
-                                  "over_provisional_judge": None}
+                                  "over_provisional_judge": None,
+                                  # 11e: made without the accounting — the topic
+                                  # page says the reasons were not recorded
+                                  "missing": None}
 
 
 def test_the_propose_gate_is_the_apis_own_words(svc):

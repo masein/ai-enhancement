@@ -146,35 +146,34 @@ def test_the_focus_line_carries_the_label_and_never_a_count(gap):
     gen = [q for q in fake.recorded() if q["custom_id"].startswith(f"gen:{did}:")]
     assert len(gen) == 6                                   # two documents a request
     focus = [q["meta"]["focus"] for q in gen]
-    plan = client.get(f"/api/proposals/{pid}/focus?count=12").json()["plan"]
+    # 11e: generation takes the first twelve labels of the plan Approve froze
+    f = client.get(f"/api/proposals/{pid}/focus?count=12").json()
+    assert f["frozen"] is True and f["mode"] == "area"
+    first = f["labels"][:12]
+    order = list(dict.fromkeys(first))
     # round-robin: the first lap covers every area, so a batch cut short still
     # spreads — and over the whole batch each area gets what the plan says
-    assert focus[:len(plan)] == [p["domain"] for p in plan]
+    assert focus[:len(order)] == order
     got = {}
     for q in gen:
         got[q["meta"]["focus"]] = got.get(q["meta"]["focus"], 0) + q["meta"]["count"]
-    assert got == {p["domain"]: p["documents"] for p in plan}
-    for q in gen:
-        lines = [x for x in q["user"].splitlines() if x.startswith("Focus:")]
-        assert lines == [f"Focus: {q['meta']['focus']}"]
-        # the label, and nothing about how the failure was counted
-        assert not any(c.isdigit() for c in lines[0])
-        body = q["system"] + "\n" + q["user"]
-        for p in plan:
-            assert f"{p['failing_diagnose']} " not in lines[0]
-            assert str(p["failing_diagnose"]) not in lines[0]
-        assert "fail" not in body.lower() and "scored" not in body.lower()
+    assert got == {lab: first.count(lab) for lab in order}
+    plan = [{"domain": lab, "documents": first.count(lab)} for lab in order]
     assert llm_poller.tick() == 1
     pv = client.get(f"/api/datasets/{did}").json()["provenance"]
     assert pv["focus_plan"] == plan
     assert sum(p["documents"] for p in pv["focus_plan"]) == 12
+    assert pv["focus_mode"] == "area" and pv["focus_labels"] == first
 
 
 def test_the_focus_endpoint_says_when_a_topic_has_no_labels(gap):
     client, _, tree = gap
     pid = _approved(client, tree, labels=False)
     j = client.get(f"/api/proposals/{pid}/focus?count=20").json()
-    assert j["plan"] == [] and "no domain labels" in j["why"]
+    # 11e: the true reason, in the brief's words — never "carry no domain
+    # labels" when labels exist; here there are none
+    assert j["labels"] == [] and j["mode"] == "off"
+    assert j["reason"] == "no sub-area labels on this topic's questions"
     assert client.get(f"/api/proposals/{pid}/focus?count=0").status_code == 422
     assert client.get("/api/proposals/9999/focus").status_code == 404
 

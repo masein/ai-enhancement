@@ -377,6 +377,147 @@ def focus_plan(model_dir: Path, task: str, topic: str, count: int,
             for d, k in allocate(counts, count)]
 
 
+# ---------------------------------------------------------------------------
+# 11e: spread the documents on EVERY topic (masein, 2026-09-22). Mathematics
+# has 18 labels and was refused by 11a's cap of 15, so 13 of its 20 documents
+# were about conditional probability. A label set is used as written when it
+# is small, by the prefix its labels share when that is small, and otherwise
+# one failed concept at a time. Only diagnose-half items are ever read.
+# ---------------------------------------------------------------------------
+
+FOCUS_MAX_AREAS = 25            # at most this many areas, as written or grouped
+FOCUS_MAX_CHARS = 64            # what is sent: a label, never a sentence
+FOCUS_MAX_WORDS = 10
+FOCUS_LIST_LEN = 100            # the frozen plan covers any count up to this
+# a label's group is the text before the first of these; each has a space on
+# both sides except ": ", so "Evidence-Based" never splits
+_GROUP_SEP = re.compile(r" — | – | - |: | / ")
+
+NO_LABELS = "no sub-area labels on this topic's questions"
+TOO_LONG = "every label is too long to send"
+TURNED_OFF = "the approver turned spreading off"
+NOTHING_FAILED = "no answer in the practice half fell short, so there is nothing to spread over"
+
+
+def label_group(label: str) -> str:
+    """'Legal Method – Precedent' -> 'Legal Method'; a label with no
+    separator is its own group."""
+    m = _GROUP_SEP.search(label)
+    return (label[:m.start()] if m else label).strip()
+
+
+def sendable(label: str) -> bool:
+    """A label that may go into a request: a short phrase, not a sentence."""
+    return bool(label) and len(label) <= FOCUS_MAX_CHARS \
+        and len(label.split()) <= FOCUS_MAX_WORDS and not set(label) & set(".?!")
+
+
+def to_send(label: str) -> str | None:
+    """The text actually sent for a label: itself, else its group, else nothing."""
+    if sendable(label):
+        return label
+    g = label_group(label)
+    return g if sendable(g) else None
+
+
+def focus_scheme(labels) -> tuple[str | None, object]:
+    """(mode, key) for a topic's labels: 'area' with the key that maps a label
+    to its area (the label itself, or its group), or 'concept' when even the
+    groups are too many to be areas; (None, None) with no labels at all."""
+    distinct = {str(x).strip() for x in labels if str(x or "").strip()}
+    if not distinct:
+        return None, None
+    if len(distinct) <= FOCUS_MAX_AREAS:
+        return "area", (lambda x: x)
+    if len({label_group(x) for x in distinct}) <= FOCUS_MAX_AREAS:
+        return "area", label_group
+    return "concept", None
+
+
+def _round_robin(counts: list[tuple[str, int]]) -> list[str]:
+    """[(A,3),(B,2)] -> [A, B, A, B, A]: a list cut anywhere still spreads."""
+    out, left = [], [[k, n] for k, n in counts]
+    while any(n for _, n in left):
+        for pair in left:
+            if pair[1]:
+                out.append(pair[0])
+                pair[1] -= 1
+    return out
+
+
+def focus_for(model_dir: Path, task: str, topic: str, root: Path | None = None) -> dict:
+    """The plan a proposal card shows before Approve, and Approve freezes:
+    {mode: 'area'|'concept'|None, labels: [<= FOCUS_LIST_LEN, in the order the
+    documents are written], failing: {label: n}, reason}. Area mode allocates
+    over the areas by their failing diagnose-half items; concept mode takes
+    one failed diagnose-half item's label at a time, weakest first (ties by
+    qid), one document per distinct label, round again past the end. The
+    report half is never read."""
+    import collections
+    rows = _exam.load_bank(root or config.EXAM_DIR).get(topic) or []
+    label_of = {r["qid"]: str((r.get("meta") or {}).get("domain") or "").strip() for r in rows}
+    mode, key = focus_scheme(label_of.values())
+    out = {"mode": mode, "labels": [], "failing": {}, "reason": ""}
+    if mode is None:
+        out["reason"] = NO_LABELS
+        return out
+    # every label unsendable, even by its group: nothing can go in a request
+    if not any(to_send(key(x) if mode == "area" else x) for x in set(label_of.values()) if x):
+        out.update(mode=None, reason=TOO_LONG)
+        return out
+    j = _judge_file(model_dir)
+    items = (((j or {}).get("tasks") or {}).get(task) or {}).get("items") or [] \
+        if j and not j.get("skipped") else []
+    failed = sorted((it for it in items
+                     if it.get("half") == "diagnose" and it.get("graded")       # the rule
+                     and it.get("score") is not None and it["score"] < WEAK_SCORE
+                     and label_of.get(it.get("qid"))),
+                    key=lambda it: (it["score"], str(it.get("qid"))))
+    if mode == "area":
+        counts: collections.Counter = collections.Counter()
+        for it in failed:
+            area = to_send(key(label_of[it["qid"]]))
+            if area:
+                counts[area] += 1
+        out["failing"] = dict(counts)
+        out["labels"] = _round_robin(allocate(dict(counts), FOCUS_LIST_LEN))
+    else:
+        seen: list[str] = []
+        for it in failed:
+            lab = to_send(label_of[it["qid"]])
+            if lab and lab not in seen:
+                seen.append(lab)
+        out["failing"] = {lab: 1 for lab in seen}
+        out["labels"] = [seen[i % len(seen)] for i in range(FOCUS_LIST_LEN)] if seen else []
+    if not out["labels"]:
+        out["reason"] = NOTHING_FAILED
+    return out
+
+
+def frozen_focus(prop: dict) -> dict | None:
+    """The plan Approve froze, or None for a proposal approved before 11e."""
+    try:
+        f = json.loads(prop.get("approved_focus") or "null")
+    except (ValueError, TypeError):
+        return None
+    return f if isinstance(f, dict) else None
+
+
+def focus_requests_plan(labels: list[str], per: int) -> list[tuple[str, int]]:
+    """(label, documents) per request from the first N frozen labels: one
+    label per request, as many of its documents as a request holds, the
+    requests round-robin over the labels in the order they first appear."""
+    import collections
+    counts = collections.Counter(labels)
+    order = list(dict.fromkeys(labels))
+    per_label = [[(lab, min(per, counts[lab] - s)) for s in range(0, counts[lab], per)]
+                 for lab in order]
+    out: list[tuple[str, int]] = []
+    for i in range(max((len(x) for x in per_label), default=0)):
+        out += [x[i] for x in per_label if i < len(x)]
+    return out
+
+
 def justifications_for(model_dir: Path, task: str,
                        limit: int = MAX_JUSTIFICATIONS) -> tuple[list[dict], dict]:
     """The judge's written reasoning for this topic's DIAGNOSE-half answers
@@ -562,7 +703,8 @@ def focus_chunks(plan: list[dict], per: int, count: int) -> list[tuple[str | Non
 
 def generation_requests(did: int, spec_text: str, category: str, count: int,
                         fmt: str, seed: int, audience: str = "",
-                        plan: list[dict] | None = None) -> list[llm.Request]:
+                        plan: list[dict] | None = None,
+                        labels: list[str] | None = None) -> list[llm.Request]:
     """One request per few items. Contains the approved spec, the topic, the
     count, the format, a style constraint, the audience labels and — when the
     topic's questions carry domain labels — the one domain this request is
@@ -571,7 +713,10 @@ def generation_requests(did: int, spec_text: str, category: str, count: int,
     per = items_per_request(fmt)
     reqs = []
     start = 0
-    for k, (focus, n) in enumerate(focus_chunks(plan or [], per, count)):
+    # 11e: a frozen plan's first N labels, one label per request; else 11a's
+    # plan, computed now (a proposal approved before plans were shown)
+    chunks = focus_requests_plan(labels, per) if labels else focus_chunks(plan or [], per, count)
+    for k, (focus, n) in enumerate(chunks):
         what = ("document" if fmt == "doc" else "item") + ("" if n == 1 else "s")
         user = (f"Skill specification:\n{spec_text.strip()}\n\n"
                 + (f"{audience.strip()}\n\n" if audience else "")
@@ -719,9 +864,15 @@ def local_marks(generator_id: str, prop: dict) -> dict:
 def provenance(prop: dict, ds: dict, backend_id: str, batch_id: str, prompt_hash: str,
                gate: dict, sha: str, n_generated: int, n_kept: int,
                audience: str = "", missing: list[dict] | None = None,
-               focus: list[dict] | None = None) -> dict:
+               focus: list[dict] | None = None, focus_mode: str = "",
+               focus_labels: list[str] | None = None) -> dict:
     out = _provenance(prop, ds, backend_id, batch_id, prompt_hash, gate, sha, n_generated,
                       n_kept, audience=audience, missing=missing, focus=focus)
+    # 11e: how the documents were spread, and over exactly which labels
+    out["focus_mode"] = focus_mode or ("area" if focus else "off")
+    out["focus_labels"] = list(focus_labels if focus_labels is not None
+                               else [f["domain"] for f in (focus or [])
+                                     for _ in range(f.get("documents") or 0)])
     local = local_marks(backend_id, prop)
     if local:                     # always, when any of them was local — there is no flag
         out["provisional"] = True
@@ -814,7 +965,8 @@ def provenance_complete(p: dict) -> list[str]:
     # focus_plan is empty for a topic with no domain labels, and a batch where
     # every document arrived has nothing missing — both are records, not holes
     return [h for h in holes if h not in ("edited_text", "gate.offending_ngrams",
-                                          "audience", "focus_plan", "items.missing",
+                                          "audience", "focus_plan", "focus_labels",
+                                          "items.missing",
                                           "identities.exam_writer", "identities.judge",
                                           "identities.single_provider_loop")
             and not h.startswith("gate.dropped")]

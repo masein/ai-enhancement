@@ -133,10 +133,12 @@ def test_the_board_checks_are_one_line_on_every_tab(live):
     n = pg.evaluate("DATA.checks.length")
     assert n == pg.evaluate("DATA.warnings.length") and f"{n} check" in said
     judged = pg.evaluate("DATA.checks.filter(c => c.judged).length")
-    if judged:
-        assert f"{judged} about the judged suite" in said
+    # 11e: the pill is a button with the count; the kind is the panel's first line
+    assert said.strip() == f"{n} check{'s' if n > 1 else ''} ▾"
     # folded, never dismissed: they open, one line each
     pg.locator("[data-warnings='collapsed'] > summary").click()
+    if judged:
+        assert f"{judged} of {n}" in pg.locator("[data-checks-judged]").text_content()
     rows = pg.locator("[data-warnings='collapsed'] li[data-check]")
     assert rows.count() == n
     first = rows.first

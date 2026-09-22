@@ -193,19 +193,32 @@ def go_tab(page, label: str) -> None:
     t.click()
 
 
+def bar_reveal(page, sel: str) -> bool:
+    """At 400 px the checks, the name and the theme sit behind the bar's ⋯
+    (11e): open it when what we want is in there. True when it opened it."""
+    if page.locator("#barMore").is_visible() and not page.locator(sel).first.is_visible():
+        page.locator("#barMore").click()
+        page.locator(sel).first.wait_for()
+        return True
+    return False
+
+
 def set_name(page, name: str) -> None:
     """The one name, in the header, that every action records (phase 9b).
     With a name already set the box is a popover on the body (11a), not an
     input inside the header."""
     who = page.locator("#who")
-    who.wait_for()
+    who.wait_for(state="attached")
+    opened = bar_reveal(page, "#who")
     if not who.locator("input").count():
         who.locator("button[data-who]").click()
         page.wait_for_selector("#pop-who input")
     box = page.locator("#pop-who") if page.locator("#pop-who input").count() else who
     box.locator("input").fill(name)
     box.locator("input").press("Enter")
-    page.wait_for_selector(f"#who button[data-who='{name}']")
+    page.wait_for_selector(f"#who button[data-who='{name}']", state="attached")
+    if opened and page.locator("#bar[data-more='open']").count():
+        page.locator("#barMore").click()              # and put the ⋯ panel away again
 
 
 def show_all_columns(page) -> None:
@@ -324,7 +337,7 @@ def arts_without_rubric(monkeypatch, tmp_path):
 DOMAIN_LABELS = ("Market Structure", "Trade and Money", "Growth and Development")
 
 
-def label_domains(exam_root, topic: str, labels=DOMAIN_LABELS):
+def label_domains(exam_root, topic: str, labels=DOMAIN_LABELS, both_halves: bool = True):
     """Put a `domain` from a small closed set on every question of `topic`,
     round-robin. Returns (path, original bytes) so a test running against the
     shared tree can put the bank back. Every label lands in both halves, as a
@@ -341,8 +354,9 @@ def label_domains(exam_root, topic: str, labels=DOMAIN_LABELS):
         r.setdefault("meta", {})["domain"] = labels[i % len(labels)]
     p.write_text("".join(_json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
                  encoding="utf-8")
-    seen = {}
-    for r in rows:
-        seen.setdefault(r["meta"]["domain"], set()).add(eb.half_of(r["qid"]))
-    assert all(h == {"report", "diagnose"} for h in seen.values()), seen
+    if both_halves:
+        seen = {}
+        for r in rows:
+            seen.setdefault(r["meta"]["domain"], set()).add(eb.half_of(r["qid"]))
+        assert all(h == {"report", "diagnose"} for h in seen.values()), seen
     return p, was

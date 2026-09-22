@@ -246,7 +246,11 @@ def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
     pg = surface.open("#tab=leaderboard")
     pg.locator("[data-chip='knowledge']").click()
     pg.wait_for_selector("table.lb thead th[data-area]")
-    assert pg.locator("table.lb thead th[data-area]").count() == 8
+    # 11e: the areas some model here has a number for (the fixture's MMLU
+    # subjects reach five of the eight)
+    assert pg.locator("table.lb thead th[data-area]").count() == pg.evaluate(
+        "Object.keys(DATA.meta.areas).filter(a => visible().some(m => areaMmlu(m, a))).length")
+    assert pg.locator("table.lb thead th[data-area]").count() >= 1
     assert pg.locator("table.lb thead th[data-task='mmlu']").count() == 1
     # the per-topic columns, one tick away: a topic under 30 items is greyed
     pg.locator("[data-columns-menu]").click()

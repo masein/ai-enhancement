@@ -907,6 +907,106 @@ sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "
    After 11d: the Overview's stat line and four highlight cards with their
    verdicts, and the model page's hero and numbered section chips.
 
+### 11e — the second live check
+
+Brief: `docs/prompts/phase-11e-live-check.md` (items 1–12). One PR. The
+phase-11 rules are unchanged: only diagnose-half items are read to build a
+generation request, and no provisional judged score goes into any average,
+column, tint or frontier.
+
+- **Documents spread on every topic** (masein's decision, item 1). The rule
+  lives in `service/proposals.py` (`focus_scheme`, `focus_for`):
+  - **By area** when a topic's labels are ≤ 25 as written, or ≤ 25 groups
+    (the text before the first ` — `, ` – `, ` - `, `: ` or ` / `): the
+    documents are allocated over the areas by their failed diagnose-half
+    items, round-robin so any first N still spreads. 18 of the 37 banks.
+  - **By concept** when even the groups are more than 25: one document per
+    failed diagnose-half label, weakest first (ties by qid), round again past
+    the end. 19 banks.
+  - **Hygiene**: a label goes in a request only when it is ≤ 64 characters,
+    ≤ 10 words and has no `.`, `?` or `!`; else its group; else it is skipped.
+  - **Shown before Approve** on the proposal card ("Where the documents go"),
+    with a "Spread the documents over these" box. **Approve freezes** the plan:
+    `proposals.approved_focus` (a new column, added at startup) holds up to
+    100 labels; Generate with count N takes the first N. Unticked → no Focus
+    lines, `focus_mode: off`. When there is no plan the card says the true
+    reason (no labels / every label too long / nothing failed / turned off).
+  - A proposal **approved before 11e** keeps 11a's behaviour and says
+    "Approved before plans were shown".
+  - `provenance.focus_mode` and `provenance.focus_labels` record what was sent.
+- **The bar** (2, 3): the checks pill reads `● 6 checks ▾` and is the same
+  button as `masein ▾` and `Theme ▾`; "k of n are about the judged suite" is
+  the first line of its panel. The pill's 40px height came from the `.warn`
+  paragraph style bleeding onto `.dot.warn` (and onto the `provisional`
+  badge, item 12) — both reset. The badge and the status line read the
+  refresh time (`LIVE · 15:17`), not the timezone.
+- **Model cell and opened row** (4, 5): the model cell is one clipped flex
+  line — the name gives way first, then a long badge — and the duplicate
+  toggle is inside it; the opened row's Links repeat "Same run as …" with the
+  toggle. The opened row's blocks are `minmax(min(100%, 300px), 1fr)`.
+- **A stale diagnosis** (6): a diagnosis whose MMLU categories are not the
+  current `categories.yaml` set is stale. The Knowledge chip says once
+  "MMLU by area needs a fresh diagnosis — … made with the old 15 categories",
+  and an opened row says it instead of eight empty bars. Area columns that
+  are empty for every model on the page are hidden (the fixture's MMLU
+  subjects reach 5 of the 8 areas; the live board's reach all 8).
+- **Focus in a panel** (7): a render patches the Columns panel's checkboxes
+  in place, so the focused control is the same node afterwards.
+- **The frontier** (8): no model of the **same size or smaller** beats it by
+  a z-tested gap; the line goes through the best point at each size; the
+  caption says "No model here is bigger and scores lower than X."
+- **Highlights** (9): the value is the number only (`39.3`, `0.79 / 4`,
+  `7 / 37`, `30 / 30`); the name is its own 16px line with an ellipsis and
+  the full id in the tooltip; the canary numbers have two decimals.
+- **400 px** (10): the bar is two rows (≤ 96px) — title, LIVE and a `⋯` menu
+  holding the checks, the name and the theme; then the tabs. On the
+  Leaderboard the rank and model take ≤ 45% of the scroller, only `prelim`
+  stays of the badges, Params drops "· N act" (it stays in the tooltip),
+  units wrap under their names, and the right edge fades with "scroll →"
+  while there is more; a poll keeps the sideways scroll. The Insights charts
+  are never narrower than their viewBox (so 12px text is 12px) and scroll in
+  their own box; below 600px Weakest topics are HTML rows.
+- **11** — a dataset made before 11a says "2 missing — reasons not recorded
+  (made before 11a)" on the topic page too.
+- **Polish** (12): 16px under the Insights intro, 12px between "Submit a
+  model" and the stats line, the standard 12px `provisional` badge,
+  link-styled Links buttons, and the Judged topics chip is `aria-disabled`:
+  its reason is the tooltip, its `aria-describedby`, and a one-line note under
+  the chips on click — no permanent line.
+
+**Deploy steps, after 11e merges.**
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+```
+
+**Expected output:**
+
+1. `up -d --build` rebuilds and ends with the container healthy; the image
+   build prints `image files OK`.
+2. The log grep prints `no errors`. On start the service adds the
+   `approved_focus` column to `proposals` by itself; nothing to run by hand.
+3. After a hard reload, at 1,512 px: every tab fully visible and none
+   overlapping, `● N checks ▾` the same size as the buttons beside it, the
+   badge `LIVE · <time>`, and each highlight value on one line.
+4. A new Propose on **Sociology** shows, before Approve, "20 documents, one
+   per concept the model missed in the practice half: …"; after Generate the
+   dataset's labels are those 20. A new Propose on **Mathematics &
+   Statistics** shows "Documents will cover N areas: …".
+5. Until the diagnosis is re-run, the Knowledge chip says "MMLU by area needs
+   a fresh diagnosis — …". Then, the data step:
+
+   ```bash
+   cd ~/benchmarks && sudo python3 aienh/scripts/diagnose.py results/full
+   ```
+
+   prints one line per model and then `wrote diagnose.json for N model(s)`,
+   with no "could not write" block; after the next poll the Knowledge chip
+   shows the 8 area columns with numbers and the sentence is gone.
+6. At 400 px: the Leaderboard shows the Avg column, the header is two rows,
+   and the chart text is readable.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

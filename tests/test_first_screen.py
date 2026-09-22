@@ -131,8 +131,8 @@ def test_the_overview_skips_the_duplicate_and_links_the_preliminary(browser, pay
         pg = s.open()
         pg.wait_for_selector("[data-hl='best']")
         # the best-model card names the twin, never the duplicate
-        best = pg.locator("[data-hl-value='best']").text_content()
-        assert best.startswith(twin["name"] + " ·") and not best.startswith(top["name"] + " ·")
+        best = pg.locator("[data-hl-name='best']").text_content()
+        assert best == twin["name"] and best != top["name"]
         names = [a.text_content() for a in pg.locator("[data-top-models] td.model a").all()]
         assert twin["name"] in names and top["name"] not in names
         assert "preliminary and carries no overall rank" not in pg.locator("#view").text_content()

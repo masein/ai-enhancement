@@ -13,11 +13,12 @@ from __future__ import annotations
 import json
 import re
 import urllib.request
+from collections import Counter
 from pathlib import Path
 
 import pytest
 
-from conftest import label_domains, set_name
+from conftest import bar_reveal, label_domains, set_name
 
 
 pytestmark = pytest.mark.dashboard
@@ -53,6 +54,7 @@ def api(base, path, body=None):
 
 
 def open_menu(page, key, sel):
+    bar_reveal(page, sel)
     page.locator(sel).click()
     page.wait_for_selector(f"[data-pop='{key}']")
     return page.locator(f"[data-pop='{key}']")
@@ -213,10 +215,13 @@ def test_the_review_card_says_where_the_documents_go_and_what_went_missing(
                 break
             page.wait_for_timeout(200)
         api(base, f"/api/proposals/{pid}/approve", {"approver": "Omar"})
-        # the card asks for the count in its box, which starts at twenty
-        plan20 = api(base, f"/api/proposals/{pid}/focus?count=20")["plan"]
-        plan = api(base, f"/api/proposals/{pid}/focus?count=12")["plan"]
-        assert len(plan) >= 2 and len(plan20) == len(plan)
+        # 11e: Approve froze the plan; the count in the box, which starts at
+        # twenty, takes its first N labels
+        frozen = api(base, f"/api/proposals/{pid}/focus?count=20")
+        assert frozen["frozen"] and frozen["mode"] == "area"
+        plan20 = Counter(frozen["labels"][:20])
+        plan = Counter(frozen["labels"][:12])
+        assert len(plan) >= 2
 
         page.set_viewport_size({"width": 1280, "height": 900})
         page.goto(base + "/#tab=review")
@@ -224,13 +229,15 @@ def test_the_review_card_says_where_the_documents_go_and_what_went_missing(
         set_name(page, "Omar")
         card = page.locator(f".rv[data-proposal='{pid}']")
         card.wait_for(timeout=E2E_MS)
-        line = page.locator(f"[data-focus-plan='{pid}']")
+        line = page.locator(f"[data-focus-plan='{pid}'][data-plan-stage='generate']")
         line.wait_for(timeout=E2E_MS)
         # the plan, before anyone presses Generate
+        page.wait_for_function("el => el.textContent.length > 0", arg=line.element_handle(),
+                               timeout=E2E_MS)
         text = line.text_content()
         assert text.startswith(f"Documents will cover {len(plan20)} areas: ")
-        for p in plan20:
-            assert f"{p['domain']} {p['documents']}" in text
+        for d, n in plan20.items():
+            assert f"{d} {n}" in text
         assert not re.search(r"\bfail", text)
         SCREENS.mkdir(parents=True, exist_ok=True)
         page.screenshot(path=SCREENS / "11a-review-focus-plan-1280-light.png", full_page=True)
@@ -238,11 +245,11 @@ def test_the_review_card_says_where_the_documents_go_and_what_went_missing(
         # generate: the toast, when the batch finishes, says what came back
         # a different count re-asks, and the line follows it
         card.get_by_label("item count").fill("12")
-        for p in plan:
+        for d, n in plan.items():
             page.wait_for_function(
                 "want => document.querySelector(`[data-focus-plan='%s']`)"
                 ".textContent.includes(want)" % pid,
-                arg=f"{p['domain']} {p['documents']}", timeout=E2E_MS)
+                arg=f"{d} {n}", timeout=E2E_MS)
         card.get_by_role("button", name="Generate data").click()
         page.wait_for_selector("[data-toast^='dataset-']", timeout=E2E_MS)
         toast = page.locator("[data-toast^='dataset-']").first.text_content()
@@ -261,7 +268,7 @@ def test_the_review_card_says_where_the_documents_go_and_what_went_missing(
         assert len(rows) == 2
         assert all("too short (60 words)" in r for r in rows)
         # each names the area it was meant to cover, so the gap in the plan shows
-        assert all(any(p["domain"] in r for p in plan) for r in rows), rows
+        assert all(any(d in r for d in plan) for r in rows), rows
         page.screenshot(path=SCREENS / "11a-dataset-missing-1280-light.png", full_page=True)
         assert page.errors == []
     finally:
