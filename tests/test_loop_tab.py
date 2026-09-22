@@ -30,8 +30,9 @@ def svc(tmp_path, monkeypatch):
     client.__exit__(None, None, None)
 
 
-def rows(client) -> dict:
-    return {r["topic"]: r for r in client.get("/api/loop").json()["topics"]}
+def rows(client, model: str = "") -> dict:
+    j = client.get("/api/loop", params={"model": model} if model else None).json()
+    return {r["topic"]: r for r in j["topics"]}
 
 
 # ---------------------------------------------------------------------------
@@ -76,10 +77,14 @@ def test_a_draft_rubric_is_stamped_on_the_topics_row(svc):
     mdir = tree["models"][model]["dir"]
     jd.write_judge(mdir, jd.merge_judged(mdir, jd.run_stub(mdir, tree["out_dir"], only=[TASK])))
     conftest.fresh(appmod)
-    last = rows(client)[TOPIC]["last_judged"]
+    # this model's board, asked for by name: which model the board opens on
+    # is the one judged most recently, and three runs of one second are a
+    # coin toss — this test is about the stamp, not about that order
+    board = rows(client, model)
+    last = board[TOPIC]["last_judged"]
     assert last["model"] == model and last["draft_rubric"] is True
     # and only this topic: the others were graded by rubrics nobody marked
-    assert rows(client)["Law"]["last_judged"]["draft_rubric"] is False
+    assert board["Law"]["last_judged"]["draft_rubric"] is False
 
 def test_the_next_step_walks_the_loop_in_order(svc, tmp_path, monkeypatch):
     client, appmod, _ = svc
