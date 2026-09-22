@@ -112,6 +112,9 @@ def _finish_generation(row: dict, results: dict[str, llm.Result], backend: llm.B
         db.dataset_update(did, status="failed", finished_at=time.time(), error=why)
         return
     path, sha = proposals.write_items(did, gate["kept"])
+    # 11g: each kept document's request and focus label, for the Reader
+    from . import reader
+    reader.write_item_labels(did, origin, gate.get("dropped") or [])
     prov = proposals.provenance(prop, ds, backend.id, row["batch_id"], prompt_hash,
                                 gate["report"], sha, len(items), len(gate["kept"]),
                                 audience=prov_stub.get("audience", ""),

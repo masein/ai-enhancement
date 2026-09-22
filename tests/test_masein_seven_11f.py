@@ -530,7 +530,9 @@ def test_the_row_menu_passes_the_popover_checks(live, page, queue_rows):
           .map(it => {{ const r = it.getBoundingClientRect();
             const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
             return [it.textContent, !!hit && (hit === it || it.contains(hit)), r.height]; }})""")
-        assert [i[0] for i in items] == ["Log", "Resubmit", "Copy id", "Open model page"]
+        # 11g: Log opens the reader; the raw log is the next item
+        assert [i[0] for i in items] == ["Log", "Open raw log ↗", "Resubmit", "Copy id",
+                                         "Open model page"]
         assert all(ok and h >= 20 for _t, ok, h in items), items
         box = panel.bounding_box()
         assert box["x"] >= 7 and box["x"] + box["width"] <= width - 7

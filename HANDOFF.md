@@ -1098,6 +1098,84 @@ sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "
 6. With macOS reduced motion on (System Settings › Accessibility › Display),
    nothing moves.
 
+### 11g — read every file in the page
+
+Brief: `docs/prompts/phase-11g-read-and-first-page.md` (11g–11j; committed
+with 11g, with masein's two corrections of 22 Sep marked in it). One PR.
+
+- **One Reader** — a sheet from the right, `min(760px, 92vw)`, the whole
+  screen below 720px. Title, where the file comes from, **Copy**,
+  **Download**, **Open raw ↗** and **✕ Close**. It has an address —
+  `…&read=<kind>:<id>[:<n>]`, e.g. `read=dataset:6:3` — so a pasted link opens
+  it and Back closes it; it lives in `state.read`, so a poll never closes it;
+  Esc closes it and gives the focus back; focus stays inside while it is
+  open. Everything is text: markdown goes through a small renderer that
+  makes no HTML (`mdRender`), links get `rel="noopener noreferrer"`, and a
+  `javascript:` link is only its words.
+- **The six kinds** (`service/reader.py`):
+  - `dataset:<id>` — `GET /api/datasets/{id}/items?offset=&limit=&q=`: every
+    kept document numbered with its focus label and word count, the missing
+    ones in their place (after their request's documents) with their
+    reason; ← → between documents, a search that marks what it finds, and
+    the free format as Question / Answer / Rationale. Each document's label
+    is now written beside the documents when a batch lands
+    (`items.meta.json`); an older dataset's is rebuilt from its provenance,
+    or said to be not recorded. A dataset made before 11a says its missing
+    ones' "reasons not recorded". The `items.jsonl` download is unchanged.
+  - `rubric:<name>` — the markdown, a contents list, the version (or "no
+    version") and the sha.
+  - `criteria:<name>` — read through the judge's own `normalise_criteria()`
+    (all three layouts the author has sent: `critical_error_flag`,
+    `critical_error`, `critical_flags`): the criteria table, the flag(s) with
+    what they do and their examples, the top-level fields, the raw JSON.
+  - `bank:<slug>` — `GET /api/exam/bank?topic=…&half=diagnose`: the practice
+    half only, and of the hidden half **only a count** — no qid either.
+    Filters for difficulty, domain and style, and a search.
+  - `log:<run id>` — `GET /api/runs/{id}/lines`: numbered lines (up to
+    2,000), a search with **next ↓**, bad lines in the warning tone, a wrap
+    toggle, **Load earlier lines**; it follows a running job until the
+    person scrolls up. A line that quotes a hidden question (its qid, or the
+    start of its text) is withheld.
+  - `provenance:dataset:<id>` and `provenance:judge:<model id>` —
+    `GET /api/judge/provenance?model=…` is the model's judge runs (never a
+    run's plan) and its judge file's head, each topic reduced to counts,
+    scores and fingerprints (never an item, never a qid). A collapsible
+    tree: hashes shortened with a copy button, times local, "Demo only" as a
+    badge.
+- **Where Read appears**: the topic page's datasets (**Read**, Download
+  beside it, Provenance in `⋯`), the Review card's and the Review tab's
+  datasets, the Exam tab's rubric table (rubric and criteria, a ↓ beside
+  each), the topic header (`arts.md`, `20 criteria`, and **Read the practice
+  questions**), the Queue's `⋯` › Log (the raw log is the next item), the
+  dataset reader's header (Provenance), and the model page's Judged section
+  (**How this was graded ▸**).
+- Found on the way: 11f's tab underline measured More ▾ from its own
+  wrapper and drew under Overview. Fixed.
+
+**Deploy steps, after 11g merges.** Code only, no data step.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+```
+
+**Expected output:**
+
+1. `up -d --build` ends with the container healthy; the image build prints
+   `image files OK`.
+2. The log grep prints `no errors`.
+3. From the Arts topic page, dataset #6's **Read** opens the reader: its 20
+   documents, each with its focus label; ← and → move; the search narrows
+   the list. Dataset #2 (Physics) lists its 2 missing documents with
+   "reasons not recorded". (A dataset generated before this deploy has its
+   labels rebuilt from its provenance.)
+4. `arts.md` reads as formatted text; the Arts criteria read as a table of
+   20 criteria, then the flag with its examples.
+5. **Read the practice questions** on Arts lists its 44 practice questions
+   and says "56 hidden questions — never shown, by design".
+6. A Queue row's `⋯` › Log opens the reader and follows a running job.
+7. Every reader's link, pasted into a new tab, opens it; Back closes it.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

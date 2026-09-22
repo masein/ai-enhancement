@@ -1673,6 +1673,119 @@ button:active:not(:disabled):not([aria-disabled="true"]) { transform:scale(.98);
 .pop.pop-out { opacity:0; transform:translateY(4px); pointer-events:none;
   transition-duration:calc(var(--dur-2) / 2); }
 .pop.flip.pop-out { transform:translateY(-4px); }
+/* 11g: the Reader — a sheet from the right, min(760px, 92vw); the whole
+   screen below 720px. It slides in and fades with the 11f tokens */
+body.reading { overflow:hidden; }
+.reader-wrap { position:fixed; inset:0; z-index:90; }
+.reader-scrim { position:absolute; inset:0; background:rgba(10,16,30,.28); opacity:0;
+  transition:opacity var(--dur-3) var(--ease); }
+.reader { position:absolute; top:0; right:0; bottom:0; width:min(760px, 92vw);
+  display:flex; flex-direction:column; background:var(--surface-1);
+  box-shadow:-12px 0 40px rgba(0,0,0,.18); border-left:1px solid var(--border);
+  transform:translateX(24px); opacity:0;
+  transition:transform var(--dur-3) var(--ease), opacity var(--dur-3) var(--ease); }
+.reader-wrap.open .reader { transform:none; opacity:1; }
+.reader-wrap.open .reader-scrim { opacity:1; }
+.reader:focus { outline:none; }
+@media (max-width:720px) { .reader { width:100vw; border-left:0; } }
+.rd-head { display:flex; gap:12px; align-items:flex-start; justify-content:space-between;
+  padding:14px 18px 12px; border-bottom:1px solid var(--border); }
+.rd-titles { min-width:0; }
+.rd-title { margin:0; font-size:var(--fs-4); overflow-wrap:anywhere; }
+.rd-src { margin:4px 0 0; color:var(--text-secondary); font-size:var(--fs-2); overflow-wrap:anywhere; }
+.rd-src .badge { margin-left:8px; }
+.rd-top { display:flex; align-items:flex-start; gap:6px; flex:none; flex-wrap:wrap;
+  justify-content:flex-end; }
+.rd-acts { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+.rd-acts > button, .rd-acts > a.btn { height:32px; min-height:32px; padding:0 10px; border-radius:6px;
+  display:inline-flex; align-items:center; text-decoration:none; font-size:var(--fs-1); }
+.rd-close { height:32px; }
+@media (max-width:720px) { .rd-head { flex-direction:column; } .rd-top { align-items:flex-start;
+  flex-direction:row-reverse; flex-wrap:wrap; } }
+.rd-body { flex:1; min-height:0; overflow:auto; padding:14px 18px 28px; overscroll-behavior:contain; }
+.rd-body:focus { outline:none; }
+.rd-summary { margin-bottom:12px; }
+.rd-summary p { margin:0 0 6px; }
+.rd-search { width:100%; box-sizing:border-box; }
+.rd-filters { margin:0 0 10px; }
+.rd-filters .rd-search { flex:1; min-width:160px; width:auto; }
+/* the dataset: the list on the left, the document on the right */
+.rd-split { display:grid; grid-template-columns:minmax(0, 240px) minmax(0, 1fr); gap:16px; }
+@media (max-width:720px) { .rd-split { grid-template-columns:minmax(0, 1fr); }
+  .rd-list { max-height:220px; } }
+.rd-side { display:flex; flex-direction:column; gap:8px; min-width:0; }
+.rd-list { list-style:none; margin:0; padding:0; overflow:auto; max-height:calc(100vh - 260px);
+  border:1px solid var(--border); border-radius:var(--r-1); }
+.rd-item { display:grid; grid-template-columns:auto minmax(0, 1fr); gap:2px 8px; padding:7px 9px;
+  border-bottom:1px solid var(--grid); cursor:pointer; font-size:var(--fs-2); }
+.rd-item:last-child { border-bottom:0; }
+.rd-item:hover, .rd-item:focus-visible { background:var(--plane); outline:none; }
+.rd-item.on { background:var(--accent-soft); box-shadow:inset 3px 0 0 var(--accent); }
+.rd-item .rd-n { grid-row:span 2; color:var(--muted); font-size:var(--fs-1); padding-top:2px; }
+.rd-item .rd-t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rd-item .rd-m { font-size:var(--fs-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rd-item.gone { cursor:default; color:var(--muted); background:none; }
+.rd-item.gone .rd-t { font-style:italic; }
+.rd-doc { min-width:0; }
+.rd-doc-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.rd-doc-head h3 { margin:0; flex:1 1 260px; font-size:var(--fs-4); }
+.rd-doc-head button { height:32px; min-height:32px; width:36px; padding:0; }
+.rd-prose { font-family:var(--font-sans); font-size:var(--fs-3); line-height:1.6; max-width:68ch;
+  color:var(--text-primary); }
+.rd-prose p { margin:0 0 .9em; }
+.rd-qa .eyebrow { margin-top:12px; }
+mark { background:color-mix(in srgb, var(--warning) 35%, transparent); color:inherit;
+  border-radius:2px; padding:0 1px; }
+/* markdown, as text: headings, lists, tables, emphasis and code */
+.md { font-size:var(--fs-2); line-height:1.6; max-width:78ch; }
+.md .md-h { margin:1.1em 0 .4em; line-height:1.3; }
+.md h3.md-h { font-size:var(--fs-4); } .md h4.md-h { font-size:var(--fs-3); }
+.md h5.md-h, .md h6.md-h { font-size:var(--fs-2); }
+.md code { font-family:var(--font-mono); font-size:.92em; background:var(--plane);
+  padding:1px 4px; border-radius:4px; }
+.md-pre { font-family:var(--font-mono); font-size:var(--fs-1); background:var(--plane);
+  border:1px solid var(--border); border-radius:var(--r-1); padding:10px 12px; overflow:auto;
+  white-space:pre-wrap; overflow-wrap:anywhere; }
+.md blockquote { margin:0 0 1em; padding-left:12px; border-left:3px solid var(--border);
+  color:var(--text-secondary); }
+.md-table td, .md-table th { white-space:normal; height:auto; }
+.rd-toc { border:1px solid var(--border); border-radius:var(--r-1); padding:8px 12px; margin-bottom:12px; }
+.rd-toc > summary { cursor:pointer; }
+.rd-kv-in { margin:0; font-size:var(--fs-2); }
+.rd-toc ul { list-style:none; margin:4px 0 0; padding:0; font-size:var(--fs-1); }
+.rd-toc li { margin:2px 0; }
+.rd-kv { display:grid; grid-template-columns:auto minmax(0, 1fr); gap:4px 12px; margin:0 0 12px;
+  font-size:var(--fs-2); }
+.rd-kv dt { font-family:var(--font-mono); font-size:var(--fs-1); color:var(--muted); }
+.rd-kv dd { margin:0; overflow-wrap:anywhere; }
+.rd-flag { border:1px solid var(--border); border-radius:var(--r-1); padding:8px 12px; margin:8px 0; }
+.rd-flag p { margin:0 0 4px; }
+.rd-raw { margin-top:14px; }
+/* the bank: one card a question */
+.rd-q { border-bottom:1px solid var(--grid); padding:10px 0; }
+.rd-q-meta { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:4px; }
+/* the log: mono, numbered, the bad lines in the warning tone */
+.rd-log { font-family:var(--font-mono); font-size:var(--fs-1); line-height:1.5; border:1px solid var(--border);
+  border-radius:var(--r-1); background:var(--plane); max-height:calc(100vh - 230px); overflow:auto;
+  padding:6px 0; }
+.rd-ln { display:grid; grid-template-columns:4.5em minmax(0, 1fr); gap:10px; padding:0 10px;
+  white-space:pre; }
+.rd-log.wrap .rd-ln { white-space:pre-wrap; overflow-wrap:anywhere; }
+.rd-ln.bad { background:color-mix(in srgb, var(--warning) 14%, transparent); }
+.rd-ln.cur { outline:2px solid var(--accent); outline-offset:-2px; }
+.rd-no { color:var(--muted); text-align:right; user-select:none; }
+/* provenance: a tree */
+.rd-tree { font-size:var(--fs-2); }
+.rd-node > summary { cursor:pointer; padding:3px 0; }
+.rd-kids { padding-left:16px; border-left:1px solid var(--grid); margin-left:4px; }
+.rd-leaf { display:grid; grid-template-columns:minmax(120px, auto) minmax(0, 1fr); gap:10px;
+  padding:2px 0; }
+.rd-k { font-family:var(--font-mono); font-size:var(--fs-1); color:var(--muted); }
+.rd-leaf > span:last-child { overflow-wrap:anywhere; }
+.rd-hash { display:inline-flex; gap:6px; align-items:center; }
+.rd-hash button { padding:0 4px; min-height:0; font-size:var(--fs-1); }
+a.dllink { text-decoration:none; }
+.actcell > a.dllink { font-size:var(--fs-1); }
 /* 11f: Select and Combobox — 36px, radius 6, the border, the accent ring */
 button.sel { display:inline-flex; align-items:center; justify-content:space-between; gap:10px;
   height:36px; min-height:36px; border-radius:6px; border:1px solid var(--border);
@@ -2682,6 +2795,7 @@ const LIVE = DATA === null;
 const state = {
   q: '', kind: 'all', tab: 'overview',
   model: null,                         // open model detail page, by id (hash-routed)
+  read: null,                          // 11g: the open reader, { kind, id, n } (hash-routed)
   src: 'all',                          // All | Models | Checkpoints — a filter, nothing hidden by default
   panelOpen: {},                       // per-task "show all bars" toggles
   sort: { key: 'avg', dir: -1 },
@@ -4001,7 +4115,10 @@ function vJudged(m) {
               : 'against a written rubric by an API judge pinned to a dated model id — ')
       + 'single answers, never pairwise. Length is in the rubric and reported below; a '
       + 'thirty-script canary is re-graded every run so a change to the model behind the id '
-      + 'would show.' }));
+      + 'would show.' }),
+    // 11g: the judge runs and the judge file behind these numbers, in the reader
+    LIVE && m.judge ? el('p', { class: 'small', 'data-how-graded': m.id },
+      readLink({ kind: 'provenance', id: 'judge:' + m.id }, 'How this was graded ▸')) : '');
   // up to five paragraphs of caveats stood above the first number; now one
   // line of badges, and the words behind "why?"
   const caveats = [], why = el('div', { class: 'caveat-text' });
@@ -4826,13 +4943,18 @@ function overviewLoop() {
 // A dashboard whose Back button leaves the page instead of returning to the list
 // you came from is the single most reported annoyance in apps shaped like this.
 // ---------------------------------------------------------------------------
-const hashFor = () => state.model ? 'model=' + encodeURIComponent(state.model)
+const hashFor = () => (state.model ? 'model=' + encodeURIComponent(state.model)
                                   : state.topic ? 'topic=' + encodeURIComponent(state.topic)
                                   : 'tab=' + state.tab
-                                    + (state.tab === 'leaderboard' && lbHash() ? '&' + lbHash() : '');
+                                    + (state.tab === 'leaderboard' && lbHash() ? '&' + lbHash() : ''))
+  // 11g: an open reader rides along, so a pasted link opens it too
+  + (state.read ? '&read=' + encRead(state.read) : '');
 
 function routeFromHash() {
-  const h = decodeURIComponent(location.hash.replace(/^#/, ''));
+  // 11g: the reader's part first — it can follow any page
+  const [rest, rd] = splitRead(location.hash);
+  state.read = rd;
+  const h = decodeURIComponent(rest);
   const m = /^model=(.+)$/.exec(h);
   if (m && DATA.models.some(x => x.id === m[1])) { state.model = m[1]; state.topic = null; return; }
   state.model = null;
@@ -4843,7 +4965,7 @@ function routeFromHash() {
   state.topic = null;
   // "tab=leaderboard&chip=knowledge&open=…": the Leaderboard's view rides
   // along, so a pasted link reproduces it (11c). Old hashes have no "&".
-  const t = /^tab=([^&]+)(?:&(.*))?$/.exec(location.hash.replace(/^#/, ''));
+  const t = /^tab=([^&]+)(?:&(.*))?$/.exec(rest);
   if (!t) return;
   const tab = decodeURIComponent(t[1]);
   const want = TAB_ALIASES[tab] || tab;
@@ -8089,6 +8211,701 @@ function vTraining() {
   return frag;
 }
 
+// ===========================================================================
+// 11g: the Reader. Every file the page names opens here, in the page — a
+// sheet from the right. It has an address (read=<kind>:<id>[:<n>]), so a
+// pasted link opens it and Back closes it, and it lives in state like an
+// opened row, so a poll never closes it. What it shows is always text: a
+// file is escaped, its markdown goes through a renderer that allows no HTML,
+// and nothing in it is ever run. No hidden (report-half) question reaches it:
+// the bank reader asks for the practice half and a count, and the log
+// reader's lines come with any line that quotes one withheld.
+// ===========================================================================
+const READ_KINDS = ['dataset', 'rubric', 'criteria', 'bank', 'log', 'provenance'];
+
+function readStr(r) {
+  return r ? [r.kind, r.id, r.n].filter(x => x != null && x !== '').join(':') : '';
+}
+function parseRead(s) {
+  const p = String(s || '').split(':');
+  if (!READ_KINDS.includes(p[0]) || !p[1]) return null;
+  if (p[0] === 'provenance')
+    return p[2] ? { kind: 'provenance', id: p[1] + ':' + p.slice(2).join(':') } : null;
+  return { kind: p[0], id: p[1], n: p[2] ? (+p[2] || null) : null };
+}
+const encRead = r => encodeURIComponent(readStr(r)).replace(/%3A/gi, ':');
+// the read= part of a hash, and the hash without it
+function splitRead(h) {
+  const raw = String(h || '').replace(/^#/, '');
+  const m = /(?:^|&)read=([^&]*)/.exec(raw);
+  return [raw.replace(/(?:^|&)read=[^&]*/, '').replace(/^&/, ''),
+          m ? parseRead(decodeURIComponent(m[1])) : null];
+}
+
+// Open it from a link or a button. `from` is a selector for what opened it:
+// focus goes back there when it closes.
+function openReader(r, from) {
+  state.readFrom = from || null;
+  if (readStr(r) === readStr(state.read)) return;
+  navigate({ read: r });
+}
+function closeReader() {
+  if (!state.read) return;
+  // the entry before this one is the same page without the reader: that is
+  // Back, so Forward opens it again
+  const from = (history.state || {}).from;
+  if (from != null && !splitRead(from)[1] && splitRead(from)[0] === splitRead(location.hash)[0]) {
+    history.back();
+    return;
+  }
+  state.read = null;
+  history.replaceState(history.state, '', '#' + hashFor());
+  render();
+}
+// a read link: an <a> with the address as its href (open it in a new tab and
+// it opens there too), which opens the reader in place
+function readLink(r, text, attrs = {}) {
+  const key = readStr(r);
+  return el('a', { href: '#' + splitRead(location.hash)[0] + '&read=' + encRead(r),
+    'data-read-open': key, text, ...attrs,
+    onclick: e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+      e.preventDefault(); openReader(r, `[data-read-open="${CSS.escape(key)}"]`); } });
+}
+function readButton(r, text, attrs = {}) {
+  const key = readStr(r);
+  return el('button', { class: 'ghost', 'data-read-open': key, text, ...attrs,
+    onclick: () => openReader(r, `[data-read-open="${CSS.escape(key)}"]`) });
+}
+
+// ---- data -------------------------------------------------------------------
+state.readData = {};
+function readKey(r) { return r.kind + ':' + r.id; }
+async function readFetch(r, extra) {
+  const k = readKey(r);
+  const put = patch => { state.readData[k] = { ...(state.readData[k] || {}), ...patch }; };
+  put({ loading: true, error: '' });
+  try {
+    let data;
+    if (r.kind === 'dataset') {
+      const q = (extra && extra.q != null) ? extra.q : ((state.readData[k] || {}).q || '');
+      const [head, page] = await Promise.all([api(`api/datasets/${r.id}`),
+        api(`api/datasets/${r.id}/items?offset=0&limit=50&q=${encodeURIComponent(q)}`)]);
+      data = { head, page };
+      put({ q });
+    } else if (r.kind === 'rubric' || r.kind === 'criteria') {
+      data = await api(`api/exam/rubrics/${encodeURIComponent(r.id)}/read?kind=${r.kind}`);
+    } else if (r.kind === 'bank') {
+      const topic = topicOfSlug(r.id) || r.id;
+      data = await api(`api/exam/bank?topic=${encodeURIComponent(topic)}&half=diagnose`);
+    } else if (r.kind === 'log') {
+      const tail = (state.readData[k] || {}).tail || 200;
+      data = await api(`api/runs/${encodeURIComponent(r.id)}/lines?tail=${tail}`);
+      put({ tail });
+    } else if (r.kind === 'provenance') {
+      const [what, id] = [r.id.split(':')[0], r.id.split(':').slice(1).join(':')];
+      data = what === 'dataset' ? { kind: 'dataset', rec: await api(`api/datasets/${id}`) }
+        : { kind: 'judge', rec: await api(`api/judge/provenance?model=${encodeURIComponent(id)}`) };
+    }
+    put({ loading: false, data, v: ((state.readData[k] || {}).v || 0) + 1 });
+  } catch (e) {
+    put({ loading: false, error: e.message || String(e), v: ((state.readData[k] || {}).v || 0) + 1 });
+  }
+  renderReader();
+}
+
+// ---- the sheet ----------------------------------------------------------------
+function readerShell() {
+  const title = el('h2', { id: 'readerTitle', class: 'rd-title' });
+  const src = el('p', { class: 'rd-src' });
+  const acts = el('div', { class: 'rd-acts' });
+  const body = el('div', { class: 'rd-body', tabindex: '-1' });
+  const close = el('button', { class: 'ghost rd-close', 'data-reader-close': '1',
+    'aria-label': 'close the reader', text: '✕ Close', onclick: () => closeReader() });
+  const aside = el('aside', { class: 'reader', role: 'dialog', 'aria-modal': 'true',
+      'aria-labelledby': 'readerTitle', tabindex: '-1' },
+    el('header', { class: 'rd-head' }, el('div', { class: 'rd-titles' }, title, src),
+      el('div', { class: 'rd-top' }, acts, close)),
+    body);
+  const wrap = el('div', { id: 'reader', class: 'reader-wrap' },
+    el('div', { class: 'reader-scrim', onclick: () => closeReader() }), aside);
+  // focus stays inside while it is open; Esc closes it, unless a menu of
+  // its own is open — that closes first
+  aside.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !POP.panel) {
+      e.preventDefault(); e.stopPropagation(); closeReader(); return;
+    }
+    if (e.key !== 'Tab') return;
+    const f = [...aside.querySelectorAll('a[href],button:not([disabled]),input,textarea,summary,'
+      + '[tabindex]:not([tabindex="-1"])')].filter(x => x.offsetParent || x === document.activeElement);
+    if (!f.length) return;
+    const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && (i <= 0)) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
+  });
+  Object.assign(wrap, { _title: title, _src: src, _acts: acts, _body: body, _aside: aside });
+  return wrap;
+}
+
+function renderReader() {
+  let wrap = document.getElementById('reader');
+  const r = state.read;
+  if (!r) {
+    if (wrap && !wrap._closing) {
+      wrap._closing = true;
+      wrap.classList.remove('open');
+      if (wrap._stop) wrap._stop();
+      document.body.classList.remove('reading');
+      setTimeout(() => wrap.remove(), motionOff() ? 0 : 240);
+      const back = state.readFrom && document.querySelector(state.readFrom);
+      state.readFrom = null;
+      if (back) back.focus();
+    }
+    return;
+  }
+  if (!wrap || wrap._closing) {
+    if (wrap) wrap.remove();
+    wrap = readerShell();
+    document.body.append(wrap);
+    document.body.classList.add('reading');
+    requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('open')));
+    if (motionOff()) wrap.classList.add('open');
+    wrap._aside.focus();
+  }
+  const k = readKey(r);
+  if (wrap.dataset.key !== k) {
+    if (wrap._stop) wrap._stop();
+    wrap._stop = null;
+    wrap.dataset.key = k;
+    wrap.dataset.kind = r.kind;
+    wrap._v = -1;
+    if (!state.readData[k] || (!state.readData[k].data && !state.readData[k].loading)) readFetch(r);
+  }
+  const got = state.readData[k] || {};
+  if (wrap._v === (got.v || 0) && !got.loading) { if (wrap._update) wrap._update(r); return; }
+  if (got.loading && !got.data) {
+    wrap._title.textContent = 'Opening…';
+    wrap._body.replaceChildren(skeleton(5, { 'data-loading': 'reader' }));
+    wrap._v = got.v || 0;
+    return;
+  }
+  wrap._v = got.v || 0;
+  wrap._update = null;
+  if (got.error && !got.data) {
+    wrap._title.textContent = 'This file could not be opened';
+    wrap._src.textContent = '';
+    wrap._acts.replaceChildren();
+    wrap._body.replaceChildren(el('p', { class: 'warn', 'data-reader-error': '1', text: got.error }));
+    return;
+  }
+  const build = { dataset: readDataset, rubric: readRubric, criteria: readCriteria, bank: readBank,
+                  log: readLog, provenance: readProvenance }[r.kind];
+  wrap._aside.onkeydown = null;
+  build(wrap, r, got.data, got);
+  wrap.dataset.ready = '1';
+}
+
+// the header's three actions: the file's text to the clipboard, the file to
+// disk, and the raw file in a new tab
+function readActs(wrap, { copy, download, name, raw }) {
+  const blobUrl = t => URL.createObjectURL(new Blob([t], { type: 'text/plain' }));
+  wrap._acts.replaceChildren(
+    copy ? el('button', { class: 'ghost', 'data-reader-copy': '1', text: 'Copy',
+      onclick: () => copyText(typeof copy === 'function' ? copy() : copy, 'the text') }) : '',
+    download ? el('a', { class: 'btn ghost', 'data-reader-download': '1', text: 'Download',
+      href: typeof download === 'string' ? download : blobUrl(download.text), download: name || '' })
+      : '',
+    raw ? el('a', { class: 'btn ghost', 'data-reader-raw': '1', href: raw, target: '_blank',
+      rel: 'noopener', text: 'Open raw ↗' }) : '');
+}
+
+// marks: the matches of a search, as text nodes and <mark>s — never HTML
+function marked(text, q) {
+  const t = String(text || '');
+  const n = (q || '').trim();
+  if (!n) return [t];
+  const out = [], low = t.toLowerCase(), ql = n.toLowerCase();
+  let i = 0, j;
+  while ((j = low.indexOf(ql, i)) >= 0) {
+    if (j > i) out.push(t.slice(i, j));
+    out.push(el('mark', { text: t.slice(j, j + n.length) }));
+    i = j + n.length;
+  }
+  if (i < t.length) out.push(t.slice(i));
+  return out;
+}
+const shortSha = s => s ? String(s).slice(0, 4) + '…' : '—';
+const paras = (text, q) => String(text || '').split(/\n\s*\n/).filter(p => p.trim())
+  .map(p => el('p', {}, ...marked(p.trim(), q)));
+
+// ---- 1. dataset documents -------------------------------------------------
+function readDataset(wrap, r, data, got) {
+  const { head, page } = data;
+  const pv = head.provenance || {};
+  const it = pv.items || {};
+  const docs = page.entries.filter(e => e.type === 'doc');
+  const q = got.q || '';
+  const n = Math.min(Math.max(1, r.n || (docs[0] || {}).n || 1), page.kept || 1);
+  wrap._title.textContent = `Dataset #${head.id} · ${head.category || '—'}`;
+  wrap._src.replaceChildren(`${head.model || '—'} · ${page.kept} document${page.kept === 1 ? '' : 's'}`
+    + (page.fmt === 'free' ? ' · question and answer' : ''),
+    head.over_provisional_judge || pv.provisional
+      ? el('span', { class: 'badge warn', 'data-demo-only': '1', text: 'Demo only',
+          title: [pv.provisional_reason, head.over_provisional_judge
+            ? 'proposed from a judge no person has checked yet' : ''].filter(Boolean).join(' · ') })
+      : '');
+  readActs(wrap, { copy: () => { const d = docs.find(x => x.n === (state.read || {}).n) || docs[0] || {};
+      return d.title ? `${d.title}\n\n${d.text || [d.question, d.answer, d.rationale].join('\n\n')}` : ''; },
+    download: head.download ? head.download.replace(/^\//, '') : null,
+    name: `dataset-${head.id}.jsonl`,
+    raw: head.download ? head.download.replace(/^\//, '') : null });
+  const missing = page.missing;
+  const summary = el('div', { class: 'rd-summary', 'data-dataset-summary': String(head.id) },
+    el('p', { class: 'small', 'data-dataset-counts': '1',
+      text: `requested ${page.requested} · kept ${page.kept} · missing ${missing}`
+        + (pv.focus_mode ? ` · spread ${pv.focus_mode === 'concept' ? 'by concept'
+          : pv.focus_mode === 'area' ? 'by area' : 'not spread'}` : '') }),
+    pv.approved_spec ? el('details', { class: 'rd-spec' },
+      el('summary', { text: 'The missing skill ▸' }), el('p', { text: pv.approved_spec })) : '',
+    el('div', { class: 'frm' },
+      readLink({ kind: 'provenance', id: 'dataset:' + head.id }, 'Provenance ▸',
+        { class: 'small', 'data-dataset-provenance': String(head.id) })));
+  const search = el('input', { type: 'search', class: 'rd-search', placeholder: 'search the documents',
+    'aria-label': 'search the documents', value: q, 'data-keep': 'reader-search',
+    oninput: e => { clearTimeout(search._t);
+      const v = e.target.value;
+      search._t = setTimeout(() => readFetch(r, { q: v }), 200); } });
+  const list = el('ol', { class: 'rd-list', 'aria-label': 'documents', 'data-doc-list': '1' },
+    page.entries.map(e => e.type === 'doc'
+      ? el('li', { class: 'rd-item' + (e.n === n ? ' on' : ''), 'data-doc': String(e.n),
+          'aria-current': e.n === n ? 'true' : null, tabindex: '0',
+          onclick: () => go(e.n),
+          onkeydown: ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); go(e.n); } } },
+        el('span', { class: 'rd-n mono', text: String(e.n) }),
+        el('span', { class: 'rd-t' }, ...marked(e.title || '(no title)', q)),
+        el('span', { class: 'rd-m se' }, e.focus ? `Focus: ${e.focus} · ` : '', `${e.words} words`))
+      : el('li', { class: 'rd-item gone', 'data-missing-doc': '1' },
+          el('span', { class: 'rd-n mono', text: '—' }),
+          el('span', { class: 'rd-t', text: 'missing' + (e.focus ? ` · ${e.focus}` : '') }),
+          el('span', { class: 'rd-m se', text: e.why || 'no reason recorded' }))),
+    page.total > page.entries.length ? el('li', { class: 'small se', text:
+      `showing ${page.entries.length} of ${page.total}` }) : '');
+  const pane = el('article', { class: 'rd-doc', 'aria-live': 'polite' });
+  const prev = el('button', { class: 'ghost', 'data-doc-prev': '1', 'aria-label': 'previous document',
+    text: '←', onclick: () => step(-1) });
+  const next = el('button', { class: 'ghost', 'data-doc-next': '1', 'aria-label': 'next document',
+    text: '→', onclick: () => step(1) });
+  function show(k) {
+    const d = docs.find(x => x.n === k);
+    list.querySelectorAll('.rd-item.on').forEach(x => { x.classList.remove('on');
+      x.removeAttribute('aria-current'); });
+    const li = list.querySelector(`[data-doc="${k}"]`);
+    if (li) { li.classList.add('on'); li.setAttribute('aria-current', 'true');
+      li.scrollIntoView({ block: 'nearest' }); }
+    const i = docs.findIndex(x => x.n === k);
+    prev.disabled = i <= 0; next.disabled = i < 0 || i >= docs.length - 1;
+    if (!d) { pane.replaceChildren(el('p', { class: 'se', text: q ? 'No document matches.'
+      : 'No documents in this dataset.' })); return; }
+    pane.dataset.docOpen = String(k);
+    pane.replaceChildren(
+      el('div', { class: 'rd-doc-head' },
+        el('h3', {}, ...marked(d.title || '(no title)', q)),
+        el('span', { class: 'se mono', 'data-doc-pos': '1',
+          text: `${i + 1} of ${docs.length}` }), prev, next),
+      el('p', { class: 'small se' }, d.focus ? `Focus: ${d.focus} · ` : '', `${d.words} words`),
+      page.fmt === 'free'
+        ? el('div', { class: 'rd-qa' },
+            el('div', { class: 'eyebrow', text: 'Question' }), ...paras(d.question, q),
+            el('div', { class: 'eyebrow', text: 'Answer' }), ...paras(d.answer, q),
+            d.rationale ? el('div', { class: 'eyebrow', text: 'Rationale' }) : '',
+            ...paras(d.rationale, q))
+        : el('div', { class: 'rd-prose' }, ...paras(d.text, q)));
+  }
+  function go(k) {
+    state.read = { ...state.read, n: k };
+    history.replaceState(history.state, '', '#' + hashFor());
+    show(k);
+  }
+  function step(d) {
+    const i = docs.findIndex(x => x.n === (state.read.n || n));
+    const t = docs[i + d];
+    if (t) go(t.n);
+  }
+  wrap._keys = e => {
+    if (e.target.closest('input, textarea')) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+  };
+  wrap._aside.onkeydown = e => wrap._keys(e);
+  wrap._body.replaceChildren(summary,
+    el('div', { class: 'rd-split' },
+      el('div', { class: 'rd-side' }, search, list), pane));
+  wrap._update = rr => { if (rr.n && rr.n !== +pane.dataset.docOpen) show(rr.n); };
+  show(docs.some(x => x.n === n) ? n : (docs[0] || {}).n);
+  if (document.activeElement === document.body && q) search.focus();
+}
+
+// ---- 2. rubric: its markdown, safely ------------------------------------------
+function mdInline(s) {
+  const out = [];
+  const re = /(`[^`]+`)|\[([^\]]+)\]\(([^)\s]+)\)|(\*\*[^*]+\*\*)|(\*[^*\s][^*]*\*|_[^_\s][^_]*_)/g;
+  let i = 0, m;
+  while ((m = re.exec(s))) {
+    if (m.index > i) out.push(s.slice(i, m.index));
+    if (m[1]) out.push(el('code', { text: m[1].slice(1, -1) }));
+    else if (m[2]) {
+      const url = m[3];
+      out.push(/^(https?:|mailto:|#)/i.test(url)
+        ? el('a', { href: url, target: url.startsWith('#') ? null : '_blank', rel: 'noopener noreferrer',
+                    text: m[2] })
+        : m[2]);
+    } else if (m[4]) out.push(el('strong', { text: m[4].slice(2, -2) }));
+    else if (m[5]) out.push(el('em', { text: m[5].slice(1, -1) }));
+    i = m.index + m[0].length;
+  }
+  if (i < s.length) out.push(s.slice(i));
+  return out;
+}
+function mdRender(text) {
+  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+  const out = [], toc = [];
+  let i = 0;
+  const flushPara = buf => { if (buf.length) out.push(el('p', {}, ...mdInline(buf.join(' ')))); };
+  let para = [];
+  while (i < lines.length) {
+    const ln = lines[i];
+    if (/^\s*```/.test(ln)) {
+      flushPara(para); para = [];
+      const code = [];
+      i++;
+      while (i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i++]);
+      i++;
+      out.push(el('pre', { class: 'md-pre' }, el('code', { text: code.join('\n') })));
+      continue;
+    }
+    const h = /^(#{1,6})\s+(.*)$/.exec(ln);
+    if (h) {
+      flushPara(para); para = [];
+      const id = 'md-' + toc.length;
+      toc.push({ id, level: h[1].length, text: h[2].replace(/[*_`]/g, '') });
+      out.push(el('h' + Math.min(6, h[1].length + 2), { id, class: 'md-h' }, ...mdInline(h[2])));
+      i++;
+      continue;
+    }
+    if (/^\s*\|/.test(ln) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+      flushPara(para); para = [];
+      const cells = l => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const head = cells(ln);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(cells(lines[i++]));
+      out.push(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd md-table' },
+        el('thead', {}, el('tr', {}, head.map(c => el('th', {}, ...mdInline(c))))),
+        el('tbody', {}, rows.map(r => el('tr', {}, r.map(c => el('td', {}, ...mdInline(c)))))))));
+      continue;
+    }
+    const li = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(ln);
+    if (li) {
+      flushPara(para); para = [];
+      const ordered = /\d/.test(li[2]);
+      const items = [];
+      while (i < lines.length) {
+        const x = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/.exec(lines[i]);
+        if (!x) {
+          // a wrapped line belongs to the item above it
+          if (/^\s{2,}\S/.test(lines[i]) && items.length) {
+            items[items.length - 1].text += ' ' + lines[i].trim(); i++; continue; }
+          break;
+        }
+        items.push({ depth: Math.min(2, Math.floor(x[1].length / 2)), text: x[3] });
+        i++;
+      }
+      out.push(el(ordered ? 'ol' : 'ul', { class: 'md-list' }, items.map(it =>
+        el('li', { style: it.depth ? `margin-left:${it.depth * 18}px` : null }, ...mdInline(it.text)))));
+      continue;
+    }
+    if (/^\s*>/.test(ln)) {
+      flushPara(para); para = [];
+      const q = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) q.push(lines[i++].replace(/^\s*>\s?/, ''));
+      out.push(el('blockquote', {}, ...mdInline(q.join(' '))));
+      continue;
+    }
+    if (!ln.trim()) { flushPara(para); para = []; i++; continue; }
+    if (/^\s*(---+|\*\*\*+)\s*$/.test(ln)) { flushPara(para); para = []; out.push(el('hr')); i++; continue; }
+    para.push(ln.trim());
+    i++;
+  }
+  flushPara(para);
+  return { nodes: out, toc };
+}
+
+function readRubric(wrap, r, d) {
+  wrap._title.textContent = d.file;
+  wrap._src.replaceChildren(el('span', { class: 'mono', text: d.file }),
+    ` · ${d.version ? 'version ' + d.version : 'no version'} · sha `,
+    el('span', { class: 'mono', title: d.sha256, text: shortSha(d.sha256) }),
+    d.status === 'draft' ? el('span', { class: 'badge taint', text: 'DRAFT' }) : '');
+  readActs(wrap, { copy: d.text, download: `api/exam/rubrics/${d.name}`, name: d.file,
+                   raw: `api/exam/rubrics/${d.name}` });
+  const { nodes, toc } = mdRender(d.text);
+  // the contents: the file's top two heading levels, folded when long
+  const top = Math.min(...toc.map(t => t.level), 9);
+  const tocs = toc.filter(t => t.level <= top + 1);
+  const links = el('ul', {}, tocs.map(t => el('li', { style: `margin-left:${(t.level - top) * 12}px` },
+    el('a', { href: '#', text: t.text, onclick: e => { e.preventDefault();
+      const x = wrap._body.querySelector('#' + t.id); if (x) x.scrollIntoView({ block: 'start' }); } }))));
+  wrap._body.replaceChildren(
+    tocs.length > 2 ? el('details', { class: 'rd-toc', 'data-rubric-toc': '1',
+        open: tocs.length <= 12 ? '' : null, 'aria-label': 'contents' },
+      el('summary', { class: 'eyebrow', text: `Contents (${tocs.length})` }), links) : '',
+    el('div', { class: 'md', 'data-md': d.name }, nodes));
+}
+
+// ---- 3. criteria, as the judge reads them --------------------------------------
+function readCriteria(wrap, r, d) {
+  wrap._title.textContent = d.file;
+  wrap._src.replaceChildren(el('span', { class: 'mono', text: d.file }),
+    ` · ${d.criteria.length} criteria · sha `,
+    el('span', { class: 'mono', title: d.sha256, text: shortSha(d.sha256) }));
+  readActs(wrap, { copy: d.raw, download: `api/exam/rubrics/${d.name}?kind=criteria`,
+                   name: d.file, raw: `api/exam/rubrics/${d.name}?kind=criteria` });
+  const val = v => v == null ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+  // a field that is itself a set of fields (score anchors, a scale) reads
+  // as its lines, not as JSON
+  const cell = v => v && typeof v === 'object' && !Array.isArray(v)
+    ? el('dl', { class: 'rd-kv rd-kv-in' }, Object.entries(v).flatMap(([k, x]) =>
+        [el('dt', { text: k }), el('dd', { text: val(x) })]))
+    : Array.isArray(v) ? el('ul', {}, v.map(x => el('li', { text: val(x) })))
+    : val(v);
+  wrap._body.replaceChildren(
+    Object.keys(d.top).length ? el('dl', { class: 'rd-kv', 'data-criteria-top': '1' },
+      Object.entries(d.top).flatMap(([k, v]) => [el('dt', { text: k }), el('dd', {}, cell(v))])) : '',
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-criteria-read': d.name },
+      el('thead', {}, el('tr', {}, el('th', { class: 'num', text: '#' }), el('th', { text: 'criterion' }),
+        el('th', { class: 'num', text: 'weight' }), el('th', { text: 'when it applies' }),
+        el('th', { text: 'what counts as a pass' }))),
+      el('tbody', {}, d.criteria.map((c, i) => el('tr', { 'data-criterion-row': c.id || String(i) },
+        el('td', { class: 'num', text: String(i + 1) }),
+        el('td', {}, el('b', { text: c.name || c.id }), el('div', { class: 'se mono', text: c.id || '' })),
+        el('td', { class: 'num', text: c.weight != null ? String(c.weight) : c.max != null ? `max ${c.max}` : '1' }),
+        el('td', { text: c.conditional ? 'only when the question calls for it' : 'always' }),
+        el('td', { text: c.definition || c.pass || '—' })))))),
+    d.flags.length ? el('div', { 'data-criteria-flags': '1' },
+      el('div', { class: 'dxh', text: d.flags.length === 1 ? 'The flag' : `Flags (${d.flags.length})` }),
+      d.flags.map(f => el('div', { class: 'rd-flag', 'data-flag': f.id },
+        el('p', {}, el('b', { text: f.name || f.label || f.id }), ' ',
+          el('span', { class: 'se mono', text: f.id })),
+        el('p', { class: 'small' }, el('b', { text: 'What it does: ' }), f.effect_words || f.effect || '—'),
+        f.condition ? el('p', { class: 'small' }, el('b', { text: 'When: ' }), f.condition) : '',
+        (f.examples || []).length ? el('div', {}, el('div', { class: 'eyebrow', text: 'Examples' }),
+          el('ul', {}, f.examples.map(x => el('li', { text: val(x) })))) : '',
+        (f.not_critical || []).length ? el('div', {},
+          el('div', { class: 'eyebrow', text: 'Not critical' }),
+          el('ul', {}, f.not_critical.map(x => el('li', { text: val(x) })))) : ''))) : '',
+    d.principles.length ? el('div', {}, el('div', { class: 'dxh', text: 'How to judge' }),
+      el('ul', {}, d.principles.map(p => el('li', { text: p })))) : '',
+    el('details', { class: 'rd-raw' }, el('summary', { text: 'Show raw JSON' }),
+      el('pre', { class: 'md-pre', 'data-criteria-raw': '1', text: d.raw })));
+}
+
+// ---- 4. the practice half of a topic's questions ------------------------------
+function readBank(wrap, r, d) {
+  const topic = d.topic;
+  wrap._title.textContent = `${topic} · practice questions`;
+  wrap._src.textContent = `${d.questions.length} practice questions · ${d.report_count} hidden `
+    + 'questions — never shown, by design';
+  readActs(wrap, { copy: () => d.questions.map(q => q.prompt).join('\n\n'),
+    download: { text: JSON.stringify(d.questions, null, 2) }, name: `${r.id}-practice.json`,
+    raw: `api/exam/bank?topic=${encodeURIComponent(topic)}&half=diagnose` });
+  const f = state.readBankF = state.readBankF || {};
+  const uniq = k => [...new Set(d.questions.map(q => q[k]).filter(x => x != null && x !== ''))]
+    .map(String).sort((a, b) => natCmp(a, b));
+  const pick = (label, k) => Select(label, [['', `${label}: all`], ...uniq(k).map(v => [v, v])],
+    f[k] || '', v => { f[k] = v; draw(); }, { key: 'rd-' + k });
+  const search = el('input', { type: 'search', class: 'rd-search', placeholder: 'search the questions',
+    'aria-label': 'search the questions', value: f.q || '', 'data-keep': 'reader-bank-q',
+    oninput: e => { f.q = e.target.value; draw(); } });
+  const list = el('div', { class: 'rd-bank', 'data-bank-list': topic });
+  const count = el('p', { class: 'small se', 'data-bank-count': '1' });
+  let shown = 50;
+  function draw() {
+    const q = (f.q || '').trim().toLowerCase();
+    const rows = d.questions.filter(x => (!f.difficulty || String(x.difficulty) === f.difficulty)
+      && (!f.domain || String(x.domain) === f.domain) && (!f.style || String(x.style) === f.style)
+      && (!q || String(x.prompt).toLowerCase().includes(q)));
+    count.textContent = `${rows.length} of ${d.questions.length} practice questions`;
+    list.replaceChildren(...rows.slice(0, shown).map(x => el('div', { class: 'rd-q', 'data-bank-q': x.qid },
+      el('div', { class: 'rd-q-meta small se' },
+        x.difficulty != null ? el('span', { class: 'chip', text: `difficulty ${x.difficulty}` }) : '',
+        x.domain ? el('span', { class: 'chip', text: x.domain }) : '',
+        x.style ? el('span', { class: 'chip', text: x.style }) : '',
+        x.written_by ? el('span', { text: `written by ${x.written_by}` }) : ''),
+      el('div', { class: 'rd-prose' }, ...paras(x.prompt, f.q)),
+      x.reference ? el('details', { class: 'small' }, el('summary', { text: 'Reference answer ▸' }),
+        el('div', { class: 'rd-prose' }, ...paras(x.reference))) : '')),
+      rows.length > shown ? el('button', { class: 'ghost', text: `Show ${Math.min(50, rows.length - shown)} more`,
+        onclick: () => { shown += 50; draw(); } }) : '');
+  }
+  wrap._body.replaceChildren(
+    el('p', { class: 'note', 'data-bank-hidden': String(d.report_count) },
+      `${d.report_count} hidden questions — never shown, by design. `,
+      el('span', { class: 'se', text: 'They score the model; nothing is ever trained on them.' })),
+    el('div', { class: 'frm rd-filters' }, search, pick('difficulty', 'difficulty'),
+      pick('domain', 'domain'), pick('style', 'style')),
+    count, list);
+  draw();
+}
+
+// ---- 5. a run's log ---------------------------------------------------------------
+function readLog(wrap, r, d, got) {
+  const k = readKey(r);
+  wrap._title.textContent = `Run #${d.id} · log`;
+  wrap._src.textContent = `${d.model} · ${d.status}` + (d.total ? ` · ${d.total.toLocaleString()} lines` : '');
+  readActs(wrap, { copy: () => d.lines.join('\n'), download: `api/runs/${d.id}/log?tail=2000`,
+    name: `run-${d.id}.log`, raw: `api/runs/${d.id}/log?tail=2000` });
+  const opt = state.readLogOpt = state.readLogOpt || { wrap: true };
+  const box = el('div', { class: 'rd-log' + (opt.wrap ? ' wrap' : ''), 'data-log': String(d.id),
+    tabindex: '0', 'aria-label': 'log lines' });
+  const bad = /ERROR|Traceback|failed/i;
+  let hits = [], at = -1;
+  const search = el('input', { type: 'search', class: 'rd-search', placeholder: 'search the log',
+    'aria-label': 'search the log', value: opt.q || '', 'data-keep': 'reader-log-q',
+    oninput: e => { opt.q = e.target.value; paint(); } });
+  const nextHit = el('button', { class: 'ghost', 'data-log-next': '1', text: 'next ↓', onclick: () => {
+    if (!hits.length) return;
+    at = (at + 1) % hits.length;
+    const row = box.querySelector(`[data-ln="${hits[at]}"]`);
+    if (row) { opt.follow = false; row.scrollIntoView({ block: 'center' });
+      box.querySelectorAll('.cur').forEach(x => x.classList.remove('cur')); row.classList.add('cur'); } } });
+  const follow = el('span', { class: 'small se', 'data-log-follow': '1' });
+  const earlier = el('button', { class: 'ghost', 'data-log-earlier': '1', text: 'Load earlier lines',
+    disabled: d.first <= 1 || (got.tail || 200) >= 2000 ? '' : null,
+    onclick: () => { state.readData[k].tail = Math.min(2000, (got.tail || 200) + 500); readFetch(r); } });
+  const wrapBox = el('label', { class: 'small' }, el('input', { type: 'checkbox', 'data-log-wrap': '1',
+    checked: opt.wrap ? '' : null, onchange: e => { opt.wrap = e.target.checked;
+      box.classList.toggle('wrap', opt.wrap); } }), ' wrap lines');
+  // long logs are drawn a chunk a frame, so 2,000 lines never freeze the page
+  function paint() {
+    const q = (opt.q || '').trim();
+    hits = []; at = -1;
+    box.replaceChildren();
+    let i = 0;
+    const chunk = () => {
+      const frag = document.createDocumentFragment();
+      for (const end = Math.min(d.lines.length, i + 400); i < end; i++) {
+        const t = d.lines[i], ln = d.first + i;
+        if (q && t.toLowerCase().includes(q.toLowerCase())) hits.push(ln);
+        frag.append(el('div', { class: 'rd-ln' + (bad.test(t) ? ' bad' : ''), 'data-ln': String(ln) },
+          el('span', { class: 'rd-no', text: String(ln) }), el('span', { class: 'rd-lt' }, ...marked(t, q))));
+      }
+      box.append(frag);
+      if (i < d.lines.length) requestAnimationFrame(chunk);
+      else { nextHit.disabled = !hits.length; if (opt.follow) box.scrollTop = box.scrollHeight; }
+    };
+    chunk();
+  }
+  // follow: while the run is going, the tail is fetched again and the box
+  // stays at the end — until the person scrolls up to read
+  if (opt.follow == null || wrap._followFor !== k) { opt.follow = true; wrap._followFor = k; }
+  box.addEventListener('scroll', () => {
+    const end = box.scrollTop + box.clientHeight >= box.scrollHeight - 4;
+    if (!end && opt.follow && !box._auto) opt.follow = false;
+    if (end && !opt.follow) opt.follow = true;
+    follow.textContent = d.active ? (opt.follow ? '● following' : 'paused — scroll to the end to follow') : '';
+  }, { passive: true });
+  follow.textContent = d.active ? (opt.follow ? '● following' : 'paused — scroll to the end to follow') : '';
+  wrap._body.replaceChildren(
+    el('div', { class: 'frm rd-filters' }, search, nextHit, wrapBox, earlier, follow),
+    d.withheld ? el('p', { class: 'small se', text: `${d.withheld} line${d.withheld === 1 ? '' : 's'} `
+      + 'withheld: they quote a hidden question.' }) : '',
+    d.note ? el('p', { class: 'small se', text: d.note }) : '', box);
+  paint();
+  if (wrap._stop) wrap._stop();
+  if (d.active) {
+    const t = setInterval(async () => {
+      if (!state.read || readKey(state.read) !== k) { clearInterval(t); return; }
+      try {
+        const fresh = await api(`api/runs/${d.id}/lines?tail=${got.tail || 200}`);
+        const had = d.first + d.lines.length;
+        const add = fresh.lines.slice(Math.max(0, had - fresh.first));
+        if (fresh.first + fresh.lines.length > had && add.length) {
+          const frag = document.createDocumentFragment();
+          add.forEach((t2, j) => frag.append(el('div', { class: 'rd-ln' + (bad.test(t2) ? ' bad' : ''),
+              'data-ln': String(had + j) },
+            el('span', { class: 'rd-no', text: String(had + j) }), el('span', { class: 'rd-lt', text: t2 }))));
+          d.lines = d.lines.concat(add);
+          box.append(frag);
+          if (opt.follow) { box._auto = true; box.scrollTop = box.scrollHeight;
+            requestAnimationFrame(() => { box._auto = false; }); }
+        }
+        d.status = fresh.status;
+        if (!fresh.active) { d.active = false; clearInterval(t);
+          follow.textContent = ''; wrap._src.textContent = `${d.model} · ${d.status}`; }
+      } catch (e) { /* the next tick tries again */ }
+    }, 2000);
+    wrap._stop = () => clearInterval(t);
+  }
+}
+
+// ---- 6. provenance: a tree -------------------------------------------------------
+function provTree(v, key, depth) {
+  const isHash = s => typeof s === 'string' && /^[0-9a-f]{16,}$/i.test(s);
+  const isTime = (k, x) => typeof x === 'number' && x > 1e9 && x < 4e9
+    && /(_at|^at|created|finished|approved|proposed|requested|generated|judged)$/i.test(String(k));
+  const leaf = x => x == null ? el('span', { class: 'se', text: '—' })
+    : isHash(x) ? el('span', { class: 'rd-hash' }, el('span', { class: 'mono', title: x, text: shortSha(x) }),
+        el('button', { class: 'quiet', 'aria-label': 'copy ' + key, text: 'copy',
+          onclick: () => copyText(x, 'the hash') }))
+    : isTime(key, x) ? el('span', { title: String(x), text: new Date(x * 1000).toLocaleString() })
+    : typeof x === 'boolean' ? el('span', { class: 'mono', text: x ? 'yes' : 'no' })
+    : el('span', { class: typeof x === 'number' ? 'mono' : '', text: String(x) });
+  if (v && typeof v === 'object') {
+    const entries = Array.isArray(v) ? v.map((x, i) => [String(i + 1), x]) : Object.entries(v);
+    return el('details', { class: 'rd-node', open: depth < 1 ? '' : null },
+      el('summary', {}, el('span', { class: 'rd-k', text: key }),
+        el('span', { class: 'se small', text: Array.isArray(v) ? ` ${v.length} item${v.length === 1 ? '' : 's'}`
+          : ` ${entries.length} field${entries.length === 1 ? '' : 's'}` })),
+      el('div', { class: 'rd-kids' }, entries.length ? entries.map(([k, x]) => x && typeof x === 'object'
+        ? provTree(x, k, depth + 1)
+        : el('div', { class: 'rd-leaf' }, el('span', { class: 'rd-k', text: k }), leaf(x)))
+        : el('span', { class: 'se', text: 'empty' })));
+  }
+  return el('div', { class: 'rd-leaf' }, el('span', { class: 'rd-k', text: key }), leaf(v));
+}
+function readProvenance(wrap, r, d) {
+  const rec = d.rec;
+  if (d.kind === 'dataset') {
+    const pv = rec.provenance || {};
+    wrap._title.textContent = `Dataset #${rec.id} · provenance`;
+    wrap._src.textContent = `${rec.category || '—'} · ${rec.model || '—'} · ${rec.status}`;
+    readActs(wrap, { copy: JSON.stringify(pv, null, 2), download: { text: JSON.stringify(pv, null, 2) },
+      name: `dataset-${rec.id}-provenance.json`, raw: `api/datasets/${rec.id}` });
+    wrap._body.replaceChildren(
+      el('div', { class: 'frm', 'data-prov-marks': '1' },
+        pv.provisional ? el('span', { class: 'badge warn', 'data-demo-only': '1', text: 'Demo only',
+          title: pv.provisional_reason || '' }) : '',
+        pv.proposed_over_provisional_judge ? el('span', { class: 'badge warn', 'data-override': '1',
+          text: 'proposed past an unchecked judge',
+          title: JSON.stringify(pv.proposed_over_provisional_judge) }) : '',
+        readLink({ kind: 'dataset', id: String(rec.id) }, 'Read the documents ▸', { class: 'small' })),
+      el('div', { class: 'rd-tree', 'data-prov-tree': 'dataset' }, provTree(pv, 'provenance', 0)));
+  } else {
+    wrap._title.textContent = `How ${rec.model} was graded`;
+    wrap._src.textContent = `${rec.runs.length} judge run${rec.runs.length === 1 ? '' : 's'} · `
+      + `${Object.keys(rec.tasks).length} topics`;
+    readActs(wrap, { copy: JSON.stringify(rec, null, 2), download: { text: JSON.stringify(rec, null, 2) },
+      name: 'judge-provenance.json', raw: `api/judge/provenance?model=${encodeURIComponent(rec.model)}` });
+    const pre = ((rec.judge_file || {}).preliminary_reasons || []);
+    wrap._body.replaceChildren(
+      el('div', { class: 'frm', 'data-prov-marks': '1' }, pre.length
+        ? el('span', { class: 'badge warn', 'data-demo-only': '1', text: 'Demo only',
+            title: pre.join(' · ') }) : ''),
+      el('div', { class: 'rd-tree', 'data-prov-tree': 'judge' },
+        provTree(rec.runs, 'judge runs', 0), provTree(rec.judge_file, 'the judge', 0),
+        provTree(rec.tasks, 'topics', 1)));
+  }
+}
+
 // ---------- live mode: submit + queue (only reachable when served by the API) ----------
 const TOKEN = new URLSearchParams(location.search).get('token') || '';
 const ACTIVE_STATUS = new Set(['preflight', 'waiting_gpu', 'waiting_lock', 'running']);
@@ -8185,7 +9002,10 @@ async function copyText(t, what) {
 
 function queueActions(r) {
   const id = String(r.id);
-  const log = { label: 'Log', act: 'log', href: `api/runs/${r.id}/log`, blank: true };
+  // 11g: the log opens in the reader; the raw text is one item further down
+  const log = { label: 'Log', act: 'log', run: () => openReader({ kind: 'log', id: id },
+    `[data-row-menu="q${id}"]`) };
+  const raw = { label: 'Open raw log ↗', act: 'log-raw', href: `api/runs/${r.id}/log`, blank: true };
   const resubmit = { label: 'Resubmit', act: 'resubmit', run: () => queueResubmit(r) };
   const copy = { label: 'Copy id', act: 'copy-id', run: () => copyText(id, '#' + id) };
   const page = DATA.models.some(m => m.id === r.hf_id)
@@ -8193,7 +9013,7 @@ function queueActions(r) {
     : null;
   const ghost = (attr, text, run, extra = {}) => el('button', { class: 'ghost', [attr]: id, text,
     onclick: run, ...extra });
-  const cell = (main, ...menu) => actCell('q' + id, main, [log, ...menu, copy, page]);
+  const cell = (main, ...menu) => actCell('q' + id, main, [log, raw, ...menu, copy, page]);
   if (r.status === 'queued')
     return cell(ghost('data-row-cancel', 'Cancel', () => queueCancel(r)));
   if (ACTIVE_STATUS.has(r.status)) {
@@ -8827,8 +9647,10 @@ function rvProposal(p, llmOk) {
         llmOk ? '' : el('span', { class: 'propwhy', 'data-why': 'generate',
           text: usage.reason || 'no generator is configured on this server' })));
     if ((p.datasets || []).length)
-      card.append(el('p', { class: 'small', text: 'datasets: ' + p.datasets.map(d =>
-        `#${d.id} ${d.status}${d.error ? ' (' + d.error + ')' : ''}`).join(' · ') }));
+      card.append(el('p', { class: 'small', 'data-rv-datasets': String(p.id) }, 'datasets: ',
+        p.datasets.flatMap((d, i) => [i ? ' · ' : '', `#${d.id} ${d.status}`
+          + (d.error ? ' (' + d.error + ')' : ''),
+          d.status === 'ready' ? [' ', readLink({ kind: 'dataset', id: String(d.id) }, 'Read')] : ''])));
   }
   if (p.status === 'rejected' && p.reject_reason)
     card.append(el('p', { class: 'small', text: 'reason: ' + p.reject_reason }));
@@ -8910,7 +9732,8 @@ function rvDataset(d) {
       pv.items || d.count != null ? ' · ' + docLine(d) : '',
       pv.provisional ? ' · provisional' : '', ' ',
       overBadge(pv.proposed_over_provisional_judge || d.over_provisional_judge),
-      d.download ? [' · ', el('a', { href: d.download.replace(/^\//, ''), text: 'items.jsonl' })] : ''));
+      d.download ? [' · ', readLink({ kind: 'dataset', id: String(d.id) }, 'Read'), ' · ',
+        el('a', { href: d.download.replace(/^\//, ''), text: 'Download' })] : ''));
   if (d.error) det.append(el('p', { class: 'warn', text: d.error }));
   det.append(el('p', { class: 'small', 'data-doc-line': String(d.id), text: docLine(d) }));
   const fl = focusLine(pv.focus_plan, 'Documents cover');
@@ -9441,12 +10264,16 @@ function vTopic() {
   const headCard = el('div', { class: 'card', 'data-topic-page': r.slug }, back,
     el('h2', { text: r.topic }), judgeOfflineLine(),
     el('div', { class: 'kvs' },
-      el('span', {}, el('b', { text: 'bank ' }), r.bank.accepted
-        ? `${r.bank.accepted} (${r.bank.report} report / ${r.bank.diagnose} diagnose)` : 'empty'),
+      el('span', {}, el('b', { text: 'questions ' }), r.bank.accepted
+        ? [`${r.bank.accepted} (${r.bank.report} hidden / ${r.bank.diagnose} practice) `,
+           readLink({ kind: 'bank', id: r.slug }, 'Read the practice questions',
+             { 'data-read-bank': r.slug })] : 'none yet'),
       el('span', {}, el('b', { text: 'rubric ' }),
-        `${r.rubric.name}.md ${rubricVersion(r.rubric.version)}`
-        + (r.rubric.status === 'draft' ? ' · DRAFT' : '')
-        + (r.rubric.scoring === 'criteria' ? ` · ${r.rubric.criteria_count} criteria` : '')),
+        readLink({ kind: 'rubric', id: r.rubric.name }, `${r.rubric.name}.md`,
+          { 'data-read-rubric': r.rubric.name }),
+        ` ${rubricVersion(r.rubric.version)}` + (r.rubric.status === 'draft' ? ' · DRAFT' : ''),
+        r.rubric.scoring === 'criteria' ? [' · ', readLink({ kind: 'criteria', id: r.rubric.name },
+          `${r.rubric.criteria_count} criteria`, { 'data-read-criteria': r.rubric.name })] : ''),
       el('span', {}, el('b', { text: 'next ' }), st.label)),
     r.bank.under_floor && r.bank.accepted ? el('p', { class: 'warn', text:
       `${r.bank.report} report-half questions — under the ${r.bank.floor} this topic needs `
@@ -9836,9 +10663,13 @@ function loopOutputPanel(r) {
           el('div', { class: 'se', text: 'the training run that consumes it registers it, and '
             + 'its checkpoints carry the taint badge on this topic' })),
         el('td', { class: 'rowacts' }, actCell('ds-' + d.id,
-          el('a', { class: 'btn ghost', 'data-ds-download': String(d.id), text: 'Download',
-            href: `api/datasets/${d.id}/items.jsonl`, download: '' }),
-          [{ label: 'Copy the training flag', act: 'copy-flag',
+          // 11g: Read is the main action, and Download stays beside it
+          [readButton({ kind: 'dataset', id: String(d.id) }, 'Read', { 'data-ds-read': String(d.id) }),
+           el('a', { class: 'dllink small', 'data-ds-download': String(d.id), text: 'Download',
+             href: `api/datasets/${d.id}/items.jsonl`, download: '' })],
+          [{ label: 'Provenance', act: 'provenance',
+             run: () => openReader({ kind: 'provenance', id: 'dataset:' + d.id }) },
+           { label: 'Copy the training flag', act: 'copy-flag',
              run: () => copyText(`--gap-dataset ${d.id}`) },
            { label: 'Copy dataset id', act: 'copy-id', run: () => copyText(String(d.id), '#' + d.id) }]))
         ))))));
@@ -10191,11 +11022,16 @@ function exRubrics() {
                   ? el('span', { class: 'badge taint', text: 'DRAFT' }) : '')
             : el('span', { class: 'se', text: 'one overall score' })),
           el('td', {},
-            el('a', { href: `api/exam/rubrics/${r.name}`, text: 'rubric', download: `${r.name}.md` }),
+            // 11g: read them in the page; the download stays beside each
+            readLink({ kind: 'rubric', id: r.name }, 'rubric', { 'data-read-rubric': r.name }),
+            el('a', { class: 'dllink', href: `api/exam/rubrics/${r.name}`, download: `${r.name}.md`,
+              'aria-label': `download ${r.name}.md`, title: 'download', text: ' ↓' }),
             ' · ',
             r.scoring === 'criteria'
-              ? el('a', { href: `api/exam/rubrics/${r.name}?kind=criteria`, text: 'criteria',
-                          download: `${r.name}.criteria.json` })
+              ? [readLink({ kind: 'criteria', id: r.name }, 'criteria', { 'data-read-criteria': r.name }),
+                 el('a', { class: 'dllink', href: `api/exam/rubrics/${r.name}?kind=criteria`,
+                   download: `${r.name}.criteria.json`, 'aria-label': `download ${r.name}.criteria.json`,
+                   title: 'download', text: ' ↓' })]
               : el('span', { class: 'se', text: '—' }),
             ' · ',
             el('a', { href: '#', text: 'replace', onclick: e => { e.preventDefault();
@@ -10452,6 +11288,7 @@ function render() {
   // an open popover keeps its panel, its scroll and its focus across a render;
   // only its button is a new node
   popReanchor();
+  renderReader();
 }
 
 // 11f: a value a poll changed — a score, a status, a count — is washed for a
@@ -10735,7 +11572,10 @@ function placeInk(still) {
   if (!b) { ink.style.opacity = '0'; return; }
   if (still) ink.classList.add('still');
   ink.style.opacity = '1';
-  ink.style.transform = `translateX(${b.offsetLeft}px) scaleX(${b.offsetWidth})`;
+  // measured against the strip itself: More ▾ sits inside a wrapper of its own
+  const tabs = document.getElementById('tabs');
+  const x = b.getBoundingClientRect().left - tabs.getBoundingClientRect().left + tabs.scrollLeft;
+  ink.style.transform = `translateX(${Math.round(x)}px) scaleX(${b.offsetWidth})`;
   // the first placement (and a resize) jumps; every move after that slides
   if (ink.classList.contains('still'))
     requestAnimationFrame(() => requestAnimationFrame(() => ink.classList.remove('still')));

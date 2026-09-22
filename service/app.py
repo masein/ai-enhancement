@@ -30,6 +30,7 @@ from pydantic import BaseModel
 
 from . import config, db, llm, llm_poller, startup, suggest, worker
 from . import proposals as prop
+from . import reader
 
 # the report module is the single source of truth for parsing and for the page
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -856,8 +857,17 @@ def exam_candidates(topic: str | None = None, status: str = "candidate"):
 
 
 @app.get("/api/exam/bank")
-def exam_bank(topic: str | None = None):
-    """The bank with report-half text withheld — see exam_build.public_bank."""
+def exam_bank(topic: str | None = None, half: str | None = None):
+    """The bank with report-half text withheld — see exam_build.public_bank.
+    11g: half=diagnose is what the Reader asks for — one topic's practice
+    half, and of the hidden half only a count: no hidden question's qid
+    either."""
+    if half is not None:
+        if half != "diagnose":
+            raise HTTPException(422, "only the practice (diagnose) half can be read")
+        if not topic or topic not in exam_build.TOPICS:
+            raise HTTPException(404, f"no topic {topic!r}")
+        return reader.bank_practice(topic)
     return exam_build.public_bank(config.EXAM_DIR, topic or None)
 
 
@@ -1064,6 +1074,20 @@ def exam_rubric_file(name: str, kind: str = "rubric"):
     return PlainTextResponse(p.read_text(encoding="utf-8"),
                              media_type="text/markdown" if kind == "rubric"
                              else "application/json")
+
+
+@app.get("/api/exam/rubrics/{name}/read")
+def exam_rubric_read(name: str, kind: str = "rubric"):
+    """11g: a rubric or a criteria file shaped for the Reader — the criteria
+    through the judge's own normalise_criteria()."""
+    if not re.fullmatch(r"[a-z0-9_]+", name) or kind not in ("rubric", "criteria"):
+        raise HTTPException(404, "no such rubric")
+    try:
+        return reader.rubric_view(name) if kind == "rubric" else reader.criteria_view(name)
+    except KeyError:
+        raise HTTPException(404, f"no {kind} file for {name}") from None
+    except ValueError as e:
+        raise HTTPException(422, f"{name}.criteria.json is not valid JSON: {e}") from None
 
 
 class RubricIn(BaseModel):
@@ -1899,6 +1923,17 @@ def dataset_detail(did: int):
     return _dataset_view(d, {p["id"]: p for p in db.proposal_list(None, 500)})
 
 
+@app.get("/api/datasets/{did}/items")
+def dataset_items_read(did: int, offset: int = 0, limit: int = reader.PAGE, q: str = ""):
+    """11g: the documents, for the Reader — numbered, each with its focus
+    label and word count, the missing ones in their place with their reason.
+    The items.jsonl download below is unchanged."""
+    try:
+        return reader.dataset_page(did, offset, limit, q)
+    except KeyError:
+        raise HTTPException(404, "no such dataset") from None
+
+
 @app.get("/api/datasets/{did}/items.jsonl")
 def dataset_items(did: int):
     d = db.dataset_get(did)
@@ -1927,6 +1962,26 @@ def dataset_delete(did: int, x_token: str = Header(default="")):
     shutil.rmtree(prop.dataset_dir(did), ignore_errors=True)
     db.dataset_update(did, status="deleted", finished_at=time.time())
     return {"deleted": did}
+
+
+@app.get("/api/runs/{sid}/lines")
+def run_lines(sid: int, tail: int = 200):
+    """11g: the log for the Reader — numbered lines, up to 2,000, a line that
+    quotes a hidden question withheld, and whether the run is still going."""
+    try:
+        return reader.log_lines(sid, tail)
+    except KeyError:
+        raise HTTPException(404, "no such submission") from None
+
+
+@app.get("/api/judge/provenance")
+def judge_provenance(model: str):
+    """11g: how a model was graded, for the Reader — its judge runs (never a
+    run's plan) and the head of its judge.json (never an item or a qid)."""
+    try:
+        return reader.judge_provenance(model)
+    except KeyError:
+        raise HTTPException(404, f"no judge run recorded for {model}") from None
 
 
 @app.get("/api/runs/{sid}/log", response_class=PlainTextResponse)

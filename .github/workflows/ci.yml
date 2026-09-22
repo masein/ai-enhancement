@@ -19,7 +19,9 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # the browser suite passed 20 minutes with the Reader's tests (11g); the
+    # limit is a guard against a hung run, not a budget
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

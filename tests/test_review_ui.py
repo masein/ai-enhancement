@@ -254,7 +254,9 @@ def test_review_flow_in_the_browser(live, page):
     assert page.locator(f"[data-doc-line='{did_attr}']").text_content() == "20 of 20 documents"
     assert page.locator(f"[data-missing='{did_attr}']").count() == 0
     assert "Provenance, in full" in dtext and "approver" in dtext and "items_sha256" in dtext
-    href = ds.locator("a:has-text('items.jsonl')").get_attribute("href")
+    # 11g: Read opens it in the page; the download beside it is the same file
+    assert ds.locator("[data-read-open^='dataset:']").count() == 1
+    href = ds.locator("a:has-text('Download')").get_attribute("href")
     with urllib.request.urlopen(f"{base}/{href}") as r:
         items = [json.loads(x) for x in r.read().decode().splitlines()]
     assert len(items) == 20
