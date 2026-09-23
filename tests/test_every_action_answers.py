@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import os
 import sys
 import threading
@@ -120,8 +121,9 @@ def test_submit_answers_with_a_toast_and_no_line_that_stays(live, page):
     page.get_by_role("button", name="Submit model").click()
     t = page.locator("[data-toast='submit']")
     t.wait_for()
-    assert "Queued #" in t.text_content() and "org/toast-me" in t.text_content()
-    assert t.locator("[data-toast-link]").count() == 1
+    # 11l: the confirmation names the run it made and links to its row
+    assert re.match(r"^Run #\d+ queued —", t.locator(".toast-text").text_content())
+    assert t.locator("[data-toast-link]").text_content() == "follow it →"
     assert page.locator("[role=status] [data-toast='submit']").count() == 1   # a live region
     # a toast with a link stays eight seconds (10c: four was gone before
     # anyone reached "see it")
@@ -176,6 +178,94 @@ def test_queue_rows_have_the_actions_their_state_allows(live, page):
     page.wait_for_selector("[data-topic-page='law']")
     page.wait_for_function("m => state.ans.model === m", arg=MODEL)
     assert page.errors == []
+
+
+@pytest.mark.dashboard
+def test_a_queued_submission_clears_the_form_and_links_to_its_row(live, page, monkeypatch):
+    """11l: on success the form goes back to where it started, and the
+    confirmation takes you to the row it made."""
+    from service import config
+    monkeypatch.setattr(config, "JUDGE_MODEL", "stub")          # the judged suite is on
+    page.goto(live["base"] + "/#tab=queue")
+    set_name(page, "Omar")
+    choose(page.get_by_label("suite"), "judged")
+    picker = page.locator("[data-exam-picker='submit']")
+    picker.wait_for()
+    picker.locator("[data-quick='none']").click()               # not the default ticks
+    picker.locator("input[data-exam-task='exam_law']").check()
+    ctl = picker.locator("[data-exam-control]")
+    if ctl.count():
+        ctl.check()
+    box = page.locator("[data-ms='submit'] input")
+    box.fill("org/clears-itself")
+    note = page.get_by_label("note")
+    note.fill("a note that goes")
+    page.get_by_role("button", name="Submit model").click()
+    t = page.locator("[data-toast='submit']")
+    t.wait_for()
+    rid = int(re.search(r"Run #(\d+)", t.locator(".toast-text").text_content()).group(1))
+    # follow it → marks that row and brings it into view. Straight away: the
+    # mark is for finding it, and it clears itself after a few seconds
+    t.locator("[data-toast-link]").click()
+    row = page.locator(f"tr[data-queue-row='{rid}']")
+    row.wait_for()
+    # the scroll lands on the next frame, so wait for it rather than guess
+    page.wait_for_function("id => { const e = document.querySelector("
+                           "`tr[data-queue-row='${id}']`); if (!e) return false;"
+                           " const r = e.getBoundingClientRect();"
+                           " return r.bottom > 0 && r.top < innerHeight; }", arg=rid)
+    assert "landed" in (row.get_attribute("class") or "")
+    # the model box and the note are empty, and the button can be pressed again
+    assert box.input_value() == ""
+    assert note.input_value() == ""
+    assert page.get_by_role("button", name="Submit model").is_enabled()
+    # and the ticks are the ones the form opens with: every topic, no control
+    boxes = picker.locator("input[data-exam-task]:not([disabled])")
+    assert boxes.count() > 1
+    assert all(boxes.nth(i).is_checked() for i in range(boxes.count()))
+    if ctl.count():
+        assert not ctl.is_checked()
+    assert page.errors == []
+
+
+@pytest.mark.dashboard
+def test_the_submit_button_is_held_while_the_request_is_in_flight(live, page):
+    page.goto(live["base"] + "/#tab=queue")
+    set_name(page, "Omar")
+    page.locator("[data-ms='submit'] input").fill("org/held-while-in-flight")
+    # read the button one tick after the click, while the POST is out
+    page.evaluate("""() => { const b = [...document.querySelectorAll('button')]
+        .find(x => x.textContent === 'Submit model');
+      window.__held = [];
+      b.addEventListener('click', () => setTimeout(
+        () => window.__held.push([b.textContent, b.disabled]), 0));
+      b.click(); }""")
+    page.wait_for_selector("[data-toast='submit']")
+    held = page.evaluate("window.__held")
+    assert held and held[0] == ["Queueing…", True], held
+    assert page.get_by_role("button", name="Submit model").is_enabled()
+    assert page.errors == []
+
+
+@pytest.mark.dashboard
+def test_a_refused_submission_keeps_every_field_and_says_why(live, page):
+    page.goto(live["base"] + "/#tab=queue")
+    set_name(page, "Omar")
+    box = page.locator("[data-ms='submit'] input")
+    box.fill("not-a-model-id")
+    note = page.get_by_label("note")
+    note.fill("keep me")
+    page.get_by_role("button", name="Submit model").click()
+    msg = page.locator("[data-qmsg]")
+    msg.wait_for()
+    assert msg.text_content().startswith("Refused. ")
+    assert "org/name" in msg.text_content()            # the server's own words
+    assert box.input_value() == "not-a-model-id"       # nothing was cleared
+    assert note.input_value() == "keep me"
+    assert page.get_by_role("button", name="Submit model").is_enabled()
+    assert page.locator("[data-toast='submit']").count() == 0
+    # the refusal itself is the 422 the browser logs; nothing else
+    assert all("422" in e for e in page.errors), page.errors
 
 
 @pytest.mark.dashboard

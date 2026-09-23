@@ -9368,21 +9368,31 @@ function vQueue() {
       if (code) { state.qmsg = code; render(); return; }
       if (sf.allow && (state.codeInfo[body.hf_id] || {}).own_code) body.allow_remote_code = true;
     }
+    // while it is in flight the button says so and cannot be pressed twice
     btn.disabled = true;
+    const said = btn.textContent;
+    btn.textContent = 'Queueing…';
     try {
       const r = await fetch('api/submissions', { method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
         body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({}));
-      state.qmsg = r.ok ? '' : 'rejected: ' + (typeof j.detail === 'string' ? j.detail : r.status);
       if (r.ok) {
+        state.qmsg = '';
         rememberQueued(j.id);
-        toast(j.note ? `#${j.id}: ${j.note}` : `Queued #${j.id} — ${body.hf_id}`
-              + (body.tasks ? ` · ${body.tasks.map(frName).join(', ')}` : ''),
-              { key: 'submit', go: goQueue, link: 'see it' });
+        // the form goes back to where it started: an empty model box and the
+        // ticks it opens with, so the next submission is not the last one's
         sf.hf_id = ''; sf.note = ''; sf.allow = false;
+        sf.tasks = null; sf.control = false;
+        toast(j.note ? `#${j.id}: ${j.note} —` : `Run #${j.id} queued —`,
+              { key: 'submit', go: () => followRun(j.id), link: 'follow it →' });
+      } else {
+        // refused: every field stays as it was, with the server's words
+        state.qmsg = 'Refused. ' + (typeof j.detail === 'string' ? j.detail
+          : j.detail ? JSON.stringify(j.detail) : `the server answered HTTP ${r.status}`);
       }
-    } catch (e) { state.qmsg = 'submit failed — server unreachable?'; }
+    } catch (e) { state.qmsg = 'Refused. The server is unreachable — it may be restarting.'; }
+    btn.disabled = false; btn.textContent = said;
     await loadQueue(); render();
   }});
   const qrow = r => el('tr', { 'data-queue-row': String(r.id),
@@ -9530,7 +9540,8 @@ function vQueue() {
         ownWhy),
       ownCodeBox(info, sf.allow, v => { sf.allow = v; gateSubmit(); }, 'submit'),
       topicBoxes,
-      state.qmsg ? el('p', { class: 'small', style: 'margin-top:8px', text: state.qmsg }) : ''),
+      state.qmsg ? el('p', { class: 'warn', 'data-qmsg': '1', style: 'margin-top:8px',
+        text: state.qmsg }) : ''),
     el('div', { class: 'card' },
       el('h2', { text: 'Queue' }),
       qToolbar, qPager, qTableWrap, qEmpty)];
@@ -12571,6 +12582,15 @@ function rememberQueued(id) {
   try { localStorage.setItem('bench-mine', JSON.stringify([...state.mine].slice(-50))); }
   catch (e) { /* private mode: this tab only */ }
 }
+// the confirmation's link: the row it made, marked and in view
+function followRun(id) {
+  markQueueRow(id);
+  state.after = { scroll: `tr[data-queue-row="${id}"]` };
+  if (state.tab !== 'queue' || state.model || state.topic)
+    navigate({ tab: 'queue', model: null, topic: null });
+  else render();
+}
+
 function markQueueRow(id) {
   state.qMark = id;
   if (state.pg.queue) state.pg.queue.page = 1;
