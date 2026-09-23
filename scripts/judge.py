@@ -1707,6 +1707,48 @@ def revalidate(model_dir: Path, dest: Path | None = None) -> dict | None:
     return changed or None
 
 
+def conditional_report(model_dir: Path) -> list[dict]:
+    """11m §5, read only: did the judge decide whether each conditional
+    criterion applies, or score it on every answer? One row per judged topic
+    that has conditional criteria — how many (answer, criterion) pairs came
+    back null (did not apply) against how many were scored, the conditionals
+    never skipped once, and the topic mean as graded beside the mean with
+    every conditional left out, which bounds what scoring them can have
+    moved. Writes nothing and prints no question."""
+    p = model_dir / "judge.json"
+    try:
+        j = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    rows = []
+    for task, t in sorted((j.get("tasks") or {}).items()):
+        if not isinstance(t, dict) or not t.get("items"):
+            continue
+        spec = rubric_for(task).criteria
+        cond = [c["id"] for c in (spec or {}).get("criteria") or [] if c.get("conditional")]
+        if not cond:
+            continue
+        scored = [it for it in t["items"] if it.get("graded") and isinstance(it.get("criteria"), dict)
+                  and not it.get("no_answer")]
+        if not scored:
+            continue
+        vals = [it["criteria"].get(c) for it in scored for c in cond]
+        applied = [v for v in vals if v is not None]
+        never = [c for c in cond if all(it["criteria"].get(c) is not None for it in scored)]
+        without = [fold({k: (None if k in cond else v) for k, v in it["criteria"].items()},
+                        it.get("flags") or {}, spec) for it in scored]
+        rows.append({
+            "task": task, "conditional": len(cond), "answers": len(scored),
+            "pairs": len(vals), "applied": len(applied), "never_skipped": len(never),
+            "mean_when_scored": round(_mean(applied), 3) if applied else None,
+            "at_zero": round(sum(1 for v in applied if v == 0.0) / len(applied), 3)
+            if applied else None,
+            "mean_as_graded": round(_mean([it["score"] for it in scored]), 3),
+            "mean_without": round(_mean(without), 3),
+        })
+    return rows
+
+
 def write_judge(model_dir: Path, out: dict, dest: Path | None = None) -> Path:
     d = dest or model_dir
     d.mkdir(parents=True, exist_ok=True)
@@ -1793,10 +1835,40 @@ def main() -> int:
     ap.add_argument("--revalidate", action="store_true",
                     help="take answers that never left a reasoning block out of every "
                          "judge.json already written; asks no judge (11l)")
+    ap.add_argument("--conditionals", action="store_true",
+                    help="report, per judged topic, whether the judge skipped conditional "
+                         "criteria that did not apply or scored them on every answer; "
+                         "writes nothing (11m)")
     a = ap.parse_args()
     if not a.results.is_dir():
         print(f"no such directory: {a.results}", file=sys.stderr)
         return 2
+    if a.conditionals:
+        want = {m.replace("/", "__") for m in a.model}
+        pairs = applied = topics = 0
+        for d in sorted(p for p in a.results.iterdir() if p.is_dir()):
+            if want and d.name not in want:
+                continue
+            for r in conditional_report(d):
+                topics += 1
+                pairs += r["pairs"]
+                applied += r["applied"]
+                print(f"{d.name}  {r['task']}: {r['conditional']} conditional criteria, scored "
+                      f"on {r['applied']:,} of {r['pairs']:,} answer-criterion pairs "
+                      f"({100 * r['applied'] / r['pairs']:.0f}%), {r['never_skipped']} never "
+                      f"skipped; " + (f"{r['mean_when_scored']:.2f} on average when scored, "
+                                      f"{100 * r['at_zero']:.0f}% at 0.0"
+                                      if r["applied"] else "none ever scored")
+                      + f"; topic mean {r['mean_as_graded']:.2f} "
+                      f"/ 4 as graded, {r['mean_without']:.2f} / 4 with every conditional "
+                      f"left out")
+        if not topics:
+            print("no judged topic with conditional criteria")
+        else:
+            print(f"conditionals: scored on {applied:,} of {pairs:,} pairs "
+                  f"({100 * applied / pairs:.0f}%) across {topics} judged topic(s) — "
+                  f"a judge that decides applicability leaves some null")
+        return 0
     if a.revalidate:
         want = {m.replace("/", "__") for m in a.model}
         touched = 0

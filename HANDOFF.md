@@ -1489,6 +1489,89 @@ sudo docker compose exec -T bench python3 scripts/judge.py /home/masein/benchmar
    were not scored"; the checks bar reads "Answers that never finished:
    Qwen3-1.7B (3,730 of 3,730)". Sit it again to score it.
 
+### 11m — the Exam tab reads the questions, and five smaller fixes
+
+Brief: `docs/prompts/phase-11l-thinking-models-and-reads.md`, §2–§9 (§1 was
+11l; §6, the submit form, was already #57).
+
+- **§2 The Exam tab opens a topic's questions.** In **Rubrics and
+  criteria**, the bank count, "read the practice half" and a **questions**
+  entry beside `rubric` and `criteria` all open the bank reader
+  (`read=bank:<topic>`). The cell reads `6 — 2 hidden / 4 practice · read
+  the practice half`: "hidden", not "report", by the plain-words rule. Only
+  the practice half opens, as everywhere.
+- **§3 The model page's by-criterion block is gone**, with its topic picker.
+  The criteria strip inside each answer card stays. Three things lived only
+  inside that block and went with it: the per-topic flag lines, the
+  breakdown tables (by acuity, difficulty, jurisdiction) and the "every
+  item is …" constant-field line. Their numbers are still in judge.json,
+  and Propose reads judge.json, not the page.
+- **§4 One rule for the three header pills** (`.bar .barpill`). The checks
+  pill had `3px 0` from `details.checks > summary`; all three are now
+  `4px 12px`.
+- **§5 Conditional criteria — reported on, not changed.** See below.
+- **§7 Question-and-answer datasets have a register of their own.**
+  `fmt: free` gets `GEN_SYSTEM_QA` and a question-and-answer register in
+  place of the documents' "Prose, never question-and-answer pairs." A
+  generator that follows its instructions now returns items the reader can
+  parse; with the old prompt the same generator reproduces dataset #9 word
+  for word ("the generator returned no parseable items").
+- **§8 A failed dataset says 0 of n and why.** DOCUMENTS MADE BY reads
+  `0 of 26`; the status says **Failed**; a line under the row says what
+  happened ("0 of 26 kept — asked for question-and-answer items, but the
+  generator was given the prose register."), and **Details** lists the
+  reason for every missing item from `provenance.items.missing`, ten a page.
+- **§9 The suite options say what each gets you**, one line each under its
+  name, and the form says `full` and `judged` are separate runs — a model
+  needs both for an average and a judged score — and that resubmitting is
+  free.
+
+**§5, what judge.py does with a conditional criterion.**
+- It asks one question per answer, carrying all twenty criteria. There is
+  no separate "does this apply?" step. Each conditional criterion's line
+  ends "Return null for it when it does not apply to this question."
+- The same prompt's header says, twice, that every criterion must come back
+  as a number from 0.0 to 1.0. The two instructions contradict each other.
+- None of the 504 conditional criteria in the 37 criteria files has an
+  `applies_when`; the condition is only inside each definition ("When
+  algebra is required, …").
+- Everything after the reply handles null correctly: the parser accepts it,
+  and the fold and every criterion mean leave it out. The stub judge
+  returns null, and the tests pass through it.
+- So "100 of 100" on all twelve of Mathematics & Statistics' conditionals
+  means the judge never returned null there. Those twelve carry 0.60 of
+  that topic's fold weight. Whether they pulled the score down or up
+  depends on the number the judge gave a criterion that did not apply.
+- Nothing is changed: a new prompt changes its sha256, and every score
+  before it stops being comparable with every score after. That is a
+  decision for masein, with a re-sit. `judge.py --conditionals` (read only)
+  measures it on the server.
+
+**Deploy steps, after 11m merges.** Code only; the last command reads and
+writes nothing.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+sudo docker compose exec -T bench python3 scripts/judge.py /home/masein/benchmarks/results/full --conditionals
+```
+
+**Expected output:**
+
+1. `up -d --build` ends with the container healthy; the image build prints
+   `image files OK`.
+2. The log grep prints `no errors`.
+3. One line per judged topic, like
+   `<model>  exam_mathematics_statistics: 12 conditional criteria, scored on <P> of <N> answer-criterion pairs (<%>), <k> never skipped; <m> on average when scored, <z>% at 0.0; topic mean <a> / 4 as graded, <b> / 4 with every conditional left out`,
+   then a total. **100% and "12 never
+   skipped" is the §5 finding**: the judge scores conditionals it should
+   skip. Some pairs below 100% means it does skip. The two topic means
+   bound how much that moved the score.
+4. The Exam tab's **Rubrics and criteria** rows open the practice questions.
+   The model page has no by-criterion block. The three header pills match.
+   Dataset #9 reads `0 of 26`, **Failed**, and the line about the prose
+   register.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

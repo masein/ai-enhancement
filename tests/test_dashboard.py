@@ -18,7 +18,7 @@ from urllib.parse import quote
 
 import pytest
 
-from conftest import go_tab, pick_topic, show_all_columns
+from conftest import go_tab, show_all_columns
 
 pytestmark = pytest.mark.dashboard
 
@@ -303,18 +303,12 @@ def test_judged_section_and_the_control_sentence(surface, tree):
     assert m and int(m.group(2)) / int(m.group(1)) >= 0.5
     assert "By topic (0–4), weakest first within each area — hidden questions" in text
     assert "Score against answer length" in text and "Economics" in text
-    # topics, score-vs-length, the control — plus one per-criterion table for
-    # every topic graded criterion by criterion, and one breakdown table per
-    # metadata field those topics' banks carry. One topic's tables at a time
-    # (9c), and every topic but Arts is graded by criteria now: the medical
-    # one, whose imported questions carry the metadata
-    pick_topic(pg, "exam_medicine_clinical_health")
-    crit = card.locator("table.jd[data-criteria-table]").count()
-    breakdown = card.locator("table.jd[data-breakdown-table]").count()
-    assert crit >= 1 and breakdown >= crit
-    assert card.locator("table.jd[data-breakdown-table='acuity']").count() >= 1
-    assert card.locator("table.jd").count() == 3 + crit + breakdown
-    assert card.locator("table.jd[data-criteria-table='Medicine & Clinical Health']").count() == 1
+    # topics, score-vs-length and the control, and nothing else: the
+    # by-criterion block, its picker and its breakdown tables went in 11m
+    # (masein did not want them); each answer card keeps its criteria strip
+    assert card.locator("table.jd").count() == 3
+    assert card.locator("[data-criteria-table], [data-breakdown-table], "
+                        "[data-topic-switch]").count() == 0
     surface.open(model_link("fx/chance-160m"))
     card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
     assert "Didn't know it either way" in card.text_content()
@@ -480,53 +474,6 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
         ctx.close()
 
 
-def test_a_criteria_graded_topic_shows_its_criteria_failures_and_acuities(browser, local_judged):
-    ctx = browser.new_context(viewport={"width": 1240, "height": 900}, reduced_motion="reduce")
-    s = Surface(ctx.new_page(), local_judged.as_uri())
-    try:
-        pg = s.open(model_link("fx/good-750m"))
-        card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
-        pick_topic(pg, "exam_medicine_clinical_health")  # one topic's tables at a time (9c)
-        head = card.locator("[data-criteria='Medicine & Clinical Health']")
-        assert head.count() == 1 and "by criterion (0–1), weakest first" in head.text_content()
-        # every criterion in THIS topic's file has a row, weakest first
-        table = card.locator("table.jd[data-criteria-table='Medicine & Clinical Health']")
-        rows = table.locator("tr[data-criterion]")
-        assert rows.count() == 15                      # the author's own file, verbatim
-        means = [float(rows.nth(i).locator("td").nth(1).inner_text())
-                 for i in range(rows.count())
-                 if rows.nth(i).locator("td").nth(1).inner_text() != "—"]
-        assert means == sorted(means)
-        # the flag is stated in words, not only coloured, and says what it did
-        flag = card.locator("[data-flag='critical_safety_failure']"
-                            "[data-flag-topic='Medicine & Clinical Health']")
-        assert flag.count() == 1
-        text = flag.text_content()
-        assert text.startswith("Critical safety failure.")
-        assert "were flagged" in text and "sets the whole score to 0" in text
-        assert "applied here and not by the judge" in text
-        # law's two flags say different things, because its file does
-        pick_topic(pg, "exam_law")
-        law = card.locator("[data-flag-topic='Law']")
-        assert law.count() == 2
-        assert "caps the whole score at 1 of 4" in law.nth(1).text_content()
-        pick_topic(pg, "exam_medicine_clinical_health")
-        # a table per metadata field, acuity first, with a column per flag
-        fields = card.locator("table.jd[data-breakdown-topic='Medicine & Clinical Health']")
-        assert [fields.nth(i).get_attribute("data-breakdown-table")
-                for i in range(fields.count())] == ["acuity", "difficulty", "intent"]
-        acuity = fields.nth(0).locator("tr[data-value]")
-        assert acuity.count() >= 3
-        assert acuity.first.get_attribute("data-value") == "emergency"   # most severe first
-        assert "Critical safety failure" in fields.nth(0).locator("thead").text_content()
-        # and the difficulty table carries the question its author asked of it
-        assert card.locator("[data-difficulty-note]").count() >= 1
-        assert "only on basic questions" in card.locator("[data-difficulty-note]").first.text_content()
-        SCREENS.mkdir(exist_ok=True)
-        card.screenshot(path=SCREENS / "criteria-medicine.png")
-        assert s.errors == []
-    finally:
-        ctx.close()
 
 
 @pytest.fixture(scope="module")
@@ -561,7 +508,7 @@ def demo_report(tmp_path_factory) -> Path:
     return page
 
 
-def test_the_demo_page_says_what_it_is_and_shows_the_criteria(browser, demo_report):
+def test_the_demo_page_says_what_it_is_and_what_its_scores_are(browser, demo_report):
     """P5a: the first time a person can open what the demo produced. The
     judged section has to hold up on the page, not only in judge.json."""
     ctx = browser.new_context(viewport={"width": 1240, "height": 900}, reduced_motion="reduce")
@@ -582,17 +529,9 @@ def test_the_demo_page_says_what_it_is_and_shows_the_criteria(browser, demo_repo
         assert "Draft rubric." in text                    # …but the rubric is still a draft
         assert "Medicine & Clinical Health is graded against a rubric its author has not " \
             "signed off" in text
-        # the criteria row, the flag in words, the tables by acuity and by
-        # difficulty — the author's own file decides all three
-        med = card.locator("table.jd[data-criteria-table='Medicine & Clinical Health']")
-        assert card.locator("[data-criteria='Medicine & Clinical Health']").count() == 1
-        assert med.locator("tr[data-criterion]").count() == 15
-        assert card.locator("[data-flag='critical_safety_failure']").count() == 1
-        assert "critical safety failure" in text.lower()
-        assert card.locator("table.jd[data-breakdown-table='acuity'] tr[data-value]"
-                            ).count() == 5
-        assert card.locator("table.jd[data-breakdown-table='difficulty'] tr[data-value]"
-                            ).count() == 3
+        # 11m: no by-criterion block, no breakdown tables — the criteria are
+        # in each answer card on the live board, which a static report has not
+        assert card.locator("[data-criteria-table], [data-breakdown-table]").count() == 0
         # the folded score is shown and not counted: 100 questions clear the
         #30-item floor, so the row is no longer greyed for being thin — the
         # whole suite is still preliminary, because nothing is calibrated
@@ -740,49 +679,3 @@ def test_a_model_page_has_a_sub_nav_and_its_sections(surface):
     assert surface.errors == []
 
 
-@pytest.fixture(scope="module")
-def zero_criterion(tmp_path_factory) -> Path:
-    """A board where one criterion scored exactly 0 on every answer it
-    applied to — physics's "Uncertainty and calibration", 5 of 100."""
-    import judge as jd
-    import make_fixture
-    root = tmp_path_factory.mktemp("zero-crit")
-    tree = make_fixture.build(root)
-    d = tree["models"]["fx/good-750m"]["dir"]
-    j = json.loads((d / "judge.json").read_text(encoding="utf-8"))
-    task = "exam_medicine_clinical_health"
-    spec = jd.rubric_for(task).criteria
-    zero = jd.criteria_ids(spec)[0]
-    t = j["tasks"][task]
-    for it in t["items"]:
-        if it.get("criteria"):
-            it["criteria"][zero] = 0.0
-    t["criteria_mean"][zero] = 0.0
-    (d / "judge.json").write_text(json.dumps(j), encoding="utf-8")
-    return make_fixture.frozen_report(root, root / "report.html")
-
-
-def test_a_criterion_that_scored_zero_says_zero(browser, zero_criterion):
-    """It rendered as an empty cell — and weakest-first put that empty row at
-    the top of the table, so the worst finding looked like a missing one."""
-    ctx = browser.new_context(viewport={"width": 1240, "height": 900}, reduced_motion="reduce")
-    s = Surface(ctx.new_page(), zero_criterion.as_uri())
-    try:
-        pg = s.open(model_link("fx/good-750m"))
-        pick_topic(pg, "exam_medicine_clinical_health")
-        table = pg.locator("table.jd[data-criteria-table='Medicine & Clinical Health']")
-        first = table.locator("tr[data-criterion]").first
-        mean = first.locator("td").nth(1)
-        assert mean.inner_text().strip() == "0.00"        # not "", not "0"
-        assert first.locator("td").nth(2).inner_text().strip() != "0"   # it was scored
-        # the bar for zero is a hairline, not an empty track
-        bar = first.locator("[data-bar]")
-        assert bar.count() == 1 and bar.get_attribute("data-bar") == "0.00"
-        assert bar.evaluate("e => e.getBoundingClientRect().width") > 0
-        # and every other row still prints two decimals
-        others = table.locator("tr[data-criterion] td.num:nth-child(2)")
-        for i in range(min(4, others.count())):
-            assert re.fullmatch(r"\d\.\d\d", others.nth(i).inner_text().strip())
-        assert s.errors == []
-    finally:
-        ctx.close()

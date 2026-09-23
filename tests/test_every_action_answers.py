@@ -440,20 +440,8 @@ def test_the_model_page_leads_with_numbers(live, page):
         assert not card.locator("[data-provisional='judge']").is_visible()   # behind "why?"
         why.locator("summary").click()
         assert card.locator("[data-provisional='judge']").is_visible()
-        # one topic's tables at a time, picked from a searchable list (10c: 36
-        # of them; 11f: a Combobox)
-        box = card.locator("[data-topic-switch]")
-        box.click()
-        sw = page.locator("#pop-cb-mdl-topic [role=option]")
-        assert sw.count() >= 2
-        assert card.locator("[data-criteria-table]").count() == 1
-        second = [o.get_attribute("data-value") for o in sw.all()
-                  if o.get_attribute("aria-selected") != "true"][0]
-        page.keyboard.press("Escape")
-        choose(box, second)
-        page.wait_for_function("document.querySelectorAll('[data-criteria-table]').length === 1 "
-                               "&& document.querySelector('[data-topic-switch]').dataset.value === "
-                               f"'{second}'")
+        # 11m: no by-criterion block and no picker for it — the numbers lead
+        assert card.locator("[data-topic-switch], [data-criteria-table]").count() == 0
         # no "Training compute: Unknown" — the hero's cards (11d) say it only when known
         assert "Training compute" not in page.locator("[data-model-hero]").text_content()
         # last evaluated counts the judged run

@@ -595,49 +595,54 @@ def test_the_select_keyboard_path(live, page, queue_rows):
     assert page.errors == []
 
 
+# 11m removed the by-criterion block's topic picker; the model page's answers
+# picker is the same Combobox, grouped and scored the same way
+TOPIC_BOX, TOPIC_POP = "[data-combobox='answers topic']", "#pop-cb-answers-topic"
+
+
 def test_the_topic_combobox_narrows_as_you_type_and_is_grouped_by_area(live, page):
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
-    box = page.locator("[data-topic-switch]")
+    box = page.locator(TOPIC_BOX)
     box.wait_for()
     box.click()
-    page.wait_for_selector("#pop-cb-mdl-topic [role=option]")
-    groups = page.locator("#pop-cb-mdl-topic [role=group]").evaluate_all(
+    page.wait_for_selector(f"{TOPIC_POP} [role=option]")
+    groups = page.locator(f"{TOPIC_POP} [role=group]").evaluate_all(
         "gs => gs.map(g => g.getAttribute('aria-label'))")
     areas = page.evaluate("Object.keys(DATA.meta.areas)")
     assert groups and all(g in areas + ["Other"] for g in groups)
     shot(page, "11f-7-topic-combobox-1280-light.png")
     box.fill("eco")
-    page.wait_for_function("document.querySelectorAll('#pop-cb-mdl-topic [role=option]').length === 1")
-    only = page.locator("#pop-cb-mdl-topic [role=option]")
-    assert only.get_attribute("data-value") == "exam_economics"
+    page.wait_for_function(f"document.querySelectorAll('{TOPIC_POP} [role=option]').length === 1")
+    only = page.locator(f"{TOPIC_POP} [role=option]")
+    assert only.get_attribute("data-value") == "Economics"
     assert re.search(r"\d\.\d\d / 4", only.text_content())
     # the keyboard: ↓ makes it active, Enter picks it
     page.keyboard.press("ArrowDown")
     act = box.get_attribute("aria-activedescendant")
-    assert act and page.locator(f"#{act}").get_attribute("data-value") == "exam_economics"
+    assert act and page.locator(f"#{act}").get_attribute("data-value") == "Economics"
     page.keyboard.press("Enter")
-    page.wait_for_selector("table[data-criteria-table='Economics']")
-    assert choice(page.locator("[data-topic-switch]")) == "exam_economics"
+    page.wait_for_function("state.ans.topic === 'Economics'")
+    assert choice(page.locator(TOPIC_BOX)) == "Economics"
     # the choice survives a poll
     page.evaluate("render()")
-    assert choice(page.locator("[data-topic-switch]")) == "exam_economics"
-    assert page.locator("[data-topic-switch]").input_value() == "Economics"
+    assert choice(page.locator(TOPIC_BOX)) == "Economics"
+    assert page.locator(TOPIC_BOX).input_value() == "Economics"
     assert page.errors == []
 
 
 def test_a_chosen_value_survives_a_poll_while_the_list_is_open(live, page):
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
-    box = page.locator("[data-topic-switch]")
+    box = page.locator(TOPIC_BOX)
     box.wait_for()
     box.click()
     box.fill("la")
-    page.wait_for_selector("#pop-cb-mdl-topic [role=option]")
+    page.wait_for_selector(f"{TOPIC_POP} [role=option]")
     page.evaluate("render()")                       # a poll, mid-typing
-    assert page.locator("[data-topic-switch]").input_value() == "la"
-    assert page.evaluate("document.activeElement.dataset.combobox") == "judged topic"
-    page.locator("#pop-cb-mdl-topic [role=option][data-value='exam_law']").click()
-    page.wait_for_selector("table[data-criteria-table='Law']")
+    assert page.locator(TOPIC_BOX).input_value() == "la"
+    assert page.evaluate("document.activeElement.dataset.combobox") == "answers topic"
+    page.locator(f"{TOPIC_POP} [role=option][data-value='Law']").click()
+    page.wait_for_function("state.ans.topic === 'Law'")
     assert page.errors == []
 
 

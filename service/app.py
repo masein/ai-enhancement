@@ -1936,7 +1936,7 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
     spec = r["edited_text"] or r["spec_text"]
     did = db.dataset_create(pid, g.fmt, g.count, who, {})
     # the audience travels with the topic: a spec alone never said who asks
-    audience = prop.audience_for(r["category"], r["task"])
+    audience = prop.audience_for(r["category"], r["task"], fmt=g.fmt)
     # and so does the corner of the topic each request is for. 11e: the first
     # N labels of the plan Approve froze; a proposal approved before 11e keeps
     # 11a's plan, computed now

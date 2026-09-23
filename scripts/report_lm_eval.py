@@ -1841,6 +1841,10 @@ input.cbox:focus { outline:2px solid var(--accent); outline-offset:1px; border-c
 .listbox [role=option][aria-selected="true"]::before { content:"✓"; color:var(--accent); width:12px; }
 .listbox [role=option][aria-selected="false"]::before { content:""; width:12px; }
 .listbox [role=option][aria-disabled="true"] { color:var(--muted); cursor:not-allowed; }
+.listbox [role=option].has-sub { align-items:flex-start; }
+.listbox .opt-t { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.listbox .opt-sub { font-weight:400; font-size:var(--fs-1); color:var(--text-secondary);
+  white-space:normal; max-width:420px; }
 .cblist { min-width:320px; max-width:min(440px, calc(100vw - 16px)); }
 .cbgroup + .cbgroup { margin-top:4px; }
 .cbhead { font-family:var(--font-mono); font-size:var(--fs-1); text-transform:uppercase;
@@ -2780,6 +2784,13 @@ table.rvlist tr.clickrow:hover > td { background:var(--accent-soft); }
   grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); }
 .nptopics { row-gap:10px; }
 .nptopics .extopic { cursor:pointer; }
+tr.dsfail > td { padding-top:0; border-top:0; }
+tr.dsfail .warn { margin:0 0 4px; }
+tr.dsfail details > summary { cursor:pointer; list-style:none; color:var(--text-secondary); }
+tr.dsfail details > summary::-webkit-details-marker { display:none; }
+tr.dsfail details[open] > summary { color:var(--text-primary); }
+.dswhy { margin:6px 0 4px; padding-left:22px; }
+.dswhy li { margin:2px 0; }
 .nptopics .exnote { padding-bottom:2px; }
 .nptopics .extopic.off { cursor:default; }
 /* ---- the answers, as cards: nothing sideways ---- */
@@ -2847,6 +2858,13 @@ details.checks { margin:10px 0 0; font-size:var(--fs-2); }
 details.checks > summary { cursor:pointer; list-style:none; display:inline-flex; align-items:center;
   color:var(--text-secondary); padding:3px 0; }
 details.checks > summary::-webkit-details-marker { display:none; }
+/* 11m: the three pills in the bar are one control in one rule. The checks
+   pill lost its side padding to the details.checks rule above — the same
+   weight, and later — and its text touched its border. This one outweighs
+   both, so the three cannot drift apart again */
+.bar .barpill { padding:4px 12px; min-height:32px; box-sizing:border-box;
+  font-family:var(--font-sans); font-size:var(--fs-1); font-weight:600; white-space:nowrap;
+  border:1px solid var(--border); border-radius:var(--r-1); }
 details.checks > summary .showhide::after { content:'\00a0— show'; color:var(--accent); }
 details.checks[open] > summary .showhide::after { content:'\00a0— hide'; }
 .checklist { list-style:none; margin:6px 0 0; padding:0; border:1px solid var(--border);
@@ -3120,11 +3138,15 @@ function Select(label, opts, cur, onpick, attrs = {}) {
     if (moved) { btn.dispatchEvent(new Event('change', { bubbles: true })); if (onpick) onpick(v); }
   };
   popover(btn, () => {
+    // an option may carry one plain line under its name (`sub`): what it gets you
     const box = el('div', { class: 'moremenu listbox', role: 'listbox', id: 'pop-' + key,
       'aria-label': label }, list.map(([v, l, o = {}], i) => el('div', { role: 'option',
-        id: `${key}-o${i}`, tabindex: '-1', 'data-value': String(v), text: l, title: o.title || null,
+        id: `${key}-o${i}`, tabindex: '-1', 'data-value': String(v), text: o.sub ? null : l,
+        title: o.title || null, class: o.sub ? 'has-sub' : null,
         'aria-selected': String(String(v) === value), 'aria-disabled': o.disabled ? 'true' : null,
-        onclick: () => pick(String(v)) })));
+        onclick: () => pick(String(v)) }, o.sub ? el('span', { class: 'opt-t' },
+          el('span', { class: 'opt-l', text: l }),
+          el('span', { class: 'opt-sub', 'data-opt-sub': String(v), text: o.sub })) : null)));
     box.addEventListener('keydown', e => listKeys(e, box, pick));
     return box;
   }, { key, menu: false, focus: '[role=option][aria-selected=true], [role=option]' });
@@ -4519,111 +4541,9 @@ function vJudged(m) {
             el('summary', { text: `Show the table (${withLen.length} topics)` }), table)
         : table);
     }
-    // a topic graded criterion by criterion: what it was weak AT, the
-    // critical failures in words, and the acuity the failures fell on — one
-    // topic at a time. Every topic stacked made a 14,443 px page for a model
-    // judged on two; thirty-six segments of a switch do not fit a row, so it
-    // is a select, weakest first with the score, and a box that narrows it
-    const crit = cats.filter(t => j.tasks[t].criteria_mean);
-    const pick = crit.includes((state.mdlTopic || {})[m.id]) ? state.mdlTopic[m.id] : crit[0];
-    if (crit.length > 1) {
-      // 11f: one searchable control, grouped by the 8 areas, weakest first in
-      // each — it replaced a native select and the "find a topic" box beside it
-      card.append(el('div', { class: 'ctrl', style: 'margin-top:14px;flex-wrap:wrap' },
-        el('label', { class: 'small', for: 'mdlTopic', text: 'topic' }),
-        Combobox('judged topic', topicGroups(crit, t => pubScore(j.tasks[t]), !judgedOkM(m)), pick,
-          v => { state.mdlTopic = state.mdlTopic || {}; state.mdlTopic[m.id] = v; render(); },
-          { key: 'mdl-topic', id: 'mdlTopic', 'data-topic-switch': '1', placeholder: 'find a topic' }),
-        el('span', { class: 'count-note', text: `${crit.length} topics, weakest first` })));
-    }
-    for (const t of crit.filter(t => t === pick)) {
-      const v = j.tasks[t];
-      if (!v.criteria_mean) continue;
-      const labels = v.criteria_labels || {};
-      const ids = Object.keys(v.criteria_mean)
-        .sort((a, b) => (v.criteria_mean[a] ?? 2) - (v.criteria_mean[b] ?? 2));
-      card.append(el('div', { class: 'dxh', 'data-criteria': frName(t),
-        text: `${frName(t)} — by criterion (0–1), weakest first · ${v.n} answers, `
-          + `${v.unparseable || 0} unreadable`
-          + (v.no_answer ? ` · ${v.no_answer} no answer` : '') }));
-      card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd',
-        'data-criteria-table': frName(t) },
-        el('thead', {}, el('tr', {}, el('th', { text: 'criterion' }),
-          el('th', { class: 'num', text: 'mean' }), el('th', { class: 'num', text: 'answers' }),
-          el('th', { text: '0 → 1' }))),
-        el('tbody', {}, ids.map(id => {
-          const m = v.criteria_mean[id], n = (v.criteria_n || {})[id] || 0;
-          // only the file says a criterion may be skipped; a low count on any
-          // other one means replies that could not be read, counted above
-          const cond = (v.criteria_conditional || []).includes(id);
-          return el('tr', { class: n ? null : 'dim', 'data-criterion': id },
-            el('td', {}, labels[id] || id,
-              cond ? el('span', { class: 'se', text: ` · conditional, ${n} of ${v.n}` }) : ''),
-            // exactly 0 is a finding, and weakest-first puts it at the top:
-            // "0" beside "0.65" read as an empty cell, so this column keeps
-            // its decimals rather than trimming them away
-            el('td', { class: 'num', text: m == null ? '—' : (+m).toFixed(2) }),
-            el('td', { class: 'num se', text: String(n) }),
-            // zero-anchored, one hue: the mean beside it is the encoding
-            el('td', {}, el('div', { class: 'dxbar', style: 'width:180px;height:8px' },
-              m == null ? '' : el('span', { 'data-bar': (+m).toFixed(2),
-                // a hairline at zero: an empty track and a missing value look
-                // the same, and one of them is a result
-                style: `width:${Math.max(0.8, 100 * m).toFixed(1)}%;`
-                  + 'background:var(--s1)' }))));
-        })))));
-      const flags = v.flags || {};
-      const fids = Object.keys(flags);
-      if (!fids.length) card.append(el('p', { class: 'note', 'data-flags': '0' },
-        'This topic\'s criteria file names no flag: the score is the fold of the criteria '
-        + 'above and nothing overrides it.'));
-      // one line per flag, in words: what it is, how often it fired, and what
-      // it did to the score — the effect is the file's, applied in code
-      fids.forEach(fid => {
-        const f = flags[fid];
-        card.append(el('p', { class: f.n ? 'warn' : 'note', 'data-flag': fid,
-          'data-flag-n': String(f.n), 'data-flag-topic': frName(t) },
-          el('b', { text: `${f.label || fid}${f.n ? '. ' : ' — none. '}` }),
-          f.n
-            ? `${f.n} of ${v.n} answers (${pct(f.share, 0)}) were flagged, and each one `
-              + `${f.effect_words || 'changes the score'}. That is the rule in the criteria `
-              + 'file, applied here and not by the judge.'
-            : `None of the ${v.n} answers was flagged. When it is true it `
-              + `${f.effect_words || 'changes the score'}, whatever the criteria said.`));
-      });
-      // one table per metadata field that actually splits this topic —
-      // acuity for a medical bank, difficulty and domain for a technical one.
-      // A field every item shares is a sentence, not a table.
-      const constant = v.breakdowns_constant || {};
-      if (Object.keys(constant).length) card.append(el('p', { class: 'small',
-        'data-constant-fields': Object.keys(constant).join(','),
-        text: Object.entries(constant)
-          .map(([f, val]) => `${f} is ${val} on every item`).join('; ')
-          + ' — no table for that.' }));
-      const order = ['acuity', 'difficulty', 'jurisdiction_required', 'intent'];
-      const fields = Object.keys(v.breakdowns || {}).sort(
-        (a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99));
-      fields.forEach(field => {
-        const cells = v.breakdowns[field];
-        card.append(el('div', { class: 'dxh', text: `By ${field}` }));
-        if (field === 'difficulty') card.append(el('p', { class: 'small',
-          'data-difficulty-note': '1', text: 'The author\'s own level for each question, 1 '
-            + 'easiest: does the model do well only on basic questions, or can it reason about '
-            + 'the ambiguous and high-risk ones too?' }));
-        card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd',
-          'data-breakdown-table': field, 'data-breakdown-topic': frName(t) },
-          el('thead', {}, el('tr', {}, el('th', { text: field }),
-            el('th', { class: 'num', text: 'answers' }), el('th', { class: 'num', text: 'mean' }),
-            ...fids.map(fid => el('th', { class: 'num',
-              text: flags[fid].label || fid })))),
-          el('tbody', {}, Object.entries(cells).map(([k, b]) =>
-            el('tr', { 'data-value': k }, el('td', { text: k }),
-              el('td', { class: 'num se', text: String(b.n) }),
-              el('td', { class: 'num', text: `${num(b.mean, 2)} / 4` }),
-              ...fids.map(fid => el('td', { class: 'num',
-                text: String((b.flags || {})[fid] || 0) }))))))));
-      });
-    }
+    // 11m: the per-topic block — by criterion, its flags and its by-field
+    // tables, under one topic picker — is gone from the model page, at
+    // masein's request. Each answer card keeps its own criteria strip.
     // the answers themselves, for whichever topic is picked — the same panel
     // the topic page shows, because "see the answers" is the step between a
     // score and knowing what to do about it
@@ -9408,13 +9328,19 @@ function vQueue() {
     // judged is offered even when it cannot run: an option that is simply
     // absent tells a person nothing, and 'why is there no judged suite?' was
     // the first question asked of this page
-    suite: Select('suite', [['full', 'full — all tasks, comparable'],
-      ['quick', 'quick — hellaswag + arc_easy + ppl, minutes'],
-      ['control', 'control — mmlu_perm only: MMLU with the options rotated (the position-bias '
-        + 'experiment), ~a fifth of a full MMLU'],
-      ['judged', 'judged — the written exam, graded by the judge'
-        + (state.loop.blocked ? ' (unavailable)' : ''),
-        { disabled: !!state.loop.blocked, title: state.loop.blocked || '' }]],
+    // 11m: masein read the drop-down as `judged` and nothing else, and took
+    // `full` for removed. Each option says what it gets you.
+    suite: Select('suite', [
+      ['full', 'full — every task', { sub: 'The benchmark tasks: the model\'s average and its '
+        + 'place on the leaderboard.' }],
+      ['quick', 'quick — three tasks, minutes', { sub: 'hellaswag, arc_easy and perplexity: a '
+        + 'first look. A full run later adds only the tasks still missing.' }],
+      ['control', 'control — MMLU, options rotated', { sub: 'The position-bias experiment: '
+        + 'MMLU with the options moved round. About a fifth of a full MMLU.' }],
+      ['judged', 'judged — the written exam' + (state.loop.blocked ? ' (unavailable)' : ''),
+        { disabled: !!state.loop.blocked, title: state.loop.blocked || '',
+          sub: 'The exam topics, answered in writing and graded by the judge: the model\'s '
+            + 'judged score per topic.' }]],
       sf.suite || 'full', v => { sf.suite = v; render(); }, { key: 'submit-suite' }),
     note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px',
       'aria-label': 'note', 'data-keep': 'submit-note', value: sf.note,
@@ -9609,9 +9535,13 @@ function vQueue() {
       el('h2', { text: 'Submit a model' }),
       el('p', { class: 'sub', text:
         'Any public (or server-accessible) Hugging Face model up to the size cap. Preflight '
-        + 'checks the repo before any GPU is spent; one run at a time, per-task resume — '
-        + 'resubmitting a finished model costs nothing, and a quick run upgrades to full by '
-        + 'running only the missing tasks. Results land on this leaderboard automatically.' }),
+        + 'checks the repo before any GPU is spent, and one run goes at a time. Results land '
+        + 'on this leaderboard automatically.' }),
+      el('p', { class: 'small', 'data-suite-help': '1' },
+        el('b', { text: 'full' }), ' and ', el('b', { text: 'judged' }),
+        ' are separate runs, not one inside the other: a model needs both to have an average '
+        + 'and a judged score. Resubmitting is free — each run does only the tasks still '
+        + 'missing, which is also how a quick run becomes a full one.'),
       el('div', { class: 'frm' }, f.hf_id, f.kind, f.suite, f.note, btn,
         cannotRun(sf.hf_id)
           ? el('span', { class: 'propwhy', 'data-why': 'weights',
@@ -9753,7 +9683,7 @@ function renderWho(force = false) {
   const name = whoName();
   // one control in the bar, whatever the state: a button that opens the same
   // panel. It is never clipped, it survives a poll, and Esc gives it back.
-  const btn = el('button', { class: 'who' + (name ? '' : ' ask'), 'data-who': name,
+  const btn = el('button', { class: 'who barpill' + (name ? '' : ' ask'), 'data-who': name,
     'data-who-prompt': name ? null : '1',
     title: name
       ? 'the name recorded on anything you start, approve or import here — click to change'
@@ -9884,7 +9814,8 @@ function dsDocs(d) {
   const kept = it.kept ?? d.kept ?? 0;
   const req = it.requested ?? (d.provenance || {}).count_requested ?? d.count ?? kept;
   const gap = Array.isArray(it.missing) ? it.missing.length : Math.max(0, req - kept);
-  return `${kept} of ${req}` + (gap ? ` · ${gap} missing` : '');
+  // "0 of 26 · 26 missing" says one thing twice: none kept is the count alone
+  return `${kept} of ${req}` + (gap && kept ? ` · ${gap} missing` : '');
 }
 
 const GAP_TIP = 'Pass this to your training run. The run records the dataset, and the '
@@ -9894,6 +9825,9 @@ function useInTraining(d) {
     text: 'Use in training ⧉', onclick: () => copyText(`--gap-dataset ${d.id}`) });
 }
 
+// failed, or turned back by the copy check: either way nothing to read
+const dsFailed = d => d.status === 'failed' || d.status === 'rejected' || (d.status !== 'ready' && !!d.error);
+
 // one row for a dataset, here and on the topic page
 function dsRow(d) {
   return el('tr', { 'data-ds-row': String(d.id),
@@ -9901,8 +9835,10 @@ function dsRow(d) {
     el('td', { class: 'num se', text: '#' + d.id }),
     el('td', { text: d.category || '—' }),
     el('td', { class: 'small', text: modelName(d.model) }),
+    // 11m: a count belongs here even when it failed — "0 of 26" — and the
+    // failure is the status beside the actions
     el('td', { class: 'small num nowrap', 'data-doc-line': String(d.id),
-      text: d.status === 'ready' ? dsDocs(d) : rvStatusWords(d.status) }),
+      text: d.status === 'ready' || dsFailed(d) ? dsDocs(d) : rvStatusWords(d.status) }),
     el('td', { class: 'small se', text: d.requester || '—' }),
     el('td', { class: 'small se num nowrap',
       text: d.created_at ? rel(d.created_at) + ' ago' : '—' }),
@@ -9911,7 +9847,10 @@ function dsRow(d) {
       d.status === 'ready'
         ? [readButton({ kind: 'dataset', id: String(d.id) }, 'Read', { 'data-ds-read': String(d.id) }),
            useInTraining(d)]
-        : el('span', { class: 'small se', text: d.error ? 'failed' : 'being written' }),
+        : dsFailed(d)
+          ? el('span', { class: 'badge danger', 'data-ds-failed': String(d.id),
+              text: d.status === 'rejected' ? 'Rejected' : 'Failed' })
+          : el('span', { class: 'small se', text: 'being written' }),
       [{ label: 'Provenance', act: 'provenance',
          run: () => openReader({ kind: 'provenance', id: 'dataset:' + d.id }) },
        d.download ? { label: 'Download', act: 'download',
@@ -9919,6 +9858,52 @@ function dsRow(d) {
        { label: 'Copy the training flag', act: 'copy-flag',
          run: () => copyText(`--gap-dataset ${d.id}`) },
        { label: 'Copy dataset id', act: 'copy-id', run: () => copyText(String(d.id), '#' + d.id) }])));
+}
+
+// 11m: what a failed dataset says. #9 said "the generator returned no
+// parseable items", while the reason for each of its 26 missing items was on
+// record in its provenance. The line says what happened; Details lists them.
+function dsWhy(d) {
+  const pv = d.provenance || {}, it = pv.items || {};
+  const miss = Array.isArray(it.missing) ? it.missing : [];
+  const kept = it.kept ?? 0;
+  const req = it.requested ?? pv.count_requested ?? d.count ?? 0;
+  const head = `${kept} of ${req} kept — `;
+  if (d.status === 'rejected') return head + (d.error || 'the copy check turned it back') + '.';
+  // made before question-and-answer items had a register of their own: the
+  // generator was told to write prose, and did
+  if (d.fmt === 'free' && !/question-and-answer items/.test(pv.audience || '') && miss.length
+      && miss.every(m => m.why === 'no question or no answer'))
+    return head + 'asked for question-and-answer items, but the generator was given the prose '
+      + 'register.';
+  if (miss.length) {
+    const by = new Map();
+    for (const m of miss) by.set(m.why, (by.get(m.why) || 0) + 1);
+    return head + [...by].map(([w, n]) => `${n} ${w}`).join(', ') + '.';
+  }
+  return head + String(d.error || 'nothing came back that could be read').replace(/\.$/, '') + '.';
+}
+
+// the row, and for a failed dataset the line under it that explains
+function dsRows(d) {
+  if (!dsFailed(d)) return [dsRow(d)];
+  const miss = Array.isArray(((d.provenance || {}).items || {}).missing)
+    ? d.provenance.items.missing : [];
+  const open = !!(state.rv.dsWhyOpen || {})[d.id];
+  const pg = paged('ds-why-' + d.id, miss, `${d.id}:${miss.length}`, render, 10);
+  return [dsRow(d), el('tr', { class: 'dsfail', 'data-ds-why': String(d.id) },
+    el('td', { colspan: '8' },
+      el('p', { class: 'warn', 'data-ds-why-line': String(d.id), text: dsWhy(d) }),
+      miss.length ? el('details', { class: 'small', 'data-ds-details': String(d.id),
+          open: open ? '' : null,
+          ontoggle: e => { state.rv.dsWhyOpen = { ...(state.rv.dsWhyOpen || {}),
+            [d.id]: e.target.open }; } },
+        el('summary', { text: `Details — ${miss.length} item${miss.length === 1 ? '' : 's'}, `
+          + 'one reason each ▸' }),
+        el('ol', { class: 'dswhy', start: String(pg.from || 1) }, pg.rows.map(m =>
+          el('li', { 'data-ds-missing': String(m.request ?? '') },
+            `request ${m.request ?? '—'} · ${m.focus || 'no area'} · ${m.why}`))),
+        pg.pager || '') : ''))];
 }
 
 // a proposal row opens the card in the sheet — the whole row, and the link in
@@ -10362,7 +10347,7 @@ function vReview() {
       el('p', { class: 'sub', text: 'What the AI wrote, after the copy check. Read one here, '
         + 'or hand it to a training run.' }),
       rvTable(['#', 'topic', 'model', 'documents', 'made by', 'when', '', ''],
-        L.datasets.map(dsRow),
+        L.datasets.flatMap(dsRows),
         empty('No datasets yet. Approve a proposal, then generate from it.')));
   } else {
     const sub = { review: 'Proposals waiting for a person. Open one to read it.',
@@ -11859,12 +11844,19 @@ function exImportPreview(p) {
 const rubricVersion = v => (!v || v === '?') ? 'no version' : 'v' + v;
 
 // what a topic's bank holds, beside the files that would grade it
-function bankCell(b) {
+// 11m: and opens it. masein came to the Exam tab to read the questions, the
+// obvious place, and found the count as plain text; the reader was only on
+// the topic page. Only the practice half opens — the hidden half never does
+function bankCell(b, topic) {
   if (!b || !b.accepted) return el('span', { class: 'warn', 'data-bank': '0',
     text: 'no questions yet' });
+  const slug = slugOfTopic(topic);
+  const read = (text, attrs) => slug ? readLink({ kind: 'bank', id: slug }, text, attrs) : text;
   return el('span', { 'data-bank': String(b.accepted) },
-    `${b.accepted} — `,
-    el('span', { class: 'se', text: `${b.report} report / ${b.diagnose} diagnose` }),
+    read(String(b.accepted), { 'data-read-bank-count': slug,
+      title: 'read the practice questions' }), ' — ',
+    el('span', { class: 'se', text: `${b.report} hidden / ${b.diagnose} practice` }),
+    slug ? [' · ', read('read the practice half', { 'data-read-bank': slug })] : '',
     b.pending ? el('span', { class: 'se', text: ` · ${b.pending} awaiting curation` }) : '');
 }
 
@@ -11903,7 +11895,7 @@ function exRubrics() {
               state.ex.candidates = null; render(); } })),
           // having a rubric is not having questions: three topics shipped
           // with both files and an empty bank, and looked ready
-          el('td', { class: 'small' }, bankCell((st.banks || {})[r.topic])),
+          el('td', { class: 'small' }, bankCell((st.banks || {})[r.topic], r.topic)),
           el('td', { title: `sha256 ${r.sha256}` }, r.fallback
             ? el('span', { 'data-fallback': '1',
                 title: `this topic has no rubric of its own; the shared ${r.name}.md grades it`
@@ -11921,6 +11913,10 @@ function exRubrics() {
                   ? el('span', { class: 'badge taint', text: 'DRAFT' }) : '')
             : el('span', { class: 'se', text: 'one overall score' })),
           el('td', {},
+            // 11m: the questions first, beside the files that grade them
+            ((st.banks || {})[r.topic] || {}).accepted && slugOfTopic(r.topic)
+              ? [readLink({ kind: 'bank', id: slugOfTopic(r.topic) }, 'questions',
+                  { 'data-read-questions': slugOfTopic(r.topic) }), ' · '] : '',
             // 11g: read them in the page; the download stays beside each
             readLink({ kind: 'rubric', id: r.name }, 'rubric', { 'data-read-rubric': r.name }),
             el('a', { class: 'dllink', href: `api/exam/rubrics/${r.name}`, download: `${r.name}.md`,
@@ -12533,7 +12529,7 @@ function renderWarnings() {
       ontoggle: e => { state.checksOpen = e.target.open; } },
     // 11e: the pill says the count and nothing else — it is a button like its
     // neighbours; what kind of checks they are is the first line of the panel
-    el('summary', { 'data-warn-summary': String(cs.length) },
+    el('summary', { class: 'barpill', 'data-warn-summary': String(cs.length) },
       el('span', { class: 'dot ' + worst }),
       `${cs.length} check${cs.length > 1 ? 's' : ''} ▾`),
     el('ul', { class: 'checklist' },
@@ -12854,7 +12850,7 @@ TEMPLATE = """<!doctype html>
     <div class="bar-right" id="barRight">
       <div id="warnings" class="bar-checks"></div>
       <div id="who"></div>
-      <button id="themeBtn" title="cycle auto / light / dark / dim — remembered in this browser">Theme &#9662;</button>
+      <button id="themeBtn" class="barpill" title="cycle auto / light / dark / dim — remembered in this browser">Theme &#9662;</button>
     </div>
   </div>
 </header>

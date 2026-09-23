@@ -920,7 +920,9 @@ def test_the_rubrics_table_says_whether_a_topic_has_questions(live, page):
         all_rows(page, "rubrics")
         med = panel.locator("tr[data-rubric-row='Medicine & Clinical Health']")
         assert med.locator("[data-bank]").first.get_attribute("data-bank") != "0"
-        assert "report" in med.text_content() and "diagnose" in med.text_content()
+        # 11m: the halves in plain words, and the practice half opens from here
+        assert "hidden" in med.text_content() and "practice" in med.text_content()
+        assert med.locator("[data-read-bank]").count() == 1
         # a topic without questions folds into one row that names it (9b-7) …
         fold = panel.locator("tr[data-empty-topics]")
         assert fold.count() == 1 and "Sociology" in fold.text_content()

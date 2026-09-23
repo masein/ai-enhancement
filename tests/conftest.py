@@ -256,16 +256,6 @@ def choice(ctl) -> str:
     return ctl.get_attribute("data-value") or ""
 
 
-def pick_topic(page, task: str) -> None:
-    """The model page shows one judged topic's tables at a time (phase 9c),
-    chosen in a searchable list since there are thirty-six of them (10c, 11f)."""
-    box = page.locator("[data-topic-switch]")
-    if box.count():
-        choose(box, task)
-        page.wait_for_function("document.querySelector('[data-topic-switch]').dataset.value === "
-                               f"'{task}'")
-
-
 def all_rows(page, key: str, n: int = 100) -> None:
     """A table behind the shared pager (25 a page since 36 topics, 10c), all
     on one page: for a test about what the whole table holds."""

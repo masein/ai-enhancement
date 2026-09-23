@@ -217,6 +217,13 @@ EXPLAINER_REGISTER = (
     "up, state the assumptions, carry units and check limiting cases where they apply, and "
     "name the common mistake. Prose, never question-and-answer pairs.")
 EXPLAINER_WHO = "people learning or practising the subject"
+# 11m: dataset #9 asked for question-and-answer items and was handed the
+# documents' register, which ends "Prose, never question-and-answer pairs."
+# The generator wrote prose, as told, and the Q&A reader found none of 26.
+# Question-and-answer items have a register of their own.
+QA_REGISTER = (
+    "practice items a learner works through — one clear question, a short correct answer, "
+    "and one or two sentences of why. Question-and-answer pairs, never an essay.")
 # a field is listed only when its values are labels — `quantitative`,
 # `case_analysis` — not a sentence per question: the 37-topic banks' `intent`
 # is a different sentence on every item, and the top four of those would put
@@ -236,7 +243,8 @@ def _share_line(counts: dict) -> str:
     return ", ".join(f"{k} {round(100 * n / total)}%" for k, n in top)
 
 
-def audience_for(topic: str, task: str | None = None, root: Path | None = None) -> str:
+def audience_for(topic: str, task: str | None = None, root: Path | None = None,
+                 fmt: str = "doc") -> str:
     """The audience line for one topic, or '' when its bank says nothing about
     who is asking. Built from the WHOLE bank — both halves — because this is a
     count of labels, and a count of labels reveals no question.
@@ -265,6 +273,11 @@ def audience_for(topic: str, task: str | None = None, root: Path | None = None) 
     who, default = register_for(rows, counts)
     parts = [f"{f}s: {_share_line(counts[f])}" for f in AUDIENCE_FIELDS
              if is_label_set(counts[f], len(rows))]
+    if fmt == "free":
+        # the author's register is written for documents; question-and-answer
+        # items take their own, or the two instructions contradict (11m)
+        return (f"Audience: {who}" + (f" ({'; '.join(parts)})" if parts else "") + ".\n"
+                f"Register for question-and-answer items: {QA_REGISTER}")
     return (f"Audience: {who}" + (f" ({'; '.join(parts)})" if parts else "") + ".\n"
             f"Register for documents: {register or default}")
 
@@ -659,6 +672,16 @@ GEN_SYSTEM = (
     "study), length, framing, named entities and settings, so no two documents share a "
     "template. Never reproduce or closely paraphrase any existing exam or benchmark text. "
     "Reply with one JSON array of objects and nothing else.")
+# 11m: the system prompt above forbids a question-and-answer pair, and the
+# comparison format asks for nothing else — dataset #9 got both, and kept 0
+# of 26. Question-and-answer items are asked for in their own words.
+GEN_SYSTEM_QA = (
+    "You write original PRACTICE ITEMS that exercise a specific skill for a small language "
+    "model: question-and-answer pairs, each with a short correct answer and one or two "
+    "sentences of why. You are given a skill specification, a topic and a count. Invent fresh "
+    "material and vary the scenario, framing, named entities and settings across the set, so "
+    "no two items share a template. Never reproduce or closely paraphrase any existing exam "
+    "or benchmark text. Reply with one JSON array of objects and nothing else.")
 
 STYLE = {
     "doc": (f"Each object: {{\"title\": <a short descriptive title>, \"text\": <the document "
@@ -728,7 +751,8 @@ def generation_requests(did: int, spec_text: str, category: str, count: int,
                 + f"Style seed {seed}-{k}: make this set differ in scenario, register and "
                 + "phrasing from any other set you might write for the same specification.")
         reqs.append(llm.Request(
-            custom_id=f"gen:{did}:{k}", system=GEN_SYSTEM, user=user, max_tokens=8192, json=True,
+            custom_id=f"gen:{did}:{k}", system=GEN_SYSTEM_QA if fmt == "free" else GEN_SYSTEM,
+            user=user, max_tokens=8192, json=True,
             meta={"kind": "generation", "dataset_id": did, "count": n, "start": start,
                   "format": fmt, **({"focus": focus} if focus else {})}))
         start += n

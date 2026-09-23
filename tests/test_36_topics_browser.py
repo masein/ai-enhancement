@@ -76,20 +76,24 @@ def test_the_topic_boxes_filter_tick_all_or_none_and_say_what_they_cost(live, pa
 
 def test_the_model_page_picks_a_judged_topic_from_a_searchable_list(live, page):
     """11f: one Combobox — grouped by the 8 areas, weakest first inside each,
-    with the score — replaced the select and the "find a topic" box."""
+    with the score — replaced the select and the "find a topic" box. 11m took
+    the by-criterion block and its picker away; the answers' picker is the
+    same component, and the one left on the model page."""
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
-    box = page.locator("[data-topic-switch]")
+    box = page.locator("[data-combobox='answers topic']")
     box.wait_for()
     box.click()
-    opts = page.locator("#pop-cb-mdl-topic [role=option]")
+    opts = page.locator("#pop-cb-answers-topic [role=option]")
     assert opts.count() >= 30
-    for g in page.locator("#pop-cb-mdl-topic [role=group]").all():
+    for g in page.locator("#pop-cb-answers-topic [role=group]").all():
         scores = [_score(t) for t in g.locator(".cb-r").all_text_contents()]
         assert scores == sorted(scores)                       # weakest first, with the score
     box.fill("law")
-    page.wait_for_function("document.querySelectorAll('#pop-cb-mdl-topic [role=option]').length <= 3")
-    page.locator("#pop-cb-mdl-topic [role=option][data-value='exam_law']").click()
-    page.wait_for_selector("table[data-criteria-table='Law']")
+    page.wait_for_function("document.querySelectorAll('#pop-cb-answers-topic [role=option]')"
+                           ".length <= 3")
+    page.locator("#pop-cb-answers-topic [role=option][data-value='Law']").click()
+    page.wait_for_function("state.ans.topic === 'Law'")
+    page.wait_for_selector("[data-panel='model-answers'] [data-answer]")
     assert page.errors == []
 
 
@@ -129,7 +133,9 @@ def test_the_rubrics_table_is_searchable_and_paged(live, page):
     page.wait_for_function("document.querySelectorAll(\"[data-panel='rubrics'] "
                            "tr[data-rubric-row]\").length === 1")
     bank = panel.locator("tr[data-rubric-row='Medicine & Clinical Health'] [data-bank]")
-    assert re.fullmatch(r"\d+ — \d+ report / \d+ diagnose.*", bank.text_content())
+    # 11m: plain words, and the practice half one click away
+    assert re.fullmatch(r"\d+ — \d+ hidden / \d+ practice · read the practice half.*",
+                        bank.text_content())
     assert page.errors == []
 
 
