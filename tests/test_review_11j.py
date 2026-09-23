@@ -390,6 +390,72 @@ def test_no_hidden_question_reaches_the_card_or_its_answers(live, page, proposed
 
 
 @pytest.mark.dashboard
+def test_what_the_reader_opened_stays_open_through_a_poll(live, page):
+    """11m: masein opened Details and it closed itself a couple of seconds
+    later — the card was repainted on every poll of the Review tab, and the
+    disclosure came back closed."""
+    clear_proposals()
+    pid = plant("proposed")
+    try:
+        page.goto(live["base"] + f"/#tab=review&read=proposal:{pid}")
+        page.wait_for_selector("#reader[data-ready='1']")
+        det = page.locator(f"[data-rv-details='{pid}']")
+        det.locator("summary").click()
+        assert det.evaluate("e => e.open")
+        answers = page.locator(f"[data-answers-read='{pid}']")
+        answers.locator("summary").click()
+        page.wait_for_selector("[data-answers-note]")
+        # a poll of the tab behind it, and then a repaint of the card itself
+        page.wait_for_timeout(6000)
+        page.evaluate("loadReview()")
+        page.wait_for_timeout(400)
+        assert page.locator(f"[data-rv-details='{pid}']").evaluate("e => e.open"), \
+            "Details closed itself"
+        assert page.locator(f"[data-answers-read='{pid}']").evaluate("e => e.open")
+        page.evaluate("() => readFetch(state.read)")
+        page.wait_for_timeout(500)
+        assert page.locator(f"[data-rv-details='{pid}']").evaluate("e => e.open"), \
+            "Details closed when the card was rebuilt"
+        assert page.errors == []
+    finally:
+        clear_proposals()
+
+
+@pytest.mark.dashboard
+def test_generate_closes_the_card_and_lands_on_the_new_dataset(live, page):
+    """11m: pressing Generate is the end of this card's work — the sheet
+    closes and the Datasets view opens on the row being written. It used to
+    leave the card open, saying "#9 Waiting for the AI"."""
+    clear_proposals()
+    pid = plant("approved")
+    try:
+        # the name goes in first: the sheet covers the header
+        open_review(page, live["base"])
+        set_name(page, "masein")
+        page.goto(live["base"] + f"/#tab=review&read=proposal:{pid}")
+        page.wait_for_selector("#reader[data-ready='1']")
+        page.locator(f"[data-generate='{pid}']").click()
+        page.wait_for_selector("#reader", state="detached")
+        assert "view=datasets" in page.evaluate("location.hash")
+        assert "read=" not in page.evaluate("location.hash")
+        assert page.locator("[data-rv-list='datasets']").count() == 1
+        toast = page.locator("[data-toast='review']")
+        toast.wait_for()
+        did = int(re.search(r"Dataset #(\d+)", toast.text_content()).group(1))
+        row = page.locator(f"[data-ds-row='{did}']")
+        row.wait_for()
+        assert "landed" in (row.get_attribute("class") or "")
+        assert "being written" in row.text_content() or "of" in row.text_content()
+        # Back returns to the card it came from
+        page.go_back()
+        page.wait_for_selector("#reader[data-ready='1']")
+        assert page.locator("#reader").get_attribute("data-key") == f"proposal:{pid}"
+        assert page.errors == []
+    finally:
+        clear_proposals()
+
+
+@pytest.mark.dashboard
 def test_one_demo_only_badge_and_no_repeated_warning(live, page):
     clear_proposals()
     pid = plant("proposed", override=json.dumps(

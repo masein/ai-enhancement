@@ -223,8 +223,10 @@ def test_review_flow_in_the_browser(live, page):
     # generate
     page.locator("#reader input[type=number]").fill("20")
     card.locator(f"[data-generate='{pid}']").click()
-    page.wait_for_selector(f"#reader [data-rv-datasets='{pid}']", timeout=E2E_MS)
-    page.goto(base + "/#tab=review&view=datasets")
+    # 11m: generating closes the card and lands on the Datasets view, on the
+    # row being written
+    page.wait_for_selector("#reader", state="detached", timeout=E2E_MS)
+    assert "view=datasets" in page.evaluate("location.hash")
     ds = page.locator("[data-ds-row]").first
     ds.wait_for(timeout=E2E_MS)
     did_attr = ds.get_attribute("data-ds-row")

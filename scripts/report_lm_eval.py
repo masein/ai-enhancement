@@ -2971,7 +2971,8 @@ const state = {
   rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '',
         // 11j: which of the four views, and the small per-proposal choices
         view: '', focus: {}, watch: new Set(), answers: {}, answersOpen: 0,
-        spread: {}, count: {}, fmt: {}, rejecting: {}, landed: null },      // Review tab
+        spread: {}, count: {}, fmt: {}, rejecting: {}, landed: null,
+        detailsOpen: {}, specOpen: {}, landedDs: null },                    // Review tab
   ex: { status: null, candidates: [], loaded: false, msg: '', topic: '' },   // Exam tab
   topic: null,                         // open topic page, by slug (hash-routed)
   loop: { rows: null, blocked: '', msg: '', loaded: false, q: '' },          // Loop tab
@@ -8668,7 +8669,10 @@ function readDataset(wrap, r, data, got) {
     // 11k: it was an empty grey box — 11j's textarea took its class name,
     // and a dataset whose provenance predates the frozen spec had nothing to
     // show. The proposal's own words are the fallback
-    el('details', { class: 'rd-skill', 'data-dataset-spec': String(head.id) },
+    el('details', { class: 'rd-skill', 'data-dataset-spec': String(head.id),
+        open: (state.rv.specOpen || {})[head.id] ? '' : null,
+        ontoggle: e => { state.rv.specOpen = { ...(state.rv.specOpen || {}),
+          [head.id]: e.target.open }; } },
       el('summary', { text: 'The missing skill ▸' }),
       el('p', { class: 'spec', text: pv.approved_spec || head.spec_text
         || 'no spec recorded' })),
@@ -9598,17 +9602,37 @@ async function rvPost(path, body) {
     headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
     body: JSON.stringify(body) }).catch(() => null);
   const j = r ? await r.json().catch(() => ({})) : {};
-  state.rv.msg = r && r.ok ? '' : 'refused: ' + (j.detail || (r ? r.status : 'server unreachable'));
+  state.rv.msg = r && r.ok ? '' : 'Refused. ' + (j.detail || (r ? `the server answered HTTP `
+    + r.status : 'the server is unreachable — it may be restarting'));
   const pid = (/proposals\/(\d+)\//.exec(path) || [])[1];
   // what this browser asked for, so the toast lands when the batch finishes
   if (r && r.ok && j.dataset_id) state.rv.watch.add(j.dataset_id);
-  // 11j: the card in the sheet is one of these records — reload it too
-  if (r && r.ok && state.read && state.read.kind === 'proposal') readFetch(state.read);
+  // 11m: generating is the end of this card's work. The sheet closes and the
+  // Datasets view opens on the row it just made, being written — leaving the
+  // card open to say "#9 Waiting for the AI" left the person where they were
+  const made = r && r.ok && /generate$/.test(path) ? j.dataset_id : null;
+  if (made) {
+    state.rv.view = 'datasets';
+    markDataset(made);
+    await loadReview();
+    navigate({ tab: 'review', model: null, topic: null, read: null });
+  } else if (r && r.ok && state.read && state.read.kind === 'proposal') {
+    // 11j: the card in the sheet is one of these records — reload it too
+    readFetch(state.read);
+  }
   if (r && r.ok) toast(/approve$/.test(path) ? `Approved the missing skill of proposal #${pid}`
-    : /reject$/.test(path) ? 'Rejected' : /generate$/.test(path)
-      ? `Dataset #${j.dataset_id} requested — it appears here when the batch completes` : 'Done',
+    : /reject$/.test(path) ? 'Rejected' : made
+      ? `Dataset #${made} is being written — it lands here when the AI answers` : 'Done',
     { key: 'review' });
+  if (made) return;
   await loadReview(); render();
+}
+
+// the dataset a click just asked for, marked while someone finds it
+function markDataset(did) {
+  state.rv.landedDs = did;
+  setTimeout(() => { if (state.rv.landedDs === did) { state.rv.landedDs = null;
+    if (state.tab === 'review') render(); } }, LANDED_MS);
 }
 
 // The name every decision is recorded under. It is remembered for this
@@ -9795,7 +9819,8 @@ function useInTraining(d) {
 
 // one row for a dataset, here and on the topic page
 function dsRow(d) {
-  return el('tr', { 'data-ds-row': String(d.id) },
+  return el('tr', { 'data-ds-row': String(d.id),
+      class: state.rv.landedDs === d.id ? 'landed' : null },
     el('td', { class: 'num se', text: '#' + d.id }),
     el('td', { text: d.category || '—' }),
     el('td', { class: 'small', text: modelName(d.model) }),
@@ -10028,6 +10053,9 @@ function readProposal(wrap, r, p) {
     }
     if (p.status === 'rejected' && p.reject_reason)
       body.push(el('p', { class: 'small', text: 'Rejected: ' + p.reject_reason }));
+    // 11m: a refusal is said here, not only on the tab behind the sheet
+    if (state.rv.msg)
+      body.push(el('p', { class: 'warn', 'data-rv-msg': String(p.id), text: state.rv.msg }));
     // 6. the datasets made from it
     if ((p.datasets || []).length) {
       body.push(el('div', { class: 'dxh', text: 'Datasets from this proposal' }));
@@ -10057,7 +10085,12 @@ function readProposal(wrap, r, p) {
           : [])].join('; ') || 'none recorded'],
       ['task', p.task],
     ];
-    body.push(el('details', { class: 'rd-det', 'data-rv-details': String(p.id) },
+    // 11m: a repaint keeps what the reader opened — the state says whether
+    // it is open, never the DOM that is about to be replaced
+    body.push(el('details', { class: 'rd-det', 'data-rv-details': String(p.id),
+        open: (state.rv.detailsOpen || {})[p.id] ? '' : null,
+        ontoggle: e => { state.rv.detailsOpen = { ...(state.rv.detailsOpen || {}),
+          [p.id]: e.target.open }; } },
       el('summary', { text: 'Details ▸' }),
       el('dl', { class: 'provlist small' }, rows.flatMap(([k, v]) =>
         [el('dt', { text: k }), el('dd', { text: String(v) })]))));
