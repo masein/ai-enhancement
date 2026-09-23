@@ -294,6 +294,10 @@ def _trim_judge(j: dict | None) -> dict | None:
                                "criteria_mean", "criteria_n", "criteria_labels",
                                "criteria_conditional", "flags", "breakdowns",
                                "breakdowns_constant", "unparseable",
+                               # 11l: answers that never left a reasoning
+                               # block, why a topic has no score, and what
+                               # the answers were generated with
+                               "no_answer", "no_score", "generation",
                                # when this topic's grades landed — its own
                                # time, not the file's last merge
                                "judged_at")
@@ -395,8 +399,15 @@ def topic_gate(task: str, t: dict, state: dict | None, caution: str | None,
     hard = []
     n_rep = t.get("n_report") or 0
     a = t.get("answers") or {}
-    n = a.get("n") or 0
+    # 11l: an answer that never left its reasoning block is not an answer —
+    # not a blank one, not a repeated one. The checks below read the rest
+    n = (a.get("n") or 0) - (a.get("no_answer") or 0)
     blank = (a.get("empty", 0) + a.get("short", 0))
+    if t.get("no_score"):
+        hard.append({"why": f"{t['no_score']} — {t.get('no_answer')} of {t.get('n')} answers "
+                            f"stopped inside the model's reasoning. Sit it again: a reasoning "
+                            f"model now gets room to answer",
+                     "short": "not scored — the model never finished answering"})
     if n_rep < PROPOSE_MIN_N:
         hard.append({"why": f"{n_rep} hidden questions in this topic — under the "
                             f"{PROPOSE_MIN_N} a topic needs, so its score is noise. Write more on "
@@ -1448,6 +1459,26 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             f"({', '.join(drifted[:4])}): the same thirty scripts were graded differently from "
             f"the previous run. Those judged scores are preliminary — a vendor may have changed "
             f"the model behind the id.")
+    # 11l: answers that never left a reasoning block. Run #60 was found by a
+    # person reading one answer; this class of failure is a check now
+    unfinished = []
+    for m in model_rows:
+        ts = ((m.get("judge") or {}).get("tasks") or {}).values()
+        gone = sum((t.get("no_answer") or 0) for t in ts if isinstance(t, dict))
+        if gone:
+            total = sum((t.get("n") or 0) for t in ts if isinstance(t, dict))
+            unfinished.append((m, gone, total))
+    if unfinished:
+        unfinished.sort(key=lambda x: -x[1])
+        named = [f"{m['name']} ({gone:,} of {total:,})" for m, gone, total in unfinished]
+        warn('judge_unfinished', 'warning', {'model': unfinished[0][0]["id"]},
+            f"Answers that never finished: {named[0]}"
+            + (f" and {len(named) - 1} more" if len(named) > 1 else ""),
+            f"{'; '.join(named[:4])}{', …' if len(named) > 4 else ''}: answers that stopped "
+            f"inside the model's reasoning before it answered. They are not scored — counted as "
+            f"no answer and left out of every mean — and a topic where most answers never "
+            f"finished has no score at all. Sit the exam again: a reasoning model now gets "
+            f"room to answer.")
     local_judged = [m["name"] for m in model_rows if provisional_reason(m.get("judge"))]
     if local_judged:
         warn('judge_local', 'info', {'tab': 'loop'}, f"{len(local_judged)} model{'s' if len(local_judged) > 1 else ''} graded by a local judge: provisional",
@@ -4370,7 +4401,15 @@ function vJudged(m) {
   // per topic, weakest first, on the REPORT half — the diagnose half is never the score
   const cats = J.exam.filter(t => j.tasks[t] && pubScore(j.tasks[t]) != null)
     .sort((a, b) => pubScore(j.tasks[a]) - pubScore(j.tasks[b]));
-  if (cats.length) {
+  // 11l: a topic whose answers never finished has no score — it stays in the
+  // table with a dash and says why, rather than vanishing from it
+  const voids = J.exam.filter(t => j.tasks[t] && pubScore(j.tasks[t]) == null
+    && j.tasks[t].no_score);
+  if (voids.length) card.append(el('p', { class: 'warn', 'data-not-scored': String(voids.length) },
+    el('b', { text: `${voids.length} topic${voids.length === 1 ? ' was' : 's were'} not scored. ` }),
+    upFirst(voids.length && j.tasks[voids[0]].no_score) + '. Sit the exam again: a reasoning '
+      + 'model now gets room to answer.'));
+  if (cats.length || voids.length) {
     card.append(el('div', { class: 'dxh', text: 'By topic (0–4), weakest first within each area — '
       + 'hidden questions' + (prov ? ' · demo only, not ranked' : '') }));
     // what is true of every row is said once, above the table: a soft gate
@@ -4387,16 +4426,24 @@ function vJudged(m) {
       const nr = v.n_report != null ? v.n_report : v.n;
       const g = v.propose;
       const tainted = (m.tainted || []).includes(t);
-      return el('tr', { class: prov || nr < CAT_MIN_N ? 'dim' : null, 'data-topic': frName(t) },
+      return el('tr', { class: prov || v.no_score || nr < CAT_MIN_N ? 'dim' : null,
+          'data-topic': frName(t) },
         el('td', {}, frName(t), tainted ? el('span', { class: 'badge taint',
           title: 'this model trained on this topic\'s practice data — the score is shown, and '
             + 'it is not a ranking',
           text: 'trained on it' }) : ''),
-        el('td', { class: 'num', text: `${num(pubScore(v), 2)} / 4` }),
+        el('td', { class: 'num', 'data-topic-score': frName(t),
+            text: pubScore(v) == null ? '—' : `${num(pubScore(v), 2)} / 4` },
+          v.no_answer ? el('div', { class: 'se', 'data-no-answer': String(v.no_answer),
+            text: `${v.n} answers, ${v.no_answer} no answer` }) : ''),
         el('td', { class: 'num se', text: k ? String(k.kappa) : '—',
           title: k ? `${k.n} human-graded answers in this topic` : 'not calibrated per topic' }),
-        el('td', { class: 'num se', text: String(nr) + (nr < CAT_MIN_N ? ' · under ' + CAT_MIN_N : '') }),
-        el('td', {}, jBar(v.dist, v.n)),
+        // a topic with no score stands on no hidden question: a dash, not "0 ·
+        // under 30", which reads as a bank still being written (11l)
+        el('td', { class: 'num se', text: v.no_score ? '—'
+          : String(nr) + (nr < CAT_MIN_N ? ' · under ' + CAT_MIN_N : '') }),
+        el('td', {}, v.no_score ? el('span', { class: 'small se', text: upFirst(v.no_score) })
+          : jBar(v.dist, v.n)),
         LIVE ? el('td', {}, g ? proposeBtn(m.id, frName(t), g) : '',
           g && (g.hard || []).length ? proposeWhy(g) : '',
           g && g.caution ? el('div', { class: 'propwhy', text: 'caution — MMLU for this '
@@ -4404,17 +4451,19 @@ function vJudged(m) {
     const body = [];
     for (const area of areas) {
       const ts = cats.filter(t => areaOf(t) === area);    // already weakest first
-      if (!ts.length) continue;
+      const vs = voids.filter(t => areaOf(t) === area);
+      if (!ts.length && !vs.length) continue;
       const of = ((DATA.meta.areas || {})[area] || []).length;
       // an area mean only for a judge whose scores count — never while provisional
       const mean = !prov && ok && ts.length * 2 >= of
         ? ts.filter(t => !(m.tainted || []).includes(t)).map(t => pubScore(j.tasks[t])) : null;
       body.push(el('tr', { class: 'arearow', 'data-area-row': area },
         el('td', { colspan: LIVE ? 6 : 5 }, el('span', { class: 'eyebrow', text: area }),
-          el('span', { class: 'se', text: ` · ${ts.length} of ${of || ts.length} topics judged` }),
+          el('span', { class: 'se', text: ` · ${ts.length} of ${of || ts.length} topics judged`
+            + (vs.length ? ` · ${vs.length} not scored` : '') }),
           mean && mean.length ? el('span', { class: 'se', 'data-area-mean': area,
             text: ` · mean ${num(mean.reduce((x, y) => x + y, 0) / mean.length, 2)} / 4` }) : '')),
-        ...ts.map(row));
+        ...ts.map(row), ...vs.map(row));
     }
     card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd', 'data-judged-topics': '1' },
       el('thead', {}, el('tr', {}, el('th', { text: 'topic' }), el('th', { class: 'num', text: 'score' }),
@@ -4495,7 +4544,8 @@ function vJudged(m) {
         .sort((a, b) => (v.criteria_mean[a] ?? 2) - (v.criteria_mean[b] ?? 2));
       card.append(el('div', { class: 'dxh', 'data-criteria': frName(t),
         text: `${frName(t)} — by criterion (0–1), weakest first · ${v.n} answers, `
-          + `${v.unparseable || 0} unreadable` }));
+          + `${v.unparseable || 0} unreadable`
+          + (v.no_answer ? ` · ${v.no_answer} no answer` : '') }));
       card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd',
         'data-criteria-table': frName(t) },
         el('thead', {}, el('tr', {}, el('th', { text: 'criterion' }),
@@ -4577,7 +4627,9 @@ function vJudged(m) {
     // the answers themselves, for whichever topic is picked — the same panel
     // the topic page shows, because "see the answers" is the step between a
     // score and knowing what to do about it
-    if (LIVE) card.append(modelAnswers(m, cats));
+    // a topic with no score keeps its answers readable — that is how a
+    // person checks what the model did write (11l)
+    if (LIVE) card.append(modelAnswers(m, [...cats, ...voids]));
   }
   // the control
   const ctl = j.tasks[J.control];
@@ -9110,10 +9162,35 @@ function readProvenance(wrap, r, d) {
       el('div', { class: 'frm', 'data-prov-marks': '1' }, pre.length
         ? el('span', { class: 'badge warn', 'data-demo-only': '1', text: 'Demo only',
             title: pre.join(' · ') }) : ''),
+      answerBudgetLine(rec.tasks),
       el('div', { class: 'rd-tree', 'data-prov-tree': 'judge' },
         provTree(rec.runs, 'judge runs', 0), provTree(rec.judge_file, 'the judge', 0),
         provTree(rec.tasks, 'topics', 1)));
   }
+}
+
+// 11l: what the answers were generated with, said once where the grading is
+// explained — it changes what a score means. A reasoning model gets room to
+// answer; an answer that still never finished is counted, not scored.
+function answerBudget(g) {
+  if (!g) return null;
+  const over = /max_gen_toks\s*=\s*(\d+)/.exec(typeof g.override === 'string' ? g.override
+    : JSON.stringify(g.override || ''));
+  return over ? +over[1] : (g.max_gen_toks != null ? +g.max_gen_toks : null);
+}
+function answerBudgetLine(tasks) {
+  const ts = Object.values(tasks || {});
+  const budgets = [...new Set(ts.map(t => answerBudget(t.generation)).filter(x => x != null))]
+    .sort((a, b) => a - b);
+  const gone = ts.reduce((a, t) => a + (t.no_answer || 0), 0);
+  const raised = budgets.some(b => b > 256);
+  if (!budgets.length && !gone) return '';
+  return el('p', { class: 'small', 'data-answer-budget': budgets.join(',') },
+    budgets.length ? `Answers were given up to ${budgets.map(b => b.toLocaleString('en'))
+      .join(' or ')} tokens` + (raised ? ' — more than the usual 256, because this model '
+        + 'reasons before it answers.' : '.') : '',
+    gone ? el('span', { class: 'warn', 'data-no-answer-total': String(gone),
+      text: ` ${gone.toLocaleString('en')} answers never finished: they were not scored.` }) : '');
 }
 
 // ---------- live mode: submit + queue (only reachable when served by the API) ----------
@@ -10333,7 +10410,10 @@ function modelAnswers(m, cats) {
   const rep = j.report_half || {};
   wrap.append(el('p', { class: 'note', 'data-report-half': '1' },
     el('b', { text: 'The hidden questions. ' }),
-    `${rep.n ?? 0} questions, mean ${num(rep.mean, 2)} / 4`
+    // 11l: a topic that was not scored says so, instead of "mean — / 4"
+    j.no_score ? `${rep.n ?? 0} questions, not scored: ${j.no_score}`
+      : `${rep.n ?? 0} questions, mean ${num(rep.mean, 2)} / 4`
+        + (j.no_answer ? ` · ${j.no_answer} answers never finished, left out` : '')
     + (Object.entries(rep.flags || {}).filter(([, n]) => n).length
        ? ' · ' + Object.entries(rep.flags).filter(([, n]) => n)
            .map(([fid, n]) => `${n} ${fid.replace(/_/g, ' ')}`).join(', ') : '')
@@ -11321,6 +11401,8 @@ function ansWeakest(it, criteria, n = 3) {
 // One answer: what was asked, what the model wrote, what the judge wrote, the
 // criteria; the score large on the right with the flags under it. Nothing
 // sideways — the judge's note is the most useful text here and it wraps.
+const wordsIn = t => (String(t || '').match(/\S+/g) || []).length;
+
 function ansCard(it, j) {
   const meta = it.meta || {};
   const flags = (j.flags || []).filter(f => (it.flags || {})[f.id]);
@@ -11332,7 +11414,17 @@ function ansCard(it, j) {
                   ? (meta.jurisdiction_required ? 'jurisdiction required' : '') : null,
                 meta.intent].filter(Boolean).join(' · ');
   const long = (it.answer || '').length > 220;
-  return el('article', { class: 'anscard', 'data-answer': it.qid, 'data-half': 'diagnose' },
+  // 11l: a reasoning model's answer is what came after its reasoning; the
+  // reasoning is one click away. One that never left it is no answer at all
+  const why = open => el('details', { class: 'small', 'data-reasoning': it.qid,
+      open: open ? '' : null },
+    el('summary', { text: `The model's reasoning (${wordsIn(it.reasoning)} words)`
+      + (it.reasoning_unterminated ? ' — it never finished' : '') + ' ▸' }),
+    el('div', { class: 'se', style: 'white-space:pre-wrap;overflow-wrap:anywhere',
+      text: it.reasoning || '' }));
+  return el('article', { class: 'anscard' + (it.no_answer ? ' noanswer' : ''),
+      'data-answer': it.qid, 'data-half': 'diagnose',
+      'data-no-answer': it.no_answer ? '1' : null },
     el('div', { class: 'main', style: 'min-width:0' },
       head ? el('div', { class: 'ansmeta', text: head }) : '',
       el('div', { class: 'qa' },
@@ -11340,12 +11432,17 @@ function ansCard(it, j) {
         el('div', { class: 'txt', text: it.prompt || '(question not on disk)' }),
         el('span', { class: 'lbl', text: 'A' }),
         el('div', { class: 'txt' },
-          el('div', { class: open ? '' : 'clamp3', 'data-answer-text': '1',
-                      text: it.answer || '(the model wrote nothing)' }),
-          long ? el('button', { class: 'quiet', style: 'padding:2px 0;font-size:12px',
+          it.no_answer
+            ? el('div', { class: 'warn', 'data-answer-text': '1',
+                text: 'No answer: the model was still reasoning when it ran out of room. '
+                  + 'This question was not scored.' })
+            : el('div', { class: open ? '' : 'clamp3', 'data-answer-text': '1',
+                text: it.answer || '(the model wrote nothing)' }),
+          long && !it.no_answer ? el('button', { class: 'quiet', style: 'padding:2px 0;font-size:12px',
             'data-answer-toggle': '1', 'aria-expanded': String(!!open),
             text: open ? 'Show less' : 'Show the whole answer',
-            onclick: () => { state.ans.open[it.qid] = !open; render(); } }) : ''),
+            onclick: () => { state.ans.open[it.qid] = !open; render(); } }) : '',
+          it.had_reasoning ? why(it.no_answer) : ''),
         el('span', { class: 'lbl', text: 'Judge' }),
         el('div', { class: 'txt', 'data-judge-note': '1', text: it.justification || '—' }),
         crit.length ? el('span', { class: 'lbl', text: 'Criteria' }) : '',
@@ -11355,7 +11452,8 @@ function ansCard(it, j) {
             : 'every criterion met' })) : '')),
     el('div', { class: 'side' },
       el('div', { class: 'score', text: it.graded ? `${it.score} / 4` : '—' }),
-      it.graded ? '' : el('div', { class: 'se', text: 'the judge\'s reply was unreadable' }),
+      it.graded ? '' : el('div', { class: 'se', text: it.no_answer ? 'no answer — not scored'
+        : 'the judge\'s reply was unreadable' }),
       el('div', {}, flags.map(f => el('span', { class: 'badge danger', title: f.effect_words,
         'data-flag': f.id, text: f.label })))));
 }
@@ -11408,7 +11506,10 @@ function loopAnswersPanel(r) {
   const rep = j.report_half || {};
   card.append(el('p', { class: 'note', 'data-report-half': '1' },
     el('b', { text: 'The hidden questions. ' }),
-    `${rep.n ?? 0} questions, mean ${num(rep.mean, 2)} / 4`
+    // 11l: a topic that was not scored says so, instead of "mean — / 4"
+    j.no_score ? `${rep.n ?? 0} questions, not scored: ${j.no_score}`
+      : `${rep.n ?? 0} questions, mean ${num(rep.mean, 2)} / 4`
+        + (j.no_answer ? ` · ${j.no_answer} answers never finished, left out` : '')
     // the flags OF THIS HALF: the whole-bank count under this heading would
     // be a claim about the published score that is not true of it
     + (Object.entries(rep.flags || {}).filter(([, n]) => n).length
@@ -12403,6 +12504,8 @@ function placeInk(still) {
 let _warnSig = null;
 
 function showMe(show) {
+  // 11l: a check about one model opens that model's page
+  if (show.model) return navigate({ model: show.model, topic: null });
   if (show.tab === 'models')
     Object.assign(state.mdl, { kind: show.kind || 'all', taintedOnly: !!show.tainted,
                                prelimOnly: !!show.prelim, judgedOnly: false, q: '' });

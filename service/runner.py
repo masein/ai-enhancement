@@ -451,6 +451,7 @@ def run_submission(sub: dict) -> None:
                        f"needs ~{meta['need_gb']:g} GB")
 
     tasks = config.tasks_for_suite(sub["suite"])
+    judged = set(config.judged_tasks())
     # a judged run narrowed to one topic: the same suite, fewer tasks. The
     # judge below grades only these, so a person can sit one topic in minutes
     # instead of the whole exam
@@ -582,6 +583,13 @@ def run_submission(sub: dict) -> None:
                    *include_args_for(task)]
             if kind == "instruct":
                 cmd.append("--apply_chat_template")
+            # 11l: a reasoning model thinks before it answers, and 256 tokens
+            # ran out inside the thinking on every question of run #60. Only
+            # its judged answers get more room, and only when its template is
+            # the one that thinks; lm_eval records the override in its results
+            if (kind == "instruct" and task in judged
+                    and (meta.get("archinfo") or {}).get("reasoning_template")):
+                cmd += ["--gen_kwargs", f"max_gen_toks={config.REASONING_MAX_GEN_TOKS}"]
 
             t_task = time.time()
             # the dropped-privilege child cannot create its own output dir under
@@ -594,6 +602,10 @@ def run_submission(sub: dict) -> None:
                     pass
             with open(log_path, "a") as lf:
                 lf.write(f"\n===== [{sid}] {task} ({shots}-shot) =====\n")
+                if "--gen_kwargs" in cmd:
+                    lf.write(f"[reasoning model] answers get "
+                             f"{config.REASONING_MAX_GEN_TOKS} tokens, not 256: the chat "
+                             f"template writes its reasoning before the answer\n")
                 if remote_code:
                     lf.write(f"[trust_remote_code] running as "
                              f"{config.EVAL_USER or 'root (EVAL_USER unset!)'}, "

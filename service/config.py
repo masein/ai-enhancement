@@ -91,6 +91,13 @@ def remote_code_blocked() -> str:
                 f"that exists")
     return ""
 
+# 11l: a reasoning model (its chat template opens a <think> block) writes its
+# reasoning before the answer, and the exam's 256-token answer budget ran out
+# inside it on every one of run #60's 3,730 questions. Its judged runs get
+# this many tokens per answer instead; every other model keeps 256, so
+# nothing it scored moves. What was used is recorded with the grades.
+REASONING_MAX_GEN_TOKS = int(os.environ.get("REASONING_MAX_GEN_TOKS", "2048"))
+
 # The benchmark suite — one place, mirrored from run_benchmarks.sh. quick is for
 # iteration (minutes); full is the comparable number. Both write into the same
 # tree, so a quick run later "upgrades" to full by running only the missing tasks.

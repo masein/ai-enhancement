@@ -298,7 +298,10 @@ def log_lines(sid: int, tail: int = 200) -> dict:
 # what a topic's entry in judge.json may show in the Reader: counts, scores
 # and fingerprints — never its items, which carry qids of both halves
 _TASK_FIELDS = ("topic", "n", "n_report", "n_diagnose", "score_report", "score_diagnose",
-                "ungraded", "unparseable", "bank_sha256", "max")
+                "ungraded", "unparseable", "bank_sha256", "max",
+                # 11l: what the answers were generated with, and how many never
+                # left a reasoning block — it changes what a score means
+                "generation", "no_answer", "no_score")
 _HEAD_FIELDS = ("judge", "canary", "split_salt", "correct_at", "preliminary_reasons")
 
 

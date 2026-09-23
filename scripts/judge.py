@@ -56,6 +56,7 @@ import collections
 import hashlib
 import json
 import math
+import os
 import re
 import sys
 import time
@@ -893,10 +894,110 @@ def answered_fingerprint(model_dir: Path, task: str) -> str | None:
 
 
 def _answer(rec: dict) -> str:
+    """The raw generation, exactly as the harness logged it — the record of
+    what the model wrote. What is graded and shown is answer_parts()."""
     r = rec.get("filtered_resps") or rec.get("resps") or []
     while isinstance(r, list) and r:
         r = r[0]
     return str(r) if isinstance(r, str) else ""
+
+
+# ---------------------------------------------------------------------------
+# 11l: reasoning models write a monologue before the answer. Qwen3's run #60
+# spent its whole budget inside <think> on every one of 3,730 questions, and
+# the judge graded 3,730 cut-off monologues as answers. The monologue is
+# taken out before anything is graded or shown, and an answer that never left
+# it is no answer — never a low score.
+#
+# The wrappers are a setting: REASONING_WRAPPERS="<think>,</think>;<r>,</r>"
+# adds pairs to the default, so the next model's tag is a config change.
+# ---------------------------------------------------------------------------
+DEFAULT_REASONING_WRAPPERS = (("<think>", "</think>"),)
+NO_ANSWER_WHY = "the model never finished answering: these questions were not scored"
+
+
+def reasoning_wrappers() -> list[tuple[str, str]]:
+    out = list(DEFAULT_REASONING_WRAPPERS)
+    for pair in os.environ.get("REASONING_WRAPPERS", "").split(";"):
+        if "," not in pair:
+            continue
+        o, c = (x.strip() for x in pair.split(",", 1))
+        if o and c and (o, c) not in out:
+            out.append((o, c))
+    return out
+
+
+def split_reasoning(text: str) -> dict:
+    """{answer_text, reasoning_text, had_reasoning, reasoning_unterminated}.
+
+    Every reasoning block comes out. A closing tag with no opening one before
+    it closes a block the chat template opened in the prompt (DeepSeek-R1's
+    distillations do this), so everything before it is reasoning. A block
+    that opens and never closes takes the rest of the generation with it.
+    A generation with no block is returned exactly as it was written, so a
+    model that does not reason is graded on the very same text as before."""
+    text = text or ""
+    rest, parts, had, open_end = text, [], False, False
+    for o, c in reasoning_wrappers():
+        while True:
+            i, j = rest.find(o), rest.find(c)
+            if i >= 0 and (j < 0 or i < j):
+                k = rest.find(c, i + len(o))
+                had = True
+                if k < 0:
+                    parts.append(rest[i + len(o):])
+                    rest, open_end = rest[:i], True
+                    break
+                parts.append(rest[i + len(o):k])
+                rest = rest[:i] + rest[k + len(c):]
+            elif j >= 0:
+                had = True
+                parts.append(rest[:j])
+                rest = rest[j + len(c):]
+            else:
+                break
+    if not had:
+        return {"answer_text": text, "reasoning_text": "", "had_reasoning": False,
+                "reasoning_unterminated": False}
+    return {"answer_text": rest.strip(),
+            "reasoning_text": "\n\n".join(p.strip() for p in parts if p.strip()),
+            "had_reasoning": True, "reasoning_unterminated": open_end}
+
+
+def answer_parts(rec: dict) -> dict:
+    """The raw generation, split: what the judge grades and the page shows is
+    `answer_text`. `no_answer` when a reasoning model never left its block,
+    or left it with nothing after — that item is not graded, and counts as
+    no answer rather than as a zero. A model that does not reason never has
+    `no_answer`: an empty generation from it is graded as it always was."""
+    raw = _answer(rec)
+    p = split_reasoning(raw)
+    p["raw"] = raw
+    p["no_answer"] = p["had_reasoning"] and (p["reasoning_unterminated"]
+                                             or not p["answer_text"])
+    return p
+
+
+def _generation(model_dir: Path, task: str) -> dict | None:
+    """What the harness generated the answers with, from its own results
+    file: the answer budget and the stop sequences, and any run-wide
+    override (--gen_kwargs). It changes what a score means, so it is recorded
+    with the grades."""
+    files = sorted(f for d in model_dir.glob(f"{task}_*shot")
+                   if re.fullmatch(rf"{task}_\d+shot", d.name)
+                   for f in d.rglob("results_*.json"))
+    if not files:
+        return None
+    try:
+        blob = json.loads(files[-1].read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    gk = ((blob.get("configs") or {}).get(task) or {}).get("generation_kwargs") or {}
+    out = {k: gk[k] for k in ("max_gen_toks", "until") if k in gk}
+    over = (blob.get("config") or {}).get("gen_kwargs")
+    if over:
+        out["override"] = over
+    return out or None
 
 
 def mmlu_outcomes(model_dir: Path) -> dict[str, bool]:
@@ -970,11 +1071,35 @@ def plan_requests(model_dir: Path, judge_family: str,
         # step that picks what to train must be able to say so.
         stats = {"n": 0, "empty": 0, "short": 0, "words": 0}
         seen: set[str] = set()
+        gen = _generation(model_dir, task)
+        if gen:
+            plan.setdefault("generation", {})[task] = gen
         for i, rec in enumerate(sorted(_records(model_dir, task), key=lambda r: str(r.get("doc_hash")))):
             doc = rec.get("doc") or {}
-            ans = _answer(rec)
+            parts = answer_parts(rec)
+            ans = parts["answer_text"]
             qid = doc.get("qid")
             cid = f"judge:{safe}:{task}:{i}"
+            if parts["no_answer"]:
+                # 11l: never sent to the judge — there is nothing to grade.
+                # Counted, and kept out of every mean
+                stats["n"] += 1
+                stats["no_answer"] = stats.get("no_answer", 0) + 1
+                item = {"doc_hash": rec.get("doc_hash"), "id": doc.get("id"), "qid": qid,
+                        "half": ("diagnose" if task == CONTROL_TASK
+                                 else dx.split_of(qid) if qid else None),
+                        "category": doc.get("category"), "answer_words": 0,
+                        "no_answer": True, "had_reasoning": True,
+                        "reasoning_words": words(parts["reasoning_text"])}
+                if parts["reasoning_unterminated"]:
+                    item["reasoning_unterminated"] = True
+                if isinstance(doc.get("meta"), dict):
+                    item["meta"] = doc["meta"]
+                if task == CONTROL_TASK:
+                    item["mmlu_doc_hash"] = doc.get("mmlu_doc_hash")
+                    item["mc_right"] = mc.get(doc.get("mmlu_doc_hash"))
+                items.append(item)
+                continue
             # a 15-key JSON reply is a few hundred tokens; a single score is
             # a few dozen. The cap is per request, so it follows the prompt.
             user = (build_criteria_prompt(rub.text, spec, doc.get("prompt", ""),
@@ -996,6 +1121,9 @@ def plan_requests(model_dir: Path, judge_family: str,
                     "half": ("diagnose" if task == CONTROL_TASK
                              else dx.split_of(qid) if qid else None),
                     "category": doc.get("category"), "answer_words": words(ans)}
+            if parts["had_reasoning"]:
+                item["had_reasoning"] = True
+                item["reasoning_words"] = words(parts["reasoning_text"])
             # what the item is about, when the bank carried it: the acuity of
             # a medical question is the axis its author reads first
             if isinstance(doc.get("meta"), dict):
@@ -1234,8 +1362,13 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
         spec = rubric_for(task).criteria
         items = []
         for m in items_meta:
-            res = results.get(m["cid"])
             it = {k: v for k, v in m.items() if k != "cid"}
+            if m.get("no_answer"):
+                # 11l: nothing reached the judge, and nothing is scored
+                it.update(score=None, graded=False, justification="")
+                items.append(it)
+                continue
+            res = results.get(m["cid"])
             reply = res.text if res and not res.error else None
             if spec:
                 # the 0-4 is folded here, from the criteria the judge gave,
@@ -1260,30 +1393,7 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
             items.append(it)
         if not items:
             continue
-        dist = collections.Counter(str(it["score"]) for it in items)
-        by_len: dict[str, list[int]] = collections.defaultdict(list)
-        for it in items:
-            by_len[length_bucket(it["answer_words"])].append(it["score"])
-        rep = [it["score"] for it in items if it["half"] == "report"]
-        dia = [it["score"] for it in items if it["half"] == "diagnose"]
-
-        def _dist(xs):
-            c = collections.Counter(xs)
-            return {str(k): c.get(k, 0) for k in range(MAX_SCORE + 1)}
-        t = {"n": len(items), "mean": round(sum(it["score"] for it in items) / len(items), 4),
-             "max": MAX_SCORE, "ungraded": sum(1 for it in items if not it["graded"]),
-             "n_report": len(rep), "score_report": round(sum(rep) / len(rep), 4) if rep else None,
-             "n_diagnose": len(dia),
-             "score_diagnose": round(sum(dia) / len(dia), 4) if dia else None,
-             "dist": {str(k): dist.get(str(k), 0) for k in range(MAX_SCORE + 1)},
-             # per half, so a before/after comparison can carry a standard error
-             "dist_report": _dist(rep), "dist_diagnose": _dist(dia),
-             "score_vs_length": [{"bucket": label, "n": len(by_len[label]),
-                                  "mean": round(sum(by_len[label]) / len(by_len[label]), 4)}
-                                 for _, _, label in LENGTH_BUCKETS if by_len.get(label)],
-             "items": items}
-        if spec:
-            t.update(_criteria_blocks(items, spec))
+        t = summarise_task(task, items, spec)
         # which questions, and under what name: a result counts only while
         # this is the task's current fingerprint, and is history after
         t["bank_sha256"] = (plan.get("bank") or {}).get(task)
@@ -1293,20 +1403,74 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
         stats = (plan.get("answer_stats") or {}).get(task)
         if stats:
             t["answers"] = stats
-        if task == CONTROL_TASK:
-            ctl: dict[str, dict] = {}
-            for it in items:
-                c = ctl.setdefault(it["category"] or "—", {"n": 0, "mc_wrong": 0, "knew": 0,
-                                                            "didnt": 0, "unjoined": 0})
-                c["n"] += 1
-                if it["mc_right"] is None:
-                    c["unjoined"] += 1
-                elif not it["mc_right"]:
-                    c["mc_wrong"] += 1
-                    c["knew" if it["score"] >= CORRECT_AT else "didnt"] += 1
-            t["control"] = ctl
+        # what the answers were generated with: the budget changes what a
+        # score means, so it travels with the grades (11l)
+        gen = (plan.get("generation") or {}).get(task)
+        if gen:
+            t["generation"] = gen
         tasks[task] = t
     return {**head, "canary": canary, "preliminary_reasons": reasons, "tasks": tasks}
+
+
+# the keys summarise_task() owns: revalidate() replaces exactly these
+AGGREGATE_KEYS = ("n", "mean", "max", "ungraded", "n_report", "score_report", "n_diagnose",
+                  "score_diagnose", "dist", "dist_report", "dist_diagnose", "score_vs_length",
+                  "items", "control", "no_answer", "no_score", "criteria_mean", "criteria_n",
+                  "criteria_labels", "flags", "unparseable", "criteria_conditional",
+                  "breakdowns", "breakdowns_constant")
+
+
+def summarise_task(task: str, items: list[dict], spec: dict | None) -> dict:
+    """A topic's numbers from its items. An item with no answer (a reasoning
+    model that never finished) is counted and kept, and left out of every
+    mean, every distribution and every criterion. When most of a topic's
+    items have no answer the topic has no score at all — a dash, never a low
+    number. A topic with no such item comes out exactly as it always did."""
+    scored = [it for it in items if not it.get("no_answer")]
+    n_none = len(items) - len(scored)
+    dist = collections.Counter(str(it["score"]) for it in scored)
+    by_len: dict[str, list[int]] = collections.defaultdict(list)
+    for it in scored:
+        by_len[length_bucket(it["answer_words"])].append(it["score"])
+    rep = [it["score"] for it in scored if it["half"] == "report"]
+    dia = [it["score"] for it in scored if it["half"] == "diagnose"]
+
+    def _dist(xs):
+        c = collections.Counter(xs)
+        return {str(k): c.get(k, 0) for k in range(MAX_SCORE + 1)}
+    t = {"n": len(items),
+         "mean": round(sum(it["score"] for it in scored) / len(scored), 4) if scored else None,
+         "max": MAX_SCORE, "ungraded": sum(1 for it in scored if not it["graded"]),
+         "n_report": len(rep), "score_report": round(sum(rep) / len(rep), 4) if rep else None,
+         "n_diagnose": len(dia),
+         "score_diagnose": round(sum(dia) / len(dia), 4) if dia else None,
+         "dist": {str(k): dist.get(str(k), 0) for k in range(MAX_SCORE + 1)},
+         # per half, so a before/after comparison can carry a standard error
+         "dist_report": _dist(rep), "dist_diagnose": _dist(dia),
+         "score_vs_length": [{"bucket": label, "n": len(by_len[label]),
+                              "mean": round(sum(by_len[label]) / len(by_len[label]), 4)}
+                             for _, _, label in LENGTH_BUCKETS if by_len.get(label)],
+         "items": items}
+    if n_none:
+        t["no_answer"] = n_none
+        if n_none * 2 > len(items):
+            # most of it never became an answer: no number at all, and why
+            t.update(mean=None, score_report=None, score_diagnose=None, no_score=NO_ANSWER_WHY)
+    if spec:
+        t.update(_criteria_blocks(scored, spec))
+    if task == CONTROL_TASK:
+        ctl: dict[str, dict] = {}
+        for it in scored:
+            c = ctl.setdefault(it["category"] or "—", {"n": 0, "mc_wrong": 0, "knew": 0,
+                                                        "didnt": 0, "unjoined": 0})
+            c["n"] += 1
+            if it["mc_right"] is None:
+                c["unjoined"] += 1
+            elif not it["mc_right"]:
+                c["mc_wrong"] += 1
+                c["knew" if it["score"] >= CORRECT_AT else "didnt"] += 1
+        t["control"] = ctl
+    return t
 
 
 CONTROL_LABEL = "MMLU control"
@@ -1479,6 +1643,70 @@ def backfill_judged_at(j: dict, runs: list[dict]) -> list[str]:
     return filled
 
 
+def revalidate(model_dir: Path, dest: Path | None = None) -> dict | None:
+    """11l: re-read a judged model's answers against its judge.json, and take
+    out of the grades every answer that never left its reasoning block — for
+    a file graded before the split existed, like run #60's. The judge is not
+    asked again: whether an answer exists is a fact of the answer on disk.
+
+    Nothing is deleted silently. What the judge said about a non-answer is
+    kept on the item under `voided`, and the topic says why it has no score.
+    Only a topic with such an answer is touched, so a model that does not
+    reason keeps its file exactly as it was. Returns {task: no-answer count}
+    for the topics that changed, or None when nothing did."""
+    p = (dest or model_dir) / "judge.json"
+    if not p.exists():
+        return None
+    try:
+        j = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if j.get("skipped") or not isinstance(j.get("tasks"), dict):
+        return None
+    changed: dict[str, int] = {}
+    for task, t in j["tasks"].items():
+        if not isinstance(t, dict) or not t.get("items"):
+            continue
+        by_hash = {rec.get("doc_hash"): rec for rec in _records(model_dir, task)}
+        touched = False
+        for it in t["items"]:
+            rec = by_hash.get(it.get("doc_hash"))
+            if rec is None:
+                continue
+            parts = answer_parts(rec)
+            if parts["had_reasoning"] and not it.get("had_reasoning"):
+                it["had_reasoning"] = True
+                it["reasoning_words"] = words(parts["reasoning_text"])
+                touched = True
+            if parts["no_answer"] and not it.get("no_answer"):
+                it["voided"] = {k: it[k] for k in ("score", "graded", "justification",
+                                                   "criteria", "flags", "fold") if k in it}
+                for k in ("criteria", "flags", "fold", "extra_keys"):
+                    it.pop(k, None)
+                it.update(score=None, graded=False, justification="", no_answer=True,
+                          answer_words=0)
+                if parts["reasoning_unterminated"]:
+                    it["reasoning_unterminated"] = True
+                touched = True
+        if not touched:
+            continue
+        items = t["items"]
+        for k in AGGREGATE_KEYS:
+            t.pop(k, None)
+        t.update(summarise_task(task, items, rubric_for(task).criteria))
+        if isinstance(t.get("answers"), dict) and t.get("no_answer"):
+            t["answers"]["no_answer"] = t["no_answer"]
+        # and what those answers were generated with: for run #60, the 256
+        # tokens that ran out inside the reasoning
+        gen = _generation(model_dir, task)
+        if gen and not t.get("generation"):
+            t["generation"] = gen
+        changed[task] = t.get("no_answer", 0)
+    if changed:
+        write_judge(model_dir, j, dest)
+    return changed or None
+
+
 def write_judge(model_dir: Path, out: dict, dest: Path | None = None) -> Path:
     d = dest or model_dir
     d.mkdir(parents=True, exist_ok=True)
@@ -1562,10 +1790,30 @@ def main() -> int:
     ap.add_argument("-o", "--out", type=Path, default=None,
                     help="write judge.json under this directory instead of beside the results")
     ap.add_argument("-q", "--quiet", action="store_true")
+    ap.add_argument("--revalidate", action="store_true",
+                    help="take answers that never left a reasoning block out of every "
+                         "judge.json already written; asks no judge (11l)")
     a = ap.parse_args()
     if not a.results.is_dir():
         print(f"no such directory: {a.results}", file=sys.stderr)
         return 2
+    if a.revalidate:
+        want = {m.replace("/", "__") for m in a.model}
+        touched = 0
+        for d in sorted(p for p in a.results.iterdir() if p.is_dir()):
+            if want and d.name not in want:
+                continue
+            changed = revalidate(d)
+            if not changed:
+                continue
+            touched += 1
+            gone = sum(changed.values())
+            j = json.loads((d / "judge.json").read_text(encoding="utf-8"))
+            dashed = sum(1 for t in changed if (j["tasks"].get(t) or {}).get("no_score"))
+            print(f"{d.name}: {gone} answers never finished — {dashed} of {len(changed)} "
+                  f"topics now have no score")
+        print(f"revalidated: {touched} model(s) changed, the rest untouched")
+        return 0
     from service import config, llm
     if not a.stub:
         why = blocked()
@@ -1621,8 +1869,10 @@ def main() -> int:
             if out.get("skipped"):
                 print(f"{d.name:46} {out['skipped']}")
             else:
-                bits = [f"{t}={v['score_report'] if v['score_report'] is not None else v['mean']:.2f}/4"
-                        f"(n={v['n']})" for t, v in sorted(out["tasks"].items())]
+                def shown(v):
+                    x = v["score_report"] if v["score_report"] is not None else v["mean"]
+                    return "—" if x is None else f"{x:.2f}/4"
+                bits = [f"{t}={shown(v)}(n={v['n']})" for t, v in sorted(out["tasks"].items())]
                 c = out.get("canary") or {}
                 print(f"{d.name:46} canary MAD {c.get('mad_vs_human')} vs human, "
                       f"{c.get('mad_vs_previous')} vs previous · {' '.join(bits)}")

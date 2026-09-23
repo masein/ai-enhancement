@@ -242,11 +242,32 @@ def _moe_params(cfg: dict, total: int | None) -> dict:
 
 def _template_id(text: str | None, src: str | None) -> dict:
     """A stable short hash of the template text — the thing that has to match
-    for two runs to be comparable. The text itself is too long for a table."""
+    for two runs to be comparable. The text itself is too long for a table.
+
+    11l: and whether it is a reasoning model's template — one that writes a
+    reasoning block before the answer (Qwen3, the DeepSeek-R1 distillations).
+    Those need room to answer; the runner reads this flag."""
     if not text:
         return {"tmpl_sha": None, "tmpl_src": None}
     sha = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
-    return {"tmpl_sha": sha, "tmpl_src": src}
+    out = {"tmpl_sha": sha, "tmpl_src": src}
+    if reasoning_template(text):
+        out["reasoning_template"] = True
+    return out
+
+
+def reasoning_template(text: str | None) -> bool:
+    """A chat template that opens a reasoning block, or offers the switch
+    that turns one on. The tags are the judge's own list, so the one setting
+    (REASONING_WRAPPERS) teaches both halves a new model's tag."""
+    if not text:
+        return False
+    import sys
+    scripts = str(Path(__file__).resolve().parent.parent / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from judge import reasoning_wrappers
+    return "enable_thinking" in text or any(o in text for o, _ in reasoning_wrappers())
 
 
 def resolve_kind(hf_id: str, requested: str,

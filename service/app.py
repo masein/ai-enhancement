@@ -1499,17 +1499,25 @@ def answers(model: str, topic: str, limit: int = 200):
     spec = _judge.rubric_for(task).criteria or {}
     answers_by_hash = {}
     for rec in _judge._records(model_dir, task):
-        answers_by_hash[rec.get("doc_hash")] = ((rec.get("doc") or {}), _judge._answer(rec))
+        answers_by_hash[rec.get("doc_hash")] = ((rec.get("doc") or {}), _judge.answer_parts(rec))
     rows = []
     for it in t.get("items") or []:
         if it.get("half") != "diagnose":
             continue                      # the whole safety property, in one line
-        doc, ans = answers_by_hash.get(it.get("doc_hash"), ({}, ""))
+        doc, parts = answers_by_hash.get(it.get("doc_hash"), ({}, None))
+        parts = parts or {"answer_text": "", "reasoning_text": "", "had_reasoning": False,
+                          "reasoning_unterminated": False, "no_answer": False}
         rows.append({
             "qid": it.get("qid"), "score": it.get("score"), "graded": it.get("graded"),
             "meta": it.get("meta") or {}, "answer_words": it.get("answer_words"),
             "prompt": doc.get("prompt") or "", "reference": doc.get("reference") or "",
-            "answer": ans, "criteria": it.get("criteria") or {},
+            # 11l: the answer is what the judge graded — a reasoning block is
+            # not part of it. The reasoning rides along for anyone checking
+            "answer": parts["answer_text"], "reasoning": parts["reasoning_text"],
+            "had_reasoning": parts["had_reasoning"],
+            "reasoning_unterminated": parts["reasoning_unterminated"],
+            "no_answer": bool(it.get("no_answer") or parts["no_answer"]),
+            "criteria": it.get("criteria") or {},
             "flags": {k: bool(v) for k, v in (it.get("flags") or {}).items()},
             "effects_applied": (it.get("fold") or {}).get("effects_applied") or [],
             "justification": it.get("justification") or "",
@@ -1533,6 +1541,8 @@ def answers(model: str, topic: str, limit: int = 200):
                         "note": "report-half questions and answers are never listed — the "
                                 "published score is this line"},
         "items": rows[:max(1, min(limit, 500))], "n_diagnose": len(rows),
+        # 11l: answers that never left a reasoning block — counted, not scored
+        "no_answer": t.get("no_answer") or 0, "no_score": t.get("no_score"),
     }
 
 
@@ -1828,7 +1838,9 @@ def proposal_answers(pid: int):
             if it.get("half") == "diagnose"}          # the whole safety property
     answers = {}
     for rec in _judge._records(model_dir, task):
-        answers[rec.get("doc_hash")] = ((rec.get("doc") or {}), _judge._answer(rec))
+        # 11l: the answer, never the reasoning before it
+        answers[rec.get("doc_hash")] = ((rec.get("doc") or {}),
+                                        _judge.answer_parts(rec)["answer_text"])
     out = []
     for f in chosen:
         it = meta.get(str(f["qid"]))

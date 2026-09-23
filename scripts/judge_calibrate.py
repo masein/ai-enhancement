@@ -65,7 +65,9 @@ def _judged_rows(results: Path, models: set[str]) -> list[dict]:
             for it in t.get("items", []):
                 key = (task, it.get("doc_hash"))
                 a = answers.get(key)
-                if not a:
+                # 11l: an answer that never left its reasoning block has no
+                # grade, so there is nothing for a person to agree with
+                if not a or it.get("no_answer"):
                     continue
                 rows.append({"id": f"{d.name}|{task}|{it['doc_hash']}", "model": d.name,
                              "task": task, "category": it.get("category") or task[3:],
@@ -82,7 +84,7 @@ def _judged_rows(results: Path, models: set[str]) -> list[dict]:
 
 
 def _answers(model_dir: Path) -> dict[tuple, dict]:
-    from judge import _answer, _records
+    from judge import _records, answer_parts
     from exam_build import ALL_TASKS
     out = {}
     for task in ALL_TASKS:
@@ -90,7 +92,9 @@ def _answers(model_dir: Path) -> dict[tuple, dict]:
             doc = rec.get("doc") or {}
             out[(task, rec.get("doc_hash"))] = {"prompt": doc.get("prompt", ""),
                                                 "reference": doc.get("reference", ""),
-                                                "answer": _answer(rec)}
+                                                # what the judge graded: the
+                                                # reasoning is not the answer
+                                                "answer": answer_parts(rec)["answer_text"]}
     return out
 
 

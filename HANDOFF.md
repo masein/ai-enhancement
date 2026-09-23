@@ -1434,6 +1434,61 @@ sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "
 5. Dataset #6's reader shows the missing skill; no table paints over its
    card at 1,280–1,920 px; no page slides sideways at 400 px.
 
+
+### 11l — thinking models are scored on their answers
+
+Brief: `docs/prompts/phase-11l-thinking-models-and-reads.md`, §1 only; §2–§9
+follow as 11m. Run #60 (Qwen3-1.7B) opened `<think>` on every one of 3,730
+answers and closed it on none: the 256-token budget ran out inside the
+reasoning, and the judge graded cut-off monologues as answers.
+
+- **The reasoning comes out before anything is graded or shown**
+  (`judge.split_reasoning`, `judge.answer_parts`). The raw generation stays
+  in the harness's own log. `<think>…</think>` is the default; more tags go
+  in `REASONING_WRAPPERS`. A closing tag with no opening one closes a block
+  the chat template opened in the prompt (the DeepSeek-R1 distillations).
+- **An answer that never left its reasoning block is no answer.** It is not
+  sent to the judge, is counted (`no_answer`), and is in no mean, no
+  distribution and no criterion. A topic where most answers never finished
+  has **no score** — a dash on the model page, with "the model never
+  finished answering: these questions were not scored", and Propose refuses
+  it. Only a reasoning model's answer can be no answer: an empty generation
+  from any other model is graded exactly as before.
+- **A reasoning model gets room to answer.** Preflight marks a chat template
+  that opens a reasoning block (or offers `enable_thinking`); its judged
+  runs pass `--gen_kwargs max_gen_toks=2048` (`REASONING_MAX_GEN_TOKS`).
+  Every other model keeps 256. The budget each topic's answers were
+  generated with is read from the harness's results file, recorded with the
+  grades, and shown under **How this was graded ▸**.
+- **Run #60 is voided, not deleted.** `judge.py --revalidate` re-reads every
+  judged model's answers and takes out of the grades each one that never
+  left its reasoning block, keeping what the judge said about it under
+  `voided`. It asks no judge, and it touches only topics with such answers.
+- **A new check:** "Answers that never finished", amber, naming the model
+  and the count; **Show me** opens its page.
+
+**Deploy steps, after 11l merges.** Code, then one data step.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+sudo docker compose exec -T bench python3 scripts/judge.py /home/masein/benchmarks/results/full --revalidate
+```
+
+**Expected output:**
+
+1. `up -d --build` ends with the container healthy; the image build prints
+   `image files OK`.
+2. The log grep prints `no errors`.
+3. The revalidate step prints
+   `Qwen__Qwen3-1.7B: 3730 answers never finished — 37 of 37 topics now have no score`
+   (the counts are the run's own), then
+   `revalidated: 1 model(s) changed, the rest untouched`. Run again, it
+   prints `revalidated: 0 model(s) changed`.
+4. Qwen3-1.7B's model page shows a dash on all 37 topics and "37 topics
+   were not scored"; the checks bar reads "Answers that never finished:
+   Qwen3-1.7B (3,730 of 3,730)". Sit it again to score it.
+
 ---
 
 ## 11. Known gaps, risks, loose ends
