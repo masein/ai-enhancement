@@ -17,7 +17,7 @@ from conftest import open_kind
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12a"
 FOUR = ["below-135m-it", "chance-160m", "good-750m", "skewed-360m"]    # by name, not by score
-LABELS = ["Typos", "JSON", "Arabic", "Fix the email", "Just 3 names"]
+LABELS = ["Typos", "JSON", "TL;DR", "Fix the email", "Just 3 names"]
 UNTESTED = "fx/one-option-70m"
 
 
@@ -177,7 +177,7 @@ def test_the_model_page_has_its_everyday_block_after_the_exam(live, page):
     assert block.locator("[data-everyday-count]").text_content() == "5 of 5"
     rows = block.locator("[data-evd-row]")
     assert [r.locator(".evgroup").text_content() for r in rows.all()] == \
-        ["Understanding", "Transform", "Language", "Writing", "Behaviour"]
+        ["Understanding", "Transform", "Summarising", "Writing", "Instructions"]
     assert [r.locator(".evmark").text_content() for r in rows.all()] == ["✓"] * 5
     assert rows.nth(1).locator(".evreason").text_content() == "valid JSON, all five values"
     # no criteria strip, no score bar, no ids

@@ -119,17 +119,54 @@ def test_the_topics_are_the_37_folders_and_the_mapping_is_the_briefs():
     assert categories.categorize("underwater_basketweaving") is None
 
 
+def _field(meta, name):
+    """task_index's values were dicts; the installed 0.4.12 gives Entry
+    objects (the live check, 2026-09-24: 'Entry' object has no attribute
+    'get'). Read either."""
+    return meta.get(name) if isinstance(meta, dict) else getattr(meta, name, None)
+
+
+def _is_plain_task(meta) -> bool:
+    """"task" — not a group, a tag or a python task — as a string or an enum"""
+    t = _field(meta, "type")
+    if t is None:
+        t = _field(meta, "kind")
+    said = {str(t).lower(), str(getattr(t, "value", "")).lower(),
+            str(getattr(t, "name", "")).lower()}
+    return "task" in said or any(x.endswith(".task") for x in said)
+
+
 def test_matches_the_installed_harness():
-    """When lm_eval is importable (the server, not CI), its own MMLU task index
-    is the authority — pinned lists drift, package contents do not."""
+    """When lm_eval is importable (the server's image, not a laptop), its own
+    MMLU task index is the authority — pinned lists drift, package contents
+    do not. Deploy step 3 is where this runs."""
     pytest.importorskip("lm_eval")
     from lm_eval.tasks import TaskManager
     tm = TaskManager()
-    subjects = sorted(name[5:] for name, meta in tm.task_index.items()
-                      if name.startswith("mmlu_")
-                      and "tasks/mmlu/default/" in str(meta.get("yaml_path", ""))
-                      and meta.get("type") == "task")
+    index = tm.task_index
+    mmlu = {name: meta for name, meta in index.items() if name.startswith("mmlu_")}
+    # a shape this cannot read fails here, and says what it got, rather than
+    # comparing an empty list
+    sample = next(iter(mmlu.values()), None)
+    assert sample is not None and _field(sample, "yaml_path") is not None, repr(sample)
+    subjects = sorted(name[5:] for name, meta in mmlu.items()
+                      if "tasks/mmlu/default/" in str(_field(meta, "yaml_path") or "")
+                      and _is_plain_task(meta))
     assert subjects == HARNESS_SUBJECTS_0_4_12
+
+
+@pytest.mark.parametrize("meta", [
+    {"yaml_path": "/x/tasks/mmlu/default/mmlu_law.yaml", "type": "task"},
+    type("Entry", (), {"yaml_path": "/x/tasks/mmlu/default/mmlu_law.yaml", "type": "task"})(),
+    type("Entry", (), {"yaml_path": "/x/tasks/mmlu/default/mmlu_law.yaml",
+                       "kind": type("Kind", (), {"name": "TASK", "value": 1})()})(),
+])
+def test_the_harness_index_is_read_in_either_shape(meta):
+    """the reader above, without lm_eval: a dict, an object, an enum kind"""
+    assert _field(meta, "yaml_path").endswith("mmlu_law.yaml")
+    assert _is_plain_task(meta)
+    group = {"yaml_path": "/x/tasks/mmlu/default/_mmlu.yaml", "type": "group"}
+    assert not _is_plain_task(group)
 
 
 def test_parser_refuses_a_subject_listed_twice():

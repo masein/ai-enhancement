@@ -325,7 +325,8 @@ def test_judged_section_and_the_control_sentence(surface, tree):
     text = card.text_content()
     # 11h: plain words — κ is "agreement with a person"
     assert "Counts." in text and "Agreement with a person:" in text
-    assert "Canary steady." in text and "fixed scripts re-graded" in text
+    # 12b.3: "Judge steady." in the view, the canary's numbers under How this works
+    assert "Judge steady." in text and "fixed scripts re-graded" in text
     assert card.locator("[data-canary='steady']").count() == 1
     assert "STUB grader" in text                                  # never mistaken for a judgement
     assert "Knew it, couldn't pick it" in text

@@ -202,7 +202,7 @@ def test_every_tab_is_itself_at_its_centre_and_the_strip_never_scrolls(live, pag
         shot(page, "11e-2-bar-1512-light.png", clip={"x": 0, "y": 0, "width": width, "height": 60})
         page.locator("#warnings summary[data-warn-summary]").click()
         judged = page.locator("[data-checks-judged]")
-        assert re.fullmatch(r"\d+ of \d+ are about the judged suite", judged.text_content().strip())
+        assert re.fullmatch(r"\d+ of \d+ (are|is) about the judged suite", judged.text_content().strip())
         shot(page, "11e-2-checks-open-1512-light.png")
     assert page.errors == []
 

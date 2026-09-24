@@ -161,7 +161,8 @@ def _everyday_dir(row: dict):
 
 
 def _finish_everyday(row: dict, results: dict[str, llm.Result]) -> None:
-    """12a: the judge's verdict on the pilot's Arabic question. The row
+    """12a: the judge's verdict on the pilot's TL;DR (the question the judge
+    marks, against its rubric). The row
     that ran the pilot says its count once it lands."""
     d, sub = _everyday_dir(row)
     if d is None:

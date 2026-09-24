@@ -1844,6 +1844,67 @@ git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check &&
    A model page opens on a header of tiles and the tabs Scores · Answers ·
    History, with Improve for a model that has a proposal or a dataset.
 
+### 12b.3 — the live check of 12a, 12b.1 and 12b.2
+
+Part A of `docs/prompts/phase-12b3-live-check-and-everyday-round2.md`: what
+the live check found on 2026-09-24 at 17:30.
+
+- **The bare address showed an empty page (A1).** The cause was the wait,
+  not the address.
+  - The scores payload is 1.4 MB of JSON, sent uncompressed. From a laptop
+    on the tailnet it took 60–65 s to arrive, and the page drew nothing but
+    its title and footer until it had.
+  - A cold `/` and a cold `/#tab=home` both rendered Home once it arrived.
+  - An exception in that first paint would have looked the same: the load
+    swallowed it.
+- **What A1 changed:**
+  - The service compresses its answers (`GZipMiddleware`; about 7× on the
+    fixture's payload).
+  - The header (the four places, the run counter, Test a model, the name) is
+    drawn before the scores arrive.
+  - An error drawing the board is shown in the page and in the console.
+  - An empty or unknown address lands on Home and reads `#tab=home`. `#home`,
+    `#models` and `#benchmarks` land on their places.
+- **The pilot is English only (A2).** 03 is the school notice's **TL;DR**,
+  marked by the judge against the rubric the question carries. The groups are
+  Understanding, Writing, Transform, Summarising and Instructions.
+- **`test_matches_the_installed_harness` (A3)** reads `task_index` whether its
+  values are dicts or the installed lm_eval's `Entry` objects. Nothing in
+  `scripts/` or `service/` reads lm_eval's internals: the service runs it as a
+  command, and MMLU by area reads the repo's own `categories.yaml`.
+- **Problems and known limits (A4).** Each check carries `limit`.
+  - The status dot and Needs you count problems only.
+  - The known limits are one folded line, **Known limits (n) ▸**.
+  - The two chat-template checks are one.
+- **Needs you ignores Demo only datasets (A5).**
+- **A judged model with no average (A6)** shows its topics judged and its
+  weakest topic, with one provisional badge. Home shows the weakest topic
+  across the board.
+- **One filled button (A7).** The header's reads **Test this model** on a
+  model page.
+- **Small fixes (A8).** Home has no section numbers. The cards say **See all
+  models →**. The judged block says **Judge steady**, with the canary's
+  numbers under How this works.
+
+**Deploy steps, after 12b.3 merges.** Code, and the pilot's 03.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check && mkdir /tmp/check && cd /tmp/check && tar -x && exec env -i PATH="$PATH" HOME=/tmp/check LANG=C.UTF-8 python -m pytest -q -p no:cacheprovider -m "not gpu and not network and not dashboard"' 2>&1 | tail -15
+curl -s -o /dev/null -w "%{size_download} bytes\n" -H "Accept-Encoding: gzip" http://100.74.89.105:8899/api/results
+```
+
+**Expected output:**
+
+1. The build ends healthy and prints `image files OK`.
+2. The log grep prints `no errors`.
+3. Step 3 ends `N passed, M deselected in …s`, with no `failed`. The
+   harness test runs there, since the image has lm_eval.
+4. The last line prints a few hundred thousand bytes, not 1.4 million.
+5. `http://100.74.89.105:8899/` opens Home. The dot is green unless there is
+   a problem, and its list ends with **Known limits (n) ▸**.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

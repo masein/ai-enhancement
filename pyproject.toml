@@ -5,6 +5,10 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+# a passing test's tmp_path goes when the test ends: many unit tests write a
+# board of about 20 MB, which kept whole came to about 6 GB a run and filled
+# the check container's disk (2026-09-24). A failing test's stays, to look at.
+tmp_path_retention_policy = "failed"
 markers = [
     "gpu: needs the RTX 5090 — deselected in CI",
     "network: needs the Hub or the internet — deselected in CI",
@@ -14,7 +18,9 @@ markers = [
 [tool.ruff]
 target-version = "py312"
 line-length = 92
-extend-exclude = ["runs", "Claude outputs", "artifacts"]
+# docs/prompts: the briefs, and the files they come with, are kept as given —
+#       phase-12b3/checks.py is the reference the everyday checks are tested against
+extend-exclude = ["runs", "Claude outputs", "artifacts", "docs/prompts"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W"]

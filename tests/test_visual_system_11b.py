@@ -148,7 +148,8 @@ def test_reduced_motion_stops_the_pulse(live, browser):
         ctx.close()
 
 
-@pytest.mark.parametrize("label", ["Overview", "Leaderboard", "Models", "Queue"])
+# Home (Overview) has no section numbers since 12b.3: test_live_check_12b3_browser
+@pytest.mark.parametrize("label", ["Leaderboard", "Models", "Queue"])
 def test_the_sections_are_numbered_in_order(live, page, label):
     page.goto(live["base"] + "/")
     page.wait_for_selector("#view .card")

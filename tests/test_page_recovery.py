@@ -128,11 +128,12 @@ def test_the_board_checks_are_one_line_on_every_tab(live):
         pg.wait_for_selector("[data-warnings='collapsed']", timeout=20000)
         fold = pg.locator("[data-warnings='collapsed']")
         assert fold.count() == 1, label
-        assert not fold.locator(".checklist").is_visible(), label       # one line, closed
+        assert not fold.locator(":scope > .checklist").is_visible(), label       # one line, closed
     said = pg.locator("[data-warnings='collapsed'] > summary").text_content()
-    n = pg.evaluate("DATA.checks.length")
-    assert n == pg.evaluate("DATA.warnings.length")
-    judged = pg.evaluate("DATA.checks.filter(c => c.judged).length")
+    assert pg.evaluate("DATA.checks.length") == pg.evaluate("DATA.warnings.length")
+    # 12b.3: the count is the problems; the known limits fold under them
+    n = pg.evaluate("boardProblems(DATA.checks).length")
+    judged = pg.evaluate("boardProblems(DATA.checks).filter(c => c.judged).length")
     # 11e: the pill is a button with the count; the kind is the panel's first
     # line. 12b: the pill is a status dot — amber, and the count, nothing else
     assert said.strip() == str(n)
@@ -141,7 +142,7 @@ def test_the_board_checks_are_one_line_on_every_tab(live):
     pg.locator("[data-warnings='collapsed'] > summary").click()
     if judged:
         assert f"{judged} of {n}" in pg.locator("[data-checks-judged]").text_content()
-    rows = pg.locator("[data-warnings='collapsed'] li[data-check]")
+    rows = pg.locator("[data-warnings='collapsed'] > .checklist > li[data-check]")
     assert rows.count() == n
     first = rows.first
     assert first.locator(".dot").count() == 1
@@ -152,6 +153,7 @@ def test_the_board_checks_are_one_line_on_every_tab(live):
     # "Show me" goes to the rows: the preliminary check lands on Models, filtered
     prelim = pg.locator("li[data-check='preliminary'] [data-show-me]")
     if prelim.count():
+        pg.locator("[data-known-limits] > details > summary").click()     # a known limit
         prelim.click()
         # 12b: the Models table, its Status filter set to preliminary
         pg.wait_for_function("lbS().status === 'preliminary'")

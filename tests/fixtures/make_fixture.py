@@ -822,7 +822,8 @@ EVERYDAY_ANSWERS = {
         _THINK.format("Five fields: name, age, role, city, start date.") + '```json\n{"name": '
         '"Sara Ahmed", "age": 34, "role": "product manager", "city": "Dubai", "joined": '
         '"March 2021"}\n```',
-        _THINK.format("Thursday is al-khamis.") + "تم تأجيل الاجتماع إلى يوم الخميس",
+        _THINK.format("Closing time, day, buses, pickup.") + "School closes early at 11:30 on "
+        "Thursday; buses leave at 11:15, or pick your child up by 11:45.",
         _THINK.format("Four mistakes to fix.") + "Dear Sir, I am writing to you regarding the "
         "invoice which was sent last week and has still not been paid.",
         _THINK.format("Short and plain.") + "1. Bean There\n2. Daily Grind\n3. Brew Haven",
@@ -831,7 +832,7 @@ EVERYDAY_ANSWERS = {
         "February has 28 days.",
         'Here\'s your JSON:\n{"name": "Sara Ahmed", "age": "34", "job": "product manager", '
         '"city": "Dubai", "start": "2021-03"}',
-        "The meeting is moved to Thursday.",
+        "School closes early on Thursday.",
         "Dear Sir, I am writing to you regarding the invoice which was sended last week and "
         "still not payed.",
         "Here are three names:\n1. Bean There\n2. Daily Grind\n3. Brew Haven",
@@ -840,7 +841,8 @@ EVERYDAY_ANSWERS = {
         "<think>\nhmm, a leap year. february normally has 28 days and a leap year adds one, "
         "so the answer should be",
         '{"name": "Sara Ahmed", "age": 34, "title": "product manager"}',
-        _THINK.format("Arabic for Thursday.") + "الاجتماع نقل إلى الخميس",
+        _THINK.format("Keep it short.") + "Thursday: school closes at 11:30. Buses leave at "
+        "11:15, pickup by 11:45.",
         _THINK.format("Fix the verbs.") + "Dear Sir, I am writing to you about the invoice which "
         "was sent last week and is still not paid.",
         "1. **Bean There** – a cozy spot\n2. Daily Grind\n3. Brew Haven",
@@ -859,7 +861,7 @@ EVERYDAY_THINKS = {"fx/good-750m", "fx/skewed-360m"}
 
 def write_everyday(out_dir: Path) -> dict[str, dict]:
     """The pilot's samples and results as the harness writes them, then
-    marked by scripts/everyday.py with the stub marking the Arabic answer."""
+    marked by scripts/everyday.py with the stub marking the TL;DR."""
     import everyday as ev
     pilot = ev.load_pilot()
     out = {}

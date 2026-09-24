@@ -16,8 +16,9 @@ It reads the generations the harness logged, marks each one on the text
 after the reasoning block (judge.answer_parts, #59's split — never the raw
 generation), and writes everyday.json beside the model's results. Each
 check says pass or fail and one reason in plain words, because the reason
-is what the page shows. Question 03 is the one the judge marks; re-marking
-keeps its verdict while the answer is the same one it read.
+is what the page shows. Question 03 is the one the judge marks, against the
+rubric the question carries; re-marking keeps its verdict while the answer is
+the same one it read. English only (2026-09-24).
 """
 
 from __future__ import annotations
@@ -41,9 +42,10 @@ PILOT_DIR = REPO / "eval_tasks" / "everyday"
 PILOT_PATH = PILOT_DIR / "pilot.jsonl"
 TEMPLATE_PATH = PILOT_DIR / "_everyday_template_yaml"
 OUT_NAME = "everyday.json"
-# the plan's five groups, as the page shows them
+# the pilot's five groups, as the page shows them (12b.3: English only —
+# Language became Summarising, and Behaviour is Instructions)
 GROUPS = {"understanding": "Understanding", "writing": "Writing", "transform": "Transform",
-          "language": "Language", "behaviour": "Behaviour"}
+          "summarising": "Summarising", "instructions": "Instructions"}
 NEVER_FINISHED = "never finished answering"
 WAITING = "waiting for the judge"
 
@@ -194,33 +196,42 @@ CHECKS = {"contains": check_contains, "json": check_json, "fixed": check_fixed,
 # the one question the judge marks
 # ---------------------------------------------------------------------------
 
-JUDGE_PROMPT = """You are checking ONE answer from an assistant. A person asked, in English, how to say a sentence in Arabic. Decide whether the answer gives a correct Arabic rendering of the WHOLE sentence, written in Arabic script. The meeting being moved, postponed or rescheduled to Thursday are all correct. A transliteration or an explanation beside the Arabic is fine. A part of the sentence, the wrong day, or no Arabic script fails. Reply with one JSON object and nothing else: {{"pass": <true or false>, "reason": <one short sentence for a person, about the answer>}}.
+# 12b.3: the question carries its rubric; nothing here knows what it asks
+JUDGE_PROMPT = """You are checking ONE answer from an assistant against a rubric. Read the question, the rubric and the answer, and decide whether the answer passes the rubric. Reply with one JSON object and nothing else: {{"pass": <true or false>, "reason": <one short sentence for a person, about the answer>}}.
 
 QUESTION
 {question}
 
-A CORRECT RENDERING
-{reference}
+RUBRIC
+{rubric}
 
 THE ANSWER
 {answer}"""
 
-_ARABIC = re.compile(r"[؀-ۿ]")
-
 
 def judge_prompt(item: dict, answer: str) -> str:
-    return JUDGE_PROMPT.format(question=item["prompt"], reference=item["check"]["reference"],
+    return JUDGE_PROMPT.format(question=item["prompt"], rubric=item["check"]["rubric"],
                                answer=answer.strip() or "(empty)")
 
 
+def _sentences(text: str) -> int:
+    return len([s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()])
+
+
 def stub_verdict(answer: str) -> dict:
-    """The deterministic stand-in the tests and dry runs use: Arabic script,
-    and Thursday."""
-    if not _ARABIC.search(answer or ""):
-        return {"pass": False, "reason": "no Arabic script in the answer"}
-    if "الخميس" not in answer:
-        return {"pass": False, "reason": "it doesn't say Thursday (الخميس)"}
-    return {"pass": True, "reason": "Arabic script, the whole sentence, Thursday"}
+    """The deterministic stand-in the tests and dry runs use, for the one
+    question the judge marks (03, the school notice): at most two sentences,
+    11:30, and Thursday."""
+    a = (answer or "").strip()
+    if not a:
+        return {"pass": False, "reason": "no answer"}
+    if "11:30" not in a:
+        return {"pass": False, "reason": "it doesn't give the 11:30 closing time"}
+    if "thursday" not in a.lower():
+        return {"pass": False, "reason": "it doesn't say Thursday"}
+    if _sentences(a) > 2:
+        return {"pass": False, "reason": "more than two sentences"}
+    return {"pass": True, "reason": "closes 11:30 on Thursday, in two sentences or fewer"}
 
 
 def stub_reply(prompt: str) -> str:

@@ -201,11 +201,13 @@ def test_no_average_of_provisional_scores_appears_anywhere(live, page):
     assert page.locator("[data-area-mean]").count() == 0
     assert "Judged average" not in text
     assert "demo only, not ranked" in text
-    # the tile has no number to show, and Home no Knowledge exam card
-    assert page.locator("[data-kind-value='exam']").text_content() == "—"
+    # the tile has no average to show: 12b.3, it says how many topics are judged
+    # and the weakest, not a dash; Home's Knowledge exam card is the weakest topic
+    assert page.locator("[data-kind-value='exam']").text_content() == "34 of 37"
+    assert page.locator("[data-kind-tile='exam'] [data-provisional-badge]").count() == 1
     page.goto(live["base"] + "/")
     page.wait_for_selector("[data-best-by-kind]")
-    assert page.locator("[data-best='exam']").count() == 0
+    assert page.locator("[data-best='exam']").get_attribute("data-best-weakest") == "1"
     assert "mean" not in page.locator("#view").text_content().lower()
     assert page.errors == []
 

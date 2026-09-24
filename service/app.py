@@ -25,6 +25,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
@@ -67,6 +68,11 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="benchmark service", lifespan=lifespan)
+# 12b.3: the scores payload is the board's biggest answer — 1.4 MB of JSON on
+# the live tree, a minute to arrive over the tailnet, and the page draws no
+# scores until it has — and JSON compresses several times over. Nothing here
+# streams, so compressing whole answers holds nothing back.
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
 @app.middleware("http")

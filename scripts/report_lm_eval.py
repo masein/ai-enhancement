@@ -624,7 +624,8 @@ def load_results(path: Path) -> list[dict]:
 
 EVERYDAY_PILOT = Path(__file__).resolve().parent.parent / "eval_tasks" / "everyday" / "pilot.jsonl"
 EVERYDAY_GROUPS = {"understanding": "Understanding", "writing": "Writing",
-                   "transform": "Transform", "language": "Language", "behaviour": "Behaviour"}
+                   "transform": "Transform", "summarising": "Summarising",
+                   "instructions": "Instructions"}
 # what the page needs of each marked answer; everything else stays on disk
 _EVERYDAY_ITEM = ("id", "pass", "reason", "answer_text", "had_reasoning", "reasoning_text",
                   "reasoning_words", "no_answer")
@@ -1387,11 +1388,20 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     # rows it concerns are ("Show me"); the long text stays behind a disclosure
     warnings: list[str] = []
     checks: list[dict] = []
+    # 12b.3: a check is a PROBLEM — something happened that a person should act
+    # on (a duplicate row, answers that never finished, a judge that drifted)
+    # — or a KNOWN LIMIT, a standing condition of the setup that stays true for
+    # weeks (a judge nobody has calibrated, one provider, preliminary models).
+    # The status dot counts problems only: a dot that is always amber stops
+    # meaning anything, and then nobody sees the duplicate row
+    LIMITS = {"chat_templates", "required_narrow", "tainted", "preliminary", "harness_builds",
+              "judge_uncalibrated", "judge_kappa", "judge_local", "judge_single_provider"}
 
     def warn(key: str, severity: str, show: dict, short: str, text: str) -> None:
         warnings.append(text)
         checks.append({"key": key, "severity": severity, "show": show, "short": short,
-                       "text": text, "judged": key.startswith("judge_")})
+                       "text": text, "judged": key.startswith("judge_"),
+                       "limit": key in LIMITS})
     shots_seen: dict[str, set] = {}
     for r in by_model.values():
         for t in headline:
@@ -1402,10 +1412,12 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         warn('fewshot', 'warning', {'tab': 'leaderboard'}, 'Few-shot count differs between models',
             f"Few-shot count differs between models on: {', '.join(mism)}. Those "
             f"columns are not comparable — re-run with the same --num_fewshot.")
+    # 12b.3: "on some models, not others" and "different templates" were two
+    # checks about one thing; they are one, saying whichever is true
+    chat_says: list[str] = []
     if len({r["chat_template"] for r in by_model.values()}) > 1:
         applied = [display[m] for m, r in by_model.items() if r["chat_template"]]
-        warn('chat_mixed', 'info', {'tab': 'models', 'kind': 'instruct'}, 'Chat template on some models, not others',
-            "Chat template applied to some models but not others (applied to: "
+        chat_says.append("Chat template applied to some models but not others (applied to: "
             + ", ".join(applied) + "). Correct if and only if those are the instruct "
             "models — it moves scores by tens of points, so check the list.")
     if any(r["limit"] for r in by_model.values()):
@@ -1418,10 +1430,12 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             for m, r in by_model.items() if r["chat_template"]}
     shas.discard(None)
     if len(shas) > 1:
-        warn('templates', 'info', {'tab': 'provenance'}, 'Models evaluated with different chat templates',
-            f"The models evaluated WITH a chat template used {len(shas)} different "
+        chat_says.append(f"The models evaluated WITH a chat template used {len(shas)} different "
             f"templates ({', '.join(sorted(shas))}). Prompt format differs, so "
             f"those scores answer slightly different questions.")
+    if chat_says:
+        warn('chat_templates', 'info', {'tab': 'models', 'kind': 'instruct'},
+             'Chat templates differ between models', " ".join(chat_says))
     unconf = [display[m] for m, r in by_model.items()
               if (r.get("archinfo") or {}).get("kind_unconfirmed")]
     if unconf:
@@ -4619,7 +4633,16 @@ function vJudged(m, more = []) {
   // the whole list of caveats is one line; their words are one click away
   if (caveats.length) card.append(el('div', { class: 'caveats', 'data-caveats': String(caveats.length) },
     ...caveats, el('details', { class: 'caveat-why' }, el('summary', { text: 'why?' }), why)));
-  if (cn && !cn.drifted) card.append(canaryPara);
+  // 12b.3: steady, the main view says so in two words; the deviations are
+  // How this works' — system words, for whoever opens it
+  if (cn && !cn.drifted) {
+    card.append(el('p', { class: 'small', 'data-canary': 'steady' },
+      el('b', { text: 'Judge steady.' })));
+    canaryPara.removeAttribute('data-canary');
+    canaryPara.querySelector('b').textContent = 'The canary: ';
+    const how = card.querySelector('[data-how-judged]');
+    if (how) how.append(canaryPara);
+  }
 
   // per topic, weakest first, on the REPORT half — the diagnose half is never the score
   const cats = J.exam.filter(t => j.tasks[t] && pubScore(j.tasks[t]) != null)
@@ -4952,12 +4975,30 @@ function kindValue(m, kind) {
     const J = DATA.judged || {};
     const n = Object.entries((m.judge || {}).tasks || {})
       .filter(([t, v]) => (J.exam || []).includes(t) && pubScore(v) != null).length;
-    return [m.judgedAvg != null ? num(m.judgedAvg, 2) : '—',
-      `out of 4 · ${n} of ${(J.exam || []).length} topics` + (judgedOkM(m) ? '' : ' · not ranked')];
+    const N = (J.exam || []).length;
+    if (m.judgedAvg != null)
+      return [num(m.judgedAvg, 2), `out of 4 · ${n} of ${N} topics` + (judgedOkM(m) ? '' : ' · not ranked')];
+    // 12b.3: no average — a provisional score never enters one — but not a
+    // dash either: the topics judged, and the weakest, which a topic score is
+    const w = weakestTopic(m);
+    return [`${n} of ${N}`, 'topics judged'
+      + (w ? ` · weakest: ${frName(w.task)} ${num(w.v, 2)} / 4` : '')];
   }
   const e = evdOf(m.id);
   return [e ? evdCount(e) : '—', ''];
 }
+// a model's weakest judged topic on the current exam: { task, v }, or null
+function weakestTopic(m) {
+  const J = DATA.judged || {};
+  const xs = Object.entries((m.judge || {}).tasks || {})
+    .filter(([t, v]) => (J.exam || []).includes(t) && pubScore(v) != null)
+    .map(([t, v]) => ({ task: t, v: pubScore(v) })).sort((a, b) => a.v - b.v);
+  return xs[0] || null;
+}
+// the exam's one badge on a tile or a card: its scores are not evidence yet
+const provBadge = (why, attrs = {}) => el('span', { class: 'badge prelim', 'data-provisional-badge': '1',
+  title: why, text: 'provisional', ...attrs });
+
 // "15.3 points behind good-750m-tuned-test — a real gap"
 function avgVerdictOf(m) {
   const avg = officialAvg(m);
@@ -4984,10 +5025,9 @@ function modelHead(m, kinds) {
       el('div', { class: 'mtop-l' },
         el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
           warnBadge(m) || '', dupBadge(m) || ''),
-        el('p', { class: 'mfacts', 'data-model-facts': '1', text: facts })),
-      // the page's one main action
-      LIVE ? el('button', { class: 'primary', 'data-test-this': m.id, text: 'Test this model',
-        onclick: () => openTest(m.id) }) : ''),
+        el('p', { class: 'mfacts', 'data-model-facts': '1', text: facts }))),
+      // 12b.3: the page's one main action is the header's, which reads Test
+      // this model here — two filled buttons side by side was one too many
     el('div', { class: 'ktiles', 'data-kind-tiles': '1' }, kinds.map(k => kindTile(m, k))));
 }
 function kindTile(m, k) {
@@ -5006,7 +5046,9 @@ function kindTile(m, k) {
     el('span', { class: 'eyebrow ktile-k', text: k.label }),
     el('span', { class: 'ktile-v', 'data-kind-value': k.kind, text: v }),
     el('span', { class: 'ktile-sub' }, sub,
-      k.kind === 'everyday' ? evdBadge(evdOf(m.id).provisional) : ''));
+      k.kind === 'everyday' ? evdBadge(evdOf(m.id).provisional) : '',
+      // the provisional badge, once, on the tile it is about
+      k.kind === 'exam' && !judgedOkM(m) ? provBadge(whyProvisional(m)) : ''));
 }
 // the button that fills an empty tile: the form for Standard, the exam's own
 // topic picker, and the pilot's one-click queue
@@ -5052,7 +5094,7 @@ function modelScoresTab(m, kinds) {
   const mine = state.mblk[m.id] || {};
   return taken.map(k => {
     const open = k.kind in mine ? mine[k.kind] : k.kind === newest;
-    const [v] = kindValue(m, k.kind);
+    const [v, sub] = kindValue(m, k.kind);
     // a closed block is built when it opens: the judged tables are the
     // page's heaviest, and most visits read one kind
     return el('details', { class: 'card kblock', 'data-kind-block': k.kind, open: open ? '' : null,
@@ -5063,7 +5105,10 @@ function modelScoresTab(m, kinds) {
           if (now) { state.after = { focus: `[data-kind-block="${k.kind}"] > summary` }; render(); }
         } },
       el('summary', { class: 'kblock-sum' }, el('span', { class: 'kblock-k', text: k.label }),
-        el('span', { class: 'kblock-v', text: v })),
+        el('span', { class: 'kblock-v', text: v }),
+        // 12b.3: without an average, the header says what the tile says
+        k.kind === 'exam' && m.judgedAvg == null
+          ? el('span', { class: 'kblock-sub small se', text: sub }) : ''),
       ...(open ? kindParts(m, k.kind) : []));
   });
 }
@@ -5254,8 +5299,9 @@ function gradedCard(m) {
     LIVE ? el('span', { 'data-how-graded': m.id },
       readLink({ kind: 'provenance', id: 'judge:' + m.id }, 'How this was graded ▸')) : '']);
   const e = evdOf(m.id);
-  if (e) rows.push(['Everyday tasks', 'Four answers are checked by a script; the Arabic one '
-    + 'is marked by the judge' + (e.provisional ? ', whose marks are not evidence yet.' : '.')]);
+  if (e) rows.push(['Everyday tasks', 'Four answers are checked by a script; the TL;DR is '
+    + 'marked by the judge, against its rubric'
+    + (e.provisional ? ', and its marks are not evidence yet.' : '.')]);
   if (!rows.length) return null;
   return el('div', { class: 'card', 'data-model-graded': m.id },
     el('h2', { text: 'How it was graded' }),
@@ -5329,7 +5375,10 @@ function needsYou() {
       () => { state.rv.view = 'review'; navigate({ tab: 'review', model: null, topic: null }); });
     if (state.trLoaded) {
       const used = new Set((state.trRuns || []).flatMap(r => r.datasets || []));
-      const idle = (state.rv.datasets || []).filter(d => d.status === 'ready' && !used.has(d.id));
+      // 12b.3: a Demo only dataset is for trying the loop, not for training on —
+      // training happens off the board, and it would wait here for ever
+      const idle = (state.rv.datasets || []).filter(d => d.status === 'ready'
+        && !used.has(d.id) && !dsDemoOnly(d));
       add('datasets', idle.length, plural(idle.length, 'dataset made but not used in training',
         'datasets made but not used in training'),
         () => { state.rv.view = 'datasets'; navigate({ tab: 'review', model: null, topic: null }); });
@@ -5342,7 +5391,8 @@ function needsYou() {
     add('failed', failed.length, plural(failed.length, 'run failed in the last seven days',
       'runs failed in the last seven days'), () => navigate({ tab: 'queue', model: null, topic: null }));
   }
-  const checks = (DATA.checks || DATA.warnings || []).length;
+  // 12b.3: the problems, not the known limits — those stay true for weeks
+  const checks = DATA.checks ? boardProblems(DATA.checks).length : (DATA.warnings || []).length;
   add('checks', checks, plural(checks, 'check is not green', 'checks are not green'), openChecks);
   return el('div', { class: 'card', 'data-needs-you': String(lines.length) },
     el('h2', { text: 'Needs you' }),
@@ -5373,7 +5423,8 @@ function runningNow() {
 // one card per kind of test that has data: the best model's number, its name,
 // and one link to the kind on Models. A kind with no data has no card
 function bestByKind(ms) {
-  const go = v => hlLink('Compare models →', () => openModelsView(v));
+  // comparing models side by side is 12h; this link goes to the table
+  const go = v => hlLink('See all models →', () => openModelsView(v));
   const card = (key, eyebrow, value, m, badge) => el('div', { class: 'hcard', 'data-best': key },
     el('div', { class: 'eyebrow' }, eyebrow, badge || ''),
     el('div', { class: 'hcard-v', 'data-best-value': key, text: value }),
@@ -5388,15 +5439,29 @@ function bestByKind(ms) {
   const exam = ms.filter(m => m.judgedAvg != null && !m.duplicateOf)
     .sort((a, b) => b.judgedAvg - a.judgedAvg)[0];
   if (exam) cards.push(card('exam', 'Knowledge exam', `${num(exam.judgedAvg, 2)} / 4`, exam));
+  // 12b.3: no model has a judged average (none counts yet) but models have
+  // judged topics: the weakest topic across the board, as the old Overview's
+  // card showed — a topic score, which a provisional judge may show
+  let weak = null;
+  if (!exam) for (const m of ms.filter(x => !x.duplicateOf)) {
+    const w = weakestTopic(m);
+    if (w && (!weak || w.v < weak.v)) weak = { ...w, m };
+  }
+  if (weak) cards.push(el('div', { class: 'hcard', 'data-best': 'exam', 'data-best-weakest': '1' },
+    el('div', { class: 'eyebrow', text: 'Knowledge exam · weakest topic' }),
+    el('div', { class: 'hcard-v', 'data-best-value': 'exam', text: `${num(weak.v, 2)} / 4` }),
+    el('div', { class: 'hcard-name', 'data-best-name': 'exam', title: weak.m.id,
+      text: `${frName(weak.task)} · ${weak.m.name}` }),
+    go('exam')));
   const E = evd();
   const ev = Object.entries(E.models || {}).filter(([id]) => ms.some(m => m.id === id))
     .sort(([a, x], [b, y]) => (y.passed - x.passed) || evdName(a).localeCompare(evdName(b)))[0];
   if (ev) cards.push(card('everyday', 'Everyday tasks', evdCount(ev[1]),
     DATA.models.find(m => m.id === ev[0]), evdBadge(ev[1].provisional)));
   // the provisional-judge caveat, once, in the block's header
-  const caveat = exam && !(judgedCalibrated() && judgedOkM(exam))
+  const caveat = (exam && !(judgedCalibrated() && judgedOkM(exam))) || (weak && !judgedOkM(weak.m))
     ? el('span', { class: 'badge prelim', 'data-best-caveat': '1',
-        title: judgedCalibrated() ? whyProvisional(exam) : judgedOffWhy(),
+        title: judgedCalibrated() ? whyProvisional(exam || weak.m) : judgedOffWhy(),
         text: 'Knowledge exam: provisional judge' }) : '';
   return el('div', { class: 'card', 'data-best-by-kind': String(cards.length) },
     el('div', { class: 'sechead' }, el('h2', { text: 'Best in each kind of test' }), caveat),
@@ -5475,7 +5540,7 @@ const evdCount = e => `${e.passed} of ${e.total}`;
 function evdBadge(provisional) {
   return el('span', { class: 'badge prelim', 'data-pilot-badge': '1',
     title: 'Five questions, all readable: a look at what the models say, not a score. Never '
-      + 'ranked, never averaged into anything.' + (provisional ? ' The Arabic answer was marked '
+      + 'ranked, never averaged into anything.' + (provisional ? ' The TL;DR was marked '
       + 'by a judge whose marks are not evidence yet.' : ''),
     text: 'Pilot · not ranked' + (provisional ? ' · provisional judge' : '') });
 }
@@ -5809,17 +5874,21 @@ function routeFromHash() {
   const tp = /^topic=(.+)$/.exec(h);
   if (tp && LIVE && topicOfSlug(tp[1])) { state.topic = tp[1]; state.tab = 'exam'; return; }
   state.topic = null;
-  // 12a's pilot page is Benchmarks ▸ Everyday tasks now
+  // 12a's pilot page is Benchmarks ▸ Everyday tasks now. 12b.3: a bare place
+  // name — #home, #models, #benchmarks — is what people type, so it lands too
   const t = h === 'everyday' ? ['', 'everyday', '']
+    : PLACE_WORDS.includes(h) ? ['', h, '']
     : /^tab=([^&]+)(?:&(.*))?$/.exec(rest);
-  if (!t) return;
-  const v = viewOfHash(decodeURIComponent(t[1]), t[2] || '');
-  if (!v) return;
-  state.tab = v;
+  const v = t && viewOfHash(decodeURIComponent(t[1]), t[2] || '');
+  // 12b.3: an empty address, or one the router does not know, is Home, and
+  // the address bar says so — the bare address is the one the team was sent
+  state.tab = v || 'overview';
   // an old address is shown as its new one; history keeps the entry
   const want = hashFor();
   if (location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
 }
+
+const PLACE_WORDS = ['home', 'models', 'improve', 'benchmarks', 'runs', 'data', 'help'];
 
 // slug ↔ topic, from the same map the payload carries (exam_law ↔ law)
 function topicOfSlug(slug) {
@@ -5859,6 +5928,7 @@ window.addEventListener('hashchange', () => {
   // else is the user pressing Back or Forward, and we adopt it — at the
   // scroll they left that view at (11f)
   if (location.hash.slice(1) === hashFor()) return;
+  if (!DATA) return;                  // routed by initData when the scores arrive
   routeFromHash();
   _restore = { y: (history.state || {}).y || 0, until: Date.now() + 3000 };
   _navigated = true;
@@ -9659,7 +9729,7 @@ async function copyText(t, what) {
 // 11k: the stage, not the table's column. #58 said "done" for several
 // minutes while the judge was still grading 240 of 570 answers, with an
 // empty action cell: it looked as if nothing was happening.
-// 12a: and a pilot run, whose Arabic answer waits on the judge
+// 12a: and a pilot run, whose TL;DR waits on the judge
 const stillGrading = r => (r.suite === 'judged' || r.suite === 'everyday') && r.judge
   && r.judge.status !== 'done' && r.judge.status !== 'failed' && !r.judge_failed;
 function runStage(r) {
@@ -10040,10 +10110,19 @@ document.addEventListener('keydown', e => {
 });
 function renderTestAct() {
   const box = document.getElementById('testAct');
-  if (!box || box.firstChild || !LIVE) return;
-  box.append(el('button', { class: 'primary', 'data-test-model': '1', title: 'Test a model',
-    onclick: () => openTest() }, el('span', { class: 't-full', text: 'Test a model' }),
-    el('span', { class: 't-short', text: 'Test' })));
+  if (!box || !LIVE) return;
+  if (!box.firstChild)
+    box.append(el('button', { class: 'primary', 'data-test-model': '1',
+      onclick: () => openTest() }, el('span', { class: 't-full' }),
+      el('span', { class: 't-short', text: 'Test' })));
+  // 12b.3: on a model page it is that model's — the dialog opens with it
+  // filled in (openTest takes state.model) — and it says so
+  const words = state.model ? 'Test this model' : 'Test a model';
+  const btn = box.firstChild;
+  btn.title = words;
+  if (state.model) btn.dataset.testThis = state.model;
+  else delete btn.dataset.testThis;
+  btn.querySelector('.t-full').textContent = words;
 }
 
 // ● n running: a pulsing dot while anything runs, "Runs" when nothing does.
@@ -10391,12 +10470,15 @@ function demoBadge(p, key) {
   return el('span', { class: 'badge taint', 'data-demo-only': String(key ?? p.id),
     title: 'for demos and trials, not for results — ' + why.join('; '), text: 'Demo only' });
 }
-function dsDemoBadge(d) {
+// a dataset made over a provisional judge, or past one: Demo only
+function dsAsProposal(d) {
   const pv = d.provenance || {};
-  return demoBadge({ id: d.id, override: pv.proposed_over_provisional_judge
-      || d.over_provisional_judge,
-    evidence: { provisional: pv.provisional, provisional_reason: pv.provisional_reason } },
-    'ds' + d.id);
+  return { id: d.id, override: pv.proposed_over_provisional_judge || d.over_provisional_judge,
+    evidence: { provisional: pv.provisional, provisional_reason: pv.provisional_reason } };
+}
+const dsDemoOnly = d => demoReasons(dsAsProposal(d)).length > 0;
+function dsDemoBadge(d) {
+  return demoBadge(dsAsProposal(d), 'ds' + d.id);
 }
 
 const rvStatusWords = s => s === 'proposed' ? 'To review' : s === 'pending' ? 'Waiting for the AI'
@@ -12728,6 +12810,8 @@ function subSwitch(place) {
 function numberSections() {
   const view = document.getElementById('view');
   if (!view) return;
+  // 12b.3: Home's three blocks are not steps in a sequence: no numbers there
+  if (!state.model && !state.topic && state.tab === 'overview') return;
   let n = 0;
   for (const card of view.querySelectorAll(':scope > .card')) {
     const h2 = card.querySelector(':scope > h2, :scope > .sechead > h2');
@@ -12739,6 +12823,8 @@ function numberSections() {
 }
 
 function render() {
+  // 12b.3: before the scores arrive there is a header to draw, and nothing else
+  if (!DATA) { renderShell(); return; }
   // full rebuild: drop the in-place refreshers so a poll can never touch the
   // DOM of a tab that just got torn down — the mounted tab re-registers its own
   state.trRedraw = state.queueRedraw = null;
@@ -13168,38 +13254,55 @@ function renderWarnings() {
   const sig = JSON.stringify([cs.map(c => c.text), steady]);
   if (sig === _warnSig) return;
   _warnSig = sig;
+  // 12b.3: the dot counts problems — something to act on. The known limits,
+  // standing conditions of the setup, are one folded line under them: an
+  // always-amber dot is a dot nobody reads
+  const problems = boardProblems(cs), limits = cs.filter(c => c.limit);
   // what kind, not just how many: after a judged run most of them are about
   // the judge, and "5 checks" says nothing about whether to open it
-  const judged = cs.filter(c => c.judged).length;
+  const judged = problems.filter(c => c.judged).length;
   // 12b: a status dot, not a pill of words — green and nothing else when every
   // check passes, amber with the count when any does not
-  const n = cs.length;
+  const n = problems.length;
+  const row = c => el('li', { class: 'check warnrow',
+      'data-check': c.key, 'data-severity': c.severity, 'data-limit': c.limit ? '1' : null },
+    el('span', { class: 'dot ' + (c.severity === 'warning' && !c.limit ? 'warn' : 'info'),
+      title: c.limit ? 'a known limit of the setup' : c.severity === 'warning' ? 'warning'
+        : 'for information' }),
+    el('span', { class: 'check-short', text: c.short }),
+    c.show ? el('a', { href: '#', class: 'small', 'data-show-me': c.key, text: 'Show me',
+      onclick: e => { e.preventDefault(); showMe(c.show); } }) : '',
+    el('details', { class: 'check-more' },
+      el('summary', { class: 'small', text: 'why' }),
+      el('p', { class: 'warn', text: c.text })));
   const fold = el('details', { class: 'checks', 'data-warnings': 'collapsed',
       open: state.checksOpen ? '' : null,
       ontoggle: e => { state.checksOpen = e.target.open; } },
     el('summary', { class: 'barpill statusdot' + (n ? ' warn' : ' ok'),
         'data-warn-summary': String(n),
-        'aria-label': n ? `${n} check${n > 1 ? 's' : ''} need a look` : 'every check passes',
-        title: n ? `${n} check${n > 1 ? 's' : ''} need a look` : 'every check passes' },
+        'aria-label': n ? `${n} problem${n > 1 ? 's' : ''} to look at` : 'no problems',
+        title: n ? `${n} problem${n > 1 ? 's' : ''} to look at` : 'no problems'
+          + (limits.length ? ` · ${limits.length} known limit${limits.length > 1 ? 's' : ''}` : '') },
       el('span', { class: 'dot ' + (n ? 'warn' : 'ok') }),
       n ? el('span', { class: 'statusn', text: String(n) }) : ''),
     el('ul', { class: 'checklist' },
-      !n ? el('li', { class: 'small', 'data-checks-none': '1', text: 'Every check passes.' }) : '',
+      !n ? el('li', { class: 'small', 'data-checks-none': '1', text: 'No problems.' }) : '',
       judged ? el('li', { class: 'small checks-judged', 'data-checks-judged': String(judged),
-        text: `${judged} of ${cs.length} ${cs.length > 1 ? 'are' : 'is'} about the judged suite` }) : '',
-      cs.map(c => el('li', { class: 'check warnrow',
-        'data-check': c.key, 'data-severity': c.severity },
-      el('span', { class: 'dot ' + (c.severity === 'warning' ? 'warn' : 'info'),
-        title: c.severity === 'warning' ? 'warning' : 'for information' }),
-      el('span', { class: 'check-short', text: c.short }),
-      c.show ? el('a', { href: '#', class: 'small', 'data-show-me': c.key, text: 'Show me',
-        onclick: e => { e.preventDefault(); showMe(c.show); } }) : '',
-      el('details', { class: 'check-more' },
-        el('summary', { class: 'small', text: 'why' }),
-        el('p', { class: 'warn', text: c.text })))),
+        text: `${judged} of ${n} ${n > 1 ? 'are' : 'is'} about the judged suite` }) : '',
+      problems.map(row),
+      limits.length ? el('li', { class: 'known-limits', 'data-known-limits': String(limits.length) },
+        el('details', { open: state.limitsOpen ? '' : null,
+            ontoggle: e => { state.limitsOpen = e.target.open; } },
+          el('summary', { class: 'small', text: `Known limits (${limits.length}) ▸` }),
+          el('ul', { class: 'checklist' }, limits.map(row)))) : '',
       steady ? el('li', { class: 'small se', 'data-judge-steady': '1', text: steady }) : ''));
   box.replaceChildren(fold);
 }
+
+// the checks that are problems — something happened that a person should act
+// on — not the known limits of the setup (12b.3). A payload from before 12b.3
+// has no `limit`, and every check in it counts
+const boardProblems = cs => cs.filter(c => !c.limit);
 
 // "live · refreshed 12:33" with a dot: green while the polls land, amber and
 // "last update 3 min ago — retrying" once they stop. A page that silently
@@ -13322,10 +13425,23 @@ async function refreshResults() {
   if (RESULTS_BUSY) return;
   RESULTS_BUSY = true;
   try {
-    initData(await api('api/results'));
+    let d;
+    try { d = await api('api/results'); }
+    catch (e) { return; }              // netFail said so; the poll retries while RESULTS_DUE
+    // 12b.3: an error drawing the board is said, not swallowed — a page with
+    // its title and footer and nothing else, and no word why, is how the
+    // live check found the bare address
+    try { initData(d); }
+    catch (e) { console.error(e); drawFailed(e); }
     if (ask === RESULTS_ASKED) RESULTS_DUE = false;
-  } catch (e) { /* netFail said so; the poll retries while RESULTS_DUE */ }
-  finally { RESULTS_BUSY = false; }
+  } finally { RESULTS_BUSY = false; }
+}
+function drawFailed(e) {
+  const view = document.getElementById('view');
+  if (view) view.replaceChildren(el('div', { class: 'card', 'data-draw-failed': '1' },
+    el('p', { class: 'warn' }, el('b', { text: 'The board could not be drawn. ' }),
+      `${(e && e.message) || e}. Reload the page; if it happens again, the browser's `
+      + 'console has the details.')));
 }
 
 // the rows this browser queued: when one of them changes status the Queue
@@ -13414,8 +13530,18 @@ try {   // remembered per browser — the dashboard is a page people leave open
 } catch (e) { /* storage unavailable: stay on auto */ }
 applyTheme(THEMES[themeIdx]);
 
+// 12b.3: the header — the four places, the run counter, Test a model and the
+// name — needs no scores, so it is drawn before they arrive. The scores are
+// the board's biggest answer; on the tailnet the first one took a minute, and
+// a page with nothing on it for that long reads as broken
+function renderShell() {
+  renderTabs();
+  renderWho();
+}
+
 // boot: embedded data renders immediately; live mode fetches then polls
 if (LIVE) {
+  renderShell();
   document.getElementById('view').replaceChildren(
     skeleton(6, { 'data-loading': 'results' }));
   refreshResults().then(() => {

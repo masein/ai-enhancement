@@ -254,7 +254,7 @@ def test_the_status_dot_is_green_alone_or_amber_with_a_count(live, page):
     assert dot.text_content().strip() == ""
     assert dot.locator(".dot.ok").count() == 1
     dot.click()
-    assert page.locator("[data-checks-none]").text_content() == "Every check passes."
+    assert page.locator("[data-checks-none]").text_content() == "No problems."   # 12b.3
     page.evaluate("DATA.checks = [{key: 'a', severity: 'info', short: 'first', text: 'x', show: null},"
                   " {key: 'b', severity: 'warning', short: 'second', text: 'y', show: null}];"
                   " _warnSig = null; renderWarnings();")

@@ -695,7 +695,7 @@ def run_submission(sub: dict) -> None:
         if note:
             db.update(sid, reuse_note=note)
         # 12a: marked straight after the answers, in the same run. Only the
-        # Arabic question waits on the judge; the row says so until it lands
+        # TL;DR waits on the judge; the row says so until it lands
         if everyday and not failed_tasks:
             db.update(sid, status="running", progress="marking the answers")
             try:

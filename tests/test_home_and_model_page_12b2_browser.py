@@ -82,10 +82,11 @@ def test_needs_you_lists_what_waits_and_each_line_goes_there(live, page, tidy):
     db.update(old, status="failed", finished_at=time.time() - 8 * 86400)    # not this week
     home(page, live["base"])
     page.wait_for_selector("[data-needs='datasets']")
-    n = page.evaluate("DATA.checks.length")
+    # 12b.3: the problems, not the known limits — this board's one is the stub grader
+    assert page.evaluate("boardProblems(DATA.checks).map(c => c.key)") == ["judge_stub"]
     lines = page.locator("[data-needs-you] li").all_inner_texts()
     assert lines == ["1 proposal waiting for review", "1 dataset made but not used in training",
-                     "1 run failed in the last seven days", f"{n} checks are not green"]
+                     "1 run failed in the last seven days", "1 check is not green"]
     # each line is a link to where it is dealt with
     page.locator("[data-needs='proposals'] a").click()
     page.wait_for_selector(f"[data-rv-list='review'] [data-rv-row='{pid}']")
@@ -195,6 +196,7 @@ def test_a_kind_with_no_data_has_no_card(browser, payload):
     p = copy.deepcopy(payload)
     for m in p["models"]:
         m["judgedAvg"] = None
+        m["judge"] = None           # 12b.3: judged topics alone make a card, the weakest topic
     p["everyday"] = None
     ctx = browser.new_context(viewport={"width": 1512, "height": 900}, reduced_motion="reduce")
     s = Live(ctx, p, fail=False)
@@ -213,8 +215,8 @@ def test_judge_steadiness_is_a_line_under_the_checks(live, page):
     line = page.locator("#warnings [data-judge-steady]")
     line.wait_for()
     assert line.inner_text().startswith("Judge steadiness: steady — 30 fixed scripts re-graded")
-    # it is not one of the checks: the dot's count is the checks'
-    n = page.evaluate("DATA.checks.length")
+    # it is not one of the checks: the dot's count is the checks' (12b.3: the problems)
+    n = page.evaluate("boardProblems(DATA.checks).length")
     assert page.locator("#warnings [data-warn-summary]").get_attribute("data-warn-summary") == str(n)
     assert page.errors == []
 
@@ -229,9 +231,9 @@ def test_the_header_is_the_name_the_facts_one_action_and_a_tile_per_kind(live, p
     assert hero.locator("h1.mtitle").inner_text() == "good-750m"
     assert hero.locator("[data-model-facts]").inner_text() == "750M · base · fx"
     assert MODEL not in hero.inner_text()                      # no ids in the main view
-    # one filled button on the page (the header's Test a model is the bar's)
-    assert page.locator("#view button.primary").count() == 1
-    assert page.locator("#view [data-test-this]").inner_text() == "Test this model"
+    # 12b.3: one filled button, and it is the header's, reading Test this model
+    assert page.locator("#view button.primary").count() == 0
+    assert page.locator("header [data-test-model]").inner_text() == "Test this model"
     tiles = hero.locator("[data-kind-tile]")
     assert [t.get_attribute("data-kind-tile") for t in tiles.all()] == \
         ["standard", "exam", "everyday"]

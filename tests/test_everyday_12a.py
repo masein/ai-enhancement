@@ -40,6 +40,8 @@ def test_contains(answer, ok, why):
     assert ev.check_contains(answer, q["check"]) == (ok, why)
 
 
+# the TL;DR (03), in two sentences with the time and the day: the stand-in passes it
+TLDR = "School closes early at 11:30 on Thursday; buses leave at 11:15."
 FULL = '{"name": "Sara Ahmed", "age": 34, "role": "product manager", "city": "Dubai", ' \
        '"joined": "March 2021"}'
 
@@ -98,20 +100,28 @@ def test_lines(answer, ok, why):
 
 
 def test_the_judges_one_question_and_its_stand_in():
+    """12b.3: English only — 03 is the school notice's TL;DR, and the judge
+    reads the rubric the question carries; nothing is written for Arabic."""
     q = next(x for x in ev.load_pilot() if x["check"]["type"] == "judge")
-    p = ev.judge_prompt(q, "تم نقل الاجتماع إلى يوم الخميس")
-    assert "whole sentence" in p.lower() and q["check"]["reference"] in p
+    assert q["label"] == "TL;DR" and q["prompt"].startswith("tldr pls:")
+    p = ev.judge_prompt(q, TLDR)
+    assert q["check"]["rubric"] in p and q["prompt"] in p and TLDR in p
+    assert "arabic" not in p.lower()
     assert ev.parse_verdict(ev.stub_reply(p)) == {
-        "pass": True, "reason": "Arabic script, the whole sentence, Thursday"}
-    assert ev.stub_verdict("The meeting is moved to Thursday.")["pass"] is False
+        "pass": True, "reason": "closes 11:30 on Thursday, in two sentences or fewer"}
+    assert ev.stub_verdict("School closes early on Thursday.")["pass"] is False
+    assert ev.stub_verdict("Thursday: closes at 11:30. Buses at 11:15. Pickup by 11:45.") == {
+        "pass": False, "reason": "more than two sentences"}
     assert ev.parse_verdict('{"pass": "yes"}') is None           # a reply it cannot read
 
 
 def test_the_five_questions_are_the_briefs():
     qs = ev.load_pilot()
     assert [q["id"] for q in qs] == [f"everyday-pilot-0{i}" for i in range(1, 6)]
-    assert [q["group"] for q in qs] == ["understanding", "transform", "language", "writing",
-                                        "behaviour"]
+    assert [q["group"] for q in qs] == ["understanding", "transform", "summarising", "writing",
+                                        "instructions"]
+    assert set(ev.GROUPS.values()) == {"Understanding", "Writing", "Transform", "Summarising",
+                                       "Instructions"}
     assert qs[0]["prompt"] == "hey can u tell me hwo many days is in febuary in a leep yaer"
     assert [q["check"]["type"] for q in qs] == ["contains", "json", "judge", "fixed", "lines"]
     # all readable: no split yet, and the page may show every word
@@ -159,7 +169,7 @@ def test_the_thinking_is_never_marked(tmp_path):
     write_pilot(mdir, [
         "<think>a leap year has 29 days in february</think>\n\nI am not sure.",
         "<think>ok</think>\n\n" + FULL,
-        "<think>thursday</think>\n\nتم نقل الاجتماع إلى يوم الخميس",
+        "<think>the notice</think>\n\n" + TLDR,
         "<think>'payed' should be 'paid', 'sended' should be 'sent'</think>\n\nDear Sir, I am "
         "writing to you regarding the invoice which was sent last week and has still not been "
         "paid.",
@@ -179,7 +189,7 @@ def test_the_thinking_is_never_marked(tmp_path):
 
 def test_a_verdict_is_kept_while_the_answer_is_the_same(tmp_path):
     mdir = tmp_path / "fx__x"
-    write_pilot(mdir, ["29", FULL, "تم نقل الاجتماع إلى يوم الخميس", "x", "a\nb\nc"])
+    write_pilot(mdir, ["29", FULL, TLDR, "x", "a\nb\nc"])
     ev.write(mdir, ev.mark(mdir, {"everyday-pilot-03": {"pass": True, "reason": "fine"}}))
     again = ev.mark(mdir)                                   # re-marked from the logs
     assert again["items"][2]["pass"] is True and again["items"][2]["reason"] == "fine"
@@ -218,7 +228,7 @@ def fake_gpu(monkeypatch, has_template=True, reasoning=False, answers=None):
     def run(sid, cmd, *a, **k):
         seen.append(cmd)
         out = Path(cmd[cmd.index("--output_path") + 1])
-        write_pilot(out.parent, answers or ["29", FULL, "تم نقل الاجتماع إلى يوم الخميس",
+        write_pilot(out.parent, answers or ["29", FULL, TLDR,
                                             "I writing", "a\nb\nc"],
                     budget=config.REASONING_MAX_GEN_TOKS if reasoning else 512)
         return 0
@@ -288,7 +298,7 @@ def test_run_again_answers_again_and_keeps_the_last_answers(svc, monkeypatch):
     assert len(kept) == 1                                     # the last answers, kept whole
 
 
-def test_the_arabic_question_waits_on_the_judge_and_the_row_says_so(svc, monkeypatch):
+def test_the_tldr_waits_on_the_judge_and_the_row_says_so(svc, monkeypatch):
     client, appmod, tree = svc
     monkeypatch.setattr(config, "JUDGE_PROVIDER", "fake")
     monkeypatch.setattr(config, "JUDGE_MODEL", "fake-judge")
@@ -301,7 +311,7 @@ def test_the_arabic_question_waits_on_the_judge_and_the_row_says_so(svc, monkeyp
     assert row["progress"] == "Everyday pilot: 3 of 5 · the judge is marking 1"
     assert row["judge"]["n_items"] == 1 and row["judge"]["progress"] == "0/1 done"
     assert row["judge"]["status"] == "submitted"
-    # one request, about the Arabic answer, and nothing else
+    # one request, about the TL;DR, and nothing else
     sent = [r for r in llm.FakeBatches("fake-judge", config.BENCH_ROOT).recorded()
             if r["custom_id"].startswith("everyday:")]
     assert len(sent) == 1 and sent[0]["custom_id"] == f"everyday:{sid}:everyday-pilot-03"
@@ -309,13 +319,13 @@ def test_the_arabic_question_waits_on_the_judge_and_the_row_says_so(svc, monkeyp
     mdir = tree["models"][MODEL]["dir"]
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
     assert out["passed"] == 4 and out["waiting"] == 0
-    assert out["items"][2]["reason"] == "Arabic script, the whole sentence, Thursday"
+    assert out["items"][2]["reason"] == "closes 11:30 on Thursday, in two sentences or fewer"
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
     assert row["progress"] == "Everyday pilot: 4 of 5"
     assert row["judge"]["status"] == "done"
 
 
-def test_without_a_judge_the_arabic_question_says_so(svc, monkeypatch):
+def test_without_a_judge_the_tldr_says_so(svc, monkeypatch):
     client, _, tree = svc
     fake_gpu(monkeypatch)
     sid = queue_pilot(client)
