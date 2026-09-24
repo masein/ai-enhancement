@@ -15,7 +15,7 @@ eval_tasks/*
 # scripts, the delivered banks and the migrated skill suites. Leaving these
 # out is invisible until the first click — which is how it shipped
 !eval_tasks/fr
-# the Everyday pilot's questions and task template (12a)
+# the Everyday bank and its task template (12a, 12a.2)
 !eval_tasks/everyday
 logs/
 artifacts/

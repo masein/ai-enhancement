@@ -240,8 +240,8 @@ def test_each_suite_option_says_what_it_gets_you(live, page):
     opts = page.locator("#pop-sel-submit-suite [role=option]")
     assert [o.get_attribute("data-value") for o in opts.all()] == \
         ["full", "quick", "control", "judged", "everyday"]
-    # 12a: the pilot's option is its one short line, and 12c replaces the list
-    assert opts.nth(4).text_content() == "Everyday tasks — 5 questions, minutes"
+    # 12a: the Everyday option is its one short line (12a.2: the bank's), and 12c replaces the list
+    assert opts.nth(4).text_content() == "Everyday tasks — 111 questions, a few minutes"
     for o in opts.all()[:4]:
         v = o.get_attribute("data-value")
         sub = o.locator(f"[data-opt-sub='{v}']").text_content()

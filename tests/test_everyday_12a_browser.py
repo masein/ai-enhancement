@@ -1,8 +1,10 @@
-"""12a on the page: #everyday shows the fixture's four models against the
-five questions and every mark opens the answer; the model page has its
-Everyday block, or one line with a Test button; Run the pilot queues one run
-per ticked model; one Pilot · not ranked badge per page, never per row; and
-nothing of the pilot reaches the Leaderboard."""
+"""12a on the page, moved to the bank in 12a.2: #everyday shows the fixture's
+four models by name, each count from its own marks, and every answer opens
+in the side panel, whose keys walk the bank and the models; the model page
+has its Everyday block, or one line with a Test button; Run everyday tasks
+queues one run per ticked model; one Round 2 · not ranked badge per page,
+never per row; and nothing of it reaches the Leaderboard. The groups-by-models
+table itself is test_everyday_12a2_browser's."""
 
 from __future__ import annotations
 
@@ -17,7 +19,8 @@ from conftest import open_kind
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12a"
 FOUR = ["below-135m-it", "chance-160m", "good-750m", "skewed-360m"]    # by name, not by score
-LABELS = ["Typos", "JSON", "TL;DR", "Fix the email", "Just 3 names"]
+GROUPS = ["Understanding", "Writing", "Summarising", "Transform", "Quick maths", "Instructions",
+          "Honesty"]
 UNTESTED = "fx/one-option-70m"
 
 
@@ -49,53 +52,47 @@ def open_pilot(page, base):
 # #everyday
 # ---------------------------------------------------------------------------
 
-def test_the_pilot_page_shows_four_models_by_five_questions(live, page):
+def test_the_page_names_the_models_and_has_one_action_and_one_badge(live, page):
     page.set_viewport_size({"width": 1400, "height": 1000})
     open_pilot(page, live["base"])
     heads = page.locator("[data-everyday-table] thead th[data-evd-model]")
     assert [h.locator("a, span").first.text_content() for h in heads.all()] == FOUR
-    # the n of 5 in the header row, from the marks themselves
+    # each model's count in the header row, from its own marks: two sat the
+    # bank, two only the pilot's five
     counts = {h.get_attribute("data-evd-model"): h.locator("[data-evd-count]").text_content()
               for h in heads.all()}
-    assert counts == {"fx/good-750m": "5 of 5", "fx/below-135m-it": "1 of 5",
-                      "fx/skewed-360m": "2 of 5", "fx/chance-160m": "1 of 5"}
-    rows = page.locator("[data-everyday-table] tbody tr")
-    assert [r.locator(".evq-short").text_content() for r in rows.all()] == LABELS
-    # the full question under its short label, typos and all
-    assert rows.first.locator(".evq-full").text_content() == \
-        "hey can u tell me hwo many days is in febuary in a leep yaer"
-    assert rows.first.locator(".evq-group").text_content() == "Understanding"
-    cells = page.locator("[data-evd-cell]")
-    assert cells.count() == 20
-    marks = {c.get_attribute("data-evd-cell"): c.text_content() for c in cells.all()}
-    assert marks["fx/good-750m|everyday-pilot-01"] == "✓"
-    assert marks["fx/skewed-360m|everyday-pilot-01"] == "✗"
-    assert marks["fx/below-135m-it|everyday-pilot-02"] == "✓"
+    assert counts == {"fx/good-750m": "108 of 111", "fx/below-135m-it": "2 of 5",
+                      "fx/skewed-360m": "57 of 111", "fx/chance-160m": "1 of 5"}
     # one badge on the page, in the header; no row repeats it
     assert page.locator("[data-pilot-badge]").count() == 1
     assert page.locator("[data-everyday-head] [data-pilot-badge]").text_content() \
-        == "Pilot · not ranked"
+        == "Round 2 · not ranked"
     body = page.locator("[data-everyday-table]").text_content()
-    assert "not ranked" not in body and "Pilot" not in body
+    assert "not ranked" not in body and "Round 2" not in body
     # one main action, top right, filled
     run = page.locator("[data-everyday-head] button.primary")
-    assert run.count() == 1 and run.text_content() == "Run the pilot"
+    assert run.count() == 1 and run.text_content() == "Run everyday tasks"
     assert page.locator("#view button.primary").count() == 1
-    # no system words: no ids, no check names, no file or suite names
+    # no system words: no ids, no check types, no file or suite names — the
+    # questions' checks are said in plain words
     view = page.locator("#view").text_content()
-    for word in ("everyday-pilot-", "everyday_pilot", ".jsonl", "contains", "judge", "suite"):
+    for word in ("everyday-", "everyday_", ".jsonl", "contains_", "not_contains", "line_count",
+                 "max_words", "no_invented", "in_order", "suite"):
         assert word not in view, word
     shot(page, "12a-1-pilot-page-1400-light.png")
     assert page.errors == []
 
 
-def test_a_mark_opens_the_answer_and_the_panel_moves_along_a_row_and_a_column(live, page):
+def test_an_answer_opens_in_the_panel_and_the_keys_walk_the_bank_and_the_models(live, page):
     page.set_viewport_size({"width": 1400, "height": 1000})
     open_pilot(page, live["base"])
-    page.locator("[data-evd-cell='fx/good-750m|everyday-pilot-01']").click()
+    page.locator("[data-evd-cell='fx/good-750m|understanding']").click()
+    page.locator("[data-evd-panel] [data-evd-row='everyday-pilot-01']").click()
     page.wait_for_selector("#reader[data-kind='everyday'][data-ready='1']")
-    assert "read=everyday:fx/good-750m:1" in page.evaluate("decodeURIComponent(location.hash)")
+    # the pilot's first question is the bank's sixteenth, the last in Understanding
+    assert "read=everyday:fx/good-750m:16" in page.evaluate("decodeURIComponent(location.hash)")
     rd = page.locator("#reader")
+    title = "document.querySelector('#readerTitle').textContent === "
     assert rd.locator("#readerTitle").text_content() == "good-750m · Typos"
     # the question above the answer, the answer after the thinking, the thinking folded
     q = rd.locator("[data-evd-question]")
@@ -106,31 +103,43 @@ def test_a_mark_opens_the_answer_and_the_panel_moves_along_a_row_and_a_column(li
     th = rd.locator("[data-evd-thinking]")
     assert th.evaluate("e => e.open") is False
     assert th.locator("summary").text_content() == "thinking ▸ 10 words"
-    assert rd.locator("[data-evd-verdict]").text_content() == "✓says 29"
+    assert rd.locator("[data-evd-verdict]").text_content() == \
+        '✓says "29" or "twenty-nine" or "twenty nine"'
     shot(page, "12a-2-answer-panel-1400-light.png")
-    # ↓ the next question for this model, → the next model on this question
+    # ↓ the next question in the bank for this model, → the next model on it
     page.keyboard.press("ArrowDown")
-    page.wait_for_function("document.querySelector('#readerTitle').textContent === "
-                           "'good-750m · JSON'")
+    page.wait_for_function(title + "'good-750m · Landlord repair message'")
     page.keyboard.press("ArrowRight")
-    page.wait_for_function("document.querySelector('#readerTitle').textContent === "
-                           "'skewed-360m · JSON'")
-    assert "missing: Dubai, March 2021" in rd.locator("[data-evd-verdict]").text_content()
+    page.wait_for_function(title + "'skewed-360m · Landlord repair message'")
+    assert rd.locator("[data-evd-verdict]").text_content().startswith('✓says "kitchen", "tap"')
     page.locator("[data-evd-prev-q]").click()
-    page.wait_for_function("document.querySelector('#readerTitle').textContent === "
-                           "'skewed-360m · Typos'")
+    page.wait_for_function(title + "'skewed-360m · Typos'")
     # an answer that never left its thinking says so, and the thinking is there
     assert rd.locator("[data-no-answer]").text_content() == \
         "No answer: the model was still thinking when it ran out of room."
     assert "never finished answering" in rd.locator("[data-evd-verdict]").text_content()
     assert rd.locator("[data-evd-thinking]").count() == 1
+    # ← twice: a model that sat only the pilot, on its question and on one it
+    # was never asked
+    page.keyboard.press("ArrowLeft")
+    page.wait_for_function(title + "'good-750m · Typos'")
+    page.keyboard.press("ArrowLeft")
+    page.wait_for_function(title + "'chance-160m · Typos'")
+    assert rd.locator("[data-evd-answer]").text_content() == \
+        "Twenty-nine days, because it is a leap year."
+    page.keyboard.press("ArrowDown")
+    page.wait_for_function(title + "'chance-160m · Landlord repair message'")
+    assert rd.locator("[data-not-asked]").text_content() == \
+        "Not asked: this model\u2019s run did not include this question."
+    assert rd.locator("[data-evd-verdict]").count() == 0          # nothing to mark
     page.keyboard.press("Escape")
     page.wait_for_selector("#reader", state="detached")
     assert page.errors == []
 
 
 def test_no_answer_to_every_question_leaves_nothing_empty(live, page):
-    """The pilot page before anyone has sat it: one line and the button."""
+    """The page before anyone has sat it: one line and the button, and the
+    questions, readable before any model has answered them."""
     import service.app as appmod
     out_dir = live["tree"]["out_dir"]
     moved = []
@@ -142,9 +151,10 @@ def test_no_answer_to_every_question_leaves_nothing_empty(live, page):
         page.goto(live["base"] + "/#everyday")
         box = page.locator("[data-everyday-empty]")
         box.wait_for()
-        assert "No model has taken the pilot yet." in box.text_content()
-        assert box.locator("button").text_content() == "Run the pilot"
+        assert "No model has taken everyday tasks yet." in box.text_content()
+        assert box.locator("button").text_content() == "Run everyday tasks"
         assert page.locator("[data-everyday-table]").count() == 0
+        assert page.locator("[data-everyday-bank] [data-evd-bank-q]").count() == 111
     finally:
         for f in moved:
             f.with_suffix(".json.bak").rename(f)
@@ -174,29 +184,36 @@ def test_the_model_page_has_its_everyday_block_after_the_exam(live, page):
     block.wait_for()
     assert page.locator("[data-pilot-badge]:visible").count() == 1
     assert page.locator("[data-kind-tile='everyday'] [data-pilot-badge]").is_visible()
-    assert block.locator("[data-everyday-count]").text_content() == "5 of 5"
-    rows = block.locator("[data-evd-row]")
-    assert [r.locator(".evgroup").text_content() for r in rows.all()] == \
-        ["Understanding", "Transform", "Summarising", "Writing", "Instructions"]
-    assert [r.locator(".evmark").text_content() for r in rows.all()] == ["✓"] * 5
-    assert rows.nth(1).locator(".evreason").text_content() == "valid JSON, all five values"
+    assert block.locator("[data-everyday-count]").text_content() == "108 of 111"
+    # 12a.2: a row a group, each its n of k
+    groups = block.locator("[data-evd-group]")
+    assert [g.locator(".evgroup").text_content() for g in groups.all()] == GROUPS
     # no criteria strip, no score bar, no ids
     assert block.locator(".critrow, [data-bar], .scorebar").count() == 0
-    assert "everyday-pilot-" not in block.text_content()
-    # a row opens the question and the whole answer under it
-    rows.nth(4).click()
-    opened = block.locator("[data-evd-open='everyday-pilot-05']")
-    opened.wait_for()
-    assert "give me 3 names" in opened.locator("[data-evd-question]").text_content()
-    assert opened.locator("[data-evd-answer]").text_content() == \
-        "1. Bean There\n2. Daily Grind\n3. Brew Haven"
-    assert opened.locator("[data-evd-thinking] summary").text_content() == "thinking ▸ 3 words"
+    assert "everyday-" not in block.text_content()
+    # a group opens its answers, a row a question with its mark and why
+    block.locator("[data-evd-group='instructions']").click()
+    row = block.locator("[data-evd-answers='fx/good-750m|instructions'] "
+                        "[data-evd-row='everyday-pilot-05']")
+    row.wait_for()
+    assert row.locator("[data-evd-mark]").get_attribute("data-evd-mark") == "ok"
+    assert row.locator(".evreason").text_content() == "3 lines · at most 15 words"
     # a poll keeps it open
     page.evaluate("render()")
-    assert page.locator("[data-evd-open='everyday-pilot-05']").count() == 1
+    assert page.locator("[data-evd-answers='fx/good-750m|instructions']").count() == 1
+    # the row opens the question and the whole answer in the side panel
+    row.click()
+    rd = page.locator("#reader[data-ready='1']")
+    rd.locator("[data-evd-answer]").wait_for()
+    assert "give me 3 names" in rd.locator("[data-evd-question]").text_content()
+    assert rd.locator("[data-evd-answer]").text_content() == \
+        "1. Bean There\n2. Daily Grind\n3. Brew Haven"
+    assert rd.locator("[data-evd-thinking] summary").text_content() == "thinking ▸ 3 words"
+    page.keyboard.press("Escape")
+    page.wait_for_selector("#reader", state="detached")
     block.scroll_into_view_if_needed()
     shot(page, "12a-3-model-block-1400-light.png")
-    # Compare models → is the pilot page
+    # Compare models → is the Everyday tasks page
     block.locator("[data-everyday-compare]").click()
     page.wait_for_selector("[data-everyday-table]")
     assert page.evaluate("location.hash") == "#tab=benchmarks&sub=everyday"      # 12b
@@ -229,10 +246,10 @@ def test_a_model_that_has_not_sat_the_pilot_shows_one_line_and_test_queues_it(li
 
 
 # ---------------------------------------------------------------------------
-# Run the pilot
+# Run everyday tasks
 # ---------------------------------------------------------------------------
 
-def test_run_the_pilot_queues_one_run_per_ticked_model(live, page):
+def test_run_everyday_tasks_queues_one_run_per_ticked_model(live, page):
     page.set_viewport_size({"width": 1400, "height": 1000})
     cancel_pilot_rows(live["base"])
     open_pilot(page, live["base"])
@@ -246,9 +263,9 @@ def test_run_the_pilot_queues_one_run_per_ticked_model(live, page):
     ticked = [p.get_attribute("data-evd-pick") for p in picks.all()
               if p.locator("input").is_checked()]
     assert ticked == ids[:4]
-    # an instruct model on the board that already sat it: done, unticked
+    # an instruct model on the board that sat the pilot: what it was asked, unticked
     done = dlg.locator("[data-evd-pick='fx/below-135m-it']")
-    assert done.locator("[data-evd-done]").text_content() == "done · run again"
+    assert done.locator("[data-evd-done]").text_content() == "asked 5 of 111 · run all 111"
     assert not done.locator("input").is_checked()
     go = dlg.locator("[data-dialog-go]")
     assert go.text_content() == "Queue 4 runs"
@@ -266,7 +283,7 @@ def test_run_the_pilot_queues_one_run_per_ticked_model(live, page):
         toast.locator("[data-toast-link]").click()
         page.wait_for_selector("[data-queue-row]")
         assert page.locator(f"tr[data-queue-row='{rows[0]['id']}'] [data-suite-cell]") \
-            .first.text_content() == "everyday pilot"
+            .first.text_content() == "everyday tasks"
     finally:
         cancel_pilot_rows(live["base"])
     assert page.errors == []
@@ -286,7 +303,7 @@ def test_it_is_reached_from_benchmarks_and_test_a_model_offers_it(live, page):
     page.wait_for_selector("[data-dialog='test'] [data-suite-help]")
     page.get_by_label("suite").click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='everyday']")
-    assert opt.text_content() == "Everyday tasks — 5 questions, minutes"
+    assert opt.text_content() == "Everyday tasks — 111 questions, a few minutes"
     page.keyboard.press("Escape")
     assert page.errors == []
 
@@ -337,7 +354,8 @@ def test_screenshots_for_the_pr(live, browser, theme):
             shot(page, f"12a-pilot-{width}-{theme}.png")
             open_model(page, live["base"], "fx/skewed-360m")
             page.evaluate(f"applyTheme('{theme}')")
-            page.locator("[data-evd-row='everyday-pilot-01']").click()
+            open_kind(page, "everyday")
+            page.locator("[data-evd-group='understanding']").click()
             page.wait_for_timeout(200)
             page.evaluate("document.querySelector('[data-everyday-block]').scrollIntoView()")
             page.wait_for_timeout(200)

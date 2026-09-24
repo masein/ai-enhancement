@@ -397,7 +397,7 @@ def default_responder(req: Request) -> str:
     no vocabulary with the fixture's questions, so nothing here can trip the
     contamination gate by accident — a test that wants a trip plants one."""
     if req.custom_id.startswith("everyday:"):
-        # 12a: the pilot's one judged question, answered as the stub would
+        # 12a: the judged Everyday questions, answered as the stub would
         from everyday import stub_reply                # scripts/, on sys.path in the service
         return stub_reply(req.user)
     if req.custom_id.startswith(("judge:", "canary:")):

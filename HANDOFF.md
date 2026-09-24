@@ -1905,6 +1905,82 @@ curl -s -o /dev/null -w "%{size_download} bytes\n" -H "Accept-Encoding: gzip" ht
 5. `http://100.74.89.105:8899/` opens Home. The dot is green unless there is
    a problem, and its list ends with **Known limits (n) ▸**.
 
+### 12a.2 — Everyday tasks round 2: one bank of 111
+
+Part B of `docs/prompts/phase-12b3-live-check-and-everyday-round2.md`. The
+pilot proved the plumbing; this is the first real Everyday bank.
+
+- **The bank**: `eval_tasks/everyday/bank.jsonl`.
+  - It holds round 2's 106 questions (`docs/prompts/phase-12b3/everyday_round2.jsonl`)
+    and the pilot's five, converted to the same vocabulary as
+    `everyday-pilot-01…05`: **111 questions**.
+  - It is in seven groups: Understanding, Writing, Summarising, Transform,
+    Quick maths, Instructions and Honesty, 15 to 17 each, in that order
+    everywhere.
+  - English only. Every question is readable. `pilot.jsonl` is gone.
+- **The checks**: every question carries a `checks` list, and all must pass.
+  - `scripts/everyday.py` ports `docs/prompts/phase-12b3/checks.py`, the
+    reference: the same regexes and the same normalising.
+  - `tests/test_everyday_12a2.py` holds the two to the same verdict on every
+    check of every one of the 180 probes, and each probe to its expected
+    verdict.
+  - Each check also says what it looks for in plain words (`describe`), and
+    a failing one says why.
+  - A judge check sends the question, the answer and its rubric. The judge
+    is asked only when the script checks have passed.
+  - `load_bank` refuses an invalid line, a duplicate id, an unknown group or
+    an unknown check type, and names the line.
+- **Running it**: the `everyday` suite runs the whole bank as the harness
+  task `everyday`.
+  - It uses the chat template, greedy, 512 tokens, or #59's 2,048 for a
+    reasoning model.
+  - A model that sat the pilot logged `everyday_pilot`. Those answers are
+    still read, so it keeps its five marks until it runs the bank.
+  - `everyday.json` now carries `groups`: n of k per group, k being what
+    the model was asked there.
+- **What masein sees**:
+  - **Benchmarks ▸ Everyday tasks**: models across the top and the seven
+    groups down the side, **n of k**. A cell opens that model's answers in
+    that group, one row per question with ✓ or ✗ and its reason; a row opens
+    the whole answer. Below it are the questions, by group, each with its
+    checks in plain words.
+  - **The model page**: the Everyday block is the seven groups, each opening
+    to its answers.
+  - **Models ▸ Everyday tasks**: a column per group and the total.
+  - The **Round 2 · not ranked** badge appears once wherever Everyday tasks
+    are shown. The button is **Run everyday tasks**. In its dialog, a model
+    that sat the pilot reads **asked 5 of 111 · run all 111**.
+  - In the side panel, a question a pilot-only model was never asked says
+    **Not asked**, not "the model wrote nothing".
+- **A 12b.3 fix**: opened, **Known limits (n) ▸** now lists its rows inside
+  the checks panel. Before, they floated out as a second panel under the
+  first, and a browser arrow sat beside the ▸.
+- **Still not a benchmark**: never ranked, never averaged, never read by
+  Propose or a generator. The results rows skip any task whose name starts
+  `everyday` (`NOT_A_BENCHMARK`). The practice/hidden split starts in round
+  3: adding `split` to a question is a data change.
+
+**Deploy steps, after 12a.2 merges.** Code and the bank.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check && mkdir /tmp/check && cd /tmp/check && tar -x && exec env -i PATH="$PATH" HOME=/tmp/check LANG=C.UTF-8 python -m pytest -q -p no:cacheprovider -m "not gpu and not network and not dashboard"' 2>&1 | tail -15
+```
+
+**Expected output:**
+
+1. The build ends healthy and prints `image files OK`, now naming
+   `eval_tasks/everyday/bank.jsonl` among the files it checks.
+2. The log grep prints `no errors`.
+3. Step 3 ends `N passed, M deselected in …s`, with no `failed`. The 180
+   probes run there too.
+4. **Run everyday tasks** on the four models queues four runs of 111
+   questions each, a few minutes apiece. Each row ends `Everyday tasks: n of
+   111`, with `the judge is marking k` until the judge's six land.
+5. Benchmarks ▸ Everyday tasks shows the four models by the seven groups,
+   and every cell opens its answers.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

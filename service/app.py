@@ -340,7 +340,7 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         raise HTTPException(422, "kind must be auto, base or instruct")
     if s.suite not in ("quick", "full", "control", "judged", "everyday"):
         raise HTTPException(422, "suite must be quick, full, control (mmlu_perm only), "
-                                 "judged (free response + judge) or everyday (the pilot)")
+                                 "judged (free response + judge) or everyday (Everyday tasks)")
     chosen: list[str] = []
     if s.suite == "judged":
         # before a GPU second is spent on answers nobody could grade

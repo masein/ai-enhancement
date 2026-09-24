@@ -37,159 +37,284 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(REPO))
 import judge as _judge  # noqa: E402
 
-TASK = "everyday_pilot"
-PILOT_DIR = REPO / "eval_tasks" / "everyday"
-PILOT_PATH = PILOT_DIR / "pilot.jsonl"
-TEMPLATE_PATH = PILOT_DIR / "_everyday_template_yaml"
+# 12a.2: one bank — round 2's 106 questions and the pilot's five, the
+# harness task "everyday". A model that sat the pilot logged it as
+# "everyday_pilot", and those answers are still read
+TASK = "everyday"
+LEGACY_TASKS = ("everyday_pilot",)
+BANK_DIR = REPO / "eval_tasks" / "everyday"
+BANK_PATH = BANK_DIR / "bank.jsonl"
+TEMPLATE_PATH = BANK_DIR / "_everyday_template_yaml"
 OUT_NAME = "everyday.json"
-# the pilot's five groups, as the page shows them (12b.3: English only —
-# Language became Summarising, and Behaviour is Instructions)
-GROUPS = {"understanding": "Understanding", "writing": "Writing", "transform": "Transform",
-          "summarising": "Summarising", "instructions": "Instructions"}
+# the seven groups, in this order everywhere, as the page shows them
+GROUPS = {"understanding": "Understanding", "writing": "Writing",
+          "summarising": "Summarising", "transform": "Transform",
+          "quick_maths": "Quick maths", "instructions": "Instructions", "honesty": "Honesty"}
 NEVER_FINISHED = "never finished answering"
 WAITING = "waiting for the judge"
 
 
-def load_pilot(path: Path = PILOT_PATH) -> list[dict]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()
-            if line.strip()]
+def load_bank(path: Path = BANK_PATH) -> list[dict]:
+    """The bank, checked as it is read: an invalid line, a duplicate id, an
+    unknown group or an unknown check type fails here, naming the line —
+    never later, on a model's answer."""
+    out, seen = [], set()
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            q = json.loads(line)
+        except ValueError as e:
+            raise ValueError(f"{path.name} line {n}: not valid JSON ({e})") from None
+        if not isinstance(q, dict):
+            raise ValueError(f"{path.name} line {n}: not a JSON object")
+        for key in ("id", "group", "prompt", "checks"):
+            if not q.get(key):
+                raise ValueError(f"{path.name} line {n}: no {key}")
+        if q["id"] in seen:
+            raise ValueError(f"{path.name} line {n}: {q['id']} is there twice")
+        seen.add(q["id"])
+        if q["group"] not in GROUPS:
+            raise ValueError(f"{path.name} line {n}: unknown group {q['group']!r}")
+        if not isinstance(q["checks"], list):
+            raise ValueError(f"{path.name} line {n}: checks is not a list")
+        for c in q["checks"]:
+            t = c.get("type") if isinstance(c, dict) else None
+            if t not in NEEDS:
+                raise ValueError(f"{path.name} line {n}: unknown check type {t!r}")
+            miss = [k for k in NEEDS[t] if k not in c]
+            if miss:
+                raise ValueError(f"{path.name} line {n}: {t} needs {', '.join(miss)}")
+        out.append(q)
+    return out
 
 
 # ---------------------------------------------------------------------------
-# the checks: (pass, reason). The reason is what a person reads on the page.
+# the check vocabulary (12a.2). docs/prompts/phase-12b3/checks.py is the
+# reference: every check below decides exactly as it does — the same regexes,
+# the same normalising — and tests/test_everyday_12a2.py holds the two to the
+# same verdict on all 180 probes. What this adds is words: each check says
+# what it looks for in plain words (the bank's page), and a failing check
+# says why (the answer's row).
 # ---------------------------------------------------------------------------
 
-def _has(text: str, s: str) -> bool:
-    """`s` as a whole word or number: "29" is in "29 days", not in "1929"."""
-    return re.search(rf"(?<!\w){re.escape(s)}(?!\w)", text, re.I) is not None
+NUM = re.compile(r'(?<![\w.])-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|(?<![\w.])-?\d+(?:\.\d+)?')
 
 
-def check_contains(answer: str, spec: dict) -> tuple[bool, str]:
-    want = list(spec.get("any") or [])
-    hit = next((s for s in want if _has(answer, s)), None)
-    return (True, f"says {hit}") if hit else (False, f"didn't say {want[0]}")
+def _norm(s: str) -> str:
+    return s.replace('’', "'").replace('½', ' 1/2')
 
 
-_FENCE = re.compile(r"```[a-zA-Z0-9_-]*\s*\n?(.*?)```", re.S)
+def _ampm(x: str) -> str:
+    """12:30pm reads as 12:30 pm, on both sides of a comparison"""
+    return re.sub(r'(\d)\s*(am|pm|a\.m\.|p\.m\.)(?!\w)', r'\1 \2', x, flags=re.I)
 
 
-def _first_object(text: str) -> tuple[str, int, int] | None:
-    """The first balanced {…} in `text`, and where it sits. Braces inside a
-    JSON string do not count."""
-    start = text.find("{")
-    while start >= 0:
-        depth, in_str, esc = 0, False, False
-        for i in range(start, len(text)):
-            ch = text[i]
-            if in_str:
-                if esc:
-                    esc = False
-                elif ch == "\\":
-                    esc = True
-                elif ch == '"':
-                    in_str = False
-            elif ch == '"':
-                in_str = True
-            elif ch == "{":
+def _has(text: str, v: str, cs: bool = False) -> bool:
+    """`v` as a whole word or number, case-insensitive unless asked: "2
+    november" is not in "22 november"."""
+    text, v = _ampm(text), _ampm(v)
+    t, v = (text, v) if cs else (text.lower(), v.lower())
+    return re.search(r'(?<!\w)' + re.escape(v) + r'(?!\w)', t) is not None
+
+
+def _lines(a: str) -> list[str]:
+    """non-empty lines, without code fences and one lead-in line ending in
+    ':' ("Here you go:")"""
+    ls = [ln for ln in a.splitlines() if ln.strip() and not ln.strip().startswith('```')]
+    if len(ls) > 1 and ls[0].rstrip().endswith(':'):
+        ls = ls[1:]
+    return ls
+
+
+def _body(a: str) -> str:
+    return '\n'.join(_lines(a))
+
+
+def numbers(text: str) -> list[float]:
+    """every number in the text; thousands commas are read (1,284.50)"""
+    out = []
+    for m in NUM.finditer(text):
+        try:
+            out.append(float(m.group().replace(',', '')))
+        except ValueError:
+            pass
+    return out
+
+
+def first_json(text: str):
+    """the first JSON object or array in the text, fenced or not"""
+    t = re.sub(r'```(?:json)?', '', text)
+    starts = [k for k, ch in enumerate(t) if ch in '{[']
+    for i in starts:
+        op = t[i]
+        cl = '}' if op == '{' else ']'
+        depth = 0
+        for j in range(i, len(t)):
+            if t[j] == op:
                 depth += 1
-            elif ch == "}":
+            elif t[j] == cl:
                 depth -= 1
                 if depth == 0:
-                    return text[start:i + 1], start, i + 1
-        start = text.find("{", start + 1)
+                    try:
+                        o = json.loads(t[i:j + 1])
+                        if isinstance(o, (dict, list)) and o:
+                            return o
+                    except ValueError:
+                        pass
+                    break
     return None
 
 
-def _values(o) -> list[str]:
-    """Every value in the object, flattened, in order — key names are free."""
+def _flat(o) -> list[str]:
     if isinstance(o, dict):
-        return [v for x in o.values() for v in _values(x)]
+        return [x for v in o.values() for x in _flat(v)]
     if isinstance(o, list):
-        return [v for x in o for v in _values(x)]
-    return [] if o is None else [str(o)]
+        return [x for v in o for x in _flat(v)]
+    return [str(o).lower()]
 
 
-# what the JSON must hold: (the name the reason uses, any of these phrases)
-JSON_NEEDS = (("Sara Ahmed", (("sara ahmed",), ("sara", "ahmed"))),
-              ("34", (("34",),)),
-              ("product manager", (("product manager",),)),
-              ("Dubai", (("dubai",),)),
-              ("March 2021", (("march 2021",), ("2021-03",))))
+INVENTED = {
+    'phone': r'(?:\+?\d[\d\s-]{6,}\d)',
+    'url': r'https?://|www\.|\b\w+\.(?:com|ae|net|org)\b',
+    'email': r'\b[\w.]+@[\w.]+\b',
+    'price': r'(?:\b(?:aed|dhs?|usd|\$)\s?\d)|(?:\d\s?(?:k|m|mn|million|thousand)?\s?'
+             r'(?:aed|dhs|dirhams?|usd)\b)',
+    'distance': r'\d+(?:\.\d+)?\s?(?:km|kms|kilomet\w*|metres?|meters?|m\b|mins?\b|minutes?)',
+}
+EMOJI = re.compile('[\U0001F000-\U0001FAFF☀-➿⭐⭕✅❌❤️]')
+_ABBR = re.compile(r'\b(?:dr|mr|mrs|ms|st|e\.g|i\.e|etc)\.', re.I)
 
 
-def check_json(answer: str, spec: dict | None = None) -> tuple[bool, str]:
-    fenced = next((m for m in _FENCE.finditer(answer) if "{" in m.group(1)), None)
-    where = fenced.group(1) if fenced else answer
-    got = _first_object(where)
-    if got is None:
-        return False, "not valid JSON"
-    blob, a, b = got
-    try:
-        obj = json.loads(blob)
-    except ValueError:
-        return False, "not valid JSON"
-    flat = " ".join(_values(obj)).lower()
-    missing = [name for name, ways in JSON_NEEDS
-               if not any(all(_has(flat, w) for w in way) for way in ways)]
-    if missing:
-        return False, "missing: " + ", ".join(missing)
-    # text around it does not fail it, but it is said
-    outside = (answer[:fenced.start()] + answer[fenced.end():]) if fenced \
-        else answer[:a] + answer[b:]
-    return True, ("valid JSON, all five values" if not outside.strip()
-                  else "valid JSON, all five values, with text around it")
+def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
+    """One check on one answer: (True, '') or (False, why). A judge check is
+    (None, 'judge'): the script cannot decide it."""
+    a = _norm(answer)
+    t = check['type']
+    cs = check.get('case_sensitive', False)
+    if t == 'contains_any':
+        ok = any(_has(a, v, cs) for v in check['values'])
+        return ok, '' if ok else 'says none of: ' + ', '.join(check['values'][:3])
+    if t == 'contains_all':
+        miss = [v for v in check['values'] if not _has(a, v, cs)]
+        return not miss, 'missing: ' + ', '.join(miss) if miss else ''
+    if t == 'not_contains':
+        bad = [v for v in check['values'] if _has(a, v, cs)]
+        return not bad, 'still says: ' + ', '.join(bad) if bad else ''
+    if t == 'number':
+        ok = any(abs(n - check['value']) <= check['tolerance'] for n in numbers(a))
+        return ok, '' if ok else f"didn't say {check['value']:g}"
+    if t == 'json':
+        o = first_json(a)
+        if o is None:
+            return False, 'not valid JSON'
+        vals = _flat(o)
+        miss = [alts[0] for alts in check['required_values']
+                if not any(x.lower() in v for x in alts for v in vals)]
+        return not miss, 'missing: ' + ', '.join(miss) if miss else ''
+    if t == 'line_count':
+        n = len(_lines(a))
+        return n == check['n'], f'{n} lines, expected {check["n"]}'
+    if t == 'max_words':
+        n = len(a.split())
+        return n <= check['n'], f'{n} words, limit {check["n"]}'
+    if t == 'in_order':
+        pos, low = 0, a.lower()
+        for v in check['values']:
+            alts = v if isinstance(v, list) else [v]
+            hits = [m.start() for x in alts
+                    for m in re.finditer(r'(?<!\w)' + re.escape(x.lower()) + r'(?!\w)', low[pos:])]
+            if not hits:
+                return False, 'wrong order'
+            pos += min(hits) + 1
+        return True, ''
+    if t == 'asks_back':
+        ok = '?' in a
+        return ok, '' if ok else "didn't ask what you meant"
+    if t == 'no_invented':
+        bad = re.search(INVENTED[check['what']], a, re.I)
+        return not bad, f"made up a {check['what']}" if bad else ''
+    if t == 'numbers_from_source':
+        src = set(numbers(_norm(prompt)))
+        extra = [n for n in numbers(a) if n not in src]
+        return not extra, f'invented {extra[0]:g}' if extra else ''
+    if t == 'word_count':
+        n = len(_body(a).split())
+        return n == check['n'], f'{n} words, expected {check["n"]}'
+    if t == 'sentence_count':
+        b = _ABBR.sub(lambda m: m.group().replace('.', ''), _body(a))
+        n = len([x for x in re.split(r'(?<=[.!?])\s+', b.strip()) if re.search(r'\w', x)])
+        return n == check['n'], f'{n} sentences, expected {check["n"]}'
+    if t == 'no_emoji':
+        bad = EMOJI.search(a)
+        return not bad, 'used an emoji' if bad else ''
+    if t == 'no_digits':
+        bad = re.search(r'\d', a)
+        return not bad, 'used a number' if bad else ''
+    if t == 'judge':
+        return None, 'judge'
+    raise ValueError(f"unknown check type: {t}")
 
 
-# (what must be there, any of these) and what must not be
-FIXED_NEEDS = (("I am writing", ("i am writing", "i'm writing", "i’m writing")),
-               ("regarding", ("regarding", "in regard to", "with regard to", "about")),
-               ("sent", ("sent",)),
-               ("paid", ("paid",)))
-FIXED_WRONG = ("I writing", "sended", "payed")
+def describe(check: dict) -> str:
+    """What a check looks for, in plain words — the bank's page"""
+    t = check['type']
+    vals = check.get('values') or []
+    q = lambda v: '"' + (' or '.join(v) if isinstance(v, list) else v) + '"'   # noqa: E731
+    if t == 'contains_any':
+        return 'says ' + ' or '.join(f'"{v}"' for v in vals[:3])
+    if t == 'contains_all':
+        return 'says ' + ', '.join(f'"{v}"' for v in vals)
+    if t == 'not_contains':
+        return 'doesn’t say ' + ' or '.join(f'"{v}"' for v in vals)
+    if t == 'number':
+        return f"says {check['value']:g}"
+    if t == 'json':
+        return 'valid JSON with ' + ', '.join(alts[0] for alts in check['required_values'])
+    if t == 'line_count':
+        return f"{check['n']} lines"
+    if t == 'max_words':
+        return f"at most {check['n']} words"
+    if t == 'word_count':
+        return f"exactly {check['n']} words"
+    if t == 'sentence_count':
+        return f"{check['n']} sentence" + ('' if check['n'] == 1 else 's')
+    if t == 'in_order':
+        return 'in this order: ' + ', then '.join(q(v) for v in vals)
+    if t == 'asks_back':
+        return 'asks what you meant'
+    if t == 'no_invented':
+        return f"no invented {check['what']}"
+    if t == 'numbers_from_source':
+        return 'no number the question doesn’t give'
+    if t == 'no_emoji':
+        return 'no emoji'
+    if t == 'no_digits':
+        return 'no numbers'
+    if t == 'judge':
+        return 'the judge: ' + check['rubric']
+    raise ValueError(f"unknown check type: {t}")
 
 
-def check_fixed(answer: str, spec: dict | None = None) -> tuple[bool, str]:
-    left = [w for w in FIXED_WRONG if _has(answer, w)]
-    if left:
-        return False, "still says " + ", ".join(f"'{w}'" for w in left)
-    gone = [name for name, ways in FIXED_NEEDS if not any(_has(answer, w) for w in ways)]
-    if gone:
-        return False, "doesn't say " + ", ".join(f"'{w}'" for w in gone)
-    return True, "all four mistakes fixed"
+# what each type needs besides its type, for the import to refuse a bad line
+NEEDS = {'contains_any': ('values',), 'contains_all': ('values',), 'not_contains': ('values',),
+         'number': ('value', 'tolerance'), 'json': ('required_values',), 'line_count': ('n',),
+         'max_words': ('n',), 'word_count': ('n',), 'sentence_count': ('n',),
+         'in_order': ('values',), 'asks_back': (), 'no_invented': ('what',),
+         'numbers_from_source': (), 'no_emoji': (), 'no_digits': (), 'judge': ('rubric',)}
 
 
-_MARKER = re.compile(r"^\s*(?:\d+\s*[.)]|[-*•·])\s*")
-_WRAP = re.compile(r"^(?:\*\*|__|[\"'“”‘’`*_])+|(?:\*\*|__|[\"'“”‘’`*_])+$")
-# a colon, or a dash with words after it: the name is being explained. A
-# hyphen inside a word ("Brew-Ha") is part of the name
-_EXPLAINS = re.compile(r":|\s[-–—]+\s*\w|[–—]\s*\w")
-
-
-def _clean_line(line: str) -> str:
-    s = _MARKER.sub("", line.strip())
-    prev = None
-    while prev != s:
-        prev, s = s, _WRAP.sub("", s).strip()
-    return s
-
-
-def check_lines(answer: str, spec: dict | None = None) -> tuple[bool, str]:
-    spec = spec or {}
-    n, most = int(spec.get("n", 3)), int(spec.get("max_words", 5))
-    lines = [_clean_line(x) for x in answer.splitlines() if x.strip()]
-    lines = [x for x in lines if x]
-    if len(lines) != n:
-        return False, f"{len(lines)} line{'' if len(lines) == 1 else 's'}, expected {n}"
-    for i, x in enumerate(lines, 1):
-        if _EXPLAINS.search(x):
-            return False, f"line {i} explains the name"
-        if len(x.split()) > most:
-            return False, f"line {i} is {len(x.split())} words"
-    return True, "three names, nothing else"
-
-
-CHECKS = {"contains": check_contains, "json": check_json, "fixed": check_fixed,
-          "lines": check_lines}
+def grade(item: dict, answer: str) -> tuple[bool | None, str]:
+    """All of a question's checks: (True, what it did), (False, why not), or
+    (None, …) when the script checks pass and the judge decides. A judge is
+    never asked about an answer a script check has already failed."""
+    res = [(c, *run_check(c, answer, item['prompt'])) for c in item['checks']]
+    fails = [why for _, ok, why in res if ok is False]
+    if fails:
+        return False, '; '.join(fails)
+    if any(ok is None for _, ok, _ in res):
+        return None, WAITING
+    return True, ' · '.join(describe(c) for c, _, _ in res)
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +335,8 @@ THE ANSWER
 
 
 def judge_prompt(item: dict, answer: str) -> str:
-    return JUDGE_PROMPT.format(question=item["prompt"], rubric=item["check"]["rubric"],
+    rubric = next(c["rubric"] for c in item["checks"] if c["type"] == "judge")
+    return JUDGE_PROMPT.format(question=item["prompt"], rubric=rubric,
                                answer=answer.strip() or "(empty)")
 
 
@@ -218,10 +344,13 @@ def _sentences(text: str) -> int:
     return len([s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()])
 
 
-def stub_verdict(answer: str) -> dict:
-    """The deterministic stand-in the tests and dry runs use, for the one
-    question the judge marks (03, the school notice): at most two sentences,
-    11:30, and Thursday."""
+def stub_verdict(answer: str, question: str = "tldr") -> dict:
+    """The deterministic stand-in the tests and dry runs use. The pilot's
+    TL;DR (the school notice) it checks: at most two sentences, 11:30, and
+    Thursday. Any other judged question has passed its script checks before
+    it reaches a judge, and the stand-in agrees with them."""
+    if "tldr" not in (question or "").lower():
+        return {"pass": True, "reason": "the stand-in judge agrees with the script checks"}
     a = (answer or "").strip()
     if not a:
         return {"pass": False, "reason": "no answer"}
@@ -237,7 +366,8 @@ def stub_verdict(answer: str) -> dict:
 def stub_reply(prompt: str) -> str:
     """What the fake judge backend answers to a judge_prompt()."""
     answer = prompt.rsplit("THE ANSWER\n", 1)[-1]
-    return json.dumps(stub_verdict(answer), ensure_ascii=False)
+    question = prompt.split("QUESTION\n", 1)[-1].split("\n\nRUBRIC", 1)[0]
+    return json.dumps(stub_verdict(answer, question), ensure_ascii=False)
 
 
 def parse_verdict(text: str) -> dict | None:
@@ -256,9 +386,14 @@ def parse_verdict(text: str) -> dict | None:
 # ---------------------------------------------------------------------------
 
 def records(model_dir: Path) -> dict[str, dict]:
-    """The harness's logged samples, by question id."""
+    """The harness's logged samples, by question id — the bank's, or the
+    pilot's for a model that sat only the pilot."""
     out = {}
-    for rec in _judge._records(model_dir, TASK):
+    recs = _judge._records(model_dir, TASK)
+    for legacy in LEGACY_TASKS:
+        if not recs:
+            recs = _judge._records(model_dir, legacy)
+    for rec in recs:
         qid = (rec.get("doc") or {}).get("id")
         if qid:
             out[qid] = rec
@@ -281,10 +416,11 @@ def _model_id(model_dir: Path) -> str:
 
 def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
          judge: dict | None = None) -> dict | None:
-    """Mark every pilot question the model answered, and return what
-    everyday.json holds — None when the harness logged no pilot answers.
+    """Mark every question of the bank the model answered, and return what
+    everyday.json holds — None when the harness logged no answers.
     `verdicts`: {question id: {pass, reason}} from the judge. A verdict
-    already on file is kept while the answer it read is unchanged."""
+    already on file is kept while the answer it read is unchanged. A model
+    that sat only the pilot is marked on the five it was asked."""
     recs = records(model_dir)
     if not recs:
         return None
@@ -292,14 +428,12 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
     before = {it["id"]: it for it in prev.get("items") or []}
     verdicts = verdicts or {}
     items = []
-    for q in load_pilot():
-        ctype = q["check"]["type"]
+    for q in load_bank():
         rec = recs.get(q["id"])
-        it = {"id": q["id"], "group": q["group"], "check": ctype}
         if rec is None:
-            items.append({**it, "pass": False, "reason": "no answer was recorded",
-                          "answer_text": "", "had_reasoning": False})
-            continue
+            continue                  # not asked (a model that sat the pilot only)
+        it = {"id": q["id"], "group": q["group"],
+              "judged": any(c["type"] == "judge" for c in q["checks"])}
         parts = _judge.answer_parts(rec)
         ans = parts["answer_text"]
         it.update(answer_text=ans, had_reasoning=parts["had_reasoning"])
@@ -310,20 +444,22 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
             it.update({"pass": False, "reason": NEVER_FINISHED, "no_answer": True})
         elif not ans.strip():
             it.update({"pass": False, "reason": "the model wrote nothing"})
-        elif ctype == "judge":
-            v = verdicts.get(q["id"])
-            old = before.get(q["id"]) or {}
-            if v is None and old.get("pass") is not None and old.get("answer_text") == ans:
-                v = {"pass": old["pass"], "reason": old["reason"]}
-            if v is None:
-                it.update({"pass": None, "reason": old.get("reason") if (
-                    old.get("answer_text") == ans and old.get("pass") is None
-                    and old.get("reason")) else WAITING})
-            else:
-                it.update({"pass": bool(v["pass"]), "reason": v["reason"]})
         else:
-            ok, why = CHECKS[ctype](ans, q["check"])
-            it.update({"pass": ok, "reason": why})
+            ok, why = grade(q, ans)
+            if ok is None:
+                # the script checks passed; the judge decides the rest
+                v = verdicts.get(q["id"])
+                old = before.get(q["id"]) or {}
+                if v is None and old.get("pass") is not None and old.get("answer_text") == ans:
+                    v = {"pass": old["pass"], "reason": old["reason"]}
+                if v is None:
+                    it.update({"pass": None, "reason": old.get("reason") if (
+                        old.get("answer_text") == ans and old.get("pass") is None
+                        and old.get("reason")) else WAITING})
+                else:
+                    it.update({"pass": bool(v["pass"]), "reason": v["reason"]})
+            else:
+                it.update({"pass": ok, "reason": why})
         items.append(it)
     gen = _judge._generation(model_dir, TASK) or {}
     out = {
@@ -335,6 +471,10 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
         "settings": {"chat_template": True, "greedy": True, **gen},
         "passed": sum(1 for it in items if it["pass"] is True),
         "total": len(items),
+        # n of k per group, k being what this model was asked in it
+        "groups": {g: {"passed": sum(1 for it in items if it["group"] == g and it["pass"] is True),
+                       "total": sum(1 for it in items if it["group"] == g)}
+                   for g in GROUPS if any(it["group"] == g for it in items)},
         "waiting": sum(1 for it in items if it["pass"] is None),
         "items": items,
     }
@@ -351,7 +491,7 @@ def write(model_dir: Path, out: dict) -> Path:
 
 def summary(out: dict) -> str:
     """The queue row's words."""
-    line = f"Everyday pilot: {out['passed']} of {out['total']}"
+    line = f"Everyday tasks: {out['passed']} of {out['total']}"
     if out.get("waiting"):
         line += f" · the judge is marking {out['waiting']}"
     return line
@@ -362,11 +502,12 @@ def summary(out: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def build_task(dest: Path) -> Path:
-    """The pilot as a harness task under `dest`: the items, and the yaml with
+    """The bank as a harness task under `dest`: the items, and the yaml with
     their absolute path filled in. Returns the directory for --include_path."""
     dest.mkdir(parents=True, exist_ok=True)
+    load_bank()                       # a bad bank fails here, before any GPU
     items = dest / f"{TASK}.jsonl"
-    shutil.copyfile(PILOT_PATH, items)
+    shutil.copyfile(BANK_PATH, items)
     yaml = TEMPLATE_PATH.read_text(encoding="utf-8").replace("__ITEMS_PATH__",
                                                              str(items.resolve()))
     (dest / f"{TASK}.yaml").write_text(f"task: {TASK}\n" + yaml, encoding="utf-8")
@@ -375,7 +516,7 @@ def build_task(dest: Path) -> Path:
 
 def _pending(out: dict) -> list[dict]:
     """The questions that wait on the judge, with an answer to send it."""
-    qs = {q["id"]: q for q in load_pilot()}
+    qs = {q["id"]: q for q in load_bank()}
     return [qs[it["id"]] for it in out["items"] if it["pass"] is None and it["answer_text"]]
 
 
@@ -386,7 +527,7 @@ def start(model_dir: Path, submission: int | None = None) -> dict:
     from service import config, db, llm
     out = mark(model_dir)
     if out is None:
-        raise RuntimeError("the harness logged no answers for the pilot")
+        raise RuntimeError("the harness logged no answers for everyday tasks")
     todo = _pending(out)
     if not todo:
         write(model_dir, out)
@@ -394,7 +535,7 @@ def start(model_dir: Path, submission: int | None = None) -> dict:
     answers = {it["id"]: it["answer_text"] for it in out["items"]}
     ident = _judge.identity()
     if config.JUDGE_MODEL == "stub":
-        out = mark(model_dir, {q["id"]: stub_verdict(answers[q["id"]]) for q in todo},
+        out = mark(model_dir, {q["id"]: stub_verdict(answers[q["id"]], q["prompt"]) for q in todo},
                    judge={"id": ident["id"], "provisional": False})
         write(model_dir, out)
         return out
@@ -463,7 +604,7 @@ def judge_failed(model_dir: Path, why: str) -> None:
         return
     for it in out["items"]:
         if it["pass"] is None:
-            it["reason"] = "not marked: the judge failed — run the pilot again"
+            it["reason"] = "not marked: the judge failed — run everyday tasks again"
     out["waiting"] = 0
     out["judge_error"] = why[:300]
     write(model_dir, out)

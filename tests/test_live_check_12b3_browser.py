@@ -162,6 +162,17 @@ def test_the_dot_counts_problems_and_the_limits_are_one_folded_line(live, page):
     assert not limits.locator("li[data-check]").first.is_visible()
     limits.locator(":scope > details > summary").click()
     assert limits.locator("li[data-check][data-limit]").count() == 2
+    # opened, they are rows in the panel, under their line — not a second
+    # panel floating below it (12a.2: the list took the panel's position)
+    panel = page.locator("#warnings details.checks > .checklist").bounding_box()
+    head = limits.locator(":scope > details > summary").bounding_box()
+    for r in limits.locator("li[data-check][data-limit]").all():
+        assert r.is_visible()
+        b = r.bounding_box()
+        assert b["y"] > head["y"] and b["y"] + b["height"] <= panel["y"] + panel["height"] + 1
+    # one arrow: the line's own ▸, no browser marker beside it
+    assert limits.locator(":scope > details > summary").evaluate(
+        "e => getComputedStyle(e).listStyleType") == "none"
     # Home's Needs you counts the problems, not the limits
     assert "1 check is not green" in page.locator("[data-needs-you]").inner_text()
     assert page.errors == []

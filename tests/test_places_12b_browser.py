@@ -418,8 +418,9 @@ def test_the_everyday_view_shows_the_pilot_rows_with_one_badge(live, page):
     assert page.locator("[data-pilot-badge]").count() == 1
     assert page.locator("[data-lb-card] h2 [data-pilot-badge]").count() == 1
     row = page.locator(f"[data-lb-row='{MODEL}']")
-    assert row.locator("[data-everyday-count]").text_content() == "5 of 5"
-    assert row.locator("[data-evd-mark]").count() == 5
+    # 12a.2: the bank, a column per group
+    assert row.locator("[data-everyday-count]").text_content() == "108 of 111"
+    assert row.locator("[data-evd-g]").count() == 7
     assert page.locator("[data-not-tested]").count() == 1
     shot(page, "12b-models-everyday-1512-light.png")
     assert page.errors == []

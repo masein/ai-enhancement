@@ -565,8 +565,8 @@ def run_submission(sub: dict) -> None:
             task_out = config.OUT_DIR / safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
             if everyday and _has_results(task_out):
-                # the pilot is five questions and minutes: "run again" answers
-                # again. The last answers move beside the tree, whole
+                # everyday tasks are a few minutes: "run again" answers again.
+                # The last answers move beside the tree, whole
                 moved = _set_aside(task_out, task)
                 with open(log_path, "a") as lf:
                     lf.write(f"\n[service] {task}: answering again; the last answers are "
@@ -710,7 +710,7 @@ def run_submission(sub: dict) -> None:
                 failed_tasks.append("marking")
                 db.update(sid, error=f"marking: {e}")
                 with open(log_path, "a") as lf:
-                    lf.write(f"\n[service] the pilot could not be marked: {e!r}\n")
+                    lf.write(f"\n[service] everyday tasks could not be marked: {e!r}\n")
         if sub["suite"] == "judged" and not failed_tasks:
             db.update(sid, status="running", progress="submitting the answers to the judge")
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))

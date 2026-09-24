@@ -120,11 +120,12 @@ CONTROL_TASKS_DIR = Path(os.environ.get(
     "CONTROL_TASKS_DIR",
     Path(__file__).resolve().parent.parent / "eval_tasks" / "mmlu_perm"))
 
-# 12a: the Everyday tasks pilot — five questions typed the way people type
-# on a phone, marked by scripts/everyday.py. A look, not a benchmark: in no
-# other suite, on no leaderboard, in no average. The harness task is written
-# here from eval_tasks/everyday at the start of each run (everyday.build_task)
-EVERYDAY_TASK = "everyday_pilot"
+# 12a: Everyday tasks — questions typed the way people type on a phone, marked
+# by scripts/everyday.py. 12a.2: the bank, 111 questions in seven groups. A
+# look, not a benchmark: in no other suite, on no leaderboard, in no average.
+# The harness task is written here from eval_tasks/everyday at the start of
+# each run (everyday.build_task)
+EVERYDAY_TASK = "everyday"
 EVERYDAY_TASKS_DIR = Path(os.environ.get("EVERYDAY_TASKS_DIR", BENCH_ROOT / "everyday" / "tasks"))
 # what a model with no chat template is told: the pilot asks it as a person would
 NO_CHAT_TEMPLATE = ("This model has no chat template, so it can't be asked questions the "

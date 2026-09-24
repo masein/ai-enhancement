@@ -598,11 +598,12 @@ def taint_compare(task: str, after: dict, before: dict, parent: str) -> dict | N
             "text": text, "categories": cats, "scale": "pct"}
 
 
-# 12a: the Everyday pilot is a look, not a benchmark. Its answers are
-# written by the same harness into the same tree, and a task of it here would
-# be a column, a count toward "tasks", a date — so it is never read as a run.
-# The page reads everyday.json instead (load_everyday).
-NOT_A_BENCHMARK = ("everyday_",)
+# 12a: Everyday tasks are a look, not a benchmark. Their answers are
+# written by the same harness into the same tree, and a task of them here
+# would be a column, a count toward "tasks", a date — so it is never read as a
+# run. The page reads everyday.json instead (load_everyday). The bank's task
+# is "everyday" (12a.2); a model that sat the pilot logged "everyday_pilot"
+NOT_A_BENCHMARK = ("everyday",)
 
 
 def load_results(path: Path) -> list[dict]:
@@ -622,25 +623,29 @@ def load_results(path: Path) -> list[dict]:
     return runs
 
 
-EVERYDAY_PILOT = Path(__file__).resolve().parent.parent / "eval_tasks" / "everyday" / "pilot.jsonl"
-EVERYDAY_GROUPS = {"understanding": "Understanding", "writing": "Writing",
-                   "transform": "Transform", "summarising": "Summarising",
-                   "instructions": "Instructions"}
 # what the page needs of each marked answer; everything else stays on disk
-_EVERYDAY_ITEM = ("id", "pass", "reason", "answer_text", "had_reasoning", "reasoning_text",
-                  "reasoning_words", "no_answer")
+_EVERYDAY_ITEM = ("id", "group", "pass", "reason", "answer_text", "had_reasoning",
+                  "reasoning_text", "reasoning_words", "no_answer")
+
+
+def _evd_label(q: dict) -> str:
+    """a question's short name in the answer panel's title: its skill, as a
+    heading ("heavy typos" → "Heavy typos")"""
+    s = str(q.get("label") or q.get("skill") or q["id"])
+    return s[:1].upper() + s[1:]
 
 
 def load_everyday(out_dir: Path | None) -> dict | None:
-    """12a: the pilot's five questions — all readable, by design: five cannot
-    be a published score, so there is no hidden half to protect yet — and
-    every model's marks, from the everyday.json beside its results. Kept apart
-    from the models' rows, so nothing that ranks or averages can reach it."""
+    """12a.2: the Everyday bank — 111 questions in seven groups, all readable
+    by design (no hidden half until round 3) — and every model's marks, from
+    the everyday.json beside its results. Kept apart from the models' rows,
+    so nothing that ranks or averages can reach it."""
     try:
-        qs = [json.loads(x) for x in EVERYDAY_PILOT.read_text(encoding="utf-8").splitlines()
-              if x.strip()]
-    except OSError:
+        import everyday as ev                    # scripts/, beside this file
+        qs = ev.load_bank()
+    except (ImportError, OSError, ValueError):
         return None
+    group_of = {q["id"]: q["group"] for q in qs}
     models = {}
     for f in sorted(Path(out_dir).glob("*/everyday.json")) if out_dir and Path(out_dir).is_dir() \
             else []:
@@ -650,17 +655,26 @@ def load_everyday(out_dir: Path | None) -> dict | None:
             continue
         if not isinstance(e, dict) or not isinstance(e.get("items"), list) or not e.get("model"):
             continue
+        # a question the bank no longer holds is not shown (and not counted)
+        items = [{**{k: it[k] for k in _EVERYDAY_ITEM if k in it}, "group": group_of[it["id"]]}
+                 for it in e["items"] if it.get("id") in group_of]
+        groups = {g: {"passed": sum(1 for it in items if it["group"] == g and it.get("pass") is True),
+                      "total": sum(1 for it in items if it["group"] == g)}
+                  for g in ev.GROUPS if any(it["group"] == g for it in items)}
         models[e["model"]] = {
-            "passed": e.get("passed", 0), "total": e.get("total", len(e["items"])),
-            "waiting": e.get("waiting", 0), "marked_at": e.get("marked_at"),
-            "settings": e.get("settings") or {},
+            "passed": sum(1 for it in items if it.get("pass") is True), "total": len(items),
+            "waiting": sum(1 for it in items if it.get("pass") is None),
+            "marked_at": e.get("marked_at"), "settings": e.get("settings") or {},
             "provisional": bool((e.get("judge") or {}).get("provisional")),
-            "items": [{k: it[k] for k in _EVERYDAY_ITEM if k in it} for it in e["items"]],
+            "groups": groups, "items": items,
         }
-    return {"questions": [{"id": q["id"], "n": i, "group": q["group"],
-                           "groupLabel": EVERYDAY_GROUPS.get(q["group"], q["group"].title()),
-                           "label": q.get("label") or q["id"], "prompt": q["prompt"],
-                           "check": (q.get("check") or {}).get("type")}
+    return {"groups": [[k, v] for k, v in ev.GROUPS.items()],
+            "questions": [{"id": q["id"], "n": i, "group": q["group"],
+                           "groupLabel": ev.GROUPS[q["group"]],
+                           "label": _evd_label(q),
+                           "prompt": q["prompt"], "reference": q.get("reference") or "",
+                           "checks": [ev.describe(c) for c in q["checks"]],
+                           "judged": any(c["type"] == "judge" for c in q["checks"])}
                           for i, q in enumerate(qs, 1)],
             "models": models}
 
@@ -1979,6 +1993,16 @@ html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *
 /* the pill's panel: what kind of checks, then one line each */
 .bar-checks .checklist li.checks-judged { list-style:none; color:var(--text-secondary);
   margin:0 0 6px; }
+/* 12b.3: the known limits, folded at the end of the panel — a list inside
+   it, not a second panel: the rule above made every .checklist in the bar a
+   floating panel, and opened, this one floated out under the first */
+.bar-checks .known-limits { list-style:none; margin:8px 0 4px; }
+.bar-checks .known-limits > details > summary { cursor:pointer; list-style:none;
+  color:var(--text-secondary); }
+.bar-checks .known-limits > details > summary::-webkit-details-marker { display:none; }
+.bar-checks .known-limits .checklist { position:static; box-shadow:none; max-height:none;
+  overflow:visible; padding:0; margin:6px 0 0; border:1px solid var(--border);
+  border-radius:var(--r-2); z-index:auto; }
 /* 12b: one line at every width. Below 720px the four places are one
    Menu ▾ on the left; the right side keeps the run counter, Test a model,
    the status dot and the name, each at its shortest */
@@ -2894,11 +2918,29 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .evq-full { display:block; margin-top:4px; font-size:var(--fs-1); color:var(--text-secondary);
   max-width:360px; overflow-wrap:anywhere; }
 .evcell-td { text-align:center; vertical-align:middle !important; }
-.evcell { min-width:40px; min-height:32px; font-family:var(--font-sans); font-weight:700;
-  font-size:var(--fs-4); background:transparent; border:1px solid transparent;
-  border-radius:var(--r-1); cursor:pointer; }
+/* 12a.2: a cell is a group's n of k, a number: the mono figures */
+.evcell { min-width:40px; min-height:32px; font-family:var(--font-mono); font-size:var(--fs-2);
+  font-weight:600; font-variant-numeric:tabular-nums; padding:4px 8px; white-space:nowrap;
+  background:transparent; border:1px solid transparent; border-radius:var(--r-1);
+  cursor:pointer; }
 .evcell:hover { border-color:var(--border); background:var(--plane); }
 .evnav { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+/* 12a.2: a group's row (its name and n of k), and a group's answers — one row
+   per question: the mark, the question, the reason */
+.evgrow { grid-template-columns:minmax(120px, 1fr) auto; }
+.evgcount { font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-weight:600;
+  color:var(--text-primary); }
+.evglist { padding:0 0 8px 12px; }
+.evqrow { grid-template-columns:28px minmax(0, 1.4fr) minmax(0, 1fr); min-height:36px;
+  border-bottom:1px solid var(--border); }
+.evprompt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.evcell.on { border-color:var(--accent); background:var(--accent-soft); }
+.evpanel { margin-top:var(--sp-4); border-top:1px solid var(--border); padding-top:var(--sp-3); }
+.evpanel h3 { margin:0; font-size:var(--fs-3); }
+.evbank-g { border-bottom:1px solid var(--border); padding:8px 0; }
+.evbank-g > summary { cursor:pointer; }
+ol.evbank { margin:8px 0 4px; padding-left:22px; display:flex; flex-direction:column; gap:10px; }
+ol.evbank li p { margin:2px 0; }
 .evverdict { display:flex; gap:8px; align-items:baseline; margin:0 0 8px; font-size:var(--fs-2);
   font-weight:600; }
 /* on a phone the question column gives the marks room: its label and group
@@ -5212,17 +5254,19 @@ function modelAnswersTab(m, kinds) {
   else card.append(evdAnswersList(m));
   return [card];
 }
-// the pilot's five, each with its answer open, one group at a time or all
+// 12a.2: a model's everyday answers, one group at a time — the first it was
+// asked opens; 111 answers at once is not a page anyone reads
 function evdAnswersList(m) {
-  const qs = evd().questions || [], e = evdOf(m.id);
-  const groups = [...new Set(qs.map(q => q.groupLabel))];
-  const g = groups.includes(state.mansGroup) ? state.mansGroup : '';
+  const e = evdOf(m.id);
+  const groups = evdGroups().filter(([g]) => ((e && e.groups) || {})[g]);
+  const g = groups.some(([k]) => k === state.mansGroup) ? state.mansGroup
+    : (groups[0] || [''])[0];
   return el('div', { 'data-panel': 'everyday-answers' },
-    el('div', { class: 'chiprow' }, [['', 'All'], ...groups.map(x => [x, x])].map(([v, t]) =>
-      el('button', { class: 'chip-btn' + (v === g ? ' on' : ''), 'data-answers-group': v || 'all',
-        'aria-pressed': String(v === g), text: t,
-        onclick: () => { state.mansGroup = v; render(); } }))),
-    qs.filter(q => !g || q.groupLabel === g).map(q => {
+    el('div', { class: 'chiprow' }, groups.map(([k, label]) =>
+      el('button', { class: 'chip-btn' + (k === g ? ' on' : ''), 'data-answers-group': k,
+        'aria-pressed': String(k === g), text: `${label} · ${evdGroupCount(e, k)}`,
+        onclick: () => { state.mansGroup = k; render(); } }))),
+    evdQs(g).filter(q => evdItem(e, q.id)).map(q => {
       const it = evdItem(e, q.id), mk = evdMark(it);
       return el('div', { class: 'evitem open', 'data-answers-q': q.id },
         el('div', { class: 'evrow evrow-static' },
@@ -5523,26 +5567,34 @@ const whyProvisional = m => {
 };
 
 // ===========================================================================
-// 12a: the Everyday tasks pilot. Five questions typed the way people type
-// into an assistant on a phone, marked by a script (scripts/everyday.py) on
-// the text after any thinking. A look, not a benchmark: never ranked, never
-// averaged into anything, on no leaderboard, read by nothing that proposes or
-// generates. Two small views — a block on the model page and #everyday —
-// and one badge on each: Pilot · not ranked.
+// 12a: Everyday tasks — what people type into an assistant on a phone,
+// marked by checks (scripts/everyday.py) on the text after any thinking.
+// 12a.2: round 2, one bank of 111 questions in seven groups — the pilot's
+// five joined it. Still a look, not a benchmark: every question readable,
+// never ranked, never averaged into anything, read by nothing that proposes
+// or generates. One badge wherever it is shown: Round 2 · not ranked.
 // ===========================================================================
-// the four the plan names; Run the pilot ticks them
+// the four the plan names; Run everyday tasks ticks them
 const EVD_DEFAULTS = ['Qwen/Qwen3-1.7B', 'Qwen/Qwen3-0.6B', 'HuggingFaceTB/SmolLM2-360M-Instruct',
                       'google/gemma-3-270m-it'];
-const evd = () => DATA.everyday || { questions: [], models: {} };
+const evd = () => DATA.everyday || { groups: [], questions: [], models: {} };
+// the seven groups, in their order, and a group's questions
+const evdGroups = () => evd().groups || [];
+const evdQs = g => (evd().questions || []).filter(q => q.group === g);
+// "12 of 16": what this model passed of what it was asked in the group
+function evdGroupCount(e, g) {
+  const x = ((e && e.groups) || {})[g];
+  return x ? `${x.passed} of ${x.total}` : null;
+}
 const evdOf = id => (evd().models || {})[id] || null;
 const evdName = id => (DATA.models.find(x => x.id === id) || {}).name || String(id).split('/').pop();
 const evdCount = e => `${e.passed} of ${e.total}`;
 function evdBadge(provisional) {
   return el('span', { class: 'badge prelim', 'data-pilot-badge': '1',
-    title: 'Five questions, all readable: a look at what the models say, not a score. Never '
-      + 'ranked, never averaged into anything.' + (provisional ? ' The TL;DR was marked '
-      + 'by a judge whose marks are not evidence yet.' : ''),
-    text: 'Pilot · not ranked' + (provisional ? ' · provisional judge' : '') });
+    title: `${(evd().questions || []).length} questions, all readable: a look at what the models `
+      + 'say, not a score. Never ranked, never averaged into anything.' + (provisional
+        ? ' Some answers were marked by a judge whose marks are not evidence yet.' : ''),
+    text: 'Round 2 · not ranked' + (provisional ? ' · provisional judge' : '') });
 }
 // ✓, ✗, or a question still with the judge
 function evdMark(it) {
@@ -5561,7 +5613,10 @@ function evdAnswer(q, it, attrs = {}, verdict = null) {
     el('blockquote', { class: 'evq', 'data-evd-question': q.id, text: q.prompt }),
     el('p', { class: 'evq-label', text: 'Answer' }),
     verdict || '',
-    it && it.no_answer
+    // 12a.2: a model that sat the pilot's five was never asked the rest
+    !it ? el('p', { class: 'evans none', 'data-evd-answer': q.id, 'data-not-asked': '1',
+          text: 'Not asked: this model\u2019s run did not include this question.' })
+    : it.no_answer
       ? el('p', { class: 'evans none', 'data-evd-answer': q.id, 'data-no-answer': '1',
           text: 'No answer: the model was still thinking when it ran out of room.' })
       : el('div', { class: 'evans', 'data-evd-answer': q.id,
@@ -5571,7 +5626,7 @@ function evdAnswer(q, it, attrs = {}, verdict = null) {
       el('div', { class: 'evthink-t', text: it.reasoning_text || '' })) : '');
 }
 
-// queue the pilot for these models, one run each; returns [{id, ok, sid, why}]
+// queue everyday tasks for these models, one run each; returns [{id, ok, sid, why}]
 async function evdQueue(ids) {
   const out = [];
   for (const id of ids) {
@@ -5579,7 +5634,7 @@ async function evdQueue(ids) {
       const r = await fetch('api/submissions', { method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
         body: JSON.stringify({ hf_id: id, kind: 'auto', suite: 'everyday',
-          submitter: whoName(), note: 'everyday pilot' }) });
+          submitter: whoName(), note: 'everyday tasks' }) });
       const j = await r.json().catch(() => ({}));
       if (r.ok) { rememberQueued(j.id); out.push({ id, ok: true, sid: j.id, note: j.note }); }
       else out.push({ id, ok: false, why: typeof j.detail === 'string' ? j.detail
@@ -5590,6 +5645,25 @@ async function evdQueue(ids) {
   return out;
 }
 
+// a model's answers in one group, one row per question — the mark, the
+// question and the reason — so a group reads from top to bottom. A row opens
+// the whole answer in the side panel
+function evdGroupList(id, g) {
+  const e = evdOf(id);
+  const qs = evdQs(g).filter(q => evdItem(e, q.id));
+  return el('div', { class: 'evglist', 'data-evd-answers': `${id}|${g}` }, qs.map(q => {
+    const it = evdItem(e, q.id), mk = evdMark(it);
+    const r = { kind: 'everyday', id, n: q.n }, key = readStr(r);
+    return el('button', { class: 'evrow evqrow', 'data-evd-row': q.id, 'data-read-open': key,
+        title: 'read the whole answer',
+        onclick: () => openReader(r, `[data-read-open="${CSS.escape(key)}"]`) },
+      el('span', { class: 'evmark ' + mk.cls, 'data-evd-mark': mk.cls, 'aria-label': mk.words,
+        text: mk.t }),
+      el('span', { class: 'evprompt', text: q.prompt }),
+      el('span', { class: 'evreason', text: it.reason }));
+  }));
+}
+
 // ---- on the model page -------------------------------------------------------
 function vEverydayBlock(m) {
   const qs = evd().questions || [];
@@ -5597,19 +5671,16 @@ function vEverydayBlock(m) {
   const e = evdOf(m.id);
   // 12b: an untested model is its Everyday tile's "Not tested · Test"
   if (!e) return null;
+  // 12a.2: the seven groups, n of k each; a group opens to its answers
   const open = state.evdOpen || (state.evdOpen = {});
-  const rows = qs.map(q => {
-    const it = evdItem(e, q.id), mk = evdMark(it), key = m.id + '|' + q.id;
-    const on = !!open[key];
-    const row = el('button', { class: 'evrow', 'data-evd-row': q.id,
-        'aria-expanded': String(on), title: q.prompt,
-        onclick: () => { open[key] = !on; render(); } },
-      el('span', { class: 'evgroup', text: q.groupLabel }),
-      el('span', { class: 'evmark ' + mk.cls, 'data-evd-mark': mk.cls, 'aria-label': mk.words,
-        text: mk.t }),
-      el('span', { class: 'evreason', text: it ? it.reason : 'not asked' }));
-    return el('div', { class: 'evitem' + (on ? ' open' : '') }, row,
-      on ? evdAnswer(q, it, { 'data-evd-open': q.id }) : '');
+  const rows = evdGroups().filter(([g]) => (e.groups || {})[g]).map(([g, label]) => {
+    const key = m.id + '|' + g, on = !!open[key];
+    return el('div', { class: 'evitem' + (on ? ' open' : '') },
+      el('button', { class: 'evrow evgrow', 'data-evd-group': g, 'aria-expanded': String(on),
+          onclick: () => { open[key] = !on; render(); } },
+        el('span', { class: 'evgroup', text: label }),
+        el('span', { class: 'evgcount', 'data-evd-group-count': g, text: evdGroupCount(e, g) })),
+      on ? evdGroupList(m.id, g) : '');
   });
   // numbered with the page's other sections (the h2 sits in a .sechead)
   return el('div', { class: 'card', 'data-everyday-block': m.id },
@@ -5622,8 +5693,8 @@ function vEverydayBlock(m) {
           text: 'Compare models →',
           onclick: ev => { ev.preventDefault();
             navigate({ tab: 'everyday', model: null, topic: null }); } }))),
-    el('p', { class: 'sub', text: 'Five questions typed the way people type on a phone, '
-      + 'marked by a script. Open a row to read the answer.' }),
+    el('p', { class: 'sub', text: `${qs.length} questions typed the way people type on a phone, `
+      + 'in seven groups, each marked by its checks. Open a group to read the answers.' }),
     el('div', { class: 'evrows' }, rows));
 }
 
@@ -5641,48 +5712,82 @@ function evdTestBtn(m, cls = 'ghost') {
 
 // ---- #everyday: the models side by side ---------------------------------------
 function vEverydayPage() {
-  const E = evd(), qs = E.questions || [];
+  const E = evd(), qs = E.questions || [], groups = evdGroups();
   const ids = Object.keys(E.models || {}).sort((a, b) => evdName(a).localeCompare(evdName(b)));
   const prov = ids.some(id => E.models[id].provisional);
   const run = LIVE ? el('button', { class: 'primary', 'data-everyday-run': '1',
-    text: 'Run the pilot', onclick: () => evdDialog({ returnTo: '[data-everyday-run]' }) }) : '';
+    text: 'Run everyday tasks', onclick: () => evdDialog({ returnTo: '[data-everyday-run]' }) }) : '';
   const head = el('div', { class: 'card', 'data-everyday-head': '1' },
     el('div', { class: 'rvbar' },
       el('div', {}, el('h2', {}, 'Everyday tasks', evdBadge(prov)),
-        el('p', { class: 'sub', text: 'Five questions people type into an assistant on a phone — '
-          + 'lowercase, typos, one plain request — and what each model said. Click a mark to '
-          + 'read the answer.' })),
+        el('p', { class: 'sub', text: `${qs.length} questions people type into an assistant on a `
+          + 'phone — lowercase, typos, one plain request — in seven groups, and what each model '
+          + 'said. Click a group\u2019s count to read a model\u2019s answers.' })),
       run));
   if (!ids.length) {
-    return [head, el('div', { class: 'card' }, empty('No model has taken the pilot yet.',
-      LIVE ? 'Run the pilot' : '', () => evdDialog({ returnTo: '[data-empty-action]' }),
-      { 'data-everyday-empty': '1' }))];
+    return [head, el('div', { class: 'card' }, empty('No model has taken everyday tasks yet.',
+      LIVE ? 'Run everyday tasks' : '', () => evdDialog({ returnTo: '[data-empty-action]' }),
+      { 'data-everyday-empty': '1' })), evdBankCard()];
   }
-  const cellBtn = (id, q) => {
-    const e = E.models[id], it = evdItem(e, q.id), mk = evdMark(it);
-    const r = { kind: 'everyday', id, n: q.n }, key = readStr(r);
-    return el('td', { class: 'evcell-td' }, el('button', { class: 'evcell ' + mk.cls,
-      'data-evd-cell': `${id}|${q.id}`, 'data-read-open': key,
-      'aria-label': `${evdName(id)}, ${q.label}: ${mk.words}` + (it ? ` — ${it.reason}` : ''),
-      title: it ? it.reason : '', text: mk.t,
-      onclick: () => openReader(r, `[data-read-open="${CSS.escape(key)}"]`) }));
+  // 12a.2: models across the top, the seven groups down the side, n of k
+  const sel = state.evdCell;
+  const cell = (id, g) => {
+    const n = evdGroupCount(E.models[id], g);
+    if (!n) return el('td', { class: 'evcell-td se', title: 'not asked', text: '—' });
+    const on = !!(sel && sel.id === id && sel.g === g);
+    return el('td', { class: 'evcell-td' }, el('button', { class: 'evcell' + (on ? ' on' : ''),
+      'data-evd-cell': `${id}|${g}`, 'aria-pressed': String(on),
+      'aria-label': `${evdName(id)}, ${(groups.find(x => x[0] === g) || [, g])[1]}: ${n}`,
+      text: n, onclick: () => { state.evdCell = on ? null : { id, g }; render(); } }));
   };
   const table = el('table', { class: 'evtable', 'data-everyday-table': '1' },
-    el('thead', {}, el('tr', {}, el('th', { class: 'evq-th', text: 'Question' }),
+    el('thead', {}, el('tr', {}, el('th', { class: 'evq-th', text: 'Group' }),
       ids.map(id => el('th', { class: 'evm-th', 'data-evd-model': id },
         DATA.models.some(x => x.id === id)
           ? el('a', { href: '#model=' + encodeURIComponent(id), text: evdName(id),
               onclick: ev => { ev.preventDefault(); navigate({ model: id, topic: null }); } })
           : el('span', { text: evdName(id) }),
         el('span', { class: 'evm-count', 'data-evd-count': id, text: evdCount(E.models[id]) }))))),
-    el('tbody', {}, qs.map(q => el('tr', { 'data-evd-q': q.id },
+    el('tbody', {}, groups.map(([g, label]) => el('tr', { 'data-evd-g': g },
       el('th', { scope: 'row', class: 'evq-cell' },
-        el('span', { class: 'evq-short', text: q.label }),
-        el('span', { class: 'evq-group', text: q.groupLabel }),
-        el('span', { class: 'evq-full', text: q.prompt })),
-      ids.map(id => cellBtn(id, q))))));
-  return [head, el('div', { class: 'card' },
-    el('div', { class: 'lb-wrap', 'data-hkeep': 'everyday' }, table))];
+        el('span', { class: 'evq-short', text: label }),
+        el('span', { class: 'evq-group', text: `${evdQs(g).length} questions` })),
+      ids.map(id => cell(id, g))))));
+  const panel = sel && (((E.models[sel.id] || {}).groups) || {})[sel.g]
+    ? el('div', { class: 'evpanel', 'data-evd-panel': `${sel.id}|${sel.g}` },
+        el('div', { class: 'sechead' },
+          el('h3', { text: `${evdName(sel.id)} · ${(groups.find(x => x[0] === sel.g) || [, sel.g])[1]}` }),
+          el('span', { class: 'evgcount', text: evdGroupCount(E.models[sel.id], sel.g) }),
+          el('button', { class: 'quiet', 'data-evd-panel-close': '1', text: '✕',
+            'aria-label': 'close', onclick: () => { state.evdCell = null; render(); } })),
+        evdGroupList(sel.id, sel.g))
+    : '';
+  return [head, el('div', { class: 'card', 'data-everyday-results': '1' },
+    el('div', { class: 'lb-wrap', 'data-hkeep': 'everyday' }, table), panel), evdBankCard()];
+}
+
+// the bank itself, by group: every question readable, with its checks in
+// plain words — what it takes to pass
+function evdBankCard() {
+  const E = evd();
+  // its heading sits in a div, as the page head's does: the page's three
+  // cards are not steps, and this one alone took a section number
+  return el('div', { class: 'card', 'data-everyday-bank': '1' },
+    el('div', {}, el('h2', { text: 'The questions' }),
+      el('p', { class: 'sub', text: `${(E.questions || []).length} questions in seven groups. `
+        + 'An answer passes when every one of its checks does; where the judge is one of them, '
+        + 'it only decides once the others have passed.' })),
+    evdGroups().map(([g, label]) => {
+      const qs = evdQs(g);
+      return el('details', { class: 'evbank-g', 'data-evd-bank-group': g },
+        el('summary', {}, el('span', { class: 'evgroup', text: label }),
+          el('span', { class: 'small se', text: ` · ${qs.length} questions` })),
+        el('ol', { class: 'evbank' }, qs.map(q => el('li', { 'data-evd-bank-q': q.id },
+          el('p', { class: 'evq', text: q.prompt }),
+          el('p', { class: 'small', 'data-evd-checks': q.id, text: 'Passes if it: '
+            + q.checks.join(' · ') }),
+          q.reference ? el('p', { class: 'small se', text: 'A good answer: ' + q.reference }) : ''))));
+    }));
 }
 
 // the side panel: the question, the answer and its reason; ↑↓ move along the
@@ -5713,10 +5818,11 @@ function readEveryday(wrap, r) {
         step('↓ Question', 'data-evd-next-q', q.n < qs.length, () => go(rr.id, q.n + 1)),
         step('← Model', 'data-evd-prev-m', i > 0, () => go(ids[i - 1], q.n)),
         step('→ Model', 'data-evd-next-m', i >= 0 && i < ids.length - 1, () => go(ids[i + 1], q.n))),
-      evdAnswer(q, it, { 'data-evd-panel': `${rr.id}|${q.id}` },
-        el('p', { class: 'evverdict ' + mk.cls, 'data-evd-verdict': mk.cls },
+      evdAnswer(q, it, { 'data-evd-read': `${rr.id}|${q.id}` },
+        // a question it was not asked has nothing to mark: the answer says so
+        it ? el('p', { class: 'evverdict ' + mk.cls, 'data-evd-verdict': mk.cls },
           el('span', { class: 'evmark ' + mk.cls, text: mk.t }),
-          el('span', { text: it ? it.reason : 'this model was not asked this question' }))));
+          el('span', { text: it.reason })) : null));
     if (had) {
       const again = stepAttr && wrap._body.querySelector(`[${stepAttr}]:not([disabled])`);
       (again || wrap._aside).focus();
@@ -5734,7 +5840,7 @@ function readEveryday(wrap, r) {
   wrap._update = paint;             // a poll or a step repaints in place
 }
 
-// ---- Run the pilot -------------------------------------------------------------
+// ---- Run everyday tasks ----------------------------------------------------------
 function evdDialog(pre = {}) {
   const board = DATA.models.filter(m => m.kind === 'instruct').map(m => m.id);
   const ids = [...EVD_DEFAULTS, ...board.filter(id => !EVD_DEFAULTS.includes(id))
@@ -5749,18 +5855,22 @@ function evdDialog(pre = {}) {
     go.textContent = `Queue ${n} run${n === 1 ? '' : 's'}`;
     go.disabled = !n;
   };
+  const nBank = (evd().questions || []).length;
   const list = el('div', { class: 'evpick', 'data-everyday-pick': '1' }, ids.map(id =>
     el('label', { class: 'evpick-row', 'data-evd-pick': id },
       el('input', { type: 'checkbox', checked: pick[id] ? '' : null,
         onchange: ev => { pick[id] = ev.target.checked; sync(); } }),
       el('span', { class: 'evpick-name', title: id, text: evdName(id) }),
-      evdOf(id) ? el('span', { class: 'small se', 'data-evd-done': id, text: 'done · run again' })
+      evdOf(id) ? el('span', { class: 'small se', 'data-evd-done': id,
+        // 12a.2: a model that sat the pilot was asked five of the bank
+        text: evdOf(id).total < nBank ? `asked ${evdOf(id).total} of ${nBank} · run all ${nBank}`
+          : 'done · run again' })
         : '')));
   const box = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true',
       'aria-labelledby': 'dlg-title' },
-    el('h2', { id: 'dlg-title', text: 'Run the pilot' }),
-    el('p', { class: 'small', text: 'One run per model: five questions, asked through the '
-      + 'model\'s chat template, then marked. Minutes each.' }),
+    el('h2', { id: 'dlg-title', text: 'Run everyday tasks' }),
+    el('p', { class: 'small', text: `One run per model: ${(evd().questions || []).length} `
+      + 'questions, asked through the model\'s chat template, then marked. A few minutes each.' }),
     list, err, el('div', { class: 'dlg-actions' }, cancel, go));
   back.append(box);
   const close = () => {
@@ -7064,19 +7174,20 @@ function notTestedRows(none, ncols, suite) {
         'data-not-tested-test': m.id, text: 'Test', onclick: e => { e.preventDefault();
           state.sub.suite = suite; openTest(m.id); } })] : '')))];
 }
-// Everyday tasks: each model's pilot row from 12a — ✓/✗ per group, n of 5
+// Everyday tasks: each model's row — n of k per group, and the total (12a.2)
 function lbEveryday(ms) {
-  const E = evd(), qs = E.questions || [];
+  const groups = evdGroups();
   const rows = lbFilter(ms);
   const have = rows.filter(m => evdOf(m.id)).sort((a, b) => natCmp(a.name, b.name));
   const none = rows.filter(m => !evdOf(m.id));
   const prov = have.some(m => evdOf(m.id).provisional);
-  const ncols = qs.length + 2;
+  const ncols = groups.length + 2;
   const table = el('table', { class: 'lb norank', 'data-lb-table': '1', 'data-lb-everyday': '1' },
     el('thead', {}, el('tr', { class: 'names' },
       el('th', { class: 'model pin', scope: 'col', text: 'Model' }),
-      qs.map(q => el('th', { class: 'num', scope: 'col', title: q.prompt, text: q.groupLabel })),
-      el('th', { class: 'num', scope: 'col', text: 'Passed' }))),
+      groups.map(([g, label]) => el('th', { class: 'num', scope: 'col', 'data-evd-col': g,
+        title: `${evdQs(g).length} questions`, text: label })),
+      el('th', { class: 'num', scope: 'col', text: 'Total' }))),
     el('tbody', {}, have.map(m => {
       const e = evdOf(m.id);
       return el('tr', { class: 'clickrow', 'data-lb-row': m.id,
@@ -7084,10 +7195,10 @@ function lbEveryday(ms) {
             navigate({ model: m.id, topic: null }); } },
         el('td', { class: 'model pin', 'data-model': m.id },
           el('a', { class: 'mname mlink', href: '#model=' + encodeURIComponent(m.id), text: m.name })),
-        qs.map(q => {
-          const it = evdItem(e, q.id), mk = evdMark(it);
-          return el('td', { class: 'num evmark ' + mk.cls, 'data-evd-mark': mk.cls,
-            title: it ? it.reason : '', 'aria-label': `${q.groupLabel}: ${mk.words}`, text: mk.t });
+        groups.map(([g, label]) => {
+          const n = evdGroupCount(e, g);
+          return el('td', { class: 'num' + (n ? '' : ' se'), 'data-evd-g': g,
+            title: n ? label : 'not asked', text: n || '—' });
         }),
         el('td', { class: 'num', 'data-everyday-count': evdCount(e), text: evdCount(e) }));
     }), notTestedRows(none, ncols, 'everyday')));
@@ -7095,8 +7206,9 @@ function lbEveryday(ms) {
     ...modelsHead(evdBadge(prov)),
     lbToolbar(ms, lbColumns(ms), new Set(), 0),
     hfade('lb', el('div', { class: 'lb-wrap', 'data-hkeep': 'lb' }, table)),
-    el('p', { class: 'lbcap', text: 'Five questions, typed the way people type on a phone. Open a '
-      + 'model for its answers; Benchmarks ▸ Everyday tasks has all of them side by side.' }))];
+    el('p', { class: 'lbcap', text: `${(evd().questions || []).length} questions in seven groups, `
+      + 'typed the way people type on a phone. Open a model for its answers; Benchmarks ▸ '
+      + 'Everyday tasks has the questions and every answer.' }))];
 }
 
 function vLeaderboard(ms) {
@@ -9838,7 +9950,7 @@ function vQueue(part = { form: true, list: true }) {
           sub: 'The exam topics, answered in writing and graded by the judge: the model\'s '
             + 'judged score per topic.' }],
       // 12a: the pilot. 12c replaces this drop-down with cards
-      ['everyday', 'Everyday tasks — 5 questions, minutes']],
+      ['everyday', `Everyday tasks — ${(evd().questions || []).length || 111} questions, a few minutes`]],
       sf.suite || 'full', v => { sf.suite = v; render(); }, { key: 'submit-suite' }),
     note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px',
       'aria-label': 'note', 'data-keep': 'submit-note', value: sf.note,
@@ -10146,7 +10258,7 @@ function runLine(r, attrs = {}) {
     onBoard ? el('a', { href: '#model=' + encodeURIComponent(r.hf_id), class: 'runname', text: name,
         onclick: e => { e.preventDefault(); popClose(); navigate({ model: r.hf_id, topic: null }); } })
       : el('span', { class: 'runname', title: r.hf_id, text: name }),
-    el('span', { class: 'small se runwhat', text: r.suite === 'everyday' ? 'everyday pilot'
+    el('span', { class: 'small se runwhat', text: r.suite === 'everyday' ? 'everyday tasks'
       : r.suite }),
     el('span', { class: 'small se runprog', title: r.progress || '',
       text: RUNNING_ST.has(r.status) || r.status === 'done' ? (r.progress || '')
@@ -11953,7 +12065,7 @@ function suiteCell(r, key) {
   let ts = [];
   try { ts = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
   const J = DATA.judged || {};
-  if (r.suite === 'everyday') return el('span', { 'data-suite-cell': key, text: 'everyday pilot' });
+  if (r.suite === 'everyday') return el('span', { 'data-suite-cell': key, text: 'everyday tasks' });
   if (r.suite !== 'judged') return el('span', { 'data-suite-cell': key, text: r.suite });
   if (!ts.length) return el('span', { 'data-suite-cell': key, text: 'judged · the whole exam' });
   const ex = ts.filter(t => t !== J.control), ctl = ts.includes(J.control);

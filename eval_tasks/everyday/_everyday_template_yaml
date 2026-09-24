@@ -1,4 +1,4 @@
-# The Everyday tasks pilot (brief 12a). everyday.build_task() copies this
+# Everyday tasks (briefs 12a, 12a.2). everyday.build_task() copies this
 # into the run's task directory with the items file's absolute path filled
 # in, as exam_build does for the exam: lm_eval resolves data_files relative
 # to nothing useful.

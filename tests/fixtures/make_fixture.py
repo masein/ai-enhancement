@@ -857,16 +857,42 @@ EVERYDAY_ANSWERS = {
 }
 # the two that think were given a reasoning model's room
 EVERYDAY_THINKS = {"fx/good-750m", "fx/skewed-360m"}
+# 12a.2: two models sat the whole bank (111 questions), the other two only the
+# pilot — logged under its old task name, and still read. On the bank,
+# good-750m answers each question's reference but for three it gets wrong;
+# skewed-360m answers every other one and says "not sure" to the rest
+EVERYDAY_WHOLE_BANK = {"fx/good-750m", "fx/skewed-360m"}
+EVERYDAY_GOOD_MISSES = {"everyday-understanding-01", "everyday-maths-01",
+                        "everyday-honesty-01"}
+
+
+def _bank_answers(model_id: str, bank: list[dict]) -> list[str]:
+    pilot = dict(zip([f"everyday-pilot-0{i}" for i in range(1, 6)],
+                     EVERYDAY_ANSWERS[model_id]))
+    out = []
+    for n, q in enumerate(bank):
+        if q["id"] in pilot:
+            out.append(pilot[q["id"]])
+        elif model_id == "fx/good-750m":
+            out.append("I'm not sure." if q["id"] in EVERYDAY_GOOD_MISSES else q["reference"])
+        else:
+            out.append(q["reference"] if n % 2 == 0 else "I'm not sure.")
+    return out
 
 
 def write_everyday(out_dir: Path) -> dict[str, dict]:
-    """The pilot's samples and results as the harness writes them, then
-    marked by scripts/everyday.py with the stub marking the TL;DR."""
+    """Everyday samples and results as the harness writes them, then marked
+    by scripts/everyday.py with the stub as the judge."""
     import everyday as ev
-    pilot = ev.load_pilot()
+    bank = ev.load_bank()
+    pilot_qs = sorted((q for q in bank if q["id"].startswith("everyday-pilot-")),
+                      key=lambda q: q["id"])
     out = {}
-    for model_id, answers in EVERYDAY_ANSWERS.items():
-        task = ev.TASK
+    for model_id in EVERYDAY_ANSWERS:
+        whole = model_id in EVERYDAY_WHOLE_BANK
+        task = ev.TASK if whole else ev.LEGACY_TASKS[0]
+        qs = bank if whole else pilot_qs
+        answers = _bank_answers(model_id, bank) if whole else EVERYDAY_ANSWERS[model_id]
         mdir = out_dir / safe_name(model_id)
         task_dir = mdir / f"{task}_0shot" / _SANITIZE.sub("__", model_args(model_id))
         task_dir.mkdir(parents=True, exist_ok=True)
@@ -874,7 +900,7 @@ def write_everyday(out_dir: Path) -> dict[str, dict]:
         gk = {"until": ["\n\n\n\n"], "max_gen_toks": 512, "do_sample": False,
               "temperature": 0.0}
         with open(task_dir / f"samples_{task}_{TS}.jsonl", "w", encoding="utf-8") as fh:
-            for i, (q, ans) in enumerate(zip(pilot, answers)):
+            for i, (q, ans) in enumerate(zip(qs, answers)):
                 ctx = f"<|user|>\n{q['prompt']}\n<|assistant|>\n"
                 fh.write(json.dumps({
                     "doc_id": i, "doc": q, "target": "",
@@ -890,7 +916,7 @@ def write_everyday(out_dir: Path) -> dict[str, dict]:
                                    "metric_list": [{"metric": "bypass"}]}},
                 "versions": {task: 1.0}, "n-shot": {task: 0},
                 "higher_is_better": {task: {"bypass": True}},
-                "n-samples": {task: {"original": 5, "effective": 5}},
+                "n-samples": {task: {"original": len(qs), "effective": len(qs)}},
                 "config": {"model": "hf", "model_args": model_args(model_id), "batch_size": "8",
                            "device": "cuda:0", "limit": None, "random_seed": 1234,
                            **({"gen_kwargs": f"max_gen_toks={budget}"}
@@ -901,8 +927,9 @@ def write_everyday(out_dir: Path) -> dict[str, dict]:
         (task_dir / f"results_{TS}.json").write_text(json.dumps(blob, indent=2),
                                                      encoding="utf-8")
         marked = ev.mark(mdir)
-        todo = {it["id"]: ev.stub_verdict(it["answer_text"]) for it in marked["items"]
-                if it["pass"] is None and it["answer_text"]}
+        prompts = {q["id"]: q["prompt"] for q in bank}
+        todo = {it["id"]: ev.stub_verdict(it["answer_text"], prompts[it["id"]])
+                for it in marked["items"] if it["pass"] is None and it["answer_text"]}
         marked = ev.mark(mdir, todo, judge={"id": "stub/overlap-v1", "provisional": False})
         ev.write(mdir, marked)
         out[model_id] = {"dir": mdir, "passed": marked["passed"]}

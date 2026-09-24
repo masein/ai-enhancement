@@ -31,7 +31,9 @@ BANNED = ["diagnosis half", "DIAGNOSIS", "report half", "report-half", "over a p
 # 12a: .evcount is the Everyday pilot's "4 of 5" — a number, so mono
 MONO_OK = ("td.num, th, .eyebrow, .secidx, .badge, .mid, .livebadge, .rd-log, svg, .evcount, "
            # 12b: the header's counts — runs going, checks that need a look
-           ".statusn, .runpill .num")
+           ".statusn, .runpill .num, "
+           # 12a.2: an Everyday group's n of k
+           ".evgcount")
 
 
 def api(base, path, body=None):

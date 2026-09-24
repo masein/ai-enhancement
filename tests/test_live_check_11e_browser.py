@@ -428,7 +428,7 @@ def test_every_best_value_is_one_line(live, page, width):
     by = {v["k"]: v["t"] for v in vals}
     assert re.fullmatch(r"\d+\.\d", by["standard"])
     assert re.fullmatch(r"\d\.\d\d? / 4", by["exam"])
-    assert re.fullmatch(r"\d of \d", by["everyday"])
+    assert re.fullmatch(r"\d+ of \d+", by["everyday"])
     # the name: its own line, cut with an ellipsis, whole in the tooltip
     name = page.locator("[data-best-name='standard']")
     assert name.text_content() == "qwen35-delta-moe-7d560104-step945-v2"
