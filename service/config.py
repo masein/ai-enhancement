@@ -120,6 +120,16 @@ CONTROL_TASKS_DIR = Path(os.environ.get(
     "CONTROL_TASKS_DIR",
     Path(__file__).resolve().parent.parent / "eval_tasks" / "mmlu_perm"))
 
+# 12a: the Everyday tasks pilot — five questions typed the way people type
+# on a phone, marked by scripts/everyday.py. A look, not a benchmark: in no
+# other suite, on no leaderboard, in no average. The harness task is written
+# here from eval_tasks/everyday at the start of each run (everyday.build_task)
+EVERYDAY_TASK = "everyday_pilot"
+EVERYDAY_TASKS_DIR = Path(os.environ.get("EVERYDAY_TASKS_DIR", BENCH_ROOT / "everyday" / "tasks"))
+# what a model with no chat template is told: the pilot asks it as a person would
+NO_CHAT_TEMPLATE = ("This model has no chat template, so it can't be asked questions the "
+                    "way a person would.")
+
 
 # ---------------------------------------------------------------------------
 # The LLM behind proposals and data generation (service/llm.py). Batch API
@@ -266,6 +276,8 @@ def discovered_ppl_tasks() -> list[str]:
 def tasks_for_suite(suite: str) -> list[str]:
     if suite == "control":
         return list(CONTROL_TASKS)
+    if suite == "everyday":
+        return [EVERYDAY_TASK]
     if suite == "judged":
         return judged_tasks()
     base = QUICK_TASKS if suite == "quick" else FULL_TASKS

@@ -598,6 +598,13 @@ def taint_compare(task: str, after: dict, before: dict, parent: str) -> dict | N
             "text": text, "categories": cats, "scale": "pct"}
 
 
+# 12a: the Everyday pilot is a look, not a benchmark. Its answers are
+# written by the same harness into the same tree, and a task of it here would
+# be a column, a count toward "tasks", a date — so it is never read as a run.
+# The page reads everyday.json instead (load_everyday).
+NOT_A_BENCHMARK = ("everyday_",)
+
+
 def load_results(path: Path) -> list[dict]:
     """Find and parse every lm-eval results file under `path`."""
     files = sorted(path.rglob("results*.json")) if path.is_dir() else [path]
@@ -609,8 +616,52 @@ def load_results(path: Path) -> list[dict]:
             continue
         if "results" not in blob:
             continue
+        if blob["results"] and all(str(t).startswith(NOT_A_BENCHMARK) for t in blob["results"]):
+            continue
         runs.append(parse_run(blob, f))
     return runs
+
+
+EVERYDAY_PILOT = Path(__file__).resolve().parent.parent / "eval_tasks" / "everyday" / "pilot.jsonl"
+EVERYDAY_GROUPS = {"understanding": "Understanding", "writing": "Writing",
+                   "transform": "Transform", "language": "Language", "behaviour": "Behaviour"}
+# what the page needs of each marked answer; everything else stays on disk
+_EVERYDAY_ITEM = ("id", "pass", "reason", "answer_text", "had_reasoning", "reasoning_text",
+                  "reasoning_words", "no_answer")
+
+
+def load_everyday(out_dir: Path | None) -> dict | None:
+    """12a: the pilot's five questions — all readable, by design: five cannot
+    be a published score, so there is no hidden half to protect yet — and
+    every model's marks, from the everyday.json beside its results. Kept apart
+    from the models' rows, so nothing that ranks or averages can reach it."""
+    try:
+        qs = [json.loads(x) for x in EVERYDAY_PILOT.read_text(encoding="utf-8").splitlines()
+              if x.strip()]
+    except OSError:
+        return None
+    models = {}
+    for f in sorted(Path(out_dir).glob("*/everyday.json")) if out_dir and Path(out_dir).is_dir() \
+            else []:
+        try:
+            e = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(e, dict) or not isinstance(e.get("items"), list) or not e.get("model"):
+            continue
+        models[e["model"]] = {
+            "passed": e.get("passed", 0), "total": e.get("total", len(e["items"])),
+            "waiting": e.get("waiting", 0), "marked_at": e.get("marked_at"),
+            "settings": e.get("settings") or {},
+            "provisional": bool((e.get("judge") or {}).get("provisional")),
+            "items": [{k: it[k] for k in _EVERYDAY_ITEM if k in it} for it in e["items"]],
+        }
+    return {"questions": [{"id": q["id"], "n": i, "group": q["group"],
+                           "groupLabel": EVERYDAY_GROUPS.get(q["group"], q["group"].title()),
+                           "label": q.get("label") or q["id"], "prompt": q["prompt"],
+                           "check": (q.get("check") or {}).get("type")}
+                          for i, q in enumerate(qs, 1)],
+            "models": models}
 
 
 def parse_run(blob: dict, source: Path) -> dict:
@@ -1020,8 +1071,12 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                   calibration: dict | None = None,
                   parents: dict[str, str] | None = None,
                   judge_identity: dict | None = None,
-                  fingerprints: dict[str, str] | None = None) -> dict:
-    """`taint`: model id -> tasks whose diagnostics its training data was
+                  fingerprints: dict[str, str] | None = None,
+                  everyday: dict | None = None) -> dict:
+    """`everyday`: the pilot's questions and marks (load_everyday), carried
+    beside the models and never inside them.
+
+    `taint`: model id -> tasks whose diagnostics its training data was
     derived from (the service computes it from the run/dataset join). A
     tainted task is treated exactly like a missing required task: shown per
     task, excluded from the official average, the model unranked.
@@ -1524,6 +1579,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                    "current": judge_identity or None,
                    "calibration": cal},
         "extra": extra,
+        # 12a: the Everyday pilot — its own key, read by its own two views
+        "everyday": everyday,
         "warnings": warnings,
         "checks": checks,
         "meta": {
@@ -2745,6 +2802,76 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 /* a hidden row is hidden, whatever its class says */
 .dlg [hidden] { display:none; }
 .dlg-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
+/* ---- 12a: the Everyday pilot — a block on the model page, and #everyday ---- */
+.evhead h2 { margin:0; }
+.evscore { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.evcount { font-family:var(--font-mono); font-size:var(--fs-3); font-weight:650;
+  font-variant-numeric:tabular-nums; color:var(--text-primary); }
+.evrows { margin-top:12px; border-top:1px solid var(--border); }
+.evitem { border-bottom:1px solid var(--border); }
+.evrow { box-sizing:border-box; display:grid; width:100%; cursor:pointer; margin:0;
+  grid-template-columns:minmax(96px, 140px) 28px minmax(0, 1fr); align-items:center; gap:10px;
+  min-height:40px; padding:6px 4px; font:inherit; font-size:var(--fs-2); text-align:left;
+  color:var(--text-primary); background:none; border:0; border-radius:0; }
+.evrow:hover { background:var(--accent-soft); }
+.evrow:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.evgroup { font-weight:600; }
+.evmark { font-weight:700; text-align:center; }
+.evmark.ok, .evcell.ok { color:var(--success-text); }
+.evmark.no, .evcell.no { color:var(--critical-text); }
+.evmark.wait, .evcell.wait { color:var(--muted); }
+.evreason { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-secondary); }
+.evans-wrap { padding:4px 4px 14px; }
+.evq-label { margin:10px 0 4px; font-size:var(--fs-1); font-weight:600; color:var(--text-secondary); }
+.evq { margin:0; padding:8px 12px; border-left:3px solid var(--border); background:var(--plane);
+  border-radius:0 var(--r-1) var(--r-1) 0; font-size:var(--fs-2); white-space:pre-wrap;
+  overflow-wrap:anywhere; }
+.evans { white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--fs-2); line-height:1.55;
+  color:var(--text-primary); }
+.evans.none { color:var(--text-secondary); }
+.evthink { margin-top:10px; font-size:var(--fs-1); }
+.evthink > summary { cursor:pointer; color:var(--text-secondary); list-style:none; }
+.evthink > summary::-webkit-details-marker { display:none; }
+.evthink[open] > summary { color:var(--text-primary); }
+.evthink-t { margin-top:6px; padding:8px 12px; white-space:pre-wrap; overflow-wrap:anywhere;
+  color:var(--text-secondary); background:var(--plane); border-radius:var(--r-1); }
+.evnone-line { margin:0; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.evtable { border-collapse:collapse; width:100%; }
+.evtable th, .evtable td { border-bottom:1px solid var(--border); padding:8px 10px;
+  vertical-align:top; }
+.evtable thead th { vertical-align:bottom; }
+.evq-th { min-width:220px; width:40%; }
+.evm-th { text-align:center; min-width:96px; font-family:var(--font-sans); text-transform:none;
+  letter-spacing:0; font-size:var(--fs-2); color:var(--text-primary); }
+.evm-th a, .evm-th > span:first-child { display:block; font-weight:600; }
+.evm-count { display:block; font-family:var(--font-mono); font-size:var(--fs-1);
+  color:var(--text-secondary); font-weight:400; margin-top:2px; }
+.evq-cell { text-align:left; font-family:var(--font-sans); text-transform:none; letter-spacing:0;
+  font-weight:400; white-space:normal; }
+.evq-short { display:block; font-weight:650; font-size:var(--fs-2); color:var(--text-primary); }
+.evq-group { display:block; font-size:var(--fs-1); color:var(--text-secondary); }
+.evq-full { display:block; margin-top:4px; font-size:var(--fs-1); color:var(--text-secondary);
+  max-width:360px; overflow-wrap:anywhere; }
+.evcell-td { text-align:center; vertical-align:middle !important; }
+.evcell { min-width:40px; min-height:32px; font-family:var(--font-sans); font-weight:700;
+  font-size:var(--fs-4); background:transparent; border:1px solid transparent;
+  border-radius:var(--r-1); cursor:pointer; }
+.evcell:hover { border-color:var(--border); background:var(--plane); }
+.evnav { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+.evverdict { display:flex; gap:8px; align-items:baseline; margin:0 0 8px; font-size:var(--fs-2);
+  font-weight:600; }
+/* on a phone the question column gives the marks room: its label and group
+   stay, the full question wraps under them */
+@media (max-width:600px) {
+  .evq-th { min-width:150px; width:auto; }
+  .evq-full { max-width:180px; }
+  .evtable th, .evtable td { padding:8px 6px; }
+  .evm-th { min-width:72px; }
+}
+.evpick { display:flex; flex-direction:column; gap:2px; margin:10px 0; max-height:320px;
+  overflow:auto; }
+.evpick-row { display:flex; align-items:center; gap:8px; min-height:32px; font-size:var(--fs-2); }
+.evpick-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* ---- 11j: the Review tab — four views, one-line rows, a card in the sheet ---- */
 .rvbar { display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
   flex-wrap:wrap; }
@@ -2994,6 +3121,7 @@ const LIVE = DATA === null;
 const state = {
   q: '', kind: 'all', tab: 'overview',
   model: null,                         // open model detail page, by id (hash-routed)
+  everyday: false,                     // 12a: the Everyday pilot page, #everyday (hash-routed)
   read: null,                          // 11g: the open reader, { kind, id, n } (hash-routed)
   src: 'all',                          // All | Models | Checkpoints — a filter, nothing hidden by default
   panelOpen: {},                       // per-task "show all bars" toggles
@@ -4793,7 +4921,10 @@ function vModel() {
   // multiple-choice results and the per-item diagnosis follow as the free
   // second opinion — same GPU, no API call, and a different kind of evidence.
   const judged = vJudged(m), taint = vTaint(m), diag = vDiagnose(m), earlier = vEarlier(m);
-  const sections = [['judged', 'Judged', judged], ['earlier', 'Earlier exams', earlier],
+  // 12a: the Everyday pilot, above the exam: five answers anyone can read
+  const everyday = vEverydayBlock(m);
+  const sections = [['everyday', 'Everyday tasks', everyday],
+                    ['judged', 'Judged', judged], ['earlier', 'Earlier exams', earlier],
                     ['results', 'Results', results],
                     ['diagnose', 'Diagnose', diag], ['taint', 'Training data', taint],
                     ['provenance', 'Provenance', provCard],
@@ -4822,7 +4953,8 @@ function sitCta(m) {
 // interesting part is halfway down it. A sub-nav that sticks is the cheapest
 // fix: anchors, not routes, so Back still leaves the page the way it came.
 function modelNav(sections) {
-  const have = sections.filter(([, , node]) => node);
+  // a one-line section (the Everyday pilot, not taken) is not a place to go
+  const have = sections.filter(([, , node]) => node && !node.dataset.nonav);
   return el('nav', { class: 'modelnav', 'data-model-nav': '1', 'aria-label': 'sections' },
     have.map(([id, label], i) =>
       el('a', { href: '#sec-' + id, class: 'navchip', 'data-nav': id,
@@ -5114,6 +5246,295 @@ function overviewLoop() {
   return card;
 }
 
+// ===========================================================================
+// 12a: the Everyday tasks pilot. Five questions typed the way people type
+// into an assistant on a phone, marked by a script (scripts/everyday.py) on
+// the text after any thinking. A look, not a benchmark: never ranked, never
+// averaged into anything, on no leaderboard, read by nothing that proposes or
+// generates. Two small views — a block on the model page and #everyday —
+// and one badge on each: Pilot · not ranked.
+// ===========================================================================
+// the four the plan names; Run the pilot ticks them
+const EVD_DEFAULTS = ['Qwen/Qwen3-1.7B', 'Qwen/Qwen3-0.6B', 'HuggingFaceTB/SmolLM2-360M-Instruct',
+                      'google/gemma-3-270m-it'];
+const evd = () => DATA.everyday || { questions: [], models: {} };
+const evdOf = id => (evd().models || {})[id] || null;
+const evdName = id => (DATA.models.find(x => x.id === id) || {}).name || String(id).split('/').pop();
+const evdCount = e => `${e.passed} of ${e.total}`;
+function evdBadge(provisional) {
+  return el('span', { class: 'badge prelim', 'data-pilot-badge': '1',
+    title: 'Five questions, all readable: a look at what the models say, not a score. Never '
+      + 'ranked, never averaged into anything.' + (provisional ? ' The Arabic answer was marked '
+      + 'by a judge whose marks are not evidence yet.' : ''),
+    text: 'Pilot · not ranked' + (provisional ? ' · provisional judge' : '') });
+}
+// ✓, ✗, or a question still with the judge
+function evdMark(it) {
+  if (!it) return { t: '·', cls: 'wait', words: 'not asked' };
+  if (it.pass === true) return { t: '✓', cls: 'ok', words: 'passed' };
+  if (it.pass === false) return { t: '✗', cls: 'no', words: 'failed' };
+  return { t: '…', cls: 'wait', words: 'not marked yet' };
+}
+const evdItem = (e, qid) => ((e && e.items) || []).find(x => x.id === qid) || null;
+
+// the question, the answer (with its mark and reason, in the side panel),
+// and the thinking folded away
+function evdAnswer(q, it, attrs = {}, verdict = null) {
+  return el('div', { class: 'evans-wrap', ...attrs },
+    el('p', { class: 'evq-label', text: 'Question' }),
+    el('blockquote', { class: 'evq', 'data-evd-question': q.id, text: q.prompt }),
+    el('p', { class: 'evq-label', text: 'Answer' }),
+    verdict || '',
+    it && it.no_answer
+      ? el('p', { class: 'evans none', 'data-evd-answer': q.id, 'data-no-answer': '1',
+          text: 'No answer: the model was still thinking when it ran out of room.' })
+      : el('div', { class: 'evans', 'data-evd-answer': q.id,
+          text: (it && it.answer_text) || '(the model wrote nothing)' }),
+    it && it.had_reasoning ? el('details', { class: 'evthink', 'data-evd-thinking': q.id },
+      el('summary', { text: `thinking ▸ ${(it.reasoning_words || 0).toLocaleString('en')} words` }),
+      el('div', { class: 'evthink-t', text: it.reasoning_text || '' })) : '');
+}
+
+// queue the pilot for these models, one run each; returns [{id, ok, sid, why}]
+async function evdQueue(ids) {
+  const out = [];
+  for (const id of ids) {
+    try {
+      const r = await fetch('api/submissions', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Token': TOKEN },
+        body: JSON.stringify({ hf_id: id, kind: 'auto', suite: 'everyday',
+          submitter: whoName(), note: 'everyday pilot' }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) { rememberQueued(j.id); out.push({ id, ok: true, sid: j.id, note: j.note }); }
+      else out.push({ id, ok: false, why: typeof j.detail === 'string' ? j.detail
+        : `the server answered HTTP ${r.status}` });
+    } catch (e) { out.push({ id, ok: false, why: 'the server is unreachable' }); }
+  }
+  loadQueue();
+  return out;
+}
+
+// ---- on the model page -------------------------------------------------------
+function vEverydayBlock(m) {
+  const qs = evd().questions || [];
+  if (!qs.length) return null;
+  const e = evdOf(m.id);
+  if (!e) {
+    // nothing empty: one line, and the button that fills it
+    const msg = (state.evdMsg || {})[m.id];
+    const test = LIVE ? el('button', { class: 'ghost', 'data-everyday-test': m.id, text: 'Test',
+      onclick: async ev => {
+        const b = ev.currentTarget; b.disabled = true; b.textContent = 'Queueing…';
+        const [r] = await evdQueue([m.id]);
+        state.evdMsg = { ...(state.evdMsg || {}), [m.id]: r.ok ? '' : 'Refused. ' + r.why };
+        if (r.ok) toast(r.note ? `#${r.sid}: ${r.note} —` : `Run #${r.sid} queued —`,
+          { key: 'submit', go: () => followRun(r.sid), link: 'follow it →' });
+        render(); } }) : '';
+    return el('div', { class: 'card evnone', 'data-everyday-none': m.id, 'data-nonav': '1' },
+      el('p', { class: 'evnone-line' }, el('span', { text: 'Not tested on everyday tasks' }),
+        test ? [el('span', { class: 'se', text: ' · ' }), test] : ''),
+      msg ? el('p', { class: 'warn', 'data-everyday-refused': m.id, text: msg }) : '');
+  }
+  const open = state.evdOpen || (state.evdOpen = {});
+  const rows = qs.map(q => {
+    const it = evdItem(e, q.id), mk = evdMark(it), key = m.id + '|' + q.id;
+    const on = !!open[key];
+    const row = el('button', { class: 'evrow', 'data-evd-row': q.id,
+        'aria-expanded': String(on), title: q.prompt,
+        onclick: () => { open[key] = !on; render(); } },
+      el('span', { class: 'evgroup', text: q.groupLabel }),
+      el('span', { class: 'evmark ' + mk.cls, 'data-evd-mark': mk.cls, 'aria-label': mk.words,
+        text: mk.t }),
+      el('span', { class: 'evreason', text: it ? it.reason : 'not asked' }));
+    return el('div', { class: 'evitem' + (on ? ' open' : '') }, row,
+      on ? evdAnswer(q, it, { 'data-evd-open': q.id }) : '');
+  });
+  // numbered with the page's other sections (the h2 sits in a .sechead)
+  return el('div', { class: 'card', 'data-everyday-block': m.id },
+    el('div', { class: 'sechead evhead' },
+      el('h2', {}, 'Everyday tasks', evdBadge(e.provisional)),
+      el('div', { class: 'acts evscore' },
+        el('span', { class: 'evcount', 'data-everyday-count': evdCount(e), text: evdCount(e) }),
+        e.waiting ? el('span', { class: 'small se', text: `${e.waiting} with the judge` }) : '',
+        el('a', { href: '#everyday', 'data-everyday-compare': '1', text: 'Compare models →',
+          onclick: ev => { ev.preventDefault();
+            navigate({ everyday: true, model: null, topic: null }); } }))),
+    el('p', { class: 'sub', text: 'Five questions typed the way people type on a phone, '
+      + 'marked by a script. Open a row to read the answer.' }),
+    el('div', { class: 'evrows' }, rows));
+}
+
+// ---- #everyday: the models side by side ---------------------------------------
+function vEverydayPage() {
+  const E = evd(), qs = E.questions || [];
+  const ids = Object.keys(E.models || {}).sort((a, b) => evdName(a).localeCompare(evdName(b)));
+  const prov = ids.some(id => E.models[id].provisional);
+  const back = el('a', { class: 'backlink', href: '#tab=' + state.tab, onclick: backTo(state.tab),
+    text: '← Back to ' + (TABS.find(([id]) => id === state.tab) || [, 'the board'])[1] });
+  const run = LIVE ? el('button', { class: 'primary', 'data-everyday-run': '1',
+    text: 'Run the pilot', onclick: () => evdDialog({ returnTo: '[data-everyday-run]' }) }) : '';
+  const head = el('div', { class: 'card', 'data-everyday-head': '1' },
+    el('div', { class: 'rvbar' },
+      el('div', {}, el('h2', {}, 'Everyday tasks', evdBadge(prov)),
+        el('p', { class: 'sub', text: 'Five questions people type into an assistant on a phone — '
+          + 'lowercase, typos, one plain request — and what each model said. Click a mark to '
+          + 'read the answer.' })),
+      run));
+  if (!ids.length) {
+    return [back, head, el('div', { class: 'card' }, empty('No model has taken the pilot yet.',
+      LIVE ? 'Run the pilot' : '', () => evdDialog({ returnTo: '[data-empty-action]' }),
+      { 'data-everyday-empty': '1' }))];
+  }
+  const cellBtn = (id, q) => {
+    const e = E.models[id], it = evdItem(e, q.id), mk = evdMark(it);
+    const r = { kind: 'everyday', id, n: q.n }, key = readStr(r);
+    return el('td', { class: 'evcell-td' }, el('button', { class: 'evcell ' + mk.cls,
+      'data-evd-cell': `${id}|${q.id}`, 'data-read-open': key,
+      'aria-label': `${evdName(id)}, ${q.label}: ${mk.words}` + (it ? ` — ${it.reason}` : ''),
+      title: it ? it.reason : '', text: mk.t,
+      onclick: () => openReader(r, `[data-read-open="${CSS.escape(key)}"]`) }));
+  };
+  const table = el('table', { class: 'evtable', 'data-everyday-table': '1' },
+    el('thead', {}, el('tr', {}, el('th', { class: 'evq-th', text: 'Question' }),
+      ids.map(id => el('th', { class: 'evm-th', 'data-evd-model': id },
+        DATA.models.some(x => x.id === id)
+          ? el('a', { href: '#model=' + encodeURIComponent(id), text: evdName(id),
+              onclick: ev => { ev.preventDefault(); navigate({ model: id, topic: null }); } })
+          : el('span', { text: evdName(id) }),
+        el('span', { class: 'evm-count', 'data-evd-count': id, text: evdCount(E.models[id]) }))))),
+    el('tbody', {}, qs.map(q => el('tr', { 'data-evd-q': q.id },
+      el('th', { scope: 'row', class: 'evq-cell' },
+        el('span', { class: 'evq-short', text: q.label }),
+        el('span', { class: 'evq-group', text: q.groupLabel }),
+        el('span', { class: 'evq-full', text: q.prompt })),
+      ids.map(id => cellBtn(id, q))))));
+  return [back, head, el('div', { class: 'card' },
+    el('div', { class: 'lb-wrap', 'data-hkeep': 'everyday' }, table))];
+}
+
+// the side panel: the question, the answer and its reason; ↑↓ move along the
+// questions, ←→ along the models
+function readEveryday(wrap, r) {
+  const E = evd(), qs = E.questions || [];
+  const ids = Object.keys(E.models || {}).sort((a, b) => evdName(a).localeCompare(evdName(b)));
+  const paint = rr => {
+    const q = qs.find(x => x.n === rr.n) || qs[0];
+    const e = E.models[rr.id] || null, it = evdItem(e, q && q.id), mk = evdMark(it);
+    if (!q) return;
+    wrap._title.textContent = `${evdName(rr.id)} · ${q.label}`;
+    wrap._src.textContent = `${q.groupLabel} · question ${q.n} of ${qs.length}`;
+    wrap._acts.replaceChildren();
+    const i = ids.indexOf(rr.id);
+    const go = (id, n) => openReader({ kind: 'everyday', id, n }, state.readFrom);
+    const step = (label, attr, ok, fn) => el('button', { class: 'ghost', [attr]: '1', text: label,
+      disabled: ok ? null : '', onclick: fn });
+    // the step pressed is rebuilt with the rest: focus goes back to it, or to
+    // the panel, so the keys (and Esc) keep working
+    const was = document.activeElement;
+    const had = wrap._aside.contains(was) || was === document.body;
+    const stepAttr = was && was.attributes
+      ? [...was.attributes].map(a => a.name).find(n => n.startsWith('data-evd-')) : null;
+    wrap._body.replaceChildren(
+      el('div', { class: 'evnav', 'data-evd-nav': '1' },
+        step('↑ Question', 'data-evd-prev-q', q.n > 1, () => go(rr.id, q.n - 1)),
+        step('↓ Question', 'data-evd-next-q', q.n < qs.length, () => go(rr.id, q.n + 1)),
+        step('← Model', 'data-evd-prev-m', i > 0, () => go(ids[i - 1], q.n)),
+        step('→ Model', 'data-evd-next-m', i >= 0 && i < ids.length - 1, () => go(ids[i + 1], q.n))),
+      evdAnswer(q, it, { 'data-evd-panel': `${rr.id}|${q.id}` },
+        el('p', { class: 'evverdict ' + mk.cls, 'data-evd-verdict': mk.cls },
+          el('span', { class: 'evmark ' + mk.cls, text: mk.t }),
+          el('span', { text: it ? it.reason : 'this model was not asked this question' }))));
+    if (had) {
+      const again = stepAttr && wrap._body.querySelector(`[${stepAttr}]:not([disabled])`);
+      (again || wrap._aside).focus();
+    }
+    wrap._aside.onkeydown = ev => {
+      if (ev.target.closest('input, textarea, summary')) return;
+      const k = { ArrowUp: [rr.id, q.n - 1], ArrowDown: [rr.id, q.n + 1],
+                  ArrowLeft: [ids[i - 1], q.n], ArrowRight: [ids[i + 1], q.n] }[ev.key];
+      if (!k || !k[0] || k[1] < 1 || k[1] > qs.length) return;
+      ev.preventDefault();
+      go(k[0], k[1]);
+    };
+  };
+  paint(r);
+  wrap._update = paint;             // a poll or a step repaints in place
+}
+
+// ---- Run the pilot -------------------------------------------------------------
+function evdDialog(pre = {}) {
+  const board = DATA.models.filter(m => m.kind === 'instruct').map(m => m.id);
+  const ids = [...EVD_DEFAULTS, ...board.filter(id => !EVD_DEFAULTS.includes(id))
+    .sort((a, b) => evdName(a).localeCompare(evdName(b)))];
+  const pick = Object.fromEntries(ids.map(id => [id, EVD_DEFAULTS.includes(id) && !evdOf(id)]));
+  const back = el('div', { class: 'dlg-back', 'data-dialog': 'everyday' });
+  const err = el('div', { class: 'warn', hidden: '', 'data-dialog-error': '1' });
+  const go = el('button', { class: 'primary', 'data-dialog-go': '1' });
+  const cancel = el('button', { 'data-dialog-cancel': '1', text: 'Cancel' });
+  const sync = () => {
+    const n = ids.filter(id => pick[id]).length;
+    go.textContent = `Queue ${n} run${n === 1 ? '' : 's'}`;
+    go.disabled = !n;
+  };
+  const list = el('div', { class: 'evpick', 'data-everyday-pick': '1' }, ids.map(id =>
+    el('label', { class: 'evpick-row', 'data-evd-pick': id },
+      el('input', { type: 'checkbox', checked: pick[id] ? '' : null,
+        onchange: ev => { pick[id] = ev.target.checked; sync(); } }),
+      el('span', { class: 'evpick-name', title: id, text: evdName(id) }),
+      evdOf(id) ? el('span', { class: 'small se', 'data-evd-done': id, text: 'done · run again' })
+        : '')));
+  const box = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true',
+      'aria-labelledby': 'dlg-title' },
+    el('h2', { id: 'dlg-title', text: 'Run the pilot' }),
+    el('p', { class: 'small', text: 'One run per model: five questions, asked through the '
+      + 'model\'s chat template, then marked. Minutes each.' }),
+    list, err, el('div', { class: 'dlg-actions' }, cancel, go));
+  back.append(box);
+  const close = () => {
+    back.remove();
+    document.removeEventListener('keydown', onKey, true);
+    const again = pre.returnTo && document.querySelector(pre.returnTo);
+    if (again) again.focus();
+  };
+  const onKey = e => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    const f = [...box.querySelectorAll('input:not([disabled]), button:not([disabled])')]
+      .filter(x => x.offsetParent);
+    if (!f.length) return;
+    const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && (i === f.length - 1 || i < 0)) { e.preventDefault(); f[0].focus(); }
+  };
+  cancel.onclick = close;
+  back.addEventListener('click', e => { if (e.target === back) close(); });
+  go.onclick = async () => {
+    const want = ids.filter(id => pick[id]);
+    go.disabled = true; go.textContent = 'Queueing…';
+    const got = await evdQueue(want);
+    const bad = got.filter(x => !x.ok), ok = got.filter(x => x.ok);
+    for (const x of ok) pick[x.id] = false;            // what went in is not asked twice
+    if (!bad.length) {
+      close();
+      toast(`${ok.length} run${ok.length === 1 ? '' : 's'} queued ·`,
+        { key: 'submit', go: () => followRun(ok[0].sid), link: `follow ${ok.length === 1 ? 'it' : 'them'} →` });
+      render();
+      return;
+    }
+    // refused: what went in says so, what did not stays ticked with the reason
+    err.hidden = false;
+    err.replaceChildren(...(ok.length ? [el('p', { text: `${ok.length} queued.` })] : []),
+      ...bad.map(x => el('p', { 'data-evd-refused': x.id, text: `${evdName(x.id)}: ${x.why}` })));
+    for (const row of list.querySelectorAll('[data-evd-pick]'))
+      row.querySelector('input').checked = !!pick[row.dataset.evdPick];
+    sync();
+  };
+  document.addEventListener('keydown', onKey, true);
+  document.body.append(back);
+  sync();
+  go.focus();
+}
+
 // ---------------------------------------------------------------------------
 // Routing. The whole report is one file with no server, so the address bar is
 // the only place a view can live — and putting it there is what makes Back work.
@@ -5122,6 +5543,7 @@ function overviewLoop() {
 // ---------------------------------------------------------------------------
 const hashFor = () => (state.model ? 'model=' + encodeURIComponent(state.model)
                                   : state.topic ? 'topic=' + encodeURIComponent(state.topic)
+                                  : state.everyday ? 'everyday'
                                   : 'tab=' + state.tab
                                     + (state.tab === 'leaderboard' && lbHash() ? '&' + lbHash() : '')
                                     // 11j: which Review view, so a link opens it
@@ -5135,6 +5557,9 @@ function routeFromHash() {
   const [rest, rd] = splitRead(location.hash);
   state.read = rd;
   const h = decodeURIComponent(rest);
+  // 12a: the Everyday pilot's page — beside the tabs, never one of them
+  state.everyday = h === 'everyday';
+  if (state.everyday) { state.model = null; state.topic = null; return; }
   const m = /^model=(.+)$/.exec(h);
   if (m && DATA.models.some(x => x.id === m[1])) { state.model = m[1]; state.topic = null; return; }
   state.model = null;
@@ -5175,6 +5600,10 @@ function navigate(patch) {
   if (patch.tab === 'queue' && (state.tab !== 'queue' || state.model || state.topic)
       && state.pg.queue) state.pg.queue.page = 1;
   const from = location.hash;
+  // a tab, a model or a topic leaves the Everyday page (12a); the reader
+  // opening on it does not
+  if (!('everyday' in patch) && ['tab', 'model', 'topic'].some(k => patch[k]))
+    patch = { ...patch, everyday: false };
   Object.assign(state, patch);
   const want = hashFor();
   // push history, then paint. Painting here rather than leaving it to the
@@ -5209,7 +5638,7 @@ window.addEventListener('hashchange', () => {
 // navigation starts at 0 unless a button aimed it at a section.
 try { history.scrollRestoration = 'manual'; } catch (e) { /* an old browser */ }
 const viewKey = () => state.model ? 'model:' + state.model
-  : state.topic ? 'topic:' + state.topic : 'tab:' + state.tab;
+  : state.topic ? 'topic:' + state.topic : state.everyday ? 'everyday' : 'tab:' + state.tab;
 let _lastView = null, _restore = null, _navigated = false, _saveT = null;
 function saveScroll() {
   try { history.replaceState({ ...(history.state || {}), y: Math.round(scrollY) }, ''); }
@@ -8392,7 +8821,7 @@ function vTraining() {
 // reader's lines come with any line that quotes one withheld.
 // ===========================================================================
 const READ_KINDS = ['dataset', 'rubric', 'criteria', 'bank', 'log', 'provenance',
-                    'proposal'];
+                    'proposal', 'everyday'];
 
 function readStr(r) {
   return r ? [r.kind, r.id, r.n].filter(x => x != null && x !== '').join(':') : '';
@@ -8475,6 +8904,9 @@ async function readFetch(r, extra) {
     } else if (r.kind === 'proposal') {
       // 11j: a proposal opens in the same sheet, as one short card
       data = await api(`api/proposals/${r.id}`);
+    } else if (r.kind === 'everyday') {
+      // 12a: already on the page — the answers are in the payload
+      data = { model: r.id };
     } else if (r.kind === 'provenance') {
       const [what, id] = [r.id.split(':')[0], r.id.split(':').slice(1).join(':')];
       data = what === 'dataset' ? { kind: 'dataset', rec: await api(`api/datasets/${id}`) }
@@ -8572,7 +9004,8 @@ function renderReader() {
     return;
   }
   const build = { dataset: readDataset, rubric: readRubric, criteria: readCriteria, bank: readBank,
-                  log: readLog, provenance: readProvenance, proposal: readProposal }[r.kind];
+                  log: readLog, provenance: readProvenance, proposal: readProposal,
+                  everyday: readEveryday }[r.kind];
   wrap._aside.onkeydown = null;
   build(wrap, r, got.data, got);
   wrap.dataset.ready = '1';
@@ -9196,6 +9629,14 @@ function queueOpen(r) {
     state.after = { scroll: '[data-panel="answers"]' };
     return navigate({ topic: exam[0].replace(/^exam_/, ''), model: null });
   }
+  // 12a: a pilot run opens on its answers — on the model page, or the pilot's
+  if (r.suite === 'everyday') {
+    if (DATA.models.some(m => m.id === r.hf_id)) {
+      state.after = { scroll: '[data-everyday-block], [data-everyday-none]' };
+      return navigate({ model: r.hf_id, topic: null });
+    }
+    return navigate({ everyday: true, model: null, topic: null });
+  }
   if (DATA.models.some(m => m.id === r.hf_id)) return navigate({ model: r.hf_id, topic: null });
   toast(`${r.hf_id} is not on the board yet — its results land on the next refresh`);
 }
@@ -9236,8 +9677,9 @@ async function copyText(t, what) {
 // 11k: the stage, not the table's column. #58 said "done" for several
 // minutes while the judge was still grading 240 of 570 answers, with an
 // empty action cell: it looked as if nothing was happening.
-const stillGrading = r => r.suite === 'judged' && r.judge && r.judge.status !== 'done'
-  && !r.judge_failed;
+// 12a: and a pilot run, whose Arabic answer waits on the judge
+const stillGrading = r => (r.suite === 'judged' || r.suite === 'everyday') && r.judge
+  && r.judge.status !== 'done' && r.judge.status !== 'failed' && !r.judge_failed;
 function runStage(r) {
   if (r.status === 'done' && stillGrading(r))
     return { key: 'grading', cls: 'running', text: 'grading ' + judgeCount(r.judge) };
@@ -9340,7 +9782,9 @@ function vQueue() {
       ['judged', 'judged — the written exam' + (state.loop.blocked ? ' (unavailable)' : ''),
         { disabled: !!state.loop.blocked, title: state.loop.blocked || '',
           sub: 'The exam topics, answered in writing and graded by the judge: the model\'s '
-            + 'judged score per topic.' }]],
+            + 'judged score per topic.' }],
+      // 12a: the pilot. 12c replaces this drop-down with cards
+      ['everyday', 'Everyday tasks — 5 questions, minutes']],
       sf.suite || 'full', v => { sf.suite = v; render(); }, { key: 'submit-suite' }),
     note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px',
       'aria-label': 'note', 'data-keep': 'submit-note', value: sf.note,
@@ -9423,7 +9867,8 @@ function vQueue() {
     el('td', { class: 'small', text: r.progress || '', 'data-watch': `q|${r.id}|progress` },
       // the GPU half finishing is not the job finishing: the judge batch is
       // still out, and the row says how far it is
-      r.judge && !r.judge_failed ? el('div', { class: 'se', 'data-judge-progress': judgeCount(r.judge),
+      r.judge && !r.judge_failed && r.suite !== 'everyday' ? el('div', { class: 'se',
+        'data-judge-progress': judgeCount(r.judge),
         title: `judge batch ${r.judge.batch_id}`,
         text: r.judge.status === 'done' ? `judged ${r.judge.n_items} answers`
           : `judging ${judgeCount(r.judge)}` }) : '',
@@ -11270,6 +11715,7 @@ function suiteCell(r, key) {
   let ts = [];
   try { ts = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
   const J = DATA.judged || {};
+  if (r.suite === 'everyday') return el('span', { 'data-suite-cell': key, text: 'everyday pilot' });
   if (r.suite !== 'judged') return el('span', { 'data-suite-cell': key, text: r.suite });
   if (!ts.length) return el('span', { 'data-suite-cell': key, text: 'judged · the whole exam' });
   const ex = ts.filter(t => t !== J.control), ctl = ts.includes(J.control);
@@ -12112,7 +12558,8 @@ function render() {
   // 11b: the hero belongs to Overview. Every other tab starts straight at its
   // first numbered section.
   const hero = document.getElementById('pagehero');
-  if (hero) hero.hidden = !!(state.model || state.topic || state.tab !== 'overview');
+  if (hero) hero.hidden = !!(state.model || state.topic || state.everyday
+                             || state.tab !== 'overview');
   const view = document.getElementById('view');
   view.classList.remove('dimmed');
   // a poll rebuilds the view every few seconds. Whatever the person is typing
@@ -12135,6 +12582,7 @@ function render() {
     .map(e => [e.dataset.hkeep, e.scrollLeft]).filter(([, x]) => x > 0);
   if (state.model) view.replaceChildren(...vModel());
   else if (state.topic) view.replaceChildren(...vTopic());
+  else if (state.everyday) view.replaceChildren(...vEverydayPage());
   else view.replaceChildren(...TABS.find(([id]) => id === state.tab)[2](ms));
   if (keep) {
     const again = view.querySelector(`[data-keep="${keep.key}"]`);
@@ -12456,8 +12904,13 @@ function renderTabs() {
     popover(moreBtn, () => el('div', { class: 'moremenu', id: 'pop-more',
         'aria-label': 'more tabs' },
       more.map(([id, label]) => el('button', { role: 'menuitem', 'data-tab': id,
-        'aria-current': (state.model ? '' : state.tab) === id ? 'page' : null,
-        text: label, onclick: () => { popClose(); go(id); } }))),
+        'aria-current': (state.model || state.everyday ? '' : state.tab) === id ? 'page' : null,
+        text: label, onclick: () => { popClose(); go(id); } })),
+      // 12a: a page, not a tab — 12b moves it into Benchmarks
+      (DATA.everyday || {}).questions ? el('button', { role: 'menuitem',
+        'data-more-everyday': '1', 'aria-current': state.everyday ? 'page' : null,
+        text: 'Everyday pilot', onclick: () => { popClose();
+          navigate({ everyday: true, model: null, topic: null }); } }) : ''),
       { key: 'more' });
     tabs.replaceChildren(...main.map(([id, label]) =>
       el('button', { role: 'tab', 'data-tab': id, onclick: () => go(id), text: label })),
@@ -12466,10 +12919,10 @@ function renderTabs() {
       el('span', { class: 'tab-ink still', id: 'tabInk', 'aria-hidden': 'true' }));
     window.addEventListener('resize', () => placeInk(true));
   }
-  const sel = state.model ? '' : state.tab;
+  const sel = state.model || state.everyday ? '' : state.tab;
   for (const b of tabs.querySelectorAll('button[role=tab][data-tab]'))
     if (b.id !== 'moreBtn') b.setAttribute('aria-selected', String(b.dataset.tab === sel));
-  const inMore = more.find(t => t[0] === sel);
+  const inMore = state.everyday ? [null, 'Everyday pilot'] : more.find(t => t[0] === sel);
   const moreBtn = document.getElementById('moreBtn');
   moreBtn.textContent = (inMore ? inMore[1] : 'More') + ' ▾';
   moreBtn.setAttribute('aria-selected', String(!!inMore));
@@ -12892,7 +13345,7 @@ def build_report(runs: list[dict], out_path: Path, title: str,
                  calibration: dict | None = None, taint: dict | None = None,
                  parents: dict | None = None, judge_identity: dict | None = None,
                  banner: str = "", banner_link: tuple[str, str] = ("", ""),
-                 fingerprints: dict | None = None) -> Path:
+                 fingerprints: dict | None = None, everyday: dict | None = None) -> Path:
     if not runs:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(f"<h1>No lm-eval results found.</h1><p>{html.escape(banner)}</p>",
@@ -12900,7 +13353,7 @@ def build_report(runs: list[dict], out_path: Path, title: str,
         return out_path
     payload = build_payload(merge_runs(runs), title, source="", calibration=calibration,
                             taint=taint, parents=parents, judge_identity=judge_identity,
-                            fingerprints=fingerprints)
+                            fingerprints=fingerprints, everyday=everyday)
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     page = (TEMPLATE
             .replace("__TITLE__", html.escape(title))
@@ -12960,7 +13413,8 @@ def main() -> int:
     else:
         print("no built exam found (--exam-tasks): judged results are shown whatever question "
               "set they were graded on")
-    out = build_report(runs, args.out, args.title, calibration=cal, fingerprints=fps)
+    out = build_report(runs, args.out, args.title, calibration=cal, fingerprints=fps,
+                       everyday=load_everyday(args.results if args.results.is_dir() else None))
     print(f"\nwrote {out}  ({out.stat().st_size / 1024:.1f} KB)")
 
     if args.csv:

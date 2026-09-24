@@ -16,6 +16,8 @@ eval_tasks/*.lock
 # service + docker local state
 .env
 service.sqlite3*
+# the Everyday pilot's harness task, written per run under BENCH_ROOT (12a)
+/everyday/
 
 # tests and tooling
 .pytest_cache/

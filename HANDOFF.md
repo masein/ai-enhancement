@@ -1572,6 +1572,64 @@ sudo docker compose exec -T bench python3 scripts/judge.py /home/masein/benchmar
    Dataset #9 reads `0 of 26`, **Failed**, and the line about the prose
    register.
 
+### 12a — the Everyday tasks pilot
+
+Brief: `docs/prompts/phase-12a-everyday-pilot.md`, the first of 12a–12f.
+Five questions typed the way people type into an assistant on a phone, so
+masein can read what four models actually say before a bigger bank is
+written. A look, not a benchmark: never ranked, never averaged, on no
+leaderboard, read by nothing that proposes or generates. None of the plan's
+restructure is here — that is 12b.
+
+- **The questions**: `eval_tasks/everyday/pilot.jsonl`, the brief's five,
+  typos included, all readable (no practice/hidden split yet; an item can
+  carry `split` later without a rewrite). The harness task is written from
+  `eval_tasks/everyday/_everyday_template_yaml` at the start of each run
+  (`everyday.build_task`): the question as typed, no `Answer:` suffix,
+  greedy, 512 tokens.
+- **The suite**: `everyday`, beside quick/full/control/judged. Always
+  through the chat template, whatever kind the board lists; a model without
+  one is refused at preflight ("This model has no chat template, so it
+  can't be asked questions the way a person would."). A reasoning model gets
+  #59's 2,048 tokens. The model's listed kind is left as it was. A second
+  pilot run answers again; the last answers move to `results/earlier/`.
+- **Marking**: `scripts/everyday.py`, straight after the answers, in the same
+  run. It marks the text after the thinking (`judge.answer_parts`, #59's
+  split); an answer that never left its thinking fails with "never finished
+  answering". Four checks are scripts — contains, json, fixed, lines — each
+  with one plain reason. The Arabic question is the only one the judge
+  marks: the row says `grading 0/1` until it lands. `everyday.json` sits
+  beside the model's results; `python3 scripts/everyday.py results/full`
+  re-marks every model from the logs, keeping the judge's verdicts.
+- **What masein sees**: an **Everyday tasks** block on the model page, above
+  the exam (the count, five rows, a row opens the question and the answer,
+  the thinking folded), or one line, "Not tested on everyday tasks · Test".
+  And `#everyday`, from **Compare models →** and **More ▾ ▸ Everyday
+  pilot**: the five questions against the models, each mark opening the
+  answer in the side panel (↑↓ questions, ←→ models), and **Run the pilot**,
+  which queues one run per ticked model (Qwen3-1.7B, Qwen3-0.6B,
+  SmolLM2-360M-Instruct and gemma-3-270m-it are ticked).
+
+**Deploy steps, after 12a merges.** Code only.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+```
+
+**Expected output:**
+
+1. `up -d --build` ends with the container healthy; the image build prints
+   `image files OK` (the build now also checks `eval_tasks/everyday/`).
+2. The log grep prints `no errors`.
+3. **More ▾ ▸ Everyday pilot** opens `#everyday`, which reads "No model has
+   taken the pilot yet" with **Run the pilot**. Run it: four rows queue,
+   each finishes in minutes and says `Everyday pilot: n of 5`, with
+   `grading 0/1` while the judge marks the Arabic answer.
+4. `#everyday` then shows four models × five questions; every mark opens the
+   answer. Qwen3-1.7B's answers are the text after its thinking, and its
+   thinking is folded. Nothing of it is on the Leaderboard.
+
 ---
 
 ## 11. Known gaps, risks, loose ends

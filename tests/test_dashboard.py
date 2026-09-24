@@ -273,13 +273,16 @@ def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
 
 def test_the_model_page_leads_with_the_exam(surface):
     """The exam is the instrument, so it comes first; the multiple-choice
-    results and the per-item diagnosis follow as the second opinion."""
+    results and the per-item diagnosis follow as the second opinion. 12a
+    puts the Everyday pilot's five answers above it — a look anyone can
+    read, never a score."""
     pg = surface.open(model_link("fx/good-750m"))
     # 11d: the name is the hero's h1; the first section under it is the exam
     assert pg.locator("[data-model-hero] h1").text_content() == "good-750m"
     heads = [h.strip() for h in pg.locator("#view .card h2").all_text_contents()]
     order = [h for h in heads if h]
-    assert order[0] == "Judged free response — the exam"
+    assert order[0].startswith("Everyday tasks")
+    assert order[1] == "Judged free response — the exam"
     assert order.index("Judged free response — the exam") < order.index("Results")
     assert order.index("Results") < order.index("Diagnose")
     assert order[-1] == "Provenance"

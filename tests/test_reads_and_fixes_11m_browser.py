@@ -236,8 +236,10 @@ def test_each_suite_option_says_what_it_gets_you(live, page):
     page.wait_for_selector("[role=listbox][aria-label='suite']")
     opts = page.locator("#pop-sel-submit-suite [role=option]")
     assert [o.get_attribute("data-value") for o in opts.all()] == \
-        ["full", "quick", "control", "judged"]
-    for o in opts.all():
+        ["full", "quick", "control", "judged", "everyday"]
+    # 12a: the pilot's option is its one short line, and 12c replaces the list
+    assert opts.nth(4).text_content() == "Everyday tasks — 5 questions, minutes"
+    for o in opts.all()[:4]:
         v = o.get_attribute("data-value")
         sub = o.locator(f"[data-opt-sub='{v}']").text_content()
         assert len(sub.split()) >= 8, v

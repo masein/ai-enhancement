@@ -28,7 +28,8 @@ BANNED = ["diagnosis half", "DIAGNOSIS", "report half", "report-half", "over a p
           "LLM", "13-gram", "batch items", "exam_", "local/chat", "judge.json", "κ"]
 # where mono is allowed: numbers in tables, cards and charts, column headers,
 # eyebrows and section indices, badges, model ids, the LIVE badge and the log
-MONO_OK = "td.num, th, .eyebrow, .secidx, .badge, .mid, .livebadge, .rd-log, svg"
+# 12a: .evcount is the Everyday pilot's "4 of 5" — a number, so mono
+MONO_OK = "td.num, th, .eyebrow, .secidx, .badge, .mid, .livebadge, .rd-log, svg, .evcount"
 
 
 def api(base, path, body=None):

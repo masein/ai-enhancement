@@ -101,7 +101,11 @@ def test_index_covers_both_halves_once_per_document(tree):
     ix = ct.index(tree["out_dir"])
     n_docs = sum(len(d) for d in tree["docs"].values())
     n_fr = sum(v["items"] for v in tree["judged"]["manifest"]["tasks"].values())
-    assert ix.n_docs == n_docs + n_fr                     # eight models, one benchmark (+ fr items)
+    # 12a: and the Everyday pilot's five questions, once each however many
+    # models answered them — a dataset that repeats one is dropped like any other
+    import everyday as ev
+    n_pilot = len(ev.load_pilot()) if tree["everyday"] else 0
+    assert ix.n_docs == n_docs + n_fr + n_pilot           # eight models, one benchmark (+ fr items)
     assert ix.n_files > 8 and len(ix.grams) > 1000
     # a report-half question is in the index too — the gate guards the half nobody sees
     import diagnose as dx

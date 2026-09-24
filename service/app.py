@@ -93,7 +93,7 @@ _cache: dict = {"key": None, "payload": None, "at": 0.0}
 # writes it long after the eval finished, and a key that ignores it means the
 # payload keeps being served from cache with no diagnosis in it.
 _WATCH = ("results*.json", "diagnose.json", "model_meta.json", "judge.json",
-          "judge_calibration.json")
+          "judge_calibration.json", "everyday.json")
 
 # 11h: the dashboard no longer links to, serves or reads anything of the
 # demo tree ($BENCH_ROOT/demo). scripts/demo_loop.py stays a command-line
@@ -289,7 +289,8 @@ def results_payload() -> dict:
                                        parents=parents_for(by_model.keys()),
                                        calibration=_calibration(),
                                        judge_identity=_judge_identity(),
-                                       fingerprints=current_fingerprints())
+                                       fingerprints=current_fingerprints(),
+                                       everyday=report.load_everyday(config.OUT_DIR))
         payload["live"] = True
         # the loop's audit trail, per tainted model: run, datasets, proposals
         trails = trail_for([m["id"] for m in payload["models"]])
@@ -308,7 +309,7 @@ def results_payload() -> dict:
 class SubmissionIn(BaseModel):
     hf_id: str
     kind: str = "auto"
-    suite: str = "full"                # quick | full | control (the mmlu_perm experiment)
+    suite: str = "full"                # quick | full | control (the mmlu_perm experiment) | everyday
     submitter: str = ""
     note: str = ""
     allow_remote_code: bool = False    # execute the upload's own modeling code
@@ -331,9 +332,9 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "id, or local/<name> for an uploaded artifact")
     if s.kind not in ("auto", "base", "instruct"):
         raise HTTPException(422, "kind must be auto, base or instruct")
-    if s.suite not in ("quick", "full", "control", "judged"):
-        raise HTTPException(422, "suite must be quick, full, control (mmlu_perm only) or "
-                                 "judged (free response + judge)")
+    if s.suite not in ("quick", "full", "control", "judged", "everyday"):
+        raise HTTPException(422, "suite must be quick, full, control (mmlu_perm only), "
+                                 "judged (free response + judge) or everyday (the pilot)")
     chosen: list[str] = []
     if s.suite == "judged":
         # before a GPU second is spent on answers nobody could grade
@@ -419,6 +420,17 @@ def submissions(limit: int = 100):
     are on disk long before the grades are, and 'done' on the GPU half is not
     done — the row should say which topics it sat and how far the judge is."""
     rows = db.recent(min(limit, 500))
+    # 12a: a pilot row waits on the judge for one question, and says so the
+    # way a judged row does — by the batch it recorded, and nothing else
+    pilot = [r for r in rows if r["suite"] == "everyday" and r.get("judge_batch")]
+    if pilot:
+        batches = {b["batch_id"]: b for b in db.batches_list(500) if b["kind"] == "everyday"}
+        for r in pilot:
+            b = batches.get(r["judge_batch"])
+            if b:
+                r["judge"] = {"batch_id": b["batch_id"], "n_items": b["n_items"],
+                              "status": b["status"], "progress": b.get("progress") or "",
+                              "error": b.get("error") or ""}
     judged = [r for r in rows if r["suite"] == "judged"]
     if judged:
         runs = {run["batch_id"]: run for run in db.judge_runs(200)}

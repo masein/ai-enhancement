@@ -306,6 +306,8 @@ def include_args_for(task: str) -> list[str]:
     other's yaml, so a stray file in one cannot rename a task in the other."""
     if task in config.CONTROL_TASKS:
         return ["--include_path", str(config.CONTROL_TASKS_DIR)]
+    if task == config.EVERYDAY_TASK:
+        return ["--include_path", str(config.EVERYDAY_TASKS_DIR)]
     if task.startswith(("exam_", "fr_")):
         return ["--include_path", str(config.JUDGED_TASKS_DIR)]
     if config.EVAL_TASKS_DIR.is_dir() and any(config.EVAL_TASKS_DIR.glob("*.yaml")):
@@ -432,13 +434,19 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as) -> int:
 
 def run_submission(sub: dict) -> None:
     sid = sub["id"]
+    everyday = sub["suite"] == "everyday"
 
     # -- preflight: metadata only, no GPU, seconds --------------------------------
     try:
         # the submitter's kind is passed in: 'auto' is resolved here, and refused
-        # when it is genuinely ambiguous rather than guessed
-        meta = preflight(sub["hf_id"], sub["kind"],
+        # when it is genuinely ambiguous rather than guessed. 12a: the pilot
+        # asks through the chat template whatever kind the board lists — a
+        # model with one is asked as a person would ask it, a model without
+        # one cannot be
+        meta = preflight(sub["hf_id"], "instruct" if everyday else sub["kind"],
                          allow_remote_code=bool(sub.get("allow_remote_code")))
+        if everyday and not meta.get("has_template"):
+            raise PreflightError(config.NO_CHAT_TEMPLATE)
     except PreflightError as e:
         db.update(sid, status="failed", error=str(e), finished_at=time.time())
         return
@@ -468,10 +476,17 @@ def run_submission(sub: dict) -> None:
     # any access to the service database
     meta_dir = config.OUT_DIR / safe
     meta_dir.mkdir(parents=True, exist_ok=True)
-    (meta_dir / "model_meta.json").write_text(json.dumps(
-        {"model": sub["hf_id"], "kind": kind, "params": meta["params"],
-         "kind_reason": meta.get("kind_reason"),
-         **(meta.get("archinfo") or {})}), encoding="utf-8")
+    # …except that the pilot's kind is not the board's: it applies the chat
+    # template to every model it asks, and a model listed as base stays base
+    if not (everyday and (meta_dir / "model_meta.json").exists()):
+        (meta_dir / "model_meta.json").write_text(json.dumps(
+            {"model": sub["hf_id"], "kind": kind, "params": meta["params"],
+             "kind_reason": meta.get("kind_reason"),
+             **(meta.get("archinfo") or {})}), encoding="utf-8")
+    if everyday:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import everyday as _everyday
+        _everyday.build_task(config.EVERYDAY_TASKS_DIR)
     if remote_code:      # the code that produced the scores is part of the record
         db.update(sid, progress=f"preflight ok · custom model code · batch={meta['batch']}")
 
@@ -549,6 +564,13 @@ def run_submission(sub: dict) -> None:
             shots = config.NFEWSHOT.get(task, 0)
             task_out = config.OUT_DIR / safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
+            if everyday and _has_results(task_out):
+                # the pilot is five questions and minutes: "run again" answers
+                # again. The last answers move beside the tree, whole
+                moved = _set_aside(task_out, task)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] {task}: answering again; the last answers are "
+                             f"kept at {moved}\n")
             if _task_done(task_out, task):
                 if current_fingerprint(task):
                     reused[task] = _answered_by(task_out)
@@ -581,13 +603,13 @@ def run_submission(sub: dict) -> None:
                    "--log_samples",
                    "--device", "cuda:0",
                    *include_args_for(task)]
-            if kind == "instruct":
+            if kind == "instruct" or everyday:
                 cmd.append("--apply_chat_template")
             # 11l: a reasoning model thinks before it answers, and 256 tokens
             # ran out inside the thinking on every question of run #60. Only
             # its judged answers get more room, and only when its template is
             # the one that thinks; lm_eval records the override in its results
-            if (kind == "instruct" and task in judged
+            if ((kind == "instruct" and task in judged or everyday)
                     and (meta.get("archinfo") or {}).get("reasoning_template")):
                 cmd += ["--gen_kwargs", f"max_gen_toks={config.REASONING_MAX_GEN_TOKS}"]
 
@@ -672,6 +694,23 @@ def run_submission(sub: dict) -> None:
         note = reuse_note(reused, tasks) if sub["suite"] == "judged" else ""
         if note:
             db.update(sid, reuse_note=note)
+        # 12a: marked straight after the answers, in the same run. Only the
+        # Arabic question waits on the judge; the row says so until it lands
+        if everyday and not failed_tasks:
+            db.update(sid, status="running", progress="marking the answers")
+            try:
+                ev = _everyday.start(config.OUT_DIR / safe, submission=sid)
+                judge_note = _everyday.summary(ev)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n===== [{sid}] everyday: {_everyday.summary(ev)}"
+                             + (f" · judge batch {ev['batch_id']}" if ev.get("batch_id") else "")
+                             + (f" · the judge could not be asked: {ev['error']}"
+                                if ev.get("error") else "") + " =====\n")
+            except Exception as e:                      # noqa: BLE001 — the answers are on disk
+                failed_tasks.append("marking")
+                db.update(sid, error=f"marking: {e}")
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] the pilot could not be marked: {e!r}\n")
         if sub["suite"] == "judged" and not failed_tasks:
             db.update(sid, status="running", progress="submitting the answers to the judge")
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -704,7 +743,8 @@ def run_submission(sub: dict) -> None:
             what = (f"all {len(tasks)} tasks" if not only
                     else f"{', '.join(t.replace('exam_', '') for t in tasks)}")
             db.update(sid, status="done", finished_at=time.time(),
-                      progress=f"{what} done" + (f" · {note}" if note else "") + judge_note,
+                      progress=judge_note if everyday
+                      else f"{what} done" + (f" · {note}" if note else "") + judge_note,
                       error="")
     finally:
         release_lock()

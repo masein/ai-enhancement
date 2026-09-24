@@ -21,6 +21,7 @@ from pathlib import Path
 from . import config, contamination, db, llm, proposals
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+import everyday as _everyday  # noqa: E402
 import exam_build as _exam  # noqa: E402
 import judge as _judge  # noqa: E402
 
@@ -152,6 +153,23 @@ def _finish_judge(row: dict, results: dict[str, llm.Result]) -> None:
     if not sub:
         return
     db.update(sub["id"], progress=judged_line(run, note=sub.get("reuse_note") or ""))
+
+
+def _everyday_dir(row: dict):
+    sub = db.get(row["ref_id"])
+    return (config.OUT_DIR / sub["hf_id"].replace("/", "__"), sub) if sub else (None, None)
+
+
+def _finish_everyday(row: dict, results: dict[str, llm.Result]) -> None:
+    """12a: the judge's verdict on the pilot's Arabic question. The row
+    that ran the pilot says its count once it lands."""
+    d, sub = _everyday_dir(row)
+    if d is None:
+        return
+    out = _everyday.finish(d, results)
+    db.batch_progress(row["batch_id"], f"{row['n_items']}/{row['n_items']} done")
+    if out:
+        db.update(sub["id"], progress=_everyday.summary(out))
 
 
 def judged_line(run: dict, at: float | None = None, note: str = "") -> str:
@@ -294,6 +312,13 @@ def _mark_failed(r: dict, why: str) -> None:
         db.dataset_update(r["ref_id"], status="failed", finished_at=time.time(), error=why[:400])
     elif r["kind"] == "judge":
         db.judge_run_update(r["ref_id"], status="failed", finished_at=time.time(), error=why[:400])
+    elif r["kind"] == "everyday":
+        d, sub = _everyday_dir(r)
+        if d is not None:
+            _everyday.judge_failed(d, why)
+            out = _everyday.read(d)
+            if out:
+                db.update(sub["id"], progress=_everyday.summary(out))
 
 
 def tick() -> int:
@@ -306,7 +331,7 @@ def tick() -> int:
     done = 0
     for r in rows:
         try:
-            backend = llm.client("judge" if r["kind"] == "judge" else "llm")
+            backend = llm.client("judge" if r["kind"] in ("judge", "everyday") else "llm")
         except llm.LocalUnreachable as e:
             # vLLM restarting (or still loading after a reboot) is not a reason
             # to throw away batches whose finished results are on disk
@@ -342,6 +367,8 @@ def tick() -> int:
                 _finish_generation(r, results, backend)
             elif r["kind"] == "judge":
                 _finish_judge(r, results)
+            elif r["kind"] == "everyday":
+                _finish_everyday(r, results)
             db.batch_finish(r["batch_id"], "done", "")
         except Exception as e:                       # noqa: BLE001 — one batch must not kill the loop
             traceback.print_exc()

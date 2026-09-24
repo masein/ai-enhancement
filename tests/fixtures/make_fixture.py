@@ -808,6 +808,105 @@ def write_judged(root: Path, out_dir: Path, seed: int = SEED) -> dict:
             "models": dict(JUDGED), "calibration_csv": cal_csv, "calibration": cal}
 
 
+# ---------------------------------------------------------------------------
+# 12a: the Everyday pilot. Four models answered its five questions: one
+# thinks before every answer and gets all five, one thinks too and ran out of
+# room on the first, two do not think at all. Between them every check passes
+# somewhere and fails somewhere, with each of its reasons.
+# ---------------------------------------------------------------------------
+_THINK = "<think>\n{}\n</think>\n\n"
+EVERYDAY_ANSWERS = {
+    "fx/good-750m": [
+        _THINK.format("February has 28 days, and a leap year adds one.") + "A leap year February "
+        "has 29 days.",
+        _THINK.format("Five fields: name, age, role, city, start date.") + '```json\n{"name": '
+        '"Sara Ahmed", "age": 34, "role": "product manager", "city": "Dubai", "joined": '
+        '"March 2021"}\n```',
+        _THINK.format("Thursday is al-khamis.") + "تم تأجيل الاجتماع إلى يوم الخميس",
+        _THINK.format("Four mistakes to fix.") + "Dear Sir, I am writing to you regarding the "
+        "invoice which was sent last week and has still not been paid.",
+        _THINK.format("Short and plain.") + "1. Bean There\n2. Daily Grind\n3. Brew Haven",
+    ],
+    "fx/below-135m-it": [
+        "February has 28 days.",
+        'Here\'s your JSON:\n{"name": "Sara Ahmed", "age": "34", "job": "product manager", '
+        '"city": "Dubai", "start": "2021-03"}',
+        "The meeting is moved to Thursday.",
+        "Dear Sir, I am writing to you regarding the invoice which was sended last week and "
+        "still not payed.",
+        "Here are three names:\n1. Bean There\n2. Daily Grind\n3. Brew Haven",
+    ],
+    "fx/skewed-360m": [
+        "<think>\nhmm, a leap year. february normally has 28 days and a leap year adds one, "
+        "so the answer should be",
+        '{"name": "Sara Ahmed", "age": 34, "title": "product manager"}',
+        _THINK.format("Arabic for Thursday.") + "الاجتماع نقل إلى الخميس",
+        _THINK.format("Fix the verbs.") + "Dear Sir, I am writing to you about the invoice which "
+        "was sent last week and is still not paid.",
+        "1. **Bean There** – a cozy spot\n2. Daily Grind\n3. Brew Haven",
+    ],
+    "fx/chance-160m": [
+        "Twenty-nine days, because it is a leap year.",
+        "name: Sara Ahmed, age: 34",
+        "",
+        "Dear Sir, I writing to you regard the invoice.",
+        "Bean There\nDaily Grind\nBrew Haven\nCup of Joy",
+    ],
+}
+# the two that think were given a reasoning model's room
+EVERYDAY_THINKS = {"fx/good-750m", "fx/skewed-360m"}
+
+
+def write_everyday(out_dir: Path) -> dict[str, dict]:
+    """The pilot's samples and results as the harness writes them, then
+    marked by scripts/everyday.py with the stub marking the Arabic answer."""
+    import everyday as ev
+    pilot = ev.load_pilot()
+    out = {}
+    for model_id, answers in EVERYDAY_ANSWERS.items():
+        task = ev.TASK
+        mdir = out_dir / safe_name(model_id)
+        task_dir = mdir / f"{task}_0shot" / _SANITIZE.sub("__", model_args(model_id))
+        task_dir.mkdir(parents=True, exist_ok=True)
+        budget = 2048 if model_id in EVERYDAY_THINKS else 512
+        gk = {"until": ["\n\n\n\n"], "max_gen_toks": 512, "do_sample": False,
+              "temperature": 0.0}
+        with open(task_dir / f"samples_{task}_{TS}.jsonl", "w", encoding="utf-8") as fh:
+            for i, (q, ans) in enumerate(zip(pilot, answers)):
+                ctx = f"<|user|>\n{q['prompt']}\n<|assistant|>\n"
+                fh.write(json.dumps({
+                    "doc_id": i, "doc": q, "target": "",
+                    "arguments": [[ctx, {**gk, "max_gen_toks": budget}]],
+                    "resps": [[ans]], "filtered_resps": [ans],
+                    "doc_hash": _sha(json.dumps(q, sort_keys=True, ensure_ascii=False)),
+                    "prompt_hash": _sha(ctx), "target_hash": _sha(""), "filter": "none",
+                    "metrics": ["bypass"], "bypass": 999}, ensure_ascii=False) + "\n")
+        blob = {"results": {task: {"alias": task, "bypass,none": 999}},
+                "group_subtasks": {task: []},
+                "configs": {task: {"task": task, "output_type": "generate_until",
+                                   "generation_kwargs": gk,
+                                   "metric_list": [{"metric": "bypass"}]}},
+                "versions": {task: 1.0}, "n-shot": {task: 0},
+                "higher_is_better": {task: {"bypass": True}},
+                "n-samples": {task: {"original": 5, "effective": 5}},
+                "config": {"model": "hf", "model_args": model_args(model_id), "batch_size": "8",
+                           "device": "cuda:0", "limit": None, "random_seed": 1234,
+                           **({"gen_kwargs": f"max_gen_toks={budget}"}
+                              if model_id in EVERYDAY_THINKS else {})},
+                "git_hash": GIT_HASH, "date": DATE + 12000,
+                "transformers_version": TRANSFORMERS, "chat_template": "applied",
+                "total_evaluation_time_seconds": "30.0"}
+        (task_dir / f"results_{TS}.json").write_text(json.dumps(blob, indent=2),
+                                                     encoding="utf-8")
+        marked = ev.mark(mdir)
+        todo = {it["id"]: ev.stub_verdict(it["answer_text"]) for it in marked["items"]
+                if it["pass"] is None and it["answer_text"]}
+        marked = ev.mark(mdir, todo, judge={"id": "stub/overlap-v1", "provisional": False})
+        ev.write(mdir, marked)
+        out[model_id] = {"dir": mdir, "passed": marked["passed"]}
+    return out
+
+
 def frozen_report(root: Path, path: Path, title: str = "Fixture board") -> Path:
     import report_lm_eval as report
     out_dir = root / "results" / "full"
@@ -817,7 +916,8 @@ def frozen_report(root: Path, path: Path, title: str = "Fixture board") -> Path:
     return report.build_report(runs, path, title, calibration=cal,
                                taint=TAINT, parents=PARENTS,
                                judge_identity={"provider": "stub", "model": "overlap-v1",
-                                               "id": "stub/overlap-v1", "family": "stub"})
+                                               "id": "stub/overlap-v1", "family": "stub"},
+                               everyday=report.load_everyday(out_dir))
 
 
 def build(root: Path, seed: int = SEED, diagnose: bool = True,
@@ -847,6 +947,7 @@ def build(root: Path, seed: int = SEED, diagnose: bool = True,
         "stale": {**STALE, "n": TASKS[STALE["task"]]["n"]},
         "diagnosed": write_diagnoses(root) if diagnose else [],
         "judged": write_judged(root, out_dir, seed) if judged else None,
+        "everyday": write_everyday(out_dir),
         "taint": dict(TAINT), "parents": dict(PARENTS),
         "report": None,
     }

@@ -44,6 +44,9 @@ COPY eval_tasks/mmlu_perm/ eval_tasks/mmlu_perm/
 # banks and the skill-suite seeds. service/app.py refuses to start without
 # them, so a missing one fails at `up` rather than on someone's first click
 COPY eval_tasks/fr/ eval_tasks/fr/
+# 12a: the Everyday pilot's five questions and its task template; the page
+# shows the questions and everyday.build_task() writes the task from them
+COPY eval_tasks/everyday/ eval_tasks/everyday/
 COPY FRIENDS.md ./
 
 # the same check the service runs at startup, at BUILD time: an image missing

@@ -54,6 +54,8 @@ REQUIRED_REPO_FILES = [
     "eval_tasks/fr/rubrics/factual_accuracy.md",   # the control set's rubric
     "eval_tasks/mmlu_perm/_mmlu_perm.yaml",  # suite=control passes this dir to --include_path
     "eval_tasks/mmlu_perm/utils.py",        # …and the tasks in it import this
+    "eval_tasks/everyday/pilot.jsonl",      # 12a: the Everyday pilot's five questions
+    "eval_tasks/everyday/_everyday_template_yaml",  # …and the task everyday.build_task writes
     "FRIENDS.md",                           # served at /guide
     "clients/bench_client.py",              # served at /client
     *DELIVERED_TOPIC_FILES,
