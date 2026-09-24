@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import bar_reveal, label_domains, set_name, open_submit
+from conftest import bar_reveal, label_domains, model_tab, set_name, open_submit
 
 
 pytestmark = pytest.mark.dashboard
@@ -303,7 +303,9 @@ def test_a_rubric_with_no_version_says_so(live, page):
     rubric, because none of them carries a version marker."""
     base = live["base"]
     page.goto(base + "/#model=fx%2Fgood-750m")
-    page.wait_for_selector(".card h2:has-text('Judged free response')")
+    # 12b.2: the judge's line, rubrics and all, is History's How it was graded
+    model_tab(page, "history")
+    page.wait_for_selector("[data-model-graded]")
     text = page.locator("#view").text_content()
     assert "rubrics no version" in text
     assert "v?" not in text

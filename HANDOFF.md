@@ -129,10 +129,10 @@ and resubmit the model and we would test again."*
 
 | # | Step | Who / where | API cost |
 |---|---|---|---|
-| 0 | **Write the exam** — LLM drafts candidates per topic, a person curates on the Exam tab | `exam_build.py draft` → dashboard | once, ~$6–10 |
+| 0 | **Write the exam** — LLM drafts candidates per topic, a person curates on Benchmarks ▸ Knowledge exam | `exam_build.py draft` → dashboard | once, ~$6–10 |
 | 1 | **Sit the exam** — the checkpoint answers and explains | lm_eval on the 5090, `--suite judged` | free |
 | 2 | **Judge** — score per topic + written evaluation | `judge.py` via API | ~$4–6 / cycle |
-| 3 | **Choose the topic** — human reads scores + judge's notes, approves a skill spec | Review tab | ~$0.04 |
+| 3 | **Choose the topic** — human reads scores + judge's notes, approves a skill spec | Improve ▸ Review | ~$0.04 |
 | 4 | **Generate the dataset** — prose documents for that topic; generator sees only the spec | `proposals.py` via API | ~$5–6 / cycle |
 | 5 | **Fine-tune and resubmit** | Roohi, `--gap-dataset <id>` | free |
 | ↻ | Back to 1 — same exam; the before/after says whether it worked | dashboard | |
@@ -404,7 +404,7 @@ topics of §10c:
 | the 0–4 rubrics derived from them — **DRAFT**, anchors not yet reviewed | `eval_tasks/fr/retired/rubrics/medicine_health.md`, `law.md` |
 
 They import into their topics with him as the approver (`exam_build.py
-import`, AUTHORING.md, or the Exam tab's import panel), the judge grades
+import`, AUTHORING.md, or the import panel on Benchmarks ▸ Knowledge exam), the judge grades
 those topics criterion by criterion and folds the 0–4 in code, and the page
 shows the per-criterion row, one line per flag in words, and one breakdown
 table per metadata field the topic carries. A criteria file names its own
@@ -457,8 +457,8 @@ agreement, but κ — the gate — is still on the folded score alone.
    why if they clash or the id is an alias. Cheapest correct arrangement: one
    provider writes + generates, the other judges.
 3. **Exam:** `scripts/exam_build.py migrate` (brings the 40 legacy seed items
-   in), `draft --topic <t>` for the first three topics, then **curate on the
-   Exam tab** to 60 accepted each. Rubrics for those three topics must exist
+   in), `draft --topic <t>` for the first three topics, then **curate on
+   Benchmarks ▸ Knowledge exam** to 60 accepted each. Rubrics for those three topics must exist
    first.
 4. **First judged run:** submit a small model with `--suite judged`. Then
    **calibrate**: `judge_calibrate.py export` → a human marks 100 answers →
@@ -471,6 +471,12 @@ agreement, but κ — the gate — is still on the folded score alone.
 ---
 
 ## 10. Phase 8 — implemented and merged
+
+> **Places in the phase records below are named as they were when each phase
+> shipped** (the Leaderboard, the Queue, More ▸ Review, the Exam tab…). Since
+> 12b the board has five places — Home, Models, Improve, Benchmarks, and the
+> pages behind the header — and every old address lands on its new home: the
+> map is in § 12b.2.
 
 Briefs: `docs/prompts/phase-8-local-backend.md` (P0–P3) and
 `docs/prompts/phase-8b-medicine.md` (P4a–P4c). Read **DEMO.md** first:
@@ -1752,6 +1758,85 @@ git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check &&
 5. Step 3 ends `N passed, M deselected in …s`, with no `failed` and no
    `error`. It is the first run of the unit suite inside the image, so a
    failure here is news about the image (§ 5b): send the output.
+
+### 12b.2 — Home, the model page's tabs, and the doc links
+
+§6–§8 of `docs/prompts/phase-12b-five-places.md`. Like 12b.1 it moves
+things: the sections of the model page keep their code and change container.
+
+- **Home** (`vOverview`) is three blocks.
+  - **Needs you** has one link per thing waiting: proposals waiting for
+    review, datasets that are ready but used by no training run, runs
+    that failed in the last seven days, and checks that aren't green. With
+    nothing waiting it says "Nothing needs you."
+  - **Running now** is the run counter's list, full width, or "Nothing
+    running · Test a model".
+  - **Best in each kind of test** has one card per kind with data. The
+    provisional-judge caveat appears once, in the block's header.
+  - There is no hero and no stats line. Top models is Models, and the
+    guides are Help (12b.1). Judge steadiness is a line under the checks
+    behind the status dot. The Weakest topic and The loop cards are
+    Improve ▸ By topic's board.
+- **The model page** (`vModel`) is a header over tabs.
+  - **The header:** the name, one line of facts (size · kind · family),
+    **Test this model**, and one tile per kind. A kind not taken reads
+    "Not tested · Test". The exam's Test opens the page's own topic
+    picker.
+  - **The tabs:** Scores · Answers · Improve · History. The choice is
+    remembered per viewer in `bench-model-tab`, and Improve appears only
+    when the Review lists hold something of this model's.
+  - **Scores** has one block per kind taken, the newest open and the others
+    folded. A folded block is built when it opens. Diagnose folds under
+    "What the score can't show", and score against length and Earlier exams
+    fold under "More detail".
+  - **Answers** holds the exam's answers, topic by topic, and the pilot's
+    five, by group.
+  - **History** holds Runs of this model, the model's Run provenance
+    (moved from Data & sources), and How it was graded, with the judge's
+    ids and the reader link.
+- **Doc links:** README, DEMO and the current sections of this file name the
+  new places. The phase records keep the names they had when each phase
+  shipped, under a note at the top of § 10.
+
+**Old addresses, and where they land** (§8; each keeps its sub-state, and
+the address bar shows the new one):
+
+| Old | Lands on |
+|---|---|
+| `#tab=overview` | `#tab=home` |
+| `#tab=leaderboard`, `#tab=models` | `#tab=models` (Standard), chips kept (`&chip=math`) |
+| `#tab=leaderboard&chip=judged` | `#tab=models&view=exam` |
+| `#tab=loop` | `#tab=improve&sub=topics` |
+| `#tab=review&view=datasets` | `#tab=improve&sub=review&view=datasets` |
+| `#tab=training` | `#tab=improve&sub=training` |
+| `#tab=queue` | `#tab=runs` (All runs) |
+| `#tab=submit` | All runs, with Test a model open |
+| `#tab=exam` | `#tab=benchmarks&sub=exam` |
+| `#tab=tasks` | `#tab=benchmarks&sub=standard` |
+| `#tab=perplexity` | `#tab=models&chip=lm` |
+| `#tab=provenance` | `#tab=data` |
+| `#everyday` | `#tab=benchmarks&sub=everyday` |
+
+`#model=…`, `#topic=…` and every `read=…` are unchanged.
+
+**Deploy steps, after 12b.2 merges.** Code only.
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check && mkdir /tmp/check && cd /tmp/check && tar -x && exec env -i PATH="$PATH" HOME=/tmp/check LANG=C.UTF-8 python -m pytest -q -p no:cacheprovider -m "not gpu and not network and not dashboard"' 2>&1 | tail -15
+```
+
+**Expected output:**
+
+1. `up -d --build` ends with the container healthy, and the image build
+   prints `image files OK`.
+2. The log grep prints `no errors`.
+3. Step 3 ends `N passed, M deselected in …s`, with no `failed` and no
+   `error`.
+4. **Home** reads Needs you, Running now, then Best in each kind of test.
+   A model page opens on a header of tiles and the tabs Scores · Answers ·
+   History, with Improve for a model that has a proposal or a dataset.
 
 ---
 

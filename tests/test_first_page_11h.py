@@ -82,7 +82,7 @@ def test_mono_is_only_for_numbers_ids_labels_and_the_log(live, page, where):
     page.wait_for_timeout(1200)
     assert page.evaluate(MONO_TEXT, MONO_OK) == []
     # and words really are sans: the stats line, the pills, a card's link
-    fams = page.evaluate("""() => ['[data-statline]', '.pill', '.chip-btn', '.hcard-link', 'footer',
+    fams = page.evaluate("""() => ['.pill', '.chip-btn', '.hcard-link', 'footer',
         '#themeBtn'].map(s => document.querySelector(s)).filter(Boolean)
         .map(e => getComputedStyle(e).fontFamily)""")
     assert fams and not [f for f in fams if re.search("monospace|Menlo", f)]
@@ -90,46 +90,35 @@ def test_mono_is_only_for_numbers_ids_labels_and_the_log(live, page, where):
 
 
 @pytest.mark.parametrize("width", [1280, 1512])
-def test_the_overview_opens_on_a_compact_hero_the_cards_and_the_top_models(live, browser, width):
+def test_home_opens_on_its_three_blocks_within_the_first_screen(live, browser, width):
+    """12b.2: no hero — Home starts at Needs you; Running now and the best in
+    each kind of test are on the first screen, the cards one height and their
+    links on one baseline, in the hcard's type (11h)."""
     ctx, page = new_page(browser, width, 868)
     try:
         page.goto(live["base"] + "/")
-        page.wait_for_selector("[data-highlights] [data-hl='judge']")
-        geo = page.evaluate("""() => { const h = document.getElementById('pagehero');
-          const r = el => el.getBoundingClientRect();
-          return { hero: r(h).height, h1: !!h.querySelector('h1') && r(h.querySelector('h1')).width > 1,
-            cards: [...document.querySelectorAll('[data-hl]')].map(c => [r(c).bottom, r(c).height]),
-            links: [...document.querySelectorAll('.hcard-link')].map(l => Math.round(r(l).bottom)),
-            row: r(document.querySelector('[data-top-models] tbody tr')).bottom }; }""")
-        assert geo["hero"] <= 120, geo
-        assert not geo["h1"]                             # the bar carries the title
-        # 12b: Test a model in the header is the one main action, so the
-        # hero has no Submit of its own
-        assert page.locator("#pagehero [data-submit-model]").count() == 0
+        page.wait_for_selector("[data-best] .hcard-link")
+        geo = page.evaluate("""() => { const r = el => el.getBoundingClientRect();
+          return { first: r(document.querySelector('#view > .card')).top,
+            cards: [...document.querySelectorAll('[data-best]')].map(c => [r(c).bottom, r(c).height]),
+            links: [...document.querySelectorAll('[data-best] .hcard-link')].map(l => Math.round(r(l).bottom)) }; }""")
+        assert geo["first"] < 120, geo                  # straight under the bar
+        assert page.locator("#pagehero").count() == 0
         assert page.locator("header [data-test-model]").is_visible()
-        assert all(b <= 868 for b, _ in geo["cards"]) and geo["row"] <= 868, geo
+        assert all(b <= 868 for b, _ in geo["cards"]), geo
         assert len({round(h) for _, h in geo["cards"]}) == 1                 # one height
         assert len(set(geo["links"])) == 1                                   # one baseline
         look = page.evaluate("""() => { const c = e => getComputedStyle(document.querySelector(e));
-          const v = c('.hcard-v'), n = c('.hcard-name'), d = c('.hcard-verdict'), l = c('.hcard-link');
+          const v = c('.hcard-v'), n = c('.hcard-name'), l = c('.hcard-link');
           return [v.fontSize, v.fontWeight, v.fontVariantNumeric, v.fontFamily, n.fontSize, n.fontWeight,
-                  n.textOverflow, d.fontSize, l.textDecorationLine, l.fontFamily]; }""")
+                  n.textOverflow, l.textDecorationLine, l.fontFamily]; }""")
         assert look[0] == "28px" and look[1] == "700" and "tabular-nums" in look[2]
         assert not re.search("monospace", look[3])
         assert look[4] == "14px" and look[5] == "600" and look[6] == "ellipsis"
-        assert look[7] == "14px" and look[8] == "none" and not re.search("monospace", look[9])
+        assert look[7] == "none" and not re.search("monospace", look[8])
         assert page.errors == []
     finally:
         ctx.close()
-
-
-def test_a_top_models_row_is_washed_end_to_end_on_hover(live, page):
-    page.goto(live["base"] + "/")
-    row = page.locator("[data-top-models] tbody tr").nth(2)            # not a leader
-    row.hover()
-    bgs = row.evaluate("tr => [...tr.children].map(td => getComputedStyle(td).backgroundColor)")
-    assert len(set(bgs)) == 1 and bgs[0] not in ("rgba(0, 0, 0, 0)", "transparent"), bgs
-    assert page.errors == []
 
 
 # ---------------------------------------------------------------------------

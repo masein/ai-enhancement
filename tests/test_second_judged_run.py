@@ -18,7 +18,7 @@ import pytest
 
 import exam_build as eb
 import judge as jd
-from conftest import choose, fresh, make_service
+from conftest import choose, fresh, make_service, open_kind
 
 REPO = Path(__file__).resolve().parents[1]
 MODEL = "fx/good-750m"
@@ -362,9 +362,10 @@ def test_a_page_open_through_a_whole_judged_run_shows_the_judged_scores(svc, mon
     s = Served(browser, client, appmod)
     try:
         # 12b: the Models tab and its "judged topics" column are gone; the
-        # model page's Judged block is where a person watches this land
+        # model page is where a person watches this land. 12b.2: its
+        # Knowledge exam tile says Not tested until a topic is judged
         pg = s.open("#model=" + MODEL)
-        pg.wait_for_selector("[data-sit-progress='0']", timeout=20000)    # 0 of 37 topics judged
+        pg.wait_for_selector("[data-kind-tile='exam'].none", timeout=20000)
         score = pg.locator("[data-topic-score='Economics']")
         assert score.count() == 0
 
@@ -375,12 +376,15 @@ def test_a_page_open_through_a_whole_judged_run_shows_the_judged_scores(svc, mon
                              "&& r.judge && r.judge.status !== 'done') && !RESULTS_DUE",
                              timeout=20000)
         assert score.count() == 0                          # the answers alone grade nothing
-        assert pg.locator("[data-sit-progress='0']").count() == 1
+        assert pg.locator("[data-kind-tile='exam'].none").count() == 1
 
         s.fail_results = 1                                 # the next results fetch fails once
         assert llm_poller.tick() == 1                      # judge.json lands
-        score.wait_for(timeout=40000)
+        # the tile turns into a number, and the block holds the topic
+        pg.wait_for_selector("[data-kind-value='exam']", timeout=40000)
         assert s.failed, "the failed fetch never happened — the retry was not exercised"
+        open_kind(pg, "exam")
+        score.wait_for()
         assert pg.locator("[data-sit-progress='1']").count() == 1          # one topic judged
         # two decimals at most, trailing zeros dropped: under its own criteria
         # economics can grade to a round 3

@@ -99,16 +99,14 @@ def routed(browser, payload, width=1512, height=900):
 
 @pytest.mark.dashboard
 def test_the_first_screen_is_the_board_not_banners(browser, payload):
-    """1,512 × 900: the highlight cards fully on screen, and Top models begun.
-    11d: the best average is the first highlight card, not a hero of its own."""
+    """1,512 × 900: 12b.2's Home — what needs you, what is running, and the
+    best in each kind of test — whole on the first screen, no banner above."""
     ctx, s = routed(browser, payload)
     try:
         pg = s.open()
-        pg.wait_for_selector("[data-highlights]")
-        hl = pg.locator("[data-highlights]").bounding_box()
-        top = pg.locator("[data-top-models]").bounding_box()
-        assert hl["y"] + hl["height"] <= 900, hl
-        assert top["y"] < 900, top
+        pg.wait_for_selector("[data-best-by-kind] [data-best]")
+        best = pg.locator("[data-best-by-kind]").bounding_box()
+        assert best["y"] + best["height"] <= 900, best
         assert pg.locator("#warnings li[data-check]").first.is_hidden()   # the checks: one line
         assert pg.locator("[data-how-to-read]").count() == 0          # 12b: in Help now
         assert s.errors == []
@@ -119,7 +117,8 @@ def test_the_first_screen_is_the_board_not_banners(browser, payload):
 @pytest.mark.dashboard
 def test_the_overview_skips_the_duplicate_and_links_the_preliminary(browser, payload):
     """The hero featured …step945 — the Leaderboard's "duplicate of …-v2" —
-    with a sentence calling it preliminary; Top models listed both."""
+    with a sentence calling it preliminary; Top models listed both. 12b.2:
+    Home's Standard card is the one place it could, and it names the twin."""
     p = copy.deepcopy(payload)
     ranked = sorted((m for m in p["models"] if m.get("avg") is not None),
                     key=lambda m: -m["avg"])
@@ -129,41 +128,22 @@ def test_the_overview_skips_the_duplicate_and_links_the_preliminary(browser, pay
     ctx, s = routed(browser, p)
     try:
         pg = s.open()
-        pg.wait_for_selector("[data-hl='best']")
-        # the best-model card names the twin, never the duplicate
-        best = pg.locator("[data-hl-name='best']").text_content()
+        pg.wait_for_selector("[data-best='standard']")
+        # the best card names the twin, never the duplicate
+        best = pg.locator("[data-best-name='standard']").text_content()
         assert best == twin["name"] and best != top["name"]
-        names = [a.text_content() for a in pg.locator("[data-top-models] td.model a").all()]
-        assert twin["name"] in names and top["name"] not in names
         assert "preliminary and carries no overall rank" not in pg.locator("#view").text_content()
-        link = pg.locator("[data-show-prelim]")
-        if link.count():
-            link.click()
-            # 12b: Models is one table; its Status filter says preliminary
-            pg.wait_for_function("lbS().status === 'preliminary'")
-            pg.wait_for_selector("table[data-lb-table] tbody tr[data-lb-row]")
-            shown = pg.locator("table[data-lb-table] tbody tr[data-lb-row]").count()
-            assert shown == sum(1 for m in p["models"]
-                                if m.get("avg") is None) or shown <= 25
         assert s.errors == []
     finally:
         ctx.close()
 
 
 @pytest.mark.dashboard
-def test_the_overview_has_the_loop_and_a_way_to_submit(live, page):
+def test_home_has_a_way_to_submit(live, page):
+    """12b: Test a model, in the header, is the way to submit — a dialog over
+    Home. (12b.2: the Overview's loop card is gone; each model's weakest
+    topic is first on Improve ▸ By topic, and on Models ▸ Insights.)"""
     base = live["base"]
-    page.goto(base + "/")
-    card = page.locator("[data-overview-loop]")
-    card.wait_for()
-    assert "topics judged" in card.text_content() or "topic judged" in card.text_content()
-    btn = card.locator("[data-weakest-topic]").first
-    task = btn.get_attribute("data-weakest-topic")
-    model = card.locator("tr[data-loop-model]").first.get_attribute("data-loop-model")
-    btn.click()
-    page.wait_for_selector(f"[data-topic-page='{task.removeprefix('exam_')}']")
-    page.wait_for_function("m => state.ans.model === m", arg=model)
-    # 12b: Test a model, in the header, is the way to submit: a dialog over Home
     page.goto(base + "/")
     page.locator("header [data-test-model]").click()
     page.wait_for_function("document.activeElement === "

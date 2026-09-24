@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 import exam_build as eb
-from conftest import label_domains, report_half_text
+from conftest import label_domains, model_tab, report_half_text
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11g"
@@ -122,6 +122,7 @@ OPENERS = {
         f"[data-row-menu='q{ctx['log']['id']}']"),
     "provenance": lambda page, base, ctx: (
         page.goto(f"{base}/#model={MODEL.replace('/', '%2F')}"),
+        model_tab(page, "history"),                   # 12b.2: How it was graded
         page.locator(f"[data-how-graded='{MODEL}'] a").click(),
         f"[data-how-graded='{MODEL}'] a"),
 }

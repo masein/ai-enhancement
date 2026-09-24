@@ -11,7 +11,7 @@ import urllib.request
 
 import pytest
 
-from conftest import choose
+from conftest import choose, open_kind
 
 pytestmark = pytest.mark.dashboard
 
@@ -35,6 +35,9 @@ def test_a_retired_grade_is_under_earlier_exams_and_not_on_the_judged_card(live,
     judge.write_text(json.dumps(j), encoding="utf-8")
     try:
         page.goto(live["base"] + "/#model=fx%2Fgood-750m")
+        # 12b.2: in the exam block, under More detail
+        open_kind(page, "exam")
+        page.locator("[data-more-detail='judged'] > summary").click()
         earlier = page.locator("[data-earlier]")
         earlier.wait_for()
         assert "Earlier exams (retired question sets)" in earlier.text_content()
@@ -46,8 +49,8 @@ def test_a_retired_grade_is_under_earlier_exams_and_not_on_the_judged_card(live,
         assert re.fullmatch(r"\d{4}-\d\d-\d\d", cells[3]), cells
         # the current Law is not on the judged card: this model has not sat it
         assert page.locator("tr[data-topic='Law']").count() == 0
-        # the model page's sub-nav reaches it
-        assert page.locator("[data-model-nav] a[href='#sec-earlier']").count() == 1
+        # it is inside the exam's block, where the sub-nav used to point
+        assert page.locator("[data-kind-block='exam'] [data-earlier]").count() == 1
         assert page.errors == []
     finally:
         judge.write_bytes(kept)

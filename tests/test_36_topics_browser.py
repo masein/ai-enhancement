@@ -8,7 +8,7 @@ import socket
 
 import pytest
 
-from conftest import go_tab, open_filters
+from conftest import go_tab, model_tab, open_filters
 
 pytestmark = pytest.mark.dashboard
 
@@ -80,6 +80,7 @@ def test_the_model_page_picks_a_judged_topic_from_a_searchable_list(live, page):
     the by-criterion block and its picker away; the answers' picker is the
     same component, and the one left on the model page."""
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
+    model_tab(page, "answers")                          # 12b.2: the Answers tab
     box = page.locator("[data-combobox='answers topic']")
     box.wait_for()
     box.click()

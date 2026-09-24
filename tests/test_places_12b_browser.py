@@ -56,7 +56,7 @@ def name_menu(page, item):
 
 def reach_all_runs(page):
     page.locator("#runs [data-runs]").click()
-    page.locator("[data-all-runs-link]").click()
+    page.locator("#pop-runs [data-all-runs-link]").click()
 
 
 def reach_test(page):
@@ -87,9 +87,19 @@ def reach_lm(page):
     page.locator("[data-chip='lm']").click()
 
 
+def reach_model_tab(tab):
+    """a Models row opens the model page (12b.1); its tabs are 12b.2's"""
+    def go(page):
+        place(page, "models")
+        page.locator(f"tr[data-lb-row='{MODEL}'] td.num").first.click()
+        page.locator(f"[data-model-tabs] [data-mtab='{tab}']").click()
+    return go
+
+
 CONTRACT = [
     # (the row today, how it is reached now, what shows it arrived)
-    ("Overview", lambda p: place(p, "home"), "[data-highlights]"),
+    ("Overview", lambda p: place(p, "home"),
+     "[data-needs-you] ~ [data-running-now] ~ [data-best-by-kind]"),
     ("Leaderboard", lambda p: place(p, "models"), "[data-lb-table]"),
     ("Leaderboard ▸ Insights", lambda p: place(p, "models"), "[data-lb-card] ~ [data-insights]"),
     ("Leaderboard ▸ About these benchmarks", lambda p: place(p, "benchmarks", "standard"),
@@ -103,8 +113,8 @@ CONTRACT = [
     ("Topic pages", reach_topic, "[data-topic-back]"),
     ("More ▸ Tasks", lambda p: place(p, "benchmarks", "standard"), ".panels"),
     ("More ▸ Perplexity & Loss", reach_lm, "[data-chip='lm'][aria-pressed='true']"),
-    ("More ▸ Provenance ▸ Run provenance", lambda p: name_menu(p, "data"),
-     "#view h2:text-is('Run provenance')"),
+    ("More ▸ Provenance ▸ Run provenance", reach_model_tab("history"),
+     f"[data-model-prov='{MODEL}']"),
     ("More ▸ Provenance ▸ Query, Export", lambda p: name_menu(p, "data"),
      "#view h2:text-is('Query every metric')"),
     ("Queue", reach_all_runs, "[data-all-runs]"),
@@ -114,6 +124,11 @@ CONTRACT = [
     ("Theme ▾", reach_theme, "#pop-who [data-theme='dark']"),
     ("guide, the loop, How to read", lambda p: name_menu(p, "help"),
      "[data-help-guide], [data-how-to-read]"),
+    ("Model page: 01 Judged · 02 Results · 03 Diagnose", reach_model_tab("scores"),
+     "[data-kind-block='standard'], [data-kind-block='exam']"),
+    ("Model page: 04 Provenance · 05 Runs", reach_model_tab("history"),
+     "[data-model-prov] ~ [data-model-graded]"),
+    ("Overview ▸ Judge steadiness", reach_status, "#warnings .checklist [data-judge-steady]"),
 ]
 
 
@@ -141,7 +156,7 @@ def test_the_topic_back_link_reads_knowledge_exam(live, page):
 # ---------------------------------------------------------------------------
 
 OLD = [
-    ("#tab=overview", "#tab=home", "[data-highlights]"),
+    ("#tab=overview", "#tab=home", "[data-needs-you]"),
     ("#tab=leaderboard", "#tab=models", "[data-models-view='standard'][aria-selected='true']"),
     ("#tab=models", "#tab=models", "[data-models-view='standard'][aria-selected='true']"),
     ("#tab=leaderboard&chip=math", "#tab=models&chip=math", "[data-chip='math'][aria-pressed='true']"),
@@ -268,7 +283,7 @@ def test_the_run_counter_lists_runs_and_leads_to_all_runs(live, page):
         assert page.locator("#runs .dot.pulse").count() == 1
         page.locator("#runs [data-runs]").click()
         shot(page, "12b-run-counter-1512-light.png")
-        page.locator("[data-all-runs-link]").click()
+        page.locator("#pop-runs [data-all-runs-link]").click()
         page.wait_for_selector(f"[data-all-runs] tr[data-queue-row='{sid}']")
         assert page.evaluate("location.hash") == "#tab=runs"
     finally:

@@ -206,7 +206,7 @@ def test_screenshots_for_the_pr(live, page):
     base = live["base"]
     where = [("overview", "/#tab=overview", "#view .card"),
              ("leaderboard", "/#tab=leaderboard", "table[data-lb-table] tbody tr"),
-             ("model", "/#model=fx%2Fgood-750m", ".card h2:has-text('Judged free response')")]
+             ("model", "/#model=fx%2Fgood-750m", "[data-model-hero] [data-kind-tiles]")]
     for theme in ("light", "dark", "dim"):
         for width in (1280, 400):
             page.set_viewport_size({"width": width, "height": 900})

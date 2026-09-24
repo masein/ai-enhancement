@@ -242,6 +242,38 @@ def open_filters(page) -> None:
     page.locator("[data-filter-sheet]").wait_for()
 
 
+def model_tab(page, tab: str) -> None:
+    """The model page is tabs since 12b.2 — Scores · Answers · Improve ·
+    History — remembered per viewer: pick one."""
+    t = page.locator(f"[data-model-tabs] [data-mtab='{tab}']")
+    t.wait_for()
+    if t.get_attribute("aria-selected") != "true":
+        t.click()
+    page.wait_for_selector(f"[data-mtab-panel='{tab}']")
+
+
+def open_kind(page, kind: str) -> None:
+    """A kind of test's block on the model page's Scores tab, open (12b.2):
+    each kind is a folded block there, only the newest open, and a folded
+    block is built when it opens. kind: standard | exam | everyday"""
+    model_tab(page, "scores")
+    blk = page.locator(f"[data-kind-block='{kind}']")
+    blk.wait_for(state="attached")
+    if blk.get_attribute("open") is None:
+        page.locator(f"[data-kind-block='{kind}'] > summary").click()
+    page.wait_for_selector(f"[data-kind-block='{kind}'][open] .kpart", state="attached")
+
+
+def open_diagnose(page) -> None:
+    """Diagnose — benchmark item analysis — under Standard's "What the score
+    can't show" on the model page's Scores tab (12b.2)"""
+    open_kind(page, "standard")
+    fold = page.locator("[data-cant-show]")
+    if fold.get_attribute("open") is None:
+        page.locator("[data-cant-show] > summary").click()
+    page.wait_for_selector("#sec-diagnose")
+
+
 def open_submit(page, base: str, name: str | None = None) -> None:
     """Queue ▸ Submit a model is the Test a model dialog now (12b): the old
     address #tab=submit opens it, over All runs. A name to record is typed

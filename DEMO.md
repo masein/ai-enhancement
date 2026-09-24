@@ -89,7 +89,7 @@ shell works as well as putting them in `.env`.
 
 Useful flags: `--dry-run` prints the plan and calls nothing; `--keep` leaves
 the tree; `--count` sets how many documents; `--no-auto-accept` stops after
-drafting so you can curate on the Exam tab; `--sit stub` skips the GPU.
+drafting so you can curate on Benchmarks ▸ Knowledge exam; `--sit stub` skips the GPU.
 
 ### A human-written bank
 

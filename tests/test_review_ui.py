@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 import pytest
 
-from conftest import all_rows, choose, go_tab, set_name, open_submit
+from conftest import all_rows, choose, go_tab, open_diagnose, open_kind, set_name, open_submit
 
 
 pytestmark = pytest.mark.dashboard
@@ -26,6 +26,7 @@ def model_url(base, mid):
 
 def open_mmlu(pg, base, mid):
     pg.goto(model_url(base, mid))
+    open_diagnose(pg)                     # 12b.2: under Standard, on Scores
     pg.wait_for_selector("details.dx")
     det = pg.locator("details.dx", has=pg.locator(".dxname", has_text=re.compile(r"^mmlu[^_]"))).first
     det.locator("> summary").click()
@@ -35,8 +36,8 @@ def open_mmlu(pg, base, mid):
 def open_topics(pg, base, mid):
     """The Judged card's per-topic table — where the loop's action lives."""
     pg.goto(model_url(base, mid))
-    pg.wait_for_selector(".card h2:has-text('Judged free response')")
-    return pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
+    open_kind(pg, "exam")                  # 12b.2: the exam's block on Scores
+    return pg.locator("#sec-judged")
 
 
 def test_propose_buttons_carry_their_reasons(live, page):
@@ -268,8 +269,11 @@ def test_review_flow_in_the_browser(live, page):
     assert "trained on Economics practice data" in row.locator(".badge.taint").text_content()
     page.goto(model_url(base, "fx/good-750m"))
     page.wait_for_selector(".backlink")
-    head = page.locator("#view .card").first.text_content()
+    # 12b.2: the sentence is the model's, at the top of its Standard block
+    open_kind(page, "standard")
+    head = page.locator("[data-kind-block='standard'] .mprose").text_content()
     assert "derived from Economics diagnostics" in head and "never ranked" in head
+    open_kind(page, "exam")
     # the topic itself is badged on the Judged card and drops out of the judged average
     econ = page.locator("tr[data-topic='Economics']")
     assert "trained on it" in econ.locator(".badge.taint").text_content()
@@ -286,7 +290,7 @@ def test_review_flow_in_the_browser(live, page):
             assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
             # the model page, exam first, with the before/after on the rubric scale
             page.goto(base + "/#model=fx%2Fskewed-360m")
-            page.wait_for_selector(".card h2:has-text('Judged free response')")
+            open_kind(page, "exam")
             page.screenshot(path=SCREENS / f"model-exam-first-{scheme}-{width}.png", full_page=True)
             assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
     assert page.errors == []

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import choice, open_filters, open_submit
+from conftest import choice, model_tab, open_filters, open_submit
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11f"
@@ -304,7 +304,7 @@ def test_every_transition_moves_only_opacity_transform_rows_or_colour(live, page
 def test_a_navigation_plays_the_entrance_and_a_poll_does_not(live, browser):
     ctx, page = new_page(browser, reduced_motion="no-preference")
     page.goto(live["base"] + "/#tab=overview")
-    page.wait_for_selector("[data-highlights]")
+    page.wait_for_selector("[data-needs-you]")
     page.evaluate(RECORD)
     page.locator("#tabs [data-tab='models']").click()
     page.wait_for_selector(f"{LB} tbody tr")
@@ -502,6 +502,7 @@ TOPIC_BOX, TOPIC_POP = "[data-combobox='answers topic']", "#pop-cb-answers-topic
 def test_the_topic_combobox_narrows_as_you_type_and_is_grouped_by_area(live, page):
     page.set_viewport_size({"width": 1280, "height": 900})
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
+    model_tab(page, "answers")                          # 12b.2: the Answers tab
     box = page.locator(TOPIC_BOX)
     box.wait_for()
     box.click()
@@ -532,6 +533,7 @@ def test_the_topic_combobox_narrows_as_you_type_and_is_grouped_by_area(live, pag
 
 def test_a_chosen_value_survives_a_poll_while_the_list_is_open(live, page):
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
+    model_tab(page, "answers")
     box = page.locator(TOPIC_BOX)
     box.wait_for()
     box.click()

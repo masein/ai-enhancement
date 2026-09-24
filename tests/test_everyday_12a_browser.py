@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import open_kind
+
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12a"
 FOUR = ["below-135m-it", "chance-160m", "good-750m", "skewed-360m"]    # by name, not by score
@@ -159,15 +161,19 @@ def open_model(page, base, mid):
     page.wait_for_selector("[data-model-hero]")
 
 
-def test_the_model_page_has_its_everyday_block_above_the_exam(live, page):
+def test_the_model_page_has_its_everyday_block_after_the_exam(live, page):
+    """12a put the pilot above the exam; 12b.2 names the kinds in one order
+    everywhere — Standard, Knowledge exam, Everyday tasks — and the badge is
+    said once, on the header's tile."""
     page.set_viewport_size({"width": 1400, "height": 1000})
     open_model(page, live["base"], "fx/good-750m")
+    kinds = [b.get_attribute("data-kind-block") for b in page.locator("[data-kind-block]").all()]
+    assert kinds.index("exam") < kinds.index("everyday")
+    open_kind(page, "everyday")
     block = page.locator("[data-everyday-block='fx/good-750m']")
     block.wait_for()
-    judged = page.locator("#sec-judged")
-    assert block.bounding_box()["y"] < judged.bounding_box()["y"]
-    assert block.locator("[data-pilot-badge]").count() == 1
-    assert page.locator("[data-pilot-badge]").count() == 1
+    assert page.locator("[data-pilot-badge]:visible").count() == 1
+    assert page.locator("[data-kind-tile='everyday'] [data-pilot-badge]").is_visible()
     assert block.locator("[data-everyday-count]").text_content() == "5 of 5"
     rows = block.locator("[data-evd-row]")
     assert [r.locator(".evgroup").text_content() for r in rows.all()] == \
@@ -201,11 +207,11 @@ def test_a_model_that_has_not_sat_the_pilot_shows_one_line_and_test_queues_it(li
     page.set_viewport_size({"width": 1400, "height": 1000})
     cancel_pilot_rows(live["base"])
     open_model(page, live["base"], UNTESTED)
+    # 12b.2: the one line is the Everyday tile's, in the header
     line = page.locator(f"[data-everyday-none='{UNTESTED}']")
     line.wait_for()
-    assert " ".join(line.text_content().split()) == "Not tested on everyday tasks · Test"
-    assert page.locator("[data-everyday-block]").count() == 0
-    assert page.locator("[data-model-nav] a[data-nav='everyday']").count() == 0
+    assert " ".join(line.inner_text().split()) == "EVERYDAY TASKS Not tested · Test"
+    assert page.locator("[data-everyday-block], [data-kind-block='everyday']").count() == 0
     line.scroll_into_view_if_needed()
     shot(page, "12a-4-not-tested-1400-light.png")
     try:
@@ -295,6 +301,7 @@ def test_the_pilot_is_on_no_leaderboard(live, page):
     assert "everyday" not in page.evaluate("JSON.stringify([DATA.models, DATA.accTasks, "
                                            "DATA.pplTasks, DATA.cells, DATA.required])")
     open_model(page, live["base"], "fx/good-750m")
+    open_kind(page, "standard")
     assert "everyday" not in page.locator("#sec-results").text_content().lower()
     assert page.errors == []
 

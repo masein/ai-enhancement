@@ -18,7 +18,7 @@ import time
 
 import pytest
 
-from conftest import choose, go_tab, make_service, open_filters, open_submit, set_name
+from conftest import choose, go_tab, make_service, open_filters, open_kind, open_submit, set_name
 from test_page_recovery import Live
 
 MODEL = "fx/good-750m"
@@ -429,7 +429,8 @@ def test_the_model_page_leads_with_numbers(live, page):
     app._cache.update(key=None, payload=None, at=0.0)
     try:
         page.goto(base + "/#model=" + MODEL.replace("/", "%2F"))
-        card = page.locator(".card", has=page.locator("h2", has_text="Judged free response"))
+        open_kind(page, "exam")                        # 12b.2: its block on Scores
+        card = page.locator("#sec-judged")
         card.wait_for()
         line = card.locator("[data-caveats]")
         assert line.count() == 1
@@ -443,7 +444,8 @@ def test_the_model_page_leads_with_numbers(live, page):
         assert card.locator("[data-topic-switch], [data-criteria-table]").count() == 0
         # no "Training compute: Unknown" — the hero's cards (11d) say it only when known
         assert "Training compute" not in page.locator("[data-model-hero]").text_content()
-        # last evaluated counts the judged run
+        # last evaluated counts the judged run — the model's sentence, on Standard
+        open_kind(page, "standard")
         assert "Last evaluated 2026-09-21" in page.locator("#view").text_content()
         assert page.errors == []
     finally:

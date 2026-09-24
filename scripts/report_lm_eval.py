@@ -1994,23 +1994,11 @@ html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *
   button.who .t-full { display:none; }
   button.who .t-short { display:inline; }
 }
-/* the hero, on Overview only */
-.pagehero { margin:18px 0 0; display:grid; grid-template-columns:minmax(0, 1fr) auto;
-  grid-template-areas:"eb acts" "sub acts" "chips acts"; column-gap:24px; align-items:center; }
-.pagehero > #heroEyebrow { grid-area:eb; margin:0; }
-.pagehero > #pageSub { grid-area:sub; margin:4px 0 0; white-space:nowrap; overflow:hidden;
-  text-overflow:ellipsis; }
-.pagehero > h1 { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0);
-  white-space:nowrap; }
-.hero-acts { grid-area:acts; display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
-.hero-acts:empty { display:none; }
-.pagehero[hidden] { display:none; }
-.meta-chips { grid-area:chips; display:flex; gap:14px; flex-wrap:wrap; margin-top:6px; }
+/* 12b: a static report's date and a smoke run's warning, above the view */
+.meta-chips { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; }
+.meta-chips:empty { display:none; }
 .meta-chips a.chip { border:0; background:none; padding:0; font-size:var(--fs-2); color:var(--accent); }
 .meta-chips a.chip:hover { text-decoration:underline; }
-@media (max-width:720px) { .pagehero { grid-template-columns:minmax(0, 1fr);
-  grid-template-areas:"eb" "sub" "chips" "acts"; }
-  .pagehero > #pageSub { white-space:normal; } .hero-acts { justify-content:flex-start; margin-top:10px; } }
 /* back to top: a mono pill, after two screens of scrolling */
 .totop { position:fixed; right:18px; bottom:18px; z-index:45; font-family:var(--font-sans);
   font-size:var(--fs-1); border-radius:999px; padding:6px 13px; background:var(--surface-1);
@@ -2079,11 +2067,6 @@ tbody tr.open { background:var(--accent-soft); }
 .planbox .plan { margin:0; color:var(--text-primary); }
 .planbox label.spread { display:inline-flex; align-items:center; gap:6px; }
 /* ---- 11d: Overview ------------------------------------------------------- */
-.statline { font-size:var(--fs-2); color:var(--muted); margin:6px 0 2px; font-family:var(--font-sans); }
-/* 11e: the hero's "Submit a model" and the stats line under it: 12px */
-.pagehero:not([hidden]) + #view > .statline[data-statline] { margin-top:12px; }
-.pagehero:not([hidden]) { margin-bottom:0; }
-#view > .statline:first-child { margin-top:-2px; }
 .hlgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:14px;
   margin-top:10px; }
 .hcard { border:1px solid var(--border); border-radius:var(--r-2); padding:14px 16px;
@@ -2094,31 +2077,66 @@ tbody tr.open { background:var(--accent-soft); }
 .hcard-v { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .hcard-name { font-size:var(--fs-2); font-weight:600; color:var(--text-primary);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-.hcard-verdict { margin:0; font-size:var(--fs-2); color:var(--muted); }
 .hcard-link { margin-top:auto; padding-top:4px; font-size:var(--fs-2); font-family:var(--font-sans);
   color:var(--accent); text-decoration:none; }
 .hcard-link:hover, .hcard-link:focus-visible { text-decoration:underline; }
 .hlgrid { align-items:stretch; }
-table.mini-lb td.model { position:static; box-shadow:inset 3px 0 0 var(--fam, var(--axis));
-  padding-left:12px; background:none; }
-/* 11h: Top models — the hover is the whole row */
-table.mini-lb tbody tr:hover > td { background-color:var(--accent-soft); }
-table.mini-lb tbody tr:hover > td[data-lead] { background-image:linear-gradient(var(--accent-soft),
-  var(--accent-soft)); }
 /* ---- 11d: the model page -------------------------------------------------- */
+/* 12b: the header — name, facts, Test this model; a tile per kind of test */
+.mtop { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.mtop-l { min-width:0; }
+.mfacts { margin:4px 0 0; font-size:var(--fs-2); color:var(--muted); }
+.ktiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;
+  margin-top:var(--sp-4); }
+.ktile { display:flex; flex-direction:column; align-items:flex-start; gap:4px; text-align:left;
+  border:1px solid var(--border); border-radius:var(--r-2); padding:12px 14px;
+  background:var(--surface-1); color:var(--text-primary); font:inherit; min-width:0; }
+button.ktile { cursor:pointer; }
+button.ktile:hover { border-color:var(--axis); background:var(--accent-soft); }
+.ktile-k { margin:0; }
+/* the hcard's number: sans, tabular, one line (11h) */
+.ktile-v { font-family:var(--font-sans); font-size:var(--fs-5); font-weight:700;
+  font-variant-numeric:tabular-nums; line-height:1.1; }
+.ktile-sub { font-size:var(--fs-1); color:var(--muted); display:flex; gap:6px; align-items:center;
+  flex-wrap:wrap; }
+.ktile.none { background:var(--plane); }
+.ktile-none { font-size:var(--fs-2); color:var(--muted); }
+button.ktest { padding:0 4px; min-height:0; font-size:var(--fs-2); }
+/* the tabs: Scores · Answers · Improve · History */
+.mtabs { display:flex; gap:4px; margin:var(--sp-4) 0 0; border-bottom:1px solid var(--border);
+  overflow-x:auto; }
+.mtab { background:none; border:0; border-bottom:2px solid transparent; border-radius:0;
+  padding:8px 12px; font:inherit; font-size:var(--fs-2); color:var(--text-secondary); cursor:pointer;
+  white-space:nowrap; }
+.mtab:hover { color:var(--text-primary); }
+.mtab[aria-selected="true"] { color:var(--text-primary); border-bottom-color:var(--accent); font-weight:600; }
+/* a kind's block on Scores: its name and number, the rest behind the fold */
+details.kblock > summary { display:flex; align-items:baseline; gap:12px; cursor:pointer;
+  list-style:none; }
+details.kblock > summary::-webkit-details-marker { display:none; }
+details.kblock > summary::before { content:'▸'; color:var(--muted); }
+details.kblock[open] > summary::before { content:'▾'; }
+.kblock-k { font-size:var(--fs-4); font-weight:700; }
+.kblock-v { font-family:var(--font-sans); font-size:var(--fs-3); font-weight:600;
+  font-variant-numeric:tabular-nums; color:var(--text-secondary); }
+.kpart { margin-top:var(--sp-5); }
+.kpart > h2 { font-size:var(--fs-3); }
+details.kfold { margin-top:var(--sp-4); }
+details.kfold > summary { cursor:pointer; color:var(--accent); font-size:var(--fs-2);
+  list-style:none; }
+details.kfold > summary::-webkit-details-marker { display:none; }
+/* the pilot's block says its name and count once, in the summary; its badge
+   is the tile's, in the header (a caveat once per page) */
+.kblock .evhead > h2, .kblock .evhead .evcount { display:none; }
+.kacts { margin-top:var(--sp-3); }
+.evrow-static { cursor:default; }
+/* Home: Needs you */
+ul.needs { margin:8px 0 0; padding-left:18px; display:flex; flex-direction:column; gap:6px; }
+ul.needs a { font-size:var(--fs-2); }
 .mhero .mhead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-top:4px; }
 .mhero h1.mtitle { font-size:var(--fs-5); font-weight:800; letter-spacing:-0.025em; margin:0; }
 .mhero .eyebrow { margin:0; }
 .mprose { color:var(--muted); font-size:var(--fs-2); max-width:72ch; margin:14px 0 0; }
-nav.modelnav { position:sticky; top:var(--bar-h); z-index:6; display:flex; gap:6px; flex-wrap:wrap;
-  padding:8px 0; margin:var(--sp-4) 0 0; background:var(--plane); }
-.navchip { font-family:var(--font-sans); font-size:var(--fs-1); text-decoration:none;
-  border:1px solid var(--border); border-radius:999px; padding:3px 11px; color:var(--text-secondary);
-  background:var(--surface-1); }
-.navchip::before { content:attr(data-ix); color:var(--accent); margin-right:6px; font-weight:600;
-  font-family:var(--font-mono); }
-.navchip[aria-current="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
-.navchip[aria-current="true"]::before { color:#fff; }
 [id^="sec-"] { scroll-margin-top:calc(var(--bar-h) + 52px); }
 tr.arearow td { background:var(--plane); height:auto; padding-top:8px; padding-bottom:6px; }
 table[data-judged-topics] td.num { white-space:nowrap; }
@@ -2540,11 +2558,8 @@ h2[data-ix]::before { content:attr(data-ix); font-family:var(--font-mono);
 .propwhy { flex-basis:100%; font-size:var(--fs-1); color:var(--muted); margin:0 0 4px 20px; }
 /* 11i: sit the exam from the model page — one grouped picker, and the
    Suite cell that stays one line */
-.mcards { display:flex; gap:14px; align-items:stretch; }
-.mcards > .hlgrid { flex:1; min-width:0; }
 .msit-cta { display:flex; flex-direction:column; justify-content:center; align-items:flex-start;
   gap:6px; flex:0 0 auto; }
-@media (max-width: 900px) { .mcards { flex-direction:column; } }
 .msit-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .msit-head h2 { margin:0; }
 .expick { margin-top:var(--sp-3); }
@@ -2848,7 +2863,6 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .evthink[open] > summary { color:var(--text-primary); }
 .evthink-t { margin-top:6px; padding:8px 12px; white-space:pre-wrap; overflow-wrap:anywhere;
   color:var(--text-secondary); background:var(--plane); border-radius:var(--r-1); }
-.evnone-line { margin:0; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
 .evtable { border-collapse:collapse; width:100%; }
 .evtable th, .evtable td { border-bottom:1px solid var(--border); padding:8px 10px;
   vertical-align:top; }
@@ -3185,7 +3199,6 @@ const state = {
   sort: { key: 'avg', dir: -1 },
   runsQ: '',                           // the Evals tab query string
   runsSort: { idx: 0, dir: 1 },        // column sort for the metric query table
-  provSort: { key: 'date', dir: -1 },  // run-provenance table: newest eval first
   ceSort: { key: 'task', dir: 1 },     // cross-entropy table
   queue: [], qmsg: '',
   qQ: '', qStatus: 'all', qSort: { key: 'id', dir: -1 },   // queue filter/sort
@@ -3208,6 +3221,8 @@ const state = {
         spread: {}, count: {}, fmt: {}, rejecting: {}, landed: null,
         detailsOpen: {}, specOpen: {}, landedDs: null },                    // Review tab
   ex: { status: null, candidates: [], loaded: false, msg: '', topic: '' },   // Exam tab
+  // 12b: the model page — its tab, which kind blocks are open, the Answers kind
+  mtab: null, mblk: {}, mans: null, mansGroup: '',
   topic: null,                         // open topic page, by slug (hash-routed)
   loop: { rows: null, blocked: '', msg: '', loaded: false, q: '' },          // Loop tab
   judgeHealth: null,                   // {ok, url, why}: is the grading model answering
@@ -4518,7 +4533,7 @@ function vEarlier(m) {
         el('td', { class: 'se', text: (e.judge_id || '—') + (e.provisional ? ' · provisional' : '') })))))));
 }
 
-function vJudged(m) {
+function vJudged(m, more = []) {
   const J = DATA.judged;
   if (!J || !J.tasks.length) return null;
   const cal = J.calibration;
@@ -4537,11 +4552,12 @@ function vJudged(m) {
       el('summary', { text: 'How this works ▸' }),
       el('p', { class: 'small', text: (prov ? 'The judge is a local model whose id cannot be '
         + 'pinned. ' : 'The judge is an API model pinned to a dated id. ')
-        + 'It grades single answers, never pairs. Length is in the rubric and reported below. '
-        + 'Thirty fixed scripts are graded again every run, so a change to the judge would show.' })),
-    // 11g: the judge runs and the judge file behind these numbers, in the reader
-    LIVE && m.judge ? el('p', { class: 'small', 'data-how-graded': m.id },
-      readLink({ kind: 'provenance', id: 'judge:' + m.id }, 'How this was graded ▸')) : '');
+        + 'It grades single answers, never pairs. Length is in the rubric and reported under '
+        + 'More detail. Thirty fixed scripts are graded again every run, so a change to the '
+        + 'judge would show. The judge’s runs and file are in History.' })));
+  // 12b: score against answer length and the earlier exams, folded
+  const detail = el('details', { class: 'kfold', 'data-more-detail': 'judged' },
+    el('summary', { text: 'More detail ▸' }));
   // up to five paragraphs of caveats stood above the first number; now one
   // line of badges, and the words behind "why?"
   const caveats = [], why = el('div', { class: 'caveat-text' });
@@ -4696,8 +4712,8 @@ function vJudged(m) {
       const drift = withLen.map(t => { const b = j.tasks[t].score_vs_length || [];
         return b.length > 1 ? b[b.length - 1].mean - b[0].mean : 0; });
       const worst = Math.max(...drift);
-      card.append(el('div', { class: 'dxh', text: 'Score against answer length' }));
-      card.append(el('p', { class: 'small', text: worst >= 1
+      detail.append(el('div', { class: 'dxh', text: 'Score against answer length' }));
+      detail.append(el('p', { class: 'small', text: worst >= 1
         ? `Longer answers score up to ${num(worst, 1)} points higher in at least one category — `
           + 'length may be driving the judge. Check the rubric\'s length clause before believing '
           + 'the category scores.'
@@ -4721,7 +4737,7 @@ function vJudged(m) {
         el('tbody', {}, withLen.map(t => { const bs = j.tasks[t].score_vs_length || [];
           return el('tr', { 'data-length-row': frName(t) }, el('td', { text: frName(t) }),
             LEN.map(([k]) => cellOf(bs.find(b => b.bucket === k)))); }))));
-      card.append(withLen.length > 10
+      detail.append(withLen.length > 10
         ? el('details', { class: 'lenfold', 'data-length-fold': '1' },
             el('summary', { text: `Show the table (${withLen.length} topics)` }), table)
         : table);
@@ -4729,12 +4745,7 @@ function vJudged(m) {
     // 11m: the per-topic block — by criterion, its flags and its by-field
     // tables, under one topic picker — is gone from the model page, at
     // masein's request. Each answer card keeps its own criteria strip.
-    // the answers themselves, for whichever topic is picked — the same panel
-    // the topic page shows, because "see the answers" is the step between a
-    // score and knowing what to do about it
-    // a topic with no score keeps its answers readable — that is how a
-    // person checks what the model did write (11l)
-    if (LIVE) card.append(modelAnswers(m, [...cats, ...voids]));
+    // 12b: the answers themselves are the model page's Answers tab
   }
   // the control
   const ctl = j.tasks[J.control];
@@ -4758,15 +4769,23 @@ function vJudged(m) {
       + `${j.correct_at} or more.` + (s.tot.unjoined ? ` ${s.tot.unjoined} items had no MMLU run to `
       + 'join to.' : '') }));
   }
-  card.append(el('p', { class: 'small', style: 'margin-top:12px' },
-    `Judge ${j.judge.id} (${j.judge.provider})`
-    + (j.judge.batch_id ? ` · batch ${String(j.judge.batch_id).slice(0, 18)}` : '')
-    + (j.judge.weights_sha256 ? ` · weights ${String(j.judge.weights_sha256).slice(0, 12)}` : '')
-    + ` · prompt v${j.judge.prompt_version} ${String(j.judge.prompt_sha256 || '').slice(0, 12)} · rubrics `
-    + [...new Set(Object.values(j.judge.rubrics || {}).map(r => rubricVersion(r.version)))]
-        .join(', ')
-    + (st.current ? '' : ` · not the judge this server runs now${J.current ? ` (${J.current.id})` : ''}`)));
+  // 12b: the judge's ids are History's (How it was graded)
+  for (const x of more) if (x) { x.classList.remove('card'); detail.append(x); }
+  if (detail.children.length > 1) card.append(detail);
   return card;
+}
+// the judge behind a model's exam scores, ids and all — History's, not Scores'
+function judgeIdLine(m) {
+  const J = DATA.judged || {}, j = m.judge || {}, jj = j.judge || {};
+  const st = m.judgeState || {};
+  return `Judge ${jj.id} (${jj.provider})`
+    + (jj.batch_id ? ` · batch ${String(jj.batch_id).slice(0, 18)}` : '')
+    + (jj.weights_sha256 ? ` · weights ${String(jj.weights_sha256).slice(0, 12)}` : '')
+    + ` · prompt v${jj.prompt_version} ${String(jj.prompt_sha256 || '').slice(0, 12)} · rubrics `
+    + [...new Set(Object.values(jj.rubrics || {}).map(r => rubricVersion(r.version)))]
+        .join(', ')
+    + (st.current ? '' : ' · not the judge this server runs now'
+      + (J.current && J.current.id ? ` (${J.current.id})` : ''));
 }
 
 // ---------- close the loop: what did the training teach? ----------
@@ -4870,55 +4889,217 @@ function vTaint(m) {
 function vModel() {
   const m = DATA.models.find(x => x.id === state.model);
   if (!m) return [note('No such model.')];
-  const a = m.archinfo || {}, r = rankOf(m), avg = officialAvg(m), comp = computeOf(m);
   const back = el('a', { class: 'backlink', href: '#' + viewHash(state.tab), onclick: backTo(state.tab),
     text: '← Back to ' + (TABS.find(([id]) => id === state.tab) || [, 'the board'])[1] });
+  // 12b: a header — the name, one line of facts, Test this model, and one
+  // tile per kind of test — then four tabs, remembered per viewer. Improve
+  // is a tab only when the Review lists hold something of this model's
+  rvNeeded();
+  const kinds = modelKinds(m);
+  const tabs = modelTabs(m);
+  const cur = modelTab(tabs.map(([id]) => id));
+  const strip = el('div', { class: 'mtabs', role: 'tablist', 'aria-label': 'this model',
+      'data-model-tabs': '1',
+      onkeydown: e => {
+        const ids = tabs.map(([id]) => id), k = ids.indexOf(cur);
+        const to = e.key === 'ArrowRight' ? ids[(k + 1) % ids.length]
+          : e.key === 'ArrowLeft' ? ids[(k - 1 + ids.length) % ids.length]
+          : e.key === 'Home' ? ids[0] : e.key === 'End' ? ids[ids.length - 1] : null;
+        if (!to) return;
+        e.preventDefault();
+        state.after = { focus: `[data-mtab="${to}"]` };
+        setModelTab(to);
+      } },
+    tabs.map(([id, label]) => el('button', { role: 'tab', class: 'mtab', 'data-mtab': id,
+      id: 'mtab-' + id, 'aria-selected': String(id === cur), 'aria-controls': 'mpanel',
+      tabindex: id === cur ? '0' : '-1', text: label, onclick: () => setModelTab(id) })));
+  const body = cur === 'answers' ? modelAnswersTab(m, kinds)
+    : cur === 'improve' ? modelImproveTab(m)
+    : cur === 'history' ? modelHistoryTab(m)
+    : modelScoresTab(m, kinds);
+  return [back, modelHead(m, kinds), modelSitPanel(m), strip,
+    el('div', { id: 'mpanel', role: 'tabpanel', 'aria-labelledby': 'mtab-' + cur,
+      'data-mtab-panel': cur }, body)].filter(Boolean);
+}
 
-  // 11d: the hero — an eyebrow, the name, the id, three highlight cards, and
-  // the prose underneath for anyone who wants it in words
+// the kinds of test, named the same and in the same order everywhere (12b).
+// A kind the board has no test for is not shown at all; one this model has
+// not taken is a tile that says so, with the button that fills it
+function modelKinds(m) {
+  const J = DATA.judged || {}, E = evd(), e = evdOf(m.id);
+  const jt = Object.entries((m.judge || {}).tasks || {}).filter(([t]) => t.startsWith('exam_'));
+  const ran = m.date ? Date.parse(String(m.date)) / 1000 : 0;
+  return [
+    { kind: 'standard', label: 'Standard',
+      taken: [...DATA.accTasks, ...DATA.pplTasks].some(t => cell(t, m.id)), at: ran || 0 },
+    (J.exam || []).length ? { kind: 'exam', label: 'Knowledge exam',
+      taken: jt.length > 0 || ((m.judge || {}).history || []).length > 0,
+      at: Math.max(0, ...jt.map(([, v]) => v.judged_at || 0)) } : null,
+    (E.questions || []).length ? { kind: 'everyday', label: 'Everyday tasks', taken: !!e,
+      at: e ? e.marked_at || 0 : 0 } : null,
+  ].filter(Boolean);
+}
+// a kind's one number, and the line under it
+function kindValue(m, kind) {
+  if (kind === 'standard') {
+    const avg = officialAvg(m), r = rankOf(m);
+    return avg != null
+      ? [(100 * avg).toFixed(1), `${state.avgMode === 'raw' ? 'raw' : 'above chance'} · `
+        + `${m.nhave} of ${m.nreq} tasks` + (r ? ` · #${r.n} of ${r.of}` : '')]
+      : ['—', `preliminary · ${m.nhave} of ${m.nreq} tasks`];
+  }
+  if (kind === 'exam') {
+    const J = DATA.judged || {};
+    const n = Object.entries((m.judge || {}).tasks || {})
+      .filter(([t, v]) => (J.exam || []).includes(t) && pubScore(v) != null).length;
+    return [m.judgedAvg != null ? num(m.judgedAvg, 2) : '—',
+      `out of 4 · ${n} of ${(J.exam || []).length} topics` + (judgedOkM(m) ? '' : ' · not ranked')];
+  }
+  const e = evdOf(m.id);
+  return [e ? evdCount(e) : '—', ''];
+}
+// "15.3 points behind good-750m-tuned-test — a real gap"
+function avgVerdictOf(m) {
+  const avg = officialAvg(m);
+  if (avg == null) return `Preliminary — ${m.nhave} of ${m.nreq} required tasks, so no `
+    + 'average and no rank.';
   const ranked = DATA.models.filter(x => officialAvg(x) != null && !x.duplicateOf)
     .sort((x, y) => officialAvg(y) - officialAvg(x));
-  let avgVerdict;
-  if (avg == null) avgVerdict = `Preliminary — ${m.nhave} of ${m.nreq} required tasks, so no `
-    + 'average and no rank.';
-  else {
-    const i = ranked.findIndex(x => x.id === m.id);
-    const other = i > 0 ? ranked[i - 1] : ranked[1];
-    if (!other) avgVerdict = 'The only ranked model on the board.';
-    else {
-      const d = avg - officialAvg(other), sa = officialSe(m), sb = officialSe(other);
-      const words = i > 0 ? `${(100 * -d).toFixed(1)} points behind ${other.name}`
-                          : `Leads ${other.name} by ${(100 * d).toFixed(1)} points`;
-      avgVerdict = `${words[0].toUpperCase()}${words.slice(1)} — ` + (sa == null || sb == null
-        ? 'no standard error to test it.'
-        : Math.abs(d) / Math.sqrt(sa * sa + sb * sb || 1e-12) > 1.96 ? 'a real gap.' : 'within noise.');
-    }
-  }
-  const eyebrow = ['model', m.source === 'artifact' ? 'checkpoint' : m.kind,
-    r ? `#${r.n} of ${r.of}` : 'preliminary'].join(' · ');
-  const head = el('div', { class: 'card mhero', 'data-model-hero': '1' },
-    el('p', { class: 'eyebrow', 'data-model-eyebrow': '1', text: eyebrow }),
-    el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
-      warnBadge(m) || '', dupBadge(m) || ''),
-    el('p', { class: 'sub mono mid', 'data-model-id': m.id, text: m.id }),
-    el('div', { class: 'mcards' }, el('div', { class: 'hlgrid' },
-      hlCard('params', 'Parameters', m.params ? P(m.params) : 'Unknown',
-        (a.active_params ? `${P(a.active_params)} active · ${a.experts} experts, `
-          + `${a.experts_per_tok} per token (${a.active_src}).`
-          : m.paramsSrc ? `From the ${m.paramsSrc === 'config' ? 'harness config' : 'model name'}.`
-          : 'Not in the config or the name.')
-        // the compute estimate, when it is known — not a card of its own
-        + (comp ? ` Training compute ${flop(comp.c)} FLOP (6ND, run ${comp.run.name}).` : '')),
-      hlCard('avg', state.avgMode === 'raw' ? 'Average · raw' : 'Average above chance',
-        avg != null ? `${(100 * avg).toFixed(1)}` + (officialSe(m) != null
-          ? ` ±${(100 * officialSe(m)).toFixed(1)}` : '') : '—', avgVerdict),
-      hlCard('tasks', 'Tasks', `${m.nhave}/${m.nreq}`,
-        (m.missing || []).length ? `Missing ${m.missing.join(', ')}.`
-          : 'All required tasks' + (m.date ? `, evaluated ${String(m.date).slice(0, 10)}.` : '.'))),
-      sitCta(m)),
-    el('p', { class: 'mprose', text: modelSentence(m) }));
+  const i = ranked.findIndex(x => x.id === m.id);
+  const other = i > 0 ? ranked[i - 1] : ranked[1];
+  if (!other) return 'The only ranked model on the board.';
+  const d = avg - officialAvg(other), sa = officialSe(m), sb = officialSe(other);
+  const words = i > 0 ? `${(100 * -d).toFixed(1)} points behind ${other.name}`
+                      : `Leads ${other.name} by ${(100 * d).toFixed(1)} points`;
+  return `${words[0].toUpperCase()}${words.slice(1)} — ` + (sa == null || sb == null
+    ? 'no standard error to test it.'
+    : Math.abs(d) / Math.sqrt(sa * sa + sb * sb || 1e-12) > 1.96 ? 'a real gap.' : 'within noise.');
+}
 
-  // results, grouped by domain the way the task panels are
+function modelHead(m, kinds) {
+  const facts = [m.params ? P(m.params) : null, m.source === 'artifact' ? 'checkpoint' : m.kind,
+    famOf(m)].filter(Boolean).join(' · ');
+  return el('div', { class: 'card mhero', 'data-model-hero': '1' },
+    el('div', { class: 'mtop' },
+      el('div', { class: 'mtop-l' },
+        el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
+          warnBadge(m) || '', dupBadge(m) || ''),
+        el('p', { class: 'mfacts', 'data-model-facts': '1', text: facts })),
+      // the page's one main action
+      LIVE ? el('button', { class: 'primary', 'data-test-this': m.id, text: 'Test this model',
+        onclick: () => openTest(m.id) }) : ''),
+    el('div', { class: 'ktiles', 'data-kind-tiles': '1' }, kinds.map(k => kindTile(m, k))));
+}
+function kindTile(m, k) {
+  const attrs = { class: 'ktile' + (k.taken ? '' : ' none'), 'data-kind-tile': k.kind };
+  if (!k.taken) {
+    const msg = k.kind === 'everyday' ? (state.evdMsg || {})[m.id] : '';
+    return el('div', { ...attrs, ...(k.kind === 'everyday' ? { 'data-everyday-none': m.id } : {}) },
+      el('span', { class: 'eyebrow ktile-k', text: k.label }),
+      el('span', { class: 'ktile-none' }, 'Not tested',
+        LIVE ? [el('span', { class: 'se', text: ' · ' }), kindTest(m, k.kind)] : ''),
+      msg ? el('span', { class: 'warn small', 'data-everyday-refused': m.id, text: msg }) : '');
+  }
+  const [v, sub] = kindValue(m, k.kind);
+  return el('button', { ...attrs, title: k.kind === 'standard' ? avgVerdictOf(m) : null,
+      onclick: () => showKind(m, k.kind) },
+    el('span', { class: 'eyebrow ktile-k', text: k.label }),
+    el('span', { class: 'ktile-v', 'data-kind-value': k.kind, text: v }),
+    el('span', { class: 'ktile-sub' }, sub,
+      k.kind === 'everyday' ? evdBadge(evdOf(m.id).provisional) : ''));
+}
+// the button that fills an empty tile: the form for Standard, the exam's own
+// topic picker, and the pilot's one-click queue
+function kindTest(m, kind) {
+  if (kind === 'exam') return el('button', { class: 'quiet ktest', 'data-sit-open': m.id,
+    'aria-expanded': String(state.msit.open && state.msit.model === m.id), text: 'Test',
+    onclick: () => openSit(m.id) });
+  if (kind === 'everyday') return evdTestBtn(m, 'quiet ktest');
+  return el('button', { class: 'quiet ktest', 'data-kind-test': 'standard', text: 'Test',
+    onclick: () => { state.sub.suite = 'full'; openTest(m.id); } });
+}
+// a tile opens its block, on Scores
+function showKind(m, kind) {
+  (state.mblk[m.id] = state.mblk[m.id] || {})[kind] = true;
+  state.after = { scroll: `[data-kind-block="${kind}"]` };
+  setModelTab('scores');
+}
+
+const MODEL_TABS = { scores: 'Scores', answers: 'Answers', improve: 'Improve', history: 'History' };
+function modelTabs(m) {
+  return ['scores', 'answers', ...(modelImproveRows(m).n ? ['improve'] : []), 'history']
+    .map(id => [id, MODEL_TABS[id]]);
+}
+// remembered per viewer; a tab this model has not got (Improve) falls back
+// to Scores without forgetting the choice
+function modelTab(have) {
+  let t = state.mtab;
+  if (!t) try { t = localStorage.getItem('bench-model-tab'); } catch (e) { /* private */ }
+  return have.includes(t) ? t : 'scores';
+}
+function setModelTab(t) {
+  state.mtab = t;
+  try { localStorage.setItem('bench-model-tab', t); } catch (e) { /* private */ }
+  render();
+}
+
+// ---- Scores: one block per kind the model has taken, the newest open ----
+function modelScoresTab(m, kinds) {
+  const taken = kinds.filter(k => k.taken);
+  if (!taken.length) return [el('div', { class: 'card', 'data-scores-none': '1' },
+    el('p', { class: 'small', text: 'No scores yet: this model has not taken a test.' }))];
+  const newest = taken.reduce((a, b) => (b.at || 0) > (a.at || 0) ? b : a).kind;
+  const mine = state.mblk[m.id] || {};
+  return taken.map(k => {
+    const open = k.kind in mine ? mine[k.kind] : k.kind === newest;
+    const [v] = kindValue(m, k.kind);
+    // a closed block is built when it opens: the judged tables are the
+    // page's heaviest, and most visits read one kind
+    return el('details', { class: 'card kblock', 'data-kind-block': k.kind, open: open ? '' : null,
+        ontoggle: e => {
+          const now = e.target.open, blk = state.mblk[m.id] = state.mblk[m.id] || {};
+          if (blk[k.kind] === now || (!(k.kind in blk) && now === open)) return;
+          blk[k.kind] = now;
+          if (now) { state.after = { focus: `[data-kind-block="${k.kind}"] > summary` }; render(); }
+        } },
+      el('summary', { class: 'kblock-sum' }, el('span', { class: 'kblock-k', text: k.label }),
+        el('span', { class: 'kblock-v', text: v })),
+      ...(open ? kindParts(m, k.kind) : []));
+  });
+}
+// the sections a block holds: each keeps its code, not its card
+function kindParts(m, kind) {
+  const part = (node, id) => {
+    if (!node) return null;
+    node.classList.remove('card'); node.classList.add('kpart');
+    if (id) node.id = 'sec-' + id;
+    return node;
+  };
+  if (kind === 'standard') {
+    const diag = part(vDiagnose(m), 'diagnose');
+    return [el('p', { class: 'mprose', text: modelSentence(m) }),
+      el('p', { class: 'small', 'data-avg-verdict': '1', text: avgVerdictOf(m)
+        + ((m.missing || []).length ? ` Missing ${m.missing.join(', ')}.` : '') }),
+      part(resultsPart(m), 'results'),
+      // item analysis of the benchmark, not the improvement loop (12b §7)
+      diag ? el('details', { class: 'kfold', 'data-cant-show': '1' },
+        el('summary', { text: 'What the score can’t show ▸' }), diag) : ''].filter(Boolean);
+  }
+  if (kind === 'exam') {
+    const earlier = vEarlier(m), judged = part(vJudged(m, [earlier]), 'judged');
+    // a card that stopped early (not judged on the current exam) still keeps
+    // the earlier exams it is about
+    if (judged && earlier && !judged.contains(earlier)) {
+      earlier.classList.remove('card');
+      judged.append(el('details', { class: 'kfold', 'data-more-detail': 'judged' },
+        el('summary', { text: 'More detail ▸' }), earlier));
+    }
+    return [LIVE ? el('div', { class: 'kacts' }, sitCta(m)) : '', judged].filter(Boolean);
+  }
+  return [part(vEverydayBlock(m), 'everyday')].filter(Boolean);
+}
+// Results: every task this model has, grouped by domain
+function resultsPart(m) {
   const rows = [];
   for (const [dom, ts] of domainGroups([...DATA.accTasks, ...DATA.pplTasks])) {
     const have = ts.filter(t => cell(t, m.id));
@@ -4945,7 +5126,7 @@ function vModel() {
           + 'task\'s diagnostics — shown, excluded from its official average' })));
     }
   }
-  const results = el('div', { class: 'card' },
+  return el('div', { class: 'card' },
     el('h2', { text: 'Results' }),
     el('p', { class: 'sub', text: 'Dashed mark is chance; the solid mark, where one '
       + 'exists, is the best published score — a different protocol from ours, shown '
@@ -4955,40 +5136,131 @@ function vModel() {
         el('th', { class: 'num', text: 'Score' }), el('th', { text: '' }),
         el('th', { class: 'num', text: 'Shots' }), el('th', { class: 'num', text: 'Items' }))),
       el('tbody', {}, rows))));
+}
 
+// ---- Answers: what the model wrote, by kind, then topic or group ----
+function modelAnswersTab(m, kinds) {
+  const J = DATA.judged || {};
+  const tasks = (m.judge || {}).tasks || {};
+  // weakest first; a topic with no score keeps its answers readable (11l)
+  const cats = Object.keys(tasks).filter(t => (J.exam || []).includes(t))
+    .sort((a, b) => (pubScore(tasks[a]) ?? 9) - (pubScore(tasks[b]) ?? 9));
+  const have = [cats.length ? ['exam', 'Knowledge exam'] : null,
+    evdOf(m.id) ? ['everyday', 'Everyday tasks'] : null].filter(Boolean);
+  const card = el('div', { class: 'card', 'data-model-answers': m.id },
+    el('h2', { text: 'Answers' }),
+    el('p', { class: 'sub', text: 'What the model wrote, on the questions anyone may read. '
+      + 'The hidden questions stay hidden: their score is all you see of them.' }));
+  if (!have.length) {
+    card.append(el('p', { class: 'small', 'data-answers-none': '1', text: 'No written answers '
+      + 'yet: this model has not sat the Knowledge exam or the Everyday tasks.' }));
+    return [card];
+  }
+  const kind = have.some(([k]) => k === state.mans) ? state.mans : have[0][0];
+  if (have.length > 1) card.append(el('div', { class: 'chiprow', 'data-answers-kinds': '1' },
+    have.map(([k, label]) => el('button', { class: 'chip-btn' + (k === kind ? ' on' : ''),
+      'data-answers-kind': k, 'aria-pressed': String(k === kind), text: label,
+      onclick: () => { state.mans = k; render(); } }))));
+  if (kind === 'exam') card.append(LIVE ? modelAnswers(m, cats)
+    : el('p', { class: 'small', text: 'The answers are read from the live board; this report '
+      + 'does not carry them.' }));
+  else card.append(evdAnswersList(m));
+  return [card];
+}
+// the pilot's five, each with its answer open, one group at a time or all
+function evdAnswersList(m) {
+  const qs = evd().questions || [], e = evdOf(m.id);
+  const groups = [...new Set(qs.map(q => q.groupLabel))];
+  const g = groups.includes(state.mansGroup) ? state.mansGroup : '';
+  return el('div', { 'data-panel': 'everyday-answers' },
+    el('div', { class: 'chiprow' }, [['', 'All'], ...groups.map(x => [x, x])].map(([v, t]) =>
+      el('button', { class: 'chip-btn' + (v === g ? ' on' : ''), 'data-answers-group': v || 'all',
+        'aria-pressed': String(v === g), text: t,
+        onclick: () => { state.mansGroup = v; render(); } }))),
+    qs.filter(q => !g || q.groupLabel === g).map(q => {
+      const it = evdItem(e, q.id), mk = evdMark(it);
+      return el('div', { class: 'evitem open', 'data-answers-q': q.id },
+        el('div', { class: 'evrow evrow-static' },
+          el('span', { class: 'evgroup', text: q.groupLabel }),
+          el('span', { class: 'evmark ' + mk.cls, 'aria-label': mk.words, text: mk.t }),
+          el('span', { class: 'evreason', text: it ? it.reason : 'not asked' })),
+        evdAnswer(q, it));
+    }));
+}
+
+// ---- Improve: this model's proposals and datasets, the Review lists ----
+function modelImproveRows(m) {
+  const props = (state.rv.proposals || []).filter(p => p.model === m.id);
+  const ds = (state.rv.datasets || []).filter(d => d.model === m.id);
+  return { props, ds, n: props.length + ds.length };
+}
+function modelImproveTab(m) {
+  const { props, ds } = modelImproveRows(m);
+  return [
+    props.length ? el('div', { class: 'card', 'data-model-proposals': m.id },
+      el('h2', { text: 'Proposals' }),
+      el('p', { class: 'sub', text: 'What someone asked the AI to write for this model, and '
+        + 'where each one stands. Open one to read it.' }),
+      rvTable(RV_PCOLS, props.map(rvRow), '')) : '',
+    ds.length ? el('div', { class: 'card', 'data-model-datasets': m.id },
+      el('h2', { text: 'Datasets' }),
+      el('p', { class: 'sub', text: 'What the AI wrote for this model, after the copy check. '
+        + 'Read one here, or hand it to a training run.' }),
+      rvTable(RV_DCOLS, ds.flatMap(dsRows), '')) : ''].filter(Boolean);
+}
+
+// ---- History: the runs, what produced the numbers, how they were graded ----
+function modelHistoryTab(m) {
+  return [LIVE ? vModelRuns(m) : null, provRecord(m), gradedCard(m), vTaint(m)].filter(Boolean);
+}
+// the model's row of the old Run provenance table, and its hero's small print
+function provRecord(m) {
+  const a = m.archinfo || {}, comp = computeOf(m);
+  const params = m.params ? P(m.params)
+    + (a.active_params ? ` · ${P(a.active_params)} active, ${a.experts} experts, `
+      + `${a.experts_per_tok} per token (${a.active_src})` : '')
+    + (m.paramsSrc ? ` · from the ${m.paramsSrc === 'config' ? 'harness config' : 'model name'}`
+      : '') : null;
   const prov = [
+    ['hub id', m.id], ['parameters', params],
+    ['training compute', comp ? `${flop(comp.c)} FLOP (6ND, run ${comp.run.name})` : null],
     ['architecture', a.arch], ['shape', a.hidden ? `hidden ${a.hidden} · layers ${a.layers}`
       + ` · heads ${a.heads} · ctx ${a.ctx}` : null],
     ['vocab', a.vocab], ['backend', m.backend], ['dtype', m.dtype],
     ['weights stored as', a.stored_dtype], ['batch size', m.batch],
     ['chat template', m.chat ? `applied${a.tmpl_sha ? ' · ' + a.tmpl_sha : ''}` : 'none'],
-    ['kind decided by', m.kindReason], ['seed', m.seed], ['limit', m.limit],
+    ['kind decided by', m.kindReason], ['seed', m.seed],
+    ['limit', m.limit == null ? 'full' : m.limit],
     ['model code', (a.code_sha || []).join(', ')],
+    ['harness', m.hash],
     ['eval wall clock', m.minutes != null ? m.minutes + ' min' : null],
     ['last evaluated', lastEval(m)],
   ].filter(([, v]) => v != null && v !== '' && v !== false);
-  const provCard = el('div', { class: 'card' },
-    el('h2', { text: 'Provenance' }),
+  return el('div', { class: 'card', 'data-model-prov': m.id },
+    el('h2', { text: 'Run provenance' }),
     el('p', { class: 'sub', text: 'What produced these numbers. Two runs whose '
       + 'template id or harness differ are not comparable, whatever the scores say.' }),
     el('dl', { class: 'provlist' }, prov.flatMap(([k, v]) =>
       [el('dt', { text: k }), el('dd', { text: String(v) })])));
-
-  // The exam leads: it is the instrument the loop steers by. The
-  // multiple-choice results and the per-item diagnosis follow as the free
-  // second opinion — same GPU, no API call, and a different kind of evidence.
-  const judged = vJudged(m), taint = vTaint(m), diag = vDiagnose(m), earlier = vEarlier(m);
-  // 12a: the Everyday pilot, above the exam: five answers anyone can read
-  const everyday = vEverydayBlock(m);
-  const sections = [['everyday', 'Everyday tasks', everyday],
-                    ['judged', 'Judged', judged], ['earlier', 'Earlier exams', earlier],
-                    ['results', 'Results', results],
-                    ['diagnose', 'Diagnose', diag], ['taint', 'Training data', taint],
-                    ['provenance', 'Provenance', provCard],
-                    ['runs', 'Runs', LIVE ? vModelRuns(m) : null]];
-  for (const [id, , node] of sections) if (node) node.id = 'sec-' + id;
-  return [back, head, modelSitPanel(m), modelNav(sections), ...sections.map(([, , n]) => n),
-          ].filter(Boolean);
+}
+// how each kind was graded, in a line each
+function gradedCard(m) {
+  const rows = [];
+  if ([...DATA.accTasks, ...DATA.pplTasks].some(t => cell(t, m.id)))
+    rows.push(['Standard', 'lm-evaluation-harness'
+      + (m.hash ? ` ${m.hash}` : '') + ': each task’s own metric, at the shots its row says.']);
+  const j = m.judge;
+  if (j && j.judge) rows.push(['Knowledge exam', judgeIdLine(m),
+    LIVE ? el('span', { 'data-how-graded': m.id },
+      readLink({ kind: 'provenance', id: 'judge:' + m.id }, 'How this was graded ▸')) : '']);
+  const e = evdOf(m.id);
+  if (e) rows.push(['Everyday tasks', 'Four answers are checked by a script; the Arabic one '
+    + 'is marked by the judge' + (e.provisional ? ', whose marks are not evidence yet.' : '.')]);
+  if (!rows.length) return null;
+  return el('div', { class: 'card', 'data-model-graded': m.id },
+    el('h2', { text: 'How it was graded' }),
+    el('dl', { class: 'provlist' }, rows.flatMap(([k, v, x]) =>
+      [el('dt', { text: k }), el('dd', {}, v, x ? [' ', x] : '')])));
 }
 
 // 11i: the model page is where a person is thinking about this model, so the
@@ -4999,49 +5271,11 @@ function sitCta(m) {
   const n = Object.entries((m.judge || {}).tasks || {})
     .filter(([t, v]) => (J.exam || []).includes(t) && pubScore(v) != null).length;
   return el('div', { class: 'msit-cta' },
-    el('button', { class: 'primary', 'data-sit-open': m.id, text: 'Sit the exam',
+    el('button', { class: 'secondary', 'data-sit-open': m.id, text: 'Sit the exam',
       'aria-expanded': String(state.msit.open && state.msit.model === m.id),
       onclick: () => openSit(m.id) }),
     el('span', { class: 'small se', 'data-sit-progress': String(n),
       text: `${n} of ${(J.exam || []).length} topics judged` }));
-}
-
-// The model page is long, and since the judged section arrived the
-// interesting part is halfway down it. A sub-nav that sticks is the cheapest
-// fix: anchors, not routes, so Back still leaves the page the way it came.
-function modelNav(sections) {
-  // a one-line section (the Everyday pilot, not taken) is not a place to go
-  const have = sections.filter(([, , node]) => node && !node.dataset.nonav);
-  return el('nav', { class: 'modelnav', 'data-model-nav': '1', 'aria-label': 'sections' },
-    have.map(([id, label], i) =>
-      el('a', { href: '#sec-' + id, class: 'navchip', 'data-nav': id,
-        'data-ix': String(i + 1).padStart(2, '0'), text: label,
-        onclick: e => { e.preventDefault();
-          const t = document.getElementById('sec-' + id);
-          if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } })));
-}
-
-// The chip of the section in view is lit as you scroll. One observer for the
-// page; a render re-points it at the new section nodes.
-let _secObs = null;
-function watchSections() {
-  if (_secObs) { _secObs.disconnect(); _secObs = null; }
-  const nav = document.querySelector('[data-model-nav]');
-  if (!nav || !('IntersectionObserver' in window)) return;
-  const secs = [...document.querySelectorAll('#view [id^="sec-"]')];
-  const seen = new Map();
-  const light = () => {
-    // the topmost section with any part inside the band under the bar
-    const vis = secs.filter(x => seen.get(x.id));
-    const cur = vis.length ? vis[0].id.slice(4) : null;
-    for (const a of nav.querySelectorAll('a[data-nav]'))
-      a.setAttribute('aria-current', a.dataset.nav === cur ? 'true' : 'false');
-  };
-  _secObs = new IntersectionObserver(es => {
-    for (const e of es) seen.set(e.target.id, e.isIntersecting);
-    light();
-  }, { rootMargin: '-110px 0px -55% 0px' });
-  secs.forEach(x => _secObs.observe(x));
 }
 
 // Every submission of this model, newest first: which suite, what came of it,
@@ -5075,88 +5309,136 @@ function vModelRuns(m) {
 }
 
 function vOverview(ms) {
-  const frag = [];
-  // only official models can be ranked — a preliminary model has no average —
-  // and a duplicate is the same run twice: it is not a second entry anywhere
-  // on this page (the hero once featured the duplicate, with a sentence
-  // calling it preliminary, and Top models listed the pair as #1 and #2)
-  const ranked = ms.filter(m => officialAvg(m) != null && !m.duplicateOf)
-                   .sort((a, b) => officialAvg(b) - officialAvg(a));
-  const prelim = ms.filter(m => !m.official && !m.duplicateOf);
-  const dup = new Set(ms.filter(m => m.duplicateOf).map(m => m.id));
-  let pairs = 0, real = 0, big = null;
-  for (const t of DATA.accTasks) for (const [a, b, diff, z, ok] of (DATA.sig[t] || [])) {
-    if (!ms.find(m => m.id === a) || !ms.find(m => m.id === b)) continue;
-    if (dup.has(a) || dup.has(b)) continue;
-    pairs++; if (ok) real++;
-    if (ok && (!big || Math.abs(diff) > Math.abs(big.diff))) big = { t, a, b, diff, z };
-  }
-  // 11d: the four stat tiles are one mono line under the hero
-  const hours = DATA.meta.hours >= 1 ? `${DATA.meta.hours} h` : `${Math.round(DATA.meta.hours * 60)} min`;
-  const dates = DATA.meta.dates[0]
-    ? `${String(DATA.meta.dates[0]).slice(0, 10)} → ${String(DATA.meta.dates[1]).slice(0, 10)}` : null;
-  frag.push(el('p', { class: 'statline', 'data-statline': '1' }, [
-    `${ms.length} model${ms.length === 1 ? '' : 's'}`
-      + (ms.length !== DATA.models.length ? ` of ${DATA.models.length}` : ''),
-    `${DATA.accTasks.length + DATA.pplTasks.length} tasks`,
-    pairs ? `${real.toLocaleString()} of ${pairs.toLocaleString()} gaps are real` : null,
-    `${hours} of evaluation`, dates].filter(Boolean).join(' · ')));
-  // 01 Highlights: a value and a sentence that says what it means, each
-  // derived from the data it sits on
-  frag.push(highlightsCard(ranked));
-  // 02 Top models, in the table component, with the biggest real gap under it
-  if (ranked.length) {
-    let gap = '';
-    if (big) {
-      const an = DATA.models.find(m => m.id === big.a), bn = DATA.models.find(m => m.id === big.b);
-      const [win, lose] = big.diff > 0 ? [an, bn] : [bn, an];
-      gap = el('p', { class: 'statline', 'data-biggest-gap': '1',
-        text: `Biggest real gap · ${big.t}: ${win.name} over ${lose.name} by `
-          + `${(100 * Math.abs(big.diff)).toFixed(1)} points (z = ${Math.abs(big.z).toFixed(1)}) · `
-          + `${pairs - real} of ${pairs} pairs are inside the noise` });
-    }
-    frag.push(el('div', { class: 'card', 'data-top-models': '1' },
-      el('div', { class: 'sechead' }, el('h2', { text: 'Top models' }),
-        el('span', { class: 'acts' }, el('a', { href: '#tab=models', 'data-see-leaderboard': '1',
-          text: 'See all models →', onclick: e => { e.preventDefault();
-            navigate({ tab: 'leaderboard', model: null, topic: null }); } }))),
-      el('div', { class: 'lb-wrap' }, lbMini(ranked.slice(0, 5))), gap));
-  } else {
-    frag.push(el('div', { class: 'card' },
-      el('h2', { text: 'No official result yet' }),
-      el('p', { class: 'sub', text: DATA.required.length
-        ? `Nothing here has completed all ${DATA.required.length} required tasks `
-          + `(${DATA.required.join(', ')}), so there is no overall ranking to show — `
-          + `only per-task numbers, which are on Models and Benchmarks ▸ Standard. `
-          + `Submit with suite=full to produce an official result.`
-        : 'No accuracy tasks in this results tree.' })));
-  }
-  if (prelim.length)
-    frag.push(el('p', { class: 'small', style: 'margin:10px 2px 0', 'data-prelim-count':
-      String(prelim.length) }, `${prelim.length} preliminary model${prelim.length > 1 ? 's' : ''}`
-      + ' — per-task results only, not in the ranking above. ',
-      el('a', { href: '#tab=models', 'data-show-prelim': '1', text: 'See them',
-        onclick: e => { e.preventDefault(); showMe({ tab: 'models', prelim: true }); } })));
-  // 03 The loop
-  if (LIVE) frag.push(overviewLoop());
-  // 12b: How to read these numbers is in Help
-  return frag;
+  // 12b: three blocks, in this order — what needs a person, what is running,
+  // and the best in each kind of test. No hero paragraph and no stats line
+  if (LIVE && !NET.fails) { rvNeeded(); if (!state.trLoaded) loadTruns(); }
+  return [needsYou(), LIVE ? runningNow() : null, bestByKind(ms)].filter(Boolean);
 }
-// ---------------------------------------------------------------------------
-// 11d: the highlight cards. Each has a value and ONE sentence that says what
-// it means, derived from the numbers under it — the best model's lead is the
-// z-test's verdict, not an adjective. Cards 2–4 are the loop's, so only a
-// live page has them.
-// ---------------------------------------------------------------------------
-// 11e: the value is the number only, on one line; what it is about — a model,
-// a topic — is its own 16px line, cut with an ellipsis, whole in the tooltip
-const hlCard = (key, eyebrow, value, verdict, link, name, full) => el('div', { class: 'hcard',
-    'data-hl': key },
-  el('div', { class: 'eyebrow', text: eyebrow }),
-  el('div', { class: 'hcard-v', 'data-hl-value': key, text: value }),
-  name ? el('div', { class: 'hcard-name', 'data-hl-name': key, title: full || name, text: name }) : '',
-  el('p', { class: 'hcard-verdict', 'data-verdict': key, text: verdict }),
-  link || '');
+const onHome = () => state.tab === 'overview' && !state.model && !state.topic;
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+// one line per thing waiting, each a link to where it is dealt with
+function needsYou() {
+  const lines = [];
+  const add = (key, n, text, go) => { if (n) lines.push(el('li', { 'data-needs': key },
+    el('a', { href: '#', text, onclick: e => { e.preventDefault(); go(); } }))); };
+  if (LIVE && state.rv.loaded) {
+    const L = rvLists();
+    add('proposals', L.review.length,
+      plural(L.review.length, 'proposal waiting for review', 'proposals waiting for review'),
+      () => { state.rv.view = 'review'; navigate({ tab: 'review', model: null, topic: null }); });
+    if (state.trLoaded) {
+      const used = new Set((state.trRuns || []).flatMap(r => r.datasets || []));
+      const idle = (state.rv.datasets || []).filter(d => d.status === 'ready' && !used.has(d.id));
+      add('datasets', idle.length, plural(idle.length, 'dataset made but not used in training',
+        'datasets made but not used in training'),
+        () => { state.rv.view = 'datasets'; navigate({ tab: 'review', model: null, topic: null }); });
+    }
+  }
+  if (LIVE) {
+    const since = Date.now() / 1000 - 7 * 86400;
+    const failed = (state.queue || []).filter(r => r.status === 'failed'
+      && (r.finished_at || r.created_at || 0) >= since);
+    add('failed', failed.length, plural(failed.length, 'run failed in the last seven days',
+      'runs failed in the last seven days'), () => navigate({ tab: 'queue', model: null, topic: null }));
+  }
+  const checks = (DATA.checks || DATA.warnings || []).length;
+  add('checks', checks, plural(checks, 'check is not green', 'checks are not green'), openChecks);
+  return el('div', { class: 'card', 'data-needs-you': String(lines.length) },
+    el('h2', { text: 'Needs you' }),
+    lines.length ? el('ul', { class: 'needs' }, lines)
+      : el('p', { class: 'small', 'data-needs-none': '1', text: 'Nothing needs you.' }));
+}
+// the status dot's list, opened from Home's line about it
+function openChecks() {
+  const d = document.querySelector('#warnings details.checks');
+  if (!d) return;
+  d.open = true; state.checksOpen = true;
+  const sum = d.querySelector('summary');
+  if (sum) sum.focus();
+}
+
+// the run counter's list, full width
+function runningNow() {
+  const { running, queued } = runsNow();
+  const card = el('div', { class: 'card', 'data-running-now': String(running.length + queued.length) },
+    el('h2', { text: 'Running now' }));
+  if (!running.length && !queued.length) card.append(el('p', { class: 'small', 'data-running-none': '1' },
+    'Nothing running · ', el('a', { href: '#', 'data-running-test': '1', text: 'Test a model',
+      onclick: e => { e.preventDefault(); openTest(); } })));
+  else card.append(el('div', { class: 'runsfull' }, runsList()));
+  return card;
+}
+
+// one card per kind of test that has data: the best model's number, its name,
+// and one link to the kind on Models. A kind with no data has no card
+function bestByKind(ms) {
+  const go = v => hlLink('Compare models →', () => openModelsView(v));
+  const card = (key, eyebrow, value, m, badge) => el('div', { class: 'hcard', 'data-best': key },
+    el('div', { class: 'eyebrow' }, eyebrow, badge || ''),
+    el('div', { class: 'hcard-v', 'data-best-value': key, text: value }),
+    el('div', { class: 'hcard-name', 'data-best-name': key, title: m.id, text: m.name }),
+    go(key));
+  const cards = [];
+  const std = ms.filter(m => officialAvg(m) != null && !m.duplicateOf)
+    .sort((a, b) => officialAvg(b) - officialAvg(a))[0];
+  if (std) cards.push(card('standard', 'Standard · '
+    + (state.avgMode === 'raw' ? 'raw accuracy' : 'above chance'),
+    (100 * officialAvg(std)).toFixed(1), std));
+  const exam = ms.filter(m => m.judgedAvg != null && !m.duplicateOf)
+    .sort((a, b) => b.judgedAvg - a.judgedAvg)[0];
+  if (exam) cards.push(card('exam', 'Knowledge exam', `${num(exam.judgedAvg, 2)} / 4`, exam));
+  const E = evd();
+  const ev = Object.entries(E.models || {}).filter(([id]) => ms.some(m => m.id === id))
+    .sort(([a, x], [b, y]) => (y.passed - x.passed) || evdName(a).localeCompare(evdName(b)))[0];
+  if (ev) cards.push(card('everyday', 'Everyday tasks', evdCount(ev[1]),
+    DATA.models.find(m => m.id === ev[0]), evdBadge(ev[1].provisional)));
+  // the provisional-judge caveat, once, in the block's header
+  const caveat = exam && !(judgedCalibrated() && judgedOkM(exam))
+    ? el('span', { class: 'badge prelim', 'data-best-caveat': '1',
+        title: judgedCalibrated() ? whyProvisional(exam) : judgedOffWhy(),
+        text: 'Knowledge exam: provisional judge' }) : '';
+  return el('div', { class: 'card', 'data-best-by-kind': String(cards.length) },
+    el('div', { class: 'sechead' }, el('h2', { text: 'Best in each kind of test' }), caveat),
+    cards.length ? el('div', { class: 'hlgrid' }, cards)
+      : el('p', { class: 'small', text: 'No model has a score yet.' }));
+}
+// Models, on one of its three views
+function openModelsView(v) {
+  const L = lbS();
+  try { localStorage.setItem('bench-models-view', v); } catch (e) { /* private */ }
+  Object.assign(L, { view: v, chip: v === 'exam' ? 'judged' : (L.stdChip || 'all') });
+  navigate({ tab: 'leaderboard', model: null, topic: null });
+}
+// the training runs' list alone — Home asks which datasets no run has used
+async function loadTruns() {
+  if (!LIVE || state.trFetching || !netReady()) return;
+  state.trFetching = true;
+  try {
+    const runs = await api('api/truns');
+    const changed = !state.trLoaded || JSON.stringify(runs) !== JSON.stringify(state.trRuns);
+    state.trRuns = runs; state.trLoaded = true;
+    if (changed && onHome()) render();
+  } catch (e) { /* next poll retries */ }
+  finally { state.trFetching = false; }
+}
+
+// "30 fixed scripts re-graded …" — Home's old Judge steadiness card, as a
+// line under the checks behind the status dot (12b §6)
+function judgeSteadiness() {
+  const m = loopModel();
+  const cn = m && (m.judge || {}).canary;
+  if (!cn) return null;
+  const cal = (DATA.judged || {}).calibration;
+  const r2 = x => x == null ? '—' : (+x).toFixed(2);
+  return `Judge steadiness: ${cn.drifted ? 'moved' : 'steady'} — ${cn.n} fixed scripts `
+    + `re-graded: ${r2(cn.mad_vs_human)} from the human marks`
+    + (cn.mad_vs_previous != null ? `, ${r2(cn.mad_vs_previous)} from the last run `
+       + `(limit ${cn.threshold})` : ', the first run for this judge') + '. '
+    + (cal && cal.calibrated ? `Agreement with a person: ${cal.kappa}.`
+       : 'No person has checked the judge yet.');
+}
+// a card's one link (the hcard component, 11d): Home's Best in each kind
 const hlLink = (text, go) => el('a', { href: '#', class: 'hcard-link', text,
   onclick: e => { e.preventDefault(); go(); } });
 
@@ -5174,128 +5456,6 @@ const whyProvisional = m => {
   if (!judgedOkM(m)) return 'provisional, the judge is not calibrated';
   return 'calibrated judge';
 };
-
-function hlBest(ranked) {
-  const toLb = hlLink('See all models →', () => navigate({ tab: 'leaderboard', model: null, topic: null }));
-  const top = ranked[0], next = ranked[1];
-  if (!top) return hlCard('best', 'Best model', '—', `Nothing has completed all `
-    + `${DATA.required.length} required tasks yet, so nothing is ranked.`, toLb);
-  const av = officialAvg(top);
-  let verdict;
-  if (!next) verdict = 'The only ranked model on the board.';
-  else {
-    const d = av - officialAvg(next), sa = officialSe(top), sb = officialSe(next);
-    const lead = `Leads ${next.name} by ${(100 * d).toFixed(1)} points — `;
-    if (sa == null || sb == null) verdict = lead + 'no standard error to test it.';
-    else {
-      const z = d / Math.sqrt(sa * sa + sb * sb || 1e-12);
-      verdict = lead + (Math.abs(z) > 1.96 ? `a real gap (z = ${z.toFixed(1)}).` : 'within noise.');
-    }
-  }
-  return hlCard('best', 'Best model', (100 * av).toFixed(1), verdict, toLb, top.name, top.id);
-}
-
-function hlWeakest() {
-  const m = loopModel();
-  const toLoop = hlLink('Improve ▸ By topic →', () => navigate({ tab: 'loop', model: null, topic: null }));
-  if (!m) return hlCard('weakest', 'Weakest topic', '—',
-    'No model has been judged yet — Improve ▸ By topic ▸ Sit the exam.', toLoop);
-  const exam = (DATA.judged || {}).exam || [];
-  const xs = Object.entries(m.judge.tasks).filter(([t]) => t.startsWith('exam_'))
-    .map(([t, v]) => ({ t, v: pubScore(v) })).filter(x => x.v != null).sort((a, b) => a.v - b.v);
-  if (!xs.length) return hlCard('weakest', 'Weakest topic', '—',
-    `${m.name} has no score on the hidden questions yet.`, toLoop);
-  const w = xs[0];
-  // one model's own topic, so it is not a ranking — and no area mean
-  return hlCard('weakest', 'Weakest topic', `${(+w.v).toFixed(2)} / 4`,
-    `${m.name}, ${xs.length} of ${exam.length} topics judged — ${whyProvisional(m)}.`,
-    hlLink('Open the topic →', () => navigate({ topic: w.t.replace(/^exam_/, ''), model: null })),
-    frName(w.t));
-}
-
-function hlLoop() {
-  const exam = new Set((DATA.judged || {}).exam || []);
-  const done = new Set(DATA.models.flatMap(m => Object.entries((m.judge || {}).tasks || {})
-    .filter(([t, v]) => exam.has(t) && pubScore(v) != null).map(([t]) => t)));
-  const m = loopModel();
-  const at = m ? Math.max(0, ...Object.values(m.judge.tasks).map(v => v.judged_at || 0)) : 0;
-  return hlCard('loop', 'The loop', `${done.size} / ${exam.size}`,
-    m ? `Last judged ${m.name}` + (at ? ` ${rel(at)} ago.` : '.')
-      : 'Nothing judged yet — sit a model on a topic from Improve ▸ By topic.',
-    hlLink('Improve ▸ By topic →', () => navigate({ tab: 'loop', model: null, topic: null })),
-    'topics judged');
-}
-
-function hlJudge() {
-  const m = loopModel();
-  const toProv = hlLink('Data & sources →', () => navigate({ tab: 'provenance', model: null, topic: null }));
-  const cn = m && (m.judge || {}).canary;
-  const cal = (DATA.judged || {}).calibration;
-  const calWords = cal && cal.calibrated ? `Agreement with a person: ${cal.kappa}.`
-    : 'No person has checked the judge yet.';
-  if (!cn) return hlCard('judge', 'Judge steadiness', '—',
-    (m ? 'No canary on file for this judge. ' : 'No judged run yet. ') + calWords, toProv);
-  const r2 = x => x == null ? '—' : (+x).toFixed(2);
-  return hlCard('judge', 'Judge steadiness', `${cn.graded} / ${cn.n}`,
-    `${cn.n} fixed scripts re-graded: ${r2(cn.mad_vs_human)} from the human marks`
-      + (cn.mad_vs_previous != null ? `, ${r2(cn.mad_vs_previous)} from the last run `
-         + `(limit ${cn.threshold})` : ', the first run for this judge') + `. ${calWords}`, toProv,
-    cn.drifted ? 'moved' : 'steady');
-}
-
-function highlightsCard(ranked) {
-  return el('div', { class: 'card', 'data-highlights': '1' },
-    el('h2', { text: 'Highlights' }),
-    el('div', { class: 'hlgrid' }, hlBest(ranked), LIVE ? [hlWeakest(), hlLoop(), hlJudge()] : ''));
-}
-
-// The loop on the first tab: how many topics have been judged, each judged
-// model's weakest topic one click away, and the last judged run and when. The
-// newest work on the server had no presence on the page people open first.
-function overviewLoop() {
-  const exam = new Set((DATA.judged || {}).exam || []);
-  const rows = DATA.models.filter(m => !m.duplicateOf && m.judge).map(m => {
-    const ts = Object.entries(m.judge.tasks || {}).filter(([t, v]) => exam.has(t)
-      && pubScore(v) != null);
-    if (!ts.length) return null;
-    const [wt, wv] = ts.reduce((a, b) => pubScore(b[1]) < pubScore(a[1]) ? b : a);
-    const at = Math.max(0, ...ts.map(([, v]) => v.judged_at || 0));
-    return { m, n: ts.length, wt, wv, at, topics: ts.map(([t]) => t) };
-  }).filter(Boolean).sort((a, b) => b.n - a.n || b.at - a.at);
-  const topics = new Set(rows.flatMap(r => r.topics));
-  const card = el('div', { class: 'card', 'data-overview-loop': '1' },
-    el('h2', { text: 'The loop' }));
-  if (!rows.length) {
-    card.append(el('p', { class: 'small' }, 'No model has sat the exam yet. ',
-      el('a', { href: '#tab=improve&sub=topics', text: 'Improve ▸ By topic →',
-        onclick: e => { e.preventDefault(); navigate({ tab: 'loop', topic: null, model: null }); } })));
-    return card;
-  }
-  const last = rows.reduce((a, b) => b.at > a.at ? b : a);
-  card.append(el('p', { class: 'sub' }, `${topics.size} topic${topics.size > 1 ? 's' : ''} `
-    + `judged across ${rows.length} model${rows.length > 1 ? 's' : ''}.`
-    + (last.at ? ` Last judged: ${last.m.name}, ${rel(last.at)} ago.` : ''), ' ',
-    el('a', { href: '#tab=improve&sub=topics', text: 'Improve ▸ By topic →',
-      onclick: e => { e.preventDefault(); navigate({ tab: 'loop', topic: null, model: null }); } })));
-  card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
-    el('thead', {}, el('tr', {}, el('th', { text: 'model' }), el('th', { class: 'num', text: 'topics' }),
-      el('th', { text: 'weakest topic' }), el('th', { class: 'num', text: 'score' }), el('th', { text: '' }))),
-    el('tbody', {}, rows.slice(0, 6).map(r => el('tr', { 'data-loop-model': r.m.id },
-      el('td', {}, el('a', { href: '#model=' + encodeURIComponent(r.m.id), text: r.m.name,
-        onclick: e => { e.preventDefault(); navigate({ model: r.m.id, topic: null }); } })),
-      el('td', { class: 'num', text: String(r.n) }),
-      el('td', { text: frName(r.wt) }),
-      el('td', { class: 'num', text: `${num(pubScore(r.wv), 2)} / 4` }),
-      el('td', {}, el('button', { class: 'quiet', 'data-weakest-topic': r.wt,
-        text: `${frName(r.wt)} →`, onclick: () => {
-          state.ans.model = r.m.id; state.ans.rows = null;
-          state.after = { scroll: '[data-panel="answers"]' };
-          navigate({ topic: r.wt.replace(/^exam_/, ''), model: null }); } }),
-        // 11i: and the exam, on the model's page
-        el('button', { class: 'quiet', 'data-loop-sit': r.m.id, text: 'Sit the exam',
-          onclick: () => openSit(r.m.id) }))))))));
-  return card;
-}
 
 // ===========================================================================
 // 12a: the Everyday tasks pilot. Five questions typed the way people type
@@ -5370,22 +5530,8 @@ function vEverydayBlock(m) {
   const qs = evd().questions || [];
   if (!qs.length) return null;
   const e = evdOf(m.id);
-  if (!e) {
-    // nothing empty: one line, and the button that fills it
-    const msg = (state.evdMsg || {})[m.id];
-    const test = LIVE ? el('button', { class: 'ghost', 'data-everyday-test': m.id, text: 'Test',
-      onclick: async ev => {
-        const b = ev.currentTarget; b.disabled = true; b.textContent = 'Queueing…';
-        const [r] = await evdQueue([m.id]);
-        state.evdMsg = { ...(state.evdMsg || {}), [m.id]: r.ok ? '' : 'Refused. ' + r.why };
-        if (r.ok) toast(r.note ? `#${r.sid}: ${r.note} —` : `Run #${r.sid} queued —`,
-          { key: 'submit', go: () => followRun(r.sid), link: 'follow it →' });
-        render(); } }) : '';
-    return el('div', { class: 'card evnone', 'data-everyday-none': m.id, 'data-nonav': '1' },
-      el('p', { class: 'evnone-line' }, el('span', { text: 'Not tested on everyday tasks' }),
-        test ? [el('span', { class: 'se', text: ' · ' }), test] : ''),
-      msg ? el('p', { class: 'warn', 'data-everyday-refused': m.id, text: msg }) : '');
-  }
+  // 12b: an untested model is its Everyday tile's "Not tested · Test"
+  if (!e) return null;
   const open = state.evdOpen || (state.evdOpen = {});
   const rows = qs.map(q => {
     const it = evdItem(e, q.id), mk = evdMark(it), key = m.id + '|' + q.id;
@@ -5407,12 +5553,25 @@ function vEverydayBlock(m) {
       el('div', { class: 'acts evscore' },
         el('span', { class: 'evcount', 'data-everyday-count': evdCount(e), text: evdCount(e) }),
         e.waiting ? el('span', { class: 'small se', text: `${e.waiting} with the judge` }) : '',
-        el('a', { href: '#everyday', 'data-everyday-compare': '1', text: 'Compare models →',
+        el('a', { href: '#tab=benchmarks&sub=everyday', 'data-everyday-compare': '1',
+          text: 'Compare models →',
           onclick: ev => { ev.preventDefault();
             navigate({ tab: 'everyday', model: null, topic: null }); } }))),
     el('p', { class: 'sub', text: 'Five questions typed the way people type on a phone, '
       + 'marked by a script. Open a row to read the answer.' }),
     el('div', { class: 'evrows' }, rows));
+}
+
+// the pilot's one-click queue, for one model
+function evdTestBtn(m, cls = 'ghost') {
+  return el('button', { class: cls, 'data-everyday-test': m.id, text: 'Test',
+    onclick: async ev => {
+      const b = ev.currentTarget; b.disabled = true; b.textContent = 'Queueing…';
+      const [r] = await evdQueue([m.id]);
+      state.evdMsg = { ...(state.evdMsg || {}), [m.id]: r.ok ? '' : 'Refused. ' + r.why };
+      if (r.ok) toast(r.note ? `#${r.sid}: ${r.note} —` : `Run #${r.sid} queued —`,
+        { key: 'submit', go: () => followRun(r.sid), link: 'follow it →' });
+      render(); } });
 }
 
 // ---- #everyday: the models side by side ---------------------------------------
@@ -6298,45 +6457,6 @@ function buildBar() {
       : left ? `Reloading by itself in ${left}s.` : 'Reloading…';
     if (!left && !held) { clearInterval(tick); location.reload(); }
   }, 500);
-}
-
-// ---------------------------------------------------------------------------
-// Propose over a provisional judge: an in-page dialog, not window.confirm. The
-// reasons in words, what the mark means, the name it is recorded under, and a
-// box to tick before "Propose anyway" can be pressed. Esc cancels; focus stays
-// inside and goes back to the button that opened it.
-// ---------------------------------------------------------------------------
-function lbMini(rows) {
-  // 11f: the Leaderboard's rule — the leaders of the whole board (the best
-  // average and every one the z-test cannot tell from it) are bold and
-  // tinted, the rest plain, and the ± is the cell's tooltip
-  const pool = DATA.models.filter(m => officialAvg(m) != null && !m.duplicateOf)
-    .sort((a, b) => officialAvg(b) - officialAvg(a));
-  const best = pool[0];
-  const lead = m => !!best && (m.id === best.id || tiedWithBest({ key: 'avg' }, m,
-    { id: best.id, v: officialAvg(best) }, null));
-  const tb = el('tbody', {}, rows.map(m => { const r = rankOf(m), se = officialSe(m);
-    const v = (100 * officialAvg(m)).toFixed(1), on = pool.length > 1 && lead(m);
-    return el('tr', { 'data-top-row': m.id },
-      el('td', { class: 'num mono se', text: r ? String(r.n) : '—' }),
-      el('td', { class: 'model', 'data-model': m.id, style: `--fam:${famColor(m)}` },
-        el('a', { href: '#model=' + encodeURIComponent(m.id), class: 'mlink', text: m.name }),
-        ckBadge(m) || (m.kind === 'instruct'
-          ? el('span', { class: 'badge instruct', text: 'instruct' }) : '')),
-      el('td', { class: 'num', text: P(m.params) }),
-      el('td', { class: 'num tcell' + (on ? ' lead' : ''), 'data-lead': on ? '1' : null,
-          style: on ? 'background:var(--heat-3)' : null, tabindex: '0',
-          'data-tip': JSON.stringify([v + (se != null ? ` ± ${(100 * se).toFixed(1)}` : ''),
-            `${m.name} · Avg`, ...(on ? [m.id === best.id ? 'best on the board'
-              : 'within the noise of the best'] : [])]) },
-        on ? el('b', { text: v }) : v)); }));
-  return el('table', { class: 'lb mini-lb tinted' },
-    el('thead', {}, el('tr', { class: 'names' },
-      el('th', { class: 'num', text: '#' }), el('th', { text: 'Model' }),
-      el('th', { class: 'num', text: 'Params' }),
-      el('th', { class: 'num', 'data-tip': JSON.stringify([`Avg — mean of the required tasks, % `
-        + (state.avgMode === 'raw' ? 'raw accuracy' : 'above chance')]), tabindex: '0',
-        text: 'Avg' }))), tb);
 }
 
 // ---------- capability profile: the radar ----------
@@ -7882,97 +8002,18 @@ function vRuns(ms) {
   const frag = [];
   // the board checks are already above every tab, in full on the board tabs
   // and folded elsewhere. A second copy here was the same finding twice.
-  // provenance was rendered in results-directory scan order — effectively random,
-  // and worst exactly when it matters most (a burst of checkpoint evals). Sortable
-  // now, defaulting to last run first: the eval you just finished is row one.
-  const PROV_COLS = [
-    { key: 'name',   label: 'model' },
-    { key: 'id',     label: 'hf id' },
-    { key: 'arch',   label: 'architecture', get: m => (m.archinfo || {}).arch },
-    { key: 'shape',  label: 'shape', num: true, get: m =>
-        m.archinfo && m.archinfo.hidden != null
-          ? m.archinfo.hidden * 1e4 + (m.archinfo.layers || 0) : null },
-    { key: 'vocab',  label: 'vocab', num: true, get: m => (m.archinfo || {}).vocab },
-    { key: 'backend', label: 'backend' },
-    { key: 'dtype',  label: 'dtype' },
-    { key: 'batch',  label: 'batch', num: true },
-    { key: 'chat',   label: 'template applied', num: true, get: m => m.chat ? 1 : 0 },
-    { key: 'tmpl',   label: 'template id', get: m => (m.archinfo || {}).tmpl_sha },
-    { key: 'code',   label: 'model code', get: m => ((m.archinfo || {}).code_sha || []).join(' ') },
-    { key: 'seed',   label: 'seed', num: true },
-    { key: 'limit',  label: 'limit', num: true,
-      get: m => m.limit == null ? Infinity : m.limit },   // 'full' sorts as largest
-    { key: 'paramsSrc', label: 'params from' },
-    { key: 'stored',  label: 'weights dtype', get: m => (m.archinfo || {}).stored_dtype },
-    { key: 'minutes', label: 'wall clock', num: true },
-    { key: 'hash',   label: 'harness' },
-    { key: 'date',   label: 'last run', defDir: -1 },
-  ];
-  const pv = (m, c) => c.get ? c.get(m) : m[c.key];
-  const provCol = PROV_COLS.find(c => c.key === state.provSort.key) || PROV_COLS[14];
-  const provAll = [...ms].sort((a, b) => {
-    const va = pv(a, provCol), vb = pv(b, provCol);
-    if (va === vb) return 0;
-    if (va == null) return 1; if (vb == null) return -1;
-    return state.provSort.dir * (provCol.num ? va - vb : natCmp(va, vb));
-  });
-  const provPg = paged('provenance', provAll, JSON.stringify([state.provSort, state.q,
-                                                              state.kind, state.src]));
-  const provRows = provPg.rows;
-  frag.push(el('div', { class: 'card' },
+  // 12b: each model's run provenance is its page's History tab. What is true
+  // of the whole board — the harness and the library that ran it — stays here
+  frag.push(el('div', { class: 'card', 'data-builds-card': '1' },
     el('h2', { text: 'Run provenance' }),
     el('div', { class: 'kvs', 'data-builds': '1' },
       DATA.meta.hashes.length ? el('span', {}, el('b', { text: 'harness ' }),
         el('span', { class: 'mono', text: DATA.meta.hashes.join(', ') })) : '',
       DATA.meta.transformers ? el('span', {}, el('b', { text: 'transformers ' }),
         DATA.meta.transformers) : ''),
-    el('p', { class: 'sub', text: 'Every field here can change a score. Publish this table with the numbers, or the numbers are hearsay. Sorted newest-eval-first — click any column to re-sort.' }),
-    provPg.pager,
-    el('div', { class: 'lb-wrap stick' }, el('table', { class: 'prov', 'data-prov-table': '1' },
-      el('thead', {}, el('tr', {}, PROV_COLS.map(c => el('th', {
-        class: (c.num ? 'num ' : '') + 'sortable',
-        onclick: () => { state.provSort = { key: c.key,
-          dir: state.provSort.key === c.key ? -state.provSort.dir
-             : (c.defDir || (c.num ? -1 : 1)) }; render(); },
-        'aria-sort': state.provSort.key === c.key
-          ? (state.provSort.dir > 0 ? 'ascending' : 'descending') : 'none' },
-        c.label + ' ', state.provSort.key === c.key
-          ? el('span', { class: 'dir', text: state.provSort.dir > 0 ? '▲' : '▼' }) : '')))),
-      el('tbody', {}, provRows.map(m => el('tr', {},
-        el('td', { class: 'model', 'data-model': m.id }, m.name, ckBadge(m) || ''),
-        el('td', {}, el('span', { class: 'mono', text: m.id })),
-        el('td', { text: (m.archinfo && m.archinfo.arch) || '—' }),
-        el('td', { class: 'num', title: m.archinfo ? `heads ${m.archinfo.heads ?? '—'} · ctx ${m.archinfo.ctx ?? '—'}` : '',
-          text: m.archinfo && m.archinfo.hidden ? `${m.archinfo.hidden}×${m.archinfo.layers ?? '?'}` : '—' }),
-        el('td', { class: 'num', text: (m.archinfo && m.archinfo.vocab)
-          ? m.archinfo.vocab.toLocaleString() : '—' }),
-        el('td', { text: m.backend || '—' }),
-        el('td', { text: m.dtype || '—' }),
-        el('td', { text: m.batch == null ? '—' : String(m.batch) }),
-        el('td', { title: m.kindReason || '' },
-          m.chat ? 'yes' : 'no',
-          (m.archinfo || {}).kind_unconfirmed
-            ? el('span', { class: 'badge prelim', title: 'detection only — the '
-                + 'repo name does not corroborate it', text: '?' }) : ''),
-        el('td', {}, el('span', { class: 'mono',
-          title: ((m.archinfo || {}).tmpl_src ? 'from ' + m.archinfo.tmpl_src : 'no chat template in the repo')
-            + (m.kindReason ? `\npolicy: ${m.kindReason}` : ''),
-          text: (m.archinfo || {}).tmpl_sha || '—' })),
-        // which Python produced this score, when the checkpoint brought its own
-        el('td', {}, ((m.archinfo || {}).code_sha || []).length
-          ? el('span', { class: 'mono', title: m.archinfo.code_sha.join('\n'),
-              text: `custom ×${m.archinfo.code_sha.length}` })
-          : el('span', { class: 'se', text: 'library' })),
-        el('td', { class: 'num', text: m.seed == null ? '—' : String(m.seed) }),
-        el('td', { text: m.limit == null ? 'full' : String(m.limit) }),
-        el('td', { text: m.paramsSrc || '—' }),
-        el('td', { title: (m.archinfo || {}).params_src
-            ? 'parameter count from ' + m.archinfo.params_src : '',
-          text: (m.archinfo || {}).stored_dtype || '—' }),
-        el('td', { class: 'num', text: m.minutes + ' min' }),
-        el('td', {}, el('span', { class: 'mono', text: m.hash || '—' })),
-        el('td', {}, el('span', { class: 'mono',
-          text: String(m.date || '—').slice(0, 16).replace('T', ' ') })))))))));
+    el('p', { class: 'sub', text: 'Each model\u2019s run provenance — architecture, dtype, '
+      + 'template, seed, harness — is on its page, under History. Every field there can '
+      + 'change a score.' })));
   // ---- query every metric — a search bar instead of a wall of rows -----------
   // Client-side on purpose: the whole corpus is a few thousand rows, so a search
   // service would be infrastructure guarding data a browser filters in under a
@@ -8389,6 +8430,7 @@ async function loadTraining(force = false) {
   state.trFetching = true;
   try {
     state.trRuns = await api('api/truns');
+    state.trLoaded = true;
     // an empty right pane until someone picks a run was the first thing the
     // tab showed; open on the most recent one instead, once
     let picked = false;
@@ -9570,7 +9612,9 @@ function queueOpen(r) {
   // 12a: a pilot run opens on its answers — on the model page, or the pilot's
   if (r.suite === 'everyday') {
     if (DATA.models.some(m => m.id === r.hf_id)) {
-      state.after = { scroll: '[data-everyday-block], [data-everyday-none]' };
+      (state.mblk[r.hf_id] = state.mblk[r.hf_id] || {}).everyday = true;
+      state.mtab = 'scores';
+      state.after = { scroll: '[data-kind-block="everyday"], [data-kind-tile="everyday"]' };
       return navigate({ model: r.hf_id, topic: null });
     }
     return navigate({ tab: 'everyday', model: null, topic: null });
@@ -10124,7 +10168,7 @@ async function loadReview() {
       const had = (state.readData[readKey(open)] || {}).data;
       if (now && JSON.stringify(now) !== JSON.stringify(had)) readFetch(open);
     }
-    if (changed && state.tab === 'review' && !state.model) render();
+    if (changed && (state.tab === 'review' || onHome()) && !state.model) render();
     // 11k: a Propose row on another page waits for this list to know whether
     // a proposal is already open
     else if (changed && (state.model || state.topic)) render();
@@ -10861,6 +10905,9 @@ function npDialog(pre = {}) {
 }
 
 // ---- the tab ----------------------------------------------------------------
+// the Review lists' columns; the model page's Improve tab shows the same rows
+const RV_PCOLS = ['topic', 'model', 'status', 'asked by', 'when', ''];
+const RV_DCOLS = ['#', 'topic', 'model', 'documents', 'made by', 'when', '', ''];
 function vReview() {
   if (!state.rv.loaded && netReady()) loadReview();
   rememberedName();
@@ -10895,14 +10942,12 @@ function vReview() {
         onclick: () => { state.rv.view = k; navigate({ tab: 'review' }); } }))),
     !llm.configured && llm.reason ? el('p', { class: 'warn', text: llm.reason }) : '',
     state.rv.msg ? el('p', { class: 'small', text: state.rv.msg }) : '');
-  const PCOLS = ['topic', 'model', 'status', 'asked by', 'when', ''];
   const body = el('div', { class: 'card', 'data-rv-list': view });
   if (view === 'datasets') {
     body.append(el('h2', { text: 'Datasets' }),
       el('p', { class: 'sub', text: 'What the AI wrote, after the copy check. Read one here, '
         + 'or hand it to a training run.' }),
-      rvTable(['#', 'topic', 'model', 'documents', 'made by', 'when', '', ''],
-        L.datasets.flatMap(dsRows),
+      rvTable(RV_DCOLS, L.datasets.flatMap(dsRows),
         empty('No datasets yet. Approve a proposal, then generate from it.')));
   } else {
     const sub = { review: 'Proposals waiting for a person. Open one to read it.',
@@ -10910,7 +10955,7 @@ function vReview() {
       history: 'Rejected and failed proposals.' }[view];
     body.append(el('h2', { text: RV_VIEWS.find(([k]) => k === view)[1] }),
       el('p', { class: 'sub', text: sub }),
-      rvTable(PCOLS, L[view].map(rvRow),
+      rvTable(RV_PCOLS, L[view].map(rvRow),
         empty(view === 'review' ? 'Nothing waiting. Start one with + New proposal.'
           : view === 'ready' ? 'Nothing approved yet. Approve one in To review.'
           : 'Nothing rejected or failed.',
@@ -12700,10 +12745,6 @@ function render() {
   renderWarnings();                 // one line, in the bar, on every tab
   const ms = visible();
   renderTabs();
-  // 11b: the hero belongs to Overview. Every other tab starts straight at its
-  // first numbered section.
-  const hero = document.getElementById('pagehero');
-  if (hero) hero.hidden = !!(state.model || state.topic || state.tab !== 'overview');
   const view = document.getElementById('view');
   view.classList.remove('dimmed');
   // a poll rebuilds the view every few seconds. Whatever the person is typing
@@ -12780,7 +12821,6 @@ function render() {
     if (Math.abs(scrollY - r.y) < 2 || Date.now() > r.until) _restore = null;
   } else if (changed && !aimed) scrollTo(0, 0);
   numberSections();
-  if (state.model) watchSections();
   // an open popover keeps its panel, its scroll and its focus across a render;
   // only its button is a new node
   popReanchor();
@@ -13116,7 +13156,8 @@ function renderWarnings() {
     judged: /judge|judged|rubric|criteria|canary|calibrat/i.test(w) }));
   // rebuilding this on every poll would snap shut a fold someone just opened,
   // and hand Playwright (and a mouse) a node that vanishes mid-click
-  const sig = JSON.stringify(cs.map(c => c.text));
+  const steady = judgeSteadiness();
+  const sig = JSON.stringify([cs.map(c => c.text), steady]);
   if (sig === _warnSig) return;
   _warnSig = sig;
   // what kind, not just how many: after a judged run most of them are about
@@ -13147,7 +13188,8 @@ function renderWarnings() {
         onclick: e => { e.preventDefault(); showMe(c.show); } }) : '',
       el('details', { class: 'check-more' },
         el('summary', { class: 'small', text: 'why' }),
-        el('p', { class: 'warn', text: c.text }))))));
+        el('p', { class: 'warn', text: c.text })))),
+      steady ? el('li', { class: 'small se', 'data-judge-steady': '1', text: steady }) : ''));
   box.replaceChildren(fold);
 }
 
@@ -13183,26 +13225,16 @@ const POLL_MS = 5000;
 
 // static shell bits (rendered whenever a payload arrives)
 function renderStatic() {
-  if (LIVE) document.getElementById('pageSub').textContent =
-    'Submit models, follow training runs and compare the results. It updates as work finishes.';
   renderWarnings();
-  // the model filters moved into the Models tab, where what they filter is on
-  // screen beneath them; each one carries its own count there
-  const eyebrow = document.getElementById('heroEyebrow');
-  const topics = ((DATA.judged || {}).exam || []).length;
-  if (eyebrow) eyebrow.textContent = LIVE
-    ? `team benchmark${topics ? ` · ${topics} topics` : ''} · ${DATA.models.length} models`
-    : `report · ${DATA.models.length} models · ${DATA.tasks.length} tasks`;
+  // 12b: Home has no hero. What it said that a reader still needs — when a
+  // static report was made, and that a run was a smoke run — sits above the
+  // view on every page, and only when there is something to say
   document.getElementById('metaChips').replaceChildren(
     LIVE ? '' : el('span', { class: 'chip', text: `generated ${DATA.generated}` }),
     // 12b: the guides and "How to read these numbers" are in Help
     // the harness build and the transformers version are provenance: they
     // live on that tab now, not on every tab's first line
     DATA.meta.anyLimit ? el('span', { class: 'chip', text: '⚠ smoke data (--limit)' }) : '');
-  // the page's own action, where the page introduces itself (11b)
-  const acts = document.getElementById('heroActs');
-  // 12b: the page's one main action is Test a model, in the header
-  if (acts) acts.replaceChildren();
   renderFresh();
   renderWho();
 }
@@ -13344,6 +13376,7 @@ async function loadQueue() {
     if (changed) { renderRuns(); if (POP.key === 'runs') popReanchor(); }
     if (justFinished) await refreshResults();       // new scores -> re-render everything
     else if (changed && state.tab === 'queue') (state.queueRedraw || render)();
+    else if (changed && onHome()) render();
     // 11i: the model page's exam panel shows each topic's place in the queue
     else if (changed && state.model && state.msitRedraw) state.msitRedraw();
   } catch (e) { /* netFail said so, and set how long to wait */ }
@@ -13392,7 +13425,11 @@ if (LIVE) {
     loadQueue();
     loadJudgeHealth();
     if (state.tab === 'training') loadTraining();
-    if (state.tab === 'review') loadReview();
+    // 12b.2: Home's lists, and a model's Improve tab — only while the service
+    // answers: a board that cannot reach it does not ask for four more things
+    const answering = DATA && !NET.fails;
+    if (answering && onHome()) { loadReview(); loadTruns(); }
+    if (state.tab === 'review' || (answering && state.model && state.mtab === 'improve')) loadReview();
     if (state.tab === 'exam') loadExam();
     // the Loop board and a topic page: without this nothing ever re-fetched
     // /api/loop, so a board whose first load failed stayed empty for as long
@@ -13426,14 +13463,7 @@ TEMPLATE = """<!doctype html>
 <div class="wrap">
 __BANNER__
   <div id="netstatus"></div>
-  <div class="pagehero" id="pagehero">
-    <p class="eyebrow" id="heroEyebrow"></p>
-    <h1>__TITLE__</h1>
-    <p class="sub" id="pageSub">lm-evaluation-harness results, one self-contained
-    file — data embedded, charts drawn locally, nothing fetched.</p>
-    <div class="meta-chips" id="metaChips"></div>
-    <div class="hero-acts" id="heroActs"></div>
-  </div>
+  <div class="meta-chips" id="metaChips"></div>
   <div id="view"></div>
   <button class="totop" id="toTop" hidden>&#8593; Top</button>
   <footer>Every score carries its standard error · differences are z-tested before

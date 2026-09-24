@@ -18,7 +18,7 @@ from urllib.parse import quote
 
 import pytest
 
-from conftest import go_tab, open_filters, show_all_columns
+from conftest import go_tab, model_tab, open_filters, open_kind, show_all_columns
 
 pytestmark = pytest.mark.dashboard
 
@@ -109,13 +109,35 @@ def test_old_hashes_still_land_where_they_used_to(surface):
     assert surface.errors == []
 
 
+def diagnose_card(pg):
+    """Diagnose: on the model page's Scores tab, under Standard's "What the
+    score can't show" (12b.2) — benchmark item analysis, not the loop"""
+    open_kind(pg, "standard")
+    fold = pg.locator("[data-cant-show]")
+    if fold.get_attribute("open") is None:
+        pg.locator("[data-cant-show] > summary").click()
+    return pg.locator("#sec-diagnose")
+
+
+def judged_card(pg):
+    """the exam's section, in its block on Scores (12b.2)"""
+    open_kind(pg, "exam")
+    return pg.locator("#sec-judged")
+
+
+def taught_card(pg):
+    """What the training taught: the model's History tab (12b.2)"""
+    model_tab(pg, "history")
+    return pg.locator(".card", has=pg.locator("h2", has_text="What the training taught"))
+
+
 def _mmlu_details(pg, card):
     return card.locator("details.dx", has=pg.locator(".dxname", has_text=re.compile(r"^mmlu[^_]", re.I))).first
 
 
 def test_model_page_shows_the_diagnose_card(surface, diag):
     pg = surface.open(model_link("fx/skewed-360m"))
-    card = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+    card = diagnose_card(pg)
     assert card.count() == 1
     assert "No per-item diagnosis on file" not in card.text_content()
     # the finding planted in this model is the one the card leads with
@@ -136,7 +158,7 @@ def test_model_page_shows_the_diagnose_card(surface, diag):
 
 def test_model_without_a_diagnosis_says_so(surface, tree):
     pg = surface.open(model_link(tree["nodiag"]))
-    card = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+    card = diagnose_card(pg)
     assert card.count() == 1
     assert "No per-item diagnosis on file for this model" in card.inner_text()
     assert card.locator("details.dx").count() == 0
@@ -184,14 +206,14 @@ def test_no_horizontal_scroll_at_phone_width(surface):
         surface.tab(label)
         assert surface.fits(), f"{label} overflows 430px"
     surface.open(model_link("fx/skewed-360m"))
-    pg.locator("details.dx > summary").first.click()               # open a task's detail
+    diagnose_card(pg).locator("details.dx > summary").first.click()   # open a task's detail
     assert surface.fits(), "model page overflows 430px"
     assert surface.errors == []
 
 
 def test_categories_first_subjects_on_expand(surface, diag):
     pg = surface.open(model_link("fx/good-750m"))
-    card = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+    card = diagnose_card(pg)
     mmlu = _mmlu_details(pg, card)
     mmlu.locator("> summary").click()
     cats = mmlu.locator("details.dxcat")
@@ -223,7 +245,7 @@ def test_categories_first_subjects_on_expand(surface, diag):
 
 def test_categories_under_a_score_at_chance_are_not_a_claim(surface):
     pg = surface.open(model_link("fx/chance-160m"))
-    card = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+    card = diagnose_card(pg)
     mmlu = _mmlu_details(pg, card)
     assert "how the model guesses per category" in mmlu.text_content()
 
@@ -231,7 +253,7 @@ def test_categories_under_a_score_at_chance_are_not_a_claim(surface):
 def test_permutation_control_sentence(surface):
     def perm_text(mid):
         pg = surface.open(model_link(mid))
-        card = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+        card = diagnose_card(pg)
         p = card.locator(".dxperm")
         return p.text_content() if p.count() else None
     skewed = perm_text("fx/skewed-360m")
@@ -279,33 +301,30 @@ def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
     assert surface.errors == []
 
 
-def test_the_model_page_leads_with_the_exam(surface):
-    """The exam is the instrument, so it comes first; the multiple-choice
-    results and the per-item diagnosis follow as the second opinion. 12a
-    puts the Everyday pilot's five answers above it — a look anyone can
-    read, never a score."""
+def test_the_model_page_scores_are_a_block_per_kind_in_the_kinds_order(surface):
+    """12b.2: Scores is one block per kind of test the model has taken —
+    Standard, Knowledge exam, Everyday tasks, the order they have everywhere.
+    Standard holds Results, and Diagnose under "What the score can't show":
+    the second opinion, free."""
     pg = surface.open(model_link("fx/good-750m"))
-    # 11d: the name is the hero's h1; the first section under it is the exam
     assert pg.locator("[data-model-hero] h1").text_content() == "good-750m"
-    heads = [h.strip() for h in pg.locator("#view .card h2").all_text_contents()]
-    order = [h for h in heads if h]
-    assert order[0].startswith("Everyday tasks")
-    assert order[1] == "Judged free response — the exam"
-    assert order.index("Judged free response — the exam") < order.index("Results")
-    assert order.index("Results") < order.index("Diagnose")
-    assert order[-1] == "Provenance"
-    dx = pg.locator(".card", has=pg.locator("h2", has_text="Diagnose"))
+    kinds = [b.get_attribute("data-kind-block") for b in pg.locator("[data-kind-block]").all()]
+    assert kinds == ["standard", "exam", "everyday"]
+    dx = diagnose_card(pg)
+    assert pg.locator("[data-kind-block='standard'] #sec-results").count() == 1
     assert "The second opinion, free" in dx.text_content()
+    judged = judged_card(pg)
+    assert judged.locator("h2").first.text_content() == "Judged free response — the exam"
     assert surface.errors == []
 
 
 def test_judged_section_and_the_control_sentence(surface, tree):
     pg = surface.open(model_link("fx/skewed-360m"))
-    card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
+    card = judged_card(pg)
     assert card.count() == 1
     text = card.text_content()
     # 11h: plain words — κ is "agreement with a person"
-    assert "Counts." in text and "Agreement with a person:" in text and "stub/overlap-v1" in text
+    assert "Counts." in text and "Agreement with a person:" in text
     assert "Canary steady." in text and "fixed scripts re-graded" in text
     assert card.locator("[data-canary='steady']").count() == 1
     assert "STUB grader" in text                                  # never mistaken for a judgement
@@ -320,12 +339,16 @@ def test_judged_section_and_the_control_sentence(surface, tree):
     assert card.locator("table.jd").count() == 3
     assert card.locator("[data-criteria-table], [data-breakdown-table], "
                         "[data-topic-switch]").count() == 0
+    # 12b.2: the judge's ids are History's, under How it was graded
+    model_tab(pg, "history")
+    assert "stub/overlap-v1" in pg.locator("[data-model-graded]").text_content()
     surface.open(model_link("fx/chance-160m"))
-    card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
+    card = judged_card(pg)
     assert "Didn't know it either way" in card.text_content()
+    # 12b.2: a model that has not sat the exam has no exam block, and its tile says so
     surface.open(model_link(tree["nodiag"]))
-    card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
-    assert "Not judged" in card.text_content()
+    assert pg.locator("[data-kind-block='exam']").count() == 0
+    assert "Not tested" in pg.locator("[data-kind-tile='exam']").text_content()
     assert surface.errors == []
 
 
@@ -350,7 +373,7 @@ def test_judged_columns_appear_once_calibrated(surface):
 
 def test_what_the_training_taught(surface, tree):
     pg = surface.open(model_link("fx/good-750m-tuned-test"))
-    card = pg.locator(".card", has=pg.locator("h2", has_text="What the training taught"))
+    card = taught_card(pg)
     assert card.count() == 1
     text = card.text_content()
     assert "before — good-750m" in text and "after — good-750m-tuned-test" in text
@@ -361,23 +384,25 @@ def test_what_the_training_taught(surface, tree):
     assert "By category — the half we never touched" in text
     assert card.locator("table.jd").nth(1).locator("tbody tr").count() >= 4
     # the category rows in Diagnose carry the same deltas
-    det = pg.locator("details.dx", has=pg.locator(".dxname", has_text=re.compile(r"^mmlu[^_]"))).first
+    det = diagnose_card(pg).locator("details.dx", has=pg.locator(".dxname",
+                                    has_text=re.compile(r"^mmlu[^_]"))).first
     det.locator("> summary").click()
     assert det.locator(".taintdelta").count() >= 4
     assert "vs parent: lb" in det.locator(".taintdelta").first.text_content()
-    # the badge and the head sentence
-    head = pg.locator("#view .card").first
+    # the badge, in the header; the sentence, at the top of Standard (12b.2)
+    head = pg.locator("[data-model-hero]")
     assert head.locator(".badge.taint").count() == 1
-    assert "derived from mmlu diagnostics" in head.text_content()
-    assert "never ranked" in head.text_content()
+    open_kind(pg, "standard")
+    prose = pg.locator("[data-kind-block='standard'] .mprose").text_content()
+    assert "derived from mmlu diagnostics" in prose and "never ranked" in prose
 
     surface.open(model_link("fx/good-750m-tuned-skill"))
-    card = pg.locator(".card", has=pg.locator("h2", has_text="What the training taught"))
+    card = taught_card(pg)
     v = card.locator("[data-verdict]")
     assert v.get_attribute("data-verdict") == "skill" and "calm" in v.get_attribute("class")
     assert "The training taught the skill" in card.text_content()
     surface.open(model_link("fx/good-750m"))
-    assert pg.locator(".card", has=pg.locator("h2", has_text="What the training taught")).count() == 0
+    assert taught_card(pg).count() == 0
     assert surface.errors == []
 
 
@@ -446,7 +471,7 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
     s = Surface(ctx.new_page(), local_judged.as_uri())
     try:
         pg = s.open(model_link("fx/good-750m"))
-        card = pg.locator(".card", has=pg.locator("h2", has_text="Judged free response"))
+        card = judged_card(pg)
         banner = card.locator("[data-provisional='judge']")
         assert banner.count() == 1
         text = banner.text_content()
@@ -579,8 +604,9 @@ def test_screenshots_for_the_pr(surface):
             surface.open("#tab=overview")
             pg.screenshot(path=SCREENS / f"overview-{scheme}-{width}.png", full_page=True)
             surface.open(model_link("fx/skewed-360m"))
-            pg.locator("details.dx > summary").first.click()
-            pg.locator("details.dxcat > summary").first.click()
+            dx = diagnose_card(pg)
+            dx.locator("details.dx > summary").first.click()
+            dx.locator("details.dxcat > summary").first.click()
             pg.screenshot(path=SCREENS / f"model-skewed-{scheme}-{width}.png", full_page=True)
             surface.open("#tab=leaderboard")
             pg.locator("[data-chip='knowledge']").click()
@@ -588,8 +614,8 @@ def test_screenshots_for_the_pr(surface):
             pg.screenshot(path=SCREENS / f"leaderboard-knowledge-{scheme}-{width}.png",
                           full_page=True)
             surface.open(model_link("fx/good-750m-tuned-test"))
-            pg.locator(".card", has=pg.locator("h2", has_text="What the training taught")) \
-              .screenshot(path=SCREENS / f"taught-the-test-{scheme}-{width}.png")
+            taught_card(pg).screenshot(path=SCREENS / f"taught-the-test-{scheme}-{width}.png")
+            model_tab(pg, "scores")
     assert len(list(SCREENS.glob("*.png"))) >= 16
     assert surface.errors == []
 
@@ -676,16 +702,17 @@ def DATA_MODELS(pg):
     return pg.evaluate("DATA.models.map(m => ({id: m.id, name: m.name}))")
 
 
-def test_a_model_page_has_a_sub_nav_and_its_sections(surface):
+def test_a_model_page_has_four_tabs_and_each_holds_its_sections(surface):
+    """12b.2: the sticky section nav is the tabs — Scores (the kinds'
+    blocks), Answers, History (the runs, provenance, how it was graded)"""
     pg = surface.open(model_link("fx/good-750m"))
-    nav = pg.locator("[data-model-nav]")
-    assert nav.count() == 1
-    labels = [nav.locator("a[data-nav]").nth(i).text_content()
-              for i in range(nav.locator("a[data-nav]").count())]
-    assert "Judged" in labels and "Provenance" in labels
-    for a in labels:
-        anchor = nav.locator("a[data-nav]", has_text=a).first.get_attribute("data-nav")
-        assert pg.locator(f"#sec-{anchor}").count() == 1
+    assert pg.locator("[data-model-nav]").count() == 0
+    assert pg.locator("[data-model-tabs] [role=tab]").all_inner_texts() == \
+        ["Scores", "Answers", "History"]
+    for tab, part in (("history", "[data-model-prov]"), ("answers", "[data-model-answers]"),
+                      ("scores", "[data-kind-block='standard']")):
+        model_tab(pg, tab)
+        assert pg.locator(part).count() == 1, tab
     assert surface.errors == []
 
 

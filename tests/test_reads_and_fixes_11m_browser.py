@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 import exam_build as eb
-from conftest import assert_no_report_half_text, open_submit
+from conftest import assert_no_report_half_text, open_kind, open_submit
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11l"
@@ -85,6 +85,7 @@ def test_the_exam_tab_opens_the_practice_half_for_three_topics(live, page):
 def test_the_model_page_has_no_by_criterion_block_and_the_cards_keep_their_strip(live, page):
     page.set_viewport_size({"width": 1400, "height": 1000})
     page.goto(live["base"] + "/#model=" + MODEL.replace("/", "%2F"))
+    open_kind(page, "exam")
     page.wait_for_selector("table[data-judged-topics]")
     for gone in ("[data-topic-switch]", "[data-criteria-table]", "[data-flag-topic]",
                  "[data-breakdown-table]"):

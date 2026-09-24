@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import choose, make_service, set_name, open_submit
+from conftest import choose, make_service, model_tab, open_kind, set_name, open_submit
 
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11i"
 MODEL = "fx/good-750m"                  # judged on every topic with questions
@@ -158,6 +158,12 @@ def judged_on(monkeypatch):
 
 def open_panel(page, base, model=MODEL):
     page.goto(base + "/#model=" + model.replace("/", "%2F"))
+    # 12b.2: a model that has sat the exam sits more from its exam block; one
+    # that has not, from its Knowledge exam tile's Test
+    tile = page.locator("[data-kind-tile='exam']")
+    tile.wait_for()
+    if "none" not in (tile.get_attribute("class") or "").split():
+        open_kind(page, "exam")
     page.locator(f"[data-sit-open='{model}']").click()
     page.wait_for_selector("[data-panel='msit'] [data-exam-picker='msit']")
     return page.locator("[data-panel='msit']")
@@ -348,14 +354,11 @@ def test_every_way_in_opens_the_panel_on_the_model_page(live, page, judged_on):
     # its Sit the exam opens the panel
     page.goto(base + "/#tab=leaderboard")
     page.locator(f"table.lb tbody tr[data-lb-row='{MODEL}'] td.num").first.click()
+    open_kind(page, "exam")                               # 12b.2: its block on Scores
     page.locator(f"[data-sit-open='{MODEL}']").click()
     page.wait_for_selector("[data-panel='msit']")
     assert page.evaluate("state.model") == MODEL
-    # the Overview's loop card
-    page.goto(base + "/")
-    page.locator(f"[data-overview-loop] [data-loop-sit='{MODEL}']").click()
-    page.wait_for_selector("[data-panel='msit']")
-    assert page.evaluate("state.model") == MODEL
+    # (the Overview's loop card went with 12b.2's Home; the Loop tab's stays)
     # the Loop tab, beside "Results for"
     page.goto(base + "/#tab=loop")
     btn = page.locator("[data-loop-sit]")
@@ -593,8 +596,9 @@ def test_a_37_topic_row_is_one_line_and_its_list_opens_by_area(live, page):
         assert lines.count() >= 7                           # grouped by area
         assert re.match(r"^[A-Z][^:]+: ", lines.first.text_content())
         shot(page, "11i-suite-cell-open-1400-light.png")
-        # the model page's runs say it the same way
+        # the model page's runs say it the same way — on its History tab (12b.2)
         page.goto(base + "/#model=" + MODEL.replace("/", "%2F"))
+        model_tab(page, "history")
         page.wait_for_selector(f"tr[data-run='{sid}'] [data-suite-cell='m']")
         assert page.locator(f"tr[data-run='{sid}'] [data-suite-cell='m'] summary") \
             .text_content().startswith(f"judged · {len(exam)} topics")
@@ -619,6 +623,7 @@ def test_screenshots_for_the_pr(live, browser, judged_on, theme):
         page.on("pageerror", lambda e: errors.append(str(e)))
         try:
             page.goto(live["base"] + "/#model=" + MODEL.replace("/", "%2F"))
+            open_kind(page, "exam")
             page.wait_for_selector(f"[data-sit-open='{MODEL}']")
             page.evaluate(f"applyTheme('{theme}')")
             shot(page, f"11i-model-hero-{width}-{theme}.png")

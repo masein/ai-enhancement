@@ -405,41 +405,42 @@ def test_the_frontier_line_goes_through_the_best_point_at_each_size(live, page):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("width", [1280, 1512])
-def test_every_highlight_value_is_one_line(live, page, width):
+def test_every_best_value_is_one_line(live, page, width):
+    """12b.2: Home's highlight cards are the best in each kind of test; a card
+    value is still one line, in the hcard's type, whatever the name beside it"""
     served(page, lambda b: next(m for m in sorted((m for m in b["models"] if m.get("avg") is not None
                                                    and not m.get("duplicateOf")), key=lambda m: -m["avg"]))
            .update(name="qwen35-delta-moe-7d560104-step945-v2"))
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(live["base"] + "/")
-    page.wait_for_selector("[data-highlights] [data-hl='judge']")
-    vals = page.evaluate("""() => [...document.querySelectorAll('[data-hl-value]')].map(v => {
+    page.wait_for_selector("[data-best-value='everyday']")
+    vals = page.evaluate("""() => [...document.querySelectorAll('[data-best-value]')].map(v => {
         const c = getComputedStyle(v);
-        return {k: v.dataset.hlValue, t: v.textContent, h: v.getBoundingClientRect().height,
+        return {k: v.dataset.bestValue, t: v.textContent, h: v.getBoundingClientRect().height,
                 lh: parseFloat(c.lineHeight) || 1.2 * parseFloat(c.fontSize),
                 fs: c.fontSize, ff: c.fontFamily, clipped: v.scrollWidth > v.clientWidth + 1}; })""")
-    assert {v["k"] for v in vals} == {"best", "weakest", "loop", "judge"}
+    assert {v["k"] for v in vals} == {"standard", "exam", "everyday"}
     for v in vals:
         assert v["h"] < 1.5 * v["lh"], v
         assert not v["clipped"], v
         # 11h: 28px, in the sans face with tabular figures
         assert v["fs"] == "28px" and "mono" not in v["ff"].lower(), v
     by = {v["k"]: v["t"] for v in vals}
-    assert re.fullmatch(r"\d+\.\d", by["best"])
-    assert re.fullmatch(r"\d\.\d\d / 4", by["weakest"])
-    assert re.fullmatch(r"\d+ / \d+", by["loop"])
-    assert re.fullmatch(r"\d+ / \d+", by["judge"])
+    assert re.fullmatch(r"\d+\.\d", by["standard"])
+    assert re.fullmatch(r"\d\.\d\d? / 4", by["exam"])
+    assert re.fullmatch(r"\d of \d", by["everyday"])
     # the name: its own line, cut with an ellipsis, whole in the tooltip
-    name = page.locator("[data-hl-name='best']")
+    name = page.locator("[data-best-name='standard']")
     assert name.text_content() == "qwen35-delta-moe-7d560104-step945-v2"
     look = name.evaluate("e => [getComputedStyle(e).fontSize, getComputedStyle(e).textOverflow, e.title]")
     # 11h: the name line is 14px, weight 600
     assert look[0] == "14px" and look[1] == "ellipsis" and look[2].startswith("fx/")
-    # the canary: two decimals
-    v = page.locator("[data-verdict='judge']").text_content()
+    # the canary: two decimals — Judge steadiness is a line under the checks now
+    v = page.locator("#warnings [data-judge-steady]").text_content()
     for x in re.findall(r"(\d+\.\d+) from the (?:human marks|last run)", v):
         assert re.fullmatch(r"\d+\.\d\d", x), v
     if width == 1512:
-        page.locator("[data-highlights]").scroll_into_view_if_needed()
+        page.locator("[data-best-by-kind]").scroll_into_view_if_needed()
         shot(page, "11e-9-highlights-1512-light.png")
     assert page.errors == []
 
@@ -598,14 +599,9 @@ def test_a_dataset_from_before_11a_says_two_are_missing_on_the_topic_page(live, 
 # ---------------------------------------------------------------------------
 
 def test_the_spacing_the_badge_and_the_links(live, page):
+    # (12b.2: Home has no hero and no stats line, so the 12px between them is
+    # gone with them; Insights' 16px stays)
     page.set_viewport_size({"width": 1512, "height": 900})
-    page.goto(live["base"] + "/")
-    page.wait_for_selector("[data-statline]")
-    # 11h: Submit a model is on the hero's right now; the stats line sits
-    # 12px under the whole hero
-    gap = page.evaluate("""() => document.querySelector('[data-statline]').getBoundingClientRect().top
-      - document.getElementById('pagehero').getBoundingClientRect().bottom""")
-    assert abs(gap - 12) <= 1, gap
     open_lb(page, live["base"])
     ins = page.evaluate("""() => { const c = document.querySelector('[data-insights]');
       return c.querySelector('.igrid').getBoundingClientRect().top
@@ -660,7 +656,7 @@ def test_the_unavailable_judged_view_says_why_in_a_sentence(live, page):
 def test_screenshots_for_the_pr(live, page, theme):
     page.set_viewport_size({"width": 1512, "height": 1000})
     page.goto(live["base"] + "/")
-    page.wait_for_selector("[data-highlights] [data-hl='judge']")
+    page.wait_for_selector("[data-best-value='everyday']")
     page.evaluate(f"applyTheme('{theme}')")
     shot(page, f"11e-overview-1512-{theme}.png")
     open_lb(page, live["base"], "&open=" + TOP)

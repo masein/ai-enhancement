@@ -5,7 +5,7 @@ needed — and get it evaluated on a fixed lm-eval suite and placed on a live,
 interactive leaderboard the whole team can read. Training code can also stream
 its metrics here (wandb-style `run.log()`), giving live loss curves, run
 comparison with config diffs, and benchmark scores joined to training steps on
-one Training tab. Built for one shared GPU and a handful of trusted users on a
+Improve ▸ Training runs. Built for one shared GPU and a handful of trusted users on a
 tailnet.
 
 ```
@@ -45,10 +45,10 @@ Details, knobs and troubleshooting: [`SERVICE.md`](SERVICE.md). Manual
 
 ## Use it
 
-- **Browser:** open the dashboard → *Queue* tab → paste an `org/model`
-  id. `quick` = minutes (iteration); `full` = the comparable number. Progress,
-  errors and logs are on the same tab; results land on the leaderboard
-  automatically.
+- **Browser:** open the dashboard → **Test a model** (top right) → paste an
+  `org/model` id. `quick` = minutes (iteration); `full` = the comparable
+  number. Progress is on the run counter beside it (**● n running**), errors
+  and logs on **All runs**; results land on **Models** automatically.
 - **From code / training loops:** the JSON API is the whole product —
   [`API.md`](API.md) documents every endpoint and the checkpoint→submit→collect
   pattern. [`clients/bench_client.py`](clients/bench_client.py) is a
@@ -77,7 +77,7 @@ eval_tasks/
                       the migrated skill items, AUTHORING.md (suite=judged)
 scripts/
   demo_loop.py        the whole loop in one narrated command, against the local model (DEMO.md)
-  exam_build.py       draft (LLM) -> curate (human, Exam tab) -> split by qid -> build harness tasks
+  exam_build.py       draft (LLM) -> curate (human, Benchmarks ▸ Knowledge exam) -> split by qid -> build harness tasks
   judge.py            the local, pinned judge -> judge.json beside each model's results
   judge_calibrate.py  human vs judge: export a CSV, import it, Cohen's kappa gates the suite
 clients/

@@ -17,6 +17,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import open_kind
+
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11k"
 MODEL = "fx/good-750m"
@@ -91,6 +93,7 @@ def test_propose_opens_the_dialog_without_leaving_the_model_page(live, page):
     clear()
     try:
         page.goto(live["base"] + "/#model=" + MODEL.replace("/", "%2F"))
+        open_kind(page, "exam")                        # 12b.2: its block on Scores
         page.wait_for_selector("table[data-judged-topics]")
         page.wait_for_function("() => state.rv.loaded")
         btn = judged_row(page).locator("[data-propose-link]")
@@ -118,6 +121,7 @@ def test_a_topic_with_an_open_proposal_says_review_it(live, page):
     pid = plant_proposal()
     try:
         page.goto(live["base"] + "/#model=" + MODEL.replace("/", "%2F"))
+        open_kind(page, "exam")
         page.wait_for_selector("table[data-judged-topics]")
         link = judged_row(page).locator("[data-review-link]")
         link.wait_for()
@@ -335,6 +339,7 @@ def test_no_page_slides_sideways_on_a_phone(live, browser):
 @pytest.mark.dashboard
 def test_the_area_heading_counts_ticks_and_judged_topics(live, page):
     page.goto(live["base"] + "/#model=" + MODEL.replace("/", "%2F"))
+    open_kind(page, "exam")
     page.locator(f"[data-sit-open='{MODEL}']").click()
     page.wait_for_selector("[data-exam-picker='msit']")
     area = page.locator("[data-panel='msit'] [data-area]").first
