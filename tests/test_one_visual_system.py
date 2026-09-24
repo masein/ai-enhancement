@@ -54,9 +54,12 @@ def test_a_disabled_button_looks_disabled_and_says_why(live, page):
     btn = page.locator("[data-propose='medicine_clinical_health']")
     btn.wait_for()
     assert btn.is_disabled()
-    look = btn.evaluate("""b => { const s = getComputedStyle(b);
-      return [s.cursor, parseFloat(s.opacity)]; }""")
-    assert look[0] == "not-allowed" and look[1] < 1
+    # read off the button on the page now: a poll redraws it every five
+    # seconds, and a detached node's computed style is empty
+    page.wait_for_function("""() => { const b = document.querySelector(
+        "[data-propose='medicine_clinical_health']");
+      const s = b && getComputedStyle(b);
+      return !!s && s.cursor === 'not-allowed' && parseFloat(s.opacity) < 1; }""")
     why = page.locator("[data-topic-page] [data-why='propose']")
     assert why.is_visible() and "under the 30" in why.text_content()
     # the four kinds of button look like four kinds

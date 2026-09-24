@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import open_kind
+
 import judge as jd
 from test_thinking_models_11l import FINISHED, UNFINISHED, rewrite_answers
 
@@ -47,6 +49,7 @@ def shot(page, name, **kw):
 
 def open_model(page, base):
     page.goto(base + "/#model=" + MODEL.replace("/", "%2F"))
+    open_kind(page, "exam")               # 12b.2: the exam is a block on Scores
     page.wait_for_selector("table[data-judged-topics]")
 
 
@@ -118,7 +121,8 @@ def test_the_checks_bar_names_the_model(live, page, reasoned):
     item.wait_for()
     shot(page, "11l-4-checks-1400-light.png")
     page.locator("[data-show-me='judge_unfinished']").click()
-    page.wait_for_selector("table[data-judged-topics]")
+    # Show me lands on the exam's block, open
+    page.wait_for_selector("[data-kind-block='exam'][open] table[data-judged-topics]")
     assert page.evaluate("state.model") == MODEL
     assert page.errors == []
 

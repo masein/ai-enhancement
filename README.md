@@ -106,9 +106,11 @@ ruff check .
 
 `scripts/check.sh` is the check before every merge: ruff, a compile pass over
 `scripts/ service/ clients/`, the unit and API tests, then the Playwright
-browser suite, with tests marked `gpu` or `network` deselected. It ends with
-one line — `lint ok · unit 516/516 · browser 398/398 · 19 min` — that goes in
-the PR under **Local check** (HANDOFF.md § Checks).
+browser suite, with tests marked `gpu` or `network` deselected. It runs them in
+a container (`python:3.12-slim` with the dev requirements and Chromium,
+`scripts/check.Dockerfile`), so it needs Docker and never the host's Python. It
+ends with one line, `lint ok · unit 516/516 · browser 398/398 · 19 min`, which
+goes in the PR under **Local check** (HANDOFF.md § 5b).
 `.github/workflows/ci.yml` runs the same steps, and the Docker image build, but
 only when started by hand: the Actions minutes ran out on 2026-09-24.
 

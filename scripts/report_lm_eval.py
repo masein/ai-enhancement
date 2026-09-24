@@ -1526,7 +1526,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     if unfinished:
         unfinished.sort(key=lambda x: -x[1])
         named = [f"{m['name']} ({gone:,} of {total:,})" for m, gone, total in unfinished]
-        warn('judge_unfinished', 'warning', {'model': unfinished[0][0]["id"]},
+        warn('judge_unfinished', 'warning', {'model': unfinished[0][0]["id"], 'kind': 'exam'},
             f"Answers that never finished: {named[0]}"
             + (f" and {len(named) - 1} more" if len(named) > 1 else ""),
             f"{'; '.join(named[:4])}{', …' if len(named) > 4 else ''}: answers that stopped "
@@ -13136,8 +13136,16 @@ function placeInk(still) {
 let _warnSig = null;
 
 function showMe(show) {
-  // 11l: a check about one model opens that model's page
-  if (show.model) return navigate({ model: show.model, topic: null });
+  // 11l: a check about one model opens that model's page — on the block its
+  // check is about (12b.2 folds all but the newest)
+  if (show.model) {
+    if (show.kind) {
+      (state.mblk[show.model] = state.mblk[show.model] || {})[show.kind] = true;
+      state.mtab = 'scores';
+      state.after = { scroll: `[data-kind-block="${show.kind}"]` };
+    }
+    return navigate({ model: show.model, topic: null });
+  }
   // 12b: the Models tab's list is the Models table: its filters say the same
   if (show.tab === 'models') {
     Object.assign(lbS(), { view: 'standard', chip: 'all', stdChip: 'all', models: null,

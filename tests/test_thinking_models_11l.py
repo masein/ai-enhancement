@@ -211,7 +211,8 @@ def test_revalidate_voids_a_run_graded_on_its_reasoning_and_says_why(svc):
     check = next(c for c in body["checks"] if c["key"] == "judge_unfinished")
     assert check["severity"] == "warning"
     assert "good-750m" in check["short"] and "good-750m" in check["text"]
-    assert check["show"] == {"model": MODEL}
+    # Show me opens the model page on its exam block (12b.2 folds the rest)
+    assert check["show"] == {"model": MODEL, "kind": "exam"}
 
 
 def test_the_answers_endpoint_shows_the_answer_and_marks_no_answer(svc):

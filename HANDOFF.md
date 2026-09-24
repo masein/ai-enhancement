@@ -242,16 +242,22 @@ local, and it is the gate.**
      - a compile pass over `scripts/ service/ clients/`;
      - the unit and API tests (`-m "not gpu and not network and not dashboard"`);
      - the browser suite (`-m dashboard`).
+   - **It runs in a container, never on the host's Python.** The image is
+     `python:3.12-slim` with `requirements-dev.txt`, Playwright's Chromium,
+     git and node (`scripts/check.Dockerfile`, tagged `evalboard-check`).
+     The repo is mounted at its own path, with git's directory beside it.
+     The host needs Docker and nothing else. The first run builds the image
+     (1.2 GB; about an hour on a 30 KB/s link), and later runs reuse it until
+     `requirements-dev.txt` or the Dockerfile changes.
+   - The tests run in UTC, as they did on the CI runner. The date on the
+     summary is the host's.
    - Every step runs even after one fails, and it ends with two lines:
      ```
-     check of b273738 (clean) · 2026-09-24 14:05 +0400
+     check of b273738 (clean) · 2026-09-24 14:05 +0400 · python 3.12.x
      lint ok · unit 516/516 · browser 398/398 · 19 min
      ```
    - `(UNCOMMITTED CHANGES)` in place of `(clean)` means it checked
      something other than the commit, so it doesn't count.
-   - It needs `requirements-dev.txt` installed and
-     `playwright install chromium` done once. `PYTHON=.venv/bin/python
-     scripts/check.sh` picks the interpreter.
 2. **Paste the summary line, the commit and the date into the PR description
    under "Local check".** No summary, no merge. A push after the check needs
    a new check.
