@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import pytest
 
+from conftest import open_filters, open_submit
+
 from test_review_ui import law_under_its_draft_rubric
 
 pytestmark = pytest.mark.dashboard
@@ -23,7 +25,7 @@ def test_the_tokens_are_the_scale(live, page):
     assert tok == ["4px", "8px", "12px", "16px", "24px", "32px", "12px", "14px", "16px", "20px",
                    "28px", "6px", "10px"]
     radii = page.evaluate("""() => [getComputedStyle(document.querySelector('.card')).borderRadius,
-      getComputedStyle(document.querySelector('#themeBtn')).borderRadius]""")
+      getComputedStyle(document.querySelector('header [data-test-model]')).borderRadius]""")
     assert radii == ["10px", "6px"]
     assert page.errors == []
 
@@ -58,7 +60,7 @@ def test_a_disabled_button_looks_disabled_and_says_why(live, page):
     why = page.locator("[data-topic-page] [data-why='propose']")
     assert why.is_visible() and "under the 30" in why.text_content()
     # the four kinds of button look like four kinds
-    page.goto(live["base"] + "/#tab=queue")
+    open_submit(page, live["base"])
     primary = page.get_by_role("button", name="Submit model")
     bg = primary.evaluate("b => getComputedStyle(b).backgroundColor")
     accent = page.evaluate("getComputedStyle(document.body).getPropertyValue('--accent').trim()")
@@ -91,14 +93,14 @@ def test_one_badge_three_tones_and_one_warning_per_row(live, page):
 
 
 def test_one_table_component(live, page):
-    page.goto(live["base"] + "/#tab=models")
-    page.wait_for_selector("table[data-models-table] tbody tr")
-    th = page.locator("table[data-models-table] thead th").first
+    page.goto(live["base"] + "/#tab=models")                  # 12b: one Models table
+    page.wait_for_selector("table[data-lb-table] tbody tr")
+    th = page.locator("table[data-lb-table] thead th").first
     assert th.evaluate("e => getComputedStyle(e).position") == "sticky"
-    heights = page.evaluate("""() => [...document.querySelectorAll('table[data-models-table] tbody tr')]
+    heights = page.evaluate("""() => [...document.querySelectorAll('table[data-lb-table] tbody tr[data-lb-row]')]
       .map(tr => tr.getBoundingClientRect().height)""")
     assert min(heights) >= 39.5
-    num = page.locator("table[data-models-table] tbody td.num").first
+    num = page.locator("table[data-lb-table] tbody td.num.tcell").first      # a score; # is left
     assert num.evaluate("e => getComputedStyle(e).textAlign") == "right"
     assert "tabular-nums" in num.evaluate("e => getComputedStyle(e).fontVariantNumeric")
     assert page.errors == []
@@ -106,13 +108,17 @@ def test_one_table_component(live, page):
 
 def test_an_empty_state_offers_what_fills_it(live, page):
     page.goto(live["base"] + "/#tab=models")
-    page.wait_for_selector("table[data-models-table] tbody tr")
-    page.locator("#view input[type=search]").first.fill("zzz-no-such-model")
-    empty = page.locator("[data-empty]")
+    page.wait_for_selector("table[data-lb-table] tbody tr")
+    # 12b: the Models tab's search is the Models ▾ picker in Filters
+    open_filters(page)
+    page.locator("#pill-models").click()
+    page.locator("#pop-models button", has_text="Clear").click()
+    page.locator("#pop-models [data-models-apply]").click()
+    empty = page.locator("[data-lb-card] [data-empty]")
     empty.wait_for()
     assert "No model matches" in empty.text_content()
     empty.locator("[data-empty-action]").click()
-    page.wait_for_selector("table[data-models-table] tbody tr")
+    page.wait_for_selector("table[data-lb-table] tbody tr")
     assert page.errors == []
 
 
@@ -128,15 +134,15 @@ def test_loading_is_a_skeleton_not_a_word(live, page):
 
 def test_every_action_is_reachable_from_the_keyboard(live, page):
     page.goto(live["base"] + "/#tab=models")
-    page.wait_for_selector("table[data-models-table] thead th[data-sort='params']")
-    th = page.locator("table[data-models-table] thead th[data-sort='params']")
+    page.wait_for_selector("table[data-lb-table] thead th[data-col='params']")
+    th = page.locator("table[data-lb-table] thead th[data-col='params']")
     assert th.get_attribute("tabindex") == "0"
-    before = page.evaluate("JSON.stringify(state.mdl.sort)")
+    before = page.evaluate("JSON.stringify(state.sort)")
     th.focus()
     page.keyboard.press("Enter")
-    page.wait_for_function("b => JSON.stringify(state.mdl.sort) !== b", arg=before)
+    page.wait_for_function("b => JSON.stringify(state.sort) !== b", arg=before)
     # a visible focus ring on a control reached by Tab
-    page.goto(live["base"] + "/#tab=queue")
+    open_submit(page, live["base"])
     page.wait_for_selector("[data-ms='submit'] input")
     page.locator("[data-ms='submit'] input").focus()
     page.keyboard.press("Tab")                                   # to the next control

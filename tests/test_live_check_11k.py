@@ -122,7 +122,7 @@ def test_a_topic_with_an_open_proposal_says_review_it(live, page):
         link = judged_row(page).locator("[data-review-link]")
         link.wait_for()
         assert link.text_content() == "Review it →"
-        assert link.get_attribute("href") == f"#tab=review&read=proposal:{pid}"
+        assert link.get_attribute("href") == f"#tab=improve&sub=review&read=proposal:{pid}"   # 12b
         assert judged_row(page).locator("[data-propose-link]").count() == 0
         link.click()
         page.wait_for_selector("#reader[data-ready='1']")

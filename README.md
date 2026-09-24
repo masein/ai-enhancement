@@ -104,12 +104,13 @@ pytest -q            # under a minute; the dashboard smoke drives Chromium
 ruff check .
 ```
 
-`.github/workflows/ci.yml` runs ruff, a compile pass over `scripts/ service/
-clients/`, pytest, then the Playwright smoke on every push and PR; tests
-marked `gpu` or `network` are deselected there. The Docker image build is a
-separate `workflow_dispatch` job (the base image is multi-GB). The screenshots
-the smoke takes — light and dark, desktop and phone width — are uploaded as a
-CI artifact.
+`scripts/check.sh` is the check before every merge: ruff, a compile pass over
+`scripts/ service/ clients/`, the unit and API tests, then the Playwright
+browser suite, with tests marked `gpu` or `network` deselected. It ends with
+one line — `lint ok · unit 516/516 · browser 398/398 · 19 min` — that goes in
+the PR under **Local check** (HANDOFF.md § Checks).
+`.github/workflows/ci.yml` runs the same steps, and the Docker image build, but
+only when started by hand: the Actions minutes ran out on 2026-09-24.
 
 ## Guarantees worth knowing
 

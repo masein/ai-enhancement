@@ -18,7 +18,7 @@ import time
 
 import pytest
 
-from conftest import choose, go_tab, make_service, set_name
+from conftest import choose, go_tab, make_service, open_filters, open_submit, set_name
 from test_page_recovery import Live
 
 MODEL = "fx/good-750m"
@@ -114,8 +114,7 @@ def test_it_waits_while_a_judged_run_is_sitting_the_exam(svc):
 
 @pytest.mark.dashboard
 def test_submit_answers_with_a_toast_and_no_line_that_stays(live, page):
-    page.goto(live["base"] + "/#tab=queue")
-    set_name(page, "Omar")
+    open_submit(page, live["base"], "Omar")
     box = page.locator("[data-ms='submit'] input")
     box.fill("org/toast-me")
     page.get_by_role("button", name="Submit model").click()
@@ -186,8 +185,7 @@ def test_a_queued_submission_clears_the_form_and_links_to_its_row(live, page, mo
     confirmation takes you to the row it made."""
     from service import config
     monkeypatch.setattr(config, "JUDGE_MODEL", "stub")          # the judged suite is on
-    page.goto(live["base"] + "/#tab=queue")
-    set_name(page, "Omar")
+    open_submit(page, live["base"], "Omar")
     choose(page.get_by_label("suite"), "judged")
     picker = page.locator("[data-exam-picker='submit']")
     picker.wait_for()
@@ -215,7 +213,9 @@ def test_a_queued_submission_clears_the_form_and_links_to_its_row(live, page, mo
                            " const r = e.getBoundingClientRect();"
                            " return r.bottom > 0 && r.top < innerHeight; }", arg=rid)
     assert "landed" in (row.get_attribute("class") or "")
+    # 12b: the dialog closed on success; open again, it starts where it began —
     # the model box and the note are empty, and the button can be pressed again
+    page.locator("[data-test-model]").click()
     assert box.input_value() == ""
     assert note.input_value() == ""
     assert page.get_by_role("button", name="Submit model").is_enabled()
@@ -230,8 +230,7 @@ def test_a_queued_submission_clears_the_form_and_links_to_its_row(live, page, mo
 
 @pytest.mark.dashboard
 def test_the_submit_button_is_held_while_the_request_is_in_flight(live, page):
-    page.goto(live["base"] + "/#tab=queue")
-    set_name(page, "Omar")
+    open_submit(page, live["base"], "Omar")
     page.locator("[data-ms='submit'] input").fill("org/held-while-in-flight")
     # read the button one tick after the click, while the POST is out
     page.evaluate("""() => { const b = [...document.querySelectorAll('button')]
@@ -243,14 +242,14 @@ def test_the_submit_button_is_held_while_the_request_is_in_flight(live, page):
     page.wait_for_selector("[data-toast='submit']")
     held = page.evaluate("window.__held")
     assert held and held[0] == ["Queueing…", True], held
+    page.locator("[data-test-model]").click()             # 12b: closed on success
     assert page.get_by_role("button", name="Submit model").is_enabled()
     assert page.errors == []
 
 
 @pytest.mark.dashboard
 def test_a_refused_submission_keeps_every_field_and_says_why(live, page):
-    page.goto(live["base"] + "/#tab=queue")
-    set_name(page, "Omar")
+    open_submit(page, live["base"], "Omar")
     box = page.locator("[data-ms='submit'] input")
     box.fill("not-a-model-id")
     note = page.get_by_label("note")
@@ -272,8 +271,7 @@ def test_a_refused_submission_keeps_every_field_and_says_why(live, page):
 def test_a_judged_submit_chooses_its_topics(live, page, monkeypatch):
     from service import config, db
     monkeypatch.setattr(config, "JUDGE_MODEL", "stub")         # the judged suite is on
-    page.goto(live["base"] + "/#tab=queue")
-    set_name(page, "Omar")
+    open_submit(page, live["base"], "Omar")
     choose(page.get_by_label("suite"), "judged")
     # 11i: the model page's grouped picker; every topic with questions starts ticked
     boxes = page.locator("[data-submit-topics] input[data-exam-task]:not([disabled])")
@@ -383,6 +381,7 @@ def test_the_leaderboard_shows_six_task_columns_and_says_how_many_are_hidden(bro
         assert task_cols <= 6
         # every task-like column (benchmarks, perplexity, judged topics) is in
         # the Columns popover; what is not shown is counted out loud on the pill
+        open_filters(pg)                                  # 12b: in Filters ▾
         pg.locator("[data-columns-menu]").click()
         pg.wait_for_selector("#pop-columns")
         n_cols = pg.locator("#pop-columns input[data-column]").count()
@@ -471,30 +470,37 @@ def test_training_opens_on_the_most_recent_run(live, page):
 
 @pytest.mark.dashboard
 def test_the_theme_is_a_menu(live, page):
+    # 12b: Theme is in the name menu — settings, not a place
     page.goto(live["base"] + "/")
-    btn = page.locator("#themeBtn")
+    btn = page.locator("#who button.who")
     btn.click()
-    # on the shared popover since 11a: the panel is on the body, keyed pop-theme
-    items = page.locator("#pop-theme [role=menuitemradio]")
+    # on the shared popover since 11a: the panel is on the body
+    items = page.locator("#pop-who [role=menuitemradio]")
     assert items.count() == 4
     assert [i.get_attribute("aria-checked") for i in items.all()].count("true") == 1
-    page.locator("#pop-theme [data-theme='dark']").click()
+    page.locator("#pop-who [data-theme='dark']").click()
     assert page.evaluate("document.documentElement.getAttribute('data-theme')") == "dark"
-    btn.click()
-    assert page.locator("#pop-theme [data-theme='dark']").get_attribute("aria-checked") == "true"
+    assert page.locator("#pop-who [data-theme='dark']").get_attribute("aria-checked") == "true"
     page.keyboard.press("Escape")
-    assert page.locator("#pop-theme").count() == 0
-    assert page.evaluate("document.activeElement.id") == "themeBtn"   # Esc gives it back
+    assert page.locator("#pop-who").count() == 0
+    assert page.evaluate("!!document.activeElement.closest('#who')")   # Esc gives it back
+    page.evaluate("applyTheme('auto')")
     assert page.errors == []
 
 
 def test_two_checkpoints_of_one_run_have_different_labels():
+    import shutil
     import subprocess
+    # node is on a laptop and was on the CI runner; the service image has none,
+    # and deploy step 3 runs this suite there (HANDOFF.md § 5b)
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node not available; the label is checked in a browser too")
     js = ("const midTrunc = (s, n) => s.length <= n ? s : s.slice(0, Math.ceil((n - 1) * 0.45))"
           " + '…' + s.slice(s.length - Math.floor((n - 1) * 0.55));"
           "console.log(midTrunc('qwen35-delta-moe-7d560104-step945', 18));"
           "console.log(midTrunc('qwen35-delta-moe-7d560104-step945-v2', 18));")
     import report_lm_eval as report
     assert "const midTrunc = (s, n) => s.length <= n ? s" in report.JS
-    out = subprocess.run(["node", "-e", js], capture_output=True, text=True).stdout.split()
+    out = subprocess.run([node, "-e", js], capture_output=True, text=True).stdout.split()
     assert len(out) == 2 and out[0] != out[1] and out[0].endswith("step945")

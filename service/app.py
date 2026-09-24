@@ -1674,7 +1674,7 @@ def propose_gate(row: dict | None, topic: str, evidence: bool = True) -> dict:
         dup = db.proposal_active(row["id"], task, topic)
         if dup:
             hard.append((f"proposal #{dup['id']} for this model and topic is already "
-                         f"{dup['status']} — review it in the Review tab",
+                         f"{dup['status']} — review it on Improve ▸ Review",
                          f"proposal #{dup['id']} is already {dup['status']}"))
         if evidence and not hard and not _has_evidence(row["id"], task):
             hard.append(("the judge wrote no comment on a practice answer that scored below 3 "

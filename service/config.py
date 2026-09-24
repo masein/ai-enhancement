@@ -262,7 +262,7 @@ def judged_blocked() -> str:
     if why:
         return why
     if not judged_tasks():
-        return (f"the exam tasks have not been built: curate the bank on the Exam tab, then "
+        return (f"the exam tasks have not been built: curate the bank on Benchmarks ▸ Knowledge exam, then "
                 f"run scripts/exam_build.py build results/full --root {EXAM_DIR}")
     return ""
 

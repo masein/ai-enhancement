@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 import pytest
 
-from conftest import all_rows, choose, go_tab, set_name
+from conftest import all_rows, choose, go_tab, set_name, open_submit
 
 
 pytestmark = pytest.mark.dashboard
@@ -586,7 +586,7 @@ def test_sitting_one_topic_from_its_page(live, page):
     assert panel.locator("[data-sit-blocked]").count() == 1
     assert panel.locator("button[data-sit]").is_disabled()
     # the queue's suite drop-down offers judged all the same, disabled with the reason
-    page.goto(base + "/#tab=queue")
+    open_submit(page, base)
     suite = page.get_by_label("suite")
     suite.click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='judged']")
@@ -596,48 +596,38 @@ def test_sitting_one_topic_from_its_page(live, page):
     assert page.errors == []
 
 
-def test_the_tabs_are_named_once_and_ordered_by_how_often_they_are_opened(live, page):
+def test_the_places_are_named_once_and_their_address_says_so(live, page):
     """Phase 8e P6c, 9b-3: one name per tab, the hash equal to it, the old
-    hashes still landing — and six tabs, the rest under More ▾."""
+    hashes still landing. 12b: four places and nothing under More — the
+    address names the place and its part, and an old one lands there."""
     base = live["base"]
     page.goto(base + "/")
     page.wait_for_selector("#tabs button[role=tab]")
     labels = page.locator("#tabs > button[role=tab]").all_text_contents()
-    assert labels == ["Overview", "Loop", "Models", "Leaderboard", "Queue"]
-    more = page.locator("#moreBtn")
-    assert more.text_content() == "More ▾" and more.get_attribute("aria-haspopup") == "menu"
-    more.click()
-    # the panel lives on the body now (11a's popover), so the tab strip's own
-    # sideways scroller cannot clip it
-    items = page.locator("#pop-more [role=menuitem]").all_text_contents()
-    assert items[:6] == ["Exam", "Review", "Training", "Tasks", "Perplexity & Loss", "Provenance"]
-    page.keyboard.press("Escape")
-    assert page.locator("#pop-more").count() == 0
-    # the hash is the label, and the page said so in SERVICE.md
-    for label, want in (("Loop", "loop"), ("Models", "models"),
-                        ("Queue", "queue"), ("Provenance", "provenance"), ("Exam", "exam")):
+    assert labels == ["Home", "Models", "Improve", "Benchmarks"]
+    assert page.locator("#moreBtn").count() == 0
+    for label, want in (("Loop", "improve&sub=topics"), ("Models", "models"),
+                        ("Queue", "runs"), ("Provenance", "data"),
+                        ("Exam", "benchmarks&sub=exam")):
         go_tab(page, label)
         page.wait_for_selector("#view > *")
         assert page.evaluate("location.hash") == f"#tab={want}", label
-    # a tab under More names itself on the More button while it is open
-    assert page.locator("#moreBtn").text_content() == "Exam ▾"
-    assert page.locator("#moreBtn").get_attribute("aria-selected") == "true"
-    # the hashes people already pasted somewhere
-    for old, label in (("runs", "Provenance ▾"), ("submit", "Queue"),
-                       ("evals", "Provenance ▾"), ("review", "Review ▾")):
+    # the hashes people already pasted somewhere: the place they are in is lit
+    for old, place in (("submit", None), ("evals", None), ("review", "Improve"),
+                       ("loop", "Improve"), ("exam", "Benchmarks"), ("leaderboard", "Models")):
         page.goto(f"{base}/#tab={old}")
         page.wait_for_selector("#view > *")
-        assert page.locator("#tabs button[aria-selected='true']").inner_text() == label, old
-    # the header says what it is, and the theme button says what it does
+        lit = page.locator("#tabs button[aria-selected='true']")
+        assert (lit.inner_text() if lit.count() else None) == place, old
+    # the header says what it is: 11b's live chip is the bar's badge
     page.goto(base + "/")
     page.wait_for_selector("[data-stamp]")
-    # 11b: the live chip is the bar's badge now — "● LIVE · 12:33"
     assert re.fullmatch(r"LIVE · \d\d:\d\d",
                         page.locator("[data-stamp]").text_content())
     assert page.locator("[data-stamp] .dot.ok").count() == 1
-    assert page.locator("#themeBtn").text_content().startswith("Theme")
-    assert ":" not in page.locator("#themeBtn").text_content()
-    assert "theme:" in page.locator("#themeBtn").get_attribute("title")
+    # 12b: the theme is in the name menu, not a button of its own
+    assert page.locator("#themeBtn").count() == 0
+    assert "the theme" in page.locator("#who button[data-who]").get_attribute("title")
     assert page.errors == []
 
 

@@ -82,7 +82,7 @@ def test_with_nothing_judged_the_cards_say_so(live, page):
     served(page, nothing)
     page.goto(live["base"] + "/")
     page.wait_for_selector("[data-highlights]")
-    assert verdict(page, "weakest") == "No model has been judged yet — Loop ▸ Sit the exam."
+    assert verdict(page, "weakest") == "No model has been judged yet — Improve ▸ By topic ▸ Sit the exam."
     n = page.evaluate("DATA.judged.exam.length")
     assert page.locator("[data-hl-value='loop']").text_content() == f"0 / {n}"
     assert page.locator("[data-hl-name='loop']").text_content() == "topics judged"

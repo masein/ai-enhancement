@@ -18,13 +18,17 @@ from urllib.parse import quote
 
 import pytest
 
-from conftest import go_tab, show_all_columns
+from conftest import go_tab, open_filters, show_all_columns
 
 pytestmark = pytest.mark.dashboard
 
-# the tabs the FROZEN page has (the live one adds Training and Submit & Queue)
-FROZEN_TABS = ["Overview", "Models", "Leaderboard", "Tasks", "Perplexity & Loss",
-                "Provenance"]
+# the old tabs the FROZEN page had, and where each one lives now (12b): the
+# place lit in the header, and the address (the live page adds Improve)
+FROZEN_TABS = {"Overview": ("Home", "#tab=home"), "Models": ("Models", "#tab=models"),
+               "Leaderboard": ("Models", "#tab=models"),
+               "Tasks": ("Benchmarks", "#tab=benchmarks&sub=standard"),
+               "Perplexity & Loss": ("Models", "#tab=models&chip=lm"),
+               "Provenance": ("", "#tab=data")}
 SCREENS = Path(__file__).resolve().parent / "_screens"
 
 
@@ -58,9 +62,9 @@ class Surface:
         self.page.wait_for_selector("#view > *")
 
     def selected_tab(self) -> str:
-        # a tab under More shows on the More button itself: "Provenance ▾"
-        return self.page.locator("#tabs button[aria-selected='true']").inner_text() \
-            .removesuffix(" ▾")
+        # 12b: the place that is lit — none on a page such as Data & sources
+        lit = self.page.locator("#tabs button[aria-selected='true']")
+        return lit.inner_text() if lit.count() else ""
 
     def fits(self) -> bool:
         return self.page.evaluate(
@@ -78,14 +82,13 @@ def surface(browser, tree, request):
 
 def test_every_tab_renders_with_zero_console_errors(surface):
     pg = surface.open()
-    assert surface.selected_tab() == "Overview"
-    for label in FROZEN_TABS:
+    assert surface.selected_tab() == "Home"
+    for label, (place, want) in FROZEN_TABS.items():
         surface.tab(label)
-        assert surface.selected_tab() == label
+        assert surface.selected_tab() == place, label
         assert pg.locator("#view > *").count() > 0, label
-        # every tab's hash is its own label's slug — one name per tab
-        assert pg.evaluate("location.hash") == "#tab=" + {
-            "Perplexity & Loss": "perplexity"}.get(label, label.lower())
+        # the address names the place, and the part of it
+        assert pg.evaluate("location.hash") == want, label
     assert surface.errors == []
 
 
@@ -93,10 +96,13 @@ def test_old_hashes_still_land_where_they_used_to(surface):
     """A link someone pasted in a message last month must not silently drop
     the reader on Overview."""
     pg = surface.page
-    for old_hash, label in (("runs", "Provenance"), ("evals", "Provenance"),
-                            ("ppl", "Perplexity & Loss")):
+    for old_hash, place, want in (("evals", "", "#tab=data"), ("provenance", "", "#tab=data"),
+                                  ("ppl", "Models", "#tab=models&chip=lm"),
+                                  ("leaderboard", "Models", "#tab=models"),
+                                  ("tasks", "Benchmarks", "#tab=benchmarks&sub=standard")):
         surface.open("#tab=" + old_hash)
-        assert surface.selected_tab() == label, old_hash
+        assert surface.selected_tab() == place, old_hash
+        assert pg.evaluate("location.hash") == want, old_hash
     # and a hash that means nothing leaves you where you were, not blank
     surface.open("#tab=nonsense")
     assert pg.locator("#view > *").count() > 0
@@ -139,16 +145,16 @@ def test_model_without_a_diagnosis_says_so(surface, tree):
 
 def test_deep_link_and_back_forward(surface):
     pg = surface.open("#tab=leaderboard")
-    assert surface.selected_tab() == "Leaderboard"
+    assert surface.selected_tab() == "Models"
     surface.tab("Tasks")
-    assert pg.evaluate("location.hash") == "#tab=tasks"
+    assert pg.evaluate("location.hash") == "#tab=benchmarks&sub=standard"
     pg.go_back()
-    pg.wait_for_function("location.hash === '#tab=leaderboard'")
-    assert surface.selected_tab() == "Leaderboard"
+    pg.wait_for_function("location.hash === '#tab=models'")
+    assert surface.selected_tab() == "Models"
     assert pg.locator("#view > *").count() > 0
     pg.go_forward()
-    pg.wait_for_function("location.hash === '#tab=tasks'")
-    assert surface.selected_tab() == "Tasks"
+    pg.wait_for_function("location.hash === '#tab=benchmarks&sub=standard'")
+    assert surface.selected_tab() == "Benchmarks"
 
     # into a model page from wherever the board links one, and Back out again
     surface.tab("Leaderboard")
@@ -159,15 +165,15 @@ def test_deep_link_and_back_forward(surface):
     assert pg.evaluate("location.hash") == href
     assert pg.locator("#tabs button[aria-selected='true']").count() == 0
     pg.go_back()
-    pg.wait_for_function("location.hash === '#tab=leaderboard'")
+    pg.wait_for_function("location.hash === '#tab=models'")
     assert pg.locator(".backlink").count() == 0
-    assert surface.selected_tab() == "Leaderboard"
+    assert surface.selected_tab() == "Models"
     assert surface.errors == []
 
 
 def test_unknown_model_link_falls_back_to_the_board(surface):
     surface.open(model_link("nobody/nothing"))
-    assert surface.selected_tab() == "Overview"
+    assert surface.selected_tab() == "Home"
     assert surface.errors == []
 
 
@@ -253,16 +259,18 @@ def test_leaderboard_knowledge_shows_mmlu_by_area_and_by_topic(surface, diag):
     assert pg.locator("table.lb thead th[data-area]").count() >= 1
     assert pg.locator("table.lb thead th[data-task='mmlu']").count() == 1
     # the per-topic columns, one tick away: a topic under 30 items is greyed
+    open_filters(pg)                                      # 12b: in Filters ▾
     pg.locator("[data-columns-menu]").click()
     pg.locator("#pop-columns [data-column-group-all='cats']").click()
     pg.wait_for_selector("table.lb thead th[data-col='cat:Economics']")
     pg.keyboard.press("Escape")
     table = pg.locator("table.lb")
     assert table.locator("td.dim").count() > 0 and table.locator("td.lead").count() > 0
-    # a model without a diagnosis on file has no area to show, and says so with a dash
-    rows = pg.evaluate("""() => [...document.querySelectorAll('table.lb tbody tr[data-lb-row]')]
-      .filter(tr => !mmluCats(DATA.models.find(m => m.id === tr.dataset.lbRow))).length""")
-    assert rows >= 1
+    # a model with nothing on Knowledge — no MMLU, no diagnosis — is not a row
+    # of dashes (12b): it sits under "Not tested on this", collapsed
+    assert pg.locator("table.lb tbody tr[data-lb-row='local/nodiag-step400']").count() == 0
+    pg.locator("[data-not-tested-toggle]").click()
+    pg.wait_for_selector("tr[data-not-tested-row='local/nodiag-step400']")
     # the control column carries its warning in All tasks
     pg.locator("[data-chip='all']").click()
     show_all_columns(pg)                             # six task columns by default (9c)
@@ -322,7 +330,9 @@ def test_judged_section_and_the_control_sentence(surface, tree):
 
 
 def test_judged_columns_appear_once_calibrated(surface):
-    pg = surface.open("#tab=leaderboard")
+    # 12b: the judged columns are the Knowledge exam view's, on the switch
+    pg = surface.open("#tab=models&view=exam")
+    pg.wait_for_selector("table.lb thead th[data-col='javg']")
     show_all_columns(pg)
     # 11f: one line of names; the κ and the 0–4 scale are each judged
     # column's tooltip
@@ -463,13 +473,18 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
         for scheme in ("light", "dark"):
             pg.emulate_media(color_scheme=scheme)
             card.screenshot(path=SCREENS / f"local-judge-provisional-{scheme}.png")
-        # never ranked: its judged cells on the board are blank, with the reason on hover
-        s.open("#tab=leaderboard")
-        show_all_columns(pg)
-        row = pg.locator("table.lb tbody tr", has_text="good-750m").first
+        # never ranked: on the Knowledge exam view its judged cells are blank,
+        # with the reason on hover. It was tested, so it is a row, not one
+        # of the "Not tested on this" (12b)
+        s.open("#tab=models&view=exam")
+        row = pg.locator("table.lb tbody tr[data-lb-row='fx/good-750m']")
+        row.wait_for()
         assert "/4" not in row.text_content()
+        assert row.locator("[data-judged-avg]").count() == 0
         assert any("graded by a local model" in (c.get_attribute("title") or "")
                    for c in row.locator("td").all())
+        pg.locator("[data-not-tested-toggle]").click()
+        assert pg.locator("tr[data-not-tested-row='fx/good-750m']").count() == 0
         assert "were graded by a local model — not a pinned benchmark" in \
             pg.locator("#warnings").text_content()
         assert s.errors == []
@@ -579,51 +594,44 @@ def test_screenshots_for_the_pr(surface):
     assert surface.errors == []
 
 
-def test_the_models_tab_lists_every_model_and_filters_it(surface):
-    """Phase 8e P6b: thirty-three models and no list was the complaint. The
-    two filter rows that floated above the tabs live here now, where what
-    they filter is on screen under them."""
+def test_the_models_table_lists_every_model_and_filters_it(surface):
+    """Phase 8e P6b: thirty-three models and no list was the complaint. 12b:
+    the Models tab and the Leaderboard are one table — every model is a row,
+    or under the one "Not tested on this" line — and its filters, the old
+    tab's included, are in Filters ▾."""
     pg = surface.open("#tab=models")
-    table = pg.locator("table.jd[data-models-table]")
-    rows = table.locator("tbody tr[data-model-row]")
+    rows = pg.locator("table.lb tbody tr[data-lb-row]")
     n = rows.count()
-    assert n == pg.evaluate("DATA.models.length") and n > 3
-    assert pg.locator("[data-model-count]").first.get_attribute("data-model-count") == str(n)
+    line = pg.locator("[data-not-tested]")
+    untested = int(line.get_attribute("data-not-tested")) if line.count() else 0
+    assert n + untested == pg.evaluate("DATA.models.length") and n > 3
     # the old floating filters are gone from the shell
     assert pg.locator("#kindSeg").count() == 0 and pg.locator("#srcSeg").count() == 0
-    # every filter narrows this list, and says so by the count
-    # 11c: the filters are the Leaderboard's "Label: Value ▾" pills
-    pg.locator("#pill-mkind").click()
-    pg.locator("#pop-mkind [data-choice='instruct']").click()
-    pg.wait_for_function("n => document.querySelectorAll('tr[data-model-row]').length < n", arg=n)
-    instruct = pg.locator("tbody tr[data-model-row]").count()
+    open_filters(pg)
+    pg.locator("#pill-kind").click()
+    pg.locator("#pop-kind [data-choice='instruct']").click()
+    pg.wait_for_function("n => document.querySelectorAll('table.lb tbody tr[data-lb-row]')"
+                         ".length < n", arg=n)
+    instruct = rows.count()
     assert 0 < instruct < n
-    assert all("instruct" in pg.locator("tbody tr[data-model-row]").nth(i).text_content()
-               for i in range(instruct))
-    assert pg.locator("#pill-mkind").text_content().startswith("Kind: instruct")
-    pg.locator("#pill-mkind").click()
-    pg.locator("#pop-mkind [data-choice='all']").click()
-    pg.wait_for_function("n => document.querySelectorAll('tr[data-model-row]').length === n", arg=n)
-    # a judged-run filter, because 'which of these sat the exam' is a question
-    pg.locator("#pill-mshow").click()
-    pg.locator("#pop-mshow input[data-filter='judged']").check()
-    pg.wait_for_function("n => document.querySelectorAll('tr[data-model-row]').length <= n", arg=n)
-    judged = pg.locator("tbody tr[data-model-row]").count()
-    assert judged >= 1
-    assert pg.locator("#pill-mshow").get_attribute("data-show-filters") == "judged"
-    pg.locator("#pop-mshow input[data-filter='judged']").uncheck()
+    assert all("instruct" in rows.nth(i).text_content() for i in range(instruct))
+    pg.locator("#pill-kind").click()
+    pg.locator("#pop-kind [data-choice='all']").click()
+    pg.wait_for_function("n => document.querySelectorAll('table.lb tbody tr[data-lb-row]')"
+                         ".length === n", arg=n)
+    # the old tab's search: the Models picker finds by name, id or family
+    pg.locator("#pill-models").click()
+    pg.locator("#pop-models input[type=search]").fill("good")
+    shown = pg.locator("#pop-models [data-model-pick]")
+    assert shown.count() >= 1
+    assert all("good" in pg.locator("#pop-models .mrow").nth(i).text_content()
+               for i in range(shown.count()))
     pg.keyboard.press("Escape")
-    # search
-    pg.get_by_label("filter models").fill("good")
-    pg.wait_for_function("() => document.querySelectorAll('tr[data-model-row]').length >= 1")
-    assert all("good" in pg.locator("tbody tr[data-model-row]").nth(i).text_content()
-               for i in range(pg.locator("tbody tr[data-model-row]").count()))
-    pg.get_by_label("filter models").fill("")
     # sort on a column, both ways
-    pg.locator("th[data-sort='params']").click()
-    first = pg.locator("tbody tr[data-model-row]").first.get_attribute("data-model-row")
-    pg.locator("th[data-sort='params']").click()
-    assert pg.locator("tbody tr[data-model-row]").first.get_attribute("data-model-row") != first
+    pg.locator("table.lb thead th[data-col='params']").click()
+    first = rows.first.get_attribute("data-lb-row")
+    pg.locator("table.lb thead th[data-col='params']").click()
+    assert rows.first.get_attribute("data-lb-row") != first
     SCREENS.mkdir(exist_ok=True)
     pg.screenshot(path=SCREENS / "models-tab.png", full_page=True)
     assert surface.errors == []
@@ -649,18 +657,17 @@ def test_the_radars_model_chips_are_the_only_comparison(surface):
     assert radar.locator("[data-radar-chip]").count() == 5
     drawn = radar.locator("svg.radar").inner_html()
     assert len(drawn) > 200
-    # full: Add is off and says why, and so is a row's own Add to radar
+    # full: Add is off and says why (12b: rows no longer open, so there is
+    # no Add to radar inside one)
     add = pg.locator("#pill-radar-add")
     assert add.is_disabled() and "remove one first" in add.get_attribute("title")
-    pg.locator(f"tr[data-lb-row='{ids[5]}'] button.disclose").click()
-    row_add = pg.locator(f"[data-add-radar='{ids[5]}']")
-    assert row_add.is_disabled() and "remove one first" in row_add.get_attribute("title")
     # remove one: the radar is redrawn without it, and Add comes back
     radar.locator(f"[data-radar-chip='{ids[0]}'] button.xbtn").click()
     pg.wait_for_selector(f"[data-radar-chip='{ids[0]}']", state="detached")
     assert radar.locator("svg.radar").inner_html() != drawn
     assert pg.locator("#pill-radar-add").is_enabled()
-    pg.locator(f"[data-add-radar='{ids[5]}']").click()
+    pg.locator("#pill-radar-add").click()
+    pg.locator(f"#pop-radar-add [data-radar-pick='{ids[5]}']").click()
     pg.wait_for_selector(f"[data-radar-chip='{ids[5]}']")
     assert surface.errors == []
 

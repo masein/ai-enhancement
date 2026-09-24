@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 import exam_build as eb
-from conftest import assert_no_report_half_text
+from conftest import assert_no_report_half_text, open_submit
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11l"
@@ -105,8 +105,10 @@ def test_the_model_page_has_no_by_criterion_block_and_the_cards_keep_their_strip
 # §4: one rule for the three pills
 # ---------------------------------------------------------------------------
 
+# 12b: the bar's pills are the run counter, the status dot and the name menu —
+# Theme is inside the name menu now
 PILLS = {"checks": "#warnings summary[data-warn-summary]", "who": "button.who",
-         "theme": "#themeBtn"}
+         "theme": "#runs [data-runs]"}
 
 
 def test_the_three_header_pills_share_one_padding(live, page):
@@ -225,7 +227,7 @@ def test_a_failed_dataset_says_0_of_n_and_what_went_wrong(live, page):
 
 def test_each_suite_option_says_what_it_gets_you(live, page):
     page.set_viewport_size({"width": 1400, "height": 1000})
-    page.goto(live["base"] + "/#tab=queue")
+    open_submit(page, live["base"])
     help_ = page.locator("[data-suite-help]")
     help_.wait_for()
     assert help_.text_content() == (
@@ -267,7 +269,7 @@ def test_screenshots_for_the_pr(live, browser, theme):
             page.evaluate("document.querySelector(\"[data-panel='rubrics']\").scrollIntoView()")
             page.wait_for_timeout(200)
             shot(page, f"11m-exam-{width}-{theme}.png")
-            page.goto(live["base"] + "/#tab=queue")
+            open_submit(page, live["base"])
             page.locator("[data-suite-help]").wait_for()
             page.evaluate(f"applyTheme('{theme}')")
             page.get_by_label("suite").click()

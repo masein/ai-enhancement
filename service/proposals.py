@@ -10,7 +10,7 @@ The pipeline, and where each safety property lives:
                 justifications_for() filters by split_of(qid) == "diagnose"
                 and strips any exam question text the judge quoted — the
                 justification is about the answer, not the question
-    → HUMAN     approves / edits / rejects in the dashboard's Review tab.
+    → HUMAN     approves / edits / rejects on the dashboard's Improve ▸ Review.
                 The spec text is the airlock; a name is recorded.
     → GENERATOR receives ONLY the approved spec, the topic, a count, a format
                 and a style constraint, and writes prose DOCUMENTS — not
@@ -53,7 +53,7 @@ import diagnose as dx  # noqa: E402
 import exam_build as _exam  # noqa: E402
 
 MAX_JUSTIFICATIONS = 60          # enough to see a pattern; one batch item either way
-EXAMPLES_SHOWN = 8               # what the Review tab shows of what the LLM saw
+EXAMPLES_SHOWN = 8               # what Improve ▸ Review shows of what the LLM saw
 # Training DOCUMENTS, not question-and-answer pairs. Generating items shaped
 # like the exam is the most direct route to teaching the test there is; prose
 # does not have that shape. `free` stays for comparison and is not the

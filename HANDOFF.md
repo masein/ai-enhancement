@@ -93,7 +93,7 @@ scripts/
 eval_tasks/
   fr/                    rubrics (exam.md + per-category), canary.jsonl, legacy seed items
   mmlu_perm/             the permutation control (options rotated) — run as suite=control
-tests/                   185 tests; fixture generator in tests/fixtures/make_fixture.py; CI in .github/workflows/ci.yml
+tests/                   fixture generator in tests/fixtures/make_fixture.py; scripts/check.sh runs them all (§ Checks)
 docs/
   design-diagnose-and-generate.md     the original design (phases 0–2 there = T…6 here)
   prompts/phases-4-5.md               brief that built T, 3b, 4, 5, 6 — superseded where phase-7 disagrees
@@ -224,6 +224,68 @@ them with him if you disagree.
 - The dashboard is one file. No framework, no bundler, no second page. Follow
   its conventions (`el()`, hash routing via `navigate()`, palette variables,
   never red-green as the only encoding, zero-anchored bars).
+
+---
+
+## 5b. Checks — there is no GitHub CI
+
+Since 2026-09-24 the account's 2,000 Actions minutes are used up.
+`.github/workflows/ci.yml` is kept but runs only when started by hand
+(`workflow_dispatch`, Actions ▸ ci ▸ Run workflow). A push or a PR starts
+nothing, so PRs show no failed job and use no minutes. **The check is
+local, and it is the gate.**
+
+1. **Before every merge, run `scripts/check.sh` on the branch head**, with
+   nothing left uncommitted.
+   - It runs what CI ran, in CI's order:
+     - ruff;
+     - a compile pass over `scripts/ service/ clients/`;
+     - the unit and API tests (`-m "not gpu and not network and not dashboard"`);
+     - the browser suite (`-m dashboard`).
+   - Every step runs even after one fails, and it ends with two lines:
+     ```
+     check of b273738 (clean) · 2026-09-24 14:05 +0400
+     lint ok · unit 516/516 · browser 398/398 · 19 min
+     ```
+   - `(UNCOMMITTED CHANGES)` in place of `(clean)` means it checked
+     something other than the commit, so it doesn't count.
+   - It needs `requirements-dev.txt` installed and
+     `playwright install chromium` done once. `PYTHON=.venv/bin/python
+     scripts/check.sh` picks the interpreter.
+2. **Paste the summary line, the commit and the date into the PR description
+   under "Local check".** No summary, no merge. A push after the check needs
+   a new check.
+3. **After every deploy, run the unit suite inside the running `bench`
+   container.** This tests the real image's Python and packages, not only the
+   laptop's. It is deploy step 3 (below). The image has carried pytest and
+   httpx since 12b.1.
+   - **The tests aren't in the image.** They read files the image leaves out
+     (the Dockerfile, `.dockerignore`, `docker-compose.yml`, the docs), so
+     step 3 streams the commit just deployed into `/tmp/check` inside the
+     container with `git archive`.
+   - **It runs with an empty environment (`env -i`).** The container's
+     environment holds the live `BENCH_ROOT`, the live database and the real
+     API keys. `service/config.py` falls back to `BENCH_ROOT` for any path a
+     test doesn't redirect, and a key in the environment changes what a
+     "not configured" test sees. With `env -i`, every fallback lands in
+     `/tmp/check`, as in a fresh CI checkout.
+
+**The deploy steps, from 12b.1 on:**
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check && mkdir /tmp/check && cd /tmp/check && tar -x && exec env -i PATH="$PATH" HOME=/tmp/check LANG=C.UTF-8 python -m pytest -q -p no:cacheprovider -m "not gpu and not network and not dashboard"' 2>&1 | tail -15
+```
+
+**Step 3's expected output:** the last line reads `N passed, M deselected
+in …s`, with no `failed` and no `error`.
+- `test_matches_the_installed_harness` skips on a laptop, where lm_eval isn't
+  installed. It runs here, because the image has lm_eval.
+- A test that fails here and passes in `scripts/check.sh` is a difference in
+  the image: its Python, a package version, or running as root. The page is
+  already up at that point, so step 3 doesn't block the deploy. Send the
+  output, and the fix goes in the next PR.
 
 ---
 
@@ -1629,6 +1691,67 @@ sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "
 4. `#everyday` then shows four models × five questions; every mark opens the
    answer. Qwen3-1.7B's answers are the text after its thinking, and its
    thinking is folded. Nothing of it is on the Leaderboard.
+
+### 12b.1 — the five places: the header, Improve, Benchmarks and Models
+
+Brief: `docs/prompts/phase-12b-five-places.md`. It shipped in two PRs, as
+the brief allows. **12b.1** is §1–§5 and §8's redirects. **12b.2** is §6
+(Home rebuilt), §7 (the model page's tabs, with Run provenance moving to
+History) and the doc links. This PR moves things: tables, readers and
+dialogs keep their code and change container.
+
+- **The views are still the old tab ids** (`leaderboard`, `loop`, `review`,
+  `queue`, `exam`…), so every in-page `navigate({ tab })` still works.
+  `PLACES` groups them:
+  - Home = `overview`
+  - Models = `leaderboard`
+  - Improve = `loop` · `review` · `training`
+  - Benchmarks = `tasks` · `exam` · `everyday`
+  - All runs, Data & sources and Help are pages outside the nav.
+
+  `viewHash`/`viewOfHash` translate between views and addresses, and any
+  legacy address is rewritten in place with `replaceState`.
+- **The header**: four places, then the run counter, **Test a model**, the
+  status dot and the name menu.
+  - Below 720px the places are one **Menu ▾**.
+  - The name menu holds Theme, Data & sources and Help.
+  - There is no More ▾ and no Theme ▾.
+  - Test a model is today's Submit form in a dialog. `#tab=submit` opens it.
+- **Models is one table.**
+  - Its switch is Standard · Knowledge exam · Everyday tasks, kept in
+    `lbS().view`. The exam view is the old `chip: 'judged'`, and
+    Language modelling is `chip: 'lm'` (the old Perplexity page).
+  - All six filters are in Filters ▾. The Models tab's facts are columns
+    under Columns ▸ Model facts, off by default.
+  - There is no row expansion: a click on a row opens the model page.
+  - A model with nothing in the view sits under **Not tested on this (n) ▸**.
+    A model graded by a judge that does not count is still a row.
+
+**Deploy steps, after 12b.1 merges.** Code, plus pytest and httpx in the
+image, which step 3 needs (§ 5b).
+
+```bash
+cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check && mkdir /tmp/check && cd /tmp/check && tar -x && exec env -i PATH="$PATH" HOME=/tmp/check LANG=C.UTF-8 python -m pytest -q -p no:cacheprovider -m "not gpu and not network and not dashboard"' 2>&1 | tail -15
+```
+
+**Expected output:**
+
+1. `up -d --build` ends with the container healthy, and the image build
+   prints `image files OK`.
+2. The log grep prints `no errors`.
+3. The header reads **Home · Models · Improve · Benchmarks**, then
+   **Runs**, **Test a model**, a green dot and your name.
+   - A bookmark to `#tab=leaderboard&chip=math` lands on Models ▸ Math.
+   - `#tab=review&view=datasets` lands on Improve ▸ Review ▸ datasets.
+   - `#everyday` lands on Benchmarks ▸ Everyday tasks.
+4. **Test a model** opens the form as a dialog. Queueing a run shows
+   "Run #n queued — follow it →", and the run counter changes to
+   **● 1 running** once the run starts.
+5. Step 3 ends `N passed, M deselected in …s`, with no `failed` and no
+   `error`. It is the first run of the unit suite inside the image, so a
+   failure here is news about the image (§ 5b): send the output.
 
 ---
 

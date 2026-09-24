@@ -96,7 +96,7 @@ def test_topic_gate_on_the_payload(payload):
     g = topics("fx/good-750m")
     assert g[TASK]["ok"] is True and g[TASK]["why"] is None
     thin = g["exam_law"]
-    assert thin["ok"] is False and "under the 30" in thin["why"] and "Exam tab" in thin["why"]
+    assert thin["ok"] is False and "under the 30" in thin["why"] and "Benchmarks ▸ Knowledge exam" in thin["why"]
     assert thin["short"] and len(thin["short"]) < len(thin["why"])
     assert thin["caution"] is None                       # noise on a row already refused
     # the model that wrote the same sentence every time: the output collapsed
@@ -515,12 +515,28 @@ def test_a_failed_batch_marks_the_proposal_failed(gap, monkeypatch):
 KEY_PATTERNS = [r"sk-ant-[A-Za-z0-9_\-]{10,}", r"\bsk-(?:proj-)?[A-Za-z0-9]{20,}"]
 
 
+def tracked_files() -> list[str]:
+    """git's list in a checkout. Deploy step 3 runs this suite on a `git archive`
+    inside the service image (HANDOFF.md § 5b): no .git, perhaps no git — and
+    an archive holds exactly the tracked files, so every file is the list. An
+    empty list would pass the scan below by checking nothing."""
+    try:
+        r = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True, text=True)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.splitlines()
+    except FileNotFoundError:
+        pass
+    return [str(p.relative_to(REPO)) for p in REPO.rglob("*")
+            if p.is_file() and "__pycache__" not in p.parts]
+
+
 def test_the_key_is_interpolated_never_literal():
     compose = (REPO / "docker-compose.yml").read_text()
     assert re.search(r"LLM_API_KEY:\s*\$\{LLM_API_KEY", compose)
     for pat in KEY_PATTERNS:
         assert not re.search(pat, compose)
-    tracked = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True, text=True).stdout.split()
+    tracked = tracked_files()
+    assert len(tracked) > 100                 # the scan checked the repo, not nothing
     for f in tracked:
         p = REPO / f
         if not p.is_file() or p.suffix in (".png",):

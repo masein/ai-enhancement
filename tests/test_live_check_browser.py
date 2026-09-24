@@ -18,16 +18,18 @@ from pathlib import Path
 
 import pytest
 
-from conftest import bar_reveal, label_domains, set_name
+from conftest import bar_reveal, label_domains, set_name, open_submit
 
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11"
 E2E_MS = 30000
 WIDTHS = (1280, 400)
-# key, the button that owns it, and whether its items are a menu
-MENUS = (("more", "#moreBtn", True), ("theme", "#themeBtn", True),
-         ("who", "#who button[data-who]", False))
+# key, the button that owns it, and whether its items are a menu. 12b: More ▾
+# and Theme ▾ are gone; the run counter and the name menu are in the header
+# at every width, and Menu ▾ holds the places below 720px
+MENUS = (("runs", "#runs button[data-runs]", False), ("who", "#who button[data-who]", False))
+PLACES_MENU = ("places", "#menuBtn", True)
 
 # every focusable thing in the panel, and whether the point at its centre
 # belongs to it — the clipping bug in one question
@@ -68,9 +70,9 @@ def test_a_menu_is_never_clipped_and_every_item_can_be_clicked(live, page):
     for width in WIDTHS:
         page.set_viewport_size({"width": width, "height": 820})
         page.goto(base + "/")
-        page.wait_for_selector("#tabs #moreBtn")
+        page.wait_for_selector("#who button[data-who]")
         set_name(page, "Omar")
-        for key, sel, _menu in MENUS:
+        for key, sel, _menu in MENUS + ((PLACES_MENU,) if width < 720 else ()):
             panel = open_menu(page, key, sel)
             assert page.locator(sel).get_attribute("aria-expanded") == "true"
             assert page.locator(sel).get_attribute("aria-controls") == f"pop-{key}"
@@ -82,28 +84,30 @@ def test_a_menu_is_never_clipped_and_every_item_can_be_clicked(live, page):
             assert box["x"] >= 7 and box["y"] >= 7, (key, width, box)
             assert box["x"] + box["width"] <= width - 7, (key, width, box)
             assert box["y"] + box["height"] <= 820 - 7, (key, width, box)
-            if key in ("more", "theme"):
-                page.screenshot(path=SCREENS / f"11a-{key}-menu-{width}-light.png")
             # an outside mousedown closes it — the stamp in the header is text
             page.locator("[data-stamp]").click()
             assert page.locator(f"[data-pop='{key}']").count() == 0
             assert page.locator(sel).get_attribute("aria-expanded") == "false"
         # one at a time: opening the next closes the last
-        open_menu(page, "more", "#moreBtn")
-        open_menu(page, "theme", "#themeBtn")
+        open_menu(page, "runs", "#runs button[data-runs]")
+        open_menu(page, "who", "#who button[data-who]")
         assert page.locator("[data-pop]").count() == 1
-        assert page.locator("#moreBtn").get_attribute("aria-expanded") == "false"
+        assert page.locator("#runs button[data-runs]").get_attribute("aria-expanded") == "false"
         page.keyboard.press("Escape")
     assert page.errors == []
 
 
-@pytest.mark.parametrize("key,sel", [("more", "#moreBtn"), ("theme", "#themeBtn")])
-def test_the_menu_keyboard_path(live, page, key, sel):
+def test_the_menu_keyboard_path(live, page):
     """The ARIA menu-button pattern, end to end: ↓ opens and focuses, ↑↓ wrap,
-    Home and End, Esc closes and gives the button back, Tab closes."""
+    Home and End, Esc closes and gives the button back, Tab closes. 12b: the
+    one menu of that kind is Menu ▾, the places below 720px."""
+    key, sel, _menu = PLACES_MENU
     base = live["base"]
+    page.set_viewport_size({"width": 400, "height": 820})
     page.goto(base + "/")
-    page.wait_for_selector("#tabs #moreBtn")
+    # the button is in the page's HTML; its menu is wired once the board has
+    # loaded — a key pressed before then opened nothing, now and then
+    page.wait_for_selector(sel + "[aria-haspopup]")
     page.locator(sel).focus()
     page.keyboard.press("ArrowDown")
     page.wait_for_selector(f"[data-pop='{key}']")
@@ -137,7 +141,7 @@ def test_the_menu_keyboard_path(live, page, key, sel):
 def test_the_name_menu_opens_from_the_keyboard_and_saves(live, page):
     base = live["base"]
     page.goto(base + "/")
-    page.wait_for_selector("#tabs #moreBtn")
+    page.wait_for_selector("#who button[data-who]")
     set_name(page, "Omar")
     page.locator("#who button[data-who]").focus()
     page.keyboard.press("ArrowDown")
@@ -163,22 +167,23 @@ def test_two_polls_do_not_close_an_open_menu(live, page):
     """The board redraws every five seconds. An open menu, the item under the
     keyboard, and the page's scroll are all still there afterwards."""
     base = live["base"]
+    page.set_viewport_size({"width": 700, "height": 700})         # Menu ▾ holds the places
     page.goto(base + "/#tab=loop")
     page.wait_for_selector("table.jd[data-loop-table] tbody tr")
-    page.locator("#moreBtn").focus()
+    page.locator("#menuBtn").focus()
     page.keyboard.press("ArrowDown")
-    page.wait_for_selector("[data-pop='more']")
+    page.wait_for_selector("[data-pop='places']")
     page.keyboard.press("ArrowDown")
     was = page.evaluate("document.activeElement.textContent.trim()")
     page.evaluate("window.scrollTo(0, 120)")
     page.wait_for_timeout(11000)                    # two polls, and two renders
-    assert page.locator("[data-pop='more']").count() == 1
+    assert page.locator("[data-pop='places']").count() == 1
     assert page.evaluate("document.activeElement.textContent.trim()") == was
-    assert page.locator("#moreBtn").get_attribute("aria-expanded") == "true"
+    assert page.locator("#menuBtn").get_attribute("aria-expanded") == "true"
     assert page.evaluate("Math.round(window.scrollY)") == 120
     # the panel is still anchored to the button it belongs to
-    box = page.locator("[data-pop='more']").bounding_box()
-    btn = page.locator("#moreBtn").bounding_box()
+    box = page.locator("[data-pop='places']").bounding_box()
+    btn = page.locator("#menuBtn").bounding_box()
     assert abs(box["y"] - (btn["y"] + btn["height"] + 4)) < 2
     assert page.errors == []
 
@@ -325,7 +330,7 @@ def test_a_model_whose_weights_are_not_here_is_greyed_and_cannot_be_queued(live,
     base = live["base"]
     page.route("**/api/models/suggest*", lambda route: route.fulfill(
         status=200, content_type="application/json", body=json.dumps(SUGGEST)))
-    page.goto(base + "/#tab=queue")
+    open_submit(page, base)
     box = page.locator('[data-ms="submit"] input')
     box.wait_for()
     box.type("qwen35")

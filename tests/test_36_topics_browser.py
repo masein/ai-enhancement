@@ -8,7 +8,7 @@ import socket
 
 import pytest
 
-from conftest import go_tab
+from conftest import go_tab, open_filters
 
 pytestmark = pytest.mark.dashboard
 
@@ -97,25 +97,42 @@ def test_the_model_page_picks_a_judged_topic_from_a_searchable_list(live, page):
     assert page.errors == []
 
 
-def test_the_leaderboard_shows_the_judged_average_and_hides_the_topic_columns(live, page):
-    page.goto(live["base"] + "/#tab=leaderboard")
-    page.wait_for_selector("table.lb")
+def test_the_exam_view_shows_the_judged_average_and_hides_the_topic_columns(live, page):
+    """12b: the judged average is the Knowledge exam view's, not Standard's."""
+    page.goto(live["base"] + "/#tab=models&view=exam")
+    page.wait_for_selector("table.lb tbody tr")
     cols = page.evaluate("[...document.querySelectorAll('table.lb thead th[data-col]')]"
                          ".map(th => th.dataset.col)")
     assert "javg" in cols                                         # shown by default
-    assert not any(c.startswith("cat:") for c in cols)            # categories: hidden
+    assert not any(c.startswith("cat:") for c in cols)            # categories: not here
     assert not any(c.startswith("j:") for c in cols)              # topics: hidden
     avg = page.locator("table.lb tbody tr[data-lb-row='fx/good-750m'] [data-judged-avg]")
     # 11c: one line per cell; 11f: the 0–4 scale is the column name's tooltip
     assert avg.count() == 1 and float(avg.text_content()) >= 0
     assert "0–4" in page.locator("table.lb thead th[data-col='javg']").get_attribute("data-tip")
+    open_filters(page)
     page.locator("[data-columns-menu]").click()
     menu = page.locator("#pop-columns")
     assert menu.locator("[data-column-group='judged']").count() == 1
+    menu.locator("[data-column-group-all='judged']").click()
+    page.wait_for_function("[...document.querySelectorAll('table.lb thead th')]"
+                           ".some(th => (th.dataset.col || '').startsWith('j:'))")
+    # the popover stayed open, and its boxes say what is true now
+    assert menu.locator("[data-column-group='judged'] input:not(:checked)").count() == 0
+    menu.locator("[data-column-group-none='judged']").click()
+    page.wait_for_function("![...document.querySelectorAll('table.lb thead th')]"
+                           ".some(th => (th.dataset.col || '').startsWith('j:'))")
+    page.keyboard.press("Escape")
+    # MMLU's topics are Knowledge's columns, hidden until asked for
+    page.goto(live["base"] + "/#tab=models&chip=knowledge")
+    page.wait_for_function("[...document.querySelectorAll('table.lb thead th')]"
+                           ".some(th => (th.dataset.col || '').startsWith('area:'))")
+    assert page.locator("table.lb thead th[data-col^='cat:']").count() == 0
+    open_filters(page)
+    page.locator("[data-columns-menu]").click()
     menu.locator("[data-column-group-all='cats']").click()
     page.wait_for_function("[...document.querySelectorAll('table.lb thead th')]"
                            ".some(th => th.dataset.col === 'cat:Economics')")
-    # the popover stayed open, and its boxes say what is true now
     assert menu.locator("[data-column-group='cats'] input:not(:checked)").count() == 0
     menu.locator("[data-column-group-none='cats']").click()
     page.wait_for_function("![...document.querySelectorAll('table.lb thead th')]"
@@ -206,7 +223,7 @@ def test_a_row_whose_grading_failed_reads_plainly_and_retries_the_grading(live, 
 
 def test_a_toast_with_a_link_stays_eight_seconds_and_while_it_is_pointed_at(live, page):
     page.goto(live["base"] + "/#tab=overview")
-    page.wait_for_selector("#tabs #moreBtn")
+    page.wait_for_selector("#view .card")
     page.evaluate("toast('plain', { key: 'plain' })")
     page.evaluate("toast('with a link', { key: 'linked', go: () => {}, link: 'see it' })")
     page.wait_for_timeout(5000)

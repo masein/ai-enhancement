@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import label_domains, set_name
+from conftest import label_domains, set_name, open_filters
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11e"
@@ -184,14 +184,17 @@ def test_every_tab_is_itself_at_its_centre_and_the_strip_never_scrolls(live, pag
     # the pill is one button among the bar's buttons: the same height and type
     pill = page.locator("#warnings summary[data-warn-summary]")
     n = int(pill.get_attribute("data-warn-summary"))
-    assert pill.text_content().strip() == f"{n} check{'s' if n != 1 else ''} ▾"
-    look = page.evaluate("""() => [document.querySelector('#warnings summary'), themeBtn,
+    # 12b: the status dot — the count and nothing else
+    assert pill.text_content().strip() == (str(n) if n else "")
+    look = page.evaluate("""() => [document.querySelector('#warnings summary'),
+        document.querySelector('#runs [data-runs]'),
         document.querySelector('#who button')].filter(Boolean).map(e => { const c = getComputedStyle(e);
         return [Math.round(e.getBoundingClientRect().height), c.fontFamily, c.fontSize, c.fontWeight,
                 c.borderTopLeftRadius, c.borderTopWidth]; })""")
     assert len({json.dumps(x) for x in look}) == 1, look
     # and they sit on one line: the same top and bottom
-    ys = page.evaluate("""() => [document.querySelector('#warnings summary'), themeBtn,
+    ys = page.evaluate("""() => [document.querySelector('#warnings summary'),
+        document.querySelector('#runs [data-runs]'),
         document.querySelector('#who button')].filter(Boolean)
       .map(e => [Math.round(e.getBoundingClientRect().top), Math.round(e.getBoundingClientRect().bottom)])""")
     assert len({json.dumps(y) for y in ys}) == 1, ys
@@ -263,37 +266,6 @@ def test_the_model_cells_children_stay_inside_the_cell(live, page, width):
     assert page.errors == []
 
 
-@pytest.mark.parametrize("width", [1280, 1512])
-def test_the_opened_rows_blocks_never_intersect(live, page, width):
-    served(page, _with_a_long_duplicate)
-    page.set_viewport_size({"width": width, "height": 1000})
-    open_lb(page, live["base"], "&status=all&open=" + TOP)
-    page.wait_for_selector(f"{LB} tr[data-lb-detail] .dblock")
-    blocks = page.evaluate(f"""() => [...document.querySelectorAll('{LB} tr[data-lb-detail] .dblock')]
-      .map(b => {{ const r = b.getBoundingClientRect();
-        return {{e: b.querySelector('.eyebrow')?.textContent, x: r.x, y: r.y, width: r.width,
-                 height: r.height}}; }})""")
-    assert len(blocks) >= 3
-    for i, a in enumerate(blocks):
-        for b in blocks[i + 1:]:
-            assert not boxes_intersect(a, b), (a, b)
-    # nothing inside a block paints past its right edge
-    over = page.evaluate(f"""() => [...document.querySelectorAll('{LB} tr[data-lb-detail] .dblock')]
-      .filter(b => b.scrollWidth > b.clientWidth + 1).map(b => b.querySelector('.eyebrow')?.textContent)""")
-    assert over == []
-    # the opened duplicate twin says so in its Links
-    open_lb(page, live["base"], "&status=all")
-    tw = page.evaluate("DATA.models.find(m => m.name === 'qwen35-delta-moe-7d560104-step945-v2').id")
-    page.goto(live["base"] + "/#tab=leaderboard&status=all&open=" + tw)
-    line = page.locator(f"[data-dup-line='{tw}']")
-    line.wait_for()
-    assert line.text_content().startswith("Same run as qwen35-delta-moe-7d560104-step945-v2-resubmitted")
-    if width == 1512:
-        page.locator(f"{LB} tr[data-lb-detail]").scroll_into_view_if_needed()
-        shot(page, "11e-5-opened-row-1512-light.png")
-    assert page.errors == []
-
-
 # ---------------------------------------------------------------------------
 # 6. a stale diagnosis says so
 # ---------------------------------------------------------------------------
@@ -317,15 +289,7 @@ def test_a_stale_diagnosis_says_so_once_and_draws_nothing_empty(live, page):
     assert page.locator("[data-stale-diag='1']").count() == 1
     # no area column, since every model's would be empty
     assert page.locator(f"{LB} thead th[data-area]").count() == 0
-    # an opened row says it in place of eight empty bars
     shot(page, "11e-6-stale-diagnosis-1512-light.png", clip={"x": 0, "y": 0, "width": 1512, "height": 700})
-    page.goto(live["base"] + "/#tab=leaderboard&chip=knowledge&open=" + TOP)
-    blk = page.locator(f"{LB} tr[data-lb-detail] [data-stale-diag='{TOP}']")
-    blk.wait_for()
-    assert blk.text_content() == ("MMLU by area needs a fresh diagnosis — this one was made with "
-                                  "the old 15 categories.")
-    assert page.locator(f"{LB} tr[data-lb-detail] .minibars [data-area-bar], "
-                        f"{LB} tr[data-lb-detail] .minibars").count() == 0
     assert page.errors == []
 
 
@@ -356,6 +320,7 @@ def test_a_fresh_diagnosis_shows_every_area_it_has_a_number_for(live, page):
 
 def test_a_render_keeps_focus_on_the_same_checkbox_in_columns(live, page):
     open_lb(page, live["base"])
+    open_filters(page)                                     # 12b: Columns is in Filters ▾
     page.locator("#pill-columns").click()
     page.wait_for_selector("[data-pop='columns'] input[data-column]")
     box = page.locator("[data-pop='columns'] input[data-column]").nth(2)
@@ -497,27 +462,28 @@ def phone(browser):
     ctx.close()
 
 
-def test_at_400px_the_header_is_two_rows_and_the_rest_is_behind_one_menu(live, phone):
+def test_at_400px_the_header_is_one_line_and_the_places_are_one_menu(live, phone):
+    # 11e made it two rows with a ⋯; 12b makes it one line: the places behind
+    # Menu ▾, and the run counter, Test a model, the dot and the name kept
     page = phone
     page.goto(live["base"] + "/#tab=leaderboard")
     page.wait_for_selector(f"{LB} tbody tr[data-lb-row]")
     h = page.evaluate("document.getElementById('bar').getBoundingClientRect().height")
-    assert h <= 96, h
-    # the checks, the name and the theme are one ⋯ away
-    assert not page.locator("#themeBtn").is_visible()
-    more = page.locator("#barMore")
-    assert more.is_visible() and more.get_attribute("aria-expanded") == "false"
-    shot(page, "11e-10-header-400-light.png", clip={"x": 0, "y": 0, "width": 400, "height": 120})
-    more.click()
-    assert more.get_attribute("aria-expanded") == "true"
-    for sel in ("#warnings summary", "#who button", "#themeBtn"):
+    assert h <= 64, h
+    assert not page.locator("#tabs").is_visible()
+    for sel in ("#runs [data-runs]", "[data-test-model]", "#warnings summary", "#who button"):
         assert page.locator(sel).first.is_visible(), sel
+    menu = page.locator("#menuBtn")
+    assert menu.is_visible() and menu.get_attribute("aria-expanded") == "false"
+    shot(page, "11e-10-header-400-light.png", clip={"x": 0, "y": 0, "width": 400, "height": 120})
+    menu.click()
+    assert menu.get_attribute("aria-expanded") == "true"
+    assert page.locator("#pop-places [data-place]").count() == 4
     shot(page, "11e-10-header-menu-400-light.png")
     page.keyboard.press("Escape")
-    assert not page.locator("#themeBtn").is_visible()
-    assert page.evaluate("document.activeElement.id") == "barMore"
-    # the bar did not grow for having been opened
-    assert page.evaluate("document.getElementById('bar').getBoundingClientRect().height") <= 96
+    assert page.locator("#pop-places").count() == 0
+    assert page.evaluate("document.activeElement.id") == "menuBtn"
+    assert page.evaluate("document.getElementById('bar').getBoundingClientRect().height") <= 64
     assert page.errors == []
 
 
@@ -640,17 +606,11 @@ def test_the_spacing_the_badge_and_the_links(live, page):
     gap = page.evaluate("""() => document.querySelector('[data-statline]').getBoundingClientRect().top
       - document.getElementById('pagehero').getBoundingClientRect().bottom""")
     assert abs(gap - 12) <= 1, gap
-    open_lb(page, live["base"], "&open=" + TOP)
+    open_lb(page, live["base"])
     ins = page.evaluate("""() => { const c = document.querySelector('[data-insights]');
       return c.querySelector('.igrid').getBoundingClientRect().top
         - c.querySelector(':scope > p.sub').getBoundingClientRect().bottom; }""")
     assert abs(ins - 16) <= 1, ins
-    # Links: the buttons are links to look at, flush with the links above
-    links = page.evaluate(f"""() => [...document.querySelectorAll('{LB} tr[data-lb-detail] .dlinks > *')]
-      .map(e => [e.tagName, Math.round(e.getBoundingClientRect().left), getComputedStyle(e).paddingLeft])""")
-    assert len(links) >= 3
-    assert len({x for _, x, _ in links}) == 1, links
-    assert all(p == "0px" for t, _, p in links if t == "BUTTON"), links
     assert page.errors == []
 
 
@@ -670,7 +630,9 @@ def test_the_provisional_badge_is_the_standard_badge(live, page):
     assert page.errors == []
 
 
-def test_the_unavailable_judged_chip_says_why_on_click(live, page):
+def test_the_unavailable_judged_view_says_why_in_a_sentence(live, page):
+    # 11e: the judged chip took the click and said why; 12b: Knowledge exam is
+    # on the switch, and while no judged score counts it says why in a sentence
     def uncal(body):
         body["judged"]["calibration"] = None
         for m in body["models"]:
@@ -680,28 +642,13 @@ def test_the_unavailable_judged_chip_says_why_on_click(live, page):
             m["judgedAvg"] = None
     served(page, uncal)
     open_lb(page, live["base"])
-    chip = page.locator("[data-chip='judged']")
-    # aria-disabled, not disabled: it still takes the click
-    assert chip.get_attribute("aria-disabled") == "true"
-    assert chip.evaluate("b => b.disabled") is False
-    why = chip.get_attribute("title")
-    assert "once a person has agreed with the judge" in why
-    note = page.locator("#" + chip.get_attribute("aria-describedby"))
-    assert note.text_content() == why
-    # no permanent line under the toolbar
-    assert not note.is_visible()
-    chip.click(force=True)
-    assert note.is_visible()
-    # under the chip: below its row of chips, above the pills
-    nb, cb = note.bounding_box(), chip.bounding_box()
-    pb = page.locator("#pill-columns").bounding_box()
-    assert cb["y"] + cb["height"] <= nb["y"] + 0.5 and nb["y"] + nb["height"] <= pb["y"] + 0.5
+    page.locator("[data-models-view='exam']").click()
+    note = page.locator("[data-exam-off]")
+    note.wait_for()
+    assert "once a person has agreed with the judge" in note.text_content()
     h, lh = note.evaluate("e => [e.getBoundingClientRect().height, parseFloat(getComputedStyle(e).lineHeight)]")
-    assert h < 1.5 * lh
-    assert page.locator("[data-chip='all'][aria-pressed='true']").count() == 1
+    assert h < 5 * lh                                      # a sentence, not a panel
     shot(page, "11e-12-judged-chip-note-1280-light.png", clip={"x": 0, "y": 0, "width": 1240, "height": 420})
-    chip.click(force=True)
-    assert not note.is_visible()
     assert page.errors == []
 
 

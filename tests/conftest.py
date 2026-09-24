@@ -8,6 +8,7 @@ own in a function-scoped temp dir.
 from __future__ import annotations
 
 import json
+import os
 import socket
 import sys
 import threading
@@ -181,6 +182,9 @@ def page(browser):
     # (test_masein_seven_11f.py), in contexts of its own.
     ctx = browser.new_context(viewport={"width": 1240, "height": 900}, reduced_motion="reduce")
     pg = ctx.new_page()
+    # a shorter wait for a quick triage run: PW_TIMEOUT_MS=5000
+    if os.environ.get("PW_TIMEOUT_MS"):
+        pg.set_default_timeout(int(os.environ["PW_TIMEOUT_MS"]))
     errors = []
     pg.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
     pg.on("console", lambda m: errors.append(f"console.error: {m.text}")
@@ -190,23 +194,68 @@ def page(browser):
     ctx.close()
 
 
+# 12b: the old tab names, and where each one lives now (the brief's §1)
+PLACE_OF = {
+    "Overview": ("home", None), "Home": ("home", None),
+    "Leaderboard": ("models", None), "Models": ("models", None),
+    "Loop": ("improve", "topics"), "Review": ("improve", "review"),
+    "Training": ("improve", "training"),
+    "Exam": ("benchmarks", "exam"), "Tasks": ("benchmarks", "standard"),
+}
+
+
 def go_tab(page, label: str) -> None:
-    """A tab by its name: one of the six, or one under More ▾ (phase 9b)."""
-    page.wait_for_selector("#tabs #moreBtn")              # the bar is built on first render
-    t = page.get_by_role("tab", name=label, exact=True)
-    if not t.count():
-        page.locator("#moreBtn").click()
-        t = page.get_by_role("menuitem", name=label, exact=True)
-    t.click()
+    """A tab by its old name, reached the way a person reaches it now: a
+    place in the header (Menu ▾ on a phone) and its switch; the run
+    counter's All runs; the name menu's Data & sources (12b)."""
+    page.wait_for_selector("#tabs [role=tab]", state="attached")   # built on first render
+    if label in PLACE_OF:
+        place, sub = PLACE_OF[label]
+        if page.locator("#menuBtn").is_visible():
+            page.locator("#menuBtn").click()
+            page.locator(f"#pop-places [data-place='{place}']").click()
+        else:
+            page.locator(f"#tabs [role=tab][data-tab='{place}']").click()
+        if sub:
+            page.locator(f"[data-subswitch] [data-sub='{sub}']").click()
+        return
+    if label == "Perplexity & Loss":
+        go_tab(page, "Models")
+        page.locator("[data-chip='lm']").click()
+        return
+    if label == "Queue":
+        page.locator("#runs [data-runs]").click()
+        page.locator("[data-all-runs-link]").click()
+        return
+    if label == "Provenance":
+        page.locator("#who button.who").click()
+        page.locator("#pop-who [data-menu='data']").click()
+        return
+    raise AssertionError(f"no place for the old tab {label!r}")
+
+
+def open_filters(page) -> None:
+    """Models' Kind, Size, Status, Columns, Models and Scale live in
+    Filters ▾ at every width (12b): open it if it is not open."""
+    if not page.locator("[data-filter-sheet]").count():
+        page.locator("[data-filters]").click()
+    page.locator("[data-filter-sheet]").wait_for()
+
+
+def open_submit(page, base: str, name: str | None = None) -> None:
+    """Queue ▸ Submit a model is the Test a model dialog now (12b): the old
+    address #tab=submit opens it, over All runs. A name to record is typed
+    in the header first — the dialog covers the header while it is open."""
+    if name:
+        page.goto(base + "/")
+        set_name(page, name)
+    page.goto(base + "/#tab=submit")
+    page.wait_for_selector("[data-dialog='test'] [data-submit-form]")
 
 
 def bar_reveal(page, sel: str) -> bool:
-    """At 400 px the checks, the name and the theme sit behind the bar's ⋯
-    (11e): open it when what we want is in there. True when it opened it."""
-    if page.locator("#barMore").is_visible() and not page.locator(sel).first.is_visible():
-        page.locator("#barMore").click()
-        page.locator(sel).first.wait_for()
-        return True
+    """11e hid the checks, the name and the theme behind ⋯ at 400 px; 12b
+    keeps the right side on the bar at every width. Nothing to reveal."""
     return False
 
 
@@ -231,6 +280,8 @@ def set_name(page, name: str) -> None:
 def show_all_columns(page) -> None:
     """The Leaderboard shows six task columns by default (phase 9c); a test
     about a column that may be hidden asks for all of them first."""
+    if page.locator("[data-filters]").count():            # 12b: the pills are in Filters ▾
+        open_filters(page)
     menu = page.locator("[data-columns-menu]")
     if menu.count() == 0 or not menu.get_attribute("data-hidden-tasks"):
         return

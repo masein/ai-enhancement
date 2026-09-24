@@ -1,15 +1,17 @@
-# Lint, compile, test, and drive the dashboard in Chromium — on every push and
-# PR, on a plain runner: no GPU, no Hub, no torch. Tests that need either are
-# marked `gpu` / `network` and deselected here.
+# Lint, compile, test, and drive the dashboard in Chromium, on a plain runner:
+# no GPU, no Hub, no torch. Tests that need either are marked `gpu` / `network`
+# and deselected here.
 #
-# The Docker image build is a separate job that runs only when asked
-# (workflow_dispatch): the pytorch base image is multi-GB and proving it still
-# builds is not something every push needs to pay for.
+# Manual only since 2026-09-24: the account used its 2,000 Actions minutes, and
+# a push or PR now shows a job that never started. scripts/check.sh runs the
+# same steps locally and is the gate before a merge (HANDOFF.md § Checks). Run
+# this by hand (Actions ▸ ci ▸ Run workflow) when there are minutes to spend.
+#
+# The Docker image build is a separate job in the same manual run: the pytorch
+# base image is multi-GB.
 name: ci
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 concurrency:

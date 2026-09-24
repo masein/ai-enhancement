@@ -110,7 +110,7 @@ def test_the_first_screen_is_the_board_not_banners(browser, payload):
         assert hl["y"] + hl["height"] <= 900, hl
         assert top["y"] < 900, top
         assert pg.locator("#warnings li[data-check]").first.is_hidden()   # the checks: one line
-        assert pg.locator("details[data-how-to-read]").get_attribute("open") is None
+        assert pg.locator("[data-how-to-read]").count() == 0          # 12b: in Help now
         assert s.errors == []
     finally:
         ctx.close()
@@ -139,8 +139,10 @@ def test_the_overview_skips_the_duplicate_and_links_the_preliminary(browser, pay
         link = pg.locator("[data-show-prelim]")
         if link.count():
             link.click()
-            pg.wait_for_selector("#pill-mshow[data-show-filters~='preliminary']")
-            shown = pg.locator("table[data-models-table] tbody tr").count()
+            # 12b: Models is one table; its Status filter says preliminary
+            pg.wait_for_function("lbS().status === 'preliminary'")
+            pg.wait_for_selector("table[data-lb-table] tbody tr[data-lb-row]")
+            shown = pg.locator("table[data-lb-table] tbody tr[data-lb-row]").count()
             assert shown == sum(1 for m in p["models"]
                                 if m.get("avg") is None) or shown <= 25
         assert s.errors == []
@@ -161,10 +163,12 @@ def test_the_overview_has_the_loop_and_a_way_to_submit(live, page):
     btn.click()
     page.wait_for_selector(f"[data-topic-page='{task.removeprefix('exam_')}']")
     page.wait_for_function("m => state.ans.model === m", arg=model)
+    # 12b: Test a model, in the header, is the way to submit: a dialog over Home
     page.goto(base + "/")
-    page.locator("[data-submit-model]").click()
-    page.wait_for_function("location.hash === '#tab=queue'")
-    page.wait_for_function("document.activeElement === document.querySelector('[data-ms=submit] input')")
+    page.locator("header [data-test-model]").click()
+    page.wait_for_function("document.activeElement === "
+                           "document.querySelector('[data-dialog=test] [data-ms=submit] input')")
+    assert page.evaluate("location.hash") in ("", "#tab=home")
     assert page.errors == []
 
 
@@ -185,7 +189,7 @@ def test_one_name_in_the_header_and_no_box_anywhere_else(live, page):
     page.goto(base + "/#tab=exam")
     page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
     set_name(page, "Omar")
-    assert page.locator("#who button[data-who='Omar']").text_content() == "Omar ▾"
+    assert page.locator("#who button[data-who='Omar']").inner_text().strip() == "Omar ▾"
     page.reload()
     page.wait_for_selector("#who button[data-who='Omar']")      # remembered
     assert page.errors == []

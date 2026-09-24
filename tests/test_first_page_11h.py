@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import label_domains
+from conftest import label_domains, open_filters
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11h"
@@ -29,7 +29,9 @@ BANNED = ["diagnosis half", "DIAGNOSIS", "report half", "report-half", "over a p
 # where mono is allowed: numbers in tables, cards and charts, column headers,
 # eyebrows and section indices, badges, model ids, the LIVE badge and the log
 # 12a: .evcount is the Everyday pilot's "4 of 5" — a number, so mono
-MONO_OK = "td.num, th, .eyebrow, .secidx, .badge, .mid, .livebadge, .rd-log, svg, .evcount"
+MONO_OK = ("td.num, th, .eyebrow, .secidx, .badge, .mid, .livebadge, .rd-log, svg, .evcount, "
+           # 12b: the header's counts — runs going, checks that need a look
+           ".statusn, .runpill .num")
 
 
 def api(base, path, body=None):
@@ -98,12 +100,13 @@ def test_the_overview_opens_on_a_compact_hero_the_cards_and_the_top_models(live,
           return { hero: r(h).height, h1: !!h.querySelector('h1') && r(h.querySelector('h1')).width > 1,
             cards: [...document.querySelectorAll('[data-hl]')].map(c => [r(c).bottom, r(c).height]),
             links: [...document.querySelectorAll('.hcard-link')].map(l => Math.round(r(l).bottom)),
-            row: r(document.querySelector('[data-top-models] tbody tr')).bottom,
-            submit: r(document.querySelector('[data-submit-model]')), eb: r(document.getElementById('heroEyebrow')) }; }""")
+            row: r(document.querySelector('[data-top-models] tbody tr')).bottom }; }""")
         assert geo["hero"] <= 120, geo
         assert not geo["h1"]                             # the bar carries the title
-        # Submit a model sits on the hero's right, beside its text
-        assert geo["submit"]["left"] > geo["eb"]["left"] + 400
+        # 12b: Test a model in the header is the one main action, so the
+        # hero has no Submit of its own
+        assert page.locator("#pagehero [data-submit-model]").count() == 0
+        assert page.locator("header [data-test-model]").is_visible()
         assert all(b <= 868 for b, _ in geo["cards"]) and geo["row"] <= 868, geo
         assert len({round(h) for _, h in geo["cards"]}) == 1                 # one height
         assert len(set(geo["links"])) == 1                                   # one baseline
@@ -134,22 +137,22 @@ def test_a_top_models_row_is_washed_end_to_end_on_hover(live, page):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("scale", ["chance", "raw"])
-def test_an_areas_number_is_the_same_in_its_column_and_its_bar(live, page, scale):
+def test_an_areas_column_says_which_scale_its_number_is_on(live, page, scale):
+    """12b removed the row's detail, and its area bars with it; the column's
+    cells and its header still say which scale they are on."""
     page.set_viewport_size({"width": 1512, "height": 900})
     model = "fx/good-750m-tuned-skill"
-    page.goto(live["base"] + f"/#tab=leaderboard&chip=knowledge&open={model}")
-    page.wait_for_selector(f"{LB} tr[data-lb-detail] [data-area-bar]")
+    page.goto(live["base"] + "/#tab=models&chip=knowledge")
+    cell = f'{LB} tr[data-lb-row="{model}"] td[data-area-cell]'
+    page.wait_for_selector(cell)
+    before = page.locator(cell).first.text_content()
     if scale == "raw":
+        open_filters(page)
         page.locator("#pill-scale").click()
         page.locator("#pop-scale [data-choice='raw']").click()
-        page.wait_for_selector("[data-bars-scale='raw']")
-    pairs = page.evaluate(f"""() => [...document.querySelectorAll('{LB} tr[data-lb-detail] [data-area-bar]')]
-      .map(b => {{ const a = b.dataset.areaBar;
-        const td = document.querySelector(`{LB} tr[data-lb-row="{model}"] td[data-area-cell="${{a}}"]`);
-        return [a, b.querySelector('.mb-v').textContent, td && td.textContent.trim()]; }})""")
-    assert pairs and all(bar == col for _, bar, col in pairs), pairs
+        page.wait_for_function(f"""() => document.querySelector('{cell}').textContent !== {before!r}""")
     words = "raw accuracy" if scale == "raw" else "above chance"
-    assert words in page.locator("[data-bars-scale]").text_content()
+    assert words in page.locator(cell).first.get_attribute("data-tip")
     tip = page.locator(f"{LB} thead th[data-area]").first.get_attribute("data-tip")
     assert words in tip
     assert page.errors == []
@@ -163,14 +166,16 @@ def test_an_areas_number_is_the_same_in_its_column_and_its_bar(live, page, scale
 def test_no_chip_makes_the_page_scroll_sideways(live, browser, width):
     ctx, page = new_page(browser, width)
     try:
-        for chip in ("all", "knowledge", "commonsense", "reasoning", "math", "truthfulness", "judged"):
-            page.goto(live["base"] + f"/#tab=leaderboard&chip={chip}")
-            page.wait_for_selector(f"{LB} tbody tr")
+        for chip in ("all", "knowledge", "commonsense", "reasoning", "math", "truthfulness",
+                     "lm", "view=exam", "view=everyday"):
+            page.goto(live["base"] + "/#tab=models&" + (chip if "=" in chip else f"chip={chip}"))
+            page.wait_for_selector("#view .card" if chip in ("lm", "view=everyday") else f"{LB} tbody tr")
             page.wait_for_timeout(150)
             assert page.evaluate("document.documentElement.scrollWidth") <= width, chip
         # every column shown on Knowledge: the table is wider than the card, so
         # it scrolls in its own box, with # and Model pinned, and the fade says so
-        page.goto(live["base"] + "/#tab=leaderboard&chip=knowledge")
+        page.goto(live["base"] + "/#tab=models&chip=knowledge")
+        open_filters(page)
         page.locator("#pill-columns").click()
         page.locator("#pop-columns [data-show-all]").click()
         page.keyboard.press("Escape")
@@ -300,9 +305,9 @@ def test_no_banned_phrase_is_on_a_main_tab(live, page, full_board, where):
 
 def test_there_is_no_sandbox_run(live, page):
     page.goto(live["base"] + "/")
-    page.locator("#moreBtn").click()
-    page.wait_for_selector("[data-pop='more']")
-    assert "Sandbox run" not in page.locator("[data-pop='more']").text_content()
+    page.locator("#who").click()                        # 12b: no More menu; the name menu
+    page.wait_for_selector("#pop-who")
+    assert "Sandbox run" not in page.locator("#pop-who").text_content()
     assert page.locator("#demoItem, [data-demo]").count() == 0
     with pytest.raises(urllib.error.HTTPError) as e:
         urllib.request.urlopen(live["base"] + "/demo", timeout=10)

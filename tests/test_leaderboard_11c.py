@@ -1,6 +1,7 @@
 """11c: the Leaderboard. Topic-group chips, "Label: Value ▾" pills on the
 shared popover, two header rows, one-line cells tinted by their rank on the
-whole board, rows that open in place, and Insights under the table.
+whole board, rows that open the model page (12b; they opened in place until
+then), and Insights under the table.
 
 The rules that do not bend are asserted here too: no provisional score is
 tinted, averaged or put on a frontier, and a tie the z-test cannot break is
@@ -11,9 +12,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from urllib.parse import quote
 
 import pytest
+
+from conftest import open_filters
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11"
@@ -83,6 +85,7 @@ def test_knowledge_shows_mmlu_and_mmlu_by_area(live, page):
       .filter(a => visible().some(m => areaMmlu(m, a)))""") and len(areas) >= 1
     assert page.locator(f"{LB} thead th[data-task='mmlu']").count() == 1
     # the 24 per-topic MMLU columns are one tick away under Columns
+    open_filters(page)                                     # 12b: in Filters ▾
     page.locator("#pill-columns").click()
     page.wait_for_selector("#pop-columns [data-column-group='cats'] input[data-column]")
     assert page.locator("#pop-columns [data-column-group='cats'] input[data-column]").count() >= 1
@@ -99,10 +102,9 @@ def test_knowledge_shows_mmlu_and_mmlu_by_area(live, page):
 
 
 def test_judged_topics_is_live_with_a_calibrated_judge(live, page):
+    # 12b: Judged topics is the Knowledge exam view, on the switch above the chips
     open_lb(page, live["base"])
-    chip = page.locator("[data-chip='judged']")
-    assert chip.is_enabled()
-    chip.click()
+    page.locator("[data-models-view='exam']").click()
     page.wait_for_selector(f"{LB} thead th[data-jarea]")
     assert page.locator(f"{LB} thead th[data-jarea]").count() == 8
     # an area mean needs half its topics judged; below that it says how many
@@ -113,21 +115,20 @@ def test_judged_topics_is_live_with_a_calibrated_judge(live, page):
 
 
 def test_judged_topics_is_disabled_and_says_why_while_provisional(live, page):
+    # 12b: the Knowledge exam view is offered — the scores exist — and says in
+    # one line why none is ranked, instead of an empty table
     uncalibrated(page)
     open_lb(page, live["base"])
-    chip = page.locator("[data-chip='judged']")
-    # 11e: aria-disabled, so a click can say why; the reason is the tooltip,
-    # the description, and a note the click opens — not a permanent line
-    assert chip.get_attribute("aria-disabled") == "true"
-    why = chip.get_attribute("title")
-    assert "once a person has agreed with the judge" in why and "not calibrated" in why
-    assert page.locator("[data-why='judged-chip']").text_content() == why
-    assert chip.get_attribute("aria-describedby") == "why-judged-chip"
-    look = chip.evaluate("b => [getComputedStyle(b).cursor, +getComputedStyle(b).opacity]")
-    assert look[0] == "not-allowed" and look[1] < 1
-    # a pasted hash asking for it lands on All tasks, not on an empty table
-    open_lb(page, live["base"], "&chip=judged")
-    assert page.locator("[data-chip='all'][aria-pressed='true']").count() == 1
+    page.locator("[data-models-view='exam']").click()
+    why = page.locator("[data-exam-off]")
+    why.wait_for()
+    assert "once a person has agreed with the judge" in why.text_content()
+    assert "not calibrated" in why.text_content()
+    assert page.locator(f"{LB}").count() == 0
+    # an old pasted link asking for the chip lands on the same line
+    page.goto(live["base"] + "/#tab=leaderboard&chip=judged")
+    page.wait_for_selector("[data-exam-off]")
+    open_lb(page, live["base"])
     # and the radar's judged source is off for the same reason
     src = page.locator("[data-radar-src='judged']")
     assert src.is_disabled() and "not calibrated" in src.get_attribute("title")
@@ -153,6 +154,7 @@ def test_the_leaders_are_the_whole_boards_and_a_filter_never_changes_them(live, 
     before = leads(page, "hellaswag")
     assert before[TOP] and 1 <= sum(before.values()) < len(before)
     # narrow the rows to the bottom of the board: nobody there becomes a leader
+    open_filters(page)
     page.locator("#pill-size").click()
     page.locator("#pop-size [data-choice='s']").click()
     page.wait_for_selector("#pill-size[data-value='s']")
@@ -205,73 +207,18 @@ def test_every_row_is_one_line(live, page):
     assert page.errors == []
 
 
-def test_an_opened_row_survives_polls_paging_sorting_and_a_pasted_hash(live, page):
+def test_a_row_opens_the_model_page_from_the_keyboard(live, page):
+    # 12b: a row opens the model page, not a panel in place — by the mouse or
+    # by the keyboard, and Back returns to the table
     open_lb(page, live["base"])
     row = page.locator(f"tr[data-lb-row='{TOP}']")
-    row.locator("td.model .se, td.num").first.click()
-    page.wait_for_selector(f"tr.detail[data-lb-detail='{TOP}']")
-    assert row.get_attribute("class").split().count("open") == 1
-    btn = row.locator("button.disclose")
-    assert btn.get_attribute("aria-expanded") == "true"
-    assert btn.get_attribute("aria-controls") == page.locator(
-        f"tr.detail[data-lb-detail='{TOP}']").get_attribute("id")
-    # the detail row holds its blocks
-    detail = page.locator(f"tr.detail[data-lb-detail='{TOP}']")
-    text = detail.text_content()
-    for eyebrow in ("Tasks", "Links"):
-        assert eyebrow in text
-    assert "Open model page →" in text and "#1/" in text
-    # two polls
-    page.wait_for_timeout(11000)
-    assert page.locator(f"tr.detail[data-lb-detail='{TOP}']").count() == 1
-    # a re-sort
-    page.locator(f"{LB} thead th[data-col='params']").click()
-    page.wait_for_selector(f"tr.detail[data-lb-detail='{TOP}']")
-    # a page change, and back (ten fixture models fit one page, so the page
-    # size is set the way the pager's own select sets it)
-    page.evaluate("state.pg.leaderboard.size = 5; state.pg.leaderboard.page = 2; render()")
-    page.wait_for_selector(f"tr.detail[data-lb-detail='{TOP}']", state="detached")
-    page.evaluate("state.pg.leaderboard.page = 1; render()")
-    page.wait_for_selector(f"tr.detail[data-lb-detail='{TOP}']")
-    page.evaluate("state.pg.leaderboard.size = 25; render()")
-    # the hash holds it: a pasted link opens it again, in a fresh page
-    h = page.evaluate("location.hash")
-    assert f"open={quote(TOP, safe='')}" in h
-    page.goto("about:blank")
-    page.goto(live["base"] + "/" + h)
-    page.wait_for_selector(f"tr.detail[data-lb-detail='{TOP}']")
-    # a click on a link keeps the link's own job
-    assert page.locator(f"tr[data-lb-row='{TOP}'] a.mname").get_attribute("href").startswith("#model=")
-    assert page.errors == []
-
-
-def test_a_row_opens_from_the_keyboard(live, page):
-    open_lb(page, live["base"])
-    btn = page.locator(f"tr[data-lb-row='{TOP}'] button.disclose")
-    btn.focus()
+    assert row.get_attribute("tabindex") == "0"
+    row.focus()
     page.keyboard.press("Enter")
-    page.wait_for_selector(f"tr.detail[data-lb-detail='{TOP}']")
-    page.locator(f"tr[data-lb-row='{TOP}'] button.disclose").focus()
-    page.keyboard.press(" ")
-    page.wait_for_selector(f"tr.detail[data-lb-detail='{TOP}']", state="detached")
-    assert page.errors == []
-
-
-def test_a_provisional_row_shows_its_topics_grey_with_the_line_once_and_no_area_mean(live, page):
-    uncalibrated(page)
-    open_lb(page, live["base"])
-    judged = page.evaluate("""() => DATA.models.find(m => Object.keys((m.judge || {}).tasks || {})
-      .some(t => t.startsWith('exam_'))).id""")
-    page.locator(f"tr[data-lb-row='{judged}'] button.disclose").click()
-    detail = page.locator(f"tr.detail[data-lb-detail='{judged}']")
-    detail.wait_for()
-    assert detail.locator("[data-provisional-line]").count() == 1
-    assert "provisional" in detail.locator("[data-provisional-line]").text_content()
-    assert "not ranked" in detail.locator("[data-provisional-line]").text_content()
-    chips = detail.locator(".tchip")
-    assert chips.count() >= 1 and chips.count() == detail.locator(".tchip.grey").count()
-    # no area mean: the chips are topics, each with its own score, and nothing else
-    assert not detail.locator("[data-area-mean]").count()
+    page.wait_for_selector("[data-model-hero]")
+    assert page.evaluate("state.model") == TOP
+    page.go_back()
+    page.wait_for_selector(f"{LB} tbody tr[data-lb-row]")
     assert page.errors == []
 
 
@@ -284,6 +231,7 @@ def test_a_provisional_row_shows_its_topics_grey_with_the_line_once_and_no_area_
                                         ("#pill-kind", "#pop-kind")])
 def test_a_popover_stays_open_across_a_poll(live, page, pill, panel):
     open_lb(page, live["base"])
+    open_filters(page)                                     # 12b: the pills are in Filters ▾
     page.locator(pill).click()
     page.wait_for_selector(panel)
     page.wait_for_timeout(6000)
@@ -294,6 +242,7 @@ def test_a_popover_stays_open_across_a_poll(live, page, pill, panel):
 
 def test_the_models_popover_narrows_the_rows_and_says_how_many(live, page):
     open_lb(page, live["base"])
+    open_filters(page)
     page.locator("#pill-models").click()
     page.wait_for_selector("#pop-models")
     assert page.locator("[data-models-foot]").text_content() == "All models shown"
@@ -315,8 +264,14 @@ def test_the_family_bar_is_never_colour_alone(live, page):
     td = page.locator(f"tr[data-lb-row='{TOP}'] td.model")
     assert "--fam" in (td.get_attribute("style") or "")
     assert "family:" in td.get_attribute("title")
-    page.locator(f"tr[data-lb-row='{TOP}'] button.disclose").click()
-    assert "family" in page.locator(f"tr.detail[data-lb-detail='{TOP}']").text_content()
+    # 12b: and in words, as the Family column under Filters ▾ ▸ Columns
+    open_filters(page)
+    page.locator("#pill-columns").click()
+    page.locator("#pop-columns input[data-column='family']").check()
+    fam = page.locator(f"tr[data-lb-row='{TOP}'] td[data-fact='family']")
+    fam.wait_for()
+    assert fam.text_content() == page.evaluate(f"famOf(DATA.models.find(m => m.id === '{TOP}'))")
+    page.evaluate("localStorage.removeItem('bench-lb-facts')")
     assert page.errors == []
 
 
@@ -387,7 +342,7 @@ def test_weakest_topics_says_so_when_nothing_is_judged(live, page):
     page.route("**/api/results*", handle)
     open_lb(page, live["base"])
     assert page.locator("[data-weakest-empty]").text_content() == \
-        "No model has been judged yet — Loop ▸ Sit the exam"
+        "No model has been judged yet — Improve ▸ By topic ▸ Sit the exam"
     assert page.errors == []
 
 
@@ -422,15 +377,15 @@ def test_screenshots_for_the_pr(live, page):
     SCREENS.mkdir(parents=True, exist_ok=True)
     for width in (1280, 400):
         page.set_viewport_size({"width": width, "height": 900})
-        open_lb(page, live["base"], f"&open={quote(TOP, safe='')}")
-        page.wait_for_selector(f"tr.detail[data-lb-detail='{TOP}']")
+        open_lb(page, live["base"])
         page.wait_for_timeout(300)
-        page.screenshot(path=SCREENS / f"leaderboard-open-{width}-light.png", full_page=True)
+        page.screenshot(path=SCREENS / f"leaderboard-{width}-light.png", full_page=True)
         open_lb(page, live["base"], "&chip=knowledge")
         page.wait_for_timeout(300)
         page.screenshot(path=SCREENS / f"leaderboard-knowledge-{width}-light.png", full_page=True)
     page.set_viewport_size({"width": 1280, "height": 900})
     open_lb(page, live["base"])
+    open_filters(page)
     page.locator("#pill-columns").click()
     page.wait_for_selector("#pop-columns")
     page.screenshot(path=SCREENS / "leaderboard-columns-1280-light.png")

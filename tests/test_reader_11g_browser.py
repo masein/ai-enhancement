@@ -406,14 +406,23 @@ def test_screenshots_for_the_pr(live, page, dataset, run_log, theme):
     assert page.errors == []
 
 
-def test_the_tab_underline_sits_under_a_tab_from_more(live, page):
-    """Found while reading 11g's screenshots: More ▾ sits in a wrapper of its
-    own, and 11f's underline measured it from there — it drew under Overview."""
+@pytest.mark.parametrize("where,place", [("#tab=review", "improve"), ("#tab=exam", "benchmarks"),
+                                         ("#model=fx/good-750m", None)])
+def test_the_tab_underline_sits_under_the_place(live, page, where, place):
+    """Found while reading 11g's screenshots: More ▾ sat in a wrapper of its
+    own, and 11f's underline measured it from there — it drew under Overview.
+    12b: a part of a place underlines the place; a model page, none."""
     page.set_viewport_size({"width": 1400, "height": 900})
-    page.goto(live["base"] + "/#tab=review")
-    page.wait_for_selector("#moreBtn[aria-selected='true']")
+    page.goto(live["base"] + "/" + where)
+    page.wait_for_selector("#view .card")
     page.wait_for_timeout(300)
-    ink, btn = page.evaluate("""() => [document.getElementById('tabInk').getBoundingClientRect(),
-      document.getElementById('moreBtn').getBoundingClientRect()].map(r => [r.left, r.width])""")
+    if place is None:
+        assert page.locator("#tabs [aria-selected='true']").count() == 0
+        assert page.evaluate("getComputedStyle(document.getElementById('tabInk')).opacity") == "0"
+        return
+    sel = f"#tabs [data-tab='{place}']"
+    page.wait_for_selector(sel + "[aria-selected='true']")
+    ink, btn = page.evaluate(f"""() => [document.getElementById('tabInk').getBoundingClientRect(),
+      document.querySelector("{sel}").getBoundingClientRect()].map(r => [r.left, r.width])""")
     assert abs(ink[0] - btn[0]) <= 1 and abs(ink[1] - btn[1]) <= 1, (ink, btn)
     assert page.errors == []

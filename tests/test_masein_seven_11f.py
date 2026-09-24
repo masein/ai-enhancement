@@ -11,15 +11,13 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
-import subprocess
 import urllib.request
 from datetime import date
 from pathlib import Path
 
 import pytest
 
-from conftest import choice
+from conftest import choice, open_filters, open_submit
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11f"
@@ -93,7 +91,9 @@ def test_the_header_is_one_line_of_names_under_a_quiet_group_row(live, page):
     for col in ("mmlu", "hellaswag", "arc_challenge"):
         if col in tips:
             assert re.search(r"\d+-shot", tips[col][0]), tips[col]
-    assert "ARC-C" in [n[0] for n in names] and "UPDATED" in [n[0].upper() for n in names]
+    assert "ARC-C" in [n[0] for n in names]
+    # 12b: Updated is one of the model facts, a column under Filters ▾, off by default
+    assert "UPDATED" not in [n[0].upper() for n in names]
     assert "above chance" in tips["avg"][0]                  # the scale left the header
     assert not page.locator(f"{LB} thead .unit").count()
     # the group row: muted, not the accent — and only on All tasks
@@ -113,6 +113,9 @@ def test_the_header_is_one_line_of_names_under_a_quiet_group_row(live, page):
 
 def test_dates_carry_a_year_only_when_it_is_not_this_one(live, page):
     open_lb(page, live["base"])
+    # 12b: Last evaluated is a model fact under Filters ▾, off by default
+    page.evaluate("localStorage.setItem('bench-lb-facts', '[\"date\"]'); render()")
+    page.wait_for_selector(f"{LB} thead th[data-col='date']")
     i = page.evaluate(f"""[...document.querySelectorAll('{LB} thead tr.names th')]
       .findIndex(t => t.dataset.col === 'date')""")
     dates = page.evaluate(f"""i => [...document.querySelectorAll('{LB} tbody tr[data-lb-row]')]
@@ -122,6 +125,7 @@ def test_dates_carry_a_year_only_when_it_is_not_this_one(live, page):
         m = re.fullmatch(r"(\d{1,2}) ([A-Z][a-z]{2})(?: (\d{4}))?", d)
         assert m, d
         assert (m.group(3) is None) == (int(m.group(3) or this_year) == this_year), d
+    page.evaluate("localStorage.removeItem('bench-lb-facts')")
     assert page.errors == []
 
 
@@ -151,7 +155,8 @@ def test_no_error_on_a_cell_by_default_and_the_switch_puts_it_back(live, page):
     cells.first.focus()
     page.wait_for_function("getComputedStyle(document.querySelector('#tip')).opacity === '1'")
     assert "±" in page.locator("#tip").text_content()
-    # the switch, in Columns, remembered in this browser
+    # the switch, in Columns (12b: under Filters ▾), remembered in this browser
+    open_filters(page)
     page.locator("#pill-columns").click()
     page.locator("#pop-columns [data-show-se]").check()
     page.wait_for_function(f"document.querySelector('{LB} tbody').textContent.includes('±')")
@@ -159,6 +164,7 @@ def test_no_error_on_a_cell_by_default_and_the_switch_puts_it_back(live, page):
     page.reload()
     page.wait_for_selector(f"{LB} tbody tr[data-lb-row]")
     assert "±" in page.locator(f"{LB} tbody").text_content()
+    open_filters(page)
     page.locator("#pill-columns").click()
     page.locator("#pop-columns [data-show-se]").uncheck()
     page.wait_for_function(f"!document.querySelector('{LB} tbody').textContent.includes('±')")
@@ -201,138 +207,31 @@ def test_the_bold_cells_are_exactly_the_z_tests_best_or_tied_set(live, page):
 
 
 # ---------------------------------------------------------------------------
-# 2. opening a row
-# ---------------------------------------------------------------------------
-
-def test_a_toggle_animates_the_row_and_a_poll_does_not(live, browser):
-    ctx, page = new_page(browser, reduced_motion="no-preference")
-    open_lb(page, live["base"])
-    page.evaluate(RECORD)
-    page.locator(f"tr[data-lb-row='{TOP}'] button.disclose").click()
-    page.wait_for_selector(f"tr[data-lb-detail='{TOP}']")
-    page.wait_for_function("() => !document.querySelector('.dwrap.anim')")
-    seen = page.evaluate("window.__cls")
-    assert any(c.startswith("dwrap:") and "anim" in c for c in seen), seen
-    # the panel's height ends at its content's
-    h = page.evaluate("""() => { const w = document.querySelector('.dwrap');
-      return [w.getBoundingClientRect().height, w.querySelector('.dinner').scrollHeight]; }""")
-    assert abs(h[0] - h[1]) < 1.5, h
-    # a poll draws it open, still
-    page.evaluate("window.__cls = []")
-    page.evaluate("render()")
-    assert not any("anim" in c for c in page.evaluate("window.__cls") if c.startswith("dwrap:"))
-    assert page.locator(f"tr[data-lb-detail='{TOP}']").count() == 1
-    assert page.errors == []
-    ctx.close()
-
-
-def test_under_reduced_motion_the_row_opens_at_once(live, browser):
-    ctx, page = new_page(browser, reduced_motion="reduce")
-    try:
-        open_lb(page, live["base"])
-        dur = page.evaluate("getComputedStyle(document.body).getPropertyValue('--dur-row').trim()")
-        assert dur in ("0ms", "0s")
-        page.evaluate(RECORD)
-        page.locator(f"tr[data-lb-row='{TOP}'] button.disclose").click()
-        page.wait_for_selector(f"tr[data-lb-detail='{TOP}']")
-        assert not any("anim" in c for c in page.evaluate("window.__cls"))
-        assert page.evaluate("document.querySelector('.dwrap').getBoundingClientRect().height") > 100
-        assert page.errors == []
-    finally:
-        ctx.close()
-
-
-@pytest.mark.parametrize("how", ["escape", "close"])
-def test_esc_or_close_shuts_the_row_and_gives_the_chevron_the_focus(live, page, how):
-    open_lb(page, live["base"], "&open=" + TOP)
-    page.wait_for_selector(f"tr[data-lb-detail='{TOP}']")
-    if how == "escape":
-        page.locator(f"tr[data-lb-row='{TOP}']").focus()
-        page.keyboard.press("Escape")
-    else:
-        page.locator(f"[data-detail-close='{TOP}']").click()
-    page.wait_for_selector(f"tr[data-lb-detail='{TOP}']", state="detached")
-    page.wait_for_function("document.activeElement && document.activeElement.dataset.openRow === "
-                           + json.dumps(TOP))
-    assert page.locator(f"button[data-open-row='{TOP}']").get_attribute("aria-expanded") == "false"
-    assert TOP not in page.evaluate("decodeURIComponent(location.hash)").split("open=")[-1]
-    assert page.errors == []
-
-
-def test_the_tasks_list_is_one_line_a_task(live, page):
-    page.set_viewport_size({"width": 1280, "height": 900})
-    open_lb(page, live["base"], "&open=" + TOP)
-    lines = page.locator(f"tr[data-lb-detail='{TOP}'] [data-task-line]")
-    lines.first.wait_for()
-    hs = page.evaluate("""() => [...document.querySelectorAll("tr[data-lb-detail] [data-task-line]")]
-      .map(l => l.getBoundingClientRect().height)""")
-    assert hs and max(hs) <= 30, hs
-    assert page.locator(f"tr[data-lb-detail='{TOP}'] [data-task-line] .tl-b").count() >= 5
-    assert page.errors == []
-
-
-def test_the_recording_of_a_row_opening_and_closing(live, browser, tmp_path):
-    """The PR carries this: a GIF (and an MP4) of the motion, from a real run."""
-    ctx = browser.new_context(viewport={"width": 1280, "height": 760},
-                              record_video_dir=str(tmp_path), record_video_size={"width": 1280, "height": 760})
-    page = ctx.new_page()
-    try:
-        open_lb(page, live["base"])
-        page.wait_for_timeout(600)
-        for _ in range(2):
-            page.locator(f"tr[data-lb-row='{TOP}'] button.disclose").click()
-            page.wait_for_timeout(900)
-            page.locator(f"tr[data-lb-row='{TOP}'] button.disclose").click()
-            page.wait_for_timeout(900)
-        video = page.video.path()
-    finally:
-        ctx.close()
-    SCREENS.mkdir(parents=True, exist_ok=True)
-    webm = SCREENS / "11f-row-open-close.webm"
-    shutil.copy(video, webm)
-    ff = shutil.which("ffmpeg")
-    if ff:
-        subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(webm), "-vf",
-                        "fps=24,scale=960:-1:flags=lanczos", "-pix_fmt", "yuv420p",
-                        str(SCREENS / "11f-row-open-close.mp4")], check=True)
-        subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(webm), "-vf",
-                        "fps=15,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse",
-                        str(SCREENS / "11f-row-open-close.gif")], check=True)
-        assert (SCREENS / "11f-row-open-close.gif").stat().st_size > 10_000
-    assert webm.stat().st_size > 10_000
-
-
-# ---------------------------------------------------------------------------
 # 4. a new page starts at the top; Back returns to where you were
 # ---------------------------------------------------------------------------
 
 def test_a_new_page_starts_at_the_top_and_back_returns_to_where_you_were(live, page):
-    page.set_viewport_size({"width": 1280, "height": 800})
-    ids = [m["id"] for m in results(live["base"])["models"]]
-    # every row opened: a Leaderboard tall enough to scroll 2,000px down it
-    open_lb(page, live["base"], "&open=" + ",".join(ids))
-    page.wait_for_function("document.documentElement.scrollHeight > 3200")
-    page.evaluate("window.scrollTo(0, 2000)")
+    # 12b: rows no longer open in place, so the tall page is Improve ▸ By topic,
+    # thirty-six topics long, and its links open topic pages
+    page.set_viewport_size({"width": 1280, "height": 600})
+    page.goto(live["base"] + "/#tab=improve&sub=topics")
+    page.wait_for_selector("[data-loop-table] a[href^='#topic=']")
+    page.wait_for_function("document.documentElement.scrollHeight > 2200")
+    page.evaluate("window.scrollTo(0, 1500)")
     page.wait_for_timeout(300)                            # the scroll is saved on the entry
     # a link well clear of the sticky bar and the table's sticky header: a
     # click on a covered one makes the browser scroll first
-    link = page.evaluate("""() => { const a = [...document.querySelectorAll('a.mname')]
+    link = page.evaluate("""() => { const a = [...document.querySelectorAll("[data-loop-table] a[href^='#topic=']")]
         .find(a => { const r = a.getBoundingClientRect(); return r.top > 220 && r.bottom < innerHeight - 40; });
       return a && a.getAttribute('href'); }""")
-    assert link, "a model link in view at 2,000px"
-    assert page.evaluate("Math.round(scrollY)") == 2000
-    page.locator(f"a.mname[href='{link}']").first.click()
-    page.wait_for_selector("[data-model-hero]")
+    assert link, "a topic link in view at 1,500px"
+    assert page.evaluate("Math.round(scrollY)") == 1500
+    page.locator(f"[data-loop-table] a[href='{link}']").first.click()
+    page.wait_for_selector("[data-topic-back]")
     assert page.evaluate("Math.round(scrollY)") == 0
     page.go_back()
-    page.wait_for_selector(f"{LB} tbody tr[data-lb-row]")
-    page.wait_for_function("Math.abs(scrollY - 2000) <= 50", timeout=5000)
-    # "← Back to …" is Back too
-    page.locator(f"a.mname[href='{link}']").first.click()
-    page.wait_for_selector("[data-model-hero]")
-    page.locator("a.backlink").click()
-    page.wait_for_selector(f"{LB} tbody tr[data-lb-row]")
-    page.wait_for_function("Math.abs(scrollY - 2000) <= 50", timeout=5000)
+    page.wait_for_selector("[data-loop-table] a[href^='#topic=']")
+    page.wait_for_function("Math.abs(scrollY - 1500) <= 50", timeout=5000)
     assert page.errors == []
 
 
@@ -407,7 +306,7 @@ def test_a_navigation_plays_the_entrance_and_a_poll_does_not(live, browser):
     page.goto(live["base"] + "/#tab=overview")
     page.wait_for_selector("[data-highlights]")
     page.evaluate(RECORD)
-    page.locator("#tabs [data-tab='leaderboard']").click()
+    page.locator("#tabs [data-tab='models']").click()
     page.wait_for_selector(f"{LB} tbody tr")
     assert any(c.startswith("view:") and "view-enter" in c for c in page.evaluate("window.__cls"))
     page.wait_for_timeout(400)
@@ -656,7 +555,7 @@ def test_screenshots_for_the_pr(live, browser, theme, width):
     ctx, page = new_page(browser)
     try:
         page.set_viewport_size({"width": width, "height": 1000 if width > 500 else 860})
-        open_lb(page, live["base"], "&open=" + TOP)
+        open_lb(page, live["base"])
         page.evaluate(f"applyTheme('{theme}')")
         page.wait_for_timeout(300)
         shot(page, f"11f-leaderboard-{width}-{theme}.png", full_page=width > 500)
@@ -664,7 +563,7 @@ def test_screenshots_for_the_pr(live, browser, theme, width):
         page.wait_for_selector("#view .card")
         page.evaluate(f"applyTheme('{theme}')")
         shot(page, f"11f-queue-{width}-{theme}.png")
-        page.goto(live["base"] + "/#tab=queue")
+        open_submit(page, live["base"])
         page.get_by_label("suite").click()
         page.wait_for_selector("[role=listbox][aria-label='suite']")
         page.wait_for_timeout(250)

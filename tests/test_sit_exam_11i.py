@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import choose, make_service, set_name
+from conftest import choose, make_service, set_name, open_submit
 
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase11i"
 MODEL = "fx/good-750m"                  # judged on every topic with questions
@@ -344,10 +344,11 @@ def test_queue_this_run_sends_exactly_the_ticks_and_the_rows_follow_the_queue(
 @pytest.mark.dashboard
 def test_every_way_in_opens_the_panel_on_the_model_page(live, page, judged_on):
     base = live["base"]
-    # an opened Leaderboard row's Run exam
+    # a Models row opens the model page (12b: rows do not open in place), and
+    # its Sit the exam opens the panel
     page.goto(base + "/#tab=leaderboard")
-    page.locator(f"table.lb tbody tr[data-lb-row='{MODEL}']").first.click()
-    page.locator(f"[data-run-exam='{MODEL}']").click()
+    page.locator(f"table.lb tbody tr[data-lb-row='{MODEL}'] td.num").first.click()
+    page.locator(f"[data-sit-open='{MODEL}']").click()
     page.wait_for_selector("[data-panel='msit']")
     assert page.evaluate("state.model") == MODEL
     # the Overview's loop card
@@ -372,7 +373,7 @@ def test_every_way_in_opens_the_panel_on_the_model_page(live, page, judged_on):
 @pytest.mark.dashboard
 def test_the_queue_forms_judged_suite_uses_the_same_picker(live, page, judged_on):
     base = live["base"]
-    page.goto(base + "/#tab=queue")
+    open_submit(page, base)
     choose(page.get_by_label("suite"), "judged")
     picker = page.locator("[data-submit-topics] [data-exam-picker='submit']")
     picker.wait_for()
@@ -410,7 +411,7 @@ def pick_model(page, mid):
 @pytest.mark.dashboard
 def test_own_code_the_server_will_not_run_disables_submit_with_the_reason(live, page, upload):
     base = live["base"]
-    page.goto(base + "/#tab=queue")
+    open_submit(page, base)
     item = pick_model(page, f"local/{UPLOAD}")
     # said in the search, before it is picked
     assert "ships its own model code — this server does not run it" in item.text_content()
@@ -433,8 +434,7 @@ def test_own_code_the_server_runs_needs_the_box_and_sends_it(live, page, upload,
     monkeypatch.setattr(config, "EVAL_USER", getpass.getuser())
     base = live["base"]
     page.set_viewport_size({"width": 1400, "height": 900})
-    page.goto(base + "/#tab=queue")
-    set_name(page, "masein")
+    open_submit(page, base, "masein")
     item = pick_model(page, f"local/{UPLOAD}")
     assert "ships its own model code" in item.text_content()
     assert "does not run it" not in item.text_content()
@@ -465,7 +465,7 @@ def test_a_sha_off_the_allowlist_is_named_on_the_page(live, page, upload, monkey
     monkeypatch.setattr(config, "ALLOW_REMOTE_CODE", True)
     monkeypatch.setattr(config, "EVAL_USER", getpass.getuser())
     monkeypatch.setattr(config, "REMOTE_CODE_SHAS", {"000000000000"})
-    page.goto(live["base"] + "/#tab=queue")
+    open_submit(page, live["base"])
     pick_model(page, f"local/{UPLOAD}").click()
     page.wait_for_function("() => (document.querySelector(\"[data-why='own-code']\") || {})"
                            ".textContent")
@@ -629,7 +629,7 @@ def test_screenshots_for_the_pr(live, browser, judged_on, theme):
             page.wait_for_timeout(200)
             panel.screenshot(path=SCREENS / f"11i-panel-{width}-{theme}.png")
             if width > 500:
-                page.goto(live["base"] + "/#tab=queue")
+                open_submit(page, live["base"])
                 choose(page.get_by_label("suite"), "judged")
                 page.locator("[data-exam-picker='submit']").wait_for()
                 page.wait_for_timeout(200)

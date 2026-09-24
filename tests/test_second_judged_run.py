@@ -361,11 +361,12 @@ def test_a_page_open_through_a_whole_judged_run_shows_the_judged_scores(svc, mon
     fresh(appmod)
     s = Served(browser, client, appmod)
     try:
-        pg = s.open("#tab=models")
-        row = pg.locator(f"[data-model-row='{MODEL}']")
-        row.wait_for(timeout=20000)
-        judged = row.locator("td").nth(5)                  # 'judged topics'
-        assert judged.text_content().strip() == "—"
+        # 12b: the Models tab and its "judged topics" column are gone; the
+        # model page's Judged block is where a person watches this land
+        pg = s.open("#model=" + MODEL)
+        pg.wait_for_selector("[data-sit-progress='0']", timeout=20000)    # 0 of 37 topics judged
+        score = pg.locator("[data-topic-score='Economics']")
+        assert score.count() == 0
 
         sid = submit(client, [ECON])
         pg.wait_for_function(f"state.queue.some(r => r.id === {sid})", timeout=20000)
@@ -373,20 +374,17 @@ def test_a_page_open_through_a_whole_judged_run_shows_the_judged_scores(svc, mon
         pg.wait_for_function(f"state.queue.some(r => r.id === {sid} && r.status === 'done' "
                              "&& r.judge && r.judge.status !== 'done') && !RESULTS_DUE",
                              timeout=20000)
-        assert judged.text_content().strip() == "—"       # the answers alone grade nothing
+        assert score.count() == 0                          # the answers alone grade nothing
+        assert pg.locator("[data-sit-progress='0']").count() == 1
 
         s.fail_results = 1                                 # the next results fetch fails once
         assert llm_poller.tick() == 1                      # judge.json lands
-        # the judged-topics cell: its count, and each topic's score in its title
-        pg.wait_for_function(
-            f"(document.querySelector(\"[data-model-row='{MODEL}']\")"
-            ".querySelectorAll('td')[5].querySelector('span[title]') || {}).title", timeout=40000)
+        score.wait_for(timeout=40000)
         assert s.failed, "the failed fetch never happened — the retry was not exercised"
-        assert judged.text_content().strip().startswith("1")     # one topic judged
+        assert pg.locator("[data-sit-progress='1']").count() == 1          # one topic judged
         # two decimals at most, trailing zeros dropped: under its own criteria
         # economics can grade to a round 3
-        assert re.fullmatch(r"Economics \d(\.\d\d?)?",
-                            judged.locator("span[title]").first.get_attribute("title"))
+        assert re.fullmatch(r"\d(\.\d\d?)? / 4", score.text_content().strip())
         assert len(s.loads) == 1                           # without a reload
         assert s.errors == []
     finally:

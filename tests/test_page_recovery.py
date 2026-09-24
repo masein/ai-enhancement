@@ -131,10 +131,12 @@ def test_the_board_checks_are_one_line_on_every_tab(live):
         assert not fold.locator(".checklist").is_visible(), label       # one line, closed
     said = pg.locator("[data-warnings='collapsed'] > summary").text_content()
     n = pg.evaluate("DATA.checks.length")
-    assert n == pg.evaluate("DATA.warnings.length") and f"{n} check" in said
+    assert n == pg.evaluate("DATA.warnings.length")
     judged = pg.evaluate("DATA.checks.filter(c => c.judged).length")
-    # 11e: the pill is a button with the count; the kind is the panel's first line
-    assert said.strip() == f"{n} check{'s' if n > 1 else ''} ▾"
+    # 11e: the pill is a button with the count; the kind is the panel's first
+    # line. 12b: the pill is a status dot — amber, and the count, nothing else
+    assert said.strip() == str(n)
+    assert pg.locator("[data-warnings='collapsed'] > summary .dot.warn").count() == 1
     # folded, never dismissed: they open, one line each
     pg.locator("[data-warnings='collapsed'] > summary").click()
     if judged:
@@ -151,8 +153,9 @@ def test_the_board_checks_are_one_line_on_every_tab(live):
     prelim = pg.locator("li[data-check='preliminary'] [data-show-me]")
     if prelim.count():
         prelim.click()
-        pg.wait_for_selector("#pill-mshow[data-show-filters~='preliminary']")
-        assert pg.evaluate("location.hash") == "#tab=models"
+        # 12b: the Models table, its Status filter set to preliminary
+        pg.wait_for_function("lbS().status === 'preliminary'")
+        assert pg.evaluate("location.hash").startswith("#tab=models")
     # and exactly once per page: the Provenance tab used to print the same
     # findings again under its own "Warnings" heading
     go_tab(pg, "Provenance")

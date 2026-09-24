@@ -17,9 +17,16 @@ COPY requirements.txt /tmp/requirements.txt
 RUN python -m pip install --no-cache-dir --break-system-packages -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
 
+# The unit suite also runs inside the running container, on this image's
+# Python and packages (HANDOFF.md § Checks, deploy step 3). That needs pytest,
+# and httpx for FastAPI's test client, and nothing else: the tests are not in
+# the image — the deploy step streams the commit in with `git archive`,
+# because they read files the image leaves out (the Dockerfile, the docs).
+RUN python -m pip install --no-cache-dir --break-system-packages "pytest>=8" httpx
+
 # Fail the BUILD, not the first submission, if the env is incoherent (e.g. deps
 # landed in a different interpreter than torch).
-RUN python -c "import torch, lm_eval, transformers, accelerate, datasets, fastapi, uvicorn; \
+RUN python -c "import torch, lm_eval, transformers, accelerate, datasets, fastapi, uvicorn, pytest, httpx; \
 print('image env OK — torch', torch.__version__, '| built for CUDA', torch.version.cuda, \
 '| lm_eval', lm_eval.__version__)"
 

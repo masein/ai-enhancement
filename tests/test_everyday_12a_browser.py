@@ -193,7 +193,7 @@ def test_the_model_page_has_its_everyday_block_above_the_exam(live, page):
     # Compare models → is the pilot page
     block.locator("[data-everyday-compare]").click()
     page.wait_for_selector("[data-everyday-table]")
-    assert page.evaluate("location.hash") == "#everyday"
+    assert page.evaluate("location.hash") == "#tab=benchmarks&sub=everyday"      # 12b
     assert page.errors == []
 
 
@@ -266,17 +266,18 @@ def test_run_the_pilot_queues_one_run_per_ticked_model(live, page):
     assert page.errors == []
 
 
-def test_it_is_reached_from_more_and_the_submit_form_offers_it(live, page):
+def test_it_is_reached_from_benchmarks_and_test_a_model_offers_it(live, page):
+    """12b: More ▸ Everyday pilot is Benchmarks ▸ Everyday tasks, and the
+    Submit form is the Test a model dialog."""
     page.set_viewport_size({"width": 1400, "height": 1000})
-    page.goto(live["base"] + "/#tab=queue")
-    page.locator("#moreBtn").click()
-    page.locator("[data-more-everyday]").click()
+    page.goto(live["base"] + "/#tab=runs")
+    page.locator("#tabs [data-tab='benchmarks']").click()
+    page.locator("[data-subswitch] [data-sub='everyday']").click()
     page.wait_for_selector("[data-everyday-table]")
-    assert page.evaluate("location.hash") == "#everyday"
-    assert page.locator("#moreBtn").text_content() == "Everyday pilot ▾"
-    # a tab leaves it
-    page.locator("#tabs [data-tab='queue']").click()
-    page.wait_for_selector("[data-suite-help]")
+    assert page.evaluate("location.hash") == "#tab=benchmarks&sub=everyday"
+    assert page.locator("#tabs [data-tab='benchmarks']").get_attribute("aria-selected") == "true"
+    page.locator("header [data-test-model]").click()
+    page.wait_for_selector("[data-dialog='test'] [data-suite-help]")
     page.get_by_label("suite").click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='everyday']")
     assert opt.text_content() == "Everyday tasks — 5 questions, minutes"

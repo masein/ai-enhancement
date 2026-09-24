@@ -411,9 +411,9 @@ def topic_gate(task: str, t: dict, state: dict | None, caution: str | None,
     if n_rep < PROPOSE_MIN_N:
         hard.append({"why": f"{n_rep} hidden questions in this topic — under the "
                             f"{PROPOSE_MIN_N} a topic needs, so its score is noise. Write more on "
-                            f"the Exam tab",
-                     "short": f"under the {PROPOSE_MIN_N}-question floor — write more on the "
-                              f"Exam tab"})
+                            f"Benchmarks ▸ Knowledge exam",
+                     "short": f"under the {PROPOSE_MIN_N}-question floor — write more on "
+                              f"Benchmarks ▸ Knowledge exam"})
     if n and blank / n >= EMPTY_SHARE:
         hard.append({"why": f"the model wrote nothing usable on {blank} of {n} answers here — "
                             f"that is a generation failure, not a topic gap; multiple choice "
@@ -1965,29 +1965,34 @@ html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *
 /* the pill's panel: what kind of checks, then one line each */
 .bar-checks .checklist li.checks-judged { list-style:none; color:var(--text-secondary);
   margin:0 0 6px; }
+/* 12b: one line at every width. Below 720px the four places are one
+   Menu ▾ on the left; the right side keeps the run counter, Test a model,
+   the status dot and the name, each at its shortest */
+.menubtn { display:none; }
+#testAct .t-short, #runs .t-short, button.who .t-short { display:none; }
 @media (max-width:720px) {
-  .bar-in { height:auto; padding:8px 16px; flex-wrap:wrap; row-gap:4px; }
+  .bar-in { padding:0 16px; gap:8px; }
   .bar-title .t-full { display:none; }
   .bar-title .t-short { display:inline; }
-  .bar-in .tabs { order:3; flex-basis:100%; margin:0; }
+  .bar-in .tabs { display:none; }
+  .menubtn { display:inline-flex; align-items:center; flex:none; }
+  .bar-right { gap:6px; }
+  #testAct .t-full, #runs .t-full { display:none; }
+  #testAct .t-short { display:inline; }
+  button.who { max-width:96px; overflow:hidden; text-overflow:ellipsis; }
+  .bar-checks .checklist { padding:10px 16px; }
 }
-/* 11e: on a phone the bar is two rows, at most 96px — the title, LIVE and
-   one ⋯ menu holding the checks, the name and the theme; then the tabs */
-.bar-more { display:none; }
-@media (max-width:600px) {
-  .bar-in { padding:6px 16px 0; row-gap:2px; }
-  .bar-more { display:inline-flex; align-items:center; justify-content:center; margin-left:auto;
-    min-height:32px; min-width:40px; padding:0 10px; font-size:var(--fs-3); line-height:1; }
-  .bar-right { display:none; position:absolute; right:16px; top:44px; z-index:60;
-    flex-direction:column; align-items:stretch; gap:8px; min-width:220px; max-width:calc(100vw - 32px);
-    background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-2);
-    padding:10px; box-shadow:0 10px 28px rgba(0,0,0,.16); }
-  .bar[data-more="open"] .bar-right { display:flex; }
-  .bar-right > * { width:100%; }
-  .bar-right button, .bar-right summary { width:100%; justify-content:flex-start; text-align:left; }
-  .bar-checks .checklist { position:static; box-shadow:none; border:0; padding:6px 0 0 18px;
-    max-height:50vh; }
-  .tabs button { padding:8px 10px; }
+@media (max-width:480px) {
+  .bar-title { display:none; }
+  .livebadge { padding:2px 5px; gap:4px; }
+  .livebadge .t-full, #runs .t-idle { display:none; }
+  .bar-in { gap:5px; }
+  .bar-right { gap:3px; }
+  .bar .barpill { padding:4px 6px; }
+  .bar .runpill, .bar .statusdot { gap:4px; min-width:0; }
+  #testAct button { padding:4px 8px; }
+  button.who .t-full { display:none; }
+  button.who .t-short { display:inline; }
 }
 /* the hero, on Overview only */
 .pagehero { margin:18px 0 0; display:grid; grid-template-columns:minmax(0, 1fr) auto;
@@ -2755,6 +2760,14 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
   background:var(--surface-1); border-top:1px solid var(--border); border-radius:var(--r-2) var(--r-2) 0 0;
   box-shadow:0 -12px 32px rgba(0,0,0,.18); padding:12px 16px 20px; }
 .fsheet-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+/* 12b: Filters ▾ at every width — a panel under the chips on a wide screen,
+   the sheet from the bottom on a phone */
+@media (min-width:721px) {
+  .fsheet { position:static; max-height:none; border:1px solid var(--border);
+    border-radius:var(--r-2); box-shadow:none; margin:8px 0 4px; padding:12px 14px; }
+  .fsheet .pills { flex-direction:row; flex-wrap:wrap; align-items:center; }
+  .fsheet .pills .pill { width:auto; }
+}
 .fsheet .pills { display:flex; flex-direction:column; align-items:stretch; gap:8px; margin:0; }
 .fsheet .pills .pill { width:100%; text-align:left; justify-content:space-between; }
 @media (max-width:720px) {
@@ -2948,8 +2961,52 @@ tr.dsfail details[open] > summary { color:var(--text-primary); }
 .topright { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
 button.who { font-weight:600; font-family:var(--font-sans); font-size:var(--fs-1);
   white-space:nowrap; }
-#themeBtn { white-space:nowrap; font-family:var(--font-sans); font-size:var(--fs-1);
-  font-weight:600; }
+/* ---- 12b: the header's right side ---- */
+.runpill { display:inline-flex; align-items:center; gap:6px; }
+.runpill .num { font-family:var(--font-mono); }
+.dot.idle { background:var(--axis); }
+.dot.pulse { animation:livepulse 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .dot.pulse { animation:none; } }
+.statusdot { gap:6px; min-width:32px; justify-content:center; }
+.statusdot .statusn { font-family:var(--font-mono); }
+#testAct button { min-height:32px; white-space:nowrap; font-size:var(--fs-1); padding:4px 14px; }
+.runspop { width:min(460px, calc(100vw - 24px)); }
+.runslist { display:flex; flex-direction:column; gap:2px; }
+.runline { display:grid; grid-template-columns:auto minmax(0, 1fr) auto; gap:4px 10px;
+  align-items:baseline; padding:6px 4px; border-radius:var(--r-1); font-size:var(--fs-2); }
+.runline .runname { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.runline .runprog { grid-column:1 / -1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.runslist.full .runline { grid-template-columns:auto minmax(0, 1fr) auto minmax(0, 2fr); }
+.runslist.full .runline .runprog { grid-column:auto; }
+.runslist .runhead { margin:8px 4px 2px; }
+.runs-all { display:block; margin:8px 4px 2px; font-weight:600; }
+.whopop .menusect { display:flex; flex-direction:column; gap:6px; margin:10px 0 6px;
+  padding-top:10px; border-top:1px solid var(--border); }
+.whopop .themeopts { display:flex; flex-wrap:wrap; gap:6px; }
+.whopop .themeopts [aria-checked="true"] { background:var(--accent-soft); border-color:var(--accent); }
+.whopop .menulink { display:block; width:100%; text-align:left; padding:7px 8px; border:0;
+  background:none; border-radius:var(--r-1); font-size:var(--fs-2); color:var(--text-primary); }
+.whopop .menulink:hover, .whopop .menulink:focus { background:var(--accent-soft); }
+.placemenu .subitem { padding-left:22px !important; font-size:var(--fs-1); }
+/* the switch at the top of Improve, Benchmarks and Models */
+.subswitch { display:flex; gap:8px; flex-wrap:wrap; margin:18px 0 0; }
+.card .subswitch { margin:10px 0 2px; }
+.subswitch + .card { margin-top:14px; }
+/* Test a model: the Submit form, in a dialog */
+.dlg.testdlg { max-width:880px; position:relative; max-height:calc(100vh - 32px); overflow:auto;
+  padding:14px 16px; }
+.dlg.testdlg > .card { border:0; box-shadow:none; margin:0; padding:6px 4px; }
+.dlg-x { position:absolute; right:12px; top:12px; z-index:1; }
+/* Models: a row opens the model page; the untested sit under one line */
+table.lb tr.clickrow { cursor:pointer; }
+table.lb tr.clickrow:hover td { background:var(--accent-soft); }
+table.lb tr.nottested td { background:var(--plane); }
+table.lb tr.nottested-row td { font-size:var(--fs-2); padding-left:24px; }
+table.lb td.evmark { font-weight:700; }
+/* a table with no rank column (Knowledge exam, Everyday tasks) pins its
+   model column at the edge */
+table.lb.norank th.model, table.lb.norank td.model { left:0; }
+.helplinks { margin:8px 0 0; padding-left:20px; font-size:var(--fs-2); line-height:1.9; }
 .bar-right button, .bar-right summary { min-height:32px; box-sizing:border-box; }
 button.who.ask { border-color:var(--warning);
   outline:2px solid color-mix(in srgb, var(--warning) 35%, transparent); }
@@ -4148,7 +4205,7 @@ function proposeBtn(mid, topic, gate) {
   rvNeeded();
   const open = openProposalFor(mid, topic);
   if (open) return el('a', { class: 'propose', 'data-review-link': String(open.id),
-    href: '#tab=review&read=proposal:' + open.id, text: 'Review it →',
+    href: '#tab=improve&sub=review&read=proposal:' + open.id, text: 'Review it →',
     title: `proposal #${open.id} is ${rvStatusWords(open.status).toLowerCase()}`,
     onclick: e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return;
       e.preventDefault();
@@ -4505,8 +4562,8 @@ function vJudged(m) {
   else caveat(cal ? 'below the agreement bar' : 'not checked by a person', standing,
     { 'data-caveat': 'calibration' });
   const j = m.judge;
-  if (!j) { card.append(note('Not judged yet. Sit the exam from the Queue, with the judged '
-    + 'suite.')); return card; }
+  if (!j) { card.append(note('Not judged yet. Sit the exam from this page, or from Test a '
+    + 'model.')); return card; }
   if (j.skipped) { card.append(note(j.skipped + '. A judge scores its own family higher; the '
     + 'cell stays empty rather than flattering.')); return card; }
   if (!Object.keys(j.tasks || {}).length) { card.append(note('Not judged on the current exam: '
@@ -4630,7 +4687,7 @@ function vJudged(m) {
              + '— this model trained on data derived from that topic' : '')
         + (ok ? '.' : ' — preliminary until the judge is calibrated.') }));
     card.append(el('p', { class: 'small', text: `A topic with under ${CAT_MIN_N} hidden questions `
-      + 'is greyed. Its bank is still being written, on the Exam tab.' }));
+      + 'is greyed. Its bank is still being written, on Benchmarks ▸ Knowledge exam.' }));
     // score vs length: one row per topic, a column per length (11d) — the
     // row-per-bucket table was 148 rows for 37 topics
     const LEN = [['≤20 words', '≤ 20'], ['21–50', '21–50'], ['51–120', '51–120'], ['>120', '> 120']];
@@ -4733,7 +4790,7 @@ function vTaint(m) {
   // of the loop that produced this model is one click from here
   const tt = m.taintTrail;
   if (tt) card.append(el('p', { class: 'small', 'data-taint-trail': '1' },
-    'From ', el('a', { href: '#tab=training', text: `training run #${tt.run_id}`,
+    'From ', el('a', { href: '#tab=improve&sub=training', text: `training run #${tt.run_id}`,
       onclick: e => { e.preventDefault(); state.trSel = [tt.run_id];
         navigate({ tab: 'training', model: null, topic: null }); } }),
     ', which trained on ',
@@ -4742,7 +4799,7 @@ function vTaint(m) {
         text: `dataset #${d}` }))),
     tt.proposals.length ? el('span', {}, ' from ',
       tt.proposals.map((pid, i) => el('span', {}, i ? ', ' : '',
-        el('a', { href: '#tab=review', text: `proposal #${pid}`,
+        el('a', { href: '#tab=improve&sub=review', text: `proposal #${pid}`,
           onclick: e => { e.preventDefault(); state.rv.loaded = false;
             navigate({ tab: 'review', model: null, topic: null }); } }), ' ',
         overBadge((tt.over_provisional_judge || {})[String(pid)])))) : '',
@@ -4814,7 +4871,7 @@ function vModel() {
   const m = DATA.models.find(x => x.id === state.model);
   if (!m) return [note('No such model.')];
   const a = m.archinfo || {}, r = rankOf(m), avg = officialAvg(m), comp = computeOf(m);
-  const back = el('a', { class: 'backlink', href: '#tab=' + state.tab, onclick: backTo(state.tab),
+  const back = el('a', { class: 'backlink', href: '#' + viewHash(state.tab), onclick: backTo(state.tab),
     text: '← Back to ' + (TABS.find(([id]) => id === state.tab) || [, 'the board'])[1] });
 
   // 11d: the hero — an eyebrow, the name, the id, three highlight cards, and
@@ -5060,8 +5117,8 @@ function vOverview(ms) {
     }
     frag.push(el('div', { class: 'card', 'data-top-models': '1' },
       el('div', { class: 'sechead' }, el('h2', { text: 'Top models' }),
-        el('span', { class: 'acts' }, el('a', { href: '#tab=leaderboard', 'data-see-leaderboard': '1',
-          text: 'See the leaderboard →', onclick: e => { e.preventDefault();
+        el('span', { class: 'acts' }, el('a', { href: '#tab=models', 'data-see-leaderboard': '1',
+          text: 'See all models →', onclick: e => { e.preventDefault();
             navigate({ tab: 'leaderboard', model: null, topic: null }); } }))),
       el('div', { class: 'lb-wrap' }, lbMini(ranked.slice(0, 5))), gap));
   } else {
@@ -5070,7 +5127,7 @@ function vOverview(ms) {
       el('p', { class: 'sub', text: DATA.required.length
         ? `Nothing here has completed all ${DATA.required.length} required tasks `
           + `(${DATA.required.join(', ')}), so there is no overall ranking to show — `
-          + `only per-task numbers, which are on the Leaderboard and Tasks tabs. `
+          + `only per-task numbers, which are on Models and Benchmarks ▸ Standard. `
           + `Submit with suite=full to produce an official result.`
         : 'No accuracy tasks in this results tree.' })));
   }
@@ -5082,13 +5139,7 @@ function vOverview(ms) {
         onclick: e => { e.preventDefault(); showMe({ tab: 'models', prelim: true }); } })));
   // 03 The loop
   if (LIVE) frag.push(overviewLoop());
-  frag.push(el('details', { class: 'card', 'data-how-to-read': '1' },
-    el('summary', { style: 'cursor:pointer' }, el('h2', { style: 'display:inline',
-      text: 'How to read these numbers' })),
-    note('Chance is not zero. 4-option tasks (MMLU, ARC, HellaSwag) sit at 25% for a model that knows nothing; 2-option tasks (Winogrande, PIQA) sit at 50%. A "50%" that looks respectable may be a coin flip.'),
-    note('GSM8K near zero is a finding, not a failure — sub-billion models mostly cannot do written arithmetic. TruthfulQA is famous for NOT improving with scale.'),
-    note('Perplexity (bits per byte) is the scale-sensitive metric here: it separates models that multiple-choice tasks cannot tell apart, and it works on base models with no prompt format at all. Multiply by ln 2 for cross-entropy loss in nats/byte — the Perplexity & Loss tab does it for you. Lower is better.'),
-    note('Whiskers are ±1 standard error. If two whiskers overlap, do not call a winner — every pairwise z-test verdict rides along in the JSON export (the "sig" field) when you need the arbiter.')));
+  // 12b: How to read these numbers is in Help
   return frag;
 }
 // ---------------------------------------------------------------------------
@@ -5125,7 +5176,7 @@ const whyProvisional = m => {
 };
 
 function hlBest(ranked) {
-  const toLb = hlLink('See the leaderboard →', () => navigate({ tab: 'leaderboard', model: null, topic: null }));
+  const toLb = hlLink('See all models →', () => navigate({ tab: 'leaderboard', model: null, topic: null }));
   const top = ranked[0], next = ranked[1];
   if (!top) return hlCard('best', 'Best model', '—', `Nothing has completed all `
     + `${DATA.required.length} required tasks yet, so nothing is ranked.`, toLb);
@@ -5146,9 +5197,9 @@ function hlBest(ranked) {
 
 function hlWeakest() {
   const m = loopModel();
-  const toLoop = hlLink('Open the Loop →', () => navigate({ tab: 'loop', model: null, topic: null }));
+  const toLoop = hlLink('Improve ▸ By topic →', () => navigate({ tab: 'loop', model: null, topic: null }));
   if (!m) return hlCard('weakest', 'Weakest topic', '—',
-    'No model has been judged yet — Loop ▸ Sit the exam.', toLoop);
+    'No model has been judged yet — Improve ▸ By topic ▸ Sit the exam.', toLoop);
   const exam = (DATA.judged || {}).exam || [];
   const xs = Object.entries(m.judge.tasks).filter(([t]) => t.startsWith('exam_'))
     .map(([t, v]) => ({ t, v: pubScore(v) })).filter(x => x.v != null).sort((a, b) => a.v - b.v);
@@ -5170,14 +5221,14 @@ function hlLoop() {
   const at = m ? Math.max(0, ...Object.values(m.judge.tasks).map(v => v.judged_at || 0)) : 0;
   return hlCard('loop', 'The loop', `${done.size} / ${exam.size}`,
     m ? `Last judged ${m.name}` + (at ? ` ${rel(at)} ago.` : '.')
-      : 'Nothing judged yet — sit a model on a topic from the Loop.',
-    hlLink('Open the Loop →', () => navigate({ tab: 'loop', model: null, topic: null })),
+      : 'Nothing judged yet — sit a model on a topic from Improve ▸ By topic.',
+    hlLink('Improve ▸ By topic →', () => navigate({ tab: 'loop', model: null, topic: null })),
     'topics judged');
 }
 
 function hlJudge() {
   const m = loopModel();
-  const toProv = hlLink('Provenance →', () => navigate({ tab: 'provenance', model: null, topic: null }));
+  const toProv = hlLink('Data & sources →', () => navigate({ tab: 'provenance', model: null, topic: null }));
   const cn = m && (m.judge || {}).canary;
   const cal = (DATA.judged || {}).calibration;
   const calWords = cal && cal.calibrated ? `Agreement with a person: ${cal.kappa}.`
@@ -5216,7 +5267,7 @@ function overviewLoop() {
     el('h2', { text: 'The loop' }));
   if (!rows.length) {
     card.append(el('p', { class: 'small' }, 'No model has sat the exam yet. ',
-      el('a', { href: '#tab=loop', text: 'Open the Loop →',
+      el('a', { href: '#tab=improve&sub=topics', text: 'Improve ▸ By topic →',
         onclick: e => { e.preventDefault(); navigate({ tab: 'loop', topic: null, model: null }); } })));
     return card;
   }
@@ -5224,7 +5275,7 @@ function overviewLoop() {
   card.append(el('p', { class: 'sub' }, `${topics.size} topic${topics.size > 1 ? 's' : ''} `
     + `judged across ${rows.length} model${rows.length > 1 ? 's' : ''}.`
     + (last.at ? ` Last judged: ${last.m.name}, ${rel(last.at)} ago.` : ''), ' ',
-    el('a', { href: '#tab=loop', text: 'Open the Loop →',
+    el('a', { href: '#tab=improve&sub=topics', text: 'Improve ▸ By topic →',
       onclick: e => { e.preventDefault(); navigate({ tab: 'loop', topic: null, model: null }); } })));
   card.append(el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
     el('thead', {}, el('tr', {}, el('th', { text: 'model' }), el('th', { class: 'num', text: 'topics' }),
@@ -5358,7 +5409,7 @@ function vEverydayBlock(m) {
         e.waiting ? el('span', { class: 'small se', text: `${e.waiting} with the judge` }) : '',
         el('a', { href: '#everyday', 'data-everyday-compare': '1', text: 'Compare models →',
           onclick: ev => { ev.preventDefault();
-            navigate({ everyday: true, model: null, topic: null }); } }))),
+            navigate({ tab: 'everyday', model: null, topic: null }); } }))),
     el('p', { class: 'sub', text: 'Five questions typed the way people type on a phone, '
       + 'marked by a script. Open a row to read the answer.' }),
     el('div', { class: 'evrows' }, rows));
@@ -5369,8 +5420,6 @@ function vEverydayPage() {
   const E = evd(), qs = E.questions || [];
   const ids = Object.keys(E.models || {}).sort((a, b) => evdName(a).localeCompare(evdName(b)));
   const prov = ids.some(id => E.models[id].provisional);
-  const back = el('a', { class: 'backlink', href: '#tab=' + state.tab, onclick: backTo(state.tab),
-    text: '← Back to ' + (TABS.find(([id]) => id === state.tab) || [, 'the board'])[1] });
   const run = LIVE ? el('button', { class: 'primary', 'data-everyday-run': '1',
     text: 'Run the pilot', onclick: () => evdDialog({ returnTo: '[data-everyday-run]' }) }) : '';
   const head = el('div', { class: 'card', 'data-everyday-head': '1' },
@@ -5381,7 +5430,7 @@ function vEverydayPage() {
           + 'read the answer.' })),
       run));
   if (!ids.length) {
-    return [back, head, el('div', { class: 'card' }, empty('No model has taken the pilot yet.',
+    return [head, el('div', { class: 'card' }, empty('No model has taken the pilot yet.',
       LIVE ? 'Run the pilot' : '', () => evdDialog({ returnTo: '[data-empty-action]' }),
       { 'data-everyday-empty': '1' }))];
   }
@@ -5408,7 +5457,7 @@ function vEverydayPage() {
         el('span', { class: 'evq-group', text: q.groupLabel }),
         el('span', { class: 'evq-full', text: q.prompt })),
       ids.map(id => cellBtn(id, q))))));
-  return [back, head, el('div', { class: 'card' },
+  return [head, el('div', { class: 'card' },
     el('div', { class: 'lb-wrap', 'data-hkeep': 'everyday' }, table))];
 }
 
@@ -5543,44 +5592,74 @@ function evdDialog(pre = {}) {
 // ---------------------------------------------------------------------------
 const hashFor = () => (state.model ? 'model=' + encodeURIComponent(state.model)
                                   : state.topic ? 'topic=' + encodeURIComponent(state.topic)
-                                  : state.everyday ? 'everyday'
-                                  : 'tab=' + state.tab
-                                    + (state.tab === 'leaderboard' && lbHash() ? '&' + lbHash() : '')
-                                    // 11j: which Review view, so a link opens it
-                                    + (state.tab === 'review' && state.rv.view
-                                       ? '&view=' + state.rv.view : ''))
+                                  : viewHash(state.tab))
   // 11g: an open reader rides along, so a pasted link opens it too
   + (state.read ? '&read=' + encRead(state.read) : '');
+// 12b: "tab=improve&sub=review&view=datasets", "tab=models&view=exam"
+function viewHash(v) {
+  const place = placeOf(v);
+  if (v === 'leaderboard') return 'tab=models' + (lbHash() ? '&' + lbHash() : '');
+  if (place === 'improve' || place === 'benchmarks')
+    return `tab=${place}&sub=${SUB_SLUG[v]}`
+      // 11j: which Review view, so a link opens it
+      + (v === 'review' && state.rv.view ? '&view=' + state.rv.view : '');
+  return 'tab=' + (PAGE_SLUG[v] || v);
+}
+// where an address lands: its view, and the state it carries. Old names and
+// new ones both, so a bookmark from before 12b opens its new home (§8)
+function viewOfHash(name, params) {
+  const p = new URLSearchParams(params || '');
+  const has = v => TABS.some(t => t[0] === v);
+  const n = TAB_ALIASES[name] || name;
+  const sub = { topics: 'loop', review: 'review', training: 'training',
+                standard: 'tasks', exam: 'exam', everyday: 'everyday' }[p.get('sub')];
+  let v = { home: 'overview', overview: 'overview', models: 'leaderboard',
+            leaderboard: 'leaderboard', perplexity: 'leaderboard', loop: 'loop',
+            review: 'review', training: 'training', runs: 'queue', queue: 'queue',
+            submit: 'queue', data: 'provenance', provenance: 'provenance', help: 'help',
+            tasks: 'tasks', exam: 'exam', everyday: 'everyday' }[n];
+  if (n === 'improve') v = ['loop', 'review', 'training'].includes(sub) ? sub : 'loop';
+  if (n === 'benchmarks') v = ['tasks', 'exam', 'everyday'].includes(sub) ? sub : benchSub();
+  if (!v || !has(v)) return null;
+  if (v === 'leaderboard') {
+    lbFromHash(params || '');
+    // Perplexity & Loss is Models ▸ Standard ▸ Language modelling now
+    if (n === 'perplexity') Object.assign(lbS(), { view: 'standard', chip: 'lm' });
+  }
+  // "tab=review&view=datasets": Improve ▸ Review, same view
+  if (v === 'review') {
+    const rv = p.get('view');
+    state.rv.view = rv && RV_VIEWS.some(([k]) => k === rv) ? rv : '';
+  }
+  // Queue ▸ Submit a model is the Test a model dialog now
+  if (n === 'submit') state.testOpen = true;
+  return v;
+}
 
 function routeFromHash() {
   // 11g: the reader's part first — it can follow any page
   const [rest, rd] = splitRead(location.hash);
   state.read = rd;
   const h = decodeURIComponent(rest);
-  // 12a: the Everyday pilot's page — beside the tabs, never one of them
-  state.everyday = h === 'everyday';
-  if (state.everyday) { state.model = null; state.topic = null; return; }
   const m = /^model=(.+)$/.exec(h);
   if (m && DATA.models.some(x => x.id === m[1])) { state.model = m[1]; state.topic = null; return; }
   state.model = null;
   // a topic page is the loop for one topic — deep-linkable, because it is the
-  // page a person is sent to when someone says "look at law"
+  // page a person is sent to when someone says "look at law". 12b: it sits
+  // under Benchmarks ▸ Knowledge exam, and its back link says so
   const tp = /^topic=(.+)$/.exec(h);
-  if (tp && LIVE && topicOfSlug(tp[1])) { state.topic = tp[1]; state.tab = 'loop'; return; }
+  if (tp && LIVE && topicOfSlug(tp[1])) { state.topic = tp[1]; state.tab = 'exam'; return; }
   state.topic = null;
-  // "tab=leaderboard&chip=knowledge&open=…": the Leaderboard's view rides
-  // along, so a pasted link reproduces it (11c). Old hashes have no "&".
-  const t = /^tab=([^&]+)(?:&(.*))?$/.exec(rest);
+  // 12a's pilot page is Benchmarks ▸ Everyday tasks now
+  const t = h === 'everyday' ? ['', 'everyday', '']
+    : /^tab=([^&]+)(?:&(.*))?$/.exec(rest);
   if (!t) return;
-  const tab = decodeURIComponent(t[1]);
-  const want = TAB_ALIASES[tab] || tab;
-  if (TABS.some(([id]) => id === want)) state.tab = want;
-  if (state.tab === 'leaderboard') lbFromHash(t[2] || '');
-  // 11j: "tab=review&view=datasets"
-  if (state.tab === 'review') {
-    const v = /(?:^|&)view=([^&]+)/.exec(t[2] || '');
-    state.rv.view = v && RV_VIEWS.some(([k]) => k === v[1]) ? v[1] : '';
-  }
+  const v = viewOfHash(decodeURIComponent(t[1]), t[2] || '');
+  if (!v) return;
+  state.tab = v;
+  // an old address is shown as its new one; history keeps the entry
+  const want = hashFor();
+  if (location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
 }
 
 // slug ↔ topic, from the same map the payload carries (exam_law ↔ law)
@@ -5600,10 +5679,6 @@ function navigate(patch) {
   if (patch.tab === 'queue' && (state.tab !== 'queue' || state.model || state.topic)
       && state.pg.queue) state.pg.queue.page = 1;
   const from = location.hash;
-  // a tab, a model or a topic leaves the Everyday page (12a); the reader
-  // opening on it does not
-  if (!('everyday' in patch) && ['tab', 'model', 'topic'].some(k => patch[k]))
-    patch = { ...patch, everyday: false };
   Object.assign(state, patch);
   const want = hashFor();
   // push history, then paint. Painting here rather than leaving it to the
@@ -5638,7 +5713,7 @@ window.addEventListener('hashchange', () => {
 // navigation starts at 0 unless a button aimed it at a section.
 try { history.scrollRestoration = 'manual'; } catch (e) { /* an old browser */ }
 const viewKey = () => state.model ? 'model:' + state.model
-  : state.topic ? 'topic:' + state.topic : state.everyday ? 'everyday' : 'tab:' + state.tab;
+  : state.topic ? 'topic:' + state.topic : 'tab:' + state.tab;
 let _lastView = null, _restore = null, _navigated = false, _saveT = null;
 function saveScroll() {
   try { history.replaceState({ ...(history.state || {}), y: Math.round(scrollY) }, ''); }
@@ -5681,7 +5756,9 @@ function backTo(tab) {
   return e => {
     const from = (history.state || {}).from;
     if (from == null || /[#&](model|topic)=/.test(from)) return;
-    if (new URLSearchParams(from.replace(/^#/, '')).get('tab') !== tab) return;
+    // 12b: the address names a place and its part, not the view id
+    const was = new URLSearchParams(from.replace(/^#/, '')), want = new URLSearchParams(viewHash(tab));
+    if (was.get('tab') !== want.get('tab') || was.get('sub') !== want.get('sub')) return;
     e.preventDefault();
     history.back();
   };
@@ -5884,7 +5961,11 @@ function pageNumbers(cur, n) {
 // redraws while someone is clicking it
 // what the table is sorted by, in the words of its own header
 function lbSortLabel(cols) {
-  const c = (cols || []).find(x => x.key === state.sort.key);
+  // the column the table really sorts by: a key this view has no column for
+  // (Avg, on the Knowledge exam) falls back as the sort does (12b)
+  const cs = cols || [];
+  const c = cs.find(x => x.key === state.sort.key) || cs.find(x => x.key === 'avg')
+    || cs.find(x => x.key === 'javg') || cs.find(x => x.key === 'name');
   return `${c ? (c.label || c.key) : state.sort.key} ${state.sort.dir > 0 ? '▲' : '▼'}`;
 }
 
@@ -6353,159 +6434,49 @@ function aboutBenchmarks(tasks, inline = false) {
     state.lbAbout ? body : '');
 }
 
-// ---------------------------------------------------------------------------
-// The Models tab. Thirty-three models, nineteen of them checkpoints, and until
-// now the only ways to one were the Overview top five, a leaderboard row, or
-// knowing its hash. The two filter rows that used to float above the tabs live
-// here, where their scope is visible: they filter THIS list.
-// ---------------------------------------------------------------------------
-
-const MCOLS = [
-  { key: 'name', label: 'model' },
-  { key: 'kind', label: 'kind' },
-  { key: 'family', label: 'family' },
-  { key: 'params', label: 'params', num: true, defDir: -1 },
-  { key: 'avg', label: 'official average', num: true, defDir: -1 },
-  { key: 'judged', label: 'judged topics', num: true, defDir: -1 },
-  { key: 'date', label: 'last evaluated', defDir: -1 },
-];
-
-function mdlValue(m, key) {
-  if (key === 'avg') return officialAvg(m);
-  if (key === 'date') return lastEval(m);
-  if (key === 'judged') return m.judge ? Object.keys(m.judge.tasks || {}).length : 0;
-  if (key === 'params') return m.params || 0;
-  return m[key];
-}
-
-function mdlVisible() {
-  const f = state.mdl;
-  const q = (f.q || '').toLowerCase();
-  let ms = DATA.models.filter(m =>
-    (f.src === 'all' || m.source === f.src) &&
-    (f.kind === 'all' || m.kind === f.kind) &&
-    (f.family === 'all' || m.family === f.family) &&
-    (!f.judgedOnly || (m.judge && Object.keys(m.judge.tasks || {}).length)) &&
-    (!f.taintedOnly || (m.tainted || []).length) &&
-    (!f.prelimOnly || officialAvg(m) == null) &&
-    (!q || m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
-        || (m.family || '').includes(q)));
-  const c = MCOLS.find(x => x.key === f.sort.key) || MCOLS[0];
-  return ms.sort((a, b) => {
-    const va = mdlValue(a, c.key), vb = mdlValue(b, c.key);
-    if (va == null && vb == null) return 0;
-    if (va == null) return 1; if (vb == null) return -1;
-    return f.sort.dir * (c.num ? va - vb : natCmp(va, vb));
-  });
-}
-
-function vModels() {
-  const f = state.mdl;
-  const families = [...new Set(DATA.models.map(m => m.family).filter(Boolean))].sort();
-  const ms = mdlVisible();
-  const nCk = DATA.models.filter(m => m.source === 'artifact').length;
-  const count = pred => DATA.models.filter(pred).length;
-  // 11c: the same "Label: Value ▾" pills as the Leaderboard, on the shared
-  // popover. The three yes/no filters combine, so they are one pill of boxes
-  const shows = [['judged', 'has a judged run', 'judgedOnly'], ['tainted', 'tainted', 'taintedOnly'],
-                 ['preliminary', 'preliminary', 'prelimOnly']];
-  const on = shows.filter(([, , k]) => f[k]);
-  const showBtn = el('button', { class: 'pill' + (on.length ? ' on' : ''), id: 'pill-mshow',
-    'data-show-filters': on.map(([v]) => v).join(' '),
-    text: `Show: ${on.length ? on.map(([, t]) => t).join(', ') : 'all'} ▾` });
-  const showPill = popover(showBtn, () => el('div', { class: 'moremenu colmenu-list', id: 'pop-mshow',
-      'aria-label': 'show only' },
-    shows.map(([v, t, k]) => el('label', { class: 'small' },
-      el('input', { type: 'checkbox', 'data-filter': v, checked: f[k] ? '' : null,
-        onchange: e => { f[k] = e.target.checked; render(); } }), ' ' + t))),
-    { key: 'mshow', menu: false, rebuild: true });
-  const head = el('div', { class: 'card' },
-    el('h2', { text: 'Models' }),
-    el('p', { class: 'sub', text: 'Every model on this board, with what is known about it. '
-      + 'The filters are this table\'s — they narrow the list below and nothing else. The '
-      + 'radar and its model chips belong to the Leaderboard, where they are.' }),
-    el('div', { class: 'toolbar lbbar' },
-      el('input', { type: 'search', id: 'mq', value: f.q, style: 'flex:1;min-width:180px',
-        placeholder: 'name, id or family…', 'aria-label': 'filter models',
-        oninput: e => { f.q = e.target.value; render(); } }),
-      el('div', { class: 'pills' },
-        pillMenu('mkind', 'Kind', [['all', `All (${DATA.models.length})`],
-          ['base', `base (${count(m => m.kind === 'base')})`],
-          ['instruct', `instruct (${count(m => m.kind === 'instruct')})`]],
-          f.kind, v => { f.kind = v; render(); }),
-        nCk ? pillMenu('msrc', 'Source', [['all', 'All'], ['hub', 'Hub models'],
-          ['artifact', `checkpoints (${nCk})`]], f.src, v => { f.src = v; render(); }) : '',
-        pillMenu('mfamily', 'Family', [['all', 'any'], ...families.map(x => [x, x])],
-          f.family, v => { f.family = v; render(); }),
-        showPill),
-      el('span', { class: 'count-note', 'data-model-count': String(ms.length),
-        text: `${ms.length} of ${DATA.models.length} models` })));
-  const th = c => el('th', { class: c.num ? 'num' : null,
-    style: c.key ? 'cursor:pointer' : null, 'data-sort': c.key || '',
-    onclick: c.key ? () => {
-      f.sort = f.sort.key === c.key ? { key: c.key, dir: -f.sort.dir }
-                                    : { key: c.key, dir: c.defDir || 1 };
-      render();
-    } : null },
-    c.label + (f.sort.key === c.key ? (f.sort.dir > 0 ? ' ▲' : ' ▼') : ''));
-  const pg = paged('models', ms, JSON.stringify([f.q, f.kind, f.src, f.family, f.judgedOnly,
-                                                 f.taintedOnly, f.prelimOnly, f.sort]));
-  const table = el('div', { class: 'card' },
-    statusLine(pg, 'models', [`sorted by ${(MCOLS.find(c => c.key === f.sort.key) || {}).label
-      || f.sort.key} ${f.sort.dir > 0 ? '▲' : '▼'}`]),
-    pg.pager,
-    el('div', { class: 'lb-wrap stick' }, el('table', { class: 'jd', 'data-models-table': '1' },
-      el('thead', {}, el('tr', {}, MCOLS.map(th), el('th', { text: 'flags' }))),
-      el('tbody', {}, pg.rows.map(m => {
-        const topics = m.judge ? Object.keys(m.judge.tasks || {})
-          .filter(t => t !== (DATA.judged || {}).control) : [];
-        // no compare tick here: the radar is the Leaderboard's, and two tables
-        // sharing one selection is what broke the Leaderboard's own ticks
-        return el('tr', { 'data-model-row': m.id },
-          el('td', {}, el('a', { href: '#model=' + encodeURIComponent(m.id), text: m.name,
-            onclick: e => { e.preventDefault(); navigate({ model: m.id, topic: null }); } }),
-            dupBadge(m) || '',
-            el('div', { class: 'se mono', text: m.id })),
-          el('td', {}, el('span', { class: 'badge' + (m.kind === 'instruct' ? ' instruct' : ''),
-            text: m.kind }), m.source === 'artifact' ? el('span', { class: 'badge',
-              text: 'ckpt' }) : ''),
-          el('td', { class: 'small', text: m.family || '—' }),
-          el('td', { class: 'num se', text: P(m.params) }),
-          el('td', { class: 'num' }, officialAvg(m) != null ? pct(officialAvg(m), 1)
-            : el('span', { class: 'se', title: (m.kindReason || '') + ' ' +
-                ((m.judgeState || {}).reasons || []).join('; '),
-                text: `preliminary ${m.nhave ?? 0}/${m.nreq ?? 0}` })),
-          el('td', { class: 'num' }, topics.length
-            ? el('span', { title: topics.map(t => `${frName(t)} ${num(pubScore(m.judge.tasks[t]), 2)}`)
-                  .join(' · ') },
-                String(topics.length),
-                (m.judgeState && m.judgeState.ok) ? '' : el('span', { class: 'badge taint',
-                  title: ((m.judgeState || {}).reasons || []).join('; '), text: 'not ranked' }))
-            : el('span', { class: 'se', text: '—' })),
-          el('td', { class: 'small se', text: lastEval(m) ? String(lastEval(m)).slice(0, 10) : '—' }),
-          el('td', {}, (m.tainted || []).length ? el('span', { class: 'badge taint',
-            title: 'trained on data derived from ' + m.tainted.map(frName).join(', '),
-            text: 'tainted' }) : '',
-            m.provisional ? el('span', { class: 'badge taint', text: 'provisional' }) : ''));
-      })))));
-  if (!ms.length) table.append(empty('No model matches these filters.', 'Clear the filters',
-    () => { Object.assign(state.mdl, { q: '', kind: 'all', src: 'all', family: 'all',
-      judgedOnly: false, taintedOnly: false, prelimOnly: false }); render(); }));
-  return [head, table];
-}
-
 // ===========================================================================
-// The Leaderboard (11c). One toolbar row: topic-group chips on the left and
-// "Label: Value ▾" filter pills on the right, every one of them on 11a's
-// popover so a poll never closes it. Two header rows, one-line cells tinted
-// by their rank on the whole board, rows that open in place, and Insights
-// under the table. The view lives in the hash, so a pasted link reproduces it.
+// The Leaderboard (11c), and since 12b the Models place: topic-group chips,
+// and the filters in Filters ▾, every one of them on 11a's popover so a poll
+// never closes it. Two header rows, one-line cells tinted by their rank on
+// the whole board, a row that opens the model page, and Insights under the
+// table. The view lives in the hash, so a pasted link reproduces it. The
+// Models tab's list merged into it; its facts are optional columns.
 // ===========================================================================
 
+// 12b: Standard's groups, and Language modelling (the old Perplexity & Loss
+// page). Judged topics is not a chip any more: it is Knowledge exam, on the
+// switch above the chips
 const LB_CHIPS = [
   ['all', 'All tasks'], ['knowledge', 'Knowledge'], ['commonsense', 'Commonsense'],
   ['reasoning', 'Reasoning'], ['math', 'Math'], ['truthfulness', 'Truthfulness'],
-  ['judged', 'Judged topics']];
+  ['lm', 'Language modelling']];
+// the four kinds of test, named the same and in the same order everywhere.
+// A kind with no data yet is not offered (On phone arrives in 12f)
+const MODELS_VIEWS = { standard: 'Standard', exam: 'Knowledge exam', everyday: 'Everyday tasks' };
+function modelsViews() {
+  const out = ['standard'];
+  if (DATA.models.some(m => Object.keys((m.judge || {}).tasks || {}).some(t => t.startsWith('exam_'))))
+    out.push('exam');
+  if (Object.keys(evd().models || {}).length) out.push('everyday');
+  return out;
+}
+// Models opens on Standard, and remembers the viewer's last choice
+function modelsView() {
+  let v = 'standard';
+  try { v = localStorage.getItem('bench-models-view') || v; } catch (e) { /* private */ }
+  return modelsViews().includes(v) ? v : 'standard';
+}
+function setModelsView(v) {
+  const L = lbS();
+  try { localStorage.setItem('bench-models-view', v); } catch (e) { /* private */ }
+  lbSet({ view: v, chip: v === 'exam' ? 'judged' : (L.stdChip || 'all') });
+}
+// the model facts the Models tab carried: columns, off until asked for
+const FACT_KEYS = ['family', 'kind', 'date', 'flags'];
+function lbFactsShown() {
+  try { return JSON.parse(localStorage.getItem('bench-lb-facts') || '[]'); }
+  catch (e) { return []; }
+}
 const LB_GROUP = { knowledge: 'Knowledge', commonsense: 'Commonsense', reasoning: 'Reasoning',
   math: 'Math', truthfulness: 'Truthfulness' };
 const LB_KINDS = [['all', 'All'], ['base', 'base'], ['instruct', 'instruct'],
@@ -6527,7 +6498,7 @@ function lbS() {
       state.lbSe = localStorage.getItem('bench-lb-se') === 'on';
     } catch (e) { /* private mode: the defaults */ }
     state.lb = { ...LB_DEFAULTS, open: [], models: null, tint, howto, shown: {},
-                 focus: null, weak: null, radarSrc: 'tasks' };
+                 focus: null, weak: null, radarSrc: 'tasks', view: 'standard', stdChip: 'all' };
   }
   return state.lb;
 }
@@ -6536,19 +6507,23 @@ function lbS() {
 // defaults, so a plain link stays plain
 function lbHash() {
   const L = lbS(), out = [];
-  for (const k of Object.keys(LB_DEFAULTS))
+  if (L.view && L.view !== 'standard') out.push('view=' + L.view);
+  for (const k of Object.keys(LB_DEFAULTS)) {
+    if (k === 'chip' && L.view !== 'standard') continue;
     if (L[k] !== LB_DEFAULTS[k]) out.push(`${k}=${encodeURIComponent(L[k])}`);
-  if (L.open.length) out.push('open=' + L.open.map(encodeURIComponent).join(','));
+  }
   return out.join('&');
 }
 function lbFromHash(rest) {
   const L = lbS(), p = new URLSearchParams(rest || '');
-  L.chip = LB_CHIPS.some(([v]) => v === p.get('chip')) ? p.get('chip') : 'all';
-  if (L.chip === 'judged' && !judgedCalibrated()) L.chip = 'all';
+  // an old link's "chip=judged" is the Knowledge exam view now (12b)
+  const view = p.get('chip') === 'judged' ? 'exam' : p.get('view');
+  L.view = Object.keys(MODELS_VIEWS).includes(view) ? view : 'standard';
+  L.stdChip = LB_CHIPS.some(([v]) => v === p.get('chip')) ? p.get('chip') : 'all';
+  L.chip = L.view === 'exam' ? 'judged' : L.stdChip;
   L.kind = LB_KINDS.some(([v]) => v === p.get('kind')) ? p.get('kind') : 'all';
   L.size = LB_SIZES.some(([v]) => v === p.get('size')) ? p.get('size') : 'all';
   L.status = LB_STATUS.some(([v]) => v === p.get('status')) ? p.get('status') : 'all';
-  L.open = (p.get('open') || '').split(',').filter(id => DATA.models.some(m => m.id === id));
 }
 // a change to the view: the address bar follows without a history entry per
 // click, and the page paints
@@ -6688,7 +6663,14 @@ function lbColumns(ms) {
     { key: 'params', label: 'Params', num: true, group: '' },
     { key: 'avg', label: 'Avg', num: true, group: '',
       unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' }];
-  const tail = [{ key: 'date', label: 'Updated', group: '' }];
+  // 12b: the Models tab's facts — family, kind, last evaluated, flags —
+  // are columns under Filters ▾, off by default
+  const tail = [
+    { key: 'family', label: 'Family', group: 'Model facts', fact: true, optional: true },
+    { key: 'kind', label: 'Kind', group: 'Model facts', fact: true, optional: true },
+    { key: 'date', label: 'Last evaluated', short: 'Updated', group: 'Model facts', fact: true,
+      optional: true },
+    { key: 'flags', label: 'Flags', group: 'Model facts', fact: true, optional: true }];
   // an area with no number for any model here is not a column (11e)
   const areasHere = areas.filter(a => ms.some(m => areaMmlu(m, a)));
   let mid;
@@ -6698,8 +6680,8 @@ function lbColumns(ms) {
     mid = [...DATA.accTasks.map(task), ...DATA.pplTasks.map(task)]
       .map(c => ({ ...c, optional: true }))
       .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
-    if (judgedCalibrated()) mid.push(...judgedCols());
-    mid.push(...cats, ...javg);
+    // 12b: the judged columns are Knowledge exam's, on the switch
+    mid.push(...cats);
   } else if (L.chip === 'knowledge') {
     mid = [...(CATS.find(([g]) => g === 'knowledge')[1]).filter(t => DATA.accTasks.includes(t))
              .map(task),
@@ -6707,9 +6689,13 @@ function lbColumns(ms) {
              group: 'MMLU by area', unit: 'hidden questions · %' })),
            ...cats];
   } else if (L.chip === 'judged') {
+    // 12b: the Knowledge exam view stands on its own numbers — the Standard
+    // rank and average are Standard's, and a model with no exam result is
+    // not a row here
+    lead.splice(0, lead.length, ...lead.filter(c => c.key !== 'rank' && c.key !== 'avg'));
     mid = judgedCalibrated()
-      ? [...areas.map(a => ({ key: 'jarea:' + a, label: a, num: true, jarea: a,
-            group: 'Judged by area', unit: 'mean · 0–4' })), ...javg, ...judgedCols()]
+      ? [...javg, ...areas.map(a => ({ key: 'jarea:' + a, label: a, num: true, jarea: a,
+            group: 'Judged by area', unit: 'mean · 0–4' })), ...judgedCols()]
       : [...javg];
   } else {
     mid = (CATS.find(([g]) => g === L.chip) || [null, []])[1]
@@ -6730,6 +6716,9 @@ function lbColTip(c) {
   if (c.key === 'name') return ['Model — sort by name'];
   if (c.key === 'params') return ['Params — parameter count, from the harness config or the name'];
   if (c.key === 'date') return ['Updated — when the model was last evaluated'];
+  if (c.key === 'family') return ['Family — the Hub organisation, or a local run\'s name'];
+  if (c.key === 'kind') return ['Kind — base, instruct or an uploaded checkpoint'];
+  if (c.key === 'flags') return ['Flags — trained on diagnostics, or graded by a provisional judge'];
   if (c.key === 'avg') return [`Avg — mean of the required tasks, % ${scale}`,
     'the Scale pill switches it'];
   if (c.task) {
@@ -6752,14 +6741,20 @@ function lbColTip(c) {
 // which optional columns show, per chip: All tasks keeps its remembered six
 function lbShownFor(cols) {
   const L = lbS();
-  const opt = cols.filter(c => c.optional);
-  if (L.chip === 'all') return lbShownTasks(opt);
+  const opt = cols.filter(c => c.optional && !c.fact);
+  // the facts are one choice across every chip
+  const facts = lbFactsShown().filter(k => FACT_KEYS.includes(k));
+  if (L.chip === 'all') return new Set([...lbShownTasks(opt), ...facts]);
   const want = L.shown[L.chip];
   // a chip's own group columns show; the long per-topic lists wait to be asked for
-  return new Set(Array.isArray(want) ? want.filter(k => opt.some(c => c.key === k)) : []);
+  return new Set([...(Array.isArray(want) ? want.filter(k => opt.some(c => c.key === k)) : []),
+                  ...facts]);
 }
 function lbSaveShown(next) {
   const L = lbS();
+  try { localStorage.setItem('bench-lb-facts', JSON.stringify(next.filter(k => FACT_KEYS.includes(k)))); }
+  catch (e) { /* private */ }
+  next = next.filter(k => !FACT_KEYS.includes(k));
   if (L.chip === 'all') {
     state.lbShown = next;
     try { localStorage.setItem('bench-lb-shown', JSON.stringify(next)); } catch (e) { /* private */ }
@@ -6851,8 +6846,83 @@ function tiedWithBest(c, m, best, val) {
   return false;
 }
 
+// 12b: Models — the Leaderboard and the Models tab, one table. A switch for
+// the kind of test; a row opens the model page; models with nothing in this
+// view sit under one line at the bottom, not in rows of dashes
+function modelsHead(badge) {
+  const L = lbS(), views = modelsViews();
+  return [el('h2', {}, 'Models', badge || ''),
+    views.length > 1 ? el('nav', { class: 'subswitch', 'data-models-switch': '1', role: 'tablist',
+        'aria-label': 'kind of test' },
+      views.map(v => el('button', { class: 'chip-btn' + (L.view === v ? ' on' : ''), role: 'tab',
+        'data-models-view': v, 'aria-selected': String(L.view === v), text: MODELS_VIEWS[v],
+        onclick: () => setModelsView(v) }))) : ''];
+}
+// "Not tested on this (12) ▸": one collapsed line, each model with its Test
+function notTestedRows(none, ncols, suite) {
+  if (!none.length) return [];
+  const open = !!state.lbNotTested;
+  const head = el('tr', { class: 'nottested', 'data-not-tested': String(none.length) },
+    el('td', { colspan: String(ncols) }, el('button', { class: 'quiet', 'data-not-tested-toggle': '1',
+      'aria-expanded': String(open), onclick: () => { state.lbNotTested = !open; render(); },
+      text: `Not tested on this (${none.length}) ${open ? '▾' : '▸'}` })));
+  if (!open) return [head];
+  return [head, ...none.map(m => el('tr', { class: 'nottested-row', 'data-not-tested-row': m.id },
+    el('td', { colspan: String(ncols) },
+      el('a', { href: '#model=' + encodeURIComponent(m.id), text: m.name }),
+      LIVE ? [el('span', { class: 'se', text: ' · ' }), el('a', { href: '#',
+        'data-not-tested-test': m.id, text: 'Test', onclick: e => { e.preventDefault();
+          state.sub.suite = suite; openTest(m.id); } })] : '')))];
+}
+// Everyday tasks: each model's pilot row from 12a — ✓/✗ per group, n of 5
+function lbEveryday(ms) {
+  const E = evd(), qs = E.questions || [];
+  const rows = lbFilter(ms);
+  const have = rows.filter(m => evdOf(m.id)).sort((a, b) => natCmp(a.name, b.name));
+  const none = rows.filter(m => !evdOf(m.id));
+  const prov = have.some(m => evdOf(m.id).provisional);
+  const ncols = qs.length + 2;
+  const table = el('table', { class: 'lb norank', 'data-lb-table': '1', 'data-lb-everyday': '1' },
+    el('thead', {}, el('tr', { class: 'names' },
+      el('th', { class: 'model pin', scope: 'col', text: 'Model' }),
+      qs.map(q => el('th', { class: 'num', scope: 'col', title: q.prompt, text: q.groupLabel })),
+      el('th', { class: 'num', scope: 'col', text: 'Passed' }))),
+    el('tbody', {}, have.map(m => {
+      const e = evdOf(m.id);
+      return el('tr', { class: 'clickrow', 'data-lb-row': m.id,
+          onclick: ev => { if (ev.target.closest('a, button')) return;
+            navigate({ model: m.id, topic: null }); } },
+        el('td', { class: 'model pin', 'data-model': m.id },
+          el('a', { class: 'mname mlink', href: '#model=' + encodeURIComponent(m.id), text: m.name })),
+        qs.map(q => {
+          const it = evdItem(e, q.id), mk = evdMark(it);
+          return el('td', { class: 'num evmark ' + mk.cls, 'data-evd-mark': mk.cls,
+            title: it ? it.reason : '', 'aria-label': `${q.groupLabel}: ${mk.words}`, text: mk.t });
+        }),
+        el('td', { class: 'num', 'data-everyday-count': evdCount(e), text: evdCount(e) }));
+    }), notTestedRows(none, ncols, 'everyday')));
+  return [el('div', { class: 'card', 'data-lb-card': '1' },
+    ...modelsHead(evdBadge(prov)),
+    lbToolbar(ms, lbColumns(ms), new Set(), 0),
+    hfade('lb', el('div', { class: 'lb-wrap', 'data-hkeep': 'lb' }, table)),
+    el('p', { class: 'lbcap', text: 'Five questions, typed the way people type on a phone. Open a '
+      + 'model for its answers; Benchmarks ▸ Everyday tasks has all of them side by side.' }))];
+}
+
 function vLeaderboard(ms) {
   const L = lbS();
+  if (!modelsViews().includes(L.view)) { L.view = 'standard'; L.chip = L.stdChip || 'all'; }
+  if (L.view === 'everyday') return lbEveryday(ms);
+  // the exam's scores are not ranked until a person has agreed with the judge:
+  // one line says so, instead of an empty table
+  if (L.view === 'exam' && !judgedCalibrated())
+    return [el('div', { class: 'card', 'data-lb-card': '1' }, ...modelsHead(),
+      el('p', { class: 'note', 'data-exam-off': '1', text: 'Knowledge exam scores are shown on '
+        + 'each model page and are not ranked here yet: ' + judgedOffWhy() + '.' }))];
+  // Language modelling: the old Perplexity & Loss page, its charts under it
+  if (L.view === 'standard' && L.chip === 'lm')
+    return [el('div', { class: 'card', 'data-lb-card': '1' }, ...modelsHead(),
+      lbToolbar(ms, lbColumns(ms), new Set(), 0)), ...vPpl(lbFilter(ms))];
   const cols = lbColumns(ms);
   const shown = lbShownFor(cols);
   const opt = cols.filter(c => c.optional);
@@ -6866,13 +6936,18 @@ function vLeaderboard(ms) {
     : c.key === 'params' ? m.params
     : c.key === 'name' ? m.name
     : c.key === 'date' ? lastEval(m)
+    : c.key === 'family' ? famOf(m)
+    : c.key === 'kind' ? (m.source === 'artifact' ? 'checkpoint' : m.kind)
+    : c.key === 'flags' ? [(m.tainted || []).length ? 'tainted' : '', m.provisional
+        ? 'provisional' : ''].filter(Boolean).join(' ') || null
     : c.judged ? jval(m, c)
     : c.jarea ? areaJudged(m, c.jarea).v
     : c.area ? (areaMmlu(m, c.area) || {}).v
     : c.cat ? ((mmluCats(m) || {})[c.cat] || {}).score_report
     : c.task ? (cell(c.task, m.id) || {}).v : null;
   const rowsIn = lbFilter(ms);
-  const sortCol = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg');
+  const sortCol = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg')
+    || cols.find(c => c.key === 'javg') || cols.find(c => c.key === 'name');
   const sorted = [...rowsIn].sort((a, b) => {
     const va = val(a, sortCol), vb = val(b, sortCol);
     if (va == null && vb == null) return 0;
@@ -6881,15 +6956,23 @@ function vLeaderboard(ms) {
   });
   // ranked rows first, whatever the sort: a preliminary model's per-task
   // numbers are valid, and it is still not on the ladder
-  const ordered = [...sorted.filter(m => officialAvg(m) != null),
-                   ...sorted.filter(m => officialAvg(m) == null)];
+  const ordered = L.chip === 'judged' ? sorted
+    : [...sorted.filter(m => officialAvg(m) != null), ...sorted.filter(m => officialAvg(m) == null)];
   const dupsOf = {};
   for (const m of ordered)
     if (m.duplicateOf && ordered.some(x => x.id === m.duplicateOf))
       (dupsOf[m.duplicateOf] = dupsOf[m.duplicateOf] || []).push(m);
-  const lbAll = ordered.filter(m => !(m.duplicateOf && dupsOf[m.duplicateOf]));
+  // 12b: a model with nothing in this view's columns is not a row of dashes
+  const dataCols = visCols.filter(c => !['rank', 'name', 'params'].includes(c.key) && !c.fact);
+  // …but a model a judge that does not count (a local one) has graded WAS
+  // tested: its row stays, its cells blank with the reason on hover
+  const judgedAny = m => Object.keys((m.judge || {}).tasks || {}).some(t => t.startsWith('exam_'));
+  const testedIn = m => dataCols.some(c => val(m, c) != null)
+    || (L.view === 'exam' && judgedAny(m));
+  const notTested = ordered.filter(m => !testedIn(m) && !(m.duplicateOf && dupsOf[m.duplicateOf]));
+  const lbAll = ordered.filter(m => !(m.duplicateOf && dupsOf[m.duplicateOf]) && testedIn(m));
   const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
-    state.src, state.avgMode, L.chip, L.kind, L.size, L.status, L.models]));
+    state.src, state.avgMode, L.view, L.chip, L.kind, L.size, L.status, L.models]));
   const rows = lbPg.rows.flatMap(m => [m, ...((state.lbDupOpen || {})[m.id] ? dupsOf[m.id] || [] : [])]);
   // the leaders are bold whatever the Tint switch says; Tint only adds the wash
   const leaders = lbLeaders(visCols, val);
@@ -6949,33 +7032,32 @@ function vLeaderboard(ms) {
   const pctn = v => (100 * v).toFixed(1);
   const ncols = visCols.length;
   const tbody = el('tbody', {});
-  rows.forEach((m, i) => {
-    const open = L.open.includes(m.id);
-    const did = 'lbd-' + i;
-    const tr = el('tr', { class: (m.duplicateOf && dupsOf[m.duplicateOf] ? 'duprow' : '')
-        + (open ? ' open' : ''), 'data-lb-row': m.id,
+  rows.forEach(m => {
+    // 12b: a row opens the model page — the detail lives there, not in a
+    // row that expands
+    const tr = el('tr', { class: 'clickrow' + (m.duplicateOf && dupsOf[m.duplicateOf] ? ' duprow' : ''),
+      'data-lb-row': m.id,
       onclick: e => {
         // links, buttons, checkboxes and badges with a job of their own keep it
         if (e.target.closest('a, button, input, select, label, .badge[title]')) return;
-        lbToggle(m.id);
-      },
-      // Esc on an opened row closes it, and the chevron has the focus back
-      onkeydown: e => { if (e.key === 'Escape' && open) { e.preventDefault(); lbToggle(m.id, true); } } },
+        navigate({ model: m.id, topic: null });
+      } },
       visCols.map(c => {
         if (c.key === 'rank') {
           const r = rankOf(m);
           return el('td', { class: 'rank pin0 num' },
-            // 11f: one chevron that turns; it starts unturned when this
-            // render is the one that opens the row, so the turn is seen
-            el('button', { class: 'disclose' + (open && state.lbAnim === m.id ? ' pre' : ''),
-              'aria-expanded': String(open),
-              'aria-controls': did, 'data-open-row': m.id,
-              'aria-label': (open ? 'close ' : 'open ') + m.name,
-              onclick: () => lbToggle(m.id) }, el('span', { class: 'chev', text: '▸' })),
             el('span', { class: 'mono', text: r ? String(r.n) : '—',
               title: r ? `rank ${r.n} of ${r.of} ranked models on this board`
                        : 'preliminary — not ranked' }));
         }
+        if (c.key === 'family') return el('td', { class: 'small', 'data-fact': 'family',
+          text: famOf(m) });
+        if (c.key === 'kind') return el('td', { class: 'small', 'data-fact': 'kind',
+          text: m.source === 'artifact' ? 'checkpoint' : m.kind || '—' });
+        if (c.key === 'flags') return el('td', { class: 'small', 'data-fact': 'flags' },
+          (m.tainted || []).length ? el('span', { class: 'badge taint', text: 'tainted',
+            title: 'trained on data derived from ' + m.tainted.join(', ') }) : '',
+          m.provisional ? el('span', { class: 'badge taint', text: 'provisional' }) : '');
         // 11e: one clipped line — the name ellipsises, the badges and the
         // duplicate toggle follow inside the cell's own width, and nothing
         // paints into Params
@@ -7058,25 +7140,30 @@ function vLeaderboard(ms) {
           c.lower ? x => num(x, 3) : pctn);
       }));
     tbody.append(tr);
-    if (open) tbody.append(lbDetailRow(m, did, ncols, dupsOf[m.id]));
   });
+  tbody.append(...notTestedRows(notTested, ncols, L.view === 'exam' ? 'judged' : 'full'));
 
-  const table = el('table', { class: 'lb' + (L.tint ? ' tinted' : ''), 'data-lb-table': '1' },
+  const table = el('table', { class: 'lb' + (L.tint ? ' tinted' : '')
+      + (visCols.some(c => c.key === 'rank') ? '' : ' norank'), 'data-lb-table': '1' },
     thead, tbody);
   return [el('div', { class: 'card', 'data-lb-card': '1' },
-      el('h2', { text: 'Leaderboard' }),
+      ...modelsHead(),
       lbToolbar(ms, cols, shown, nHidden),
       L.chip === 'knowledge' && staleSentence(ms)
         ? el('p', { class: 'warn', 'data-stale-diag': '1', text: staleSentence(ms) }) : '',
       statusLine(lbPg, 'models', [
-        `${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
+        L.chip === 'judged' ? null : `${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
         `sorted by ${lbSortLabel(cols)}`,
         L.chip !== 'all' ? (LB_CHIPS.find(([v]) => v === L.chip) || [])[1] : null]),
       lbPg.pager,
-      hfade('lb', el('div', { class: 'lb-wrap stick' + (state.lbWide ? ' hscroll' : ''),
-        'data-hkeep': 'lb' }, table)),
+      // the Models tab's empty state, kept: a sentence and the way back
+      !rowsIn.length ? empty('No model matches these filters.', 'Clear the filters',
+        () => lbSet({ kind: 'all', size: 'all', status: 'all', models: null }))
+        : hfade('lb', el('div', { class: 'lb-wrap stick' + (state.lbWide ? ' hscroll' : ''),
+          'data-hkeep': 'lb' }, table)),
       el('p', { class: 'lbcap', 'data-lb-caption': '1', text: 'Bold = best in the column or '
-        + 'within its noise · hover a score for its ± error · hover a column name for its setup' }),
+        + 'within its noise · hover a score for its ± error · hover a column name for its setup · '
+        + 'click a row for the model' }),
       lbHowTo(ms)),
     insightsCard(ms)];
 }
@@ -7131,60 +7218,6 @@ function dupToggle(m, dups) {
 // row already open (a poll, a sort, a pasted link) is drawn open, still.
 function motionOff() { return matchMedia('(prefers-reduced-motion: reduce)').matches; }
 
-function lbToggle(id, refocus) {
-  const L = lbS();
-  const back = () => { if (refocus) state.after = {
-    focus: `button[data-open-row="${CSS.escape(id)}"]` }; };
-  if (!L.open.includes(id)) {
-    state.lbAnim = motionOff() ? null : id;
-    lbSet({ open: [...L.open, id] });
-    return;
-  }
-  const wrap = document.querySelector(`[data-dwrap="${CSS.escape(id)}"]`);
-  // the state closes now, so a poll in the middle does not open it again
-  L.open = L.open.filter(x => x !== id);
-  if (!wrap || motionOff()) { back(); lbSet({}); return; }
-  const btn = document.querySelector(`button[data-open-row="${CSS.escape(id)}"]`);
-  if (btn) btn.setAttribute('aria-expanded', 'false');
-  wrap.classList.add('anim');
-  requestAnimationFrame(() => wrap.classList.add('closed'));
-  let done = false;
-  const fin = () => { if (done) return; done = true; back(); lbSet({}); };
-  wrap.addEventListener('transitionend', e => {
-    if (e.target === wrap && e.propertyName === 'grid-template-rows') fin(); });
-  setTimeout(fin, 400);        // a transition that never ends still ends
-}
-
-// the opened row: the row's own continuation — its accent bar down the left,
-// a faint wash, ✕ Close at the top right — in a wrapper that can move
-function lbDetailRow(m, did, ncols, dups) {
-  const anim = state.lbAnim === m.id;
-  const wrap = el('div', { class: 'dwrap' + (anim ? ' anim closed' : ''), 'data-dwrap': m.id },
-    el('div', { class: 'dinner' }, el('div', { class: 'dpad' },
-      el('button', { class: 'quiet dclose', 'data-detail-close': m.id,
-        'aria-label': 'close ' + m.name, text: '✕ Close', onclick: () => lbToggle(m.id, true) }),
-      lbDetail(m, dups))));
-  if (anim) {
-    state.lbAnim = null;                 // consumed: the next render draws it still
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      wrap.classList.remove('closed');
-      const b = document.querySelector(`button.disclose.pre[data-open-row="${CSS.escape(m.id)}"]`);
-      if (b) b.classList.remove('pre');
-    }));
-    wrap.addEventListener('transitionend', e => {
-      if (e.target !== wrap || e.propertyName !== 'grid-template-rows') return;
-      wrap.classList.remove('anim');
-      // the panel ends below the screen: just enough scroll to show it
-      const tr = wrap.closest('tr');
-      if (tr) tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    });
-  }
-  return el('tr', { class: 'detail', id: did, 'data-lb-detail': m.id,
-      onkeydown: e => { if (e.key === 'Escape' && !e.target.closest('[data-pop]')) {
-        e.preventDefault(); e.stopPropagation(); lbToggle(m.id, true); } } },
-    el('td', { colspan: String(ncols) }, wrap));
-}
-
 // ---- the toolbar: one row ---------------------------------------------------
 function lbToolbar(ms, cols, shown, nHidden) {
   const L = lbS();
@@ -7213,30 +7246,27 @@ function lbToolbar(ms, cols, shown, nHidden) {
   const note = calOk ? '' : el('p', { class: 'chipnote', id: 'why-judged-chip', role: 'note',
     'data-why': 'judged-chip', hidden: state.lbChipWhy ? null : '', text: judgedOffWhy() });
   // 11h: on a phone the six pills are one "Filters ▾" beside the chips, and
-  // open as a sheet from the bottom; the chips are one row that scrolls
-  if (narrowLb()) {
-    const set = [L.kind !== LB_DEFAULTS.kind, L.size !== LB_DEFAULTS.size,
-      L.status !== LB_DEFAULTS.status, !!L.models, state.avgMode === 'raw'].filter(Boolean).length;
-    const open = !!state.lbFilters;
-    const toggle = el('button', { class: 'pill' + (set ? ' on' : ''), 'data-filters': String(set),
-      'aria-expanded': String(open), 'aria-controls': 'filter-sheet',
-      text: `Filters${set ? ` · ${set}` : ''} ▾`,
-      onclick: () => { state.lbFilters = !open; render(); } });
-    return el('div', { class: 'lbbar narrow' },
-      el('div', { class: 'chiprow' }, chips, toggle), note,
-      open ? el('div', { class: 'fsheet', id: 'filter-sheet', role: 'dialog', 'aria-label': 'filters',
-          'data-filter-sheet': '1',
-          onkeydown: e => { if (e.key === 'Escape' && !POP.panel) { state.lbFilters = false; render(); } } },
-        el('div', { class: 'fsheet-head' }, el('b', { text: 'Filters' }),
-          el('button', { class: 'ghost', text: 'Done', 'data-filters-done': '1',
-            onclick: () => { state.lbFilters = false; render(); } })),
-        pills) : '');
-  }
-  // the note sits right under the chips, where the click was
-  return el('div', { class: 'lbbar' }, chips, note, pills);
+  // open as a sheet from the bottom; the chips are one row that scrolls.
+  // 12b: at every width — Kind, Size, Status, Columns, Models and Scale all
+  // sit in Filters ▾. Standard has its chips; the other kinds have none
+  const set = [L.kind !== LB_DEFAULTS.kind, L.size !== LB_DEFAULTS.size,
+    L.status !== LB_DEFAULTS.status, !!L.models, state.avgMode === 'raw'].filter(Boolean).length;
+  const open = !!state.lbFilters;
+  const toggle = el('button', { class: 'pill' + (set ? ' on' : ''), 'data-filters': String(set),
+    'aria-expanded': String(open), 'aria-controls': 'filter-sheet',
+    text: `Filters${set ? ` · ${set}` : ''} ▾`,
+    onclick: () => { state.lbFilters = !open; render(); } });
+  return el('div', { class: 'lbbar narrow' },
+    el('div', { class: 'chiprow' }, L.view === 'standard' ? chips : '', toggle), note,
+    open ? el('div', { class: 'fsheet', id: 'filter-sheet', role: 'dialog', 'aria-label': 'filters',
+        'data-filter-sheet': '1',
+        onkeydown: e => { if (e.key === 'Escape' && !POP.panel) { state.lbFilters = false; render(); } } },
+      el('div', { class: 'fsheet-head' }, el('b', { text: 'Filters' }),
+        el('button', { class: 'ghost', text: 'Done', 'data-filters-done': '1',
+          onclick: () => { state.lbFilters = false; render(); } })),
+      pills) : '');
 }
-const narrowLb = () => matchMedia('(max-width:720px)').matches;
-// crossing 720px changes what the toolbar is made of: draw it again
+// crossing 720px turns the panel into a sheet: close it
 matchMedia('(max-width:720px)').addEventListener('change', () => {
   state.lbFilters = false; if (DATA) render(); });
 
@@ -7248,10 +7278,10 @@ function lbColumnsPill(cols, shown, nHidden) {
     'data-columns-menu': '1', 'data-hidden-tasks': nHidden ? String(nHidden) : null,
     text: `Columns${nHidden ? ` · ${nHidden} hidden` : ''} ▾` });
   return popover(btn, () => {
-    const tagOf = c => c.judged ? 'judged' : c.cat ? 'cats' : 'tasks';
+    const tagOf = c => c.fact ? 'facts' : c.judged ? 'judged' : c.cat ? 'cats' : 'tasks';
     const heads = { tasks: 'Task columns', judged: 'Judged topics (rubric 0–4)',
-                    cats: 'MMLU by topic' };
-    const tags = ['tasks', 'judged', 'cats'].filter(t => opt.some(c => tagOf(c) === t));
+                    cats: 'MMLU by topic', facts: 'Model facts' };
+    const tags = ['tasks', 'judged', 'cats', 'facts'].filter(t => opt.some(c => tagOf(c) === t));
     return el('div', { class: 'moremenu colmenu-list', id: 'pop-columns', 'aria-label': 'columns' },
       opt.length ? tags.map(tag => {
         const cs = opt.filter(c => tagOf(c) === tag), keys = cs.map(c => c.key);
@@ -7341,7 +7371,7 @@ function lbHowTo(ms) {
         try { localStorage.setItem('bench-lb-howto', L.howto ? 'open' : 'closed'); }
         catch (x) { /* private */ } } },
     el('summary', { text: 'How to read this table ▾' }),
-    el('p', { class: 'sub', text: 'Click a column to sort, and a row to open it in place. Each '
+    el('p', { class: 'sub', text: 'Click a column to sort, and a row for the model\'s page. Each '
       + 'cell is a score and its standard error, on one line; the unit is in the header. '
       + 'Perplexity columns are lower-is-better, excluded from Avg, and carry no standard error. '
       + '● marks a column\'s best value and ≈ marks values the z-test cannot tell from it. '
@@ -7349,100 +7379,8 @@ function lbHowTo(ms) {
       + 'filtering never changes a colour. '
       + `Avg exists only for models that completed all ${DATA.required.length} required tasks `
       + `(${DATA.required.join(', ')}): ${nOff} of ${ms.length} here. Anything short of that is `
-      + 'preliminary — its per-task scores are valid and shown, it just has no overall number.' }),
-    aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks], true));
-}
-
-// ---- a row opened in place -------------------------------------------------
-function lbDetail(m, dups) {
-  const block = (eyebrow, ...kids) => el('div', { class: 'dblock' },
-    el('div', { class: 'eyebrow', text: eyebrow }), ...kids);
-  const out = [];
-  // TASKS (11f): a compact list, one line each — the name, the score, a thin
-  // bar on the column's scale, the rank; the n-shot and the ± muted
-  out.push(block('Tasks', el('div', { class: 'tlist', role: 'list' },
-    [...DATA.accTasks, ...DATA.pplTasks].map(t => {
-      const c = cell(t, m.id);
-      const name = el('span', { class: 'tl-n', title: t }, LB_SHORT[t] || t,
-        c && c.shots != null ? el('span', { class: 'se', text: ` ${c.shots}-shot` }) : '');
-      if (!c) return el('div', { class: 'tl', role: 'listitem', 'data-task-line': t }, name,
-        el('span', { class: 'tl-v se', text: '—' }), el('span'), el('span'));
-      const lower = DATA.pplTasks.includes(t);
-      const pool = DATA.models.map(x => ({ id: x.id, c: cell(t, x.id) })).filter(x => x.c)
-        .sort((a, b) => lower ? a.c.v - b.c.v : b.c.v - a.c.v);
-      const r = pool.findIndex(x => x.id === m.id) + 1;
-      const best = pool[0];
-      const row = best && best.id !== m.id && !lower ? (DATA.sig[t] || []).find(([a, b]) =>
-        (a === best.id && b === m.id) || (a === m.id && b === best.id)) : null;
-      // the column's scale: 0–100% for accuracy; best to worst on the board
-      // for a lower-is-better task
-      const lo = lower ? pool[pool.length - 1].c.v : 0, hi = lower ? pool[0].c.v : 1;
-      const fill = lower ? (lo === hi ? 1 : (lo - c.v) / (lo - hi)) : c.v;
-      return el('div', { class: 'tl', role: 'listitem', 'data-task-line': t }, name,
-        el('span', { class: 'tl-v' }, el('b', { text: lower ? num(c.v, 3) : (100 * c.v).toFixed(1) }),
-          c.se && !lower ? el('span', { class: 'se', text: ` ±${(100 * c.se).toFixed(1)}` }) : ''),
-        el('span', { class: 'tl-b' }, el('span', { class: 'tl-f',
-          style: `width:${(100 * Math.max(0, Math.min(1, fill))).toFixed(1)}%` })),
-        el('span', { class: 'tl-r se', text: `#${r}/${pool.length}`
-          + (best && best.id === m.id ? ' · best' : row && !row[4] ? ' · tied with best' : '') }));
-    }))));
-  // MMLU BY AREA: eight mini bars, on the Scale pill's scale (11h)
-  const areas = Object.keys(DATA.meta.areas || {}).filter(a => areaMmlu(m, a));
-  if (mmluCats(m) && diagStale(m)) {
-    out.push(block('MMLU by area', el('p', { class: 'small', 'data-stale-diag': m.id,
-      text: staleSentence([m]) })));
-  } else if (mmluCats(m) && areas.length) {
-    out.push(block('MMLU by area', el('p', { class: 'small se', 'data-bars-scale': state.avgMode,
-        text: `% ${scaleWords()} — the Scale pill switches it` }),
-      el('div', { class: 'minibars' }, areas.map(a => {
-      const r = areaMmlu(m, a);
-      const v = r ? areaScaled(r.v) : null;
-      return el('div', { class: 'minibar', tabindex: '0', 'data-area-bar': a,
-          'data-tip': JSON.stringify([a, r ? `${(100 * v).toFixed(1)}% ${scaleWords()} · ${r.n} questions`
-            : 'no questions', 'topics: ' + ((DATA.meta.areas || {})[a] || []).join(', ')]) },
-        el('span', { class: 'mb-l', text: a }),
-        el('span', { class: 'mb-t' }, el('span', { class: 'mb-f',
-          style: `width:${v == null ? 0 : (100 * v).toFixed(1)}%` })),
-        el('span', { class: 'mb-v mono', text: v == null ? '—' : (100 * v).toFixed(1) }));
-    }))));
-  }
-  // JUDGED TOPICS: report half only, by area, weakest first
-  const jt = Object.entries((m.judge || {}).tasks || {}).filter(([t]) => t.startsWith('exam_'));
-  if (jt.length) {
-    const ok = judgedOkM(m);
-    const byArea = Object.entries(DATA.meta.areas || {}).map(([a, ts]) => [a,
-      jt.filter(([t]) => ts.includes(frName(t)))
-        .map(([t, v]) => ({ t, v: pubScore(v) })).filter(x => x.v != null)
-        .sort((x, y) => x.v - y.v)]).filter(([, xs]) => xs.length);
-    out.push(block('Judged topics',
-      ok ? '' : el('p', { class: 'small', 'data-provisional-line': '1',
-        text: 'provisional — ' + ((m.judgeState || {}).reasons || ['judge not calibrated'])[0]
-          + ' · not ranked' }),
-      byArea.map(([a, xs]) => el('div', { class: 'jgroup' },
-        el('span', { class: 'se', text: a + (ok ? '' : '') }),
-        el('div', { class: 'tchips' }, xs.map(x => el('a', {
-          class: 'tchip' + (ok ? '' : ' grey'), href: '#topic=' + x.t.replace(/^exam_/, ''),
-          text: `${frName(x.t)} ${num(x.v, 2)}` })))))));
-  }
-  // LINKS
-  const canRun = LIVE && (m.source === 'artifact' || !m.id.startsWith('local/'));
-  out.push(block('Links', dups && dups.length ? el('p', { class: 'small', 'data-dup-line': m.id },
-      `Same run as ${dups.map(d => d.name).join(', ')} `, dupToggle(m, dups)) : '',
-    el('p', { class: 'small', 'data-family': famOf(m) },
-      el('span', { class: 'famdot', style: `background:${famColor(m)}` }),
-      ` family: ${famOf(m)} · ${m.kind}` + (m.source === 'artifact' ? ' · uploaded checkpoint' : '')),
-    el('div', { class: 'dlinks' },
-    el('a', { href: '#model=' + encodeURIComponent(m.id), text: 'Open model page →' }),
-    el('a', { href: '#tab=provenance', text: 'Provenance →' }),
-    el('button', { class: 'quiet', 'data-add-radar': m.id,
-      text: state.cmpSel.includes(m.id) ? 'On the radar' : 'Add to radar',
-      disabled: state.cmpSel.includes(m.id) || state.cmpSel.length >= CMP_MAX ? '' : null,
-      title: !state.cmpSel.includes(m.id) && state.cmpSel.length >= CMP_MAX
-        ? `the radar holds ${CMP_MAX} — remove one first` : null,
-      onclick: () => cmpToggle(m.id, DATA.models) }),
-    canRun ? el('button', { class: 'quiet', 'data-run-exam': m.id, text: 'Run exam',
-      onclick: () => openSit(m.id) }) : '')));
-  return el('div', { class: 'dgrid' }, out);
+      + 'preliminary — its per-task scores are valid and shown, it just has no overall number. '
+      + 'What each benchmark measures is under Benchmarks ▸ Standard.' }));
 }
 
 // ===========================================================================
@@ -7570,7 +7508,7 @@ function weakestChart() {
   const head = el('div', { class: 'ihead' }, el('div', { class: 'eyebrow', text: 'Weakest topics' }));
   if (!judged.length) return el('div', { class: 'ibox', 'data-weakest': '1' }, head,
     el('p', { class: 'small', 'data-weakest-empty': '1',
-      text: 'No model has been judged yet — Loop ▸ Sit the exam' }));
+      text: 'No model has been judged yet — Improve ▸ By topic ▸ Sit the exam' }));
   // the model the loop is on: the one judged last, unless someone picked another
   const lastJ = m => Math.max(0, ...Object.values((m.judge || {}).tasks || {}).map(t => t.judged_at || 0));
   const m = judged.find(x => x.id === L.weak) || [...judged].sort((a, b) => lastJ(b) - lastJ(a))[0];
@@ -8753,7 +8691,7 @@ function vTraining() {
         let statusLine = `Training ${selRuns[0].row.status} · benchmarks: `
           + `${evs.length - pendingEvs.length}/${evs.length} done`;
         if (inQueue) statusLine += `, ${inQueue} in the eval queue`;
-        if (failedEvs) statusLine += `, ${failedEvs} failed (see the Queue tab)`;
+        if (failedEvs) statusLine += `, ${failedEvs} failed (see All runs)`;
         if (series.length || evs.length) {
           const XTITLE = { step: 'benchmark score vs step',
                            tokens: 'benchmark score vs training tokens',
@@ -9635,7 +9573,7 @@ function queueOpen(r) {
       state.after = { scroll: '[data-everyday-block], [data-everyday-none]' };
       return navigate({ model: r.hf_id, topic: null });
     }
-    return navigate({ everyday: true, model: null, topic: null });
+    return navigate({ tab: 'everyday', model: null, topic: null });
   }
   if (DATA.models.some(m => m.id === r.hf_id)) return navigate({ model: r.hf_id, topic: null });
   toast(`${r.hf_id} is not on the board yet — its results land on the next refresh`);
@@ -9751,7 +9689,9 @@ function queueActions(r) {
   return cell('');
 }
 
-function vQueue() {
+// 12b: the form opens in the Test a model dialog, the list is All runs —
+// the same code, in two containers
+function vQueue(part = { form: true, list: true }) {
   // the judged suite's availability (and its reason when it has none) comes
   // from the same endpoint the Loop tab reads
   if (!state.loop.loaded && netReady()) loadLoop();
@@ -9835,6 +9775,7 @@ function vQueue() {
         // ticks it opens with, so the next submission is not the last one's
         sf.hf_id = ''; sf.note = ''; sf.allow = false;
         sf.tasks = null; sf.control = false;
+        state.testOpen = false;                       // 12b: the dialog's job is done
         toast(j.note ? `#${j.id}: ${j.note} —` : `Run #${j.id} queued —`,
               { key: 'submit', go: () => followRun(j.id), link: 'follow it →' });
       } else {
@@ -9927,9 +9868,9 @@ function vQueue() {
   const qPager = el('div');
   const qTableWrap = el('div', { class: 'lb-wrap stick' }, el('table', { 'data-queue-table': '1' },
     qThead, qTbody));
-  const qEmpty = empty('Nothing in the queue yet. Submit a model above — it runs here, one '
-    + 'at a time.', 'Submit a model', () => {
-      const i = document.querySelector('[data-ms="submit"] input'); if (i) i.focus(); });
+  const qEmpty = empty('Nothing has run yet. Test a model — it runs here, one '
+    + 'at a time.', 'Test a model', () => {
+      openTest(); });
   // in place, same reason as everywhere: the 5s poll must never eat a keystroke
   function rebuildQueue() {
     const any = state.queue.length > 0;
@@ -9962,8 +9903,10 @@ function vQueue() {
     markChanged(qTbody, was);
     if (qTbody.isConnected) popReanchor();     // an open ⋯ hangs from the new button
   }
-  state.queueRedraw = rebuildQueue;
-  rebuildQueue();
+  if (part.list) {
+    state.queueRedraw = rebuildQueue;
+    rebuildQueue();
+  }
   function gateSubmit() {
     const code = info ? ownCodeWhy(info, !!sf.allow) : '';
     const w = judgedOff() ? (cannotRun(sf.hf_id) ? noWeightsWhy(sf.hf_id.trim()) : judgeWhy())
@@ -9976,12 +9919,12 @@ function vQueue() {
   }
   gateSubmit();
   return [
-    el('div', { class: 'card' },
-      el('h2', { text: 'Submit a model' }),
+    part.form ? el('div', { class: 'card', 'data-submit-form': '1' },
+      el('h2', { id: 'test-title', text: 'Test a model' }),
       el('p', { class: 'sub', text:
         'Any public (or server-accessible) Hugging Face model up to the size cap. Preflight '
         + 'checks the repo before any GPU is spent, and one run goes at a time. Results land '
-        + 'on this leaderboard automatically.' }),
+        + 'on Models automatically.' }),
       el('p', { class: 'small', 'data-suite-help': '1' },
         el('b', { text: 'full' }), ' and ', el('b', { text: 'judged' }),
         ' are separate runs, not one inside the other: a model needs both to have an average '
@@ -9997,10 +9940,154 @@ function vQueue() {
       ownCodeBox(info, sf.allow, v => { sf.allow = v; gateSubmit(); }, 'submit'),
       topicBoxes,
       state.qmsg ? el('p', { class: 'warn', 'data-qmsg': '1', style: 'margin-top:8px',
-        text: state.qmsg }) : ''),
-    el('div', { class: 'card' },
-      el('h2', { text: 'Queue' }),
-      qToolbar, qPager, qTableWrap, qEmpty)];
+        text: state.qmsg }) : '') : null,
+    part.list ? el('div', { class: 'card', 'data-all-runs': '1' },
+      el('h2', { text: 'All runs' }),
+      qToolbar, qPager, qTableWrap, qEmpty) : null].filter(Boolean);
+}
+
+// ---------------------------------------------------------------------------
+// 12b: All runs — today's Queue table, unchanged, with its filters. Not in
+// the header's places: reached from the run counter and every "follow it →".
+// ---------------------------------------------------------------------------
+function vAllRuns() {
+  return vQueue({ list: true });
+}
+
+// Test a model: the one filled button on every page. It opens today's Submit
+// form in a dialog, unchanged — 12c replaces its insides with four cards.
+// From a model page it opens with that model filled in.
+function openTest(prefill) {
+  if (!LIVE) return;
+  const id = prefill || state.model;
+  if (id) {
+    const m = DATA.models.find(x => x.id === id);
+    Object.assign(state.sub, { hf_id: id, allow: false,
+      ...(m && m.kind && m.kind !== 'checkpoint' ? { kind: m.kind } : {}) });
+  }
+  state.testOpen = true;
+  state.qmsg = '';
+  state.after = { focus: '[data-dialog="test"] [data-ms="submit"] input' };
+  render();
+}
+function closeTest() {
+  if (!state.testOpen) return;
+  state.testOpen = false;
+  state.after = { focus: '[data-test-model]' };
+  render();
+}
+function testDialog() {
+  if (!state.testOpen || !LIVE) return [];
+  const [form] = vQueue({ form: true });
+  // the backdrop closes it on a click, and is not itself a control
+  const back = el('div', { class: 'dlg-back', 'data-dialog': 'test' },
+    el('div', { class: 'dlg testdlg', role: 'dialog', 'aria-modal': 'true',
+        'aria-labelledby': 'test-title' },
+      el('button', { class: 'ghost dlg-x', 'data-dialog-close': '1', 'aria-label': 'close',
+        text: '✕ Close', onclick: closeTest }),
+      form));
+  back.addEventListener('click', e => { if (e.target === back) closeTest(); });
+  return [back];
+}
+// Esc closes it — unless a list of its own is open, or the reader is
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && state.testOpen && !POP.panel && !state.read) {
+    e.preventDefault(); closeTest(); }
+});
+function renderTestAct() {
+  const box = document.getElementById('testAct');
+  if (!box || box.firstChild || !LIVE) return;
+  box.append(el('button', { class: 'primary', 'data-test-model': '1', title: 'Test a model',
+    onclick: () => openTest() }, el('span', { class: 't-full', text: 'Test a model' }),
+    el('span', { class: 't-short', text: 'Test' })));
+}
+
+// ● n running: a pulsing dot while anything runs, "Runs" when nothing does.
+// It opens the running and queued runs with their progress, then the last
+// five that finished, each linking to its model; All runs → at the bottom.
+const RUNNING_ST = new Set(['preflight', 'waiting_gpu', 'waiting_lock', 'running', 'canceling']);
+function runsNow() {
+  const q = state.queue || [];
+  const running = q.filter(r => RUNNING_ST.has(r.status) || (r.status === 'done' && stillGrading(r)));
+  const queued = q.filter(r => r.status === 'queued');
+  const done = q.filter(r => !running.includes(r) && !queued.includes(r))
+    .sort((a, b) => (b.finished_at || 0) - (a.finished_at || 0)).slice(0, 5);
+  return { running, queued, done };
+}
+function runLine(r, attrs = {}) {
+  const st = runStage(r);
+  const onBoard = DATA.models.some(m => m.id === r.hf_id);
+  const name = (DATA.models.find(m => m.id === r.hf_id) || {}).name || r.hf_id.split('/').pop();
+  return el('div', { class: 'runline', 'data-run-line': String(r.id), ...attrs },
+    el('span', { class: stClass(st.cls), text: st.text }),
+    onBoard ? el('a', { href: '#model=' + encodeURIComponent(r.hf_id), class: 'runname', text: name,
+        onclick: e => { e.preventDefault(); popClose(); navigate({ model: r.hf_id, topic: null }); } })
+      : el('span', { class: 'runname', title: r.hf_id, text: name }),
+    el('span', { class: 'small se runwhat', text: r.suite === 'everyday' ? 'everyday pilot'
+      : r.suite }),
+    el('span', { class: 'small se runprog', title: r.progress || '',
+      text: RUNNING_ST.has(r.status) || r.status === 'done' ? (r.progress || '')
+        : r.status === 'queued' ? 'waiting its turn' : (r.error || '') }));
+}
+function runsList(full = false) {
+  const { running, queued, done } = runsNow();
+  const all = el('a', { href: '#tab=runs', class: 'runs-all', 'data-all-runs-link': '1',
+    text: 'All runs →', onclick: e => { e.preventDefault(); popClose();
+      navigate({ tab: 'queue', model: null, topic: null }); } });
+  return el('div', { class: full ? 'runslist full' : 'runslist', 'data-runs-list': '1' },
+    running.length || queued.length
+      ? [...running, ...queued].map(r => runLine(r))
+      : el('p', { class: 'small', 'data-nothing-running': '1', text: 'Nothing running.' }),
+    done.length ? [el('p', { class: 'small se runhead', text: 'Finished' }),
+      ...done.map(r => runLine(r, { 'data-run-done': '1' }))] : '',
+    full ? '' : all);
+}
+let _runsSig = null;
+function renderRuns() {
+  const box = document.getElementById('runs');
+  if (!box || !LIVE) return;
+  const { running } = runsNow();
+  const n = running.length;
+  const sig = String(n);
+  if (_runsSig === sig && box.firstChild) return;
+  _runsSig = sig;
+  const btn = el('button', { class: 'barpill runpill' + (n ? ' on' : ''), 'data-runs': String(n),
+    'aria-label': n ? `${n} running — runs` : 'runs', title: n ? `${n} running` : 'no run is going',
+  }, el('span', { class: 'dot ' + (n ? 'ok pulse' : 'idle') }),
+    n ? [el('span', { class: 'num', text: String(n) }), el('span', { class: 't-full', text: ' running' })]
+      : el('span', { class: 't-idle', text: 'Runs' }));
+  box.replaceChildren(popover(btn, () => el('div', { class: 'moremenu runspop', id: 'pop-runs',
+      'aria-label': 'runs' }, runsList()), { key: 'runs', menu: false, placement: 'bottom-end',
+    rebuild: true }));
+}
+
+// ---------------------------------------------------------------------------
+// 12b: Help — the guides and How to read these numbers, from the old hero
+// and Overview. Settings and reference: reached from the name menu.
+// ---------------------------------------------------------------------------
+function vHelp() {
+  return [
+    LIVE ? el('div', { class: 'card', 'data-help-guides': '1' },
+      el('h2', { text: 'Help' }),
+      el('p', { class: 'sub', text: 'What this board is for and how to use it.' }),
+      el('ul', { class: 'helplinks' },
+        el('li', {}, el('a', { href: 'guide', target: '_blank', rel: 'noopener',
+          'data-help-guide': '1', text: '📖 The guide for new users ↗' })),
+        el('li', {}, el('a', { href: 'guide#the-loop', target: '_blank', rel: 'noopener',
+          'data-help-loop': '1', text: 'The loop, explained ↗' })))) : '',
+    el('div', { class: 'card', 'data-how-to-read': '1' },
+      el('h2', { text: 'How to read these numbers' }),
+      note('Chance is not zero. 4-option tasks (MMLU, ARC, HellaSwag) sit at 25% for a model that knows nothing; 2-option tasks (Winogrande, PIQA) sit at 50%. A "50%" that looks respectable may be a coin flip.'),
+      note('GSM8K near zero is a finding, not a failure — sub-billion models mostly cannot do written arithmetic. TruthfulQA is famous for NOT improving with scale.'),
+      note('Perplexity (bits per byte) is the scale-sensitive metric here: it separates models that multiple-choice tasks cannot tell apart, and it works on base models with no prompt format at all. Multiply by ln 2 for cross-entropy loss in nats/byte — Models ▸ Standard ▸ Language modelling does it for you. Lower is better.'),
+      note('Whiskers are ±1 standard error. If two whiskers overlap, do not call a winner — every pairwise z-test verdict rides along in the JSON export (the "sig" field) when you need the arbiter.'))]
+    .filter(Boolean);
+}
+
+// Benchmarks ▸ Standard: today's Tasks page, with About these benchmarks
+// under it (from the Leaderboard's How to read this table)
+function vStandardBench(ms) {
+  return [...vTasks(ms), aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
 }
 
 // ---------- Review: the human in the loop ----------
@@ -10121,20 +10208,28 @@ function askName() {
 
 function renderWho(force = false) {
   const box = document.getElementById('who');
-  if (!box || !LIVE) return;
+  if (!box) return;
   // a results refresh redraws the header: never under someone's caret
   if (!force && box.contains(document.activeElement)
       && document.activeElement.tagName === 'INPUT') return;
-  const name = whoName();
+  const name = LIVE ? whoName() : '';
+  const sig = `${LIVE}|${name}|${state.whoAsk}`;
+  if (!force && box._sig === sig && box.firstChild) return;
+  box._sig = sig;
   // one control in the bar, whatever the state: a button that opens the same
   // panel. It is never clipped, it survives a poll, and Esc gives it back.
-  const btn = el('button', { class: 'who barpill' + (name ? '' : ' ask'), 'data-who': name,
-    'data-who-prompt': name ? null : '1',
-    title: name
-      ? 'the name recorded on anything you start, approve or import here — click to change'
-      : 'the name recorded on anything you start, approve or import here',
-    'aria-label': name ? `your name: ${name} — change` : 'who are you?',
-    text: name ? `${name} ▾` : 'Who are you? ▾' });
+  // 12b: and it holds what is settings and reference, not a place — the name
+  // at the top, then Theme, Data & sources and Help
+  const btn = el('button', { class: 'who barpill' + (LIVE && !name ? ' ask' : ''),
+    'data-who': name, 'data-who-prompt': LIVE && !name ? '1' : null,
+    title: LIVE ? 'your name, the theme, data & sources, and help'
+      : 'the theme, data & sources, and help',
+    'aria-label': LIVE ? (name ? `${name}: name, theme, data and help` : 'who are you?')
+      : 'settings and help',
+  }, el('span', { class: 't-full', text: LIVE ? (name ? `${name} ▾` : 'Who are you? ▾') : 'Settings ▾' }),
+    // at a phone's width, the initial: "Wh…" said nothing
+    el('span', { class: 't-short', 'aria-hidden': 'true',
+      text: LIVE ? (name ? name[0].toUpperCase() : '?') + ' ▾' : 'Settings ▾' }));
   box.replaceChildren(popover(btn, () => {
     const input = el('input', { type: 'text', value: name, 'aria-label': 'your name',
       'data-keep': 'whoname',
@@ -10145,13 +10240,28 @@ function renderWho(force = false) {
       if (!v) { input.focus(); return; }
       setWho(v); state.whoAsk = false; popClose(); renderWho(true);
     };
+    const labels = { auto: 'Auto', light: 'Light', dark: 'Dark', dim: 'Dim' };
+    const go = tab => { popClose(); navigate({ tab, model: null, topic: null }); };
     return el('div', { class: 'moremenu whopop' + (state.whoAsk ? ' ask' : ''),
-        id: 'pop-who', 'aria-label': 'your name' },
-      el('p', { class: 'small', text: 'Recorded on anything you start, approve or import '
-        + 'here — this tailnet has no login, so the name you type is the record.' }),
-      el('div', { class: 'frm' }, input,
-        el('button', { class: 'primary', 'data-who-save': '1', text: 'Save', onclick: save })));
-  }, { key: 'who', menu: false, placement: 'bottom-end' }));
+        id: 'pop-who', 'aria-label': LIVE ? 'your name, theme, data and help' : 'settings' },
+      LIVE ? [el('p', { class: 'small', text: 'Your name is recorded on anything you start, '
+          + 'approve or import here — this tailnet has no login, so the name you type is the '
+          + 'record.' }),
+        el('div', { class: 'frm' }, input,
+          el('button', { class: 'primary', 'data-who-save': '1', text: 'Save', onclick: save }))]
+        : '',
+      el('div', { class: 'menusect', role: 'group', 'aria-label': 'theme' },
+        el('span', { class: 'small se', text: 'Theme' }),
+        el('div', { class: 'themeopts' }, THEMES.map(t => el('button', {
+          role: 'menuitemradio', 'data-theme': t, class: 'chip-btn',
+          'aria-checked': String(THEMES[themeIdx] === t), text: labels[t],
+          onclick: () => { themeIdx = THEMES.indexOf(t); themeFade(); applyTheme(t); } })))),
+      el('button', { role: 'menuitem', class: 'menulink', 'data-menu': 'data',
+        text: 'Data & sources', onclick: () => go('provenance') }),
+      el('button', { role: 'menuitem', class: 'menulink', 'data-menu': 'help',
+        text: 'Help', onclick: () => go('help') }));
+    // the name first: the checked theme would otherwise take the focus
+  }, { key: 'who', menu: false, placement: 'bottom-end', focus: '[data-who-input]' }));
 }
 
 // kept for the call sites that used to place a box: they place nothing now
@@ -11036,7 +11146,7 @@ function proposeControl(r) {
   const open = openProposalFor(model, r.topic);
   if (open)
     return el('div', {}, el('a', { ...attrs, class: 'propose', 'data-gate': 'open',
-      'data-review-link': String(open.id), href: '#tab=review&read=proposal:' + open.id,
+      'data-review-link': String(open.id), href: '#tab=improve&sub=review&read=proposal:' + open.id,
       text: 'Review it →', title: `proposal #${open.id} is `
         + rvStatusWords(open.status).toLowerCase(),
       onclick: e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return;
@@ -11166,9 +11276,9 @@ function vLoop() {
               text: `under ${r.bank.floor} hidden questions` }) : '',
         r.bank.awaiting ? el('div', { class: 'se', text: `${r.bank.awaiting} awaiting curation` }) : ''),
       el('td', { class: 'small' },
-        el('a', { href: '#tab=exam', 'data-fallback': r.rubric.fallback ? '1' : null,
+        el('a', { href: '#tab=benchmarks&sub=exam', 'data-fallback': r.rubric.fallback ? '1' : null,
           title: (r.rubric.fallback ? `this topic has no rubric of its own: the shared `
-            + `${r.rubric.name}.md grades it. ` : '') + 'The rubric and criteria panel on the Exam tab.',
+            + `${r.rubric.name}.md grades it. ` : '') + 'The rubric and criteria panel on Benchmarks ▸ Knowledge exam.',
           text: r.rubric.fallback ? 'shared rubric' : `${r.rubric.name}.md`,
           onclick: e => { e.preventDefault(); navigate({ tab: 'exam', topic: null }); } }),
         r.rubric.status === 'draft' ? el('span', { class: 'badge taint', text: 'DRAFT' }) : '',
@@ -11186,7 +11296,7 @@ function vLoop() {
                 onclick: e => { e.preventDefault(); loopGo(r, 'sit'); } }))
           : el('span', { class: 'se', text: '—' })),
       el('td', { class: 'small' }, r.proposal
-        ? el('a', { href: '#tab=review', text: `#${r.proposal.id} `
+        ? el('a', { href: '#tab=improve&sub=review', text: `#${r.proposal.id} `
               + rvStatusWords(r.proposal.status).toLowerCase(),
             onclick: e => { e.preventDefault(); loopGo(r, 'review'); } })
         : el('span', { class: 'se', text: '—' })),
@@ -11236,8 +11346,8 @@ function vTopic() {
   if (!state.queue.length && netReady()) loadQueue();
   const r = loopRowOf(state.topic);
   const back = el('p', { class: 'small' },
-    el('a', { href: '#tab=loop', text: '← every topic',
-      onclick: e => { e.preventDefault(); navigate({ topic: null, tab: 'loop' }); } }));
+    el('a', { href: '#tab=benchmarks&sub=exam', 'data-topic-back': '1', text: '← Knowledge exam',
+      onclick: e => { e.preventDefault(); navigate({ topic: null, tab: 'exam' }); } }));
   if (!r) return [el('div', { class: 'card' }, back,
     el('h2', { text: state.topic }), el('p', { class: 'small',
       text: state.loop.loaded ? 'No such topic.' : '' }),
@@ -11260,7 +11370,8 @@ function vTopic() {
       el('span', {}, el('b', { text: 'next ' }), st.label)),
     r.bank.under_floor && r.bank.accepted ? el('p', { class: 'warn', text:
       `${r.bank.report} hidden questions — under the ${r.bank.floor} a topic needs before `
-      + 'anything is proposed from it. Import or write more on the Exam tab.' }) : '',
+      + 'anything is proposed from it. Import or write more on Benchmarks ▸ Knowledge exam.' })
+      : '',
     el('div', { class: 'frm' },
       r.next.step === 'propose' ? proposeControl(r) : loopBtn(r)),
     judgingLine(r),
@@ -11278,7 +11389,7 @@ function judgingLine(r) {
   if (!mine.length) return '';
   return el('p', { class: 'small', 'data-judging': '1' },
     mine.map(q => el('span', {}, `${q.hf_id}: judging ${judgeCount(q.judge)} `,
-      el('a', { href: '#tab=queue', text: 'in the queue',
+      el('a', { href: '#tab=runs', text: 'in All runs',
         onclick: e => { e.preventDefault(); navigate({ tab: 'queue', topic: null }); } }), ' ')));
 }
 
@@ -11389,8 +11500,8 @@ function loopSitPanel(r) {
         : judgeDown() ? el('span', { class: 'propwhy', 'data-why': 'sit', text: judgeWhy() }) : ''),
     el('p', { class: 'small', text: 'topics in this run:' }), pick,
     s.msg ? el('p', { class: 'small', 'data-sit-msg': '1', text: s.msg }) : '',
-    el('p', { class: 'small' }, 'The queue is on ',
-      el('a', { href: '#tab=queue', text: 'Queue',
+    el('p', { class: 'small' }, 'Every run is on ',
+      el('a', { href: '#tab=runs', text: 'All runs',
         onclick: e => { e.preventDefault(); navigate({ tab: 'queue', topic: null }); } }),
       ' — a judged row says which topics it sat and how far the judge batch is.'));
 }
@@ -11975,14 +12086,14 @@ function loopOutputPanel(r) {
     el('h2', { text: 'Propose, approve, generate' }),
     el('p', { class: 'sub', text: 'A proposal reads the judge\'s written assessments of the '
       + 'answers above — never the questions — and says what skill is missing. A person '
-      + 'approves that sentence on the Review tab, and only the approved text reaches a '
+      + 'approves that sentence on Improve ▸ Review, and only the approved text reaches a '
       + 'generator.' }));
   if (r.proposal) {
     card.append(el('p', { class: 'small', 'data-proposal': String(r.proposal.id) },
       `Proposal #${r.proposal.id} for ${r.proposal.model} is ${r.proposal.status}`
       + (r.proposal.requested_by ? `, requested by ${r.proposal.requested_by}` : ''), ' ',
       overBadge(r.proposal.override), '. ',
-      el('a', { href: '#tab=review', text: 'Review it',
+      el('a', { href: '#tab=improve&sub=review', text: 'Review it',
         onclick: e => { e.preventDefault(); loopGo(r, 'review'); } })));
   } else {
     card.append(el('p', { class: 'small' }, 'No open proposal. '
@@ -12505,33 +12616,67 @@ function exportCsv() {
 function exportJson() { download('benchmark.json', 'application/json', JSON.stringify(DATA, null, 1)); }
 
 // ---------- shell ----------
-// Tab order is how often each is opened, and every id is the label's own
-// slug — a tab called Evals whose hash said `runs` and whose heading said
-// "Run provenance" was three names for one thing.
+// 12b: five places, organised around what people come to do. A table, a
+// reader or a dialog keeps its code and changes container: the views below
+// are the old tabs under their old ids, so every call that opens one still
+// does, and the places group them in the header.
 const TABS = [
-  ['overview', 'Overview', vOverview],
-  // the loop is what this server is for, so it sits where the eye lands
-  ...(LIVE ? [['loop', 'Loop', vLoop]] : []),
-  ['models', 'Models', vModels],
-  ['leaderboard', 'Leaderboard', vLeaderboard],
-  ...(LIVE ? [['queue', 'Queue', vQueue]] : []),
-  // one click further, under More: Exam and Review are steps of the loop and
-  // are reached from it; the rest are for the people who go looking
-  ...(LIVE ? [['exam', 'Exam', vExam, 'more'],
-              ['review', 'Review', vReview, 'more'],
-              ['training', 'Training', vTraining, 'more']] : []),
-  ['tasks', 'Tasks', vTasks, 'more'],
-  ['perplexity', 'Perplexity & Loss', vPpl, 'more'],
-  ['provenance', 'Provenance', vRuns, 'more'],
+  ['overview', 'Home', vOverview],
+  ['leaderboard', 'Models', vLeaderboard],
+  ...(LIVE ? [['loop', 'By topic', vLoop], ['review', 'Review', vReview],
+              ['training', 'Training runs', vTraining]] : []),
+  ['tasks', 'Standard', vStandardBench],
+  ...(LIVE ? [['exam', 'Knowledge exam', vExam]] : []),
+  ['everyday', 'Everyday tasks', vEverydayPage],
+  // pages, not places: reached from the header's right side
+  ...(LIVE ? [['queue', 'All runs', vAllRuns]] : []),
+  ['provenance', 'Data & sources', vRuns],
+  ['help', 'Help', vHelp],
 ];
+// Playground joins in 12d, between Models and Improve
+const PLACES = [['home', 'Home', ['overview']], ['models', 'Models', ['leaderboard']],
+  ['improve', 'Improve', ['loop', 'review', 'training']],
+  ['benchmarks', 'Benchmarks', ['tasks', 'exam', 'everyday']]]
+  .map(([id, label, views]) => [id, label, views.filter(v => TABS.some(t => t[0] === v))])
+  .filter(p => p[2].length);
+const placeOf = v => (PLACES.find(p => p[2].includes(v)) || [])[0] || null;
+const viewLabel = v => (TABS.find(t => t[0] === v) || [, v])[1];
+// the address of each view: its place, and which part of it
+const SUB_SLUG = { loop: 'topics', review: 'review', training: 'training',
+                   tasks: 'standard', exam: 'exam', everyday: 'everyday' };
+const PAGE_SLUG = { overview: 'home', leaderboard: 'models', queue: 'runs',
+                    provenance: 'data', help: 'help' };
 
-// Old hashes keep working: a link someone pasted into a message last month
-// should still land, and silently landing on Overview instead is the worst
-// of the three possible behaviours.
+// Old hashes keep working (§8): a link someone pasted into a message last
+// month still lands, and the address bar then shows where it lives now.
 const TAB_ALIASES = {
-  runs: 'provenance', evals: 'provenance', submit: 'queue', 'submit-queue': 'queue',
-  models_tab: 'models', ppl: 'perplexity', 'perplexity-loss': 'perplexity',
+  evals: 'provenance', 'submit-queue': 'submit', models_tab: 'models', ppl: 'perplexity',
+  'perplexity-loss': 'perplexity',
 };
+// the Benchmarks switch remembers the viewer's last choice
+function benchSub() {
+  let v = 'tasks';
+  try { v = localStorage.getItem('bench-benchmarks-sub') || v; } catch (e) { /* private */ }
+  return ['tasks', 'exam', 'everyday'].includes(v) && TABS.some(t => t[0] === v) ? v : 'tasks';
+}
+function goPlace(pid) {
+  const p = PLACES.find(x => x[0] === pid);
+  if (!p) return;
+  if (pid === 'models') lbS().view = modelsView();
+  navigate({ tab: pid === 'benchmarks' ? benchSub() : p[2][0], model: null, topic: null });
+}
+// the switch at the top of Improve and Benchmarks
+function subSwitch(place) {
+  const p = PLACES.find(x => x[0] === place);
+  return el('nav', { class: 'subswitch', 'data-subswitch': place, role: 'tablist',
+      'aria-label': p[1] },
+    p[2].map(v => el('button', { class: 'chip-btn' + (v === state.tab ? ' on' : ''), role: 'tab',
+      'data-sub': SUB_SLUG[v], 'aria-selected': String(v === state.tab), text: viewLabel(v),
+      onclick: () => {
+        if (place === 'benchmarks')
+          try { localStorage.setItem('bench-benchmarks-sub', v); } catch (e) { /* private */ }
+        navigate({ tab: v, model: null, topic: null }); } })));
+}
 // 11b: the cards of a tab are its sections, numbered 01, 02, … in the order
 // they are read. The index is drawn from the DOM rather than written into
 // twenty view functions, so a card that moves takes its place in the count.
@@ -12558,8 +12703,7 @@ function render() {
   // 11b: the hero belongs to Overview. Every other tab starts straight at its
   // first numbered section.
   const hero = document.getElementById('pagehero');
-  if (hero) hero.hidden = !!(state.model || state.topic || state.everyday
-                             || state.tab !== 'overview');
+  if (hero) hero.hidden = !!(state.model || state.topic || state.tab !== 'overview');
   const view = document.getElementById('view');
   view.classList.remove('dimmed');
   // a poll rebuilds the view every few seconds. Whatever the person is typing
@@ -12580,10 +12724,18 @@ function render() {
         start: live.selectionStart, end: live.selectionEnd } : null;
   const hkeep = [...view.querySelectorAll('[data-hkeep]')]
     .map(e => [e.dataset.hkeep, e.scrollLeft]).filter(([, x]) => x > 0);
-  if (state.model) view.replaceChildren(...vModel());
-  else if (state.topic) view.replaceChildren(...vTopic());
-  else if (state.everyday) view.replaceChildren(...vEverydayPage());
-  else view.replaceChildren(...TABS.find(([id]) => id === state.tab)[2](ms));
+  // 12b: the Test a model dialog is part of the view, so a poll redraws it
+  // with everything else and keeps what is being typed into it
+  const dlg = testDialog();
+  if (state.model) view.replaceChildren(...vModel(), ...dlg);
+  else if (state.topic) view.replaceChildren(...vTopic(), ...dlg);
+  else {
+    if (!TABS.some(([id]) => id === state.tab)) state.tab = 'overview';
+    const place = placeOf(state.tab);
+    view.replaceChildren(
+      ...(place === 'improve' || place === 'benchmarks' ? [subSwitch(place)] : []),
+      ...TABS.find(([id]) => id === state.tab)[2](ms), ...dlg);
+  }
   if (keep) {
     const again = view.querySelector(`[data-keep="${keep.key}"]`);
     if (again) {
@@ -12881,52 +13033,43 @@ document.addEventListener('click', e => {
   scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches
     ? 'auto' : 'smooth' });
   const bar = document.getElementById('bar');
-  const first = bar && bar.querySelector('button, a, [tabindex]');
+  // the first control you can see: Menu ▾ is there only on a phone (12b)
+  const first = bar && [...bar.querySelectorAll('button, a, summary, [tabindex]')]
+    .find(e => e.offsetParent !== null);
   if (first) first.focus({ preventScroll: true });
 });
 
-function moreMenu(open) {                  // kept for the call sites that toggle it
-  const btn = document.getElementById('moreBtn');
-  if (!btn) return;
-  if (!open) popClose();
-  else if (POP.key !== 'more') btn.click();
-}
-
+// 12b: the header holds four places and nothing that opens a list of more.
+// Below 720px the four collapse into Menu ▾, on the left.
 function renderTabs() {
   const tabs = document.getElementById('tabs');
-  const main = TABS.filter(t => !t[3]), more = TABS.filter(t => t[3]);
-  const go = id => navigate({ tab: id, model: null, topic: null });
   if (!_tabsBuilt) {
     _tabsBuilt = true;
-    const moreBtn = el('button', { role: 'tab', id: 'moreBtn', 'data-tab': 'more' });
-    // the panel is built on open and lives on the body (popover): inside the
-    // tab strip, which scrolls sideways, it was clipped to 37 px
-    popover(moreBtn, () => el('div', { class: 'moremenu', id: 'pop-more',
-        'aria-label': 'more tabs' },
-      more.map(([id, label]) => el('button', { role: 'menuitem', 'data-tab': id,
-        'aria-current': (state.model || state.everyday ? '' : state.tab) === id ? 'page' : null,
-        text: label, onclick: () => { popClose(); go(id); } })),
-      // 12a: a page, not a tab — 12b moves it into Benchmarks
-      (DATA.everyday || {}).questions ? el('button', { role: 'menuitem',
-        'data-more-everyday': '1', 'aria-current': state.everyday ? 'page' : null,
-        text: 'Everyday pilot', onclick: () => { popClose();
-          navigate({ everyday: true, model: null, topic: null }); } }) : ''),
-      { key: 'more' });
-    tabs.replaceChildren(...main.map(([id, label]) =>
-      el('button', { role: 'tab', 'data-tab': id, onclick: () => go(id), text: label })),
-      el('div', { class: 'morewrap' }, moreBtn),
+    tabs.replaceChildren(...PLACES.map(([id, label]) =>
+      el('button', { role: 'tab', 'data-tab': id, onclick: () => goPlace(id), text: label })),
       // 11f: one underline, which slides from the old tab to the new one
       el('span', { class: 'tab-ink still', id: 'tabInk', 'aria-hidden': 'true' }));
     window.addEventListener('resize', () => placeInk(true));
+    const menu = document.getElementById('menuBtn');
+    if (menu) popover(menu, () => el('div', { class: 'moremenu placemenu', id: 'pop-places',
+        'aria-label': 'places' },
+      PLACES.flatMap(([id, label, views]) => [
+        el('button', { role: 'menuitem', 'data-place': id, class: 'placeitem',
+          'aria-current': placeOf(state.model || state.topic ? '' : state.tab) === id
+            ? 'page' : null,
+          text: label, onclick: () => { popClose(); goPlace(id); } }),
+        ...(views.length > 1 ? views.map(v => el('button', { role: 'menuitem',
+          class: 'subitem', 'data-place-sub': v, text: viewLabel(v),
+          'aria-current': !state.model && !state.topic && state.tab === v ? 'page' : null,
+          onclick: () => { popClose(); navigate({ tab: v, model: null, topic: null }); } }))
+          : [])])), { key: 'places' });
   }
-  const sel = state.model || state.everyday ? '' : state.tab;
+  const sel = state.model ? '' : placeOf(state.tab) || '';
   for (const b of tabs.querySelectorAll('button[role=tab][data-tab]'))
-    if (b.id !== 'moreBtn') b.setAttribute('aria-selected', String(b.dataset.tab === sel));
-  const inMore = state.everyday ? [null, 'Everyday pilot'] : more.find(t => t[0] === sel);
-  const moreBtn = document.getElementById('moreBtn');
-  moreBtn.textContent = (inMore ? inMore[1] : 'More') + ' ▾';
-  moreBtn.setAttribute('aria-selected', String(!!inMore));
+    b.setAttribute('aria-selected', String(b.dataset.tab === sel));
   placeInk();
+  renderRuns();
+  renderTestAct();
 }
 
 function placeInk(still) {
@@ -12936,7 +13079,7 @@ function placeInk(still) {
   if (!b) { ink.style.opacity = '0'; return; }
   if (still) ink.classList.add('still');
   ink.style.opacity = '1';
-  // measured against the strip itself: More ▾ sits inside a wrapper of its own
+  // measured against the strip itself, wherever the bar has put it
   const tabs = document.getElementById('tabs');
   const x = b.getBoundingClientRect().left - tabs.getBoundingClientRect().left + tabs.scrollLeft;
   ink.style.transform = `translateX(${Math.round(x)}px) scaleX(${b.offsetWidth})`;
@@ -12955,9 +13098,13 @@ let _warnSig = null;
 function showMe(show) {
   // 11l: a check about one model opens that model's page
   if (show.model) return navigate({ model: show.model, topic: null });
-  if (show.tab === 'models')
-    Object.assign(state.mdl, { kind: show.kind || 'all', taintedOnly: !!show.tainted,
-                               prelimOnly: !!show.prelim, judgedOnly: false, q: '' });
+  // 12b: the Models tab's list is the Models table: its filters say the same
+  if (show.tab === 'models') {
+    Object.assign(lbS(), { view: 'standard', chip: 'all', stdChip: 'all', models: null,
+      kind: show.kind || 'all', size: 'all',
+      status: show.tainted ? 'tainted' : show.prelim ? 'preliminary' : 'all' });
+    return navigate({ tab: 'leaderboard', model: null, topic: null });
+  }
   navigate({ tab: show.tab, model: null, topic: null });
 }
 
@@ -12972,20 +13119,23 @@ function renderWarnings() {
   const sig = JSON.stringify(cs.map(c => c.text));
   if (sig === _warnSig) return;
   _warnSig = sig;
-  if (!cs.length) { box.replaceChildren(); return; }
   // what kind, not just how many: after a judged run most of them are about
   // the judge, and "5 checks" says nothing about whether to open it
   const judged = cs.filter(c => c.judged).length;
-  const worst = cs.some(c => c.severity === 'warning') ? 'warn' : 'info';
+  // 12b: a status dot, not a pill of words — green and nothing else when every
+  // check passes, amber with the count when any does not
+  const n = cs.length;
   const fold = el('details', { class: 'checks', 'data-warnings': 'collapsed',
       open: state.checksOpen ? '' : null,
       ontoggle: e => { state.checksOpen = e.target.open; } },
-    // 11e: the pill says the count and nothing else — it is a button like its
-    // neighbours; what kind of checks they are is the first line of the panel
-    el('summary', { class: 'barpill', 'data-warn-summary': String(cs.length) },
-      el('span', { class: 'dot ' + worst }),
-      `${cs.length} check${cs.length > 1 ? 's' : ''} ▾`),
+    el('summary', { class: 'barpill statusdot' + (n ? ' warn' : ' ok'),
+        'data-warn-summary': String(n),
+        'aria-label': n ? `${n} check${n > 1 ? 's' : ''} need a look` : 'every check passes',
+        title: n ? `${n} check${n > 1 ? 's' : ''} need a look` : 'every check passes' },
+      el('span', { class: 'dot ' + (n ? 'warn' : 'ok') }),
+      n ? el('span', { class: 'statusn', text: String(n) }) : ''),
     el('ul', { class: 'checklist' },
+      !n ? el('li', { class: 'small', 'data-checks-none': '1', text: 'Every check passes.' }) : '',
       judged ? el('li', { class: 'small checks-judged', 'data-checks-judged': String(judged),
         text: `${judged} of ${cs.length} ${cs.length > 1 ? 'are' : 'is'} about the judged suite` }) : '',
       cs.map(c => el('li', { class: 'check warnrow',
@@ -13022,8 +13172,10 @@ function renderFresh() {
   const ago = NET.lastOk ? Math.max(0, Math.round((Date.now() - NET.lastOk) / 1000)) : null;
   chip.title = (judge ? judgeWhy() + '\n' : '') + `data last changed ${refreshedAt() || '—'}`
     + (ago != null ? ` · checked ${ago < 60 ? ago + ' s' : Math.round(ago / 60) + ' min'} ago` : '');
+  // 12b: on a phone the badge is the dot and the time — the words go first
   chip.replaceChildren(el('span', { class: 'dot ' + (stale || judge ? 'warn' : 'ok') }),
-    stale ? `STALE · ${at}` : judge ? `LIVE · ${at} · judge offline` : `LIVE · ${at}`);
+    el('span', { class: 't-full', text: stale ? 'STALE · ' : 'LIVE · ' }), at,
+    judge ? el('span', { class: 't-full', text: ' · judge offline' }) : '');
 }
 // the last check that worked, as the clock on the wall reads it
 const checkedAt = () => NET.lastOk ? new Date(NET.lastOk).toTimeString().slice(0, 5) : refreshedAt();
@@ -13043,42 +13195,20 @@ function renderStatic() {
     : `report · ${DATA.models.length} models · ${DATA.tasks.length} tasks`;
   document.getElementById('metaChips').replaceChildren(
     LIVE ? '' : el('span', { class: 'chip', text: `generated ${DATA.generated}` }),
-    LIVE ? el('a', { class: 'chip', href: 'guide', target: '_blank', rel: 'noopener',
-                     style: 'text-decoration:none', text: '📖 guide for new users' }) : '',
-    LIVE ? el('a', { class: 'chip', href: 'guide#the-loop', target: '_blank', rel: 'noopener',
-                     style: 'text-decoration:none', text: 'the loop, explained' }) : '',
+    // 12b: the guides and "How to read these numbers" are in Help
     // the harness build and the transformers version are provenance: they
     // live on that tab now, not on every tab's first line
     DATA.meta.anyLimit ? el('span', { class: 'chip', text: '⚠ smoke data (--limit)' }) : '');
   // the page's own action, where the page introduces itself (11b)
   const acts = document.getElementById('heroActs');
-  if (acts) acts.replaceChildren(LIVE
-    ? el('button', { class: 'primary', 'data-submit-model': '1', text: 'Submit a model',
-        onclick: () => { state.after = { focus: '[data-ms="submit"] input' };
-          navigate({ tab: 'queue', model: null, topic: null }); } })
-    : '');
+  // 12b: the page's one main action is Test a model, in the header
+  if (acts) acts.replaceChildren();
   renderFresh();
   renderWho();
 }
 
-function barMoreInit() {
-  const bar = document.getElementById('bar'), btn = document.getElementById('barMore');
-  if (!bar || !btn || btn._init) return;
-  btn._init = true;
-  const set = open => { bar.dataset.more = open ? 'open' : '';
-    btn.setAttribute('aria-expanded', String(open)); };
-  btn.addEventListener('click', e => { e.stopPropagation(); set(bar.dataset.more !== 'open'); });
-  document.addEventListener('click', e => {
-    // a popover opened from inside the panel (the name, the theme) is part of it
-    if (bar.dataset.more === 'open' && !e.target.closest('#barRight, #barMore, [data-pop]'))
-      set(false); });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && bar.dataset.more === 'open') { set(false); btn.focus(); } });
-}
-
 function initData(d) {
   DATA = d;
-  barMoreInit();
   renderStatic();
   // adopt the address bar before the first paint, so a shared #model= link opens
   // that model rather than the overview
@@ -13210,6 +13340,8 @@ async function loadQueue() {
         || JSON.stringify(p.judge || null) !== JSON.stringify(r.judge || null);
     });
     state.queue = rows;
+    // 12b: the run counter is on every page, and says so as runs move
+    if (changed) { renderRuns(); if (POP.key === 'runs') popReanchor(); }
     if (justFinished) await refreshResults();       // new scores -> re-render everything
     else if (changed && state.tab === 'queue') (state.queueRedraw || render)();
     // 11i: the model page's exam panel shows each topic's place in the queue
@@ -13229,32 +13361,16 @@ function themeFade() {
 function applyTheme(t) {
   if (t === 'auto') document.documentElement.removeAttribute('data-theme');
   else document.documentElement.setAttribute('data-theme', t);
-  document.getElementById('themeBtn').textContent = 'Theme \u25be';
-  document.getElementById('themeBtn').title =
-    `theme: ${t} — choose auto, light, dark or dim; remembered in this browser`;
-  for (const it of document.querySelectorAll('#themeMenu [role=menuitemradio]'))
+  // 12b: Theme is in the name menu; its choices say which one is on
+  for (const it of document.querySelectorAll('#pop-who [role=menuitemradio][data-theme]'))
     it.setAttribute('aria-checked', String(it.dataset.theme === t));
   try { localStorage.setItem('bench-theme', t); } catch (e) { /* private mode etc. */ }
 }
-// "Theme ▾" promised a menu and cycled on click. A menu: Auto, Light, Dark,
-// Dim, the current one ticked — on the shared popover, so it is never clipped
-(() => {
-  const btn = document.getElementById('themeBtn');
-  const labels = { auto: 'Auto (follow the system)', light: 'Light', dark: 'Dark', dim: 'Dim' };
-  popover(btn, () => el('div', { class: 'moremenu themes', id: 'pop-theme',
-      'aria-label': 'theme' },
-    THEMES.map(t => el('button', { role: 'menuitemradio', 'data-theme': t,
-      'aria-checked': String(THEMES[themeIdx] === t), text: labels[t],
-      onclick: () => { themeIdx = THEMES.indexOf(t); themeFade(); applyTheme(t); popClose(true); } }))),
-    { key: 'theme', placement: 'bottom-end' });
-})();
 let themeIdx = 0;
 try {   // remembered per browser — the dashboard is a page people leave open
   const saved = localStorage.getItem('bench-theme');
   if (THEMES.includes(saved)) themeIdx = THEMES.indexOf(saved);
 } catch (e) { /* storage unavailable: stay on auto */ }
-// always applied, even on 'auto': the button's title names the current theme,
-// and a button whose tooltip is only right after the first click is a lie
 applyTheme(THEMES[themeIdx]);
 
 // boot: embedded data renders immediately; live mode fetches then polls
@@ -13295,15 +13411,15 @@ TEMPLATE = """<!doctype html>
 <body class="viz-root"><div id="tip" role="status"></div>
 <header class="bar" id="bar">
   <div class="bar-in">
+    <button class="menubtn barpill" id="menuBtn" type="button" aria-label="places">Menu &#9662;</button>
     <span class="bar-title"><span class="t-full">__TITLE__</span><span class="t-short">Benchmark</span></span>
     <span class="livebadge" id="liveBadge" data-stamp="1" hidden></span>
     <div class="tabs" role="tablist" id="tabs"></div>
-    <button class="bar-more" id="barMore" aria-expanded="false" aria-controls="barRight"
-      aria-label="checks, name and theme" title="checks, name and theme">&#8943;</button>
     <div class="bar-right" id="barRight">
+      <div id="runs"></div>
+      <div id="testAct"></div>
       <div id="warnings" class="bar-checks"></div>
       <div id="who"></div>
-      <button id="themeBtn" class="barpill" title="cycle auto / light / dark / dim — remembered in this browser">Theme &#9662;</button>
     </div>
   </div>
 </header>
@@ -13321,7 +13437,7 @@ __BANNER__
   <div id="view"></div>
   <button class="totop" id="toTop" hidden>&#8593; Top</button>
   <footer>Every score carries its standard error · differences are z-tested before
-  they are called wins · provenance is in the Provenance tab · scores are only comparable to
+  they are called wins · provenance is in Data &amp; sources · scores are only comparable to
   published numbers when n-shot, prompt template and metric all match.</footer>
 </div>
 <script id="data" type="application/json">__DATA__</script>

@@ -8,7 +8,7 @@ import re
 
 import pytest
 
-from conftest import choice, choose
+from conftest import choice, choose, open_submit
 from test_the_five_asks import make_provisional
 
 pytestmark = pytest.mark.dashboard
@@ -99,7 +99,7 @@ def test_a_poll_mid_typing_keeps_the_text_the_caret_and_the_list(live, page):
 
 
 def test_submit_has_the_same_search(live, page):
-    page.goto(live["base"] + "/#tab=queue")
+    open_submit(page, live["base"])
     box = page.locator("[data-ms='submit'] input")
     box.wait_for()
     box.click()
@@ -210,18 +210,22 @@ def test_it_never_reloads_while_someone_is_typing(live, page):
     stale(page, base, reload_ms=1200)
     loads = []
     page.on("load", lambda _: loads.append(1))
-    page.goto(base + "/#tab=queue")
+    open_submit(page, base)
     page.locator("[data-build-bar]").wait_for(timeout=20000)
     page.locator("[data-ms='submit'] input").click()      # typing
     page.wait_for_timeout(3500)
     assert len(loads) == 1
     assert "once you stop typing" in page.locator("[data-build-bar]").text_content()
-    page.locator("h2").first.click()                      # stopped
+    # stopped: out of the field, and the dialog put away — a page never
+    # reloads under an open dialog (12b: the form is one)
+    page.locator("[data-dialog='test'] h2").click()
+    page.keyboard.press("Escape")
+    page.wait_for_selector("[data-dialog='test']", state="detached")
     page.wait_for_function("() => performance.getEntriesByType('navigation')[0] && "
                            "document.readyState === 'complete'")
     page.wait_for_timeout(2500)
     assert len(loads) >= 2
-    assert page.url.endswith("#tab=queue")                # the hash survives
+    assert page.url.endswith("#tab=runs")                 # the hash survives (12b: All runs)
 
 
 # ---------------------------------------------------------------------------
