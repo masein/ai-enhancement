@@ -4,11 +4,14 @@
 Everyday tasks asks what people type into an assistant on a phone — short,
 lowercase, typos, one plain request — and most answers can be marked by a
 script, so the score needs no judge. The bank is 333 questions in seven
-groups (eval_tasks/everyday/bank.jsonl), all of them readable. It is a
-look, not a benchmark: never ranked, never averaged into anything, never on
-the Leaderboard, never read by Propose, never sent to a generator. Its
-questions are not split into practice and hidden halves yet; 12g.2 does
-that, and nothing here reads a `split`.
+groups (eval_tasks/everyday/bank.jsonl). It is a look, not a benchmark:
+never ranked, never averaged into anything, never on the Leaderboard.
+
+12g.2 splits it as the exam is split — each question's qid is the hash of
+its normalised text (exam_build.qid_of), and diagnose.split_of with the
+exam's salt puts it in the HIDDEN half, which scores the model and is never
+shown, or the PRACTICE half, which the page shows and Improve may read. A
+model is still asked all 333; its published score is the hidden half's.
 
     python scripts/everyday.py results/full            re-mark every model
     python scripts/everyday.py results/full -m org/x   one model
@@ -38,6 +41,8 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(REPO))
+import diagnose as _dx  # noqa: E402
+import exam_build as _eb  # noqa: E402
 import judge as _judge  # noqa: E402
 
 # one bank, the harness task "everyday": round 2's 106 questions and the
@@ -61,6 +66,13 @@ GROUPS = {"understanding": "Understanding", "writing": "Writing",
 # (tests/test_everyday_12a4.py pins the hash beside it).
 WORDING_DATE = "2026-09-25"
 NEVER_FINISHED = "never finished answering"
+# 12g.2: the halves, by the exam's names — "report" is the hidden half that
+# scores the model, "diagnose" the practice half the loop may read. The split
+# is part of what a score means, so it is part of the bank's version: results
+# from before it are "all questions, before the split", and never mixed in
+HIDDEN, PRACTICE = "report", "diagnose"
+SPLIT = _dx.SPLIT_SALT
+BEFORE_SPLIT = "all questions, before the split"
 WAITING = "waiting for the judge"
 
 
@@ -529,9 +541,37 @@ def wording_hash(questions) -> str:
     return h.hexdigest()[:8]
 
 
+def bank_hash(questions) -> str:
+    """12g.2: the wording AND the split — eight hex digits. A result marked
+    before the split has the wording's hash alone, so it is never this"""
+    return hashlib.sha256(f"{wording_hash(questions)}|{SPLIT}".encode("utf-8")).hexdigest()[:8]
+
+
 def version() -> dict:
-    """the bank's version: {"date": …, "hash": …}"""
-    return {"date": WORDING_DATE, "hash": wording_hash(load_bank())}
+    """the bank's version: {"date": …, "hash": …, "split": …}"""
+    return {"date": WORDING_DATE, "hash": bank_hash(load_bank()), "split": SPLIT}
+
+
+# ---------------------------------------------------------------------------
+# 12g.2: the split, by the exam's function and salt — nothing by hand
+# ---------------------------------------------------------------------------
+
+def qid(q: dict) -> str:
+    return _eb.qid_of(q["prompt"])
+
+
+def half(q: dict) -> str:
+    """HIDDEN ("report") or PRACTICE ("diagnose")"""
+    return _dx.split_of(qid(q))
+
+
+def split_counts(questions=None) -> dict[str, dict]:
+    """{group: {"hidden": n, "practice": m}}, in the groups' order"""
+    qs = load_bank() if questions is None else questions
+    out = {g: {"hidden": 0, "practice": 0} for g in GROUPS}
+    for q in qs:
+        out[q["group"]]["hidden" if half(q) == HIDDEN else "practice"] += 1
+    return {g: c for g, c in out.items() if c["hidden"] or c["practice"]}
 
 
 # ---------------------------------------------------------------------------
@@ -582,8 +622,9 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
     # re-marked by today's checks — the question under them changed. What was
     # marked when they were answered stays, labelled earlier
     now = version()
-    asked = wording_hash([rec.get("doc") or {} for rec in recs.values()])
-    stamp = {"version": {"hash": asked, "date": now["date"] if asked == now["hash"]
+    asked = bank_hash([rec.get("doc") or {} for rec in recs.values()])
+    stamp = {"version": {"hash": asked, "split": SPLIT,
+                         "date": now["date"] if asked == now["hash"]
                          else (prev.get("version") or {}).get("date")},
              "earlier": asked != now["hash"]}
     if stamp["earlier"] and prev.get("items"):
@@ -595,7 +636,7 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
         rec = recs.get(q["id"])
         if rec is None:
             continue                  # not asked (a model that sat the pilot only)
-        it = {"id": q["id"], "group": q["group"],
+        it = {"id": q["id"], "group": q["group"], "half": half(q),
               "judged": any(c["type"] == "judge" for c in q["checks"])}
         parts = _judge.answer_parts(rec)
         ans = parts["answer_text"]
@@ -625,6 +666,7 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
                 it.update({"pass": ok, "reason": why})
         items.append(it)
     gen = _judge._generation(model_dir, TASK) or {}
+    scored = items if stamp["earlier"] else [it for it in items if it["half"] == HIDDEN]
     out = {
         "model": prev.get("model") or _model_id(model_dir),
         "task": TASK,
@@ -632,22 +674,31 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
         # what the answers were generated with: the chat template always,
         # greedy, and the budget (512, or a reasoning model's 2,048)
         "settings": {"chat_template": True, "greedy": True, **gen},
-        "passed": sum(1 for it in items if it["pass"] is True),
-        "total": len(items),
-        # n of k per group, k being what this model was asked in it
-        "groups": {g: {"passed": sum(1 for it in items if it["group"] == g and it["pass"] is True),
-                       "total": sum(1 for it in items if it["group"] == g)}
-                   for g in GROUPS if any(it["group"] == g for it in items)},
+        # 12g.2: the score is the hidden half's; the practice half's is the
+        # loop's to read, and counted apart. An earlier wording's run is kept
+        # as it was — every question it was asked — and is in History only
+        "passed": sum(1 for it in scored if it["pass"] is True),
+        "total": len(scored),
+        # n of k per group, k being the (hidden) questions this model was asked in it
+        "groups": _group_counts(scored),
+        "practice": {} if stamp["earlier"] else _group_counts(
+            [it for it in items if it["half"] == PRACTICE]),
         "waiting": sum(1 for it in items if it["pass"] is None),
         # 12a.4: answers whose thinking used the whole budget; they fail, and
-        # the page says how many beside the score
-        "ran_out": _ran_out(items),
+        # the page says how many beside the score (12g.2: the score's half)
+        "ran_out": _ran_out(scored),
         **stamp,
         "items": items,
     }
     if judge or prev.get("judge"):
         out["judge"] = judge or prev["judge"]
     return out
+
+
+def _group_counts(items: list[dict]) -> dict:
+    return {g: {"passed": sum(1 for it in items if it["group"] == g and it["pass"] is True),
+                "total": sum(1 for it in items if it["group"] == g)}
+            for g in GROUPS if any(it["group"] == g for it in items)}
 
 
 def _ran_out(items: list[dict]) -> int:
@@ -662,7 +713,8 @@ def write(model_dir: Path, out: dict) -> Path:
 
 def summary(out: dict) -> str:
     """The queue row's words."""
-    line = f"Everyday tasks: {out['passed']} of {out['total']}"
+    line = f"Everyday tasks: {out['passed']} of {out['total']}" + (
+        "" if out.get("earlier") else " hidden")
     if out.get("waiting"):
         line += f" · the judge is marking {out['waiting']}"
     return line

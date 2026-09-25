@@ -134,6 +134,10 @@ CONTROL_TASKS_DIR = Path(os.environ.get(
 # each run (everyday.build_task)
 EVERYDAY_TASK = "everyday"
 EVERYDAY_TASKS_DIR = Path(os.environ.get("EVERYDAY_TASKS_DIR", BENCH_ROOT / "everyday" / "tasks"))
+# 12g.2: an Everyday group joins Improve only when its hidden half has at least
+# this many questions — a score from fewer is noise, and training toward it
+# would chase noise. One setting
+EVERYDAY_MIN_HIDDEN = int(os.environ.get("EVERYDAY_MIN_HIDDEN", "20"))
 # what a model with no chat template is told: the pilot asks it as a person would
 NO_CHAT_TEMPLATE = ("This model has no chat template, so it can't be asked questions the "
                     "way a person would.")

@@ -159,7 +159,7 @@ def test_best_in_each_kind_is_one_card_per_kind_with_data(live, page):
     for key, (value, name) in zip(("standard", "exam"), want):
         assert page.locator(f"[data-best-value='{key}']").inner_text() == value
         assert page.locator(f"[data-best-name='{key}']").inner_text() == name
-    assert page.locator("[data-best-value='everyday']").inner_text() == "330 of 333"   # 12a.3
+    assert page.locator("[data-best-value='everyday']").inner_text() == "168 of 169"   # 12g.2
     assert page.locator("[data-best='everyday'] [data-pilot-badge]").count() == 1
     # one link each, to that kind on Models
     for key in ("standard", "exam", "everyday"):
@@ -244,7 +244,7 @@ def test_the_header_is_the_name_the_facts_one_action_and_a_tile_per_kind(live, p
     assert hero.locator("[data-kind-tile='standard'] .ktile-sub").inner_text() == \
         f"above chance · 7 of 7 tasks · #{r['n']} of {r['of']}"
     assert hero.locator("[data-kind-value='exam']").inner_text() == jav
-    assert hero.locator("[data-kind-value='everyday']").inner_text() == "330 of 333"  # 12a.3
+    assert hero.locator("[data-kind-value='everyday']").inner_text() == "168 of 169"  # 12g.2
     assert hero.locator("[data-kind-tile='everyday'] [data-pilot-badge]").count() == 1
     # the main action: the Test a model dialog, this model filled in
     page.locator("[data-test-this]").click()
@@ -334,8 +334,10 @@ def test_improve_is_this_models_proposals_and_datasets(live, page, tidy):
     assert page.locator("[data-model-tabs] [role=tab]").all_inner_texts() == \
         ["Scores", "Answers", "Improve", "History"]
     page.locator("[data-mtab='improve']").click()
-    page.wait_for_selector(f"[data-model-proposals] [data-rv-row='{pid}']")
-    assert page.locator(f"[data-model-datasets] [data-ds-row='{did}']").count() == 1
+    # 12g.2: the same four stages as Improve's, for this model
+    panel = page.locator("[data-mtab-panel='improve']")
+    panel.locator(f"[data-stage='proposals'] [data-prop='{pid}']").wait_for()
+    assert panel.locator(f"[data-stage='data'] [data-ds-item='{did}']").count() == 1
     # another model's page has none of it, and no Improve
     open_model(page, live["base"], STANDARD_ONLY)
     page.wait_for_selector("[data-model-tabs]")
@@ -352,16 +354,16 @@ def test_answers_are_by_kind_then_topic_or_group(live, page):
     assert kinds.all_inner_texts() == ["Knowledge exam", "Everyday tasks"]
     page.wait_for_selector("[data-panel='model-answers'] .anscard")
     page.locator("[data-answers-kind='everyday']").click()
-    # 12a.2: one group at a time, the first to begin with — Understanding's
-    # 45 since 12a.3
+    # 12a.2: one group at a time, the first to begin with. 12g.2: its practice
+    # half's answers (Understanding's 18), beside the hidden half's score
     qs = page.locator("[data-answers-q]")
-    assert qs.count() == 45
+    assert qs.count() == 18
     group = page.locator("[data-answers-group='summarising']")
-    assert group.inner_text() == "Summarising · 63 of 63"
+    assert group.inner_text() == "Summarising · 26 of 26"
     group.click()
-    page.wait_for_function("document.querySelectorAll('[data-answers-q]').length === 63")
+    page.wait_for_function("document.querySelectorAll('[data-answers-q]').length === 37")
     assert set(page.locator("[data-answers-q] .evgroup").all_inner_texts()) == {"Summarising"}
-    assert page.locator("[data-answers-q] [data-evd-question]").count() == 63
+    assert page.locator("[data-answers-q] [data-evd-question]").count() == 37
     # a model that has written nothing says so in one line
     open_model(page, live["base"], STANDARD_ONLY)
     page.locator("[data-mtab='answers']").click()

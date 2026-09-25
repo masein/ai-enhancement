@@ -14,6 +14,10 @@ generated questions and nothing outside protects it: a document that repeats
 an exam question teaches the test directly, and the per-topic score it moves
 is the number the whole loop steers by.
 
+12g.2: and every Everyday question, both halves — a chat example's request
+and reply are checked against the bank's requests and good answers, and a
+request that IS one of the bank's, however short, is a copy.
+
 Both halves of both are indexed on purpose. The report half is never SHOWN to
 anyone or anything; it is still the thing the published score comes from, so
 a generated document that collides with it is exactly the leak this exists to
@@ -26,6 +30,7 @@ import re
 from pathlib import Path
 
 NGRAM = 13
+EVERYDAY_BANK = Path(__file__).resolve().parent.parent / "eval_tasks" / "everyday" / "bank.jsonl"
 MAX_DROP_SHARE = 0.02
 NEAR_DUP_SHINGLE = 5
 NEAR_DUP_JACCARD = 0.8
@@ -60,7 +65,9 @@ def item_text(item: dict) -> str:
     """Everything a generated item says, whatever its format — a document's
     title and body, or a question-shaped item's parts."""
     parts = [str(item.get("title") or ""), str(item.get("text") or ""),
-             str(item.get("question") or "")]
+             str(item.get("question") or ""),
+             # 12g.2: a chat example's request and reply
+             str(item.get("user") or ""), str(item.get("assistant") or "")]
     for c in item.get("choices") or []:
         parts.append(str(c))
     parts.append(str(item.get("answer") or ""))
@@ -79,9 +86,12 @@ class BenchmarkIndex:
         self.key: tuple = ()
         self.grams: set[int] = set()
         self.exam_grams: set[int] = set()
+        self.everyday_grams: set[int] = set()
+        self.everyday_exact: set[str] = set()
         self.n_docs = 0
         self.n_files = 0
         self.n_exam = 0
+        self.n_everyday = 0
 
     def _bank_files(self) -> list[Path]:
         d = (self.exam_root / "bank") if self.exam_root else None
@@ -90,8 +100,9 @@ class BenchmarkIndex:
     def _key(self) -> tuple:
         files = list(self.root.rglob("samples_*.jsonl")) if self.root.is_dir() else []
         bank = self._bank_files()
+        evd = EVERYDAY_BANK.stat().st_mtime if EVERYDAY_BANK.exists() else 0.0
         return (len(files), max((f.stat().st_mtime for f in files), default=0.0),
-                len(bank), max((f.stat().st_mtime for f in bank), default=0.0))
+                len(bank), max((f.stat().st_mtime for f in bank), default=0.0), evd)
 
     def refresh(self) -> "BenchmarkIndex":
         import json
@@ -131,18 +142,45 @@ class BenchmarkIndex:
                 n_exam += 1
                 for w in windows(normalize(rec.get("prompt") or "")):
                     exam.add(hash(w))
+        # 12g.2: the Everyday bank, both halves: its requests and good answers
+        evd: set[int] = set()
+        exact: set[str] = set()
+        n_evd = 0
+        if EVERYDAY_BANK.exists():
+            for line in EVERYDAY_BANK.read_text(encoding="utf-8", errors="replace").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                n_evd += 1
+                exact.add(" ".join(normalize(rec.get("prompt") or "")))
+                for s in (rec.get("prompt") or "", rec.get("reference") or ""):
+                    for w in windows(normalize(s)):
+                        evd.add(hash(w))
         self.key, self.grams, self.exam_grams = key, grams, exam
-        self.n_docs, self.n_files, self.n_exam = n_docs, n_files, n_exam
+        self.everyday_grams, self.everyday_exact = evd, exact - {""}
+        self.n_docs, self.n_files, self.n_exam, self.n_everyday = n_docs, n_files, n_exam, n_evd
         return self
 
     def hits(self, text: str) -> list[str]:
-        both = self.grams | self.exam_grams if self.exam_grams else self.grams
+        both = self.grams | self.exam_grams | self.everyday_grams
         return [w for w in windows(normalize(text)) if hash(w) in both]
+
+    def copies_request(self, item: dict) -> str:
+        """12g.2: a chat example whose request is one of the Everyday bank's,
+        however short — below 13 words no window can see it"""
+        u = " ".join(normalize(item.get("user") or ""))
+        return u if u and u in self.everyday_exact else ""
 
     def source_of(self, gram: str) -> str:
         """Which corpus a matched n-gram came from — the exam is named
-        separately because a document echoing it is the worse failure."""
-        return "exam" if hash(gram) in self.exam_grams else "benchmark"
+        separately because a document echoing it is the worse failure, and
+        the Everyday bank because it is ours too (12g.2)."""
+        h = hash(gram)
+        return "exam" if h in self.exam_grams else "everyday" if h in self.everyday_grams \
+            else "benchmark"
 
 
 _INDEX: dict[str, BenchmarkIndex] = {}
@@ -172,13 +210,22 @@ def check(items: list[dict], ix: BenchmarkIndex) -> dict:
     dropped: list[dict] = []
     offending: list[str] = []
     shingles: list[set[int]] = []
-    n_exam = 0
+    n_exam = n_everyday = 0
     for i, item in enumerate(items):
         text = item_text(item)
         hits = ix.hits(text)
+        copy = ix.copies_request(item)
+        if copy and not hits:
+            n_everyday += 1
+            dropped.append({"index": i, "reason": "benchmark", "source": "everyday",
+                            "ngram": copy})
+            if len(offending) < 5:
+                offending.append(copy)
+            continue
         if hits:
             src = ix.source_of(hits[0])
             n_exam += src == "exam"
+            n_everyday += src == "everyday"
             dropped.append({"index": i, "reason": "benchmark", "source": src, "ngram": hits[0]})
             if len(offending) < 5:
                 offending.append(hits[0])
@@ -205,11 +252,12 @@ def check(items: list[dict], ix: BenchmarkIndex) -> dict:
         "report": {
             "ngram": NGRAM, "items_in": n_in, "items_kept": len(kept),
             "dropped_benchmark": n_bench, "dropped_exam": n_exam,
+            "dropped_everyday": n_everyday,
             "dropped_duplicate": n_dup,
             "share_dropped_benchmark": round(share, 4), "max_share": MAX_DROP_SHARE,
             "rejected": bool(n_in) and share > MAX_DROP_SHARE,
             "offending_ngrams": offending,
             "benchmark_docs": ix.n_docs, "benchmark_files": ix.n_files,
-            "exam_questions": ix.n_exam,
+            "exam_questions": ix.n_exam, "everyday_questions": ix.n_everyday,
         },
     }

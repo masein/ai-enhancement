@@ -340,6 +340,9 @@ def results_payload() -> dict:
                                        fingerprints=current_fingerprints(),
                                        everyday=report.load_everyday(config.OUT_DIR))
         payload["live"] = True
+        # 12g.2: the hidden questions an Everyday group needs before Improve takes it
+        if payload.get("everyday"):
+            payload["everyday"]["minHidden"] = config.EVERYDAY_MIN_HIDDEN
         # the loop's audit trail, per tainted model: run, datasets, proposals
         trails = trail_for([m["id"] for m in payload["models"]])
         for m in payload["models"]:
@@ -838,7 +841,8 @@ def results():
 
 class ProposalIn(BaseModel):
     model: str
-    topic: str                   # an exam topic from scripts/categories.yaml
+    topic: str = ""              # an exam topic from scripts/categories.yaml
+    everyday: str = ""           # 12g.2: or an Everyday group ("instructions")
     requested_by: str = ""
     # propose over a judge whose grades are not evidence yet — accepted only
     # when every reason is about the judge, the setting allows it, and a name
@@ -861,7 +865,9 @@ class RejectIn(BaseModel):
 class GenerateIn(BaseModel):
     requester: str
     count: int = 20
-    fmt: str = prop.DEFAULT_FORMAT      # prose documents, not question-and-answer pairs
+    # prose documents for an exam topic, chat examples for an Everyday group:
+    # empty is the proposal's own default (12g.2)
+    fmt: str = ""
 
 
 def _llm_status() -> dict:
@@ -1784,6 +1790,8 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
     row = next((m for m in payload["models"] if m["id"] == p.model), None)
     if not row:
         raise HTTPException(404, f"no such model on the board: {p.model}")
+    if p.everyday.strip():
+        return _propose_everyday(p, backend)
     task = exam_build.topic_task(p.topic)
     judge = row.get("judge") or {}
     t = (judge.get("tasks") or {}).get(task)
@@ -1842,6 +1850,58 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
                        judge_run=json.dumps({"judge_id": jmeta.get("id"),
                                              "batch_id": jmeta.get("batch_id"),
                                              "prompt_sha256": jmeta.get("prompt_sha256")}))
+    return {"id": pid, "status": "pending", "batch_id": bid, "task": task}
+
+
+def _propose_everyday(p: ProposalIn, backend) -> dict:
+    """12g.2: a proposal for an Everyday group, from the PRACTICE questions of
+    that group the model failed — never a hidden one. The group must have at
+    least EVERYDAY_MIN_HIDDEN hidden questions: a score from fewer is noise."""
+    import everyday as ev
+    g = p.everyday.strip()
+    if g not in ev.GROUPS:
+        raise HTTPException(422, f"{g!r} is not an Everyday group — the groups are "
+                                 + ", ".join(ev.GROUPS))
+    label = ev.GROUPS[g]
+    hidden = ev.split_counts().get(g, {}).get("hidden", 0)
+    if hidden < config.EVERYDAY_MIN_HIDDEN:
+        need = config.EVERYDAY_MIN_HIDDEN - hidden
+        raise HTTPException(409, f"{label} has {hidden} hidden questions and Improve takes a "
+                                 f"group at {config.EVERYDAY_MIN_HIDDEN}: it needs {need} more")
+    task = prop.EVERYDAY_PREFIX + g
+    dup = db.proposal_active(p.model, task, label)
+    if dup:
+        raise HTTPException(409, f"proposal #{dup['id']} for this model and group is already "
+                                 f"{dup['status']} — open it on Improve")
+    model_dir = config.OUT_DIR / p.model.replace("/", "__")
+    failed, counts = prop.everyday_failures(model_dir, g)
+    if not counts["current"]:
+        raise HTTPException(409, f"{p.model}'s everyday answers are to an earlier version of the "
+                                 f"questions — run everyday tasks again first")
+    if not failed:
+        raise HTTPException(409, f"no practice question in {label} failed — nothing to propose "
+                                 f"from")
+    _spend_check(1)
+    marks = ev.read(model_dir) or {}
+    evidence = {
+        "kind": "everyday", "group": g, "n_shown": len(failed),
+        "practice_total": counts["total"], "practice_failed": counts["failed"],
+        # the published score, its hidden half — a count, never a question
+        "hidden": (marks.get("groups") or {}).get(g),
+        # what the AI read, for the reviewer: practice requests and why each failed
+        "failed": [{k: f[k] for k in ("id", "qid", "skill", "prompt", "reason")} for f in failed],
+        "skills": prop.everyday_focus(failed),
+        "qids_read": [f["qid"] for f in failed],
+    }
+    pid = db.proposal_create(p.model, task, label, p.requested_by.strip()[:80], evidence)
+    req = prop.everyday_proposal_request(pid, p.model, g, label, failed, counts)
+    try:
+        bid = backend.submit([req])
+    except llm.LLMError as e:
+        db.proposal_update(pid, status="failed", error=str(e)[:400])
+        raise HTTPException(502, f"the LLM batch could not be submitted: {e}") from None
+    db.batch_add(bid, "proposal", pid, 1, backend.name, backend.model)
+    db.proposal_update(pid, batch_id=bid, prompt_sha=llm.prompt_sha(req.system, req.user))
     return {"id": pid, "status": "pending", "batch_id": bid, "task": task}
 
 
@@ -1963,6 +2023,15 @@ def proposal_approve(pid: int, a: ApproveIn, x_token: str = Header(default="")):
 
 
 def _focus_live(r: dict) -> dict:
+    # 12g.2: an Everyday group's plan is its failed skills — one batch each
+    if prop.is_everyday(r["task"]):
+        try:
+            failed = json.loads(r.get("evidence") or "{}").get("failed") or []
+        except (ValueError, TypeError):
+            failed = []
+        labels = prop.everyday_focus(failed)
+        return {"mode": "skill" if labels else None, "labels": labels,
+                "failing": len(failed), "reason": "" if labels else "no failed skill on file"}
     return prop.focus_for(config.OUT_DIR / r["model"].replace("/", "__"), r["task"],
                           r["category"])
 
@@ -2004,10 +2073,18 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
         raise HTTPException(409, f"proposal #{pid} is {r['status']}; only an approved spec "
                                  f"reaches the generator")
     who = _name(g.requester, "generating")
-    if g.fmt not in prop.FORMATS:
+    fmt = g.fmt or prop.formats_for(r["task"])[0]
+    if fmt not in prop.FORMATS:
         raise HTTPException(422, f"fmt must be one of {', '.join(prop.FORMATS)} — question-"
                                  f"shaped training data teaches the exam more readily than "
                                  f"prose does, so 'doc' is the default and 'mc' is retired")
+    # 12g.2: chat examples are an Everyday group's; documents an exam topic's
+    if fmt not in prop.formats_for(r["task"]):
+        raise HTTPException(422, "an Everyday group's data is chat examples ('chat')"
+                            if prop.is_everyday(r["task"]) else
+                            "chat examples are for Everyday groups; an exam topic takes 'doc' "
+                            "(or 'free')")
+    g.fmt = fmt
     if not 1 <= g.count <= 1000:
         raise HTTPException(422, "count must be between 1 and 1000")
     why = prop.quota_blocked()
@@ -2018,7 +2095,13 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
     spec = r["edited_text"] or r["spec_text"]
     did = db.dataset_create(pid, g.fmt, g.count, who, {})
     # the audience travels with the topic: a spec alone never said who asks
-    audience = prop.audience_for(r["category"], r["task"], fmt=g.fmt)
+    everyday = prop.is_everyday(r["task"])
+    audience = prop.CHAT_AUDIENCE if everyday else prop.audience_for(r["category"], r["task"],
+                                                                       fmt=g.fmt)
+    try:
+        failed = (json.loads(r.get("evidence") or "{}").get("failed") or []) if everyday else None
+    except (ValueError, TypeError):
+        failed = []
     # and so does the corner of the topic each request is for. 11e: the first
     # N labels of the plan Approve froze; a proposal approved before 11e keeps
     # 11a's plan, computed now
@@ -2032,14 +2115,14 @@ def proposal_generate(pid: int, g: GenerateIn, x_token: str = Header(default="")
             counts[lab] = counts.get(lab, 0) + 1
         plan = [{"domain": lab, "documents": n} for lab, n in counts.items()]
         reqs = prop.generation_requests(did, spec, r["category"], g.count, g.fmt, seed=did,
-                                        audience=audience, labels=labels or None)
+                                        audience=audience, labels=labels or None, failed=failed)
     else:
         plan = prop.focus_plan(config.OUT_DIR / r["model"].replace("/", "__"), r["task"],
                                r["category"], g.count)
         mode = "area" if plan else "off"
         labels = [f["domain"] for f in plan for _ in range(f["documents"])]
         reqs = prop.generation_requests(did, spec, r["category"], g.count, g.fmt, seed=did,
-                                        audience=audience, plan=plan)
+                                        audience=audience, plan=plan, failed=failed)
     sha = llm.prompt_sha(*[q.system + "\n" + q.user for q in reqs])
     try:
         bid = backend.submit(reqs)

@@ -62,7 +62,8 @@ def test_the_page_names_the_models_and_has_one_action_and_one_badge(live, page):
     # sat only the pilot's five answered an earlier wording, and are not here
     counts = {h.get_attribute("data-evd-model"): h.locator("[data-evd-count]").text_content()
               for h in heads.all()}
-    assert counts == {"fx/good-750m": "330 of 333", "fx/skewed-360m": "183 of 333"}
+    # 12g.2: the hidden half's — good-750m's three misses, one of them hidden
+    assert counts == {"fx/good-750m": "168 of 169", "fx/skewed-360m": "90 of 169"}
     # one badge on the page, in the header; no row repeats it
     assert page.locator("[data-pilot-badge]").count() == 1
     assert page.locator("[data-everyday-head] [data-pilot-badge]").text_content() \
@@ -89,8 +90,9 @@ def test_an_answer_opens_in_the_panel_and_the_keys_walk_the_bank_and_the_models(
     page.locator("[data-evd-cell='fx/good-750m|understanding']").click()
     page.locator("[data-evd-panel] [data-evd-row='everyday-pilot-01']").click()
     page.wait_for_selector("#reader[data-kind='everyday'][data-ready='1']")
-    # the pilot's first question is the bank's sixteenth, the last in Understanding
-    assert "read=everyday:fx/good-750m:16" in page.evaluate("decodeURIComponent(location.hash)")
+    # the pilot's first question is the practice half's fourth (12g.2: the
+    # reader walks the practice half; the hidden one is never shown)
+    assert "read=everyday:fx/good-750m:4" in page.evaluate("decodeURIComponent(location.hash)")
     rd = page.locator("#reader")
     title = "document.querySelector('#readerTitle').textContent === "
     assert rd.locator("#readerTitle").text_content() == "good-750m · Typos"
@@ -106,13 +108,13 @@ def test_an_answer_opens_in_the_panel_and_the_keys_walk_the_bank_and_the_models(
     assert rd.locator("[data-evd-verdict]").text_content() == \
         '✓says "29" or "twenty-nine" or "twenty nine"'
     shot(page, "12a-2-answer-panel-1400-light.png")
-    # ↓ the next question in the bank for this model (12a.3: round 3's first in
+    # ↓ the next practice question for this model (12g.2: round 3's second in
     # Understanding), → the next model on it
     page.keyboard.press("ArrowDown")
-    page.wait_for_function(title + "'good-750m · Abbreviated alphabetical sort'")
+    page.wait_for_function(title + "'good-750m · Reverse routine'")
     page.keyboard.press("ArrowRight")
-    page.wait_for_function(title + "'skewed-360m · Abbreviated alphabetical sort'")
-    assert rd.locator("[data-evd-verdict]").text_content().startswith('✓in this order: "bagels"')
+    page.wait_for_function(title + "'skewed-360m · Reverse routine'")
+    assert rd.locator("[data-evd-verdict]").text_content()[0] in "✓✗"
     page.locator("[data-evd-prev-q]").click()
     page.wait_for_function(title + "'skewed-360m · Typos'")
     # an answer that never left its thinking says so, and the thinking is there
@@ -147,7 +149,10 @@ def test_no_answer_to_every_question_leaves_nothing_empty(live, page):
         assert "No model has taken everyday tasks yet." in box.text_content()
         assert box.locator("button").text_content() == "Run everyday tasks"
         assert page.locator("[data-everyday-table]").count() == 0
-        assert page.locator("[data-everyday-bank] [data-evd-bank-q]").count() == 333
+        # 12g.2: the practice half, readable; the hidden half's count beside it
+        assert page.locator("[data-everyday-bank] [data-evd-bank-q]").count() == 164
+        assert page.locator("[data-evd-bank-split]").get_attribute(
+            "data-evd-bank-split") == "169|164"
     finally:
         for f in moved:
             f.with_suffix(".json.bak").rename(f)
@@ -177,7 +182,7 @@ def test_the_model_page_has_its_everyday_block_after_the_exam(live, page):
     block.wait_for()
     assert page.locator("[data-pilot-badge]:visible").count() == 1
     assert page.locator("[data-kind-tile='everyday'] [data-pilot-badge]").is_visible()
-    assert block.locator("[data-everyday-count]").text_content() == "330 of 333"
+    assert block.locator("[data-everyday-count]").text_content() == "168 of 169"   # 12g.2
     # 12a.2: a row a group, each its n of k
     groups = block.locator("[data-evd-group]")
     assert [g.locator(".evgroup").text_content() for g in groups.all()] == GROUPS

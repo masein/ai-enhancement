@@ -368,7 +368,8 @@ def test_parse_items_on_the_document_format():
     # the free format is unchanged; mc is gone
     free = {"question": "q?", "answer": "a", "rationale": "r"}
     assert prop_mod.parse_items(json.dumps([free]), "free") == [free]
-    assert prop_mod.FORMATS == ("doc", "free") and prop_mod.DEFAULT_FORMAT == "doc"
+    # 12g.2: chat examples, an Everyday group's format
+    assert prop_mod.FORMATS == ("doc", "free", "chat") and prop_mod.DEFAULT_FORMAT == "doc"
     assert prop_mod.items_per_request("doc") == 2 and prop_mod.items_per_request("free") == 10
 
 

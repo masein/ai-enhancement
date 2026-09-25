@@ -254,9 +254,12 @@ def test_the_bank_is_asked_through_the_chat_template_and_marked_in_the_same_run(
                .splitlines()) == 333
     # marked straight after, the judge's question too (the stub is in-process)
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
-    assert out["model"] == MODEL and out["passed"] == 332 and out["waiting"] == 0
+    # 12g.2: all 333 asked, the score the hidden half's — the one it fails is practice
+    hidden = sum(c["hidden"] for c in ev.split_counts().values())
+    assert out["model"] == MODEL and out["passed"] == out["total"] == hidden == 169
+    assert out["waiting"] == 0 and len(out["items"]) == 333
     row = db.get(sid)
-    assert row["status"] == "done" and row["progress"] == "Everyday tasks: 332 of 333"
+    assert row["status"] == "done" and row["progress"] == "Everyday tasks: 169 of 169 hidden"
     assert (mdir / "model_meta.json").read_text(encoding="utf-8") == meta_before
 
 
@@ -284,7 +287,8 @@ def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeyp
     runner.run_submission(db.get(sid))
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
     assert row["status"] == "done"
-    assert row["progress"] == "Everyday tasks: 321 of 333 · the judge is marking 11"
+    # 12g.2: the hidden half's score; the judge marks both halves' 11
+    assert row["progress"] == "Everyday tasks: 161 of 169 hidden · the judge is marking 11"
     assert row["judge"]["n_items"] == 11 and row["judge"]["progress"] == "0/11 done"
     assert row["judge"]["status"] == "submitted"
     # one request per judged question, and nothing else
@@ -294,11 +298,11 @@ def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeyp
     llm_poller.tick()
     mdir = tree["models"][MODEL]["dir"]
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
-    assert out["passed"] == 332 and out["waiting"] == 0
+    assert out["passed"] == out["total"] == 169 and out["waiting"] == 0      # 12g.2: hidden
     tldr = next(it for it in out["items"] if it["id"] == "everyday-pilot-03")
     assert tldr["reason"] == "closes 11:30 on Thursday, in two sentences or fewer"
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
-    assert row["progress"] == "Everyday tasks: 332 of 333"
+    assert row["progress"] == "Everyday tasks: 169 of 169 hidden"
     assert row["judge"]["status"] == "done"
 
 

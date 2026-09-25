@@ -446,6 +446,8 @@ def default_responder(req: Request) -> str:
     start = int(req.meta.get("start", 0))
     if fmt == "doc":
         return json.dumps([_fake_document(i) for i in range(start, start + n)])
+    if fmt == "chat":
+        return json.dumps([_fake_chat(i) for i in range(start, start + n)])
     nouns = ["a bakery", "a shipping line", "a vineyard", "a bicycle workshop", "a hospital",
              "a fishing cooperative", "a software studio", "a city council", "a dairy farm",
              "a book printer", "a taxi firm", "a night school"]
@@ -510,6 +512,37 @@ def default_responder(req: Request) -> str:
             item["choices"] = opts[k:] + opts[:k]
         items.append(item)
     return json.dumps(items)
+
+
+def _fake_chat(i: int) -> dict:
+    """12g.2: one chat example that passes its own checks — six shapes and
+    varied fillers, so the near-duplicate rule does not collapse a set"""
+    things = ["mangoes", "bus tickets", "paper cups", "phone chargers", "tomato plants",
+              "library books", "bike lights", "coffee pods", "hair ties", "spare keys", "stamps"]
+    names = ["priya", "tomas", "wen", "aisha", "leo", "marta", "kofi", "yuki", "sam", "ines"]
+    a, b, t, who = 3 + i % 17, 2 + (i * 7) % 13, things[i % len(things)], names[(i * 3) % len(names)]
+    shapes = [
+        ({"user": f"if i have {a} {t} and {who} gives me {b} more hw many is that",
+          "assistant": f"{a + b} {t}."}, [{"type": "number", "value": a + b, "tolerance": 0}]),
+        ({"user": f"{who} owes me {a * 10} and paid {b} back, how much left?? #{i}",
+          "assistant": f"{a * 10 - b} left to pay."},
+         [{"type": "number", "value": a * 10 - b, "tolerance": 0}]),
+        ({"user": f"one line only pls: remind {who} to bring {t} on day {i + 1}",
+          "assistant": f"Hi {who.title()}, please bring the {t} on day {i + 1}."},
+         [{"type": "line_count", "n": 1}, {"type": "max_words", "n": 25}]),
+        ({"user": f"can u tell me what {who} thinks about {t} (case {i})",
+          "assistant": f"I can't know what {who.title()} thinks about {t} — you'd have to ask them."},
+         [{"type": "admits_limit"}]),
+        ({"user": f"list {t} and {things[(i + 4) % len(things)]} in that order, nothing else {i}",
+          "assistant": f"{t}\n{things[(i + 4) % len(things)]}"},
+         [{"type": "in_order", "values": [t, things[(i + 4) % len(things)]]},
+          {"type": "max_words", "n": 8}]),
+        ({"user": f"no numbers pls, just say if {a} {t} is more than {b} for {who}",
+          "assistant": "Yes, it is more." if a > b else "No, it is not more."},
+         [{"type": "no_digits"}]),
+    ]
+    item, checks = shapes[i % len(shapes)]
+    return {**item, "checks": checks}
 
 
 class FakeBatches(Backend):

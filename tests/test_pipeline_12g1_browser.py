@@ -128,12 +128,16 @@ def test_the_pipeline_is_four_stages_for_one_model(live, page, planted):
     assert page.locator("[data-imp-model]").inner_text() == "good-750m ▾"
     # Weak spots: judged topics, weakest first, none with an open proposal
     want = weak_expected(page, MODEL, {"exam_economics", "exam_law", "exam_sociology"})
-    assert page.locator("[data-stage='weak']").get_attribute("data-stage-n") == str(len(want))
-    assert stage_items(page, "weak", "data-weak") == want[:5]          # five, then + n more
+    # 12g.2: its seven Everyday groups sit beside them, each labelled
+    n = len(want) + 7
+    assert page.locator("[data-stage='weak']").get_attribute("data-stage-n") == str(n)
+    assert len(stage_items(page, "weak", "data-weak")) == 5            # five, then + n more
     more = page.locator("[data-stage-more='weak']")
-    assert more.inner_text() == f"+ {len(want) - 5} more"
+    assert more.inner_text() == f"+ {n - 5} more"
     more.click()
-    assert stage_items(page, "weak", "data-weak") == want
+    got = stage_items(page, "weak", "data-weak")
+    assert [t for t in got if t.startswith("exam_")] == want          # weakest first, within each
+    assert len([t for t in got if t.startswith("everyday:")]) == 7
     # Proposals: waiting, approved, being written — newest first, one action each
     p = planted
     assert stage_items(page, "proposals", "data-prop") == \

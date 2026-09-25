@@ -265,6 +265,9 @@ def gap_text(item: dict) -> str:
     title and body. The older question-shaped formats are laid out plainly."""
     if item.get("text"):
         return f"{item.get('title', '')}\n\n{item['text']}".strip()
+    if item.get("user"):
+        # 12g.2: a chat example — the request, and the reply that passed its checks
+        return f"User: {item['user']}\nAssistant: {item['assistant']}"
     lines = [item["question"]]
     for i, c in enumerate(item.get("choices") or []):
         lines.append(f"{'ABCD'[i]}. {c}")

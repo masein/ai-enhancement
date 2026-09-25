@@ -59,9 +59,13 @@ EXAMPLES_SHOWN = 8               # what a proposal's card shows of what the LLM 
 # does not have that shape. `free` stays for comparison and is not the
 # default; `mc` is retired.
 DEFAULT_FORMAT = "doc"
-FORMATS = ("doc", "free")
+# 12g.2: `chat` — one request and one good reply, and the checks the reply
+# must pass — is an Everyday group's format, and only theirs; an exam topic
+# takes `doc` (or `free`, as #60 left it)
+FORMATS = ("doc", "free", "chat")
 # documents are long, so fewer per request
-ITEMS_PER_REQUEST = {"doc": 2, "free": 10}
+ITEMS_PER_REQUEST = {"doc": 2, "free": 10, "chat": 5}
+EVERYDAY_PREFIX = "everyday:"          # a proposal's task for an Everyday group
 GEN_ITEMS_PER_REQUEST = ITEMS_PER_REQUEST[DEFAULT_FORMAT]
 DOC_MIN_WORDS = 120              # shorter than this is a note, not a teaching document
 DOC_TARGET_WORDS = 600           # ~800 tokens of body
@@ -643,6 +647,70 @@ def proposal_request(pid: int, model: str, task: str, topic: str,
               "topic": topic, "qids": [f["qid"] for f in justifications]})
 
 
+# ---------------------------------------------------------------------------
+# 12g.2: an Everyday group's proposal — its PRACTICE failures, never a hidden one
+# ---------------------------------------------------------------------------
+
+EVERYDAY_PROPOSAL_SYSTEM = (
+    "You read everyday requests a small assistant model got wrong — typed the way people type "
+    "into an assistant on a phone — with what it replied and why the reply failed, and describe "
+    "the SKILL the model is missing, in general terms a teacher would use. You are writing a "
+    "specification for a data generator: describe what the model cannot do, not the requests "
+    "themselves, and never quote them. Reply with one JSON object and nothing else: "
+    "{\"spec\": <one to three sentences>, \"share_explained\": <0..1, the share of the failures "
+    "below your spec accounts for>, \"patterns\": [<two or three short failure patterns you "
+    "saw>]}.")
+
+
+def everyday_failures(model_dir: Path, group: str) -> tuple[list[dict], dict]:
+    """(the PRACTICE questions of `group` this model failed — each with its
+    skill, request, reply and why — and the group's practice counts). Read
+    from everyday.json at the bank's current version; the hidden half is never
+    read here. ([], counts) when there is nothing to propose from."""
+    import everyday as _ev
+    out = _ev.read(model_dir) or {}
+    qs = {q["id"]: q for q in _ev.load_bank()}
+    if (out.get("version") or {}).get("hash") != _ev.version()["hash"]:
+        return [], {"total": 0, "failed": 0, "current": False}
+    practice = [it for it in out.get("items") or [] if it.get("id") in qs
+                and qs[it["id"]]["group"] == group and _ev.half(qs[it["id"]]) == _ev.PRACTICE]
+    failed = [{"id": it["id"], "qid": _ev.qid(qs[it["id"]]),
+               "skill": qs[it["id"]].get("skill") or "", "prompt": qs[it["id"]]["prompt"],
+               "answer": it.get("answer_text") or "", "reason": it.get("reason") or ""}
+              for it in practice if it.get("pass") is False]
+    return failed, {"total": len(practice), "failed": len(failed), "current": True}
+
+
+def everyday_proposal_request(pid: int, model: str, group: str, label: str,
+                              failed: list[dict], counts: dict) -> llm.Request:
+    """The group, the model, and each practice request it failed with its
+    reply and why — labels and practice text, never a hidden question."""
+    lines = [f"Everyday group: {label}", f"Model under assessment: {model}",
+             f"Practice requests in this group: {counts['total']}; failed: {counts['failed']}; "
+             f"shown below: {len(failed)}.", "",
+             "Each request the model got wrong, with its reply and why it failed:", ""]
+    for i, f in enumerate(failed, 1):
+        reply = " ".join(f["answer"].split())
+        lines += [f"[{i}] skill: {f['skill'] or '—'}", f"    request: {f['prompt']}",
+                  f"    reply: {reply[:400] + ('…' if len(reply) > 400 else '') or '(none)'}",
+                  f"    why it failed: {f['reason']}"]
+    lines += ["", "Write the skill spec now, as the JSON object described."]
+    return llm.Request(
+        custom_id=f"proposal:{pid}", system=EVERYDAY_PROPOSAL_SYSTEM, user="\n".join(lines),
+        max_tokens=1024, json=True,
+        meta={"kind": "proposal", "proposal_id": pid, "model": model,
+              "task": EVERYDAY_PREFIX + group, "topic": label,
+              "qids": [f["qid"] for f in failed]})
+
+
+def everyday_focus(failed: list[dict]) -> list[str]:
+    """the failed skills, the most failed first: one batch of examples each,
+    spread over them as 11e spreads documents over concepts"""
+    import collections
+    n = collections.Counter(f["skill"] or "the group's requests" for f in failed)
+    return [k for k, _ in sorted(n.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+
 def parse_proposal(text: str) -> dict:
     obj = llm.extract_json(text)
     if not isinstance(obj, dict) or not str(obj.get("spec") or "").strip():
@@ -683,6 +751,31 @@ GEN_SYSTEM_QA = (
     "no two items share a template. Never reproduce or closely paraphrase any existing exam "
     "or benchmark text. Reply with one JSON array of objects and nothing else.")
 
+# 12g.2: an Everyday gap is a skill of the chat itself, so its training data is
+# chat, checked by the bank's own vocabulary before it is kept
+GEN_SYSTEM_CHAT = (
+    "You write original CHAT EXAMPLES that teach a small assistant model an everyday skill: "
+    "one short request, typed the way people type into an assistant on a phone, and the reply "
+    "a good assistant gives, with the checks that reply must pass. You are given a skill "
+    "specification, the group, the one skill this set is for, and requests the model got "
+    "wrong, for their style only: never copy them, or any other text, word for word — invent "
+    "fresh requests with different details, names and numbers. Every reply must pass every "
+    "one of its own checks; examples that do not are thrown away. Reply with one JSON array "
+    "of objects and nothing else.")
+CHAT_AUDIENCE = ("Audience: people typing requests into an assistant on a phone.\n"
+                 "Register for chat examples: the request short and plain — lowercase, an "
+                 "occasional typo, one thing asked — and the reply direct, correct and as short "
+                 "as the request allows.")
+CHAT_CHECKS = (
+    "\"checks\": one to four checks the reply must pass, each an object with a \"type\" and its "
+    "fields — contains_any {values} · contains_all {values} · not_contains {values} · "
+    "number {value, tolerance} · max_words {n} · word_count {n} · sentence_count {n} · "
+    "line_count {n} · in_order {values} · json {required_values} · asks_back {} · "
+    "admits_limit {} · no_invented {what} · numbers_from_source {} · no_emoji {} · "
+    "no_digits {} · facts {n, values: a list of facts, each a list of ways to say it} · "
+    "first_mention {right, wrong} · any {checks}. No judge check: every check must be one a "
+    "script can mark.")
+
 STYLE = {
     "doc": (f"Each object: {{\"title\": <a short descriptive title>, \"text\": <the document "
             f"body, around {DOC_TARGET_WORDS} words of continuous prose that teaches the "
@@ -694,7 +787,19 @@ STYLE = {
     "free": ("Each object: {\"question\": ..., \"answer\": <a short free-text answer>, "
              "\"rationale\": <one or two sentences>}. This format is for comparison only: "
              "question-shaped training data teaches the test more readily than prose does."),
+    "chat": ("Each object: {\"user\": <the request>, \"assistant\": <the reply>, "
+             + CHAT_CHECKS + "}"),
 }
+
+
+def is_everyday(task: str | None) -> bool:
+    """an Everyday group's proposal (its task is "everyday:<group>"), not an exam topic's"""
+    return str(task or "").startswith(EVERYDAY_PREFIX)
+
+
+def formats_for(task: str | None) -> tuple[str, ...]:
+    """the formats a proposal may generate in, the first its default"""
+    return ("chat",) if is_everyday(task) else ("doc", "free")
 
 
 def items_per_request(fmt: str, provider: str | None = None) -> int:
@@ -727,12 +832,18 @@ def focus_chunks(plan: list[dict], per: int, count: int) -> list[tuple[str | Non
 def generation_requests(did: int, spec_text: str, category: str, count: int,
                         fmt: str, seed: int, audience: str = "",
                         plan: list[dict] | None = None,
-                        labels: list[str] | None = None) -> list[llm.Request]:
+                        labels: list[str] | None = None,
+                        failed: list[dict] | None = None) -> list[llm.Request]:
     """One request per few items. Contains the approved spec, the topic, the
     count, the format, a style constraint, the audience labels and — when the
     topic's questions carry domain labels — the one domain this request is
     for. No benchmark item, no exam question, no hash, no model name, no
-    score and no failure count, in any form."""
+    score and no failure count, in any form.
+
+    12g.2, `chat`: an Everyday group's set is told its group, the one failed
+    skill it is for, and the PRACTICE requests of that skill the model failed
+    (`failed`: [{skill, prompt}]) — never a hidden question, which the
+    proposal never read."""
     per = items_per_request(fmt)
     reqs = []
     start = 0
@@ -740,18 +851,24 @@ def generation_requests(did: int, spec_text: str, category: str, count: int,
     # plan, computed now (a proposal approved before plans were shown)
     chunks = focus_requests_plan(labels, per) if labels else focus_chunks(plan or [], per, count)
     for k, (focus, n) in enumerate(chunks):
-        what = ("document" if fmt == "doc" else "item") + ("" if n == 1 else "s")
+        what = ({"doc": "document", "chat": "example"}.get(fmt, "item")
+                + ("" if n == 1 else "s"))
+        shown = [f for f in (failed or []) if not focus or f.get("skill") == focus][:6]
         user = (f"Skill specification:\n{spec_text.strip()}\n\n"
                 + (f"{audience.strip()}\n\n" if audience else "")
-                + f"Topic: {category}\n"
+                + (f"Everyday group: {category}\n" if fmt == "chat" else f"Topic: {category}\n")
                 # the label, and only the label: which corner of the topic this
                 # set is for, so twenty documents are not twenty of one thing
                 + (f"Focus: {focus}\n" if focus else "")
+                + ("Requests of this kind the model got wrong (for their style only — never "
+                   "copy them):\n" + "".join(f"- {f['prompt']}\n" for f in shown)
+                   if fmt == "chat" and shown else "")
                 + f"Format: {fmt}\nWrite {n} {what}.\n{STYLE[fmt]}\n"
                 + f"Style seed {seed}-{k}: make this set differ in scenario, register and "
                 + "phrasing from any other set you might write for the same specification.")
         reqs.append(llm.Request(
-            custom_id=f"gen:{did}:{k}", system=GEN_SYSTEM_QA if fmt == "free" else GEN_SYSTEM,
+            custom_id=f"gen:{did}:{k}",
+            system={"free": GEN_SYSTEM_QA, "chat": GEN_SYSTEM_CHAT}.get(fmt, GEN_SYSTEM),
             user=user, max_tokens=8192, json=True,
             meta={"kind": "generation", "dataset_id": did, "count": n, "start": start,
                   "format": fmt, **({"focus": focus} if focus else {})}))
@@ -793,6 +910,13 @@ def read_reply(text: str, fmt: str, expected: int = 1) -> tuple[list[dict], list
             else:
                 out.append({"title": title[:300], "text": body})
             continue
+        if fmt == "chat":
+            item, bad = read_chat(o)
+            if bad:
+                why.append(bad)
+            else:
+                out.append(item)
+            continue
         q = str(o.get("question") or "").strip()
         a = str(o.get("answer") or "").strip()
         r = str(o.get("rationale") or "").strip()
@@ -803,6 +927,36 @@ def read_reply(text: str, fmt: str, expected: int = 1) -> tuple[list[dict], list
     # asked for two, sent one: the other is missing with no reason of its own
     why += ["not in the reply"] * max(0, expected - len(out) - len(why))
     return out, why
+
+
+def _judged(c) -> bool:
+    return isinstance(c, dict) and (c.get("type") == "judge"
+                                    or (c.get("type") == "any"
+                                        and any(_judged(x) for x in c.get("checks") or [])))
+
+
+def read_chat(o: dict) -> tuple[dict | None, str]:
+    """One chat example, or why it is not kept (12g.2). Its checks must be the
+    bank's vocabulary, ones a script can mark — and its reply must pass every
+    one of them, marked by the bank's own checker (everyday.run_check). Data
+    meant to fix a mistake cannot carry it."""
+    import everyday as _ev                           # scripts/, on sys.path above
+    u = str(o.get("user") or "").strip()
+    a = str(o.get("assistant") or "").strip()
+    checks = o.get("checks")
+    if not u or not a:
+        return None, "no request or no reply"
+    if not isinstance(checks, list) or not checks:
+        return None, "no checks"
+    bad = next((b for b in (_ev._bad_check(c) for c in checks) if b), "")  # noqa: SLF001
+    if bad:
+        return None, f"a check it cannot use: {bad}"
+    if any(_judged(c) for c in checks):
+        return None, "a judge check, which a script cannot mark"
+    fails = [why for ok, why in (_ev.run_check(c, a, u) for c in checks) if ok is not True]
+    if fails:
+        return None, "failed its own checks: " + "; ".join(fails)[:200]
+    return {"user": u, "assistant": a, "checks": checks}, ""
 
 
 def parse_items(text: str, fmt: str) -> list[dict]:

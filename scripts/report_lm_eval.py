@@ -636,8 +636,9 @@ def _evd_label(q: dict) -> str:
 
 
 def load_everyday(out_dir: Path | None) -> dict | None:
-    """12a.3: the Everyday bank — 333 questions in seven groups, all readable
-    until 12g.2 splits them — and every model's marks, from
+    """12a.3: the Everyday bank — 333 questions in seven groups, split by
+    12g.2 into a hidden half that scores and a practice half that is shown —
+    and every model's marks, from
     the everyday.json beside its results. Kept apart from the models' rows,
     so nothing that ranks or averages can reach it.
 
@@ -652,6 +653,10 @@ def load_everyday(out_dir: Path | None) -> dict | None:
         return None
     group_of = {q["id"]: q["group"] for q in qs}
     now = ev.version()
+    # 12g.2: the split — the hidden half scores and is never shown; the page
+    # gets the practice half's questions and answers, and the hidden counts
+    half_of = {q["id"]: ev.half(q) for q in qs}
+    counts = ev.split_counts(qs)
     models, earlier = {}, {}
     for f in sorted(Path(out_dir).glob("*/everyday.json")) if out_dir and Path(out_dir).is_dir() \
             else []:
@@ -661,37 +666,52 @@ def load_everyday(out_dir: Path | None) -> dict | None:
             continue
         if not isinstance(e, dict) or not isinstance(e.get("items"), list) or not e.get("model"):
             continue
-        ver = (e.get("version") or {}).get("hash") or ""
+        stamp = e.get("version") or {}
+        ver = stamp.get("hash") or ""
         if ver != now["hash"]:
-            # as it was marked then: its questions may be gone or reworded
+            # as it was marked then: its questions may be gone or reworded —
+            # or it was marked on all of them, before the split (12g.2)
             earlier[e["model"]] = {
                 "passed": e.get("passed", sum(1 for it in e["items"] if it.get("pass") is True)),
                 "total": e.get("total", len(e["items"])), "marked_at": e.get("marked_at"),
-                "hash": ver}
+                "hash": ver, "label": ev.BEFORE_SPLIT if not stamp.get("split")
+                else "an earlier wording"}
             continue
         # a question the bank no longer holds is not shown (and not counted)
         items = [{**{k: it[k] for k in _EVERYDAY_ITEM if k in it}, "group": group_of[it["id"]]}
                  for it in e["items"] if it.get("id") in group_of]
-        groups = {g: {"passed": sum(1 for it in items if it["group"] == g and it.get("pass") is True),
-                      "total": sum(1 for it in items if it["group"] == g)}
-                  for g in ev.GROUPS if any(it["group"] == g for it in items)}
+        hidden = [it for it in items if half_of[it["id"]] == ev.HIDDEN]
+        practice = [it for it in items if half_of[it["id"]] == ev.PRACTICE]
+
+        def by_group(xs):
+            return {g: {"passed": sum(1 for it in xs if it["group"] == g and it.get("pass") is True),
+                        "total": sum(1 for it in xs if it["group"] == g)}
+                    for g in ev.GROUPS if any(it["group"] == g for it in xs)}
         models[e["model"]] = {
-            "passed": sum(1 for it in items if it.get("pass") is True), "total": len(items),
-            "waiting": sum(1 for it in items if it.get("pass") is None),
+            # the published score: the hidden half's
+            "passed": sum(1 for it in hidden if it.get("pass") is True), "total": len(hidden),
+            "waiting": sum(1 for it in hidden if it.get("pass") is None),
             "marked_at": e.get("marked_at"), "settings": e.get("settings") or {},
             "provisional": bool((e.get("judge") or {}).get("provisional")),
+            "version": ver,
             # 12a.4: answers whose thinking used the whole budget
-            "ran_out": sum(1 for it in items if it.get("no_answer")),
-            "groups": groups, "items": items,
+            "ran_out": sum(1 for it in hidden if it.get("no_answer")),
+            "groups": by_group(hidden),
+            # the practice half: its counts, and its answers — the only ones shown
+            "practice": by_group(practice), "items": practice,
         }
+    shown = [q for q in qs if half_of[q["id"]] == ev.PRACTICE]
     return {"groups": [[k, v] for k, v in ev.GROUPS.items()],
+            # 12g.2: the practice half only; the hidden half is its counts
             "questions": [{"id": q["id"], "n": i, "group": q["group"],
                            "groupLabel": ev.GROUPS[q["group"]],
-                           "label": _evd_label(q),
+                           "label": _evd_label(q), "skill": q.get("skill") or "",
                            "prompt": q["prompt"], "reference": q.get("reference") or "",
                            "checks": [ev.describe(c) for c in q["checks"]],
                            "judged": any(c["type"] == "judge" for c in q["checks"])}
-                          for i, q in enumerate(qs, 1)],
+                          for i, q in enumerate(shown, 1)],
+            "hidden": {g: c["hidden"] for g, c in counts.items()},
+            "practice": {g: c["practice"] for g, c in counts.items()},
             "version": now, "models": models, "earlier": earlier}
 
 
@@ -2120,6 +2140,16 @@ html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *
 .watch { margin-top:2px; }
 .watch.dropped, .watch.dropped a { color:var(--warning-text); }
 .imp-past { margin-top:14px; }
+/* 12g.2: what a weak spot is — an exam topic or an Everyday group — and a
+   group whose hidden half is under the line, greyed */
+.imp-kind { display:inline-block; font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--text-secondary); border:1px solid var(--border); border-radius:999px;
+  padding:0 6px; margin-right:6px; vertical-align:1px; }
+.stageitem.greyed { color:var(--text-secondary); }
+.stageitem.greyed .imp-kind { opacity:.7; }
+.evsplit { margin:4px 0 6px; }
+.evd-read { margin:6px 0 0; padding-left:20px; }
+.evd-read li { margin:4px 0; }
 /* the checks: a popover from the status dot, as the run counter's */
 .checkspop { width:min(460px, calc(100vw - 32px)); max-height:min(60vh, 520px); overflow:auto;
   padding:10px 14px; }
@@ -3910,7 +3940,11 @@ const prelimBadge = m => m.official ? null
 // the page and leaves the average. Not a punishment — the only honest way to
 // keep a board where some models have been tuned against it.
 // an exam task reads as its topic wherever a person sees it
-const tName = t => ((DATA.judged || {}).topics || {})[t] || t;
+// 12g.2: an Everyday group's task, "everyday:instructions", in words
+const evdTaskName = t => 'Everyday · ' + ((((DATA.everyday || {}).groups) || [])
+  .find(([k]) => k === String(t).slice(9)) || [null, String(t).slice(9)])[1];
+const tName = t => String(t).startsWith('everyday:') ? evdTaskName(t)
+  : ((DATA.judged || {}).topics || {})[t] || t;
 const taintBadge = m => (m.tainted || []).length
   ? el('span', { class: 'badge taint',
       title: `trained on the practice questions of ${m.tainted.map(tName).join(', ')}`
@@ -4724,6 +4758,7 @@ function vDiagnose(m) {
 const SCORE_FILL = ['var(--s8)', 'color-mix(in srgb, var(--s8) 45%, var(--plane))', 'var(--axis)',
                     'color-mix(in srgb, var(--s1) 55%, var(--plane))', 'var(--s1)'];
 const frName = t => t === DATA.judged.control ? 'MMLU control (open-ended)'
+  : String(t).startsWith('everyday:') ? evdTaskName(t)
   : (DATA.judged.topics || {})[t] || t.replace(/^(fr_|exam_)/, '').replace(/_/g, ' ');
 // the published topic score is the REPORT half; older files carry only a mean
 const pubScore = v => v.score_report != null ? v.score_report : (v.n_report == null ? v.mean : null);
@@ -5322,7 +5357,9 @@ function kindTile(m, k) {
         LIVE ? [el('span', { class: 'se', text: ' · ' }), kindTest(m, k.kind)] : ''),
       // 12a.4: it answered an earlier wording, which is in its History
       k.kind === 'everyday' && evdEarlier(m.id) ? el('span', { class: 'small se',
-        'data-evd-earlier-note': m.id, text: 'answered an earlier wording · in History' }) : '',
+        'data-evd-earlier-note': m.id, text: (evdEarlier(m.id).label === 'all questions, before '
+          + 'the split' ? 'scored on all questions, before the split' : 'answered an earlier '
+          + 'wording') + ' · in History' }) : '',
       msg ? el('span', { class: 'warn small', 'data-everyday-refused': m.id, text: msg }) : '');
   }
   const [v, sub] = kindValue(m, k.kind);
@@ -5536,20 +5573,9 @@ function modelImproveRows(m) {
   return { props, ds, n: props.length + ds.length };
 }
 function modelImproveTab(m) {
-  const { props, ds } = modelImproveRows(m);
-  return [
-    props.length ? el('div', { class: 'card', 'data-model-proposals': m.id },
-      el('h2', { text: 'Proposals' }),
-      el('p', { class: 'sub', text: 'What someone asked the AI to write for this model, and '
-        + 'where each one stands. Open one to read it.' }),
-      rvTable(RV_PCOLS, props.map(rvRow), '')) : '',
-    ds.length ? el('div', { class: 'card', 'data-model-datasets': m.id },
-      el('h2', { text: 'Datasets' }),
-      el('p', { class: 'sub', text: 'What the AI wrote for this model, after the copy check. '
-        + 'Read one here, or hand it to a training run.' }),
-      rvTable(RV_DCOLS, ds.flatMap(dsRows), '')) : ''].filter(Boolean);
+  // 12g.2: the same four stages Improve shows, for this model
+  return [impStagesCard(m)];
 }
-
 // ---- History: the runs, what produced the numbers, how they were graded ----
 function modelHistoryTab(m) {
   return [LIVE ? vModelRuns(m) : null, evdEarlierCard(m), provRecord(m), gradedCard(m),
@@ -5561,13 +5587,20 @@ function evdEarlierCard(m) {
   const x = evdEarlier(m.id);
   if (!x) return null;
   const when = x.marked_at ? new Date(x.marked_at * 1000).toISOString().slice(0, 10) : '';
+  // 12g.2: marked on every question, before the bank was split — kept, and
+  // never beside a hidden-half score
+  const split = x.label === 'all questions, before the split';
   return el('div', { class: 'card', 'data-evd-earlier': m.id },
     el('div', { class: 'sechead' }, el('h2', { text: 'Everyday tasks' }),
-      el('span', { class: 'badge', 'data-earlier-badge': '1', text: 'earlier wording' })),
+      el('span', { class: 'badge', 'data-earlier-badge': '1',
+        text: split ? x.label : 'earlier wording' })),
     el('p', { class: 'sub', 'data-evd-earlier-count': `${x.passed} of ${x.total}`,
-      text: `${x.passed} of ${x.total}${when ? ', marked ' + when : ''}. The questions have been `
-        + 'reworded since, so these answers are in no score and no comparison. Run everyday '
-        + 'tasks to answer this wording.' }));
+      text: `${x.passed} of ${x.total}${when ? ', marked ' + when : ''}. ` + (split
+        ? 'These were marked on all the questions, before the bank was split into a hidden half '
+          + 'that scores and a practice half that is shown, so they are in no score and no '
+          + 'comparison. Run everyday tasks to be scored on the hidden half.'
+        : 'The questions have been reworded since, so these answers are in no score and no '
+          + 'comparison. Run everyday tasks to answer this wording.') }));
 }
 // an everyday run that answered another wording than the bank's current one
 const evdEarlierRun = r => r.suite === 'everyday' && r.status === 'done'
@@ -5856,6 +5889,14 @@ const whyProvisional = m => {
 const EVD_DEFAULTS = ['Qwen/Qwen3-1.7B', 'Qwen/Qwen3-0.6B', 'HuggingFaceTB/SmolLM2-360M-Instruct',
                       'HuggingFaceTB/SmolLM2-135M-Instruct', 'google/gemma-3-270m-it'];
 const evd = () => DATA.everyday || { groups: [], questions: [], models: {} };
+// 12g.2: the split — how many questions are hidden (they score, and are never
+// shown) and practice (shown), in a group or in all
+const evdHidden = g => g ? ((evd().hidden || {})[g] || 0)
+  : Object.values(evd().hidden || {}).reduce((a, b) => a + b, 0);
+const evdPractice = g => g ? ((evd().practice || {})[g] || 0)
+  : Object.values(evd().practice || {}).reduce((a, b) => a + b, 0);
+// every question a run asks: both halves (the page shows the practice half)
+const evdAll = () => evdHidden() + evdPractice() || (evd().questions || []).length;
 // the seven groups, in their order, and a group's questions
 const evdGroups = () => evd().groups || [];
 const evdQs = g => (evd().questions || []).filter(q => q.group === g);
@@ -5880,8 +5921,9 @@ const evdName = id => (DATA.models.find(x => x.id === id) || {}).name || String(
 const evdCount = e => `${e.passed} of ${e.total}`;
 function evdBadge(provisional) {
   return el('span', { class: 'badge prelim', 'data-pilot-badge': '1',
-    title: `${(evd().questions || []).length} questions, all readable: a look at what the models `
-      + 'say, not a score. Never ranked, never averaged into anything.' + (provisional
+    title: `${evdHidden()} hidden questions score it and ${evdPractice()} practice ones are shown: `
+      + 'a look at what the models say, not a ranking. Never ranked, never averaged into anything.'
+      + (provisional
         ? ' Some answers were marked by a judge whose marks are not evidence yet.' : ''),
     text: 'not ranked' + (provisional ? ' · provisional judge' : '') });
 }
@@ -5940,7 +5982,13 @@ async function evdQueue(ids) {
 function evdGroupList(id, g) {
   const e = evdOf(id);
   const qs = evdQs(g).filter(q => evdItem(e, q.id));
-  return el('div', { class: 'evglist', 'data-evd-answers': `${id}|${g}` }, qs.map(q => {
+  const pr = ((e && e.practice) || {})[g];
+  return el('div', { class: 'evglist', 'data-evd-answers': `${id}|${g}` },
+    // 12g.2: the score above is the hidden half's; these are the practice half
+    el('p', { class: 'small se evsplit', 'data-evd-split-note': g },
+      `Practice questions${pr ? ` · ${pr.passed} of ${pr.total} passed` : ''}. The `
+      + `${evdHidden(g)} hidden ones score it and are not shown.`),
+    ...qs.map(q => {
     const it = evdItem(e, q.id), mk = evdMark(it);
     const r = { kind: 'everyday', id, n: q.n }, key = readStr(r);
     return el('button', { class: 'evrow evqrow', 'data-evd-row': q.id, 'data-read-open': key,
@@ -5983,8 +6031,9 @@ function vEverydayBlock(m) {
           text: 'Compare models →',
           onclick: ev => { ev.preventDefault();
             navigate({ tab: 'everyday', model: null, topic: null }); } }))),
-    el('p', { class: 'sub', text: `${qs.length} questions typed the way people type on a phone, `
-      + 'in seven groups, each marked by its checks. Open a group to read the answers.' }),
+    el('p', { class: 'sub', text: `Questions typed the way people type on a phone, in seven `
+      + `groups, each marked by its checks. The score is the ${evdHidden()} hidden questions; `
+      + `open a group to read the answers to its practice ones.` }),
     el('div', { class: 'evrows' }, rows));
 }
 
@@ -6010,14 +6059,17 @@ function vEverydayPage() {
   const head = el('div', { class: 'card', 'data-everyday-head': '1' },
     el('div', { class: 'rvbar' },
       el('div', {}, el('h2', {}, 'Everyday tasks', evdBadge(prov)),
-        el('p', { class: 'sub', text: `${qs.length} questions people type into an assistant on a `
-          + 'phone — lowercase, typos, one plain request — in seven groups, and what each model '
-          + 'said. Click a group\u2019s count to read a model\u2019s answers.' }),
-        // 12a.4: the wording these answers are to; earlier ones are in each
-        // model's History
+        el('p', { class: 'sub', text: `${evdHidden() + evdPractice()} questions people type `
+          + 'into an assistant on a phone — lowercase, typos, one plain request — in seven '
+          + `groups. Each model is scored on the ${evdHidden()} hidden ones, which are never `
+          + `shown; the ${evdPractice()} practice ones are here, with its answers. Click a `
+          + 'group\u2019s count to read them.' }),
+        // 12a.4: the wording these answers are to — 12g.2: and the split;
+        // earlier ones are in each model's History
         E.version ? el('p', { class: 'small se', 'data-evd-version': E.version.hash,
-          text: `This wording: ${E.version.date} · ${E.version.hash}. Answers to an earlier `
-            + 'wording are in each model\u2019s History, and in no score here.' }) : ''),
+          text: `This version: ${E.version.date} · ${E.version.hash}, the wording and the split. `
+            + 'Answers from before it are in each model\u2019s History, and in no score here.' })
+          : ''),
       run));
   if (!ids.length) {
     return [head, el('div', { class: 'card' }, empty('No model has taken everyday tasks yet.',
@@ -6047,7 +6099,8 @@ function vEverydayPage() {
     el('tbody', {}, groups.map(([g, label]) => el('tr', { 'data-evd-g': g },
       el('th', { scope: 'row', class: 'evq-cell' },
         el('span', { class: 'evq-short', text: label }),
-        el('span', { class: 'evq-group', text: `${evdQs(g).length} questions` })),
+        el('span', { class: 'evq-group', 'data-evd-group-split': g,
+          text: `${evdHidden(g)} hidden · ${evdPractice(g)} practice` })),
       ids.map(id => cell(id, g))))));
   const panel = sel && (((E.models[sel.id] || {}).groups) || {})[sel.g]
     ? el('div', { class: 'evpanel', 'data-evd-panel': `${sel.id}|${sel.g}` },
@@ -6069,15 +6122,18 @@ function evdBankCard() {
   // its heading sits in a div, as the page head's does: the page's three
   // cards are not steps, and this one alone took a section number
   return el('div', { class: 'card', 'data-everyday-bank': '1' },
-    el('div', {}, el('h2', { text: 'The questions' }),
-      el('p', { class: 'sub', text: `${(E.questions || []).length} questions in seven groups. `
+    el('div', {}, el('h2', { text: 'The practice questions' }),
+      el('p', { class: 'sub', 'data-evd-bank-split': `${evdHidden()}|${evdPractice()}`,
+        text: `${(E.questions || []).length} practice questions in seven groups; `
+        + `${evdHidden()} more are hidden — they score the models, and are never shown. `
         + 'An answer passes when every one of its checks does; where the judge is one of them, '
         + 'it only decides once the others have passed.' })),
     evdGroups().map(([g, label]) => {
       const qs = evdQs(g);
       return el('details', { class: 'evbank-g', 'data-evd-bank-group': g },
         el('summary', {}, el('span', { class: 'evgroup', text: label }),
-          el('span', { class: 'small se', text: ` · ${qs.length} questions` })),
+          el('span', { class: 'small se', text: ` · ${qs.length} practice · `
+            + `${evdHidden(g)} hidden` })),
         el('ol', { class: 'evbank' }, qs.map(q => el('li', { 'data-evd-bank-q': q.id },
           el('p', { class: 'evq', text: q.prompt }),
           el('p', { class: 'small', 'data-evd-checks': q.id, text: 'Passes if it: '
@@ -6151,7 +6207,7 @@ function evdDialog(pre = {}) {
     go.textContent = `Queue ${n} run${n === 1 ? '' : 's'}`;
     go.disabled = !n;
   };
-  const nBank = (evd().questions || []).length;
+  const nBank = evdAll();
   const list = el('div', { class: 'evpick', 'data-everyday-pick': '1' }, ids.map(id =>
     el('label', { class: 'evpick-row', 'data-evd-pick': id },
       el('input', { type: 'checkbox', checked: pick[id] ? '' : null,
@@ -6165,8 +6221,9 @@ function evdDialog(pre = {}) {
   const box = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true',
       'aria-labelledby': 'dlg-title' },
     el('h2', { id: 'dlg-title', text: 'Run everyday tasks' }),
-    el('p', { class: 'small', text: `One run per model: ${(evd().questions || []).length} `
-      + 'questions, asked through the model\'s chat template, then marked. A few minutes each.' }),
+    el('p', { class: 'small', text: `One run per model: ${evdAll()} questions, asked through `
+      + `the model's chat template, then marked — the ${evdHidden()} hidden ones make its score. `
+      + 'A few minutes each.' }),
     list, err, el('div', { class: 'dlg-actions' }, cancel, go));
   back.append(box);
   const close = () => {
@@ -7647,9 +7704,9 @@ function lbEveryday(ms) {
     ...modelsHead(evdBadge(prov)),
     lbToolbar(ms, lbColumns(ms), new Set(), 0),
     hfade('lb', el('div', { class: 'lb-wrap', 'data-hkeep': 'lb' }, table)),
-    el('p', { class: 'lbcap', text: `${(evd().questions || []).length} questions in seven groups, `
-      + 'typed the way people type on a phone. Open a model for its answers; Benchmarks ▸ '
-      + 'Everyday tasks has the questions and every answer.' }))];
+    el('p', { class: 'lbcap', text: `${evdAll()} questions in seven groups, typed the way `
+      + `people type on a phone; each count is the ${evdHidden()} hidden ones. Open a model for `
+      + 'its answers to the practice ones; Benchmarks ▸ Everyday tasks has those questions.' }))];
 }
 
 // 12h.1: one generative cell — its number, and under it, only when there is
@@ -9978,14 +10035,16 @@ function readDataset(wrap, r, data, got) {
   const n = Math.min(Math.max(1, r.n || (docs[0] || {}).n || 1), page.kept || 1);
   wrap._title.textContent = `Dataset #${head.id} · ${head.category || '—'}`;
   wrap._src.replaceChildren(`${head.model || '—'} · ${page.kept} document${page.kept === 1 ? '' : 's'}`
-    + (page.fmt === 'free' ? ' · question and answer' : ''),
+    + (page.fmt === 'free' ? ' · question and answer' : page.fmt === 'chat'
+      ? ' · chat examples, each passed its own checks' : ''),
     head.over_provisional_judge || pv.provisional
       ? el('span', { class: 'badge warn', 'data-demo-only': '1', text: 'Demo only',
           title: [pv.provisional_reason, head.over_provisional_judge
             ? 'proposed from a judge no person has checked yet' : ''].filter(Boolean).join(' · ') })
       : '');
   readActs(wrap, { copy: () => { const d = docs.find(x => x.n === (state.read || {}).n) || docs[0] || {};
-      return d.title ? `${d.title}\n\n${d.text || [d.question, d.answer, d.rationale].join('\n\n')}` : ''; },
+      return d.user ? `User: ${d.user}\n\nAssistant: ${d.assistant}`
+        : d.title ? `${d.title}\n\n${d.text || [d.question, d.answer, d.rationale].join('\n\n')}` : ''; },
     download: head.download ? head.download.replace(/^\//, '') : null,
     name: `dataset-${head.id}.jsonl`,
     raw: head.download ? head.download.replace(/^\//, '') : null });
@@ -10051,7 +10110,15 @@ function readDataset(wrap, r, data, got) {
         el('span', { class: 'se mono', 'data-doc-pos': '1',
           text: `${i + 1} of ${docs.length}` }), prev, next),
       el('p', { class: 'small se' }, d.focus ? `Focus: ${d.focus} · ` : '', `${d.words} words`),
-      page.fmt === 'free'
+      // 12g.2: a chat example — the request, the reply, and the checks it passed
+      page.fmt === 'chat'
+        ? el('div', { class: 'rd-qa', 'data-chat-example': String(k) },
+            el('div', { class: 'eyebrow', text: 'Request' }), ...paras(d.user, q),
+            el('div', { class: 'eyebrow', text: 'Reply' }), ...paras(d.assistant, q),
+            el('div', { class: 'eyebrow', text: 'Passed its checks' }),
+            el('p', { class: 'small', 'data-chat-checks': String(k),
+              text: (d.checks || []).join(' · ') || '—' }))
+      : page.fmt === 'free'
         ? el('div', { class: 'rd-qa' },
             el('div', { class: 'eyebrow', text: 'Question' }), ...paras(d.question, q),
             el('div', { class: 'eyebrow', text: 'Answer' }), ...paras(d.answer, q),
@@ -10712,7 +10779,7 @@ function vQueue(part = { form: true, list: true }) {
           sub: 'The exam topics, answered in writing and graded by the judge: the model\'s '
             + 'judged score per topic.' }],
       // 12a: the pilot. 12c replaces this drop-down with cards
-      ['everyday', `Everyday tasks — ${(evd().questions || []).length || 111} questions, a few minutes`],
+      ['everyday', `Everyday tasks — ${evdAll() || 111} questions, a few minutes`],
       // 12h.1: instruct models only; MMLU-Pro alone is hours
       ['generative', 'Instruction & maths — IFEval, MMLU-Pro, MATH-500, hours',
         { sub: 'Asked through the chat template and scored on what the model writes. '
@@ -11478,38 +11545,8 @@ function dsWhyBlock(d) {
             `request ${m.request ?? '—'} · ${m.focus || 'no area'} · ${m.why}`))),
         pg.pager || '') : ''];
 }
-// the row, and for a failed dataset the line under it that explains
-function dsRows(d) {
-  if (!dsFailed(d)) return [dsRow(d)];
-  return [dsRow(d), el('tr', { class: 'dsfail', 'data-ds-why': String(d.id) },
-    el('td', { colspan: '8' }, ...dsWhyBlock(d)))];
-}
 
-// a proposal row opens the card in the sheet — the whole row, and the link in
-// it for the keyboard
-function rvRow(p) {
-  const key = readStr({ kind: 'proposal', id: String(p.id) });
-  return el('tr', { 'data-rv-row': String(p.id),
-      class: 'clickrow' + (state.rv.landed === p.id ? ' landed' : ''),
-      onclick: e => { if (e.target.closest('a, button')) return;
-        openReader({ kind: 'proposal', id: String(p.id) }, `[data-read-open="${CSS.escape(key)}"]`); } },
-    el('td', {}, readLink({ kind: 'proposal', id: String(p.id) }, p.category || p.task,
-      { 'data-rv-open': String(p.id) })),
-    el('td', { class: 'small', text: modelName(p.model) }),
-    el('td', { class: 'small' }, rvStatusChip(p)),
-    el('td', { class: 'small se', text: p.requested_by || '—' }),
-    el('td', { class: 'small se num nowrap',
-      text: p.created_at ? rel(p.created_at) + ' ago' : '—' }),
-    el('td', {}, demoBadge(p)));
-}
 
-function rvTable(cols, rows, emptyNode) {
-  if (!rows.length) return emptyNode;
-  return el('div', { class: 'lb-wrap' }, el('table', { class: 'jd rvlist' },
-    el('thead', {}, el('tr', {}, cols.map(c => el('th',
-      { class: /^(when|documents)$/.test(c) ? 'num' : null, text: c })))),
-    el('tbody', {}, rows)));
-}
 
 // the focus plan as chips: the first 8 areas, then "+12 more"
 function focusChips(p, n, box, done) {
@@ -11595,6 +11632,16 @@ function rvAnswersBlock(p, ev, redraw) {
 }
 
 // ---- the card in the sheet --------------------------------------------------
+// 12g.2: what an Everyday proposal's AI read — the group's PRACTICE requests
+// the model failed, each with its skill and why; never a hidden one
+function evdReadBlock(p, ev) {
+  const failed = ev.failed || [];
+  return el('details', { class: 'small', 'data-evd-read-block': String(p.id) },
+    el('summary', { text: `The practice requests it read (${failed.length}) ▸` }),
+    el('ol', { class: 'evd-read' }, failed.map(f => el('li', { 'data-evd-read-q': f.id },
+      el('span', { class: 'se', text: (f.skill || '—') + ' · ' }), f.prompt,
+      el('div', { class: 'se', text: 'why it failed: ' + (f.reason || '—') })))));
+}
 function readProposal(wrap, r, p) {
   const paint = () => {
     const ev = p.evidence || {};
@@ -11624,14 +11671,20 @@ function readProposal(wrap, r, p) {
         body.push(el('p', { class: 'small se', text: 'Approved as edited.' }));
     }
     // 2. why, in one line — this is the count that used to be blank
+    // 12g.2: an Everyday group's proposal read its failed PRACTICE requests
+    const evdP = ev.kind === 'everyday';
+    const unit = evdP ? 'examples' : 'documents';
     body.push(el('div', { class: 'dxh', text: 'Why' }));
     body.push(el('p', { class: 'small', 'data-why-line': String(p.id),
-      text: `${ev.diagnose_weak ?? '—'} of ${ev.diagnose_items ?? '—'} practice answers scored `
+      text: evdP ? `${ev.practice_failed ?? '—'} of ${ev.practice_total ?? '—'} practice requests `
+          + `failed · ${p.category} ` + (ev.hidden ? `${ev.hidden.passed} of ${ev.hidden.total}`
+            : '—') + ' (hidden questions)'
+        : `${ev.diagnose_weak ?? '—'} of ${ev.diagnose_items ?? '—'} practice answers scored `
         + `below 3 of 4 · ${p.category} score `
         + (ev.topic_score_report != null ? `${num(ev.topic_score_report, 2)} / 4` : '—')
         + ` (hidden questions)` }));
     // 3. the answers it read
-    body.push(rvAnswersBlock(p, ev, paint));
+    body.push(evdP ? evdReadBlock(p, ev) : rvAnswersBlock(p, ev, paint));
     // 4. where the documents go
     const chips = el('div', { class: 'focuschips', 'data-focus-plan': String(p.id),
       'data-plan-stage': p.status === 'proposed' ? 'decide' : 'generate' });
@@ -11639,13 +11692,14 @@ function readProposal(wrap, r, p) {
       checked: state.rv.spread[p.id] !== false ? '' : null,
       onchange: e => { state.rv.spread[p.id] = e.target.checked; } });
     const spreadLabel = el('label', { class: 'small spread' }, spreadBox,
-      ' Spread the documents over these');
+      ` Spread the ${unit} over these`);
     const count = el('input', { type: 'number', value: String(state.rv.count[p.id] || 20),
-      min: '1', max: '1000', style: 'width:80px', 'aria-label': 'how many documents',
+      min: '1', max: '1000', style: 'width:80px', 'aria-label': `how many ${unit}`,
       oninput: e => { const n = +e.target.value;
         if (n >= 1 && n <= 1000) { state.rv.count[p.id] = n; focusChips(p, n, chips); } } });
     if (p.status === 'proposed' || p.status === 'approved') {
-      body.push(el('div', { class: 'dxh', text: 'Documents will cover' }));
+      body.push(el('div', { class: 'dxh', text: evdP ? 'Examples will cover, one skill a batch'
+        : 'Documents will cover' }));
       body.push(chips);
       if (p.status === 'proposed') body.push(spreadLabel);
       focusChips(p, p.status === 'proposed' ? 20 : (state.rv.count[p.id] || 20), chips, f => {
@@ -11680,15 +11734,19 @@ function readProposal(wrap, r, p) {
       }
     }
     if (p.status === 'approved') {
-      const fmt = Select('format', [['doc', 'Documents'], ['free', 'Q&A (for comparison)']],
-        state.rv.fmt[p.id] || 'doc', v => { state.rv.fmt[p.id] = v; },
+      // 12g.2: chat examples are an Everyday group's; documents an exam topic's
+      const fmts = evdP ? [['chat', 'Chat examples']]
+        : [['doc', 'Documents'], ['free', 'Q&A (for comparison)']];
+      const fmtNow = fmts.some(([v]) => v === state.rv.fmt[p.id]) ? state.rv.fmt[p.id] : fmts[0][0];
+      const fmt = Select('format', fmts, fmtNow, v => { state.rv.fmt[p.id] = v; },
         { key: 'rv-fmt-' + p.id });
       body.push(el('div', { class: 'frm rd-acts-row' }, count, fmt,
         el('button', { class: 'primary', 'data-generate': String(p.id), text: 'Generate',
           disabled: llmOk ? null : '',
           title: llmOk ? '' : (llm.reason || 'no AI is set up here to write documents'),
           onclick: () => rvPost(`api/proposals/${p.id}/generate`, { requester: whoName(),
-            count: +count.value, fmt: state.rv.fmt[p.id] || 'doc' }) }),
+            count: +count.value, fmt: fmts.some(([v]) => v === state.rv.fmt[p.id])
+              ? state.rv.fmt[p.id] : fmts[0][0] }) }),
         llmOk ? '' : el('span', { class: 'propwhy', 'data-why': 'generate',
           text: llm.reason || 'no AI is set up here to write documents' })));
     }
@@ -11885,10 +11943,6 @@ function npDialog(pre = {}) {
   (st.model && st.topic ? (name.value.trim() ? go : name) : models).focus();
 }
 
-// ---- the tab ----------------------------------------------------------------
-// the Review lists' columns; the model page's Improve tab shows the same rows
-const RV_PCOLS = ['topic', 'model', 'status', 'asked by', 'when', ''];
-const RV_DCOLS = ['#', 'topic', 'model', 'documents', 'made by', 'when', '', ''];
 // ---------------------------------------------------------------------------
 // 12g.1: Improve is one pipeline for one model. Weak spots → Proposals →
 // Training data → Retests, left to right: a count and five one-line items
@@ -12075,14 +12129,44 @@ function vPipeline() {
       `${llm.provider}/${llm.model || '—'} · `, usageLine(llm)) : '',
     state.rv.msg ? el('p', { class: 'small', text: state.rv.msg }) : '');
 
-  const weakItems = weak.map(w => impItem({ 'data-weak': w.task },
-    [frName(w.task), ' ', el('span', { class: 'mono', text: `${num(w.v, 2)}/4` })],
-    w.why ? el('span', { 'data-weak-why': w.task, text: w.why }) : '',
-    w.why ? '' : el('button', { class: 'ghost', 'data-weak-propose': w.task, text: 'Propose',
-      onclick: () => npDialog({ model: m.id, topic: frName(w.task),
-        returnTo: `[data-weak-propose="${CSS.escape(w.task)}"]` }) })));
+  return [head, impStagesCard(m)];
+}
+
+// the four stages for one model — Improve's pipeline, and the model page's Improve tab
+function impStagesCard(m) {
+  const weak = impWeak(m), props = impProposals(m), ds = impDatasets(m), rts = impRetests(m);
+  // 12g.2: the Everyday groups beside the exam topics, each labelled — the
+  // weakest first within each, as fractions of their own scale; a group
+  // under the line is one greyed line at the end, with no Propose
+  const evw = impEvdWeak(m);
+  const tag = k => el('span', { class: 'imp-kind', 'data-kind': k, text: k === 'exam' ? 'Exam'
+    : 'Everyday' });
+  const mixed = [...weak.map(w => ({ ...w, kind: 'exam', frac: w.v / 4 })),
+                 ...evw.open.map(w => ({ ...w, kind: 'everyday' }))]
+    .sort((a, b) => a.frac - b.frac);
+  const weakItems = [...mixed.map(w => w.kind === 'exam'
+    ? impItem({ 'data-weak': w.task, 'data-weak-kind': 'exam' },
+      [tag('exam'), ' ', frName(w.task), ' ',
+       el('span', { class: 'mono', text: `${num(w.v, 2)}/4` })],
+      w.why ? el('span', { 'data-weak-why': w.task, text: w.why }) : '',
+      w.why ? '' : el('button', { class: 'ghost', 'data-weak-propose': w.task, text: 'Propose',
+        onclick: () => npDialog({ model: m.id, topic: frName(w.task),
+          returnTo: `[data-weak-propose="${CSS.escape(w.task)}"]` }) }))
+    : impItem({ 'data-weak': w.task, 'data-weak-kind': 'everyday' },
+      [tag('everyday'), ' ', w.label],
+      // the score on the line under the name: "8 of 24 hidden questions"
+      [el('span', { class: 'mono', 'data-weak-score': w.task,
+        text: `${w.x.passed} of ${w.x.total}` }), ' hidden questions',
+       w.why ? el('span', { 'data-weak-why': w.task, text: ' · ' + w.why }) : ''],
+      w.why ? '' : el('button', { class: 'ghost', 'data-weak-propose': w.task, text: 'Propose',
+        onclick: e => impProposeEveryday(m, w.g, e.currentTarget) }))),
+    ...evw.under.map(w => impItem({ 'data-weak': w.task, 'data-weak-kind': 'everyday',
+        'data-weak-need': String(w.need), class: 'stageitem greyed' },
+      [tag('everyday'), ` ${w.label} · needs ${w.need} more hidden question`
+        + `${w.need === 1 ? '' : 's'} to improve on`], '', ''))];
   const propItems = props.map(p => impItem({ 'data-prop': String(p.id) },
-    [p.category || frName(p.task), demoBadge(p)],
+    [tag(String(p.task).startsWith('everyday:') ? 'everyday' : 'exam'), ' ',
+     p.category || frName(p.task), demoBadge(p)],
     el('span', { class: 'se', 'data-rv-status': String(p.id), text: PROP_WORDS[p.status] }),
     readButton({ kind: 'proposal', id: String(p.id) },
       p.status === 'approved' ? 'Generate' : p.status === 'proposed' ? 'Review' : 'Read',
@@ -12108,13 +12192,17 @@ function vPipeline() {
           { 'data-ds-read': String(d.id) }) : ''));
   const retestItems = rts.map(c => {
     const topics = (c.tainted || []).filter(t => t.startsWith('exam_'));
+    // 12g.2: an Everyday group it trained on, before → after on the hidden half
+    const groups = (c.tainted || []).filter(t => t.startsWith('everyday:'));
     const score = (x, t) => { const jt = ((x.judge || {}).tasks || {})[t];
       return jt && pubScore(jt) != null ? num(pubScore(jt), 2) : 'not sat'; };
     return impItem({ 'data-retest': c.id },
       [el('a', { href: '#model=' + encodeURIComponent(c.id), text: c.name }), ckBadge(c) || ''],
-      [...(topics.length ? topics.map(t => el('div', { class: 'small', 'data-retest-topic': t },
-          frName(t) + ' ', el('span', { class: 'mono', text: `${score(m, t)} → ${score(c, t)}` })))
-        : [el('div', { class: 'small se', text: 'trained on no dataset made here' })]),
+      [...topics.map(t => el('div', { class: 'small', 'data-retest-topic': t },
+          frName(t) + ' ', el('span', { class: 'mono', text: `${score(m, t)} → ${score(c, t)}` }))),
+       ...groups.map(t => evdRetestLine(m, c, t.slice(9))),
+       ...(topics.length || groups.length ? []
+         : [el('div', { class: 'small se', text: 'trained on no dataset made here' })]),
        watchLine(m, c)],
       el('button', { class: 'ghost', 'data-retest-compare': c.id, text: 'Compare',
         title: 'its page: what the training taught, against ' + m.name,
@@ -12122,11 +12210,11 @@ function vPipeline() {
           try { localStorage.setItem('bench-model-tab', 'history'); } catch (e) { /* private */ }
           navigate({ model: c.id, topic: null }); } }));
   });
-  if (!state.rv.loaded) return [head, el('div', { class: 'card', 'data-pipeline-stages': m.id },
-    skeleton(4, { 'data-loading': 'pipeline' }))];
+  if (!state.rv.loaded) return el('div', { class: 'card', 'data-pipeline-stages': m.id },
+    skeleton(4, { 'data-loading': 'pipeline' }));
   const stages = el('div', { class: 'stages', 'data-stages': '1' },
-    impStage('weak', 'Weak spots', weakItems, judgedTopics(m).length
-      ? 'Every judged topic has a proposal' : 'No judged topics yet'),
+    impStage('weak', 'Weak spots', weakItems, judgedTopics(m).length || evdOf(m.id)
+      ? 'Every judged topic and group has a proposal' : 'No judged topics yet'),
     impStage('proposals', 'Proposals', propItems, 'No proposals waiting'),
     impStage('data', 'Training data', dataItems, 'No training data yet'),
     impStage('retests', 'Retests', retestItems, 'No retests yet — a checkpoint shows here once '
@@ -12141,7 +12229,56 @@ function vPipeline() {
     el('ul', {}, past.map(p => el('li', {}, readLink({ kind: 'proposal', id: String(p.id) },
       p.category || frName(p.task)), el('span', { class: 'se', text: ' · '
         + rvStatusWords(p.status).toLowerCase() }))))) : '';
-  return [head, el('div', { class: 'card', 'data-pipeline-stages': m.id }, stages, pastFold)];
+  return el('div', { class: 'card', 'data-pipeline-stages': m.id }, stages, pastFold);
+}
+
+// 12g.2: a model's Everyday groups for Weak spots — the hidden half's score,
+// on this version of the questions; a group whose hidden half is under the
+// line (EVERYDAY_MIN_HIDDEN) is `under`, and says how many more it needs
+function impEvdWeak(m) {
+  const e = evdOf(m.id);
+  if (!e) return { open: [], under: [] };
+  const min = evd().minHidden || 20;
+  const open = new Set(impProposals(m).map(p => p.task));
+  const items = evdGroups().filter(([g]) => (e.groups || {})[g] && !open.has('everyday:' + g))
+    .map(([g, label]) => {
+      const x = e.groups[g], pr = (e.practice || {})[g];
+      return { task: 'everyday:' + g, g, label, x, frac: x.total ? x.passed / x.total : 1,
+        need: Math.max(0, min - evdHidden(g)),
+        why: pr && pr.total && pr.passed === pr.total ? 'no practice question failed' : '' };
+    });
+  return { open: items.filter(w => !w.need), under: items.filter(w => w.need) };
+}
+// Propose, for an Everyday group: no dialog to choose in — the group is chosen
+async function impProposeEveryday(m, g, btn) {
+  if (!whoName()) { askName(); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Proposing…'; }
+  try {
+    const j = await post('api/proposals', { model: m.id, everyday: g, requested_by: whoName() });
+    toast(`Proposal #${j.id} requested — ${evdTaskName('everyday:' + g)}`, { key: 'propose' });
+    state.rv.loaded = false;
+    await loadReview();
+  } catch (e) {
+    toast('Refused. ' + String((e && e.message) || e), { key: 'propose' });
+  }
+  render();
+}
+// "Instructions 6 of 22 → 13 of 22": both on this version of the questions,
+// or a line that says to retest (12g.2)
+function evdRetestLine(m, c, g) {
+  const name = evdTaskName('everyday:' + g).replace(/^Everyday · /, '');
+  const a = ((evdOf(m.id) || {}).groups || {})[g], b = ((evdOf(c.id) || {}).groups || {})[g];
+  const test = who => LIVE ? [' · ', el('a', { href: '#', 'data-evd-retest-test': who.id,
+    text: 'Test', onclick: e => { e.preventDefault(); evdQueue([who.id]); } })] : '';
+  if (a && b) return el('div', { class: 'small', 'data-retest-group': g },
+    name + ' ', el('span', { class: 'mono', text: `${a.passed} of ${a.total} → ${b.passed} of `
+      + `${b.total}` }));
+  // one of them answered another version: no before → after across it
+  const stale = !b ? (evdEarlier(c.id) ? c : null) : (evdEarlier(m.id) ? m : null);
+  return el('div', { class: 'small se', 'data-retest-group': g,
+      'data-retest-stale': stale ? stale.id : null },
+    `${name}: ` + (stale ? 'retest on the current questions' : 'not tested'),
+    test(stale || (!b ? c : m)));
 }
 
 // The judged card's answers section on a model page: pick one of this model's

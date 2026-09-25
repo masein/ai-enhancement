@@ -12,6 +12,10 @@ pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12a3"
 SIZES = {"understanding": 45, "writing": 48, "summarising": 63, "transform": 46,
          "quick_maths": 45, "instructions": 45, "honesty": 41}
+# 12g.2: each group's hidden half (scores, never shown) and practice half (shown)
+SPLIT = {"understanding": (27, 18), "writing": (24, 24), "summarising": (26, 37),
+         "transform": (25, 21), "quick_maths": (24, 21), "instructions": (24, 21),
+         "honesty": (19, 22)}
 
 
 def everyday_page(page, base, width=1400):
@@ -23,16 +27,19 @@ def everyday_page(page, base, width=1400):
 def test_the_question_list_is_333_with_each_groups_count(live, page):
     everyday_page(page, live["base"])
     bank = page.locator("[data-everyday-bank]")
-    assert bank.locator("[data-evd-bank-q]").count() == 333
-    assert "333 questions in seven groups" in bank.inner_text()
+    # 12g.2: the 333, split — the practice half listed, the hidden half counted
+    assert bank.locator("[data-evd-bank-q]").count() == 164
+    assert "164 practice questions in seven groups; 169 more are hidden" in bank.inner_text()
     for g, n in SIZES.items():
+        hidden, practice = SPLIT[g]
+        assert hidden + practice == n
         head = bank.locator(f"[data-evd-bank-group='{g}'] > summary")
-        assert head.inner_text().endswith(f"· {n} questions"), g
-        assert bank.locator(f"[data-evd-bank-group='{g}'] [data-evd-bank-q]").count() == n
-    # the results table says the same count beside each group
-    for g, n in SIZES.items():
+        assert head.inner_text().endswith(f"· {practice} practice · {hidden} hidden"), g
+        assert bank.locator(f"[data-evd-bank-group='{g}'] [data-evd-bank-q]").count() == practice
+    # the results table says the same beside each group
+    for g, (hidden, practice) in SPLIT.items():
         assert page.locator(f"[data-everyday-table] tr[data-evd-g='{g}'] .evq-group") \
-            .inner_text() == f"{n} questions"
+            .inner_text() == f"{hidden} hidden · {practice} practice"
     assert page.errors == []
 
 
@@ -47,7 +54,7 @@ def test_the_new_checks_are_said_in_plain_words(live, page):
     words = page.evaluate("""() => DATA.everyday.questions
       .filter(q => q.group === 'summarising' && q.id.includes('-r3-'))
       .map(q => document.querySelector(`[data-evd-checks='${q.id}']`).textContent)""")
-    assert len(words) == 46
+    assert len(words) == 26                      # 12g.2: round 3's practice ones
     assert all(w.startswith("Passes if it: at most ") and " · keeps at least " in w
                for w in words), words[:3]
     # no check is said by its type
@@ -61,7 +68,7 @@ def test_the_new_checks_are_said_in_plain_words(live, page):
 def test_the_screens(live, page, width):
     everyday_page(page, live["base"], width)
     page.locator("[data-evd-bank-group='summarising'] > summary").click()
-    page.locator("[data-evd-bank-q='everyday-summarising-r3-01']").scroll_into_view_if_needed()
+    page.locator("[data-evd-bank-q='everyday-summarising-r3-02']").scroll_into_view_if_needed()
     assert page.evaluate("document.scrollingElement.scrollWidth <= innerWidth")
     SCREENS.mkdir(parents=True, exist_ok=True)
     page.wait_for_timeout(200)

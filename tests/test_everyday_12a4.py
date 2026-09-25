@@ -37,7 +37,8 @@ BANK = {q["id"]: q for q in ev.load_bank()}
 LOCAL = ["aed", "dirham", "dubai", "abu dhabi", "sharjah", "emirates", "uae", "nol",
          "talabat", "dewa", "careem", "salik"]
 # the wording of 2026-09-25: change WORDING_DATE with the wording, and this with it
-WORDING = {"date": "2026-09-25", "hash": "20efe555"}
+# 12g.2: the split is part of what a score means, so it is part of the version
+WORDING = {"date": "2026-09-25", "hash": "8954b300", "split": "evalboard-split-v1"}
 
 
 def reference_checker():
@@ -196,10 +197,12 @@ def test_the_bank_has_a_version():
     # the texts make it, not the checks: a fairer check marks the same answers again
     qs = ev.load_bank()
     checked = [{**q, "checks": [{"type": "asks_back"}]} for q in qs]
-    assert ev.wording_hash(checked) == WORDING["hash"]
+    assert ev.bank_hash(checked) == WORDING["hash"]
     reworded = [{**q, "prompt": q["prompt"] + "?"} if q["id"] == "everyday-honesty-01" else q
                 for q in qs]
-    assert ev.wording_hash(reworded) != WORDING["hash"]
+    assert ev.bank_hash(reworded) != WORDING["hash"]
+    # 12g.2: the split is in it — the wording alone is not this version
+    assert ev.wording_hash(qs) != WORDING["hash"]
 
 
 def _asked(model_dir: Path, questions: list[dict], answer=lambda q: q["reference"]):
@@ -217,7 +220,8 @@ def test_a_run_on_this_wording_is_stamped_with_it(tmp_path):
     _asked(mdir, ev.load_bank())
     out = ev.mark(mdir)
     assert out["version"] == WORDING and out["earlier"] is False
-    assert out["passed"] == 322 and out["waiting"] == 11          # the judge's eleven wait
+    # 12g.2: the hidden half's score; the judge's eleven wait, in both halves
+    assert out["passed"] == 161 and out["total"] == 169 and out["waiting"] == 11
 
 
 def test_answers_to_an_earlier_wording_are_never_re_marked(tmp_path):
@@ -238,7 +242,8 @@ def test_answers_to_an_earlier_wording_are_never_re_marked(tmp_path):
     e = report.load_everyday(tree)
     assert "org/m" not in e["models"]                                  # in no score…
     assert e["earlier"]["org/m"] == {"passed": 170, "total": 333, "marked_at": 1.0,
-                                     "hash": out["version"]["hash"]}   # …but kept
+                                     "hash": out["version"]["hash"],
+                                     "label": "an earlier wording"}    # …but kept
     assert e["version"] == WORDING
 
 
@@ -258,6 +263,8 @@ def test_answers_that_ran_out_of_room_are_counted(tmp_path):
     _asked(mdir, ev.load_bank(),
            answer=lambda q: thinking if q["group"] == "quick_maths" else q["reference"])
     out = ev.mark(mdir)
-    assert out["ran_out"] == 45
+    # 12g.2: beside the score, so the hidden half's: 24 of quick maths' 45
+    hidden = ev.split_counts()["quick_maths"]["hidden"]
+    assert out["ran_out"] == hidden == 24
     ev.write(mdir, out)
-    assert report.load_everyday(tmp_path)["models"]["org/m"]["ran_out"] == 45
+    assert report.load_everyday(tmp_path)["models"]["org/m"]["ran_out"] == hidden

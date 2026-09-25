@@ -2412,6 +2412,71 @@ check, and Improve shows them only as a before → after watch line.
   most judged topics, and names it: "good-750m · weakest: Economics 1.46 / 4 ·
   Improve it →".
 
+### 12g.2 — Everyday tasks in Improve
+
+`docs/prompts/phase-12g-improve-pipeline.md`, part two.
+
+- **The split.**
+  - Every Everyday question's qid is `exam_build.qid_of(prompt)`, and its half
+    is `diagnose.split_of(qid)`, with the exam's salt. Nothing is assigned by
+    hand.
+  - The **hidden half** ("report") scores the model and is never shown. The
+    **practice half** ("diagnose") is shown, and it is the only half Improve
+    reads.
+  - A model is still asked all 333 questions. `everyday.json` marks them all,
+    and the published score (`passed`/`total`, `groups`) is the hidden half's.
+    `practice` holds the practice half's counts.
+  - The payload's `everyday.questions` and each model's `items` are the
+    practice half only. `hidden`/`practice` give the counts per group.
+- **The counts:**
+
+  | Group | Hidden | Practice |
+  |---|---|---|
+  | Understanding | 27 | 18 |
+  | Writing | 24 | 24 |
+  | Summarising | 26 | 37 |
+  | Transform | 25 | 21 |
+  | Quick maths | 24 | 21 |
+  | Instructions | 24 | 21 |
+  | Honesty | 19 | 22 |
+
+  That is 169 hidden and 164 practice. **Honesty is one short of 20**, so it
+  waits for more questions.
+- **The version.**
+  - The split is part of it: `everyday.version()` is `{date, hash, split}`, and
+    the hash is over the wording and the split salt (`bank_hash`).
+  - A result marked before 12g.2 has the wording's hash alone. It goes to
+    History as "all questions, before the split" and is never in a score.
+  - A run on an earlier wording keeps every question it was asked, labelled
+    "an earlier wording".
+- **Improve.**
+  - A group joins once its hidden half has `EVERYDAY_MIN_HIDDEN` questions (20,
+    one setting).
+  - In Weak spots, Everyday groups sit beside the exam topics, labelled *Exam*
+    or *Everyday*, and ordered by their share of their own scale.
+  - A group under the line is one greyed line: "Honesty · needs 1 more hidden
+    question to improve on", with no Propose.
+  - **Propose on a group:** `POST /api/proposals {model, everyday: group}`.
+    - It reads the group's **failed practice questions**: each request, the
+      model's reply and why it failed, never a hidden one.
+    - The plan is the failed skills, one batch each.
+  - The model page's Improve tab shows the same four stages.
+  - Retests show a group before → after on the hidden half ("Instructions 6
+    of 24 → 13 of 24"), then the Standard watch. If either side answered
+    another version, the line reads "retest on the current questions · Test".
+- **Chat examples** (format `chat`, Everyday groups only; exam topics keep
+  `doc`, and `free` stays as #60 left it).
+  - Each item is `{user, assistant, checks}`, and the checks use the bank's
+    vocabulary. A judge check is refused, because a script can't mark it.
+  - **Every example is marked by its own checks** (`everyday.run_check`)
+    before it is kept. One that fails is dropped with its reason, "failed its
+    own checks: …", and counted missing.
+  - The generator is told the group, the one skill the set is for, and the
+    practice requests of that skill the model failed.
+  - The 13-gram gate now covers the whole Everyday bank, both halves,
+    requests and good answers. It also drops an example whose request *is*
+    one of the bank's, however short.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

@@ -193,7 +193,7 @@ def test_review_flow_in_the_browser(live, page):
     row = page.locator("[data-stage='proposals'] [data-prop]").first
     row.wait_for(timeout=E2E_MS)
     pid = row.get_attribute("data-prop")
-    assert row.locator(".si-main").inner_text().startswith("Economics")
+    assert row.locator(".si-main").inner_text().endswith("Economics")    # after its Exam label
     row.locator("[data-prop-act]").click()
     page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
     card = page.locator("#reader")

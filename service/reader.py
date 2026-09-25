@@ -102,7 +102,17 @@ def dataset_page(did: int, offset: int = 0, limit: int = PAGE, q: str = "") -> d
     entries: list[dict] = []
 
     def doc(i: int, x: dict) -> dict:
-        if fmt == "free":
+        if fmt == "chat":
+            # 12g.2: a request, the reply, and the checks it passed
+            try:
+                import everyday as _ev
+                said = [_ev.describe(c) for c in x.get("checks") or []]
+            except Exception:                    # noqa: BLE001 — the words are a courtesy
+                said = []
+            body = str(x.get("assistant") or "")
+            e = {"type": "doc", "n": i + 1, "title": str(x.get("user") or "")[:160],
+                 "user": x.get("user") or "", "assistant": body, "checks": said}
+        elif fmt == "free":
             body = " ".join(str(x.get(k) or "") for k in ("question", "answer", "rationale"))
             e = {"type": "doc", "n": i + 1, "title": str(x.get("question") or "")[:160],
                  "question": x.get("question") or "", "answer": x.get("answer") or "",
@@ -142,7 +152,8 @@ def dataset_page(did: int, offset: int = 0, limit: int = PAGE, q: str = "") -> d
     qn = (q or "").strip().lower()
     if qn:
         entries = [e for e in entries if e["type"] == "doc" and qn in " ".join(
-            str(e.get(k) or "") for k in ("title", "text", "question", "answer", "rationale")).lower()]
+            str(e.get(k) or "") for k in ("title", "text", "question", "answer", "rationale",
+                                          "user", "assistant")).lower()]
     offset = max(0, int(offset))
     limit = max(1, min(int(limit), 200))
     return {"id": did, "status": d["status"], "fmt": fmt, "kept": len(items),

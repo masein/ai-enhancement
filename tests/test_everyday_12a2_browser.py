@@ -42,9 +42,10 @@ def test_the_results_are_groups_by_models_n_of_k(live, page):
     models = [th.get_attribute("data-evd-model")
               for th in page.locator("[data-everyday-table] th[data-evd-model]").all()]
     assert models == ["fx/good-750m", "fx/skewed-360m"]
-    assert page.locator("[data-evd-count='fx/good-750m']").inner_text() == "330 of 333"
-    # k is the group's size
-    assert page.locator("[data-evd-cell='fx/good-750m|quick_maths']").inner_text() == "44 of 45"
+    # 12g.2: the hidden half's score
+    assert page.locator("[data-evd-count='fx/good-750m']").inner_text() == "168 of 169"
+    # k is the group's hidden half
+    assert page.locator("[data-evd-cell='fx/good-750m|quick_maths']").inner_text() == "23 of 24"
     # 12a.4: one that sat the pilot only answered an earlier wording: not here
     assert page.locator("[data-evd-count='fx/chance-160m']").count() == 0
     # one badge, and the one action
@@ -64,7 +65,7 @@ def test_a_cell_opens_that_models_answers_in_that_group(live, page):
       .map(q => q.id)""")
     assert [r.get_attribute("data-evd-row") for r in rows.all()] == want      # one row a question
     marks = [r.locator("[data-evd-mark]").get_attribute("data-evd-mark") for r in rows.all()]
-    assert marks.count("ok") == 24 and marks.count("no") == 24                # "24 of 48"
+    assert marks.count("ok") == 12 and marks.count("no") == 12     # 12g.2: its 24 practice
     # each row says why, and opens the whole answer in the side panel
     no = rows.nth(marks.index("no"))
     assert no.locator(".evreason").inner_text()
@@ -75,9 +76,10 @@ def test_a_cell_opens_that_models_answers_in_that_group(live, page):
     page.locator("[data-evd-cell='fx/good-750m|quick_maths']").click()
     page.wait_for_selector("[data-evd-panel='fx/good-750m|quick_maths']")
     assert page.locator("[data-evd-panel]").count() == 1
-    miss = page.locator("[data-evd-row='everyday-maths-01']")
-    assert miss.locator("[data-evd-mark]").get_attribute("data-evd-mark") == "no"
-    assert miss.locator(".evreason").inner_text() == "didn't say 180"
+    # 12g.2: its one miss here is a hidden question — counted, never a row
+    assert page.locator("[data-evd-row='everyday-maths-01']").count() == 0
+    assert page.locator("[data-evd-split-note='quick_maths']").inner_text().endswith(
+        "The 24 hidden ones score it and are not shown.")
     page.locator("[data-evd-cell='fx/good-750m|quick_maths']").click()
     assert page.locator("[data-evd-panel]").count() == 0
     assert page.errors == []
@@ -88,12 +90,14 @@ def test_the_bank_is_readable_by_group_with_its_checks_in_plain_words(live, page
     groups = page.locator("[data-everyday-bank] [data-evd-bank-group]")
     assert [g.get_attribute("data-evd-bank-group") for g in groups.all()] == KEYS
     page.locator("[data-evd-bank-group='transform'] > summary").click()
-    q = page.locator("[data-evd-bank-q='everyday-pilot-02']")
-    assert q.locator(".evq").inner_text().startswith("turn this into json: Sara Ahmed")
+    # 12g.2: a practice question (the pilot's JSON one is hidden now)
+    q = page.locator("[data-evd-bank-q='everyday-transform-07']")
+    assert q.locator(".evq").inner_text().startswith("convert this bank sms into json")
     assert q.locator("[data-evd-checks]").inner_text() == \
-        "Passes if it: valid JSON with sara, ahmed, 34, product manager, toronto, march 2021"
-    # every question is there, every one readable
-    assert page.locator("[data-evd-bank-q]").count() == 333
+        "Passes if it: valid JSON with 4091, 84.50, freshmart"
+    # every practice question is there, every one readable; the hidden are counted
+    assert page.locator("[data-evd-bank-q]").count() == 164
+    assert page.locator("[data-evd-bank-q='everyday-pilot-02']").count() == 0
     # the page's cards are not steps: no section numbers
     assert page.locator("#view h2[data-ix]").count() == 0
     assert page.errors == []
@@ -105,13 +109,14 @@ def test_the_model_page_block_is_the_seven_groups(live, page):
     open_kind(page, "everyday")
     block = page.locator("[data-everyday-block='fx/good-750m']")
     assert [b.get_attribute("data-evd-group") for b in block.locator("[data-evd-group]").all()] == KEYS
-    assert block.locator("[data-evd-group-count='honesty']").inner_text() == "40 of 41"
+    # 12g.2: the hidden half's count, and the practice half's answers
+    assert block.locator("[data-evd-group-count='honesty']").inner_text() == "19 of 19"
     block.locator("[data-evd-group='honesty']").click()
     rows = page.locator("[data-evd-answers='fx/good-750m|honesty'] [data-evd-row]")
     rows.first.wait_for()
-    assert rows.count() == 41
+    assert rows.count() == 22
     assert page.locator("[data-kind-tile='everyday'] [data-kind-value='everyday']").inner_text() == \
-        "330 of 333"
+        "168 of 169"
     # 12a.4: a model that sat the pilot answered an earlier wording — no
     # block, and its header says where the answers are
     page.goto(live["base"] + "/#model=fx%2Fbelow-135m-it")
@@ -131,8 +136,8 @@ def test_models_everyday_is_a_column_per_group_and_the_total(live, page):
     assert [h.lower() for h in heads[1:-1]] == [g.lower() for g in GROUPS]
     assert heads[-1].lower() == "total"
     row = t.locator("tr[data-lb-row='fx/good-750m']")
-    assert row.locator("[data-evd-g='writing']").inner_text() == "48 of 48"
-    assert row.locator("[data-everyday-count]").inner_text() == "330 of 333"
+    assert row.locator("[data-evd-g='writing']").inner_text() == "24 of 24"      # 12g.2
+    assert row.locator("[data-everyday-count]").inner_text() == "168 of 169"
     assert page.locator("[data-lb-card] [data-pilot-badge]").count() == 1
     assert page.errors == []
 
