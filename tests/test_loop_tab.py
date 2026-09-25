@@ -177,7 +177,9 @@ def test_a_judged_run_can_be_narrowed_to_one_topic(svc, monkeypatch):
     assert bad.status_code == 422 and "not built exam tasks" in bad.json()["detail"]
     wrong = client.post("/api/submissions", json={"hf_id": "org/m4", "suite": "full",
                                                   "tasks": [LAW]})
-    assert wrong.status_code == 422 and "judged run only" in wrong.json()["detail"]
+    # 12a.5b: tasks also picks among IFEval, MMLU-Pro and MATH-500
+    assert wrong.status_code == 422 and "narrows a judged run" in wrong.json()["detail"] \
+        and "the other suites are fixed lists" in wrong.json()["detail"]
 
 
 def test_the_judge_grades_only_the_narrowed_tasks(svc, tmp_path):

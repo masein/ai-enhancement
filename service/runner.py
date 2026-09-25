@@ -916,8 +916,11 @@ def run_submission(sub: dict) -> None:
                         if line and line != said[0]:
                             said[0] = line
                             db.update(sid, progress=line)
+                # only a slow run passes a watch (the tests' own _run_task fakes
+                # predate it)
+                polls = {"on_poll": watch} if watch else {}
                 status = _run_task(sid, cmd, lf, job_env, run_as, cwd=lm_eval_cwd(task_out),
-                                   on_poll=watch)
+                                   **polls)
                 if status == CANCELED:
                     canceled = True
                 # 12h.1: a model vLLM cannot load runs on the harness's own
@@ -929,7 +932,7 @@ def run_submission(sub: dict) -> None:
                     lf.write(f"\n[service] {fell_back}\n")
                     lf.flush()
                     status = _run_task(sid, gen_cmd("hf"), lf, job_env, run_as,
-                                       cwd=lm_eval_cwd(task_out), on_poll=watch)
+                                       cwd=lm_eval_cwd(task_out), **polls)
                     if status == CANCELED:
                         canceled = True
             gpu_seconds += time.time() - t_task
