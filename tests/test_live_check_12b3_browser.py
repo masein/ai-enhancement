@@ -6,7 +6,6 @@ filled buttons."""
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
 
 import pytest
@@ -19,14 +18,12 @@ MODEL = "fx/good-750m"
 PLACES = ["Home", "Models", "Improve", "Benchmarks"]
 
 
-def served(page, edit, delay=0.0):
-    """the board as served, edited (and held back) on the way to the page"""
+def served(page, edit):
+    """the board as served, edited on the way to the page"""
     def handle(route):
         r = route.fetch()
         body = r.json()
         edit(body)
-        if delay:
-            time.sleep(delay)
         route.fulfill(response=r, body=json.dumps(body))
     page.route("**/api/results*", handle)
 
@@ -68,17 +65,22 @@ def test_the_header_is_drawn_before_the_scores_arrive(live, browser):
     """The scores are the board's biggest answer; the header needs none of
     them, so it is there while they are on their way."""
     ctx, pg = fresh_page(browser)
+    # the scores are held until the test lets them go: a fixed delay raced a
+    # busy machine, where the scores could land before the test looked
+    held = []
     try:
-        served(pg, lambda b: None, delay=3.0)
-        t0 = time.time()
+        pg.route("**/api/results*", lambda route: held.append(route))
         pg.goto(live["base"] + "/")
-        pg.wait_for_selector("#tabs > button[role=tab]", timeout=2500)
-        assert time.time() - t0 < 2.5
+        pg.wait_for_selector("#tabs > button[role=tab]", timeout=10000)
+        assert held                                             # asked for, not yet answered
         assert pg.locator("#tabs > button[role=tab]").all_inner_texts() == PLACES
         assert pg.locator("header [data-test-model]").is_visible()
         assert pg.locator("#view [data-loading='results']").count() == 1   # the skeleton, still
         # a place clicked before the scores land is where the page opens
         pg.locator("#tabs [data-tab='benchmarks']").click()
+        for route in list(held):                               # now let them through
+            route.fulfill(response=route.fetch())
+        pg.unroute("**/api/results*")
         pg.wait_for_selector("[data-subswitch='benchmarks']", timeout=10000)
         assert pg.errors == []
     finally:

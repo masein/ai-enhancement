@@ -66,7 +66,7 @@ def test_the_runner_stops_a_task_it_was_asked_to_stop(svc, tmp_path):
         with open(tmp_path / "log.txt", "a") as lf:
             got["status"] = runner._run_task(
                 sid, [sys.executable, "-c", "import time; time.sleep(60)"], lf,
-                dict(os.environ), None)
+                dict(os.environ), None, cwd=tmp_path)
     t0 = time.time()
     th = threading.Thread(target=run)
     th.start()

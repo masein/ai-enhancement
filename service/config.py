@@ -274,6 +274,11 @@ def discovered_ppl_tasks() -> list[str]:
     return sorted(y.stem for y in EVAL_TASKS_DIR.glob("*.yaml"))
 
 
+# every suite a run can ask for; scripts/check_tasks.py (deploy step 4) asks
+# the installed lm_eval to find every task of each
+SUITES = ("quick", "full", "control", "judged", "everyday")
+
+
 def tasks_for_suite(suite: str) -> list[str]:
     if suite == "control":
         return list(CONTROL_TASKS)

@@ -37,6 +37,9 @@ def home(page, base, width=1512):
     page.goto(base + "/")
     page.wait_for_selector("#tabs [role=tab]", state="attached")
     page.wait_for_selector("#view > *")
+    # 12b.3 draws the header and a skeleton before the scores arrive: the
+    # tests here read DATA, so wait for the scores too
+    page.wait_for_function("() => DATA !== null")
 
 
 def place(page, pid, sub=None):

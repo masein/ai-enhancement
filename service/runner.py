@@ -315,6 +315,42 @@ def include_args_for(task: str) -> list[str]:
     return []
 
 
+def lm_eval_cmd(model_args: str, task: str, shots: int, batch, task_out: Path, *,
+                chat: bool, max_gen_toks: int | None = None) -> list[str]:
+    """The lm_eval command for one task. Built here only, so that
+    scripts/check_tasks.py (deploy step 4) hands the installed harness exactly
+    what a run hands it."""
+    cmd = ["lm_eval",
+           "--model", "hf",
+           "--model_args", model_args,
+           "--tasks", task,
+           "--num_fewshot", str(shots),
+           "--batch_size", str(batch),
+           "--seed", str(config.SEED),
+           "--output_path", str(task_out),
+           "--log_samples",
+           "--device", "cuda:0",
+           *include_args_for(task)]
+    if chat:
+        cmd.append("--apply_chat_template")
+    if max_gen_toks:
+        cmd += ["--gen_kwargs", f"max_gen_toks={max_gen_toks}"]
+    return cmd
+
+
+def lm_eval_cwd(task_out: Path) -> Path:
+    """Where lm_eval runs: the task's own output folder, never BENCH_ROOT.
+
+    lm_eval 0.4.12 reads a --tasks value that names a folder in its working
+    directory as a folder of task yaml files, and never looks the name up
+    (lm_eval/config/evaluate_config.py, process_tasks). BENCH_ROOT/everyday
+    is such a folder: run from BENCH_ROOT, `--tasks everyday` found no yaml
+    directly in it and selected nothing, and all four everyday runs, #62 to
+    #65, failed before asking a question. The output folder holds only what
+    lm_eval writes there, a folder named after the model, never a task."""
+    return task_out
+
+
 def _has_results(task_out: Path) -> bool:
     return any(task_out.glob("*/results*.json")) or any(task_out.glob("results*.json"))
 
@@ -405,11 +441,12 @@ def reuse_note(reused: dict[str, int | None], tasks: list[str]) -> str:
 CANCELED = -15
 
 
-def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as) -> int:
+def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path) -> int:
     """One lm_eval task, as a child we watch: its exit code, -1 on timeout, or
     CANCELED when someone asked the queue to stop this run. Polled every two
-    seconds, so a cancel costs at most that plus a clean shutdown."""
-    proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=config.BENCH_ROOT,
+    seconds, so a cancel costs at most that plus a clean shutdown. `cwd` is
+    lm_eval_cwd(), never BENCH_ROOT."""
+    proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=cwd,
                             env=env, **({"user": run_as[0], "group": run_as[1]}
                                         if run_as else {}))
     t0 = time.time()
@@ -592,26 +629,15 @@ def run_submission(sub: dict) -> None:
             margs = f"pretrained={pretrained},dtype=bfloat16"
             if remote_code:
                 margs += ",trust_remote_code=True"
-            cmd = ["lm_eval",
-                   "--model", "hf",
-                   "--model_args", margs,
-                   "--tasks", task,
-                   "--num_fewshot", str(shots),
-                   "--batch_size", str(meta["batch"]),
-                   "--seed", str(config.SEED),
-                   "--output_path", str(task_out),
-                   "--log_samples",
-                   "--device", "cuda:0",
-                   *include_args_for(task)]
-            if kind == "instruct" or everyday:
-                cmd.append("--apply_chat_template")
             # 11l: a reasoning model thinks before it answers, and 256 tokens
             # ran out inside the thinking on every question of run #60. Only
             # its judged answers get more room, and only when its template is
             # the one that thinks; lm_eval records the override in its results
-            if ((kind == "instruct" and task in judged or everyday)
-                    and (meta.get("archinfo") or {}).get("reasoning_template")):
-                cmd += ["--gen_kwargs", f"max_gen_toks={config.REASONING_MAX_GEN_TOKS}"]
+            thinks = ((kind == "instruct" and task in judged or everyday)
+                      and (meta.get("archinfo") or {}).get("reasoning_template"))
+            cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
+                              chat=kind == "instruct" or everyday,
+                              max_gen_toks=config.REASONING_MAX_GEN_TOKS if thinks else None)
 
             t_task = time.time()
             # the dropped-privilege child cannot create its own output dir under
@@ -634,7 +660,7 @@ def run_submission(sub: dict) -> None:
                              f"hub offline, token withheld\n")
                 lf.flush()
                 mark = log_path.stat().st_size      # this task's output starts here
-                status = _run_task(sid, cmd, lf, job_env, run_as)
+                status = _run_task(sid, cmd, lf, job_env, run_as, cwd=lm_eval_cwd(task_out))
                 if status == CANCELED:
                     canceled = True
             gpu_seconds += time.time() - t_task

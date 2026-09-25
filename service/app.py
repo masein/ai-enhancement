@@ -338,7 +338,7 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "id, or local/<name> for an uploaded artifact")
     if s.kind not in ("auto", "base", "instruct"):
         raise HTTPException(422, "kind must be auto, base or instruct")
-    if s.suite not in ("quick", "full", "control", "judged", "everyday"):
+    if s.suite not in config.SUITES:
         raise HTTPException(422, "suite must be quick, full, control (mmlu_perm only), "
                                  "judged (free response + judge) or everyday (Everyday tasks)")
     chosen: list[str] = []

@@ -68,8 +68,10 @@ class Harness:
         self.results = json.loads(src.read_text(encoding="utf-8"))
         self.subdir = src.parent.name
 
-    def run(self, sid, cmd, lf, env, run_as) -> int:
+    def run(self, sid, cmd, lf, env, run_as, cwd) -> int:
         task = cmd[cmd.index("--tasks") + 1]
+        # 12a.3: lm_eval starts in the task's own output folder, not BENCH_ROOT
+        assert cwd == Path(cmd[cmd.index("--output_path") + 1])
         out = Path(cmd[cmd.index("--output_path") + 1]) / self.subdir
         out.mkdir(parents=True, exist_ok=True)
         items = [json.loads(x) for x in (self.config.JUDGED_TASKS_DIR / f"{task}.jsonl")

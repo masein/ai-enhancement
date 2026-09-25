@@ -275,13 +275,33 @@ local, and it is the gate.**
      test doesn't redirect, and a key in the environment changes what a
      "not configured" test sees. With `env -i`, every fallback lands in
      `/tmp/check`, as in a fresh CI checkout.
+4. **After every deploy, ask the real lm_eval in the running container to
+   find every task the board runs.** It is deploy step 4 (below), from 12a.3.
+   `scripts/check_tasks.py` does it.
+   - **What it covers:** every task of every suite (`config.SUITES`): the
+     standard tasks, the perplexity slices, `mmlu_perm`, each exam topic
+     built under `exam/tasks`, and `everyday`.
+   - **How it asks:** for each task it builds the command a run builds
+     (`runner.lm_eval_cmd`) and goes to the folder a run starts lm_eval in
+     (`runner.lm_eval_cwd`). It then hands the command to lm_eval's own
+     command line, stopped at `simple_evaluate`, after the tasks are chosen
+     and before any model loads. No GPU, no model, no dataset.
+   - **Why:** all four everyday runs, #62 to #65, failed right there, and
+     nothing else could have caught it. The unit suite never meets the real
+     lm_eval, since the check image doesn't have it. Step 3 runs with an
+     empty environment, so it never sees the live task folders. And
+     TaskManager alone found `everyday` fine: the failure was in how the
+     command line reads `--tasks`.
+   - It writes only to a temporary folder. Everyday's task is built there
+     from the deployed bank.
 
-**The deploy steps, from 12b.1 on:**
+**The deploy steps, from 12a.3 on:**
 
 ```bash
 cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
 sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
 git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check && mkdir /tmp/check && cd /tmp/check && tar -x && exec env -i PATH="$PATH" HOME=/tmp/check LANG=C.UTF-8 python -m pytest -q -p no:cacheprovider -m "not gpu and not network and not dashboard"' 2>&1 | tail -15
+sudo docker compose exec -T bench python scripts/check_tasks.py
 ```
 
 **Step 3's expected output:** the last line reads `N passed, M deselected
@@ -292,6 +312,18 @@ in …s`, with no `failed` and no `error`.
   the image: its Python, a package version, or running as root. The page is
   already up at that point, so step 3 doesn't block the deploy. Send the
   output, and the fix goes in the next PR.
+
+**Step 4's expected output:**
+- One line per suite, each reading `k of k found`.
+  - `judged` counts the exam's task files.
+  - A suite with no tasks says so. For `judged`, that means the exam has not
+    been built.
+- The last line is `tasks OK: N of N found by lm_eval 0.4.12`.
+- Anything else ends `tasks FAILED: … not found: <tasks>`, and exits 1.
+  - Above it, each task not found is named, with why and the last lines of
+    lm_eval's output.
+  - A run of that task would fail the same way. Hold off queueing it, and
+    send the output.
 
 ---
 
@@ -1982,6 +2014,41 @@ git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check &&
    and every cell opens its answers.
 
 ---
+
+### 12a.3 — everyday runs find their task
+
+All four everyday runs, #62 to #65, failed in lm_eval before asking a
+question:
+
+```
+Including path: /home/masein/benchmarks/everyday/tasks
+Selected Tasks: []
+ValueError: No tasks specified, or no tasks found.
+```
+
+- **The cause:** a rule in lm_eval 0.4.12's command line
+  (`lm_eval/config/evaluate_config.py`, `process_tasks`): a single `--tasks`
+  value that names a folder in the working directory is read as a folder of
+  task yaml files, and the name is never looked up.
+  - The runner started lm_eval in `BENCH_ROOT`, which holds
+    `everyday/tasks/`.
+  - So `--tasks everyday` meant the folder `everyday/`, which has no yaml
+    directly in it. lm_eval selected nothing.
+  - TaskManager itself indexed `everyday` correctly from the include path,
+    which is why asking it directly found the task.
+  - The pilot's task was `everyday_pilot`, and no folder had that name.
+- **The fix:** lm_eval now runs in the task's own output folder
+  (`runner.lm_eval_cwd`). That folder only ever holds what lm_eval writes, a
+  folder named after the model, so no name there can be taken for a task.
+  - Every path in the command and in the task files was already absolute.
+  - The command is built in one place, `runner.lm_eval_cmd`.
+- **The guard:** deploy step 4, `scripts/check_tasks.py` (§ 5b).
+  - `tests/test_task_discovery.py` tests it against a stand-in harness that
+    follows 0.4.12's rules for `--tasks`, since the check image has no
+    lm_eval.
+  - With the old working folder, the stand-in fails exactly as #62–#65 did.
+- **The failed runs:** nothing was written for them. Queue them again with
+  **Run everyday tasks**.
 
 ## 11. Known gaps, risks, loose ends
 
