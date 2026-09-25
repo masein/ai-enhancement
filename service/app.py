@@ -2089,6 +2089,106 @@ def dataset_delete(did: int, x_token: str = Header(default="")):
     return {"deleted": did}
 
 
+# ---- 12h.2: saved views of the Models table ---------------------------------
+# A table someone built on Models ▸ Standard — its benchmarks and its models —
+# named and kept for the whole team. The tailnet is the auth boundary, as for
+# every other decision here: the owner is the name typed at the top of the
+# page, and only that name renames or deletes the view.
+
+_VIEW_KEY = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
+
+
+class ViewSpec(BaseModel):
+    chip: str = "all"
+    cols: list[str] | None = None      # the chosen benchmarks, or the chip's own
+    models: list[str] | None = None    # the chosen models, or every one
+
+
+class ViewIn(BaseModel):
+    name: str
+    spec: ViewSpec
+    by: str
+
+
+class ViewRename(BaseModel):
+    name: str
+    by: str
+
+
+class ViewBy(BaseModel):
+    by: str
+
+
+def _view_name(s: str) -> str:
+    s = " ".join((s or "").split())[:60]
+    if not s:
+        raise HTTPException(422, "a view needs a name")
+    return s
+
+
+def _view_spec(v: ViewSpec) -> dict:
+    cols = v.cols if v.cols else None
+    models = v.models if v.models else None
+    if cols is None and models is None:
+        raise HTTPException(422, "nothing to save: choose benchmarks or models first")
+    if cols and (len(cols) > 40 or not all(_VIEW_KEY.match(c) for c in cols)):
+        raise HTTPException(422, "benchmarks are task names, at most 40")
+    if models and (len(models) > 300 or not all(0 < len(m) <= 200 for m in models)):
+        raise HTTPException(422, "models are model ids, at most 300")
+    chip = v.chip if _VIEW_KEY.match(v.chip or "") else "all"
+    return {"chip": chip, "cols": cols, "models": models}
+
+
+def _own_view(vid: int, by: str, what: str) -> dict:
+    view = db.view_get(vid)
+    if not view:
+        raise HTTPException(404, "no such view — someone may have deleted it")
+    who = _name(by, what)
+    if who.casefold() != view["saved_by"].casefold():
+        raise HTTPException(403, f"only {view['saved_by']}, who saved this view, can {what}")
+    return view
+
+
+@app.get("/api/views")
+def views_list():
+    return {"views": db.views_list()}
+
+
+@app.post("/api/views")
+def view_save(v: ViewIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    who = _name(v.by, "saving a view")
+    name = _view_name(v.name)
+    spec = _view_spec(v.spec)
+    clash = next((x for x in db.views_list() if x["name"].casefold() == name.casefold()), None)
+    if clash:
+        raise HTTPException(409, f"a view called {clash['name']} already exists, saved by "
+                                 f"{clash['saved_by']} — choose another name")
+    return db.view_get(db.view_add(name, spec, who))
+
+
+@app.patch("/api/views/{vid}")
+def view_rename(vid: int, v: ViewRename, x_token: str = Header(default="")):
+    _check_token(x_token)
+    _own_view(vid, v.by, "rename it")
+    name = _view_name(v.name)
+    clash = next((x for x in db.views_list() if x["id"] != vid
+                  and x["name"].casefold() == name.casefold()), None)
+    if clash:
+        raise HTTPException(409, f"a view called {clash['name']} already exists, saved by "
+                                 f"{clash['saved_by']} — choose another name")
+    db.view_rename(vid, name)
+    return db.view_get(vid)
+
+
+@app.delete("/api/views/{vid}")
+def view_delete(vid: int, v: ViewBy, x_token: str = Header(default="")):
+    _check_token(x_token)
+    view = _own_view(vid, v.by, "delete it")
+    db.view_delete(vid)
+    return {"deleted": vid, "name": view["name"]}
+
+
 @app.get("/api/runs/{sid}/lines")
 def run_lines(sid: int, tail: int = 200):
     """11g: the log for the Reader — numbered lines, up to 2,000, a line that

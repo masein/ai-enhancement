@@ -203,9 +203,11 @@ def test_on_a_phone_the_filters_are_one_button_and_the_table_starts_near_the_top
         btn.click()
         sheet = page.locator("[data-filter-sheet]")
         sheet.wait_for()
-        for pill in ("#pill-kind", "#pill-size", "#pill-status", "#pill-columns", "#pill-models",
-                     "#pill-scale"):
+        for pill in ("#pill-kind", "#pill-size", "#pill-status", "#pill-columns", "#pill-scale"):
             assert sheet.locator(pill).count() == 1, pill
+        # 12h.2: Benchmarks ▾ and Models ▾ sit beside Filters, not in it
+        for pill in ("#pill-benchmarks", "#pill-models"):
+            assert page.locator("[data-pickers] " + pill).count() == 1, pill
         shot(page, "11h-4-filters-400-light.png")
         sheet.locator("#pill-kind").click()
         page.locator("#pop-kind [data-choice='base']").click()

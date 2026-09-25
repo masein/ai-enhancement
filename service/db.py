@@ -173,6 +173,16 @@ CREATE TABLE IF NOT EXISTS repairs (
   ran_at      REAL NOT NULL,
   result      TEXT DEFAULT ''
 );
+-- 12h.2: a Models table someone built — its benchmarks, its models — named
+-- and kept for the whole team. Only the name that saved it renames or deletes it
+CREATE TABLE IF NOT EXISTS views (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT NOT NULL,
+  spec        TEXT NOT NULL,                      -- JSON: {chip, cols, models}
+  saved_by    TEXT NOT NULL,
+  created_at  REAL NOT NULL,
+  updated_at  REAL NOT NULL
+);
 """
 
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
@@ -787,3 +797,46 @@ def judge_runs(limit: int = 100) -> list[dict]:
                          "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
     cols = [k for k in _JR_COLS if k != "plan"]
     return [dict(zip(cols, r)) for r in rows]
+
+
+# ---- 12h.2: saved views of the Models table --------------------------------
+_VIEW_COLS = ["id", "name", "spec", "saved_by", "created_at", "updated_at"]
+
+
+def _view(row) -> dict:
+    d = dict(zip(_VIEW_COLS, row))
+    d["spec"] = json.loads(d["spec"] or "{}")
+    return d
+
+
+def views_list() -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute(f"SELECT {','.join(_VIEW_COLS)} FROM views ORDER BY id").fetchall()
+    return [_view(r) for r in rows]
+
+
+def view_get(vid: int) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute(f"SELECT {','.join(_VIEW_COLS)} FROM views WHERE id=?", (vid,)).fetchone()
+    return _view(row) if row else None
+
+
+def view_add(name: str, spec: dict, saved_by: str) -> int:
+    now = time.time()
+    with closing(_conn()) as c:
+        cur = c.execute("INSERT INTO views (name, spec, saved_by, created_at, updated_at) "
+                        "VALUES (?,?,?,?,?)", (name, json.dumps(spec), saved_by, now, now))
+        c.commit()
+        return int(cur.lastrowid)
+
+
+def view_rename(vid: int, name: str) -> None:
+    with closing(_conn()) as c:
+        c.execute("UPDATE views SET name=?, updated_at=? WHERE id=?", (name, time.time(), vid))
+        c.commit()
+
+
+def view_delete(vid: int) -> None:
+    with closing(_conn()) as c:
+        c.execute("DELETE FROM views WHERE id=?", (vid,))
+        c.commit()

@@ -16,7 +16,9 @@ SHOTS = {"ifeval": 0, "mmlu_pro": 5, "hendrycks_math500": 0}
 
 
 def write_run(out_dir: Path, model: str, *, thinking: bool | None = None,
-              backend: str = "vllm", ifeval: float = 0.5) -> Path:
+              backend: str = "vllm", ifeval: float = 0.5,
+              tasks: tuple[str, ...] = tuple(SHOTS)) -> Path:
+    """`tasks`: which of the three it sat (12h.2: a model missing one)"""
     import generative as gen
     safe = model.replace("/", "__") + ("__thinking" if thinking else "")
     mdir = out_dir / safe
@@ -24,6 +26,8 @@ def write_run(out_dir: Path, model: str, *, thinking: bool | None = None,
         f",enable_thinking={thinking}" if thinking is not None else "")
     for task, metric in (("ifeval", "prompt_level_strict_acc"), ("mmlu_pro", "exact_match"),
                          ("hendrycks_math500", "exact_match")):
+        if task not in tasks:
+            continue
         d = mdir / f"{task}_{SHOTS[task]}shot" / "run"
         d.mkdir(parents=True, exist_ok=True)
         recs = [f["rec"] for f in FIX if f["task"] == task]

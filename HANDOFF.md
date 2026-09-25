@@ -2292,6 +2292,64 @@ happens on the server, first with `scripts/trial_generative.py` (§ 5b).
   score of ours more than 15 points below one is flagged on its cell: *far
   below published, check extraction*.
 
+### 12h.2 — a table you build, on Models ▸ Standard
+
+`docs/prompts/phase-12h-instruct-benchmarks-and-custom-table.md`, part two.
+
+- **Two pickers beside Filters.**
+  - **Benchmarks: N ▾** lists every Standard benchmark in its chip groups,
+    with a search box, and each tick applies at once.
+  - A group chip still works as before, and fills the checklist with its own
+    benchmarks.
+  - The list leaves out four kinds of column:
+    - the Everyday tasks and the Knowledge exam (provisional or judged, and
+      never averaged with Standard numbers);
+    - Language modelling (a perplexity is not a percentage);
+    - the permutation control, which would stop being a control if it could
+      move a rank.
+  - **Models: N ▾** moved out of Filters. It is grouped instruct, base and
+    checkpoints, with "All ranked" (today's default) and "Clear" at the top.
+    Apply works as before.
+- **Avg of N.**
+  - With benchmarks chosen, the average is over those only, on the Scale
+    pill's scale.
+  - Its ± combines the chosen columns' errors as √Σse²/k, each error scaled
+    as its score is.
+  - Bold uses the same z-test as Avg.
+  - The rank (#) is over every model on the board that has all of them, so
+    the Models picker never changes it.
+  - The three instruction & maths benchmarks can be averaged here: this is
+    the only place they are. The board's own Avg still leaves them out.
+- **Missing one.** A model without every chosen benchmark is not a row. It
+  sits under "Not tested on this" with what is missing, for example
+  "small-it-1b · no MATH-500 · Test". Test opens the form with the right
+  suite. A base model's line says "instruct only" instead.
+- **The custom line.**
+  - It appears only when benchmarks or models are chosen, and reads, for
+    example, "Custom · IFEval, MMLU-Pro, MATH-500 · 2 models".
+  - It carries Save view, Reset, and ⋯ Copy as CSV.
+  - The CSV holds every row of the table (all pages) and its columns, each
+    number followed by its ± column, in the table's own units.
+- **The address holds it:** `#tab=models&cols=ifeval,mmlu_pro,math500&models=…`.
+  - `math500` is short for `hendrycks_math500`, and either spelling works.
+  - A name the board does not know is dropped. With none left, the table is
+    today's.
+- **Saved views.**
+  - They live in the `views` table in the service's sqlite database,
+    `/api/views`:
+    - `GET` lists them;
+    - `POST {name, spec, by}` saves one;
+    - `PATCH {name, by}` renames one;
+    - `DELETE {by}` deletes one.
+  - They are chips after the groups, behind a thin divider.
+  - The owner is the name typed at the top of the page, because the tailnet
+    is the auth boundary, as for every decision here.
+  - Only that name gets the ⋯ that renames or deletes a view, and the
+    service refuses anyone else with 403.
+  - A page picks up someone else's new view within half a minute.
+- **Phone.** The pickers and Filters sit on a row under the chips. The table
+  scrolls sideways in its own box, and the page does not.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

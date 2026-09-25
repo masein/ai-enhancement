@@ -360,12 +360,15 @@ def test_models_is_one_table_and_a_row_opens_the_model_page(live, page):
     assert [b.text_content() for b in page.locator("[data-chip]").all()] == \
         ["All tasks", "Knowledge", "Commonsense", "Reasoning", "Math", "Truthfulness",
          "Instruction & maths", "Language modelling"]          # 12h.1: IFEval, MMLU-Pro, MATH-500
-    # Kind, Size, Status, Columns, Models and Scale are in Filters ▾
+    # Kind, Size, Status, Columns and Scale are in Filters ▾; 12h.2: Benchmarks
+    # and Models sit beside it
     assert page.locator(".lbbar > .pills").count() == 0
     page.locator("[data-filters]").click()
     sheet = page.locator("[data-filter-sheet]")
-    for pill in ("Kind", "Size", "Status", "Columns", "Models", "Scale"):
+    for pill in ("Kind", "Size", "Status", "Columns", "Scale"):
         assert pill in sheet.text_content(), pill
+    assert page.locator("[data-pickers]").inner_text().split("\n")[:2] == \
+        ["Benchmarks: 6 ▾", "Models: all ▾"]
     # no row expands: a click on a row is the model page
     assert page.locator("[data-open-row], [data-lb-detail]").count() == 0
     page.locator("[data-filters-done]").click()

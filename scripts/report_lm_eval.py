@@ -2944,6 +2944,31 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .lbbar.narrow .chips::-webkit-scrollbar { display:none; }
 .lbbar.narrow .chips .chip-btn { flex:none; }
 .lbbar.narrow .chiprow > .pill { flex:none; }
+/* 12h.2: Benchmarks ▾, Models ▾ and Filters ▾ sit together beside the chips;
+   on a phone they stack under them, on a row of their own */
+.lbbar .pickers { display:flex; gap:8px; align-items:center; flex:none; }
+.lbbar .chipdiv { flex:none; width:1px; align-self:stretch; margin:2px 4px; background:var(--border); }
+.lbbar .savedchip { flex:none; display:inline-flex; align-items:center; }
+.lbbar .chip-more { border:0; background:none; cursor:pointer; padding:0 6px; font-size:var(--fs-1);
+  color:var(--text-secondary); }
+.lbbar .chip-more:hover, .lbbar .chip-more[aria-expanded="true"] { color:var(--text-primary); }
+.lbbar .viewform { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; margin:8px 0 2px; }
+.lbbar .viewform input { min-width:0; width:220px; max-width:100%; }
+.customline { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline;
+  gap:4px 12px; margin:10px 0 0; font-size:var(--fs-1); }
+.customline .cl-what { color:var(--text-secondary); min-width:0; overflow-wrap:anywhere; }
+.customline .cl-what b { color:var(--text-primary); }
+.customline .cl-acts { display:flex; gap:10px; align-items:baseline; flex:none; }
+.benchmenu.pop { min-width:260px; padding:10px 12px; gap:6px; }
+.benchmenu .benchlist { max-height:min(60vh, 520px); overflow:auto; }
+.benchmenu .colgroup { display:flex; flex-direction:column; gap:2px; margin:6px 0 8px; }
+.benchmenu .colgroup label { display:flex; align-items:center; gap:4px; white-space:nowrap; }
+.modelsmenu .mgroup { margin:6px 0 2px; text-transform:none; }
+@media (max-width:720px) {
+  .lbbar.narrow .chiprow { flex-wrap:wrap; row-gap:8px; }
+  .lbbar.narrow .chips { flex-basis:100%; }
+  .lbbar .pickers { flex-wrap:wrap; }
+}
 .fsheet { position:fixed; left:0; right:0; bottom:0; z-index:55; max-height:70vh; overflow:auto;
   background:var(--surface-1); border-top:1px solid var(--border); border-radius:var(--r-2) var(--r-2) 0 0;
   box-shadow:0 -12px 32px rgba(0,0,0,.18); padding:12px 16px 20px; }
@@ -6495,7 +6520,8 @@ function lbSortLabel(cols) {
   // (Avg, on the Knowledge exam) falls back as the sort does (12b)
   const cs = cols || [];
   const c = cs.find(x => x.key === state.sort.key) || cs.find(x => x.key === 'avg')
-    || cs.find(x => x.key === 'javg') || cs.find(x => x.key === 'name');
+    || cs.find(x => x.key === 'cavg') || cs.find(x => x.key === 'javg')
+    || cs.find(x => x.key === 'name');
   return `${c ? (c.label || c.key) : state.sort.key} ${state.sort.dir > 0 ? '▲' : '▼'}`;
 }
 
@@ -7000,7 +7026,8 @@ function genTip(t) {
   return [scorer ? 'scored by ' + scorer : '',
     'thinking off unless the row says thinking; a thinking run is a row of its own',
     pub.length ? 'published by the makers, in their own setups: ' + pub.join(' · ') : '',
-    'instruct models only, and never part of Avg'].filter(Boolean);
+    'instruct models only, and never part of the board\'s Avg — choose it under '
+      + 'Benchmarks to average it with others'].filter(Boolean);
 }
 const LB_KINDS = [['all', 'All'], ['base', 'base'], ['instruct', 'instruct'],
   ['checkpoint', 'checkpoint']];
@@ -7020,7 +7047,7 @@ function lbS() {
       howto = localStorage.getItem('bench-lb-howto') === 'open';
       state.lbSe = localStorage.getItem('bench-lb-se') === 'on';
     } catch (e) { /* private mode: the defaults */ }
-    state.lb = { ...LB_DEFAULTS, open: [], models: null, tint, howto, shown: {},
+    state.lb = { ...LB_DEFAULTS, open: [], models: null, cols: null, tint, howto, shown: {},
                  focus: null, weak: null, radarSrc: 'tasks', view: 'standard', stdChip: 'all' };
   }
   return state.lb;
@@ -7035,6 +7062,11 @@ function lbHash() {
     if (k === 'chip' && L.view !== 'standard') continue;
     if (L[k] !== LB_DEFAULTS[k]) out.push(`${k}=${encodeURIComponent(L[k])}`);
   }
+  // 12h.2: a table someone built — its benchmarks and its models — so the
+  // address alone opens it: "cols=ifeval,mmlu_pro,math500&models=…"
+  if (L.view === 'standard' && L.cols)
+    out.push('cols=' + L.cols.map(t => LB_ALIAS[t] || t).join(','));
+  if (L.models) out.push('models=' + L.models.map(encodeURIComponent).join(','));
   return out.join('&');
 }
 function lbFromHash(rest) {
@@ -7047,7 +7079,79 @@ function lbFromHash(rest) {
   L.kind = LB_KINDS.some(([v]) => v === p.get('kind')) ? p.get('kind') : 'all';
   L.size = LB_SIZES.some(([v]) => v === p.get('size')) ? p.get('size') : 'all';
   L.status = LB_STATUS.some(([v]) => v === p.get('status')) ? p.get('status') : 'all';
+  // 12h.2: the chosen benchmarks and models; a name this board does not know
+  // is dropped, and a list with nothing left is the default
+  const list = k => (p.get(k) || '').split(',').map(x => x.trim()).filter(Boolean);
+  const unalias = Object.fromEntries(Object.entries(LB_ALIAS).map(([k, v]) => [v, k]));
+  L.cols = L.view === 'standard' ? lbKnownCols(list('cols').map(t => unalias[t] || t)) : null;
+  const ids = new Set(((DATA || {}).models || []).map(m => m.id));
+  const ms = list('models').filter(id => !DATA || ids.has(id));
+  L.models = ms.length ? [...new Set(ms)] : null;
 }
+// ---- 12h.2: a table you build ----------------------------------------------
+// Benchmarks ▾ offers every Standard benchmark, in its chip groups: the
+// harness's scored tasks and the three that generate. Not the Everyday tasks
+// or the Knowledge exam (provisional or judged, never averaged with these),
+// not Language modelling (a perplexity is not a percentage), and not a
+// control (a control that could move a rank would stop being one).
+const LB_ALIAS = { hendrycks_math500: 'math500' };
+function lbBenchGroups() {
+  const ok = t => DATA.accTasks.includes(t) && !(DATA.tasks[t] || {}).control;
+  const used = new Set(), out = [];
+  for (const [g, ts] of CATS) {
+    const have = ts.filter(ok);
+    have.forEach(t => used.add(t));
+    if (have.length) out.push([g, LB_GROUP[g], have]);
+  }
+  const other = DATA.accTasks.filter(t => ok(t) && !used.has(t));
+  if (other.length) out.push(['other', 'Other tasks', other]);
+  return out;
+}
+const lbBenchAll = () => lbBenchGroups().flatMap(([, , ts]) => ts);
+// the chosen benchmarks in the checklist's order, the unknown ones dropped;
+// none left is the default (the chip's own). Before the scores arrive the
+// names are kept as given, and checked on the first paint
+function lbKnownCols(ts) {
+  if (!DATA) return ts.length ? [...new Set(ts)] : null;
+  const want = new Set(ts);
+  const out = lbBenchAll().filter(t => want.has(t));
+  return out.length ? out : null;
+}
+const benchName = t => LB_SHORT[t] || t;
+// the mean of the chosen benchmarks, on the Scale pill's scale; each error
+// scales as its score does, and the errors add as variances (separate item
+// sets), so the mean's is √Σse² / k. Null when a benchmark is missing; no ±
+// when any benchmark has none
+function customAvg(m, ts) {
+  if (!ts || !ts.length) return null;
+  const raw = state.avgMode === 'raw';
+  let sum = 0, v2 = 0, noSe = false;
+  for (const t of ts) {
+    const cc = cell(t, m.id);
+    if (!cc || cc.v == null) return null;
+    const c = (DATA.tasks[t] || {}).chance;
+    const scaled = !raw && c != null && c > 0 && c < 1;
+    const k = scaled ? 1 / (1 - c) : 1;
+    sum += scaled ? Math.max(0, (cc.v - c) * k) : cc.v;
+    if (cc.se == null) noSe = true; else v2 += (cc.se * k) ** 2;
+  }
+  return { v: sum / ts.length, se: noSe ? null : Math.sqrt(v2) / ts.length };
+}
+// the rank on the chosen average — over the whole board, as the Avg's rank
+// is: every model with all the chosen benchmarks. The Models picker never
+// changes it, as no filter changes a rank
+let _crank = { key: '', map: null };
+function customRankOf(m, ts) {
+  const key = [state.avgMode, ts.join(','), DATA.models.length, DATA.generated].join('|');
+  if (_crank.key !== key) {
+    const pool = DATA.models.filter(x => !x.duplicateOf)
+      .map(x => ({ id: x.id, a: customAvg(x, ts) })).filter(x => x.a)
+      .sort((a, b) => b.a.v - a.a.v);
+    _crank = { key, map: new Map(pool.map((x, i) => [x.id, { n: i + 1, of: pool.length }])) };
+  }
+  return _crank.map.get(m.id) || null;
+}
+
 // a change to the view: the address bar follows without a history entry per
 // click, and the page paints
 function lbSet(patch) {
@@ -7196,6 +7300,13 @@ function lbColumns(ms) {
     { key: 'flags', label: 'Flags', group: 'Model facts', fact: true, optional: true }];
   // an area with no number for any model here is not a column (11e)
   const areasHere = areas.filter(a => ms.some(m => areaMmlu(m, a)));
+  // 12h.2: the chosen benchmarks, and their own average: "Avg of 3"
+  if (L.view === 'standard' && L.cols) {
+    if (!L.cols.length) return [...lead.slice(1, 3), ...tail];
+    lead[3] = { key: 'cavg', label: `Avg of ${L.cols.length}`, num: true, group: '',
+      unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' };
+    return [...lead, ...L.cols.map(task), ...tail];
+  }
   let mid;
   if (L.chip === 'all') {
     // today's view: the harness tasks, six by default, the rest one tick away
@@ -7240,7 +7351,13 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
 // scale went (11f).
 function lbColTip(c) {
   const scale = state.avgMode === 'raw' ? 'raw accuracy' : 'above chance';
+  if (c.key === 'rank' && lbS().cols) return [`# — rank by Avg of ${lbS().cols.length} among `
+    + 'the models on this board that have every one of these'];
   if (c.key === 'rank') return ['# — rank among the ranked models on this board'];
+  if (c.key === 'cavg') return [`Avg of ${lbS().cols.length} — the mean of `
+    + lbS().cols.map(benchName).join(', ') + `, % ${scale}`,
+    'its ± combines the chosen columns\' errors; bold is the same z-test as Avg',
+    'the Scale pill switches it'];
   if (c.key === 'name') return ['Model — sort by name'];
   if (c.key === 'params') return ['Params — parameter count, from the harness config or the name'];
   if (c.key === 'date') return ['Updated — when the model was last evaluated'];
@@ -7367,6 +7484,11 @@ function tiedWithBest(c, m, best, val) {
     const b = DATA.models.find(x => x.id === best.id);
     return pair(officialSe(b), officialSe(m), officialAvg(b), officialAvg(m));
   }
+  if (c.key === 'cavg') {
+    const ts = lbS().cols;
+    const x = customAvg(DATA.models.find(y => y.id === best.id), ts), y = customAvg(m, ts);
+    return !!(x && y) && pair(x.se, y.se, x.v, y.v);
+  }
   if (c.area) {
     const b = DATA.models.find(x => x.id === best.id);
     const x = areaMmlu(b, c.area), y = areaMmlu(m, c.area);
@@ -7396,14 +7518,22 @@ function notTestedRows(none, ncols, suite, whyNot = null) {
       'aria-expanded': String(open), onclick: () => { state.lbNotTested = !open; render(); },
       text: `Not tested on this (${none.length}) ${open ? '▾' : '▸'}` })));
   if (!open) return [head];
-  return [head, ...none.map(m => el('tr', { class: 'nottested-row', 'data-not-tested-row': m.id },
-    el('td', { colspan: String(ncols) },
-      el('a', { href: '#model=' + encodeURIComponent(m.id), text: m.name }),
-      whyNot && whyNot(m) ? el('span', { class: 'se', 'data-instruct-only': m.id,
-        text: ' · ' + whyNot(m) })
-      : LIVE ? [el('span', { class: 'se', text: ' · ' }), el('a', { href: '#',
-        'data-not-tested-test': m.id, text: 'Test', onclick: e => { e.preventDefault();
-          state.sub.suite = suite; openTest(m.id); } })] : '')))];
+  return [head, ...none.map(m => {
+    // a string says why there is no Test ("instruct only"); {text, suite}
+    // says what is missing (12h.2), and Test asks for it
+    const why = whyNot ? whyNot(m) : null;
+    const said = typeof why === 'string';
+    const note = said ? why : why && why.text;
+    const test = said ? null : why ? why.suite : suite;
+    return el('tr', { class: 'nottested-row', 'data-not-tested-row': m.id },
+      el('td', { colspan: String(ncols) },
+        el('a', { href: '#model=' + encodeURIComponent(m.id), text: m.name }),
+        note ? el('span', { class: 'se', [said ? 'data-instruct-only' : 'data-missing']: m.id,
+          text: ' · ' + note }) : '',
+        LIVE && test ? [el('span', { class: 'se', text: ' · ' }), el('a', { href: '#',
+          'data-not-tested-test': m.id, text: 'Test', onclick: e => { e.preventDefault();
+            state.sub.suite = test; openTest(m.id); } })] : ''));
+  })];
 }
 // Everyday tasks: each model's row — n of k per group, and the total (12a.2)
 function lbEveryday(ms) {
@@ -7477,9 +7607,15 @@ function vLeaderboard(ms) {
       el('p', { class: 'note', 'data-exam-off': '1', text: 'Knowledge exam scores are shown on '
         + 'each model page and are not ranked here yet: ' + judgedOffWhy() + '.' }))];
   // Language modelling: the old Perplexity & Loss page, its charts under it
-  if (L.view === 'standard' && L.chip === 'lm')
+  if (L.view === 'standard' && L.chip === 'lm' && !L.cols)
     return [el('div', { class: 'card', 'data-lb-card': '1' }, ...modelsHead(),
       lbToolbar(ms, lbColumns(ms), new Set(), 0)), ...vPpl(lbFilter(ms))];
+  // 12h.2: every benchmark unticked — a sentence, not a table of names
+  if (L.view === 'standard' && L.cols && !L.cols.length)
+    return [el('div', { class: 'card', 'data-lb-card': '1' }, ...modelsHead(),
+      lbToolbar(ms, lbColumns(ms), new Set(), 0), lbCustomLine(0, 0),
+      el('p', { class: 'note', 'data-no-bench': '1', text: 'No benchmark chosen: tick one under '
+        + 'Benchmarks ▾, or choose a group.' }))];
   const cols = lbColumns(ms);
   const shown = lbShownFor(cols);
   const opt = cols.filter(c => c.optional);
@@ -7489,7 +7625,9 @@ function vLeaderboard(ms) {
     : !judgedOkM(m) ? null
     : (m.tainted || []).includes(c.judged) ? null      // shown on the page, never ranked here
     : (((m.judge || {}).tasks || {})[c.judged] ? pubScore(m.judge.tasks[c.judged]) : null);
+  const custom = L.view === 'standard' && !!L.cols;
   const val = (m, c) => c.key === 'avg' ? officialAvg(m)
+    : c.key === 'cavg' ? (customAvg(m, L.cols) || {}).v
     : c.key === 'params' ? m.params
     : c.key === 'name' ? m.name
     : c.key === 'date' ? lastEval(m)
@@ -7504,7 +7642,8 @@ function vLeaderboard(ms) {
     : c.task ? (cell(c.task, m.id) || {}).v : null;
   const rowsIn = lbFilter(ms);
   const sortCol = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg')
-    || cols.find(c => c.key === 'javg') || cols.find(c => c.key === 'name');
+    || cols.find(c => c.key === 'cavg') || cols.find(c => c.key === 'javg')
+    || cols.find(c => c.key === 'name');
   const sorted = [...rowsIn].sort((a, b) => {
     const va = val(a, sortCol), vb = val(b, sortCol);
     if (va == null && vb == null) return 0;
@@ -7513,7 +7652,7 @@ function vLeaderboard(ms) {
   });
   // ranked rows first, whatever the sort: a preliminary model's per-task
   // numbers are valid, and it is still not on the ladder
-  const ordered = L.chip === 'judged' ? sorted
+  const ordered = L.chip === 'judged' || custom ? sorted
     : [...sorted.filter(m => officialAvg(m) != null), ...sorted.filter(m => officialAvg(m) == null)];
   const dupsOf = {};
   for (const m of ordered)
@@ -7524,16 +7663,20 @@ function vLeaderboard(ms) {
   // …but a model a judge that does not count (a local one) has graded WAS
   // tested: its row stays, its cells blank with the reason on hover
   const judgedAny = m => Object.keys((m.judge || {}).tasks || {}).some(t => t.startsWith('exam_'));
-  const testedIn = m => dataCols.some(c => val(m, c) != null)
-    || (L.view === 'exam' && judgedAny(m));
+  // 12h.2: with benchmarks chosen, a model is a row only with every one of
+  // them — one missing any is not averaged, and says what it is missing
+  const testedIn = m => custom ? L.cols.every(t => (cell(t, m.id) || {}).v != null)
+    : dataCols.some(c => val(m, c) != null) || (L.view === 'exam' && judgedAny(m));
   const notTested = ordered.filter(m => !testedIn(m) && !(m.duplicateOf && dupsOf[m.duplicateOf]));
   const lbAll = ordered.filter(m => !(m.duplicateOf && dupsOf[m.duplicateOf]) && testedIn(m));
   const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
-    state.src, state.avgMode, L.view, L.chip, L.kind, L.size, L.status, L.models]));
+    state.src, state.avgMode, L.view, L.chip, L.kind, L.size, L.status, L.models, L.cols]));
   const rows = lbPg.rows.flatMap(m => [m, ...((state.lbDupOpen || {})[m.id] ? dupsOf[m.id] || [] : [])]);
   // the leaders are bold whatever the Tint switch says; Tint only adds the wash
   const leaders = lbLeaders(visCols, val);
 
+  // the chosen average stands in for Avg, arrow and all (12h.2)
+  const sortedBy = c => state.sort.key === c.key || (custom && c.key === 'cavg' && sortCol === c);
   // ---- header (11f): one line of one-word names. The setup — n-shot, unit,
   // scale — is the name's tooltip, not three more lines; the group row is
   // quiet, and only on All tasks, where there is more than one group
@@ -7556,12 +7699,12 @@ function vLeaderboard(ms) {
           + (c.judged || c.jarea ? ' judged' : ''),
         scope: 'col', 'data-tip': JSON.stringify(tipRows),
         'aria-label': tipRows.join(' — '),
-        'aria-sort': state.sort.key === c.key ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none',
+        'aria-sort': sortedBy(c) ? (state.sort.dir > 0 ? 'ascending' : 'descending') : 'none',
         onclick: () => { state.sort = { key: c.key,
           dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
           render(); } },
         el('span', { class: 'hname', text: c.short || c.label }),
-        state.sort.key === c.key ? el('span', { class: 'dir', text: state.sort.dir > 0 ? ' ▲' : ' ▼' }) : '');
+        sortedBy(c) ? el('span', { class: 'dir', text: state.sort.dir > 0 ? ' ▲' : ' ▼' }) : '');
     })));
 
   // ---- a cell (11f): the number only. A leader — the column's best, or
@@ -7601,10 +7744,11 @@ function vLeaderboard(ms) {
       } },
       visCols.map(c => {
         if (c.key === 'rank') {
-          const r = rankOf(m);
+          const r = custom ? customRankOf(m, L.cols) : rankOf(m);
           return el('td', { class: 'rank pin0 num' },
             el('span', { class: 'mono', text: r ? String(r.n) : '—',
-              title: r ? `rank ${r.n} of ${r.of} ranked models on this board`
+              title: r ? (custom ? `rank ${r.n} of ${r.of} on Avg of ${L.cols.length}`
+                                 : `rank ${r.n} of ${r.of} ranked models on this board`)
                        : 'preliminary — not ranked' }));
         }
         if (c.key === 'family') return el('td', { class: 'small', 'data-fact': 'family',
@@ -7651,6 +7795,13 @@ function vLeaderboard(ms) {
             + (+y !== new Date().getFullYear() ? ` ${y}` : '') : '—';
           return el('td', { class: 'num small nowrap', 'data-date': d.slice(0, 10),
             title: d.replace('T', ' '), text: short });
+        }
+        if (c.key === 'cavg') {
+          const a = customAvg(m, L.cols);
+          return one(c, m, a.v, a.se != null ? (100 * a.se).toFixed(1) : null, pctn, {
+            title: `mean over ${L.cols.map(benchName).join(', ')}, `
+              + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0'),
+            'data-cavg': m.id });
         }
         if (c.key === 'avg') {
           const a = officialAvg(m);
@@ -7708,10 +7859,22 @@ function vLeaderboard(ms) {
   });
   // 12h.1: under Instruction & maths, a base model is not "not tested" but
   // "instruct only", said once here, never as an empty cell
-  const genView = dataCols.length > 0 && dataCols.every(c => c.task && isGen(c.task));
+  const genView = !custom && dataCols.length > 0 && dataCols.every(c => c.task && isGen(c.task));
+  // 12h.2: "Qwen3.5-0.8B · no MATH-500 · Test" — Test asks for what is missing
+  const missing = m => {
+    const miss = L.cols.filter(t => (cell(t, m.id) || {}).v == null);
+    const text = 'no ' + miss.map(benchName).join(', ');
+    const harness = miss.filter(t => !isGen(t));
+    if (m.thinkingRow && harness.length)
+      return { text: text + ' · a thinking row has only IFEval, MMLU-Pro and MATH-500' };
+    if (!harness.length && m.kind === 'base') return { text: text + ' · instruct only' };
+    return { text, suite: harness.length ? 'full' : 'generative' };
+  };
   tbody.append(...notTestedRows(notTested, ncols,
     genView ? 'generative' : L.view === 'exam' ? 'judged' : 'full',
-    genView ? m => (m.kind === 'base' ? 'instruct only' : null) : null));
+    custom ? missing : genView ? m => (m.kind === 'base' ? 'instruct only' : null) : null));
+  // what Copy as CSV copies: these rows, these columns, as shown (12h.2)
+  state.lbTable = { cols: visCols, rows: lbAll, val, custom };
 
   const table = el('table', { class: 'lb' + (L.tint ? ' tinted' : '')
       + (visCols.some(c => c.key === 'rank') ? '' : ' norank'), 'data-lb-table': '1' },
@@ -7719,14 +7882,20 @@ function vLeaderboard(ms) {
   return [el('div', { class: 'card', 'data-lb-card': '1' },
       ...modelsHead(),
       lbToolbar(ms, cols, shown, nHidden),
-      L.chip === 'knowledge' && staleSentence(ms)
+      L.chip === 'knowledge' && staleSentence(ms) && !custom
         ? el('p', { class: 'warn', 'data-stale-diag': '1', text: staleSentence(ms) }) : '',
+      lbCustomLine(lbAll.length, notTested.length),
       statusLine(lbPg, 'models', [
-        L.chip === 'judged' ? null : `${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
+        L.chip === 'judged' || custom ? null
+          : `${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
         `sorted by ${lbSortLabel(cols)}`,
-        L.chip !== 'all' ? (LB_CHIPS.find(([v]) => v === L.chip) || [])[1] : null]),
+        L.chip !== 'all' && !custom ? (LB_CHIPS.find(([v]) => v === L.chip) || [])[1] : null]),
       lbPg.pager,
       // the Models tab's empty state, kept: a sentence and the way back
+      custom && !lbAll.length && rowsIn.length ? empty(`No model here has all ${L.cols.length} `
+        + 'of these — each one is under the line with what it is missing.', 'Reset',
+        () => lbSet({ cols: null, models: null }))
+        : '',
       !rowsIn.length ? empty('No model matches these filters.', 'Clear the filters',
         () => lbSet({ kind: 'all', size: 'all', status: 'all', models: null }))
         : hfade('lb', el('div', { class: 'lb-wrap stick' + (state.lbWide ? ' hscroll' : ''),
@@ -7798,19 +7967,26 @@ function lbToolbar(ms, cols, shown, nHidden) {
       // 11e: an unavailable chip still takes the click (aria-disabled, not
       // disabled) — the click says why, in one line under the chips; the
       // tooltip and the screen reader say it without one
-      return el('button', { class: 'chip-btn' + (L.chip === v ? ' on' : ''), 'data-chip': v,
-        'aria-pressed': String(L.chip === v), 'aria-disabled': off ? 'true' : null,
+      // 12h.2: a group chip fills the Benchmarks checklist with its own; while
+      // benchmarks are chosen, no group is the one shown
+      const on = L.chip === v && !(L.view === 'standard' && L.cols);
+      return el('button', { class: 'chip-btn' + (on ? ' on' : ''), 'data-chip': v,
+        'aria-pressed': String(on), 'aria-disabled': off ? 'true' : null,
         'aria-describedby': off ? 'why-judged-chip' : null,
         title: off ? judgedOffWhy() : null, text: t,
-        onclick: () => { if (!off) lbSet({ chip: v });
+        onclick: () => { if (!off) lbSet({ chip: v, cols: null });
           else { state.lbChipWhy = !state.lbChipWhy; render(); } } });
-    }));
+    }),
+    // 12h.2: the team's saved views, after a small divider
+    ...(LIVE && (state.views || []).length ? [el('span', { class: 'chipdiv', 'aria-hidden': 'true' }),
+      ...state.views.map(viewChip)] : []));
+  const std = L.view === 'standard';
   const pills = el('div', { class: 'pills' },
     pillMenu('kind', 'Kind', LB_KINDS, L.kind, v => lbSet({ kind: v })),
     pillMenu('size', 'Size', LB_SIZES, L.size, v => lbSet({ size: v })),
     pillMenu('status', 'Status', LB_STATUS, L.status, v => lbSet({ status: v })),
     lbColumnsPill(cols, shown, nHidden),
-    lbModelsPill(ms),
+    std ? '' : lbModelsPill(ms),
     pillMenu('scale', 'Scale', [['chance', 'above chance'], ['raw', 'raw accuracy']],
       state.avgMode, v => { state.avgMode = v; render(); }));
   const note = calOk ? '' : el('p', { class: 'chipnote', id: 'why-judged-chip', role: 'note',
@@ -7820,14 +7996,22 @@ function lbToolbar(ms, cols, shown, nHidden) {
   // 12b: at every width — Kind, Size, Status, Columns, Models and Scale all
   // sit in Filters ▾. Standard has its chips; the other kinds have none
   const set = [L.kind !== LB_DEFAULTS.kind, L.size !== LB_DEFAULTS.size,
-    L.status !== LB_DEFAULTS.status, !!L.models, state.avgMode === 'raw'].filter(Boolean).length;
+    L.status !== LB_DEFAULTS.status, !std && !!L.models, state.avgMode === 'raw']
+    .filter(Boolean).length;
   const open = !!state.lbFilters;
   const toggle = el('button', { class: 'pill' + (set ? ' on' : ''), 'data-filters': String(set),
     'aria-expanded': String(open), 'aria-controls': 'filter-sheet',
     text: `Filters${set ? ` · ${set}` : ''} ▾`,
     onclick: () => { state.lbFilters = !open; render(); } });
+  // the benchmarks in view now, for the checklist: read when it is used, as
+  // the panel outlives the render that built it
+  state.lbBenchNow = L.cols || cols.filter(c => c.task && !c.lower && !(DATA.tasks[c.task] || {})
+    .control && (!c.optional || shown.has(c.key))).map(c => c.task);
   return el('div', { class: 'lbbar narrow' },
-    el('div', { class: 'chiprow' }, L.view === 'standard' ? chips : '', toggle), note,
+    el('div', { class: 'chiprow' }, std ? chips : '',
+      el('div', { class: 'pickers', 'data-pickers': '1' },
+        std ? lbBenchPill() : '', std ? lbModelsPill(ms) : '', toggle)),
+    note, std ? lbViewForm() : '',
     open ? el('div', { class: 'fsheet', id: 'filter-sheet', role: 'dialog', 'aria-label': 'filters',
         'data-filter-sheet': '1',
         onkeydown: e => { if (e.key === 'Escape' && !POP.panel) { state.lbFilters = false; render(); } } },
@@ -7896,39 +8080,270 @@ function lbColumnsPill(cols, shown, nHidden) {
 }
 
 // Models ▾ — a search, a checklist with each family's colour, and Apply
+// 12h.2: "Models: 6 ▾", beside Filters on Standard — grouped as the board
+// groups them (instruct, base, checkpoints); "All ranked" is today's default
 function lbModelsPill(ms) {
   const L = lbS();
-  const n = L.models ? L.models.length : ms.length;
   const btn = el('button', { class: 'pill' + (L.models ? ' on' : ''), id: 'pill-models',
-    'data-models-menu': '1', text: `Models${L.models ? ` · ${n} of ${ms.length}` : ''} ▾` });
+    'data-models-menu': '1', text: `Models: ${L.models ? L.models.length : 'all'} ▾` });
   return popover(btn, () => {
     const pick = new Set(L.models || ms.map(m => m.id));
     const list = el('div', { class: 'mlist' });
     const foot = el('p', { class: 'small se', 'data-models-foot': '1' });
     const say = () => { foot.textContent = pick.size === ms.length ? 'All models shown'
       : `${pick.size} of ${ms.length} shown`; };
-    const fill = q => list.replaceChildren(...ms.filter(m => !q
-        || (m.name + ' ' + m.id + ' ' + famOf(m)).toLowerCase().includes(q.toLowerCase()))
-      .map(m => el('label', { class: 'small mrow' },
-        el('input', { type: 'checkbox', 'data-model-pick': m.id, checked: pick.has(m.id) ? '' : null,
-          onchange: e => { if (e.target.checked) pick.add(m.id); else pick.delete(m.id); say(); } }),
-        el('span', { class: 'famdot', style: `background:${famColor(m)}`, title: famOf(m) }),
-        ' ' + m.name, el('span', { class: 'se', text: ' ' + famOf(m) }))));
+    const groupOf = m => m.source === 'artifact' ? 'checkpoints'
+      : m.kind === 'instruct' ? 'instruct' : 'base';
+    const row = m => el('label', { class: 'small mrow' },
+      el('input', { type: 'checkbox', 'data-model-pick': m.id, checked: pick.has(m.id) ? '' : null,
+        onchange: e => { if (e.target.checked) pick.add(m.id); else pick.delete(m.id); say(); } }),
+      el('span', { class: 'famdot', style: `background:${famColor(m)}`, title: famOf(m) }),
+      ' ' + m.name, el('span', { class: 'se', text: ' ' + famOf(m) }));
+    const fill = q => {
+      const hit = ms.filter(m => !q
+        || (m.name + ' ' + m.id + ' ' + famOf(m)).toLowerCase().includes(q.toLowerCase()));
+      list.replaceChildren(...['instruct', 'base', 'checkpoints'].flatMap(g => {
+        const gs = hit.filter(m => groupOf(m) === g);
+        return gs.length ? [el('div', { class: 'small se mgroup', 'data-model-group': g, text: g }),
+          ...gs.map(row)] : [];
+      }));
+    };
     fill('');
     say();
     return el('div', { class: 'moremenu modelsmenu', id: 'pop-models', 'aria-label': 'models' },
-      el('input', { type: 'search', placeholder: 'search models…', 'aria-label': 'search models',
-        'data-keep': 'lbmodels', oninput: e => fill(e.target.value) }),
       el('div', { class: 'frm' },
-        el('button', { class: 'quiet', text: 'Select all', onclick: () => {
-          ms.forEach(m => pick.add(m.id)); fill(''); say(); } }),
+        el('button', { class: 'quiet', text: 'All ranked', 'data-models-default': '1',
+          title: 'every model, the ranked ones first — the default', onclick: () => {
+            popClose(true); lbSet({ models: null }); } }),
         el('button', { class: 'quiet', text: 'Clear', onclick: () => {
           pick.clear(); fill(''); say(); } })),
+      el('input', { type: 'search', placeholder: 'search models…', 'aria-label': 'search models',
+        'data-keep': 'lbmodels', oninput: e => fill(e.target.value) }),
       list, foot,
       el('button', { class: 'primary', 'data-models-apply': '1', text: 'Apply', onclick: () => {
         popClose(true);
         lbSet({ models: pick.size === ms.length ? null : [...pick] }); } }));
   }, { key: 'models', menu: false });
+}
+
+// 12h.2: "Benchmarks: 3 ▾" — every Standard benchmark in its chip groups,
+// with a search. A tick applies at once; the average follows
+function lbBenchPill() {
+  const L = lbS();
+  const n = (state.lbBenchNow || []).length;
+  const btn = el('button', { class: 'pill' + (L.cols ? ' on' : ''), id: 'pill-benchmarks',
+    'data-benchmarks-menu': String(n), text: `Benchmarks: ${n} ▾` });
+  return popover(btn, () => {
+    const now = new Set(state.lbBenchNow || []);
+    const set = (t, on) => {
+      const next = new Set(state.lbBenchNow || []);
+      if (on) next.add(t); else next.delete(t);
+      lbSet({ cols: lbBenchAll().filter(x => next.has(x)) });
+    };
+    const list = el('div', { class: 'benchlist' });
+    const fill = () => {
+      const q = (state.lbBenchQ || '').trim().toLowerCase();
+      // a benchmark's own names: "math" finds MATH-500, not its whole group
+      const hit = t => !q || (t + ' ' + benchName(t)).toLowerCase().includes(q);
+      const groups = lbBenchGroups().map(([g, name, ts]) => [g, name, ts.filter(hit)])
+        .filter(([, , ts]) => ts.length);
+      list.replaceChildren(...(groups.length ? groups.map(([g, name, ts]) =>
+        el('div', { class: 'colgroup', 'data-bench-group': g },
+          el('div', { class: 'small se', text: name }),
+          ts.map(t => el('label', { class: 'small' },
+            el('input', { type: 'checkbox', 'data-bench': t, checked: now.has(t) ? '' : null,
+              onchange: e => set(t, e.target.checked) }),
+            ' ' + benchName(t), benchName(t) !== t ? el('span', { class: 'se', text: ' ' + t }) : ''))))
+        : [el('p', { class: 'small se', text: 'No benchmark matches.' })]));
+    };
+    fill();
+    return el('div', { class: 'moremenu benchmenu', id: 'pop-benchmarks', 'aria-label': 'benchmarks' },
+      el('input', { type: 'search', placeholder: 'search benchmarks…', 'aria-label': 'search benchmarks',
+        'data-keep': 'lbbench', value: state.lbBenchQ || '',
+        oninput: e => { state.lbBenchQ = e.target.value; fill(); } }),
+      list,
+      el('div', { class: 'frm' },
+        el('button', { class: 'quiet', text: 'Clear', 'data-bench-clear': '1',
+          onclick: () => lbSet({ cols: [] }) })),
+      el('p', { class: 'small se', 'data-bench-foot': '1', text: 'The average is over the ticked '
+        + 'ones only. Everyday tasks and the Knowledge exam keep their own tables.' }));
+  }, { key: 'benchmarks', menu: false, rebuild: true });
+}
+
+// 12h.2: one line above a table someone built — what is shown, Save view,
+// Reset, and ⋯ Copy as CSV. Nothing when the table is today's
+function lbCustomLine(nRows) {
+  const L = lbS();
+  if (L.view !== 'standard' || (!L.cols && !L.models)) return '';
+  const what = L.cols ? (L.cols.length ? L.cols.map(benchName).join(', ') : 'no benchmarks')
+    : (LB_CHIPS.find(([v]) => v === L.chip) || [null, 'All tasks'])[1];
+  const more = popover(el('button', { class: 'quiet cl-more', id: 'pill-custom-more',
+      'data-custom-more': '1', 'aria-label': 'more: copy as CSV', text: '⋯' }),
+    () => el('div', { class: 'moremenu', id: 'pop-custom-more', 'aria-label': 'more' },
+      el('button', { role: 'menuitem', 'data-copy-csv': '1', text: 'Copy as CSV',
+        onclick: () => { popClose(true);
+          const n = ((state.lbTable || {}).rows || []).length;
+          copyText(lbCsv(), `${n} row${n === 1 ? '' : 's'} as CSV`); } })),
+    { key: 'custom-more' });
+  return el('div', { class: 'customline', 'data-custom-line': '1' },
+    el('span', { class: 'cl-what', 'data-custom-what': '1' }, el('b', { text: 'Custom' }),
+      ` · ${what} · ${nRows} model${nRows === 1 ? '' : 's'}`),
+    el('span', { class: 'cl-acts' },
+      LIVE ? el('button', { class: 'quiet', 'data-save-view': '1', text: 'Save view',
+        'aria-expanded': String(state.lbForm === 'save'),
+        onclick: () => { state.lbForm = state.lbForm === 'save' ? null : 'save';
+          state.lbViewName = ''; state.after = { focus: '[data-view-name]' }; render(); } }) : '',
+      el('button', { class: 'quiet', 'data-custom-reset': '1', text: 'Reset',
+        onclick: () => { state.lbForm = null; lbSet({ cols: null, models: null }); } }),
+      L.cols && !L.cols.length ? '' : more));
+}
+
+// a saved view is the state it names: its group, its benchmarks, its models
+const sameList = (a, b) => (!a && !b) || (!!a && !!b && a.length === b.length
+  && [...a].sort().join('\n') === [...b].sort().join('\n'));
+function lbIsView(v) {
+  const L = lbS(), sp = v.spec || {};
+  return L.view === 'standard' && sameList(L.cols, lbKnownCols(sp.cols || []))
+    && sameList(L.models, sp.models || null) && (!!L.cols || L.chip === (sp.chip || 'all'));
+}
+const ownView = v => !!whoName() && whoName().toLowerCase() === String(v.saved_by).toLowerCase();
+// a saved view's chip; its owner has ⋯ beside it, to rename or delete it
+function viewChip(v) {
+  const on = lbIsView(v);
+  const chip = el('button', { class: 'chip-btn saved' + (on ? ' on' : ''),
+    'data-saved-view': String(v.id), 'aria-pressed': String(on), title: `saved by ${v.saved_by}`,
+    text: v.name, onclick: () => { const sp = v.spec || {};
+      lbSet({ chip: sp.chip || 'all', cols: lbKnownCols(sp.cols || []),
+              models: sp.models && sp.models.length ? sp.models : null }); } });
+  if (!ownView(v)) return chip;
+  return el('span', { class: 'savedchip' }, chip,
+    popover(el('button', { class: 'chip-more', 'data-view-menu': String(v.id),
+        'aria-label': `${v.name}: rename or delete`, text: '⋯' }),
+      () => el('div', { class: 'moremenu', id: 'pop-view-' + v.id, 'aria-label': v.name },
+        el('button', { role: 'menuitem', 'data-view-rename': String(v.id), text: 'Rename…',
+          onclick: () => { popClose(true); state.lbForm = 'rename:' + v.id;
+            state.lbViewName = v.name; state.after = { focus: '[data-view-name]' }; render(); } }),
+        el('button', { role: 'menuitem', 'data-view-delete': String(v.id), text: 'Delete…',
+          onclick: () => { popClose(true); state.lbForm = 'delete:' + v.id; render(); } })),
+      { key: 'view-' + v.id }));
+}
+// the one form under the chips: save this view, rename one, or delete one
+function lbViewForm() {
+  const f = state.lbForm;
+  if (!LIVE || !f) return '';
+  const L = lbS();
+  const close = () => { state.lbForm = null; render(); };
+  const cancel = el('button', { class: 'quiet', text: 'Cancel', onclick: close });
+  const by = () => { if (!whoName()) throw new Error(askName()); return whoName(); };
+  // the name typed so far lives in state: the click on Save redraws the form
+  const nameBox = (label, key) => [el('label', { class: 'small', for: 'view-name', text: label }),
+    el('input', { id: 'view-name', 'data-view-name': '1', 'data-keep': key, maxlength: '60',
+      placeholder: 'Phone shortlist', value: state.lbViewName || '',
+      oninput: e => { state.lbViewName = e.target.value; },
+      onkeydown: e => { if (e.key === 'Enter') { e.preventDefault();
+        const b = e.target.closest('.viewform').querySelector('[data-action]'); if (b) b.click(); } } })];
+  if (f === 'save') {
+    if (!L.cols && !L.models) { state.lbForm = null; return ''; }
+    return el('div', { class: 'viewform', 'data-view-form': 'save' },
+      ...nameBox('Name this view', 'viewname'),
+      actButton('view-save', 'Save for the team', async () => {
+        const name = state.lbViewName || '';
+        const v = await sendView('api/views', 'POST', { name, by: by(),
+          spec: { chip: L.chip, cols: L.cols, models: L.models } });
+        state.lbForm = null;
+        await loadViews();
+        return { toast: `Saved “${v.name}” for the team — it is a chip after the groups` };
+      }), cancel, actNote('view-save'));
+  }
+  const [what, id] = f.split(':');
+  const v = (state.views || []).find(x => String(x.id) === id);
+  if (!v) { state.lbForm = null; return ''; }
+  if (what === 'rename')
+    return el('div', { class: 'viewform', 'data-view-form': 'rename' },
+      ...nameBox(`Rename “${v.name}”`, 'viewname:' + v.id),
+      actButton('view-rename', 'Rename', async () => {
+        const name = state.lbViewName || '';
+        const out = await sendView('api/views/' + v.id, 'PATCH', { name, by: by() });
+        state.lbForm = null;
+        await loadViews();
+        return { toast: `Renamed to “${out.name}”` };
+      }), cancel, actNote('view-rename'));
+  return el('div', { class: 'viewform', 'data-view-form': 'delete' },
+    el('span', { class: 'small', text: `Delete “${v.name}” for the whole team?` }),
+    actButton('view-delete', 'Delete', async () => {
+      await sendView('api/views/' + v.id, 'DELETE', { by: by() });
+      state.lbForm = null;
+      await loadViews();
+      return { toast: `Deleted “${v.name}”` };
+    }, { class: 'danger' }), el('button', { class: 'quiet', text: 'Keep it', onclick: close }),
+    actNote('view-delete'));
+}
+// post(), for the verbs a view also needs
+async function sendView(path, method, body) {
+  if (method === 'POST') return post(path, body);
+  const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json',
+    'X-Token': TOKEN }, body: JSON.stringify(body) }).catch(() => null);
+  if (!r) throw new Error('the server is unreachable — it may be restarting');
+  checkBuild(r);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail
+    : `the server answered HTTP ${r.status}`);
+  return j;
+}
+// the team's saved views: once the scores are in, after a change, and every
+// half minute on Models. A nicety, not the board: a failed fetch leaves the
+// chips as they were and is not one of the failures the network line counts
+let VIEWS_AT = 0;
+async function loadViews() {
+  if (!LIVE || !netReady()) return;
+  VIEWS_AT = Date.now();
+  try {
+    const r = await fetch('api/views');
+    if (!r.ok) return;
+    const j = await r.json();
+    const was = JSON.stringify(state.views || []);
+    state.views = j.views || [];
+    if (JSON.stringify(state.views) !== was && DATA) render();
+  } catch (e) { /* the chips stay as they were */ }
+}
+
+// 12h.2: the table as shown — its rows and columns, the average and each
+// ± error beside its number, in the table's own units
+function lbCsv() {
+  const t = state.lbTable;
+  if (!t) return '';
+  const q = x => { const s = String(x ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const pctn = v => (100 * v).toFixed(1);
+  const hasSe = c => ['avg', 'cavg'].includes(c.key) || (!!c.task && !c.lower) || !!c.area;
+  const se = (m, c) => {
+    if (c.key === 'cavg') { const a = customAvg(m, lbS().cols); return a && a.se != null ? pctn(a.se) : ''; }
+    if (c.key === 'avg') { const x = officialSe(m); return officialAvg(m) != null && x != null ? pctn(x) : ''; }
+    if (c.area) { const r = areaMmlu(m, c.area);
+      return r ? (100 * r.se * (state.avgMode === 'raw' ? 1 : 1 / 0.75)).toFixed(1) : ''; }
+    // as the cell shows it: no ± where the harness gave none
+    const cc = cell(c.task, m.id);
+    return cc && cc.se ? pctn(cc.se) : '';
+  };
+  const text = (m, c) => {
+    if (c.key === 'rank') { const r = t.custom ? customRankOf(m, lbS().cols) : rankOf(m); return r ? r.n : ''; }
+    if (c.key === 'params') return m.params == null ? '' : P(m.params);
+    if (c.key === 'date') return String(lastEval(m) || '').slice(0, 10);
+    const v = t.val(m, c);
+    if (v == null) return '';
+    if (typeof v === 'string') return v;
+    if (c.judged || c.jarea) return num(v, 2);
+    if (c.lower) return num(v, 3);
+    if (c.area) return pctn(areaScaled(v));
+    return pctn(v);
+  };
+  const head = t.cols.flatMap(c => {
+    const name = c.short || c.label;
+    return hasSe(c) ? [name, name + ' ±'] : [name];
+  });
+  const lines = [head.map(q).join(',')];
+  for (const m of t.rows)
+    lines.push(t.cols.flatMap(c => hasSe(c) ? [text(m, c), se(m, c)] : [text(m, c)]).map(q).join(','));
+  return lines.join('\n') + '\n';
 }
 
 // ---- the paragraph that used to sit above the table -------------------------
@@ -13509,7 +13924,7 @@ function popReanchor() {
   if ((POP.opts || {}).rebuild && POP.build) {
     const fresh = POP.build();
     const sig = root => [...root.querySelectorAll('input, button')].map(e => e.tagName + ':'
-      + (e.dataset.column || e.dataset.filter || e.dataset.tint || e.dataset.showAll
+      + (e.dataset.column || e.dataset.bench || e.dataset.filter || e.dataset.tint || e.dataset.showAll
          || e.dataset.columnGroupAll || e.dataset.columnGroupNone || e.textContent)).join('|');
     if (sig(POP.panel) === sig(fresh)) {
       const now = [...fresh.querySelectorAll('input')];
@@ -13954,6 +14369,7 @@ if (LIVE) {
     skeleton(6, { 'data-loading': 'results' }));
   refreshResults().then(() => {
     if (DATA && !DATA.models.length) { state.tab = 'queue'; render(); }
+    if (DATA) loadViews();
   });
   loadQueue();
   loadJudgeHealth();
@@ -13973,6 +14389,8 @@ if (LIVE) {
     if (answering && onHome()) { loadReview(); loadTruns(); }
     if (state.tab === 'review' || (answering && state.model && state.mtab === 'improve')) loadReview();
     if (state.tab === 'exam') loadExam();
+    // 12h.2: a view someone else saved reaches this page within half a minute
+    if (answering && state.tab === 'leaderboard' && Date.now() - VIEWS_AT > 30000) loadViews();
     // the Loop board and a topic page: without this nothing ever re-fetched
     // /api/loop, so a board whose first load failed stayed empty for as long
     // as the tab was open — which is exactly what happened on the live tree

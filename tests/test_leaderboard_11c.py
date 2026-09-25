@@ -255,7 +255,7 @@ def test_the_models_popover_narrows_the_rows_and_says_how_many(live, page):
     assert page.locator("#pop-models .famdot").count() == n
     page.locator("[data-models-apply]").click()
     page.wait_for_function(f"document.querySelectorAll('{LB} tbody tr[data-lb-row]').length === 2")
-    assert "2 of" in page.locator("#pill-models").text_content()
+    assert page.locator("#pill-models").text_content() == "Models: 2 ▾"     # 12h.2
     assert page.errors == []
 
 

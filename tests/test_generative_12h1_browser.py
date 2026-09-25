@@ -69,7 +69,9 @@ def test_instruction_and_maths_is_a_group_of_three(live, page):
     # the column says who scores it and how it is asked
     tip = json.loads(page.locator("th[data-col='mmlu_pro']").get_attribute("data-tip"))
     assert any(t.startswith("scored by exact match on the letter A–J") for t in tip)
-    assert "instruct models only, and never part of Avg" in tip
+    # 12h.2: never in the board's Avg; Benchmarks ▾ can average it with others
+    assert ("instruct models only, and never part of the board's Avg — choose it under "
+            "Benchmarks to average it with others") in tip
     assert any(t.startswith("published by the makers") and "Qwen3.5-2B 55.3 (no thinking)" in t
                for t in tip)
     assert page.errors == []
