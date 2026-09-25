@@ -329,6 +329,32 @@ def mark(model_dir: Path, extra: dict | None = None) -> dict | None:
             **(extra or {}), "tasks": tasks}
 
 
+def items_of(blob: dict, task: str) -> tuple[int, int]:
+    """12a.5b: (answered, of) from a results file's n-samples — a task's own,
+    or a group's (MMLU-Pro) summed over its subjects. A subset answers fewer
+    than there are"""
+    ns = blob.get("n-samples") or {}
+    keys = [task] if task in ns else [k for k in ns if k.startswith(task + "_")]
+    got = of = 0
+    for k in keys:
+        v = ns[k]
+        got += int((v.get("effective") if isinstance(v, dict) else v) or 0)
+        of += int((v.get("original") if isinstance(v, dict) else v) or 0)
+    return got, of
+
+
+def answered(task_out: Path, task: str) -> tuple[int, int] | None:
+    """items_of() for the newest results file in a task's folder; None with
+    no results there"""
+    files = sorted(task_out.rglob("results_*.json"), key=lambda f: f.name)
+    if not files:
+        return None
+    try:
+        return items_of(json.loads(files[-1].read_text(encoding="utf-8")), task)
+    except (OSError, ValueError):
+        return None
+
+
 def read_json(model_dir: Path) -> dict | None:
     try:
         return json.loads((model_dir / OUT_NAME).read_text(encoding="utf-8"))

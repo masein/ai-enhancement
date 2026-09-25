@@ -69,7 +69,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   reuse_note  TEXT DEFAULT '',                   -- "answers reused from #46 (same questions) · re-graded"
   bank_version TEXT DEFAULT '',                  -- 12a.4: the Everyday wording this run answered (its hash)
   thinking    INTEGER NOT NULL DEFAULT 0,        -- 12h.1: "Think before answering" asked for
-  subset      INTEGER NOT NULL DEFAULT 0         -- 12h.1: MMLU-Pro items, a seeded subset; 0 = all
+  subset      INTEGER NOT NULL DEFAULT 0,        -- 12h.1: MMLU-Pro items, a seeded subset; 0 = all
+  task_times  TEXT DEFAULT '{}'                  -- 12a.5b: {task: {s, n}}, seconds and items
 );
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
 -- find-the-gap: an LLM proposes a skill spec from diagnose-half failures, a
@@ -196,7 +197,8 @@ CREATE TABLE IF NOT EXISTS views (
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
          "finished_at", "gpu_seconds", "arch", "allow_remote_code", "load_missing",
-         "tasks", "judge_batch", "reuse_note", "bank_version", "thinking", "subset"]
+         "tasks", "judge_batch", "reuse_note", "bank_version", "thinking", "subset",
+         "task_times"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -228,7 +230,9 @@ def init() -> None:
                      "ALTER TABLE submissions ADD COLUMN reuse_note TEXT DEFAULT ''",
                      "ALTER TABLE submissions ADD COLUMN bank_version TEXT DEFAULT ''",
                      "ALTER TABLE submissions ADD COLUMN thinking INTEGER NOT NULL DEFAULT 0",
-                     "ALTER TABLE submissions ADD COLUMN subset INTEGER NOT NULL DEFAULT 0"):
+                     "ALTER TABLE submissions ADD COLUMN subset INTEGER NOT NULL DEFAULT 0",
+                     # 12a.5b: each generative task's seconds and items, for the estimate
+                     "ALTER TABLE submissions ADD COLUMN task_times TEXT DEFAULT '{}'"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:

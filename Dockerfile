@@ -4,6 +4,33 @@
 # (sm_120) and needs cu128+ kernels; torch 2.11.0 matches the version already
 # validated on the target server. (Tag existence verified against Docker Hub.)
 ARG BASE_IMAGE=pytorch/pytorch:2.11.0-cuda12.8-cudnn9-runtime
+# 12a.5b: the speed-up kernels for the hybrid models — causal-conv1d and
+# mamba_ssm — are compiled in the devel image of the same torch and CUDA (it
+# has nvcc; the runtime image does not), and only their wheels come into the
+# image below. Neither publishes a wheel for torch 2.11 (their releases stop
+# at 2.10), so pip always compiled, and without nvcc it always failed. The
+# devel image is about 14 GB to pull, once; each kernel compiles for six GPU
+# generations, so the first build is long (an hour or more) and Docker's cache
+# keeps it after. A kernel that will not build is left out, and the env line
+# below says so; torch is never changed for one. To skip them:
+#   WITH_KERNELS=0 KERNELS_IMAGE=pytorch/pytorch:2.11.0-cuda12.8-cudnn9-runtime
+ARG KERNELS_IMAGE=pytorch/pytorch:2.11.0-cuda12.8-cudnn9-devel
+
+FROM ${KERNELS_IMAGE} AS kernels
+ARG WITH_KERNELS=1
+# parallel compile jobs: each takes several GB of memory
+ARG KERNEL_JOBS=4
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
+RUN mkdir -p /wheels && if [ "$WITH_KERNELS" = "1" ]; then \
+      python -m pip install --no-cache-dir packaging ninja wheel setuptools; \
+      for pkg in "causal-conv1d==1.7.0" "mamba-ssm==2.3.2.post1"; do \
+        CAUSAL_CONV1D_FORCE_BUILD=TRUE MAMBA_FORCE_BUILD=TRUE MAX_JOBS=$KERNEL_JOBS \
+          timeout 10800 python -m pip wheel --no-cache-dir --no-build-isolation --no-deps \
+            -w /wheels "$pkg" \
+          && echo "kernels: built $pkg" || echo "kernels: $pkg did not build, left out"; \
+      done; \
+    fi; ls /wheels
+
 FROM ${BASE_IMAGE}
 
 # lm-eval + service deps; torch comes from the base image.
@@ -29,26 +56,36 @@ RUN python -m pip install --no-cache-dir --break-system-packages "pytest>=8" htt
 # move FastAPI below 0.137, away from the version the check tests the service
 # on. If the trials say hf is too slow, vLLM gets a container of its own, in
 # its own brief — not this image.
-# 12h.1: the Mamba2 hybrids (Granite-4.0-H, Nemotron-3-Nano) are far faster
-# with these kernels, which may need a build this runtime image cannot do.
-# Tried, never required. WITH_MAMBA=0 skips it.
-ARG WITH_MAMBA=1
-RUN if [ "$WITH_MAMBA" = "1" ]; then \
-      timeout 900 python -m pip install --no-cache-dir --break-system-packages \
-        --no-build-isolation "causal-conv1d==1.7.0" "mamba-ssm==2.3.2.post1" \
-        && echo "Mamba kernels installed" \
-        || echo "Mamba kernels did not build: the Mamba2 hybrids run on the slower path"; \
-    fi
+# 12a.5b: the hybrids run on a slow fallback without their kernels — Qwen3.5
+# (Gated DeltaNet) wants flash-linear-attention and causal-conv1d, and
+# Granite-4.0-H and Nemotron-3-Nano (Mamba2) mamba_ssm and causal-conv1d.
+# Qwen3.5-2B took 14.75 s per IFEval item without them. The two compiled ones
+# come from the kernels stage above, without their dependencies, so nothing
+# here can move torch; flash-linear-attention is Python and Triton, and
+# installs as it is. Each is tried, never required.
+COPY --from=kernels /wheels /tmp/kernel-wheels
+RUN for w in /tmp/kernel-wheels/*.whl; do \
+      [ -e "$w" ] || continue; \
+      python -m pip install --no-cache-dir --break-system-packages --no-deps "$w" \
+        || echo "kernels: $(basename "$w") did not install"; \
+    done; rm -rf /tmp/kernel-wheels; \
+    python -m pip install --no-cache-dir --break-system-packages \
+      "flash-linear-attention==0.5.2" "fla-core==0.5.2" "einops" \
+      || echo "kernels: flash-linear-attention did not install"
 
 # Fail the BUILD, not the first submission, if the env is incoherent (e.g. deps
 # landed in a different interpreter than torch).
+# 12a.5b: each speed-up package, yes or no — a compiled kernel is yes only
+# when its extension loads against this torch
 RUN python -c "import torch, lm_eval, transformers, accelerate, datasets, fastapi, uvicorn, pytest, httpx; \
 import math_verify, langdetect, nltk, immutabledict; \
-import importlib.util as u; \
+import sys, subprocess, importlib.util as u; \
+loads = lambda m: 'yes' if u.find_spec(m) and subprocess.run([sys.executable, '-c', 'import torch, ' + m]).returncode == 0 else 'no'; \
 print('image env OK — torch', torch.__version__, '| built for CUDA', torch.version.cuda, \
 '| lm_eval', lm_eval.__version__, '| transformers', transformers.__version__, \
 '| fastapi', fastapi.__version__, \
-'| Mamba kernels', 'yes' if u.find_spec('mamba_ssm') else 'no')"
+'| flash-linear-attention', 'yes' if u.find_spec('fla') else 'no', \
+'| causal-conv1d', loads('causal_conv1d_cuda'), '| mamba_ssm', loads('selective_scan_cuda'))"
 
 # An unprivileged account for evaluating uploads that carry their own model code
 # (EVAL_USER). The service itself still runs as root — it needs to write the

@@ -435,6 +435,14 @@ def mmlu_pro_subset(n: int, seed: int = config.GEN_SUBSET_SEED) -> dict[str, lis
     return {f"mmlu_pro_{k}": sorted(rng.sample(range(subj[k]), take[k])) for k in subj}
 
 
+def mmlu_pro_per_subject(k: int, seed: int = config.GEN_SUBSET_SEED) -> dict[str, list[int]]:
+    """12a.5b, a trial's MMLU-Pro: `k` seeded items of each of its 14 subjects"""
+    import random
+    rng = random.Random(seed)
+    return {f"mmlu_pro_{s}": sorted(rng.sample(range(n), min(k, n)))
+            for s, n in config.MMLU_PRO_SUBJECTS.items()}
+
+
 def lm_eval_cwd(task_out: Path) -> Path:
     """Where lm_eval runs: the task's own output folder, never BENCH_ROOT.
 
@@ -538,11 +546,54 @@ def reuse_note(reused: dict[str, int | None], tasks: list[str]) -> str:
 CANCELED = -15
 
 
-def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path) -> int:
+def duration(seconds: float) -> str:
+    """"about 45 min", "about 2 h 40 min" """
+    m = int(round(seconds / 60))
+    if m < 60:
+        return f"about {max(m, 1)} min"
+    return f"about {m // 60} h {m % 60} min" if m % 60 else f"about {m // 60} h"
+
+
+# 12a.5b: a slow run says how far it is, from lm_eval's own progress bar —
+# "Running generate_until requests:  28%|██▊ | 340/1200 [10:02<25:21, 1.77s/it]"
+_BAR = re.compile(r"generate_until requests:\s*\d+%\|[^|\n]*\|\s*(\d+)/(\d+)\s*"
+                  r"\[([\d:]+)<([\d:?]+)")
+
+
+def _clock(s: str) -> int:
+    """"1:10:05" -> seconds"""
+    secs = 0
+    for part in s.split(":"):
+        secs = secs * 60 + int(part)
+    return secs
+
+
+def bar_seconds(text: str) -> tuple[int, int] | None:
+    """(items done, seconds spent generating them) from the newest bar in the
+    text — the time without loading the model; None before the first bar"""
+    bars = list(_BAR.finditer(text))
+    return (int(bars[-1].group(1)), _clock(bars[-1].group(3))) if bars else None
+
+
+def progress_line(text: str, name: str) -> str | None:
+    """"MMLU-Pro 340 of 1,200 · about 45 min left", from the newest bar in the
+    text; None before the first"""
+    bars = list(_BAR.finditer(text))
+    if not bars:
+        return None
+    done, total, left = int(bars[-1].group(1)), int(bars[-1].group(2)), bars[-1].group(4)
+    secs = None if "?" in left else _clock(left)
+    return f"{name} {done:,} of {total:,}" + (
+        f" · {duration(secs)} left" if secs is not None and done < total else "")
+
+
+def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
+              on_poll=None) -> int:
     """One lm_eval task, as a child we watch: its exit code, -1 on timeout, or
     CANCELED when someone asked the queue to stop this run. Polled every two
     seconds, so a cancel costs at most that plus a clean shutdown. `cwd` is
-    lm_eval_cwd(), never BENCH_ROOT."""
+    lm_eval_cwd(), never BENCH_ROOT. `on_poll` is called at each poll (12a.5b:
+    a slow run's progress)."""
     proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=cwd,
                             env=env, **({"user": run_as[0], "group": run_as[1]}
                                         if run_as else {}))
@@ -552,6 +603,8 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path) -> int
             return proc.wait(timeout=2)
         except subprocess.TimeoutExpired:
             pass
+        if on_poll:
+            on_poll()
         why = ("canceled by request" if db.cancel_requested(sid)
                else f"killed after {config.TASK_TIMEOUT_S}s timeout"
                if time.time() - t0 > config.TASK_TIMEOUT_S else "")
@@ -605,6 +658,12 @@ def run_submission(sub: dict) -> None:
     only = [t for t in json.loads(sub.get("tasks") or "[]") if t in tasks]
     if only:
         tasks = only
+    if generative:
+        # 12a.5b: MMLU-Pro last — hours, where the other two take minutes — so
+        # a run cancelled during it keeps them
+        tasks = sorted(tasks, key=lambda t: t == "mmlu_pro")
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import generative as _gen
     safe = sub["hf_id"].replace("/", "__")
     log_path = config.LOGS_DIR / f"service_{sid}_{safe}.log"
     # 12h.1: a thinking-on run of a model that can turn thinking off is a row
@@ -718,6 +777,7 @@ def run_submission(sub: dict) -> None:
                 return
 
         gpu_seconds = 0.0
+        times: dict[str, dict] = {}                # 12a.5b: seconds and items per task
         failed_tasks: list[str] = []
         canceled = False
         reused: dict[str, int | None] = {}
@@ -753,6 +813,16 @@ def run_submission(sub: dict) -> None:
                     with open(log_path, "a") as lf:
                         lf.write(f"\n[service] {task}: the last run's folder is kept at "
                                  f"{moved}\n")
+            if generative and task == "mmlu_pro" and _has_results(task_out):
+                # 12a.5b: a subset and the full run are not the same answers
+                want = int(sub.get("subset") or 0) or config.GEN_ITEMS["mmlu_pro"]
+                got = (_gen.answered(task_out, task) or (0, 0))[0]
+                if got != want:
+                    moved = _set_aside(task_out, task)
+                    with open(log_path, "a") as lf:
+                        lf.write(f"\n[service] {task}: the answers on disk are to {got:,} items "
+                                 f"and this run asks {want:,}; kept at {moved}, answering "
+                                 f"again\n")
             if _task_done(task_out, task):
                 if current_fingerprint(task):
                     reused[task] = _answered_by(task_out)
@@ -832,7 +902,22 @@ def run_submission(sub: dict) -> None:
                              f"hub offline, token withheld\n")
                 lf.flush()
                 mark = log_path.stat().st_size      # this task's output starts here
-                status = _run_task(sid, cmd, lf, job_env, run_as, cwd=lm_eval_cwd(task_out))
+                watch = None
+                if generative:
+                    # 12a.5b: "MMLU-Pro 340 of 1,200 · about 45 min left"
+                    def watch(name=_gen.TASKS[task], start=mark, said=[""]):
+                        try:
+                            with open(log_path, "rb") as fh:
+                                fh.seek(max(start, log_path.stat().st_size - 16384))
+                                text = fh.read().decode("utf-8", "replace")
+                        except OSError:
+                            return
+                        line = progress_line(text, name)
+                        if line and line != said[0]:
+                            said[0] = line
+                            db.update(sid, progress=line)
+                status = _run_task(sid, cmd, lf, job_env, run_as, cwd=lm_eval_cwd(task_out),
+                                   on_poll=watch)
                 if status == CANCELED:
                     canceled = True
                 # 12h.1: a model vLLM cannot load runs on the harness's own
@@ -844,11 +929,17 @@ def run_submission(sub: dict) -> None:
                     lf.write(f"\n[service] {fell_back}\n")
                     lf.flush()
                     status = _run_task(sid, gen_cmd("hf"), lf, job_env, run_as,
-                                       cwd=lm_eval_cwd(task_out))
+                                       cwd=lm_eval_cwd(task_out), on_poll=watch)
                     if status == CANCELED:
                         canceled = True
             gpu_seconds += time.time() - t_task
             db.update(sid, gpu_seconds=gpu_seconds)
+            if generative and status == 0:
+                # 12a.5b: what the next estimate is made of
+                n = (_gen.answered(task_out, task) or (0, 0))[0]
+                if n:
+                    times[task] = {"s": round(time.time() - t_task, 1), "n": n}
+                    db.update(sid, task_times=json.dumps(times))
             if canceled:
                 break
 
@@ -896,6 +987,41 @@ def run_submission(sub: dict) -> None:
         # let the poller finish it — a judge that waits on a provider must
         # never hold the card. With JUDGE_MODEL=stub the file is written now.
         judge_note = ""
+
+        def mark_generative() -> str:
+            """12h.1: the three read again, in this board's words — the letter
+            an answer settles on, the final answer compared as maths, the
+            harness's own IFEval verdicts — and the answers that ran out of
+            room counted. Returns the queue row's words"""
+            n_sub = int(sub.get("subset") or 0)
+            out = _gen.mark(config.OUT_DIR / row_safe, extra={
+                "thinking": {"mode": th["mode"], "on": th["on"], "budget": th["budget"]},
+                "backend": backend, "fell_back": fell_back or None,
+                "not_vllm": not_vllm or None,
+                "subset": ({"n": min(n_sub, sum(config.MMLU_PRO_SUBJECTS.values())),
+                            "of": sum(config.MMLU_PRO_SUBJECTS.values()),
+                            "seed": config.GEN_SUBSET_SEED} if n_sub > 0 else None)})
+            if not out:
+                return ""
+            _gen.write(config.OUT_DIR / row_safe, out)
+            with open(log_path, "a") as lf:
+                lf.write(f"\n===== [{sid}] generative: {_gen.summary(out)} =====\n")
+            return _gen.summary(out)
+
+        if canceled and generative:
+            # 12a.5b: cancelling keeps what finished — each of the three is
+            # scored as soon as it is done, and read again here
+            kept = [_gen.TASKS[t] for t in tasks if t in times]
+            try:
+                mark_generative()
+            except Exception as e:                      # noqa: BLE001 — the answers are on disk
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] the finished answers could not be read: {e!r}\n")
+            db.update(sid, status="canceled", finished_at=time.time(),
+                      progress=f"cancelled during {_gen.TASKS[task]}" + (
+                          f" · {' and '.join(kept)} kept" if kept
+                          else " · nothing had finished"))
+            return
         if canceled:
             db.update(sid, status="canceled", finished_at=time.time(),
                       progress=f"canceled by request after {len(tasks) and i - 1} of "
@@ -932,21 +1058,9 @@ def run_submission(sub: dict) -> None:
         if generative and not failed_tasks:
             db.update(sid, status="running", progress="reading the answers")
             try:
-                sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-                import generative as _gen
-                n_sub = int(sub.get("subset") or 0)
-                out = _gen.mark(config.OUT_DIR / row_safe, extra={
-                    "thinking": {"mode": th["mode"], "on": th["on"], "budget": th["budget"]},
-                    "backend": backend, "fell_back": fell_back or None,
-                    "not_vllm": not_vllm or None,
-                    "subset": ({"n": min(n_sub, sum(config.MMLU_PRO_SUBJECTS.values())),
-                                "of": sum(config.MMLU_PRO_SUBJECTS.values()),
-                                "seed": config.GEN_SUBSET_SEED} if n_sub > 0 else None)})
-                if out:
-                    _gen.write(config.OUT_DIR / row_safe, out)
-                    judge_note = " · " + _gen.summary(out)
-                    with open(log_path, "a") as lf:
-                        lf.write(f"\n===== [{sid}] generative: {_gen.summary(out)} =====\n")
+                said = mark_generative()
+                if said:
+                    judge_note = " · " + said
             except Exception as e:                      # noqa: BLE001 — the answers are on disk
                 failed_tasks.append("reading")
                 db.update(sid, error=f"reading the answers: {e}")

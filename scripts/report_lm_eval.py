@@ -813,6 +813,20 @@ def parse_run(blob: dict, source: Path) -> dict:
     for task, metrics in (blob.get("higher_is_better") or {}).items():
         if isinstance(metrics, dict):
             hib[task] = {k: bool(v) for k, v in metrics.items() if v is not None}
+    # 12a.5b: a seeded subset of MMLU-Pro is a benchmark of its own on this
+    # board — "mmlu_pro_subset", never averaged or compared with the full
+    # 12,032. The harness says which it was: its subjects answered fewer items
+    # than they hold
+    if "mmlu_pro" in tasks:
+        subj = [v for k, v in (blob.get("n-samples") or {}).items()
+                if k.startswith("mmlu_pro_") and isinstance(v, dict)]
+        got = sum(int(v.get("effective") or 0) for v in subj)
+        if got < sum(int(v.get("original") or 0) for v in subj):
+            tasks["mmlu_pro_subset"] = tasks.pop("mmlu_pro")
+            n_samples["mmlu_pro_subset"] = n_samples.pop("mmlu_pro", got)
+            for d in (n_shot, hib):
+                if "mmlu_pro" in d:
+                    d["mmlu_pro_subset"] = d.pop("mmlu_pro")
     return {
         "higher_is_better": hib,
         "subtasks": subtasks,
@@ -923,12 +937,13 @@ def significant(a: float, sa: float, b: float, sb: float, z: float = 1.96) -> tu
 # and gsm8k's is 0.
 _CANON = ["mmlu", "mmlu_perm", "hellaswag", "arc_challenge", "arc_easy",
           "winogrande", "piqa", "truthfulqa_mc2", "gsm8k",
-          "ifeval", "mmlu_pro", "hendrycks_math500"]
+          "ifeval", "mmlu_pro", "mmlu_pro_subset", "hendrycks_math500"]
 _CHANCE = {"mmlu": 0.25, "mmlu_perm": 0.25, "hellaswag": 0.25, "arc_challenge": 0.25,
            "arc_easy": 0.25, "winogrande": 0.5, "piqa": 0.5, "gsm8k": 0.0,
-           "mmlu_pro": 0.1, "hendrycks_math500": 0.0}
-# 12h.1: the three that generate text, for instruct models only; never in Avg
-GEN_TASKS = ("ifeval", "mmlu_pro", "hendrycks_math500")
+           "mmlu_pro": 0.1, "mmlu_pro_subset": 0.1, "hendrycks_math500": 0.0}
+# 12h.1: the three that generate text, for instruct models only; never in Avg.
+# 12a.5b: a subset of MMLU-Pro is a column of its own
+GEN_TASKS = ("ifeval", "mmlu_pro", "mmlu_pro_subset", "hendrycks_math500")
 
 # Controls: tasks run to test how we POSE a benchmark, not what a model knows.
 # They are shown wherever the task they control for is shown, and they never
@@ -1001,6 +1016,13 @@ _TASK_META = {
                  "the reasoning written out (5-shot chain of thought) and scored on the "
                  "letter the answer settles on. Hours per model where the other tasks take "
                  "minutes. Instruct models only, and never in the overall average."),
+    # 12a.5b: what the submit form runs unless the full one is asked for
+    "mmlu_pro_subset": ("instruction & maths",
+                        "MMLU-Pro, a subset: a seeded 1,200 of its 12,032 questions, the "
+                        "same share of each subject, asked and scored as MMLU-Pro is. "
+                        "Labelled subset, and a benchmark of its own: never averaged or "
+                        "compared with the full MMLU-Pro, and not comparable to published "
+                        "numbers. Instruct models only, and never in the overall average."),
     "hendrycks_math500": ("instruction & maths",
                           "500 competition maths problems (MATH-500), answered in the "
                           "model's own words and scored on the final answer, compared as "
@@ -1364,8 +1386,10 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             # below what its makers publish
             "gen": ({"thinking": gen.get("thinking"), "backend": gen.get("backend"),
                      "fellBack": gen.get("fell_back"), "subset": gen.get("subset"),
-                     "tasks": {t: {k: g.get(k) for k in ("ran_out", "unreadable", "inst_acc",
-                                                         "n", "scorer")}
+                     "tasks": {("mmlu_pro_subset" if t == "mmlu_pro"
+                                and mid in cells.get("mmlu_pro_subset", {}) else t):
+                               {k: g.get(k) for k in ("ran_out", "unreadable", "inst_acc",
+                                                      "n", "scorer")}
                                for t, g in (gen.get("tasks") or {}).items()},
                      "far": {t: f for t in GEN_TASKS
                              if (f := far_below(mid, t, (cells.get(t) or {}).get(mid, {})
@@ -2292,9 +2316,16 @@ tbody tr.open { background:var(--accent-soft); }
   margin:10px 0; background:var(--plane); display:flex; flex-direction:column; gap:4px; }
 .planbox .plan { margin:0; color:var(--text-primary); }
 .planbox label.spread { display:inline-flex; align-items:center; gap:6px; }
-/* 12h.1: Instruction & maths' two options, under the form */
-.genopts { display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; margin-top:8px; }
+/* 12h.1: Instruction & maths' options, under the form. 12a.5b: a group of
+   their own — the three, MMLU-Pro's size, the time, and one amber line */
+.genopts { display:flex; flex-direction:column; gap:6px; margin:8px 0 0; padding:8px 12px 10px;
+  border:1px solid var(--border); border-radius:8px; min-width:0; }
+.genopts legend { padding:0 4px; font-size:var(--fs-1); font-weight:600; letter-spacing:.04em;
+  text-transform:uppercase; color:var(--text-secondary); }
 .genopts label.spread { display:inline-flex; align-items:center; gap:6px; }
+.genpicks, .gensizes { display:flex; flex-wrap:wrap; gap:6px 18px; }
+.genopts p { margin:2px 0; }
+.genopts .warn { margin:4px 0 0; color:var(--warning-text); }
 /* ---- 11d: Overview ------------------------------------------------------- */
 .hlgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:14px;
   margin-top:10px; }
@@ -7032,7 +7063,7 @@ const CATS = [
   ['math',         ['gsm8k']],
   ['truthfulness', ['truthfulqa_mc2']],
   // 12h.1: the three that generate text — instruct models only, never in Avg
-  ['instruction',  ['ifeval', 'mmlu_pro', 'hendrycks_math500']],
+  ['instruction',  ['ifeval', 'mmlu_pro', 'mmlu_pro_subset', 'hendrycks_math500']],
 ];
 function radarAxes() {
   if (state.radarAxes === 'tasks') return DATA.accTasks.map(t => ({ key: t, label: t, tasks: [t] }));
@@ -7506,7 +7537,8 @@ function lbColumns(ms) {
 
 // 11f: one word per column name; the long ones are the tooltip's
 const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'TruthfulQA',
-  ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro', hendrycks_math500: 'MATH-500' };
+  ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro', mmlu_pro_subset: 'MMLU-Pro subset',
+  hendrycks_math500: 'MATH-500' };
 
 // A column's setup, in words — its tooltip, and its accessible name. The
 // header shows only the name; this is where the n-shot, the unit and the
@@ -7740,7 +7772,8 @@ function lbEveryday(ms) {
 // level score, a subset, a score far below what its makers publish
 function genCell(c, m, cc, one, pctn) {
   const g = ((m.gen || {}).tasks || {})[c.task] || {}, far = ((m.gen || {}).far || {})[c.task];
-  const sub = c.task === 'mmlu_pro' && (m.gen || {}).subset;
+  // 12a.5b: a subset is its own column, and says so in every cell
+  const sub = c.task === 'mmlu_pro_subset';
   const td = one(c, m, cc.v, cc.se ? (100 * cc.se).toFixed(1) : null, pctn, {
     title: [genMode(m), g.inst_acc != null ? `instruction-level ${pctn(g.inst_acc)}` : '',
       g.ran_out ? `${g.ran_out} answer${g.ran_out === 1 ? '' : 's'} ran out of room` : '',
@@ -10770,6 +10803,91 @@ function queueActions(r) {
   return cell('');
 }
 
+// ---- 12a.5b: IFEval, MMLU-Pro and MATH-500 are slow, and optional ------------
+// Hours on this server's hf backend where the Standard tasks take minutes: a
+// full MMLU-Pro was about 11½ h per model. So they sit in their own group,
+// unticked; MMLU-Pro is a seeded 1,200 unless Full is chosen; and before
+// Submit the form says how long the run will hold the GPU — from the model's
+// size and the seconds per item this server's past runs took (/api/gen/pace),
+// or a rough guess before any
+const GEN_NAMES = { ifeval: 'IFEval', hendrycks_math500: 'MATH-500', mmlu_pro: 'MMLU-Pro' };
+const GEN_ORDER = ['ifeval', 'hendrycks_math500', 'mmlu_pro'];     // a run asks MMLU-Pro last
+const genPace = () => state.genPace || { tasks: {}, items: { ifeval: 541, mmlu_pro: 12032,
+  hendrycks_math500: 500 }, subset: 1200 };
+async function loadGenPace() {
+  if (state.genPaceAsked) return;
+  state.genPaceAsked = true;
+  try { state.genPace = await api('api/gen/pace'); } catch (e) { return; }
+  if (state.genPaint) state.genPaint();
+}
+// "about 45 min", "about 1 h 10 min" — the runner's words (service/runner.duration)
+function aboutTime(s) {
+  const m = Math.round(s / 60);
+  if (m < 60) return `about ${Math.max(m, 1)} min`;
+  return `about ${Math.floor(m / 60)} h` + (m % 60 ? ` ${m % 60} min` : '');
+}
+// the model's size, when the page knows it: picked from the list, or on the board
+const genParams = sf => sf.params
+  || (DATA.models.find(m => m.id === sf.hf_id.trim()) || {}).params || null;
+// seconds for one of the three at this size ({s, guess}), or null without a size
+function genSeconds(sf, t, full) {
+  const P = genParams(sf), pace = genPace(), x = (pace.tasks || {})[t];
+  if (!P) return null;
+  const items = t === 'mmlu_pro' && !full ? pace.subset : pace.items[t];
+  const perB = x ? x.per_b : { ifeval: 7.4, mmlu_pro: 2.0, hendrycks_math500: 5.0 }[t];
+  return { s: perB * (P / 1e9) * items, guess: !x || !x.runs };
+}
+const genTime = e => e.guess
+  ? (e.s >= 3600 ? `about ${Math.round(e.s / 3600)} h` : aboutTime(e.s)) + ', a rough guess'
+  : aboutTime(e.s);
+function genSlowGroup(sf, canThink) {
+  if (!sf.gen) sf.gen = {};                 // none ticked to begin with
+  if (LIVE && netReady()) loadGenPace();
+  const est = el('p', { class: 'small', 'data-gen-estimate': '1' });
+  const long = el('p', { class: 'warn small', 'data-gen-long': '1', hidden: '' });
+  const sizeEst = { subset: el('span', { class: 'se' }), full: el('span', { class: 'se' }) };
+  const pick = t => el('label', { class: 'spread', 'data-gen-pick': t },
+    el('input', { type: 'checkbox', checked: sf.gen[t] ? '' : null,
+      onchange: e => { sf.gen[t] = e.target.checked; paint(); } }), ' ' + GEN_NAMES[t]);
+  const size = full => el('label', { class: 'spread small', 'data-mmlu-size': full ? 'full' : 'subset' },
+    el('input', { type: 'radio', name: 'mmlu-size', checked: !!sf.full === full ? '' : null,
+      onchange: () => { sf.full = full; paint(); } }),
+    ` ${full ? 'Full' : 'Subset'} (${(full ? genPace().items.mmlu_pro : genPace().subset)
+      .toLocaleString('en')})`, sizeEst[full ? 'full' : 'subset']);
+  const sizes = el('div', { class: 'gensizes', 'data-mmlu-sizes': '1' }, size(false), size(true));
+  function paint() {
+    sizes.hidden = !sf.gen.mmlu_pro;
+    for (const k of ['subset', 'full']) {
+      const e = genSeconds(sf, 'mmlu_pro', k === 'full');
+      sizeEst[k].textContent = e ? ' · ' + genTime(e) : '';
+    }
+    const ticked = GEN_ORDER.filter(t => sf.gen[t]);
+    const parts = ticked.map(t => genSeconds(sf, t, !!sf.full));
+    long.hidden = true;
+    if (!ticked.length) { est.textContent = 'Tick the ones to run.'; return; }
+    if (parts.some(x => !x)) {
+      est.textContent = 'The time needs the model\u2019s size: pick it from the list.'; return;
+    }
+    const all = { s: parts.reduce((a, x) => a + x.s, 0), guess: parts.some(x => x.guess) };
+    est.textContent = `Time on the GPU: ${genTime(all)}`;
+    if (all.s > 3600) {
+      long.hidden = false;
+      long.textContent = `This holds the GPU for ${aboutTime(all.s)}; other runs wait.`;
+    }
+  }
+  paint();
+  state.genPaint = paint;
+  return el('fieldset', { class: 'genopts', 'data-gen-opts': '1' },
+    el('legend', { text: 'Slow · instruct models only' }),
+    el('div', { class: 'genpicks' }, GEN_ORDER.map(pick)), sizes,
+    canThink ? el('label', { class: 'spread', 'data-think-switch': '1' },
+      el('input', { type: 'checkbox', checked: sf.thinking ? '' : null,
+        onchange: e => { sf.thinking = e.target.checked; } }),
+      ' Think before answering', el('span', { class: 'small se',
+        text: ' — off by default; its scores are a row of their own' })) : '',
+    est, long);
+}
+
 // 12b: the form opens in the Test a model dialog, the list is All runs —
 // the same code, in two containers
 function vQueue(part = { form: true, list: true }) {
@@ -10780,8 +10898,10 @@ function vQueue(part = { form: true, list: true }) {
   // kind), and a re-render must not wipe the suite and note already chosen
   const sf = state.sub;
   const f = {
-    hf_id: modelBox('submit', sf.hf_id, v => { sf.hf_id = v; },
+    hf_id: modelBox('submit', sf.hf_id,
+      v => { sf.hf_id = v; sf.params = null; if (state.genPaint) state.genPaint(); },
       it => { sf.hf_id = it.id; if (it.kind) sf.kind = it.kind; sf.allow = false;
+              sf.params = it.params || null;           // 12a.5b: the estimate's size
               delete state.codeInfo[it.id]; render(); },
       { 'aria-label': 'model id',
         placeholder: 'search: org/model on the Hub, or local/<name> for an uploaded artifact' }),
@@ -10806,32 +10926,23 @@ function vQueue(part = { form: true, list: true }) {
             + 'judged score per topic.' }],
       // 12a: the pilot. 12c replaces this drop-down with cards
       ['everyday', `Everyday tasks — ${evdAll() || 111} questions, a few minutes`],
-      // 12h.1: instruct models only; MMLU-Pro alone is hours
-      ['generative', 'Instruction & maths — IFEval, MMLU-Pro, MATH-500, hours',
-        { sub: 'Asked through the chat template and scored on what the model writes. '
-          + 'Instruct models only; never in the average.' }]],
+      // 12h.1: instruct models only; MMLU-Pro alone is hours. 12a.5b: each
+      // of the three is chosen, and the time it takes is said before Submit
+      ['generative', 'Instruction & maths — slow, instruct models only',
+        { sub: 'IFEval, MMLU-Pro and MATH-500, each chosen on its own, with the time it will '
+          + 'take. Scored on what the model writes; never in the average.' }]],
       sf.suite || 'full', v => { sf.suite = v; render(); }, { key: 'submit-suite' }),
     note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px',
       'aria-label': 'note', 'data-keep': 'submit-note', value: sf.note,
       oninput: e => { sf.note = e.target.value; } }),
   };
-  // 12h.1: Instruction & maths asks two more things, and only then — whether
-  // the model thinks first (a model with a switch only; off by default, and a
-  // row of its own), and a seeded MMLU-Pro subset (off: the full 12,032 is the
-  // only run comparable to published numbers)
+  // 12h.1: Instruction & maths asks more, and only then — whether the model
+  // thinks first (a model with a switch only; off by default, and a row of
+  // its own). 12a.5b: which of the three, none ticked to begin with; MMLU-Pro
+  // a seeded subset unless Full is chosen; and the time it will hold the GPU
   const canThink = thinkingModeOf(sf.hf_id.trim()) === 'switch';
   if (!canThink) sf.thinking = false;
-  const genOpts = sf.suite === 'generative' ? el('div', { class: 'genopts', 'data-gen-opts': '1' },
-    canThink ? el('label', { class: 'spread', 'data-think-switch': '1' },
-      el('input', { type: 'checkbox', checked: sf.thinking ? '' : null,
-        onchange: e => { sf.thinking = e.target.checked; } }),
-      ' Think before answering', el('span', { class: 'small se',
-        text: ' — off by default; its scores are a row of their own' })) : '',
-    el('label', { class: 'spread small' }, 'MMLU-Pro subset ',
-      el('input', { type: 'number', min: '0', max: '12031', step: '100', placeholder: 'all',
-        'aria-label': 'MMLU-Pro subset', 'data-subset-input': '1', value: sf.subset || '',
-        style: 'width:7em', oninput: e => { sf.subset = parseInt(e.target.value, 10) || 0; } }),
-      el('span', { class: 'se', text: ' items, seeded — empty runs all 12,032' }))) : '';
+  const genOpts = sf.suite === 'generative' ? genSlowGroup(sf, canThink) : '';
   // judged: 11i's grouped picker, the one the model page uses — every exam
   // topic ticked to begin with, the MMLU control off. The ticks are sent as
   // they are: the whole exam is 37 names, not an empty list
@@ -10851,7 +10962,12 @@ function vQueue(part = { form: true, list: true }) {
                    submitter: whoName(), note: sf.note };
     if (sf.suite === 'generative') {
       if (sf.thinking) body.thinking = true;
-      if (sf.subset) body.subset = sf.subset;
+      // 12a.5b: the ticked ones, and the subset unless Full was chosen
+      body.tasks = GEN_ORDER.filter(t => (sf.gen || {})[t]);
+      if (!body.tasks.length) {
+        state.qmsg = 'tick at least one of IFEval, MATH-500 and MMLU-Pro'; render(); return;
+      }
+      body.subset = sf.full ? 0 : genPace().subset;
     }
     if (sf.suite === 'judged') {
       body.tasks = [...(sf.tasks || []), ...(sf.control && J.control ? [J.control] : [])];
@@ -10881,6 +10997,7 @@ function vQueue(part = { form: true, list: true }) {
         // ticks it opens with, so the next submission is not the last one's
         sf.hf_id = ''; sf.note = ''; sf.allow = false;
         sf.tasks = null; sf.control = false;
+        sf.gen = {}; sf.full = false; sf.params = null;  // 12a.5b: unticked again
         state.testOpen = false;                       // 12b: the dialog's job is done
         toast(j.note ? `#${j.id}: ${j.note} —` : `Run #${j.id} queued —`,
               { key: 'submit', go: () => followRun(j.id), link: 'follow it →' });
@@ -11144,7 +11261,9 @@ function runLine(r, attrs = {}) {
     el('span', { class: 'small se runwhat', text: r.suite === 'everyday' ? 'everyday tasks'
       : r.suite }),
     el('span', { class: 'small se runprog', title: r.progress || '',
-      text: RUNNING_ST.has(r.status) || r.status === 'done' ? (r.progress || '')
+      // 12a.5b: a cancelled run says what it kept
+      text: RUNNING_ST.has(r.status) || r.status === 'done'
+        || (r.status === 'canceled' && r.progress) ? (r.progress || '')
         : r.status === 'queued' ? 'waiting its turn' : (r.error || '') }));
 }
 function runsList(full = false) {

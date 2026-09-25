@@ -373,9 +373,10 @@ class SubmissionIn(BaseModel):
     # 12h.1, the generative suite only: think before answering (a model with
     # a switch; its run is a row of its own), and a seeded MMLU-Pro subset
     # of this many items (0: all 12,032 — the only run comparable to
-    # published numbers)
+    # published numbers). 12a.5b: left out, the subset is 1,200
+    # (GEN_MMLU_PRO_SUBSET); and `tasks` picks among the three
     thinking: bool = False
-    subset: int = 0
+    subset: int | None = None
 
 
 ACTIVE = ("queued", "preflight", "waiting_gpu", "waiting_lock", "running")
@@ -404,7 +405,21 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     if s.subset and not 0 < s.subset < total:
         raise HTTPException(422, f"subset is a number of MMLU-Pro items, from 1 to {total - 1}; "
                                  f"0 runs all {total}")
+    subset = int(s.subset or 0)
     chosen: list[str] = []
+    if s.suite == "generative":
+        # 12a.5b: which of the three — all, when none is named
+        chosen = [t.strip() for t in s.tasks if t.strip()]
+        unknown = [t for t in chosen if t not in config.GEN_TASKS]
+        if unknown:
+            raise HTTPException(422, f"not one of the three: {', '.join(unknown)} — they are "
+                                     f"{', '.join(config.GEN_TASKS)}")
+        if len(set(chosen)) == len(config.GEN_TASKS):
+            chosen = []                         # all three is the whole suite
+        # MMLU-Pro is a seeded subset unless the full run is asked for (0)
+        subset = config.GEN_MMLU_PRO_SUBSET if s.subset is None else subset
+        if chosen and "mmlu_pro" not in chosen:
+            subset = 0
     if s.suite == "judged":
         # before a GPU second is spent on answers nobody could grade
         h = judge_health()
@@ -421,9 +436,9 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         if unknown:
             raise HTTPException(422, f"not built exam tasks: {', '.join(unknown)} — built "
                                      f"tasks are {', '.join(built)}")
-    elif s.tasks:
-        raise HTTPException(422, "tasks narrows a judged run only; the other suites are "
-                                 "fixed lists")
+    elif s.tasks and s.suite != "generative":
+        raise HTTPException(422, "tasks narrows a judged run, or picks among IFEval, MMLU-Pro "
+                                 "and MATH-500; the other suites are fixed lists")
     # 11i: a checkpoint that ships its own model code is answered HERE, before
     # anything is queued, in the words the page shows beside its disabled
     # button. #56 learned it at start, after the wait — and its Resubmit had
@@ -477,13 +492,13 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
             same = not chosen
         # 12h.1: thinking on is another row, and a subset another run
         same = same and bool(row.get("thinking")) == s.thinking \
-            and int(row.get("subset") or 0) == s.subset
+            and int(row.get("subset") or 0) == subset
         if row["suite"] == s.suite and same:
             return {"id": row["id"], "status": row["status"],
                     "note": "already in the queue — joining the existing run"}
     sid = db.add(hf_id, s.kind, s.suite, s.submitter.strip()[:80], s.note.strip()[:200],
                  allow_remote_code=s.allow_remote_code, tasks=chosen,
-                 thinking=s.thinking, subset=s.subset)
+                 thinking=s.thinking, subset=subset)
     return {"id": sid, "status": "queued", "tasks": sorted(chosen)}
 
 
@@ -1526,6 +1541,37 @@ def judged_pace() -> dict | None:
         items += run["n_items"]
         used += 1
     return {"sec_per_answer": round(secs / items, 3), "runs": int(used)} if items else None
+
+
+def gen_pace() -> dict:
+    """12a.5b: what the submit form's estimate is made of — per task, seconds
+    per item per billion parameters, the median of this server's last few
+    runs that finished it (GEN_PACE_RUNS), or the rough guess before any; and
+    how many items each asks."""
+    rates: dict[str, list[float]] = {t: [] for t in config.GEN_TASKS}
+    for s in db.recent(300):
+        if s["suite"] != "generative" or s["status"] not in ("done", "canceled") \
+                or not s.get("params"):
+            continue
+        try:
+            times = json.loads(s.get("task_times") or "{}")
+        except ValueError:
+            continue
+        for t, x in times.items():
+            if t in rates and len(rates[t]) < config.GEN_PACE_RUNS and x.get("n") and x.get("s"):
+                rates[t].append(x["s"] / x["n"] / (s["params"] / 1e9))
+    out = {}
+    for t, r in rates.items():
+        r = sorted(r)
+        out[t] = {"per_b": round(r[len(r) // 2], 4) if r
+                  else config.GEN_GUESS_S_PER_ITEM_PER_B[t], "runs": len(r)}
+    return {"tasks": out, "items": dict(config.GEN_ITEMS),
+            "subset": config.GEN_MMLU_PRO_SUBSET}
+
+
+@app.get("/api/gen/pace")
+def gen_pace_api():
+    return gen_pace()
 
 
 def built_items() -> dict[str, int]:

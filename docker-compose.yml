@@ -27,9 +27,12 @@ services:
       args:
         # EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
         EVALBOARD_BUILD: ${EVALBOARD_BUILD:-}
-        # 12h.1: the Mamba kernels, tried at build and never required;
-        # WITH_MAMBA=0 builds without them
-        WITH_MAMBA: ${WITH_MAMBA:-1}
+        # 12a.5b: the hybrids' kernels (causal-conv1d, mamba_ssm), compiled
+        # in the devel image at build and never required. To skip them:
+        # WITH_KERNELS=0 KERNELS_IMAGE=pytorch/pytorch:2.11.0-cuda12.8-cudnn9-runtime
+        WITH_KERNELS: ${WITH_KERNELS:-1}
+        KERNELS_IMAGE: ${KERNELS_IMAGE:-pytorch/pytorch:2.11.0-cuda12.8-cudnn9-devel}
+        KERNEL_JOBS: ${KERNEL_JOBS:-4}
     image: aienh-bench
     pid: "host"
     # the box's loopback, reachable from inside the container: the `local`

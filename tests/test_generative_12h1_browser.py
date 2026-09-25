@@ -139,13 +139,16 @@ def test_the_form_offers_the_three_a_thinking_switch_and_a_subset(live, page):
     dlg.wait_for()
     page.get_by_label("suite").click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='generative']")
-    assert opt.inner_text().startswith("Instruction & maths — IFEval, MMLU-Pro, MATH-500, hours")
+    # 12a.5b: slow, each chosen on its own (test_slow_benchmarks_12a5b_browser.py)
+    assert opt.inner_text().startswith("Instruction & maths — slow, instruct models only")
     opt.click()
     # a model with a switch: the switch; one without: none
     page.evaluate("state.sub.hf_id = 'Qwen/Qwen3.5-2B'; render()")
     dlg.locator("[data-gen-opts]").wait_for()
     assert dlg.locator("[data-think-switch]").count() == 1
-    assert dlg.locator("[data-subset-input]").get_attribute("placeholder") == "all"
+    # 12a.5b: MMLU-Pro is the seeded 1,200 unless Full is chosen
+    dlg.locator("[data-gen-pick='mmlu_pro'] input").check()
+    assert dlg.locator("[data-mmlu-size='subset'] input").is_checked()
     page.evaluate("state.sub.hf_id = 'LiquidAI/LFM2.5-1.2B-Instruct'; render()")
     assert dlg.locator("[data-think-switch]").count() == 0
     shot(page, "12h1-form-1400-light.png")

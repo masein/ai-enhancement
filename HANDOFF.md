@@ -325,6 +325,18 @@ sudo docker compose exec -T bench python scripts/check_tasks.py 2>&1 | tail -15
 **Before a full run of IFEval, MMLU-Pro or MATH-500 (12h.1).** Four trials
 inside the container. They hold the GPU lock and write only to a temporary
 folder.
+- **12a.5b: a trial stops.** `--max-minutes` (15 unless said) stops it and
+  prints what it finished; so does Ctrl+C without `-T` (a TTY passes it on),
+  and closing the terminal that started it. Each ends "stopped; GPU free",
+  with lm_eval and everything it started killed. With `-T`, Ctrl+C ends the
+  client on this side and, it seems, never reaches the trial — the likely
+  reason one ran two hours after Ctrl+C on 2026-09-25. What the trial should
+  see is its stdin closing, and it stops on that; `--max-minutes` stops it
+  regardless. From any shell on the host (the service runs with `pid: host`,
+  so the trial is a process there): `sudo pkill -INT -f scripts/trial_`.
+- **12a.5b: what `--limit` asks.** IFEval and MATH-500 ask `--limit` items
+  (20 unless said); MMLU-Pro asks `--limit` per subject (2 unless said, 28
+  items). The counts print first.
 - **Trials 1–3** ask a few items of the three exactly as a run does. They
   print, per item, what the model wrote, what the board read, the correct
   answer and the verdict, then seconds per item and the time a full
@@ -334,23 +346,24 @@ folder.
   and score the same on transformers 5.5.3. A queued run can't do this,
   because it skips every task it already has.
 
-Trial 1, extraction works: 20 items per benchmark, one model:
+Trial 1, extraction works: 20 items of IFEval and MATH-500 and 28 of
+MMLU-Pro, one model:
 
 ```bash
-sudo docker compose exec -T bench python scripts/trial_generative.py --model Qwen/Qwen3-1.7B --limit 20 2>&1 | tail -60
+sudo docker compose exec -T bench python scripts/trial_generative.py --model Qwen/Qwen3-1.7B --max-minutes 30 2>&1 | tail -60
 ```
 
 Trial 2, a new model loads, and its full-run estimate:
 
 ```bash
-sudo docker compose exec -T bench python scripts/trial_generative.py --model Qwen/Qwen3.5-2B --limit 5 2>&1 | tail -30
+sudo docker compose exec -T bench python scripts/trial_generative.py --model Qwen/Qwen3.5-2B --limit 2 2>&1 | tail -30
 ```
 
 Trial 3, Youtu-LLM-2B loads on transformers 5.5.3's own Youtu class (its
 repo ships no code):
 
 ```bash
-sudo docker compose exec -T bench python scripts/trial_generative.py --model tencent/Youtu-LLM-2B --limit 5 2>&1 | tail -30
+sudo docker compose exec -T bench python scripts/trial_generative.py --model tencent/Youtu-LLM-2B --limit 2 2>&1 | tail -30
 ```
 
 Trial 4, the Standard tasks on transformers 5.5.3: HellaSwag and ARC-Easy,
@@ -365,6 +378,26 @@ Expected: one line per task, for example "hellaswag · acc_norm 0.4312 ±
 0.0049 · board 0.4309 ± 0.0049 · +0.0003, inside the noise", then "trial
 OK: every task ran". A difference past the noise comes from the image
 change. Send it before anything else is queued.
+
+**After 12a.5b, the speed-up packages.** The rebuild's env line says each:
+`| flash-linear-attention yes | causal-conv1d yes | mamba_ssm yes`. The
+first build after 12a.5b pulls the devel image (about 14 GB) and compiles
+the two kernels, an hour or more; the running service stays up meanwhile,
+and later builds take them from Docker's cache. A "no" is a kernel that
+would not build or load: the build log says why (`grep kernels:`), and that
+model family keeps its slow path. Then the speed trial:
+
+```bash
+sudo docker compose exec -T bench python scripts/trial_generative.py --model Qwen/Qwen3.5-2B --limit 2 --max-minutes 10 2>&1 | tee /tmp/trial-speed.log
+```
+
+Expected: the counts first ("IFEval: 2 items", "MATH-500: 2 items",
+"MMLU-Pro: 28 items (2 per subject × 14)"), then per benchmark a line like
+"IFEval — 2 items in 40 s, 20.00 s per item · generating 3.10 s per item,
+loading left out". Two items are mostly loading the model, so compare the
+generating rate: 12h.1's trial measured 14.75 s per IFEval item with loading
+in it, over five items. With the kernels it should be well below. If the ten
+minutes run out, it prints what it finished and "stopped; GPU free".
 
 **After a change to the Everyday bank or its checks (12g.2, 12a.5a).** Mark
 the answers already on file again, with today's checks. No GPU, no judge
@@ -2541,6 +2574,41 @@ check, and Improve shows them only as a before → after watch line.
     questions · 333 re-marked", or "333 re-marked · 55 not asked yet".
 - **Why an answer failed.** A failed item keeps `failed`: each check it
   failed, its reason and its plain words. The answer reader lists them.
+
+### 12a.5b — slow benchmarks made optional, and trials that stop
+
+`docs/prompts/phase-12a5-everyday-fixes-long-summaries-slow-benchmarks.md`,
+§5–8.
+
+- **The submit form.** Instruction & maths opens a group of its own, "Slow ·
+  instruct models only": IFEval, MATH-500 and MMLU-Pro, none ticked.
+  - MMLU-Pro is **Subset (1,200)** unless **Full (12,032)** is chosen, each
+    with its time. The API does the same: `subset` left out is 1,200
+    (`GEN_MMLU_PRO_SUBSET`), `subset: 0` is the full run, and `tasks` picks
+    among the three.
+  - **The time before Submit**: seconds per item per billion parameters,
+    the median of this server's last five runs of each (`/api/gen/pace`,
+    from each run's `task_times`), times the model's size and the items.
+    Before any run of one here, `GEN_GUESS_S_PER_ITEM_PER_B` gives "about N
+    h, a rough guess". Over an hour, one amber line: "This holds the GPU for
+    about 3 h; other runs wait."
+- **On the board**, a subset MMLU-Pro is `mmlu_pro_subset`, "MMLU-Pro
+  subset": a column of its own, labelled in its cells and tooltip. It is
+  never averaged or compared with the full one. The harness's own item
+  counts say which a run was, and a run of one size never reuses answers of
+  the other (the runner moves them aside and asks again).
+- **On Runs.** A generative run asks MMLU-Pro last. While a task runs, the
+  row reads lm_eval's own progress bar: "MMLU-Pro 340 of 1,200 · about 45 min
+  left". Cancelled, it keeps what finished — read in the board's words and
+  on the board — and says so: "cancelled during MMLU-Pro · IFEval and
+  MATH-500 kept".
+- **Trials stop** (`scripts/trial_stop.py`), as §5b says, and
+  `trial_generative.py` prints a generating rate beside the one with loading
+  in it, and uses it for the full-run estimate.
+- **The image** compiles causal-conv1d and mamba_ssm in a `kernels` stage on
+  the devel image, and installs flash-linear-attention. Neither kernel has a
+  wheel for torch 2.11, so the old one-line install always tried to compile
+  without nvcc, and failed. The env line says yes or no for each.
 
 ## 11. Known gaps, risks, loose ends
 

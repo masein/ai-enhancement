@@ -100,7 +100,9 @@ def test_our_reading_is_the_score_and_the_harness_one_is_not(tmp_path):
         assert ours[t]["acc"] > 0.5
     # IFEval is the harness's own checker: its prompt-level strict score
     assert p["cells"]["ifeval"]["org/chat-2b"]["v"] == 0.5
-    assert set(gen.TASKS) <= set(p["accTasks"]) and p["genTasks"] == list(gen.TASKS)
+    # 12a.5b: a subset of MMLU-Pro is a column of its own
+    assert set(gen.TASKS) <= set(p["accTasks"]) and p["genTasks"] == [
+        "ifeval", "mmlu_pro", "mmlu_pro_subset", "hendrycks_math500"]
     # the answers that ran out of room, counted per task
     assert all(m["gen"]["tasks"][t]["ran_out"] == 1 for t in gen.TASKS)
     assert m["gen"]["backend"] == "vllm"
@@ -321,10 +323,11 @@ def test_the_queue_takes_thinking_and_a_subset_for_the_three_only(svc):
                                             "thinking": True})
     assert on.status_code == 200 and on.json()["id"] != r.json()["id"]   # another row
     row = db.get(on.json()["id"])
-    assert row["thinking"] == 1 and row["subset"] == 0
+    # 12a.5b: MMLU-Pro is the seeded 1,200 unless the full run is asked for
+    assert row["thinking"] == 1 and row["subset"] == 1200
     sub = svc.post("/api/submissions", json={"hf_id": "Qwen/Qwen3.5-4B", "suite": "generative",
-                                             "subset": 1200})
-    assert db.get(sub.json()["id"])["subset"] == 1200
+                                             "subset": 0})
+    assert db.get(sub.json()["id"])["subset"] == 0
     for body, want in (({"suite": "full", "thinking": True}, "suite generative"),
                        ({"suite": "generative", "subset": 20000}, "from 1 to 12031"),
                        ({"suite": "generative", "kind": "base"}, "only an instruct model")):

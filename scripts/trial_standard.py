@@ -14,7 +14,9 @@ number beside the board's, and whether the difference is inside the noise.
 The quick suite by default (HellaSwag and ARC-Easy), whole, so the numbers
 compare. It writes only to a temporary folder, holds the GPU lock while it
 runs (a queued run waits, as it would for any other), and never touches the
-results.
+results. 12a.5b: it stops — lm_eval killed, the lock freed, "stopped; GPU
+free" — on Ctrl+C, when the terminal that started it goes away, and at
+--max-minutes (15 unless said); scripts/trial_stop.py.
 """
 
 from __future__ import annotations
@@ -32,12 +34,17 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(REPO), str(REPO / "scripts")]
 
 import report_lm_eval as report  # noqa: E402
+import trial_stop  # noqa: E402
 from service import config, runner  # noqa: E402
+
+STOP: trial_stop.Stop | None = None
 
 
 def run_harness(cmd: list[str], cwd: Path, log: Path) -> int:
-    """lm_eval, as a run starts it; its output goes to `log`. The tests put a
-    fake harness here."""
+    """lm_eval, as a run starts it; its output goes to `log`. It stops as the
+    trial does (trial_stop). The tests put a fake harness here."""
+    if STOP is not None:
+        return STOP.run(cmd, cwd, log)
     with open(log, "a") as lf:
         return subprocess.run(cmd, cwd=cwd, stdout=lf, stderr=subprocess.STDOUT).returncode
 
@@ -74,17 +81,23 @@ def compare(task: str, now: tuple[str, float, float] | None,
 
 
 def main(argv=None) -> int:
+    global STOP
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True, help="a Hugging Face id on the board")
     ap.add_argument("--tasks", default=",".join(config.QUICK_TASKS),
                     help="Standard tasks (default: the quick suite)")
+    ap.add_argument("--max-minutes", type=float, default=trial_stop.MAX_MINUTES,
+                    help="stop at this many minutes, keeping what finished (default "
+                         f"{trial_stop.MAX_MINUTES:g})")
     ap.add_argument("--keep", action="store_true", help="keep the temporary folder")
     a = ap.parse_args(argv)
     tasks = [t.strip() for t in a.tasks.split(",") if t.strip()]
     known = set(config.FULL_TASKS) | set(config.QUICK_TASKS)
     if not tasks or [t for t in tasks if t not in known]:
         ap.error(f"tasks are Standard tasks: {', '.join(config.FULL_TASKS)}")
+    if a.max_minutes <= 0:
+        ap.error("--max-minutes is more than 0")
 
     from service.hfmeta import PreflightError, preflight
     try:
@@ -109,7 +122,10 @@ def main(argv=None) -> int:
         return 3
     work = Path(tempfile.mkdtemp(prefix="trial-standard-"))
     got: dict[str, tuple[str, float, float] | None] = {}
+    stopped = ""
+    STOP = trial_stop.Stop(a.max_minutes)
     try:
+        STOP.__enter__()
         for task in tasks:
             shots = config.NFEWSHOT.get(task, 0)
             task_out = work / a.model.replace("/", "__") / f"{task}_{shots}shot"
@@ -125,12 +141,22 @@ def main(argv=None) -> int:
                 for ln in tail[-12:]:
                     print(f"    | {ln}")
             print(compare(task, got[task], board.get(task)))
+    except trial_stop.Stopped as e:
+        stopped = str(e)
     finally:
+        # lm_eval is gone before the lock is: Stop.run kills its whole group
+        STOP.__exit__(None, None, None)
+        STOP = None
         runner.release_lock()
         if not a.keep:
             shutil.rmtree(work, ignore_errors=True)
         else:
             print(f"kept: {work}")
+    if stopped:
+        done = [t for t in tasks if got.get(t)]
+        trial_stop.say(f"{stopped}. Finished: {', '.join(done) if done else 'nothing'}.")
+        trial_stop.say("stopped; GPU free")
+        return 4
     ok = all(got.get(t) for t in tasks)
     print("trial OK: every task ran" if ok
           else "trial FAILED: " + ", ".join(t for t in tasks if not got.get(t)))

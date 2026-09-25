@@ -306,6 +306,22 @@ MMLU_PRO_SUBJECTS = {
     "economics": 844, "engineering": 969, "health": 818, "history": 381, "law": 1101,
     "math": 1351, "other": 924, "philosophy": 499, "physics": 1299, "psychology": 798}
 GEN_SUBSET_SEED = 1234
+# 12a.5b: the three are slow — hours on hf where the Standard tasks take
+# minutes — so the submit form offers them unticked, with an estimate, and
+# MMLU-Pro runs last, so a cancel keeps the other two. MMLU-Pro is a seeded
+# subset of this many items unless the full 12,032 is asked for: the board
+# shows a subset as a benchmark of its own ("mmlu_pro_subset"), never averaged
+# or compared with the full one
+GEN_MMLU_PRO_SUBSET = int(os.environ.get("GEN_MMLU_PRO_SUBSET", "1200"))
+GEN_ITEMS = {"ifeval": 541, "mmlu_pro": sum(MMLU_PRO_SUBJECTS.values()),
+             "hendrycks_math500": 500}
+# the estimate is seconds per item per billion parameters, from this server's
+# last few runs of each (GEN_PACE_RUNS). Before any: these, from the trials of
+# 2026-09-25 on hf — Qwen3.5-2B took 14.75 s per IFEval item, and a full
+# MMLU-Pro on Qwen3-1.7B about 11½ h; MATH-500 was not timed. A rough guess,
+# and the form says so
+GEN_GUESS_S_PER_ITEM_PER_B = {"ifeval": 7.4, "mmlu_pro": 2.0, "hendrycks_math500": 5.0}
+GEN_PACE_RUNS = 5
 GEN_INSTRUCT_ONLY = ("IFEval, MMLU-Pro and MATH-500 are asked through the chat template and "
                      "scored on what the model writes, so only an instruct model can sit them "
                      "fairly — this one runs as a base model (it has no chat template, or "
