@@ -366,6 +366,22 @@ Expected: one line per task, for example "hellaswag · acc_norm 0.4312 ±
 OK: every task ran". A difference past the noise comes from the image
 change. Send it before anything else is queued.
 
+**After a change to the Everyday bank or its checks (12g.2, 12a.5a).** Mark
+the answers already on file again, with today's checks. No GPU, no judge
+call; a judge verdict is kept while its answer is the same:
+
+```bash
+sudo docker compose exec -T bench sh -c 'python scripts/everyday.py "$BENCH_ROOT/results/full"' 2>&1 | tail -12
+```
+
+Expected: one line per model, for example "Qwen/Qwen3-1.7B: Everyday tasks:
+140 of 169 hidden · 333 re-marked · 55 not asked yet", then "marked N
+model(s)". The answers are now kept beside each model's marks
+(`everyday_answers.jsonl`), by question and words. Then **Run everyday
+tasks** on those models asks each only the questions it has no answer to —
+after 12a.5a, the 55 new ones — and the run's line says "55 new questions ·
+333 re-marked".
+
 **Step 3's expected output:** the last line reads `N passed, M deselected
 in …s`, with no `failed` and no `error`.
 - `test_matches_the_installed_harness` skips on a laptop, where lm_eval isn't
@@ -2476,6 +2492,55 @@ check, and Improve shows them only as a before → after watch line.
   - The 13-gram gate now covers the whole Everyday bank, both halves,
     requests and good answers. It also drops an example whose request *is*
     one of the bank's, however short.
+
+### 12a.5a — the Everyday bank and checker
+
+`docs/prompts/phase-12a5-everyday-fixes-long-summaries-slow-benchmarks.md`,
+§1–4; its files are in `docs/prompts/phase-12a5/`.
+
+- **The bank is 388 questions in eight groups.**
+  - The brief's 383 replace 12a.4's by id (the checks of 22 fixed), and the
+    pilot's five stay as they were.
+  - **Shorten a message** (`shorten`) is the 62 short ones that were
+    "Summarising", same ids, and the pilot's tldr.
+  - **Summarise** (`summarising`) is 45 new long texts, 425 to 850 words.
+  - **Honesty** gains 10 questions whose answer is in the message, so a
+    blanket refusal fails them.
+  - Hidden · practice per group: Understanding 27 · 18, Writing 24 · 24,
+    Shorten 26 · 37, Summarise 26 · 19, Transform 25 · 21, Quick maths 24 · 21,
+    Instructions 24 · 21, Honesty 24 · 27. That is 200 hidden and 188
+    practice; every group is over 12g.2's line of 20.
+  - The version's hash is new (`32432393`); the wording of the 328 is
+    12a.4's.
+- **The checker** ports `docs/prompts/phase-12a5/checks.py`, and agrees with
+  it on all 776 probes (21 of them real answers from the live board):
+  - a closing offer isn't a line, and a code block's lines are the answer's;
+  - "doesn't say" skips the explanation of the fixes;
+  - a key fact counts in another word form, within four words;
+  - a bare time matches its am form, "Sept" is "Sep", "to"/"until"/"till"
+    make a range;
+  - no invented numbers compares times as times and reads numbers in words,
+    and list markers aren't numbers;
+  - asking for the details it needs admits a limit;
+  - a bare site name isn't a made-up link;
+  - `json` with `"only": true` fails text outside the JSON ("wrote more than
+    the JSON"; the question list says "nothing but the JSON").
+- **Answers are kept by question and words.**
+  - `everyday_answers.jsonl` beside `everyday.json` holds every answer, keyed
+    by the question's id and a hash of its prompt. The run folder's samples
+    are gathered into it whenever answers are marked, and before a run moves
+    the folder aside.
+  - Re-marking marks every answer to a question's current words with
+    today's checks. A model with no such answer at all is an earlier
+    wording's, as in 12a.4.
+  - A run asks only the questions the model has no answer to
+    (`everyday.unanswered`; the task is built with only those). With none it
+    asks nothing and marks again.
+  - `everyday.json` says what the marking was: `marking: {new, remarked}` and
+    `unasked`. The run's line and the model page say it in one line: "55 new
+    questions · 333 re-marked", or "333 re-marked · 55 not asked yet".
+- **Why an answer failed.** A failed item keeps `failed`: each check it
+  failed, its reason and its plain words. The answer reader lists them.
 
 ## 11. Known gaps, risks, loose ends
 

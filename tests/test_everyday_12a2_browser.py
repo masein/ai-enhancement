@@ -5,7 +5,7 @@ model's answers in that group; the model page's block by group; Models'
 Everyday view with a column per group and the total, the badge once. 12a.3:
 the bank is 333 questions. 12a.4: the badge says "not ranked", and only the
 models that answered this wording are here — the two that sat only the pilot
-answered an earlier one."""
+answered an earlier one. 12a.5: 388 questions in eight groups."""
 
 from __future__ import annotations
 
@@ -17,10 +17,10 @@ from conftest import open_kind
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12a2"
-GROUPS = ["Understanding", "Writing", "Summarising", "Transform", "Quick maths", "Instructions",
-          "Honesty"]
-KEYS = ["understanding", "writing", "summarising", "transform", "quick_maths", "instructions",
-        "honesty"]
+GROUPS = ["Understanding", "Writing", "Shorten a message", "Summarise", "Transform",
+          "Quick maths", "Instructions", "Honesty"]
+KEYS = ["understanding", "writing", "shorten", "summarising", "transform", "quick_maths",
+        "instructions", "honesty"]
 
 
 def shot(page, name, **kw):
@@ -43,7 +43,7 @@ def test_the_results_are_groups_by_models_n_of_k(live, page):
               for th in page.locator("[data-everyday-table] th[data-evd-model]").all()]
     assert models == ["fx/good-750m", "fx/skewed-360m"]
     # 12g.2: the hidden half's score
-    assert page.locator("[data-evd-count='fx/good-750m']").inner_text() == "168 of 169"
+    assert page.locator("[data-evd-count='fx/good-750m']").inner_text() == "199 of 200"
     # k is the group's hidden half
     assert page.locator("[data-evd-cell='fx/good-750m|quick_maths']").inner_text() == "23 of 24"
     # 12a.4: one that sat the pilot only answered an earlier wording: not here
@@ -96,27 +96,27 @@ def test_the_bank_is_readable_by_group_with_its_checks_in_plain_words(live, page
     assert q.locator("[data-evd-checks]").inner_text() == \
         "Passes if it: valid JSON with 4091, 84.50, freshmart"
     # every practice question is there, every one readable; the hidden are counted
-    assert page.locator("[data-evd-bank-q]").count() == 164
+    assert page.locator("[data-evd-bank-q]").count() == 188
     assert page.locator("[data-evd-bank-q='everyday-pilot-02']").count() == 0
     # the page's cards are not steps: no section numbers
     assert page.locator("#view h2[data-ix]").count() == 0
     assert page.errors == []
 
 
-def test_the_model_page_block_is_the_seven_groups(live, page):
+def test_the_model_page_block_is_the_eight_groups(live, page):
     page.set_viewport_size({"width": 1400, "height": 1000})
     page.goto(live["base"] + "/#model=fx%2Fgood-750m")
     open_kind(page, "everyday")
     block = page.locator("[data-everyday-block='fx/good-750m']")
     assert [b.get_attribute("data-evd-group") for b in block.locator("[data-evd-group]").all()] == KEYS
     # 12g.2: the hidden half's count, and the practice half's answers
-    assert block.locator("[data-evd-group-count='honesty']").inner_text() == "19 of 19"
+    assert block.locator("[data-evd-group-count='honesty']").inner_text() == "24 of 24"
     block.locator("[data-evd-group='honesty']").click()
     rows = page.locator("[data-evd-answers='fx/good-750m|honesty'] [data-evd-row]")
     rows.first.wait_for()
-    assert rows.count() == 22
+    assert rows.count() == 27
     assert page.locator("[data-kind-tile='everyday'] [data-kind-value='everyday']").inner_text() == \
-        "168 of 169"
+        "199 of 200"
     # 12a.4: a model that sat the pilot answered an earlier wording — no
     # block, and its header says where the answers are
     page.goto(live["base"] + "/#model=fx%2Fbelow-135m-it")
@@ -137,23 +137,24 @@ def test_models_everyday_is_a_column_per_group_and_the_total(live, page):
     assert heads[-1].lower() == "total"
     row = t.locator("tr[data-lb-row='fx/good-750m']")
     assert row.locator("[data-evd-g='writing']").inner_text() == "24 of 24"      # 12g.2
-    assert row.locator("[data-everyday-count]").inner_text() == "168 of 169"
+    assert row.locator("[data-everyday-count]").inner_text() == "199 of 200"
     assert page.locator("[data-lb-card] [data-pilot-badge]").count() == 1
     assert page.errors == []
 
 
-def test_run_everyday_tasks_and_the_suite_say_333(live, page):
+def test_run_everyday_tasks_and_the_suite_say_388(live, page):
     everyday_page(page, live["base"])
     page.locator("[data-everyday-run]").click()
     dlg = page.locator("[data-dialog='everyday']")
     dlg.wait_for()
     assert dlg.locator("h2").inner_text() == "Run everyday tasks"
-    assert "333 questions" in dlg.inner_text()
+    # 12a.5: a run asks what the model has no answer to — all 388 the first time
+    assert "all 388 the first time" in dlg.inner_text()
     page.keyboard.press("Escape")
     page.locator("header [data-test-model]").click()
     page.get_by_label("suite").click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='everyday']")
-    assert opt.inner_text() == "Everyday tasks — 333 questions, a few minutes"
+    assert opt.inner_text() == "Everyday tasks — 388 questions, a few minutes"
     page.keyboard.press("Escape")
     assert page.errors == []
 

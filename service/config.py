@@ -128,10 +128,11 @@ CONTROL_TASKS_DIR = Path(os.environ.get(
     Path(__file__).resolve().parent.parent / "eval_tasks" / "mmlu_perm"))
 
 # 12a: Everyday tasks — questions typed the way people type on a phone, marked
-# by scripts/everyday.py. 12a.3: the bank, 333 questions in seven groups. A
-# look, not a benchmark: in no other suite, on no leaderboard, in no average.
-# The harness task is written here from eval_tasks/everyday at the start of
-# each run (everyday.build_task)
+# by scripts/everyday.py. 12a.3: the bank, 333 questions in seven groups;
+# 12a.5: 388 in eight. A look, not a benchmark: in no other suite, on no
+# leaderboard, in no average. The harness task is written here from
+# eval_tasks/everyday at each run (everyday.build_task) — 12a.5: only the
+# questions the model has no answer to on their current words
 EVERYDAY_TASK = "everyday"
 EVERYDAY_TASKS_DIR = Path(os.environ.get("EVERYDAY_TASKS_DIR", BENCH_ROOT / "everyday" / "tasks"))
 # 12g.2: an Everyday group joins Improve only when its hidden half has at least

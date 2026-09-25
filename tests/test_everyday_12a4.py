@@ -1,17 +1,18 @@
 """12a.4: Everyday tasks, neutral wording and fairer checks. The bank is
-reworded so nothing only makes sense in one country, and
-docs/prompts/phase-12a4/checks.py replaces 12a.3's reference checker:
-scripts/everyday.py must reach its verdict on all 382 probes in
-everyday_probes_all.jsonl, and decide every check exactly as it does.
+reworded so nothing only makes sense in one country. 12a.5 replaced its
+reference checker (docs/prompts/phase-12a5/checks.py): the probes — its 776
+hold 12a.4's 382, each with the same verdict — the port and the references
+are tests/test_everyday_12a5.py's now. What 12a.4 added and still holds is
+here: the wording, the checks it added, and the version.
 
 The bank has a version — the date its wording changed and a short hash of
-the question texts — and a run's version is the hash of what it was asked.
-Answers to an earlier wording are never re-marked, never in a current score
-and never in a comparison: they are in the model's History."""
+the question texts. Answers to an earlier wording are never in a current
+score and never in a comparison: they are in the model's History. 12a.5: an
+answer is kept by its question's words, so a model with answers to today's
+words is marked on those, and one with none is an earlier wording's."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import re
 from pathlib import Path
@@ -30,38 +31,29 @@ def _jsonl(path: Path) -> list[dict]:
             if line.strip()]
 
 
-PROBES = _jsonl(BRIEF / "everyday_probes_all.jsonl")
 NEUTRAL = _jsonl(BRIEF / "everyday_bank_neutral.jsonl")
 BANK = {q["id"]: q for q in ev.load_bank()}
 # the words that only make sense in one country (the brief's list)
 LOCAL = ["aed", "dirham", "dubai", "abu dhabi", "sharjah", "emirates", "uae", "nol",
          "talabat", "dewa", "careem", "salik"]
 # the wording of 2026-09-25: change WORDING_DATE with the wording, and this with it
-# 12g.2: the split is part of what a score means, so it is part of the version
-WORDING = {"date": "2026-09-25", "hash": "8954b300", "split": "evalboard-split-v1"}
-
-
-def reference_checker():
-    spec = importlib.util.spec_from_file_location("checks_12a4", BRIEF / "checks.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def script_verdict(item, answer):
-    return all(ev.run_check(c, answer, item["prompt"])[0]
-               for c in item["checks"] if c["type"] != "judge")
+# 12g.2: the split is part of what a score means, so it is part of the version.
+# 12a.5: 55 new questions, the same day — a new hash
+WORDING = {"date": "2026-09-25", "hash": "32432393", "split": "evalboard-split-v1"}
 
 
 # ---------------------------------------------------------------------------
 # the bank
 # ---------------------------------------------------------------------------
 
-def test_the_bank_is_333_neutral_questions():
+def test_the_neutral_wording_stands():
+    """12a.5 fixed checks and moved the short summaries to a group of their
+    own; the 328's words, and who wrote them, are still 12a.4's"""
     qs = ev.load_bank()
-    assert len(qs) == 333
-    # the 328 are the brief's, by id, written_by and all; the order is the bank's
-    assert len(NEUTRAL) == 328 and all(BANK[q["id"]] == q for q in NEUTRAL)
+    assert len(NEUTRAL) == 328
+    for q in NEUTRAL:
+        assert {k: BANK[q["id"]][k] for k in ("prompt", "reference", "written_by")} == \
+            {k: q[k] for k in ("prompt", "reference", "written_by")}, q["id"]
     assert [q["id"] for q in qs].index("everyday-pilot-01") == 15
     # the one pilot question that needed it: Toronto, not Dubai
     p2 = BANK["everyday-pilot-02"]
@@ -86,53 +78,8 @@ def test_no_question_only_makes_sense_in_one_country():
 
 
 # ---------------------------------------------------------------------------
-# the checks
+# the checks 12a.4 added
 # ---------------------------------------------------------------------------
-
-@pytest.mark.parametrize("i", range(len(PROBES)), ids=[f"{p['id']}#{n}" for n, p in enumerate(PROBES)])
-def test_every_probe_gets_its_verdict(i):
-    p = PROBES[i]
-    item = BANK[p["id"]]
-    assert script_verdict(item, p["answer"]) == (p["expected"] == "pass"), (p["answer"], [
-        ev.run_check(c, p["answer"], item["prompt"]) for c in item["checks"]])
-    ok, why = ev.grade(item, p["answer"])
-    if p["expected"] == "pass":
-        assert ok is (None if any(c["type"] == "judge" for c in item["checks"]) else True), why
-    else:
-        assert ok is False and why
-
-
-def test_the_port_decides_as_checks_py_does():
-    """every check of every question, on every probe and on the question's own
-    reference: the same verdict and the same reason"""
-    ref = reference_checker()
-    n = 0
-    for p in PROBES + [{"id": q["id"], "answer": q["reference"]} for q in BANK.values()]:
-        item = BANK[p["id"]]
-        for c in item["checks"]:
-            assert ev.run_check(c, p["answer"], item["prompt"]) == \
-                ref.run(c, p["answer"], item["prompt"]), (p["id"], c, p["answer"])
-            n += 1
-    assert n > 1000
-    assert ev.ADMITS == ref.ADMITS
-
-
-def test_every_reference_passes_its_own_script_checks():
-    assert [q["id"] for q in BANK.values() if not script_verdict(q, q["reference"])] == []
-
-
-def test_pasting_the_message_back_fails_every_summary():
-    """by its word limit; the TL;DR, which only the judge limits, by the judge"""
-    summaries = [q for q in BANK.values() if q["group"] == "summarising"]
-    assert len(summaries) == 63
-    for q in summaries:
-        message = q["prompt"][q["prompt"].index('"') + 1:q["prompt"].rindex('"')]
-        ok, why = ev.grade(q, message)
-        if any(c["type"] == "judge" for c in q["checks"]):
-            assert ok is None and ev.stub_verdict(message, q["prompt"])["pass"] is False, q["id"]
-        else:
-            assert ok is False and "words, limit" in why, (q["id"], why)
-
 
 def test_admits_limit_and_any():
     admits = {"type": "admits_limit"}
@@ -221,14 +168,16 @@ def test_a_run_on_this_wording_is_stamped_with_it(tmp_path):
     out = ev.mark(mdir)
     assert out["version"] == WORDING and out["earlier"] is False
     # 12g.2: the hidden half's score; the judge's eleven wait, in both halves
-    assert out["passed"] == 161 and out["total"] == 169 and out["waiting"] == 11
+    assert out["passed"] == 192 and out["total"] == 200 and out["waiting"] == 11
 
 
 def test_answers_to_an_earlier_wording_are_never_re_marked(tmp_path):
     """#67–#73 answered questions that have been reworded since: what they
-    were marked stays, labelled earlier, and today's checks never touch it"""
+    were marked stays, labelled earlier, and today's checks never touch it.
+    12a.5: every question here was reworded — a model with an answer to some
+    of today's words is marked on those (tests/test_everyday_12a5.py)"""
     mdir = tmp_path / "org__m"
-    old = [{**q, "prompt": q["prompt"].replace("Toronto", "Dubai")} for q in ev.load_bank()]
+    old = [{**q, "prompt": q["prompt"] + " (then)"} for q in ev.load_bank()]
     _asked(mdir, old, answer=lambda q: "I'm not sure.")
     as_marked = {"model": "org/m", "passed": 170, "total": 333, "marked_at": 1.0,
                  "items": [{"id": q["id"], "pass": False, "reason": "then"} for q in old]}
