@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""The Everyday tasks pilot (brief 12a): mark what a model answered.
+"""Everyday tasks (briefs 12a, 12a.2, 12a.3): mark what a model answered.
 
 Everyday tasks asks what people type into an assistant on a phone — short,
 lowercase, typos, one plain request — and most answers can be marked by a
-script, so the score needs no judge. The pilot is five questions, all of
-them readable. It is a look, not a benchmark: never ranked, never averaged
-into anything, never on the Leaderboard, never read by Propose, never sent
-to a generator. Its questions are not split into practice and hidden
-halves; each item may carry a `split` later, and nothing here reads one yet.
+script, so the score needs no judge. The bank is 333 questions in seven
+groups (eval_tasks/everyday/bank.jsonl), all of them readable. It is a
+look, not a benchmark: never ranked, never averaged into anything, never on
+the Leaderboard, never read by Propose, never sent to a generator. Its
+questions are not split into practice and hidden halves yet; 12g.2 does
+that, and nothing here reads a `split`.
 
     python scripts/everyday.py results/full            re-mark every model
     python scripts/everyday.py results/full -m org/x   one model
@@ -16,9 +17,10 @@ It reads the generations the harness logged, marks each one on the text
 after the reasoning block (judge.answer_parts, #59's split — never the raw
 generation), and writes everyday.json beside the model's results. Each
 check says pass or fail and one reason in plain words, because the reason
-is what the page shows. Question 03 is the one the judge marks, against the
-rubric the question carries; re-marking keeps its verdict while the answer is
-the same one it read. English only (2026-09-24).
+is what the page shows. The few questions with a judge check go to the
+judge, with the rubric the question carries, once their script checks
+pass; re-marking keeps a verdict while the answer is the same one it read.
+English only (2026-09-24).
 """
 
 from __future__ import annotations
@@ -37,9 +39,9 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(REPO))
 import judge as _judge  # noqa: E402
 
-# 12a.2: one bank — round 2's 106 questions and the pilot's five, the
-# harness task "everyday". A model that sat the pilot logged it as
-# "everyday_pilot", and those answers are still read
+# one bank, the harness task "everyday": round 2's 106 questions and the
+# pilot's five (12a.2), and round 3's 222 (12a.3), 333 in all. A model that
+# sat the pilot logged it as "everyday_pilot", and those answers are still read
 TASK = "everyday"
 LEGACY_TASKS = ("everyday_pilot",)
 BANK_DIR = REPO / "eval_tasks" / "everyday"
@@ -52,6 +54,26 @@ GROUPS = {"understanding": "Understanding", "writing": "Writing",
           "quick_maths": "Quick maths", "instructions": "Instructions", "honesty": "Honesty"}
 NEVER_FINISHED = "never finished answering"
 WAITING = "waiting for the judge"
+
+
+def _words(x) -> bool:
+    return isinstance(x, list) and bool(x) and all(isinstance(v, str) and v for v in x)
+
+
+def _bad_shape(c: dict) -> str:
+    """12a.3's two check types, read as the checker reads them: a fact given
+    as a string would be read letter by letter, and pass on nearly anything"""
+    if c["type"] == "facts":
+        if not (isinstance(c["values"], list) and c["values"]
+                and all(_words(f) for f in c["values"])):
+            return "facts needs values: a list of facts, each a list of ways to say it"
+        if not (isinstance(c["n"], int) and 0 < c["n"] <= len(c["values"])):
+            return f"facts needs n between 1 and {len(c['values'])}"
+    if c["type"] == "first_mention":
+        for k in ("right", "wrong"):
+            if not _words(c[k]):
+                return f"first_mention needs {k}: a list of names"
+    return ""
 
 
 def load_bank(path: Path = BANK_PATH) -> list[dict]:
@@ -85,17 +107,20 @@ def load_bank(path: Path = BANK_PATH) -> list[dict]:
             miss = [k for k in NEEDS[t] if k not in c]
             if miss:
                 raise ValueError(f"{path.name} line {n}: {t} needs {', '.join(miss)}")
+            why = _bad_shape(c)
+            if why:
+                raise ValueError(f"{path.name} line {n}: {why}")
         out.append(q)
     return out
 
 
 # ---------------------------------------------------------------------------
-# the check vocabulary (12a.2). docs/prompts/phase-12b3/checks.py is the
-# reference: every check below decides exactly as it does — the same regexes,
-# the same normalising — and tests/test_everyday_12a2.py holds the two to the
-# same verdict on all 180 probes. What this adds is words: each check says
-# what it looks for in plain words (the bank's page), and a failing check
-# says why (the answer's row).
+# the check vocabulary (12a.2, 12a.3). docs/prompts/phase-12a3/checks.py is
+# the reference, and replaces 12a.2's: every check below decides exactly as it
+# does — the same regexes, the same normalising, the same reasons — and
+# tests/test_everyday_12a3.py holds the two to the same verdict on all 366
+# probes. What this adds is words: each check says what it looks for in plain
+# words (the bank's page), and a failing check says why (the answer's row).
 # ---------------------------------------------------------------------------
 
 NUM = re.compile(r'(?<![\w.])-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|(?<![\w.])-?\d+(?:\.\d+)?')
@@ -105,9 +130,22 @@ def _norm(s: str) -> str:
     return s.replace('’', "'").replace('½', ' 1/2')
 
 
+_RANGE = re.compile(r'(?<![\d:])(\d{1,2}(?::\d\d)?)\s*[-–—]\s*(\d{1,2}(?::\d\d)?)\s*'
+                    r'(am|pm|a\.m\.|p\.m\.)(?!\w)', re.I)
+
+
 def _ampm(x: str) -> str:
-    """12:30pm reads as 12:30 pm, on both sides of a comparison"""
+    """12:30pm reads as 12:30 pm, on both sides of a comparison. 12a.3: a
+    range says each of its times — "7-11 am", "2–3pm" and "9:30–11:30 am"
+    read as "7 am-11 am" — so "7 am" is found in "7–11 am"."""
+    x = _RANGE.sub(r'\1 \3-\2 \3', x)
     return re.sub(r'(\d)\s*(am|pm|a\.m\.|p\.m\.)(?!\w)', r'\1 \2', x, flags=re.I)
+
+
+def _at(text_low: str, v: str) -> list[int]:
+    """where `v` starts in lowercased, am/pm-read text, as a whole word"""
+    return [m.start() for m in
+            re.finditer(r'(?<!\w)' + re.escape(_ampm(v).lower()) + r'(?!\w)', text_low)]
 
 
 def _has(text: str, v: str, cs: bool = False) -> bool:
@@ -182,6 +220,10 @@ INVENTED = {
              r'(?:aed|dhs|dirhams?|usd)\b)',
     'distance': r'\d+(?:\.\d+)?\s?(?:km|kms|kilomet\w*|metres?|meters?|m\b|mins?\b|minutes?)',
 }
+def _digits(x: str) -> str:
+    return re.sub(r'\D', '', x)
+
+
 EMOJI = re.compile('[\U0001F000-\U0001FAFF☀-➿⭐⭕✅❌❤️]')
 _ABBR = re.compile(r'\b(?:dr|mr|mrs|ms|st|e\.g|i\.e|etc)\.', re.I)
 
@@ -219,11 +261,11 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
         n = len(a.split())
         return n <= check['n'], f'{n} words, limit {check["n"]}'
     if t == 'in_order':
-        pos, low = 0, a.lower()
+        # 12a.3: am/pm read as the contains checks read them ("8am" is "8 am")
+        pos, low = 0, _ampm(a).lower()
         for v in check['values']:
             alts = v if isinstance(v, list) else [v]
-            hits = [m.start() for x in alts
-                    for m in re.finditer(r'(?<!\w)' + re.escape(x.lower()) + r'(?!\w)', low[pos:])]
+            hits = [h for x in alts for h in _at(low[pos:], x)]
             if not hits:
                 return False, 'wrong order'
             pos += min(hits) + 1
@@ -232,8 +274,18 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
         ok = '?' in a
         return ok, '' if ok else "didn't ask what you meant"
     if t == 'no_invented':
-        bad = re.search(INVENTED[check['what']], a, re.I)
-        return not bad, f"made up a {check['what']}" if bad else ''
+        # 12a.3: what the question itself holds is not invented — repeating
+        # the caller's number back names it, it doesn't make one up. Phone,
+        # price and distance compare digits; url and email, the text
+        src = _digits(prompt)
+        for m in re.finditer(INVENTED[check['what']], a, re.I):
+            d = _digits(m.group())
+            if check['what'] in ('phone', 'price', 'distance') and d and d in src:
+                continue
+            if check['what'] in ('url', 'email') and m.group().lower() in prompt.lower():
+                continue
+            return False, f"made up a {check['what']}"
+        return True, ''
     if t == 'numbers_from_source':
         src = set(numbers(_norm(prompt)))
         extra = [n for n in numbers(a) if n not in src]
@@ -251,6 +303,26 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
     if t == 'no_digits':
         bad = re.search(r'\d', a)
         return not bad, 'used a number' if bad else ''
+    if t == 'facts':
+        # 12a.3: at least n of the listed facts, each a list of ways to say it.
+        # A good summary keeps most key facts, not every one
+        got = [f for f in check['values'] if any(_has(a, v, cs) for v in f)]
+        miss = [f[0] for f in check['values'] if f not in got]
+        return len(got) >= check['n'], (f"kept {len(got)} of {len(check['values'])} key facts, "
+                                         f"needs {check['n']} (missing: {', '.join(miss[:3])})")
+    if t == 'first_mention':
+        # 12a.3: the right choice is named before any wrong one — "Message
+        # Nadia, not Nabil" passes, "Nabil" fails
+        low = _ampm(a).lower()
+
+        def first(vals):
+            ps = [p for v in vals for p in _at(low, v)]
+            return min(ps) if ps else None
+        r, w = first(check['right']), first(check['wrong'])
+        if r is None:
+            return False, 'never names ' + check['right'][0]
+        ok = w is None or r < w
+        return ok, '' if ok else 'names ' + check['wrong'][0] + ' first'
     if t == 'judge':
         return None, 'judge'
     raise ValueError(f"unknown check type: {t}")
@@ -291,6 +363,12 @@ def describe(check: dict) -> str:
         return 'no emoji'
     if t == 'no_digits':
         return 'no numbers'
+    if t == 'facts':
+        return (f"keeps at least {check['n']} of: "
+                + ', '.join(f'"{f[0]}"' for f in check['values']))
+    if t == 'first_mention':
+        return (f"picks {check['right'][0]}, not "
+                + ' or '.join(check['wrong']))
     if t == 'judge':
         return 'the judge: ' + check['rubric']
     raise ValueError(f"unknown check type: {t}")
@@ -301,7 +379,8 @@ NEEDS = {'contains_any': ('values',), 'contains_all': ('values',), 'not_contains
          'number': ('value', 'tolerance'), 'json': ('required_values',), 'line_count': ('n',),
          'max_words': ('n',), 'word_count': ('n',), 'sentence_count': ('n',),
          'in_order': ('values',), 'asks_back': (), 'no_invented': ('what',),
-         'numbers_from_source': (), 'no_emoji': (), 'no_digits': (), 'judge': ('rubric',)}
+         'numbers_from_source': (), 'no_emoji': (), 'no_digits': (), 'judge': ('rubric',),
+         'facts': ('n', 'values'), 'first_mention': ('right', 'wrong')}
 
 
 def grade(item: dict, answer: str) -> tuple[bool | None, str]:
@@ -344,12 +423,16 @@ def _sentences(text: str) -> int:
     return len([s for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()])
 
 
-def stub_verdict(answer: str, question: str = "tldr") -> dict:
+PILOT_NOTICE = "school will close early at 11:30"
+
+
+def stub_verdict(answer: str, question: str = PILOT_NOTICE) -> dict:
     """The deterministic stand-in the tests and dry runs use. The pilot's
     TL;DR (the school notice) it checks: at most two sentences, 11:30, and
     Thursday. Any other judged question has passed its script checks before
-    it reaches a judge, and the stand-in agrees with them."""
-    if "tldr" not in (question or "").lower():
+    it reaches a judge, and the stand-in agrees with them. 12a.3: the notice
+    is known by its text — round 3 has seven more "tldr" questions."""
+    if PILOT_NOTICE not in (question or ""):
         return {"pass": True, "reason": "the stand-in judge agrees with the script checks"}
     a = (answer or "").strip()
     if not a:

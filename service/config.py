@@ -121,7 +121,7 @@ CONTROL_TASKS_DIR = Path(os.environ.get(
     Path(__file__).resolve().parent.parent / "eval_tasks" / "mmlu_perm"))
 
 # 12a: Everyday tasks — questions typed the way people type on a phone, marked
-# by scripts/everyday.py. 12a.2: the bank, 111 questions in seven groups. A
+# by scripts/everyday.py. 12a.3: the bank, 333 questions in seven groups. A
 # look, not a benchmark: in no other suite, on no leaderboard, in no average.
 # The harness task is written here from eval_tasks/everyday at the start of
 # each run (everyday.build_task)

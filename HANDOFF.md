@@ -2015,7 +2015,7 @@ git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check &&
 
 ---
 
-### 12a.3 — everyday runs find their task
+### Before 12a.3: everyday runs find their task (#67)
 
 All four everyday runs, #62 to #65, failed in lm_eval before asking a
 question:
@@ -2049,6 +2049,47 @@ ValueError: No tasks specified, or no tasks found.
   - With the old working folder, the stand-in fails exactly as #62–#65 did.
 - **The failed runs:** nothing was written for them. Queue them again with
   **Run everyday tasks**.
+
+### 12a.3 — Everyday tasks round 3: 333 questions
+
+`docs/prompts/phase-12a3-everyday-round3.md`, with its three files in
+`docs/prompts/phase-12a3/`.
+
+- **The bank** is 333 questions: round 2's 106, the pilot's five, and
+  round 3's 222, kept as written, `written_by` and all.
+  - It is in the groups' order, each group's older questions first, so the
+    pilot's first question is still number 16.
+  - Per group: Understanding 45, Writing 48, Summarising 63, Transform 46,
+    Quick maths 45, Instructions 45, Honesty 41.
+  - Eleven questions carry a judge check: the TL;DR, round 2's five and
+    round 3's five.
+- **The checker:** `docs/prompts/phase-12a3/checks.py` replaces 12a.2's.
+  `scripts/everyday.py` ports every change:
+  - **Time ranges.** "7–11 am" reads as "7 am-11 am", in every check that
+    matches times.
+  - **`in_order`** reads am/pm as the contains checks do.
+  - **`no_invented`** skips what the question itself holds: digits for a
+    phone, price or distance, the text for a url or email.
+  - **`facts`**: at least n of the listed facts, each a list of ways to say
+    it. Its reason reads *kept 3 of 6 key facts, needs 4 (missing: …)*, and
+    the question list says *keeps at least 4 of: "picnic", "4 pm", …*.
+  - **`first_mention`**: the right choice named before any wrong one. Its
+    reasons are *never names Nadia* and *names Nabil first*, and the
+    question list says *picks Nadia, not Nabil*.
+  - The import refuses a `facts` or `first_mention` whose shape the checker
+    would misread, such as a fact given as a string, and names the line.
+- **The tests:** `tests/test_everyday_12a3.py`.
+  - All 366 probes get their verdict, and the port gives checks.py's verdict
+    and reason on every check of every probe and every reference.
+  - Every reference passes its own script checks.
+  - A pasted-back message fails every round-3 summary, on the word limit
+    alone, and a repeated request fails every round-3 writing question.
+- **The page** says **Round 3 · not ranked**. Otherwise it needed nothing:
+  it counts the bank, and each group shows its own count.
+- **The split (12g.2)** is not done here. When it runs on this bank, say the
+  real hidden counts per group in that PR. Honesty is the one at risk: 41
+  questions give about 20 hidden, right at 12g.2's bar of 20. If it lands
+  below, masein adds a few.
 
 ## 11. Known gaps, risks, loose ends
 

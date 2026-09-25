@@ -636,8 +636,8 @@ def _evd_label(q: dict) -> str:
 
 
 def load_everyday(out_dir: Path | None) -> dict | None:
-    """12a.2: the Everyday bank — 111 questions in seven groups, all readable
-    by design (no hidden half until round 3) — and every model's marks, from
+    """12a.3: the Everyday bank — 333 questions in seven groups, all readable
+    until 12g.2 splits them — and every model's marks, from
     the everyday.json beside its results. Kept apart from the models' rows,
     so nothing that ranks or averages can reach it."""
     try:
@@ -5255,7 +5255,7 @@ function modelAnswersTab(m, kinds) {
   return [card];
 }
 // 12a.2: a model's everyday answers, one group at a time — the first it was
-// asked opens; 111 answers at once is not a page anyone reads
+// asked opens; 333 answers at once is not a page anyone reads
 function evdAnswersList(m) {
   const e = evdOf(m.id);
   const groups = evdGroups().filter(([g]) => ((e && e.groups) || {})[g]);
@@ -5569,10 +5569,11 @@ const whyProvisional = m => {
 // ===========================================================================
 // 12a: Everyday tasks — what people type into an assistant on a phone,
 // marked by checks (scripts/everyday.py) on the text after any thinking.
-// 12a.2: round 2, one bank of 111 questions in seven groups — the pilot's
-// five joined it. Still a look, not a benchmark: every question readable,
+// 12a.2: one bank in seven groups, the pilot's five in it; 12a.3: round 3
+// grew it to 333. Still a look, not a benchmark: every question readable,
 // never ranked, never averaged into anything, read by nothing that proposes
-// or generates. One badge wherever it is shown: Round 2 · not ranked.
+// or generates. One badge wherever it is shown: Round 3 · not ranked (12a.3:
+// the bank is round 3's, 333 questions).
 // ===========================================================================
 // the four the plan names; Run everyday tasks ticks them
 const EVD_DEFAULTS = ['Qwen/Qwen3-1.7B', 'Qwen/Qwen3-0.6B', 'HuggingFaceTB/SmolLM2-360M-Instruct',
@@ -5594,7 +5595,7 @@ function evdBadge(provisional) {
     title: `${(evd().questions || []).length} questions, all readable: a look at what the models `
       + 'say, not a score. Never ranked, never averaged into anything.' + (provisional
         ? ' Some answers were marked by a judge whose marks are not evidence yet.' : ''),
-    text: 'Round 2 · not ranked' + (provisional ? ' · provisional judge' : '') });
+    text: 'Round 3 · not ranked' + (provisional ? ' · provisional judge' : '') });
 }
 // ✓, ✗, or a question still with the judge
 function evdMark(it) {

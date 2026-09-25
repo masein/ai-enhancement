@@ -1,4 +1,4 @@
-"""12a: Everyday tasks, off the page — since 12a.2 the bank of 111 questions.
+"""12a: Everyday tasks, off the page — since 12a.3 the bank of 333 questions.
 
 Questions typed the way people type into an assistant on a phone, marked by
 their checks on the text after any thinking (#59's split). Each check says
@@ -37,9 +37,10 @@ JUDGED = [q["id"] for q in BANK if any(c["type"] == "judge" for c in q["checks"]
 
 def test_the_judges_questions_and_its_stand_in():
     """12b.3: English only — the TL;DR's judge reads the rubric the question
-    carries; nothing is written for Arabic. 12a.2: six questions carry a judge
-    check (the TL;DR and round 2's five), each beside script checks."""
-    assert len(JUDGED) == 6 and "everyday-pilot-03" in JUDGED
+    carries; nothing is written for Arabic. 12a.3: eleven questions carry a
+    judge check (the TL;DR, round 2's five and round 3's five), each beside
+    script checks."""
+    assert len(JUDGED) == 11 and "everyday-pilot-03" in JUDGED
     q = Q["everyday-pilot-03"]
     assert q["prompt"].startswith("tldr pls:")
     p = ev.judge_prompt(q, TLDR)
@@ -171,7 +172,7 @@ def queue_pilot(client, hf_id=MODEL):
 
 
 # every question answered with its reference, but the pilot's email left
-# unfixed: 110 of 111 once the judge has agreed with the six it marks
+# unfixed: 332 of 333 once the judge has agreed with the eleven it marks
 DEFAULT_ANSWERS = {**{q["id"]: q["reference"] for q in BANK}, "everyday-pilot-04": "I writing"}
 
 
@@ -237,12 +238,12 @@ def test_the_bank_is_asked_through_the_chat_template_and_marked_in_the_same_run(
     assert "max_gen_toks: 512" in y
     assert f"test: {config.EVERYDAY_TASKS_DIR / 'everyday.jsonl'}" in y
     assert len((config.EVERYDAY_TASKS_DIR / "everyday.jsonl").read_text(encoding="utf-8")
-               .splitlines()) == 111
+               .splitlines()) == 333
     # marked straight after, the judge's question too (the stub is in-process)
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
-    assert out["model"] == MODEL and out["passed"] == 110 and out["waiting"] == 0
+    assert out["model"] == MODEL and out["passed"] == 332 and out["waiting"] == 0
     row = db.get(sid)
-    assert row["status"] == "done" and row["progress"] == "Everyday tasks: 110 of 111"
+    assert row["status"] == "done" and row["progress"] == "Everyday tasks: 332 of 333"
     assert (mdir / "model_meta.json").read_text(encoding="utf-8") == meta_before
 
 
@@ -270,8 +271,8 @@ def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeyp
     runner.run_submission(db.get(sid))
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
     assert row["status"] == "done"
-    assert row["progress"] == "Everyday tasks: 104 of 111 · the judge is marking 6"
-    assert row["judge"]["n_items"] == 6 and row["judge"]["progress"] == "0/6 done"
+    assert row["progress"] == "Everyday tasks: 321 of 333 · the judge is marking 11"
+    assert row["judge"]["n_items"] == 11 and row["judge"]["progress"] == "0/11 done"
     assert row["judge"]["status"] == "submitted"
     # one request per judged question, and nothing else
     sent = [r for r in llm.FakeBatches("fake-judge", config.BENCH_ROOT).recorded()
@@ -280,11 +281,11 @@ def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeyp
     llm_poller.tick()
     mdir = tree["models"][MODEL]["dir"]
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
-    assert out["passed"] == 110 and out["waiting"] == 0
+    assert out["passed"] == 332 and out["waiting"] == 0
     tldr = next(it for it in out["items"] if it["id"] == "everyday-pilot-03")
     assert tldr["reason"] == "closes 11:30 on Thursday, in two sentences or fewer"
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
-    assert row["progress"] == "Everyday tasks: 110 of 111"
+    assert row["progress"] == "Everyday tasks: 332 of 333"
     assert row["judge"]["status"] == "done"
 
 

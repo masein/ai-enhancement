@@ -1,90 +1,19 @@
-"""12a.2: Everyday tasks round 2 — one bank of 111 questions in seven groups,
-marked by a general check vocabulary. docs/prompts/phase-12b3/checks.py is the
-reference checker; scripts/everyday.py must reach its verdict on every probe
-in everyday_round2_probes.jsonl, and every question's reference must pass its
-own script checks."""
+"""12a.2: Everyday tasks round 2 — one bank in seven groups, marked by a
+general check vocabulary. 12a.3 replaced the reference checker
+(docs/prompts/phase-12a3/checks.py) and grew the bank to 333: the probes —
+round 2's 180 among the 366 — the port against checks.py and the references
+are tests/test_everyday_12a3.py's now. What 12a.2 added and still holds is
+here: its rules, its import's refusals, and every check in plain words."""
 
 from __future__ import annotations
 
-import importlib.util
 import json
-from pathlib import Path
 
 import pytest
 
 import everyday as ev
 
-REPO = Path(__file__).resolve().parents[1]
-BRIEF = REPO / "docs" / "prompts" / "phase-12b3"
-PROBES = [json.loads(line) for line in
-          (BRIEF / "everyday_round2_probes.jsonl").read_text(encoding="utf-8").splitlines()
-          if line.strip()]
 BANK = {q["id"]: q for q in ev.load_bank()}
-
-
-def reference_checker():
-    spec = importlib.util.spec_from_file_location("checks_ref", BRIEF / "checks.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def script_verdict(item, answer):
-    """what the script checks say, the judge left out: a probe on a judged
-    question expects the script checks' verdict"""
-    res = [ev.run_check(c, answer, item["prompt"]) for c in item["checks"] if c["type"] != "judge"]
-    return all(ok for ok, _ in res)
-
-
-def test_the_bank_is_111_questions_in_seven_groups():
-    qs = ev.load_bank()
-    assert len(qs) == 111
-    assert list(ev.GROUPS) == ["understanding", "writing", "summarising", "transform",
-                               "quick_maths", "instructions", "honesty"]
-    assert list(ev.GROUPS.values()) == ["Understanding", "Writing", "Summarising", "Transform",
-                                        "Quick maths", "Instructions", "Honesty"]
-    sizes = {g: sum(1 for q in qs if q["group"] == g) for g in ev.GROUPS}
-    assert all(15 <= n <= 17 for n in sizes.values()), sizes
-    # the pilot's five joined it, and the round's 106 are all there
-    assert [q["id"] for q in qs if q["id"].startswith("everyday-pilot-")] == \
-        [f"everyday-pilot-0{i}" for i in (1, 4, 3, 2, 5)]           # in the groups' order
-    round2 = [json.loads(line)["id"] for line in
-              (BRIEF / "everyday_round2.jsonl").read_text(encoding="utf-8").splitlines() if line]
-    assert set(round2) <= set(BANK) and len(round2) == 106
-    # no split yet: every question readable; adding one later is a data change
-    assert not any("split" in q for q in qs)
-
-
-@pytest.mark.parametrize("i", range(len(PROBES)), ids=[f"{p['id']}#{n}" for n, p in enumerate(PROBES)])
-def test_every_probe_gets_its_verdict(i):
-    p = PROBES[i]
-    item = BANK[p["id"]]
-    got = script_verdict(item, p["answer"])
-    assert got == (p["expected"] == "pass"), (p["answer"], [
-        ev.run_check(c, p["answer"], item["prompt"]) for c in item["checks"]])
-    # a probe expecting a pass does not fail on a script check, and a judge
-    # question's pass waits on the judge
-    ok, why = ev.grade(item, p["answer"])
-    if p["expected"] == "pass":
-        assert ok is not False, why
-        assert ok is (None if any(c["type"] == "judge" for c in item["checks"]) else True)
-    else:
-        assert ok is False and why
-
-
-def test_the_port_decides_as_checks_py_does_on_every_probe():
-    ref = reference_checker()
-    for p in PROBES:
-        item = BANK[p["id"]]
-        for c in item["checks"]:
-            mine = ev.run_check(c, p["answer"], item["prompt"])
-            theirs = ref.run(c, p["answer"], item["prompt"])
-            assert mine == theirs, (p["id"], c, p["answer"])
-
-
-def test_every_reference_passes_its_own_script_checks():
-    bad = [q["id"] for q in BANK.values() if not script_verdict(q, q["reference"])]
-    assert bad == []
 
 
 def test_the_rules_the_brief_names():

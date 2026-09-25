@@ -2,7 +2,7 @@
 four models by name, each count from its own marks, and every answer opens
 in the side panel, whose keys walk the bank and the models; the model page
 has its Everyday block, or one line with a Test button; Run everyday tasks
-queues one run per ticked model; one Round 2 · not ranked badge per page,
+queues one run per ticked model; one Round 3 · not ranked badge per page,
 never per row; and nothing of it reaches the Leaderboard. The groups-by-models
 table itself is test_everyday_12a2_browser's."""
 
@@ -61,14 +61,14 @@ def test_the_page_names_the_models_and_has_one_action_and_one_badge(live, page):
     # bank, two only the pilot's five
     counts = {h.get_attribute("data-evd-model"): h.locator("[data-evd-count]").text_content()
               for h in heads.all()}
-    assert counts == {"fx/good-750m": "108 of 111", "fx/below-135m-it": "2 of 5",
-                      "fx/skewed-360m": "57 of 111", "fx/chance-160m": "1 of 5"}
+    assert counts == {"fx/good-750m": "330 of 333", "fx/below-135m-it": "2 of 5",
+                      "fx/skewed-360m": "169 of 333", "fx/chance-160m": "1 of 5"}
     # one badge on the page, in the header; no row repeats it
     assert page.locator("[data-pilot-badge]").count() == 1
     assert page.locator("[data-everyday-head] [data-pilot-badge]").text_content() \
-        == "Round 2 · not ranked"
+        == "Round 3 · not ranked"
     body = page.locator("[data-everyday-table]").text_content()
-    assert "not ranked" not in body and "Round 2" not in body
+    assert "not ranked" not in body and "Round 3" not in body
     # one main action, top right, filled
     run = page.locator("[data-everyday-head] button.primary")
     assert run.count() == 1 and run.text_content() == "Run everyday tasks"
@@ -106,12 +106,13 @@ def test_an_answer_opens_in_the_panel_and_the_keys_walk_the_bank_and_the_models(
     assert rd.locator("[data-evd-verdict]").text_content() == \
         '✓says "29" or "twenty-nine" or "twenty nine"'
     shot(page, "12a-2-answer-panel-1400-light.png")
-    # ↓ the next question in the bank for this model, → the next model on it
+    # ↓ the next question in the bank for this model (12a.3: round 3's first in
+    # Understanding), → the next model on it
     page.keyboard.press("ArrowDown")
-    page.wait_for_function(title + "'good-750m · Landlord repair message'")
+    page.wait_for_function(title + "'good-750m · Abbreviated alphabetical sort'")
     page.keyboard.press("ArrowRight")
-    page.wait_for_function(title + "'skewed-360m · Landlord repair message'")
-    assert rd.locator("[data-evd-verdict]").text_content().startswith('✓says "kitchen", "tap"')
+    page.wait_for_function(title + "'skewed-360m · Abbreviated alphabetical sort'")
+    assert rd.locator("[data-evd-verdict]").text_content().startswith('✓in this order: "chai"')
     page.locator("[data-evd-prev-q]").click()
     page.wait_for_function(title + "'skewed-360m · Typos'")
     # an answer that never left its thinking says so, and the thinking is there
@@ -128,7 +129,7 @@ def test_an_answer_opens_in_the_panel_and_the_keys_walk_the_bank_and_the_models(
     assert rd.locator("[data-evd-answer]").text_content() == \
         "Twenty-nine days, because it is a leap year."
     page.keyboard.press("ArrowDown")
-    page.wait_for_function(title + "'chance-160m · Landlord repair message'")
+    page.wait_for_function(title + "'chance-160m · Abbreviated alphabetical sort'")
     assert rd.locator("[data-not-asked]").text_content() == \
         "Not asked: this model\u2019s run did not include this question."
     assert rd.locator("[data-evd-verdict]").count() == 0          # nothing to mark
@@ -154,7 +155,7 @@ def test_no_answer_to_every_question_leaves_nothing_empty(live, page):
         assert "No model has taken everyday tasks yet." in box.text_content()
         assert box.locator("button").text_content() == "Run everyday tasks"
         assert page.locator("[data-everyday-table]").count() == 0
-        assert page.locator("[data-everyday-bank] [data-evd-bank-q]").count() == 111
+        assert page.locator("[data-everyday-bank] [data-evd-bank-q]").count() == 333
     finally:
         for f in moved:
             f.with_suffix(".json.bak").rename(f)
@@ -184,7 +185,7 @@ def test_the_model_page_has_its_everyday_block_after_the_exam(live, page):
     block.wait_for()
     assert page.locator("[data-pilot-badge]:visible").count() == 1
     assert page.locator("[data-kind-tile='everyday'] [data-pilot-badge]").is_visible()
-    assert block.locator("[data-everyday-count]").text_content() == "108 of 111"
+    assert block.locator("[data-everyday-count]").text_content() == "330 of 333"
     # 12a.2: a row a group, each its n of k
     groups = block.locator("[data-evd-group]")
     assert [g.locator(".evgroup").text_content() for g in groups.all()] == GROUPS
@@ -265,7 +266,7 @@ def test_run_everyday_tasks_queues_one_run_per_ticked_model(live, page):
     assert ticked == ids[:4]
     # an instruct model on the board that sat the pilot: what it was asked, unticked
     done = dlg.locator("[data-evd-pick='fx/below-135m-it']")
-    assert done.locator("[data-evd-done]").text_content() == "asked 5 of 111 · run all 111"
+    assert done.locator("[data-evd-done]").text_content() == "asked 5 of 333 · run all 333"
     assert not done.locator("input").is_checked()
     go = dlg.locator("[data-dialog-go]")
     assert go.text_content() == "Queue 4 runs"
@@ -303,7 +304,7 @@ def test_it_is_reached_from_benchmarks_and_test_a_model_offers_it(live, page):
     page.wait_for_selector("[data-dialog='test'] [data-suite-help]")
     page.get_by_label("suite").click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='everyday']")
-    assert opt.text_content() == "Everyday tasks — 111 questions, a few minutes"
+    assert opt.text_content() == "Everyday tasks — 333 questions, a few minutes"
     page.keyboard.press("Escape")
     assert page.errors == []
 

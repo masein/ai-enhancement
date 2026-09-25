@@ -158,7 +158,7 @@ def test_best_in_each_kind_is_one_card_per_kind_with_data(live, page):
     for key, (value, name) in zip(("standard", "exam"), want):
         assert page.locator(f"[data-best-value='{key}']").inner_text() == value
         assert page.locator(f"[data-best-name='{key}']").inner_text() == name
-    assert page.locator("[data-best-value='everyday']").inner_text() == "108 of 111"   # 12a.2
+    assert page.locator("[data-best-value='everyday']").inner_text() == "330 of 333"   # 12a.3
     assert page.locator("[data-best='everyday'] [data-pilot-badge]").count() == 1
     # one link each, to that kind on Models
     for key in ("standard", "exam", "everyday"):
@@ -243,7 +243,7 @@ def test_the_header_is_the_name_the_facts_one_action_and_a_tile_per_kind(live, p
     assert hero.locator("[data-kind-tile='standard'] .ktile-sub").inner_text() == \
         f"above chance · 7 of 7 tasks · #{r['n']} of {r['of']}"
     assert hero.locator("[data-kind-value='exam']").inner_text() == jav
-    assert hero.locator("[data-kind-value='everyday']").inner_text() == "108 of 111"  # 12a.2
+    assert hero.locator("[data-kind-value='everyday']").inner_text() == "330 of 333"  # 12a.3
     assert hero.locator("[data-kind-tile='everyday'] [data-pilot-badge]").count() == 1
     # the main action: the Test a model dialog, this model filled in
     page.locator("[data-test-this]").click()
@@ -351,15 +351,16 @@ def test_answers_are_by_kind_then_topic_or_group(live, page):
     assert kinds.all_inner_texts() == ["Knowledge exam", "Everyday tasks"]
     page.wait_for_selector("[data-panel='model-answers'] .anscard")
     page.locator("[data-answers-kind='everyday']").click()
-    # 12a.2: one group at a time, the first to begin with — Understanding's 16
+    # 12a.2: one group at a time, the first to begin with — Understanding's
+    # 45 since 12a.3
     qs = page.locator("[data-answers-q]")
-    assert qs.count() == 16
+    assert qs.count() == 45
     group = page.locator("[data-answers-group='summarising']")
-    assert group.inner_text() == "Summarising · 17 of 17"
+    assert group.inner_text() == "Summarising · 63 of 63"
     group.click()
-    page.wait_for_function("document.querySelectorAll('[data-answers-q]').length === 17")
+    page.wait_for_function("document.querySelectorAll('[data-answers-q]').length === 63")
     assert set(page.locator("[data-answers-q] .evgroup").all_inner_texts()) == {"Summarising"}
-    assert page.locator("[data-answers-q] [data-evd-question]").count() == 17
+    assert page.locator("[data-answers-q] [data-evd-question]").count() == 63
     # a model that has written nothing says so in one line
     open_model(page, live["base"], STANDARD_ONLY)
     page.locator("[data-mtab='answers']").click()
