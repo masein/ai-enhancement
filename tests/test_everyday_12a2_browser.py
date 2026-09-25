@@ -3,7 +3,9 @@ each question readable with its checks in plain words; the results as models
 across the top and groups down the side, n of k, each cell opening that
 model's answers in that group; the model page's block by group; Models'
 Everyday view with a column per group and the total, the badge once. 12a.3:
-the bank is 333 questions, and the badge says Round 3."""
+the bank is 333 questions. 12a.4: the badge says "not ranked", and only the
+models that answered this wording are here — the two that sat only the pilot
+answered an earlier one."""
 
 from __future__ import annotations
 
@@ -39,15 +41,14 @@ def test_the_results_are_groups_by_models_n_of_k(live, page):
     assert page.locator("[data-everyday-table] .evq-short").all_inner_texts() == GROUPS
     models = [th.get_attribute("data-evd-model")
               for th in page.locator("[data-everyday-table] th[data-evd-model]").all()]
-    assert models == ["fx/below-135m-it", "fx/chance-160m", "fx/good-750m", "fx/skewed-360m"]
+    assert models == ["fx/good-750m", "fx/skewed-360m"]
     assert page.locator("[data-evd-count='fx/good-750m']").inner_text() == "330 of 333"
-    # k is the group's size for a model that sat the bank …
+    # k is the group's size
     assert page.locator("[data-evd-cell='fx/good-750m|quick_maths']").inner_text() == "44 of 45"
-    # … and what it was asked, for one that sat the pilot only: its five marks kept
-    assert page.locator("[data-evd-count='fx/chance-160m']").inner_text() == "1 of 5"
-    assert page.locator("[data-evd-cell='fx/chance-160m|quick_maths']").count() == 0
+    # 12a.4: one that sat the pilot only answered an earlier wording: not here
+    assert page.locator("[data-evd-count='fx/chance-160m']").count() == 0
     # one badge, and the one action
-    assert page.locator("[data-pilot-badge]").inner_text() == "Round 3 · not ranked"
+    assert page.locator("[data-pilot-badge]").inner_text() == "not ranked"
     assert page.locator("[data-everyday-run]").inner_text() == "Run everyday tasks"
     assert page.errors == []
 
@@ -90,7 +91,7 @@ def test_the_bank_is_readable_by_group_with_its_checks_in_plain_words(live, page
     q = page.locator("[data-evd-bank-q='everyday-pilot-02']")
     assert q.locator(".evq").inner_text().startswith("turn this into json: Sara Ahmed")
     assert q.locator("[data-evd-checks]").inner_text() == \
-        "Passes if it: valid JSON with sara, ahmed, 34, product manager, dubai, march 2021"
+        "Passes if it: valid JSON with sara, ahmed, 34, product manager, toronto, march 2021"
     # every question is there, every one readable
     assert page.locator("[data-evd-bank-q]").count() == 333
     # the page's cards are not steps: no section numbers
@@ -111,12 +112,12 @@ def test_the_model_page_block_is_the_seven_groups(live, page):
     assert rows.count() == 41
     assert page.locator("[data-kind-tile='everyday'] [data-kind-value='everyday']").inner_text() == \
         "330 of 333"
-    # a model that sat the pilot: the groups it was asked, its five marks
+    # 12a.4: a model that sat the pilot answered an earlier wording — no
+    # block, and its header says where the answers are
     page.goto(live["base"] + "/#model=fx%2Fbelow-135m-it")
-    open_kind(page, "everyday")
-    b2 = page.locator("[data-everyday-block='fx/below-135m-it']")
-    assert [x.get_attribute("data-evd-group") for x in b2.locator("[data-evd-group]").all()] == \
-        ["understanding", "writing", "summarising", "transform", "instructions"]
+    page.wait_for_selector("[data-model-hero]")
+    assert page.locator("[data-kind-block='everyday']").count() == 0
+    assert page.locator("[data-evd-earlier-note='fx/below-135m-it']").is_visible()
     assert page.errors == []
 
 

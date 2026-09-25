@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS submissions (
   load_missing TEXT DEFAULT '',                  -- JSON: checkpoint keys transformers had to invent
   tasks       TEXT DEFAULT '[]',                 -- JSON: narrow a suite to these tasks (one exam topic)
   judge_batch TEXT DEFAULT '',                   -- the judge batch THIS run submitted (not the model's newest)
-  reuse_note  TEXT DEFAULT ''                    -- "answers reused from #46 (same questions) · re-graded"
+  reuse_note  TEXT DEFAULT '',                   -- "answers reused from #46 (same questions) · re-graded"
+  bank_version TEXT DEFAULT ''                   -- 12a.4: the Everyday wording this run answered (its hash)
 );
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
 -- find-the-gap: an LLM proposes a skill spec from diagnose-half failures, a
@@ -175,7 +176,7 @@ CREATE TABLE IF NOT EXISTS repairs (
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
          "finished_at", "gpu_seconds", "arch", "allow_remote_code", "load_missing",
-         "tasks", "judge_batch", "reuse_note"]
+         "tasks", "judge_batch", "reuse_note", "bank_version"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -204,7 +205,8 @@ def init() -> None:
                      "ALTER TABLE proposals ADD COLUMN override TEXT",
                      # 11e: the focus plan Approve froze (JSON), NULL before then
                      "ALTER TABLE proposals ADD COLUMN approved_focus TEXT",
-                     "ALTER TABLE submissions ADD COLUMN reuse_note TEXT DEFAULT ''"):
+                     "ALTER TABLE submissions ADD COLUMN reuse_note TEXT DEFAULT ''",
+                     "ALTER TABLE submissions ADD COLUMN bank_version TEXT DEFAULT ''"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:

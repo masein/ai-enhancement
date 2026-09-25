@@ -97,6 +97,10 @@ def remote_code_blocked() -> str:
 # this many tokens per answer instead; every other model keeps 256, so
 # nothing it scored moves. What was used is recorded with the grades.
 REASONING_MAX_GEN_TOKS = int(os.environ.get("REASONING_MAX_GEN_TOKS", "2048"))
+# 12a.4: Everyday tasks need more. In #70, 8 of Qwen3-1.7B's 45 quick-maths
+# answers were empty — its thinking went past 2,048 tokens — and Qwen3-0.6B's
+# 5. A reasoning model's everyday answers get this many; the exam's stay above
+EVERYDAY_REASONING_MAX_GEN_TOKS = int(os.environ.get("EVERYDAY_REASONING_MAX_GEN_TOKS", "4096"))
 
 # The benchmark suite — one place, mirrored from run_benchmarks.sh. quick is for
 # iteration (minutes); full is the comparable number. Both write into the same

@@ -26,6 +26,7 @@ English only (2026-09-24).
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -52,6 +53,13 @@ OUT_NAME = "everyday.json"
 GROUPS = {"understanding": "Understanding", "writing": "Writing",
           "summarising": "Summarising", "transform": "Transform",
           "quick_maths": "Quick maths", "instructions": "Instructions", "honesty": "Honesty"}
+# 12a.4: the bank's version is the date its wording last changed and a short
+# hash of the question texts. A run's version is the hash of the questions it
+# was asked — the harness logs each one — so answers to an earlier wording are
+# never marked by today's checks, counted in today's score or compared with
+# today's runs. Reword a question, and this date changes with it
+# (tests/test_everyday_12a4.py pins the hash beside it).
+WORDING_DATE = "2026-09-25"
 NEVER_FINISHED = "never finished answering"
 WAITING = "waiting for the judge"
 
@@ -74,6 +82,22 @@ def _bad_shape(c: dict) -> str:
             if not _words(c[k]):
                 return f"first_mention needs {k}: a list of names"
     return ""
+
+
+def _bad_check(c) -> str:
+    """what is wrong with one check, or '' — an `any` holds checks of its
+    own, each read the same way"""
+    t = c.get("type") if isinstance(c, dict) else None
+    if t not in NEEDS:
+        return f"unknown check type {t!r}"
+    miss = [k for k in NEEDS[t] if k not in c]
+    if miss:
+        return f"{t} needs {', '.join(miss)}"
+    if t == "any":
+        if not (isinstance(c["checks"], list) and c["checks"]):
+            return "any needs checks: a list of checks"
+        return next((why for why in map(_bad_check, c["checks"]) if why), "")
+    return _bad_shape(c)
 
 
 def load_bank(path: Path = BANK_PATH) -> list[dict]:
@@ -101,13 +125,7 @@ def load_bank(path: Path = BANK_PATH) -> list[dict]:
         if not isinstance(q["checks"], list):
             raise ValueError(f"{path.name} line {n}: checks is not a list")
         for c in q["checks"]:
-            t = c.get("type") if isinstance(c, dict) else None
-            if t not in NEEDS:
-                raise ValueError(f"{path.name} line {n}: unknown check type {t!r}")
-            miss = [k for k in NEEDS[t] if k not in c]
-            if miss:
-                raise ValueError(f"{path.name} line {n}: {t} needs {', '.join(miss)}")
-            why = _bad_shape(c)
+            why = _bad_check(c)
             if why:
                 raise ValueError(f"{path.name} line {n}: {why}")
         out.append(q)
@@ -115,10 +133,10 @@ def load_bank(path: Path = BANK_PATH) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# the check vocabulary (12a.2, 12a.3). docs/prompts/phase-12a3/checks.py is
-# the reference, and replaces 12a.2's: every check below decides exactly as it
-# does — the same regexes, the same normalising, the same reasons — and
-# tests/test_everyday_12a3.py holds the two to the same verdict on all 366
+# the check vocabulary (12a.2, 12a.3, 12a.4). docs/prompts/phase-12a4/checks.py
+# is the reference, and replaces 12a.3's: every check below decides exactly as
+# it does — the same regexes, the same normalising, the same reasons — and
+# tests/test_everyday_12a4.py holds the two to the same verdict on all 382
 # probes. What this adds is words: each check says what it looks for in plain
 # words (the bank's page), and a failing check says why (the answer's row).
 # ---------------------------------------------------------------------------
@@ -216,14 +234,29 @@ INVENTED = {
     'phone': r'(?:\+?\d[\d\s-]{6,}\d)',
     'url': r'https?://|www\.|\b\w+\.(?:com|ae|net|org)\b',
     'email': r'\b[\w.]+@[\w.]+\b',
-    'price': r'(?:\b(?:aed|dhs?|usd|\$)\s?\d)|(?:\d\s?(?:k|m|mn|million|thousand)?\s?'
-             r'(?:aed|dhs|dirhams?|usd)\b)',
+    # 12a.4: "$25" is caught — `\b` before `$` never matched — and € and £,
+    # eur, gbp, dollars, euros and pounds too
+    'price': r'(?:(?<!\w)(?:aed|dhs?|usd|eur|gbp)\s?\d)|(?:[$€£]\s?\d)|(?:\d\s?'
+             r'(?:k|m|mn|million|thousand)?\s?'
+             r'(?:aed|dhs|dirhams?|usd|eur|gbp|dollars?|euros?|pounds?)\b)',
     'distance': r'\d+(?:\.\d+)?\s?(?:km|kms|kilomet\w*|metres?|meters?|m\b|mins?\b|minutes?)',
 }
 def _digits(x: str) -> str:
     return re.sub(r'\D', '', x)
 
 
+# 12a.4: the usual ways of saying it can't know or can't do something — one
+# list for every admits_limit check, where each question used to carry its own
+ADMITS = ["can't", "cannot", "can not", "unable", "not able", "no way to", "no way of",
+          "no access", "don't have", "do not have", "doesn't have",
+          "don't know", "do not know", "not sure which", "i'm not sure", "not possible",
+          "isn't possible", "can't see", "don't see", "do not see",
+          "not attached", "isn't attached", "wasn't attached", "no attachment", "no photo",
+          "no image", "no live", "no real-time", "not aware",
+          "came through", "didn't come through", "didn't receive", "haven't received",
+          "wasn't received", "nothing came through", "nothing was attached",
+          "as an ai", "i'm an ai", "i am an ai", "ai assistant", "language model", "text-based",
+          "beyond my", "outside my", "not something i can"]
 EMOJI = re.compile('[\U0001F000-\U0001FAFF☀-➿⭐⭕✅❌❤️]')
 _ABBR = re.compile(r'\b(?:dr|mr|mrs|ms|st|e\.g|i\.e|etc)\.', re.I)
 
@@ -236,7 +269,9 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
     cs = check.get('case_sensitive', False)
     if t == 'contains_any':
         ok = any(_has(a, v, cs) for v in check['values'])
-        return ok, '' if ok else 'says none of: ' + ', '.join(check['values'][:3])
+        # 12a.4: "never mentions", not "says none of", which read as if the
+        # answer was not allowed to say it
+        return ok, '' if ok else 'never mentions: ' + ', '.join(check['values'][:3])
     if t == 'contains_all':
         miss = [v for v in check['values'] if not _has(a, v, cs)]
         return not miss, 'missing: ' + ', '.join(miss) if miss else ''
@@ -323,6 +358,19 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
             return False, 'never names ' + check['right'][0]
         ok = w is None or r < w
         return ok, '' if ok else 'names ' + check['wrong'][0] + ' first'
+    if t == 'admits_limit':
+        # 12a.4: says it can't know or can't do it, in any of the usual ways
+        ok = any(_has(a, v) for v in ADMITS)
+        return ok, '' if ok else "never says it can't know or do this"
+    if t == 'any':
+        # 12a.4: passes when any one of its checks passes ("asks what you
+        # meant, or says it can't know")
+        res = [run_check(c, answer, prompt) for c in check['checks']]
+        if any(r[0] is True for r in res):
+            return True, ''
+        if any(r[0] is None for r in res):
+            return None, 'judge'
+        return False, ' and '.join(r[1] for r in res)
     if t == 'judge':
         return None, 'judge'
     raise ValueError(f"unknown check type: {t}")
@@ -369,6 +417,10 @@ def describe(check: dict) -> str:
     if t == 'first_mention':
         return (f"picks {check['right'][0]}, not "
                 + ' or '.join(check['wrong']))
+    if t == 'admits_limit':
+        return "says it can't know or do this"
+    if t == 'any':
+        return ', or '.join(describe(c) for c in check['checks'])
     if t == 'judge':
         return 'the judge: ' + check['rubric']
     raise ValueError(f"unknown check type: {t}")
@@ -380,7 +432,8 @@ NEEDS = {'contains_any': ('values',), 'contains_all': ('values',), 'not_contains
          'max_words': ('n',), 'word_count': ('n',), 'sentence_count': ('n',),
          'in_order': ('values',), 'asks_back': (), 'no_invented': ('what',),
          'numbers_from_source': (), 'no_emoji': (), 'no_digits': (), 'judge': ('rubric',),
-         'facts': ('n', 'values'), 'first_mention': ('right', 'wrong')}
+         'facts': ('n', 'values'), 'first_mention': ('right', 'wrong'),
+         'admits_limit': (), 'any': ('checks',)}
 
 
 def grade(item: dict, answer: str) -> tuple[bool | None, str]:
@@ -465,6 +518,23 @@ def parse_verdict(text: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# the version
+# ---------------------------------------------------------------------------
+
+def wording_hash(questions) -> str:
+    """eight hex digits over each question's id and text, in id order"""
+    h = hashlib.sha256()
+    for q in sorted(questions, key=lambda q: str(q.get("id"))):
+        h.update(f"{q.get('id')}\t{q.get('prompt', '')}\n".encode("utf-8"))
+    return h.hexdigest()[:8]
+
+
+def version() -> dict:
+    """the bank's version: {"date": …, "hash": …}"""
+    return {"date": WORDING_DATE, "hash": wording_hash(load_bank())}
+
+
+# ---------------------------------------------------------------------------
 # marking
 # ---------------------------------------------------------------------------
 
@@ -508,6 +578,16 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
     if not recs:
         return None
     prev = read(model_dir) or {}
+    # 12a.4: what was this model asked? Answers to an earlier wording are not
+    # re-marked by today's checks — the question under them changed. What was
+    # marked when they were answered stays, labelled earlier
+    now = version()
+    asked = wording_hash([rec.get("doc") or {} for rec in recs.values()])
+    stamp = {"version": {"hash": asked, "date": now["date"] if asked == now["hash"]
+                         else (prev.get("version") or {}).get("date")},
+             "earlier": asked != now["hash"]}
+    if stamp["earlier"] and prev.get("items"):
+        return {**prev, **stamp, "ran_out": _ran_out(prev["items"])}
     before = {it["id"]: it for it in prev.get("items") or []}
     verdicts = verdicts or {}
     items = []
@@ -559,11 +639,19 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
                        "total": sum(1 for it in items if it["group"] == g)}
                    for g in GROUPS if any(it["group"] == g for it in items)},
         "waiting": sum(1 for it in items if it["pass"] is None),
+        # 12a.4: answers whose thinking used the whole budget; they fail, and
+        # the page says how many beside the score
+        "ran_out": _ran_out(items),
+        **stamp,
         "items": items,
     }
     if judge or prev.get("judge"):
         out["judge"] = judge or prev["judge"]
     return out
+
+
+def _ran_out(items: list[dict]) -> int:
+    return sum(1 for it in items if it.get("no_answer"))
 
 
 def write(model_dir: Path, out: dict) -> Path:
@@ -611,7 +699,7 @@ def start(model_dir: Path, submission: int | None = None) -> dict:
     out = mark(model_dir)
     if out is None:
         raise RuntimeError("the harness logged no answers for everyday tasks")
-    todo = _pending(out)
+    todo = [] if out.get("earlier") else _pending(out)
     if not todo:
         write(model_dir, out)
         return out
@@ -712,7 +800,8 @@ def main() -> int:
             continue
         write(d, out)
         n += 1
-        print(f"{out['model']}: {summary(out)}")
+        print(f"{out['model']}: {summary(out)}"
+              + (" · earlier wording, kept as marked" if out.get("earlier") else ""))
     print(f"marked {n} model(s)")
     return 0
 

@@ -1,10 +1,11 @@
-"""12a on the page, moved to the bank in 12a.2: #everyday shows the fixture's
-four models by name, each count from its own marks, and every answer opens
-in the side panel, whose keys walk the bank and the models; the model page
-has its Everyday block, or one line with a Test button; Run everyday tasks
-queues one run per ticked model; one Round 3 · not ranked badge per page,
-never per row; and nothing of it reaches the Leaderboard. The groups-by-models
-table itself is test_everyday_12a2_browser's."""
+"""12a on the page, moved to the bank in 12a.2: #everyday shows the models
+that answered the bank's wording (12a.4: the two that sat only the pilot
+answered an earlier one) by name, each count from its own marks, and every
+answer opens in the side panel, whose keys walk the bank and the models; the
+model page has its Everyday block, or one line with a Test button; Run
+everyday tasks queues one run per ticked model; one "not ranked" badge per
+page, never per row; and nothing of it reaches the Leaderboard. The
+groups-by-models table itself is test_everyday_12a2_browser's."""
 
 from __future__ import annotations
 
@@ -18,7 +19,7 @@ from conftest import open_kind
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12a"
-FOUR = ["below-135m-it", "chance-160m", "good-750m", "skewed-360m"]    # by name, not by score
+TWO = ["good-750m", "skewed-360m"]            # by name, not by score; on this wording
 GROUPS = ["Understanding", "Writing", "Summarising", "Transform", "Quick maths", "Instructions",
           "Honesty"]
 UNTESTED = "fx/one-option-70m"
@@ -56,19 +57,18 @@ def test_the_page_names_the_models_and_has_one_action_and_one_badge(live, page):
     page.set_viewport_size({"width": 1400, "height": 1000})
     open_pilot(page, live["base"])
     heads = page.locator("[data-everyday-table] thead th[data-evd-model]")
-    assert [h.locator("a, span").first.text_content() for h in heads.all()] == FOUR
-    # each model's count in the header row, from its own marks: two sat the
-    # bank, two only the pilot's five
+    assert [h.locator("a, span").first.text_content() for h in heads.all()] == TWO
+    # each model's count in the header row, from its own marks; the two that
+    # sat only the pilot's five answered an earlier wording, and are not here
     counts = {h.get_attribute("data-evd-model"): h.locator("[data-evd-count]").text_content()
               for h in heads.all()}
-    assert counts == {"fx/good-750m": "330 of 333", "fx/below-135m-it": "2 of 5",
-                      "fx/skewed-360m": "169 of 333", "fx/chance-160m": "1 of 5"}
+    assert counts == {"fx/good-750m": "330 of 333", "fx/skewed-360m": "183 of 333"}
     # one badge on the page, in the header; no row repeats it
     assert page.locator("[data-pilot-badge]").count() == 1
     assert page.locator("[data-everyday-head] [data-pilot-badge]").text_content() \
-        == "Round 3 · not ranked"
+        == "not ranked"
     body = page.locator("[data-everyday-table]").text_content()
-    assert "not ranked" not in body and "Round 3" not in body
+    assert "not ranked" not in body
     # one main action, top right, filled
     run = page.locator("[data-everyday-head] button.primary")
     assert run.count() == 1 and run.text_content() == "Run everyday tasks"
@@ -112,7 +112,7 @@ def test_an_answer_opens_in_the_panel_and_the_keys_walk_the_bank_and_the_models(
     page.wait_for_function(title + "'good-750m · Abbreviated alphabetical sort'")
     page.keyboard.press("ArrowRight")
     page.wait_for_function(title + "'skewed-360m · Abbreviated alphabetical sort'")
-    assert rd.locator("[data-evd-verdict]").text_content().startswith('✓in this order: "chai"')
+    assert rd.locator("[data-evd-verdict]").text_content().startswith('✓in this order: "bagels"')
     page.locator("[data-evd-prev-q]").click()
     page.wait_for_function(title + "'skewed-360m · Typos'")
     # an answer that never left its thinking says so, and the thinking is there
@@ -120,19 +120,11 @@ def test_an_answer_opens_in_the_panel_and_the_keys_walk_the_bank_and_the_models(
         "No answer: the model was still thinking when it ran out of room."
     assert "never finished answering" in rd.locator("[data-evd-verdict]").text_content()
     assert rd.locator("[data-evd-thinking]").count() == 1
-    # ← twice: a model that sat only the pilot, on its question and on one it
-    # was never asked
+    # ← back to the first model, and no further: 12a.4, the models that sat
+    # only the pilot answered an earlier wording and are not walked
     page.keyboard.press("ArrowLeft")
     page.wait_for_function(title + "'good-750m · Typos'")
-    page.keyboard.press("ArrowLeft")
-    page.wait_for_function(title + "'chance-160m · Typos'")
-    assert rd.locator("[data-evd-answer]").text_content() == \
-        "Twenty-nine days, because it is a leap year."
-    page.keyboard.press("ArrowDown")
-    page.wait_for_function(title + "'chance-160m · Abbreviated alphabetical sort'")
-    assert rd.locator("[data-not-asked]").text_content() == \
-        "Not asked: this model\u2019s run did not include this question."
-    assert rd.locator("[data-evd-verdict]").count() == 0          # nothing to mark
+    assert rd.locator("[data-evd-prev-m]").is_disabled()
     page.keyboard.press("Escape")
     page.wait_for_selector("#reader", state="detached")
     assert page.errors == []
@@ -259,28 +251,30 @@ def test_run_everyday_tasks_queues_one_run_per_ticked_model(live, page):
     dlg.wait_for()
     picks = dlg.locator("[data-evd-pick]")
     ids = [p.get_attribute("data-evd-pick") for p in picks.all()]
-    assert ids[:4] == ["Qwen/Qwen3-1.7B", "Qwen/Qwen3-0.6B",
-                       "HuggingFaceTB/SmolLM2-360M-Instruct", "google/gemma-3-270m-it"]
+    # 12a.4: the five instruct models, SmolLM2-135M-Instruct among them
+    assert ids[:5] == ["Qwen/Qwen3-1.7B", "Qwen/Qwen3-0.6B",
+                       "HuggingFaceTB/SmolLM2-360M-Instruct",
+                       "HuggingFaceTB/SmolLM2-135M-Instruct", "google/gemma-3-270m-it"]
     ticked = [p.get_attribute("data-evd-pick") for p in picks.all()
               if p.locator("input").is_checked()]
-    assert ticked == ids[:4]
-    # an instruct model on the board that sat the pilot: what it was asked, unticked
+    assert ticked == ids[:5]
+    # an instruct model on the board that sat the pilot: an earlier wording, unticked
     done = dlg.locator("[data-evd-pick='fx/below-135m-it']")
-    assert done.locator("[data-evd-done]").text_content() == "asked 5 of 333 · run all 333"
+    assert done.locator("[data-evd-done]").text_content() == "earlier wording · run all 333"
     assert not done.locator("input").is_checked()
     go = dlg.locator("[data-dialog-go]")
-    assert go.text_content() == "Queue 4 runs"
+    assert go.text_content() == "Queue 5 runs"
     shot(page, "12a-5-run-the-pilot-1400-light.png")
     try:
         go.click()
         toast = page.locator("[data-toast='submit']")
         toast.wait_for()
-        assert toast.locator(".toast-text").text_content() == "4 runs queued ·"
+        assert toast.locator(".toast-text").text_content() == "5 runs queued ·"
         assert toast.locator("[data-toast-link]").text_content() == "follow them →"
         assert page.locator("[data-dialog='everyday']").count() == 0
         rows = [r for r in api(live["base"], "/api/submissions")
                 if r["suite"] == "everyday" and r["status"] == "queued"]
-        assert sorted(r["hf_id"] for r in rows) == sorted(ids[:4])
+        assert sorted(r["hf_id"] for r in rows) == sorted(ids[:5])
         toast.locator("[data-toast-link]").click()
         page.wait_for_selector("[data-queue-row]")
         assert page.locator(f"tr[data-queue-row='{rows[0]['id']}'] [data-suite-cell]") \

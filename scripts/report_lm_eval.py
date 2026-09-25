@@ -639,14 +639,20 @@ def load_everyday(out_dir: Path | None) -> dict | None:
     """12a.3: the Everyday bank — 333 questions in seven groups, all readable
     until 12g.2 splits them — and every model's marks, from
     the everyday.json beside its results. Kept apart from the models' rows,
-    so nothing that ranks or averages can reach it."""
+    so nothing that ranks or averages can reach it.
+
+    12a.4: only answers to this wording (its version, everyday.version()) are
+    in `models`. Answers to an earlier wording — everything marked before the
+    version existed, and the pilot's five — are in `earlier`, as their count
+    and date alone: never in a score, a table or a comparison."""
     try:
         import everyday as ev                    # scripts/, beside this file
         qs = ev.load_bank()
     except (ImportError, OSError, ValueError):
         return None
     group_of = {q["id"]: q["group"] for q in qs}
-    models = {}
+    now = ev.version()
+    models, earlier = {}, {}
     for f in sorted(Path(out_dir).glob("*/everyday.json")) if out_dir and Path(out_dir).is_dir() \
             else []:
         try:
@@ -654,6 +660,14 @@ def load_everyday(out_dir: Path | None) -> dict | None:
         except (OSError, ValueError):
             continue
         if not isinstance(e, dict) or not isinstance(e.get("items"), list) or not e.get("model"):
+            continue
+        ver = (e.get("version") or {}).get("hash") or ""
+        if ver != now["hash"]:
+            # as it was marked then: its questions may be gone or reworded
+            earlier[e["model"]] = {
+                "passed": e.get("passed", sum(1 for it in e["items"] if it.get("pass") is True)),
+                "total": e.get("total", len(e["items"])), "marked_at": e.get("marked_at"),
+                "hash": ver}
             continue
         # a question the bank no longer holds is not shown (and not counted)
         items = [{**{k: it[k] for k in _EVERYDAY_ITEM if k in it}, "group": group_of[it["id"]]}
@@ -666,6 +680,8 @@ def load_everyday(out_dir: Path | None) -> dict | None:
             "waiting": sum(1 for it in items if it.get("pass") is None),
             "marked_at": e.get("marked_at"), "settings": e.get("settings") or {},
             "provisional": bool((e.get("judge") or {}).get("provisional")),
+            # 12a.4: answers whose thinking used the whole budget
+            "ran_out": sum(1 for it in items if it.get("no_answer")),
             "groups": groups, "items": items,
         }
     return {"groups": [[k, v] for k, v in ev.GROUPS.items()],
@@ -676,7 +692,7 @@ def load_everyday(out_dir: Path | None) -> dict | None:
                            "checks": [ev.describe(c) for c in q["checks"]],
                            "judged": any(c["type"] == "judge" for c in q["checks"])}
                           for i, q in enumerate(qs, 1)],
-            "models": models}
+            "version": now, "models": models, "earlier": earlier}
 
 
 def parse_run(blob: dict, source: Path) -> dict:
@@ -2115,6 +2131,13 @@ tbody tr.open { background:var(--accent-soft); }
 .hcard-v { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .hcard-name { font-size:var(--fs-2); font-weight:600; color:var(--text-primary);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+/* 12a.4: a card's badge, one short line under the heading, with the room
+   around it the section's caveat has beside its heading */
+.hcard-badge { margin:2px 0; line-height:1.2; }
+.hcard-badge .badge { margin-left:0; white-space:nowrap; }
+/* 12a.4: "3 answers ran out of room", its own line under a score */
+.evd-ranout { display:block; font-weight:400; }
+.ktile .evd-ranout, .evscore .evd-ranout { display:inline; }
 .hcard-link { margin-top:auto; padding-top:4px; font-size:var(--fs-2); font-family:var(--font-sans);
   color:var(--accent); text-decoration:none; }
 .hcard-link:hover, .hcard-link:focus-visible { text-decoration:underline; }
@@ -5080,6 +5103,9 @@ function kindTile(m, k) {
       el('span', { class: 'eyebrow ktile-k', text: k.label }),
       el('span', { class: 'ktile-none' }, 'Not tested',
         LIVE ? [el('span', { class: 'se', text: ' · ' }), kindTest(m, k.kind)] : ''),
+      // 12a.4: it answered an earlier wording, which is in its History
+      k.kind === 'everyday' && evdEarlier(m.id) ? el('span', { class: 'small se',
+        'data-evd-earlier-note': m.id, text: 'answered an earlier wording · in History' }) : '',
       msg ? el('span', { class: 'warn small', 'data-everyday-refused': m.id, text: msg }) : '');
   }
   const [v, sub] = kindValue(m, k.kind);
@@ -5090,7 +5116,8 @@ function kindTile(m, k) {
     el('span', { class: 'ktile-sub' }, sub,
       k.kind === 'everyday' ? evdBadge(evdOf(m.id).provisional) : '',
       // the provisional badge, once, on the tile it is about
-      k.kind === 'exam' && !judgedOkM(m) ? provBadge(whyProvisional(m)) : ''));
+      k.kind === 'exam' && !judgedOkM(m) ? provBadge(whyProvisional(m)) : ''),
+    k.kind === 'everyday' ? evdRanOut(evdOf(m.id)) : '');
 }
 // the button that fills an empty tile: the form for Standard, the exam's own
 // topic picker, and the pilot's one-click queue
@@ -5300,8 +5327,26 @@ function modelImproveTab(m) {
 
 // ---- History: the runs, what produced the numbers, how they were graded ----
 function modelHistoryTab(m) {
-  return [LIVE ? vModelRuns(m) : null, provRecord(m), gradedCard(m), vTaint(m)].filter(Boolean);
+  return [LIVE ? vModelRuns(m) : null, evdEarlierCard(m), provRecord(m), gradedCard(m),
+    vTaint(m)].filter(Boolean);
 }
+// 12a.4: its everyday answers to an earlier wording — kept, and said once, as
+// what they were; never in a score or beside this wording's answers
+function evdEarlierCard(m) {
+  const x = evdEarlier(m.id);
+  if (!x) return null;
+  const when = x.marked_at ? new Date(x.marked_at * 1000).toISOString().slice(0, 10) : '';
+  return el('div', { class: 'card', 'data-evd-earlier': m.id },
+    el('div', { class: 'sechead' }, el('h2', { text: 'Everyday tasks' }),
+      el('span', { class: 'badge', 'data-earlier-badge': '1', text: 'earlier wording' })),
+    el('p', { class: 'sub', 'data-evd-earlier-count': `${x.passed} of ${x.total}`,
+      text: `${x.passed} of ${x.total}${when ? ', marked ' + when : ''}. The questions have been `
+        + 'reworded since, so these answers are in no score and no comparison. Run everyday '
+        + 'tasks to answer this wording.' }));
+}
+// an everyday run that answered another wording than the bank's current one
+const evdEarlierRun = r => r.suite === 'everyday' && r.status === 'done'
+  && (r.bank_version || '') !== ((evd().version || {}).hash || '');
 // the model's row of the old Run provenance table, and its hero's small print
 function provRecord(m) {
   const a = m.archinfo || {}, comp = computeOf(m);
@@ -5392,7 +5437,9 @@ function vModelRuns(m) {
       el('td', { class: 'small' }, suiteCell(r, 'm')),
       el('td', {}, (() => { const st = runStage(r);
         return el('span', { class: stClass(st.cls), 'data-stage': st.key, text: st.text }); })()),
-      el('td', { class: 'small se', text: r.error || r.progress || '' }),
+      el('td', { class: 'small se' }, r.error || r.progress || '',
+        evdEarlierRun(r) ? el('span', { class: 'badge', 'data-earlier-run': String(r.id),
+          text: 'earlier wording' }) : ''),
       el('td', {}, el('a', { href: `api/runs/${r.id}/log`, target: '_blank', rel: 'noopener',
         class: 'small', text: 'log' }))))))));
   return card;
@@ -5469,8 +5516,11 @@ function runningNow() {
 function bestByKind(ms) {
   // comparing models side by side is 12h; this link goes to the table
   const go = v => hlLink('See all models →', () => openModelsView(v));
+  // 12a.4: a card's badge is a line of its own under the heading, not a
+  // second line of it
   const card = (key, eyebrow, value, m, badge) => el('div', { class: 'hcard', 'data-best': key },
-    el('div', { class: 'eyebrow' }, eyebrow, badge || ''),
+    el('div', { class: 'eyebrow', text: eyebrow }),
+    badge ? el('div', { class: 'hcard-badge', 'data-best-badge': key }, badge) : '',
     el('div', { class: 'hcard-v', 'data-best-value': key, text: value }),
     el('div', { class: 'hcard-name', 'data-best-name': key, title: m.id, text: m.name }),
     go(key));
@@ -5572,12 +5622,14 @@ const whyProvisional = m => {
 // 12a.2: one bank in seven groups, the pilot's five in it; 12a.3: round 3
 // grew it to 333. Still a look, not a benchmark: every question readable,
 // never ranked, never averaged into anything, read by nothing that proposes
-// or generates. One badge wherever it is shown: Round 3 · not ranked (12a.3:
-// the bank is round 3's, 333 questions).
+// or generates. One badge wherever it is shown: not ranked (12a.4: one short
+// line; the wording's version is on the Everyday tab, not in the badge).
+// 12a.4: only answers to the bank's current wording are shown or compared;
+// a model's answers to an earlier wording are in its History
 // ===========================================================================
-// the four the plan names; Run everyday tasks ticks them
+// the five instruct models on the board; Run everyday tasks ticks them
 const EVD_DEFAULTS = ['Qwen/Qwen3-1.7B', 'Qwen/Qwen3-0.6B', 'HuggingFaceTB/SmolLM2-360M-Instruct',
-                      'google/gemma-3-270m-it'];
+                      'HuggingFaceTB/SmolLM2-135M-Instruct', 'google/gemma-3-270m-it'];
 const evd = () => DATA.everyday || { groups: [], questions: [], models: {} };
 // the seven groups, in their order, and a group's questions
 const evdGroups = () => evd().groups || [];
@@ -5588,6 +5640,17 @@ function evdGroupCount(e, g) {
   return x ? `${x.passed} of ${x.total}` : null;
 }
 const evdOf = id => (evd().models || {})[id] || null;
+// 12a.4: a model's answers to an earlier wording — a count and a date, never
+// a score here
+const evdEarlier = id => (evd().earlier || {})[id] || null;
+// "3 answers ran out of room", beside a score, only when there are any: the
+// thinking used the whole budget before the answer; those answers fail
+function evdRanOut(e) {
+  const n = (e && e.ran_out) || 0;
+  return n ? el('span', { class: 'small se evd-ranout', 'data-evd-ran-out': String(n),
+    title: 'the model was still thinking when it reached its answer budget; these answers '
+      + 'count as failed', text: `${n} answer${n === 1 ? '' : 's'} ran out of room` }) : '';
+}
 const evdName = id => (DATA.models.find(x => x.id === id) || {}).name || String(id).split('/').pop();
 const evdCount = e => `${e.passed} of ${e.total}`;
 function evdBadge(provisional) {
@@ -5595,7 +5658,7 @@ function evdBadge(provisional) {
     title: `${(evd().questions || []).length} questions, all readable: a look at what the models `
       + 'say, not a score. Never ranked, never averaged into anything.' + (provisional
         ? ' Some answers were marked by a judge whose marks are not evidence yet.' : ''),
-    text: 'Round 3 · not ranked' + (provisional ? ' · provisional judge' : '') });
+    text: 'not ranked' + (provisional ? ' · provisional judge' : '') });
 }
 // ✓, ✗, or a question still with the judge
 function evdMark(it) {
@@ -5690,6 +5753,7 @@ function vEverydayBlock(m) {
       el('div', { class: 'acts evscore' },
         el('span', { class: 'evcount', 'data-everyday-count': evdCount(e), text: evdCount(e) }),
         e.waiting ? el('span', { class: 'small se', text: `${e.waiting} with the judge` }) : '',
+        evdRanOut(e),
         el('a', { href: '#tab=benchmarks&sub=everyday', 'data-everyday-compare': '1',
           text: 'Compare models →',
           onclick: ev => { ev.preventDefault();
@@ -5723,7 +5787,12 @@ function vEverydayPage() {
       el('div', {}, el('h2', {}, 'Everyday tasks', evdBadge(prov)),
         el('p', { class: 'sub', text: `${qs.length} questions people type into an assistant on a `
           + 'phone — lowercase, typos, one plain request — in seven groups, and what each model '
-          + 'said. Click a group\u2019s count to read a model\u2019s answers.' })),
+          + 'said. Click a group\u2019s count to read a model\u2019s answers.' }),
+        // 12a.4: the wording these answers are to; earlier ones are in each
+        // model's History
+        E.version ? el('p', { class: 'small se', 'data-evd-version': E.version.hash,
+          text: `This wording: ${E.version.date} · ${E.version.hash}. Answers to an earlier `
+            + 'wording are in each model\u2019s History, and in no score here.' }) : ''),
       run));
   if (!ids.length) {
     return [head, el('div', { class: 'card' }, empty('No model has taken everyday tasks yet.',
@@ -5748,7 +5817,8 @@ function vEverydayPage() {
           ? el('a', { href: '#model=' + encodeURIComponent(id), text: evdName(id),
               onclick: ev => { ev.preventDefault(); navigate({ model: id, topic: null }); } })
           : el('span', { text: evdName(id) }),
-        el('span', { class: 'evm-count', 'data-evd-count': id, text: evdCount(E.models[id]) }))))),
+        el('span', { class: 'evm-count', 'data-evd-count': id, text: evdCount(E.models[id]) }),
+        evdRanOut(E.models[id]))))),
     el('tbody', {}, groups.map(([g, label]) => el('tr', { 'data-evd-g': g },
       el('th', { scope: 'row', class: 'evq-cell' },
         el('span', { class: 'evq-short', text: label }),
@@ -5862,11 +5932,11 @@ function evdDialog(pre = {}) {
       el('input', { type: 'checkbox', checked: pick[id] ? '' : null,
         onchange: ev => { pick[id] = ev.target.checked; sync(); } }),
       el('span', { class: 'evpick-name', title: id, text: evdName(id) }),
-      evdOf(id) ? el('span', { class: 'small se', 'data-evd-done': id,
-        // 12a.2: a model that sat the pilot was asked five of the bank
-        text: evdOf(id).total < nBank ? `asked ${evdOf(id).total} of ${nBank} · run all ${nBank}`
-          : 'done · run again' })
-        : '')));
+      evdOf(id) ? el('span', { class: 'small se', 'data-evd-done': id, text: 'done · run again' })
+        // 12a.4: its answers are to an earlier wording (the pilot's five, or
+        // a run before the questions were reworded)
+        : evdEarlier(id) ? el('span', { class: 'small se', 'data-evd-done': id,
+          text: `earlier wording · run all ${nBank}` }) : '')));
   const box = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true',
       'aria-labelledby': 'dlg-title' },
     el('h2', { id: 'dlg-title', text: 'Run everyday tasks' }),
@@ -7201,7 +7271,8 @@ function lbEveryday(ms) {
           return el('td', { class: 'num' + (n ? '' : ' se'), 'data-evd-g': g,
             title: n ? label : 'not asked', text: n || '—' });
         }),
-        el('td', { class: 'num', 'data-everyday-count': evdCount(e), text: evdCount(e) }));
+        el('td', { class: 'num' },
+          el('span', { 'data-everyday-count': evdCount(e), text: evdCount(e) }), evdRanOut(e)));
     }), notTestedRows(none, ncols, 'everyday')));
   return [el('div', { class: 'card', 'data-lb-card': '1' },
     ...modelsHead(evdBadge(prov)),

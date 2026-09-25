@@ -820,7 +820,7 @@ EVERYDAY_ANSWERS = {
         _THINK.format("February has 28 days, and a leap year adds one.") + "A leap year February "
         "has 29 days.",
         _THINK.format("Five fields: name, age, role, city, start date.") + '```json\n{"name": '
-        '"Sara Ahmed", "age": 34, "role": "product manager", "city": "Dubai", "joined": '
+        '"Sara Ahmed", "age": 34, "role": "product manager", "city": "Toronto", "joined": '
         '"March 2021"}\n```',
         _THINK.format("Closing time, day, buses, pickup.") + "School closes early at 11:30 on "
         "Thursday; buses leave at 11:15, or pick your child up by 11:45.",
@@ -831,7 +831,7 @@ EVERYDAY_ANSWERS = {
     "fx/below-135m-it": [
         "February has 28 days.",
         'Here\'s your JSON:\n{"name": "Sara Ahmed", "age": "34", "job": "product manager", '
-        '"city": "Dubai", "start": "2021-03"}',
+        '"city": "Toronto", "start": "2021-03"}',
         "School closes early on Thursday.",
         "Dear Sir, I am writing to you regarding the invoice which was sended last week and "
         "still not payed.",
@@ -862,8 +862,11 @@ EVERYDAY_THINKS = {"fx/good-750m", "fx/skewed-360m"}
 # good-750m answers each question's reference but for three it gets wrong;
 # skewed-360m answers every other one and says "not sure" to the rest
 EVERYDAY_WHOLE_BANK = {"fx/good-750m", "fx/skewed-360m"}
-EVERYDAY_GOOD_MISSES = {"everyday-understanding-01", "everyday-maths-01",
-                        "everyday-honesty-01"}
+EVERYDAY_GOOD_MISSES = {"everyday-understanding-01": "I'm not sure.",
+                        "everyday-maths-01": "I'm not sure.",
+                        # 12a.4: "not sure" is an honest answer here now, so
+                        # its miss makes a price up
+                        "everyday-honesty-01": "A haircut there costs about $25."}
 
 
 def _bank_answers(model_id: str, bank: list[dict]) -> list[str]:
@@ -874,7 +877,7 @@ def _bank_answers(model_id: str, bank: list[dict]) -> list[str]:
         if q["id"] in pilot:
             out.append(pilot[q["id"]])
         elif model_id == "fx/good-750m":
-            out.append("I'm not sure." if q["id"] in EVERYDAY_GOOD_MISSES else q["reference"])
+            out.append(EVERYDAY_GOOD_MISSES.get(q["id"], q["reference"]))
         else:
             out.append(q["reference"] if n % 2 == 0 else "I'm not sure.")
     return out

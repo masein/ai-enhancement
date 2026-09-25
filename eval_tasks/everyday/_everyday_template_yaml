@@ -21,7 +21,7 @@ generation_kwargs:
   # harness can fall back to its few-shot delimiter, a blank line, which
   # would cut the JSON, the email, and Qwen3's "<think>\n\n</think>"
   until: ["\n\n\n\n"]
-  # a reasoning model gets REASONING_MAX_GEN_TOKS instead (--gen_kwargs)
+  # a reasoning model gets EVERYDAY_REASONING_MAX_GEN_TOKS, 4,096 (--gen_kwargs)
   max_gen_toks: 512
   do_sample: false
   temperature: 0.0

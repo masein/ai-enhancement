@@ -635,9 +635,11 @@ def run_submission(sub: dict) -> None:
             # the one that thinks; lm_eval records the override in its results
             thinks = ((kind == "instruct" and task in judged or everyday)
                       and (meta.get("archinfo") or {}).get("reasoning_template"))
+            # 12a.4: its everyday answers get more room still
+            room = (config.EVERYDAY_REASONING_MAX_GEN_TOKS if everyday
+                    else config.REASONING_MAX_GEN_TOKS) if thinks else None
             cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
-                              chat=kind == "instruct" or everyday,
-                              max_gen_toks=config.REASONING_MAX_GEN_TOKS if thinks else None)
+                              chat=kind == "instruct" or everyday, max_gen_toks=room)
 
             t_task = time.time()
             # the dropped-privilege child cannot create its own output dir under
@@ -650,10 +652,10 @@ def run_submission(sub: dict) -> None:
                     pass
             with open(log_path, "a") as lf:
                 lf.write(f"\n===== [{sid}] {task} ({shots}-shot) =====\n")
-                if "--gen_kwargs" in cmd:
-                    lf.write(f"[reasoning model] answers get "
-                             f"{config.REASONING_MAX_GEN_TOKS} tokens, not 256: the chat "
-                             f"template writes its reasoning before the answer\n")
+                if room:
+                    lf.write(f"[reasoning model] answers get {room} tokens, not "
+                             f"{512 if everyday else 256}: the chat template writes its "
+                             f"reasoning before the answer\n")
                 if remote_code:
                     lf.write(f"[trust_remote_code] running as "
                              f"{config.EVAL_USER or 'root (EVAL_USER unset!)'}, "
@@ -727,8 +729,13 @@ def run_submission(sub: dict) -> None:
             try:
                 ev = _everyday.start(config.OUT_DIR / safe, submission=sid)
                 judge_note = _everyday.summary(ev)
+                # 12a.4: the wording this run answered, on the run itself
+                ver = ev.get("version") or {}
+                db.update(sid, bank_version=ver.get("hash") or "")
                 with open(log_path, "a") as lf:
                     lf.write(f"\n===== [{sid}] everyday: {_everyday.summary(ev)}"
+                             + f" · questions of {ver.get('date') or 'an earlier wording'}"
+                             + f" ({ver.get('hash')})"
                              + (f" · judge batch {ev['batch_id']}" if ev.get("batch_id") else "")
                              + (f" · the judge could not be asked: {ev['error']}"
                                 if ev.get("error") else "") + " =====\n")

@@ -28,7 +28,7 @@ MODEL = "fx/one-option-70m"          # a fixture model Everyday tasks have not a
 
 # the TL;DR (03), in one sentence with the time and the day: the stand-in passes it
 TLDR = "School closes early at 11:30 on Thursday; buses leave at 11:15."
-FULL = '{"name": "Sara Ahmed", "age": 34, "role": "product manager", "city": "Dubai", ' \
+FULL = '{"name": "Sara Ahmed", "age": 34, "role": "product manager", "city": "Toronto", ' \
        '"joined": "March 2021"}'
 BANK = ev.load_bank()
 Q = {q["id"]: q for q in BANK}
@@ -109,7 +109,7 @@ def test_the_thinking_is_never_marked(tmp_path):
         "<think>names: Bean There: cozy</think>\n\nBean There\nDaily Grind\nBrew Haven"))
     out = ev.mark(mdir)
     got = {it["id"][-2:]: (it["pass"], it["reason"]) for it in out["items"]}
-    assert got["01"] == (False, "says none of: 29, twenty-nine, twenty nine")
+    assert got["01"] == (False, "never mentions: 29, twenty-nine, twenty nine")   # 12a.4
     assert got["02"][0] is True and got["02"][1].startswith("valid JSON with sara")
     assert got["03"] == (None, "waiting for the judge")
     assert got["04"][0] is True
@@ -134,24 +134,35 @@ def test_a_script_check_that_fails_is_never_sent_to_the_judge(tmp_path):
 
 
 def test_a_verdict_is_kept_while_the_answer_is_the_same(tmp_path):
+    """12a.4: on a run of the whole bank — only this wording's are re-marked"""
     mdir = tmp_path / "fx__x"
-    write_bank(mdir, pilot("29", FULL, TLDR, "x", "a\nb\nc"))
+    refs = {q["id"]: q["reference"] for q in BANK}
+
+    def tldr(out):
+        return next(it for it in out["items"] if it["id"] == "everyday-pilot-03")
+    write_bank(mdir, {**refs, **pilot("29", FULL, TLDR, "x", "a\nb\nc")})
     ev.write(mdir, ev.mark(mdir, {"everyday-pilot-03": {"pass": True, "reason": "fine"}}))
     again = ev.mark(mdir)                                   # re-marked from the logs
-    assert again["items"][2]["pass"] is True and again["items"][2]["reason"] == "fine"
-    write_bank(mdir, pilot("29", FULL, TLDR + " Friday is normal.", "x", "a\nb\nc"))
-    assert ev.mark(mdir)["items"][2]["pass"] is None        # a new answer: asked again
+    assert tldr(again)["pass"] is True and tldr(again)["reason"] == "fine"
+    write_bank(mdir, {**refs, **pilot("29", FULL, TLDR + " Friday is normal.", "x", "a\nb\nc")})
+    assert tldr(ev.mark(mdir))["pass"] is None              # a new answer: asked again
 
 
 def test_a_model_that_sat_the_pilot_keeps_its_five_marks(tmp_path):
     """The pilot's answers were logged as "everyday_pilot"; they are read, and
-    the model shows the five it was asked"""
+    the model shows the five it was asked. 12a.4: the pilot was an earlier
+    bank, so they are an earlier wording's — kept as they were marked, and
+    never marked again by today's checks"""
     mdir = tmp_path / "fx__old"
     write_bank(mdir, pilot("29", FULL, TLDR, "x", "a\nb\nc"))
     (mdir / f"{ev.TASK}_0shot").rename(mdir / "everyday_pilot_0shot")
     out = ev.mark(mdir, {"everyday-pilot-03": {"pass": True, "reason": "fine"}})
     assert [it["id"] for it in out["items"]] == [f"everyday-pilot-0{i}" for i in (1, 4, 3, 2, 5)]
     assert out["total"] == 5 and out["passed"] == 4
+    assert out["earlier"] is True and out["version"]["hash"] != ev.version()["hash"]
+    ev.write(mdir, out)
+    again = ev.mark(mdir, {"everyday-pilot-03": {"pass": False, "reason": "changed"}})
+    assert again["items"] == out["items"] and again["passed"] == 4
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +202,7 @@ def fake_gpu(monkeypatch, has_template=True, reasoning=False, answers=None):
         seen.append(cmd)
         out = Path(cmd[cmd.index("--output_path") + 1])
         write_bank(out.parent, answers or DEFAULT_ANSWERS,
-                   budget=config.REASONING_MAX_GEN_TOKS if reasoning else 512)
+                   budget=config.EVERYDAY_REASONING_MAX_GEN_TOKS if reasoning else 512)
         return 0
     monkeypatch.setattr(runner, "_run_task", run)
     return seen
@@ -227,7 +238,9 @@ def test_the_bank_is_asked_through_the_chat_template_and_marked_in_the_same_run(
     assert "--apply_chat_template" in cmd
     assert cmd[cmd.index("--include_path") + 1] == str(config.EVERYDAY_TASKS_DIR)
     if reasoning:
-        assert cmd[cmd.index("--gen_kwargs") + 1] == f"max_gen_toks={config.REASONING_MAX_GEN_TOKS}"
+        # 12a.4: 4,096 for its everyday answers; the exam's 2,048 is the exam's
+        assert config.EVERYDAY_REASONING_MAX_GEN_TOKS == 4096 != config.REASONING_MAX_GEN_TOKS
+        assert cmd[cmd.index("--gen_kwargs") + 1] == "max_gen_toks=4096"
     else:
         assert "--gen_kwargs" not in cmd
     # the task it ran, written from the bank and the template: the question as
@@ -335,7 +348,11 @@ def test_the_bank_is_on_no_leaderboard_and_in_no_average(tmp_path):
         assert json.dumps(a[key], sort_keys=True) == json.dumps(b[key], sort_keys=True), key
         # the task's name, not the word (HellaSwag is "about everyday situations")
         assert not re.search(r'"everyday"|everyday[-_]', json.dumps(a[key])), key
-    assert sorted(a["everyday"]["models"]) == sorted(with_it["everyday"])
+    # 12a.4: the two that sat the bank are on its wording; the two that sat
+    # only the pilot answered an earlier one, kept beside them
+    assert sorted(a["everyday"]["models"]) == ["fx/good-750m", "fx/skewed-360m"]
+    assert sorted([*a["everyday"]["models"], *a["everyday"]["earlier"]]) == \
+        sorted(with_it["everyday"])
     assert b["everyday"]["models"] == {}
 
 

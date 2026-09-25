@@ -295,13 +295,31 @@ local, and it is the gate.**
    - It writes only to a temporary folder. Everyday's task is built there
      from the deployed bank.
 
-**The deploy steps, from 12a.3 on:**
+**The deploy steps, from 12a.3 on.** One block per step, so each copies on its
+own (12a.4: step 4 had to be asked for on 2026-09-25).
+
+Step 1, pull and rebuild:
 
 ```bash
 cd ~/benchmarks/aienh && git pull origin main && sudo EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
+```
+
+Step 2, the logs:
+
+```bash
 sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
+```
+
+Step 3, the unit tests inside the container:
+
+```bash
 git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check && mkdir /tmp/check && cd /tmp/check && tar -x && exec env -i PATH="$PATH" HOME=/tmp/check LANG=C.UTF-8 python -m pytest -q -p no:cacheprovider -m "not gpu and not network and not dashboard"' 2>&1 | tail -15
-sudo docker compose exec -T bench python scripts/check_tasks.py
+```
+
+Step 4, the task-discovery check inside the container:
+
+```bash
+sudo docker compose exec -T bench python scripts/check_tasks.py 2>&1 | tail -15
 ```
 
 **Step 3's expected output:** the last line reads `N passed, M deselected
@@ -2090,6 +2108,68 @@ ValueError: No tasks specified, or no tasks found.
   real hidden counts per group in that PR. Honesty is the one at risk: 41
   questions give about 20 hidden, right at 12g.2's bar of 20. If it lands
   below, masein adds a few.
+
+### 12a.4 — Everyday tasks: neutral wording and fairer checks
+
+`docs/prompts/phase-12a4-everyday-neutral.md`, with its files in
+`docs/prompts/phase-12a4/`. Three findings from the round-3 runs, #70 to #73,
+drove it.
+
+- **The bank is neutral** (masein, 2026-09-25): nothing that only makes sense
+  in one country.
+  - The 328 round-2 and round-3 questions were replaced by id with the
+    brief's rewrite, keeping `written_by`: 126 new wordings, 121 new check
+    lists.
+  - The pilot's `everyday-pilot-02` says Toronto, not Dubai, in its prompt,
+    its reference and its JSON check.
+  - `tests/test_everyday_12a4.py` asserts, over whole words, that no
+    question, reference or check says aed, dirham, dubai, abu dhabi,
+    sharjah, emirates, uae, nol, talabat, dewa, careem or salik.
+    ("chronological" is not "nol".)
+  - The prompt for writing the next round, now neutral, is
+    `eval_tasks/everyday/everyday-question-prompt.md`.
+- **The checker:** `docs/prompts/phase-12a4/checks.py` replaces 12a.3's, and
+  `scripts/everyday.py` agrees with it on all 382 probes.
+  - **`admits_limit`** checks the answer against one shared list, `ADMITS`,
+    of the ways to say it can't know or can't do something. In the question
+    list it reads *says it can't know or do this*.
+  - **`any`** passes when one of its checks passes, e.g. *asks what you
+    meant, or says it can't know or do this*. When none passes, its reason
+    joins theirs with "and".
+  - **The made-up price check** catches `$25`, `€`, `£`, eur, gbp, dollars,
+    euros and pounds. Before, `\b` before `$` never matched.
+  - **A missed `contains_any`** says *never mentions: …*, not *says none
+    of: …*.
+- **The version.** The bank's version is `WORDING_DATE` (2026-09-25) and a
+  short hash of the question texts: each question's id and prompt. The
+  checks are not in it, since a fairer check can mark the same answers again.
+  - **A run's version** is the hash of what it was asked, read from the
+    questions the harness logged.
+    - `mark()` stamps it on `everyday.json`.
+    - The runner writes it to the run's row (`submissions.bank_version`) and
+      its log.
+  - **Answers to another version are never re-marked.** What they were
+    marked when they were answered stays, flagged `earlier`. The pilot's
+    five were a different bank, so they count as earlier too.
+  - **The page** (the model page, Benchmarks ▸ Everyday tasks, Models ▸
+    Everyday tasks and Home) counts only this wording's runs. Earlier
+    answers are in the model's History under **earlier wording**, with their
+    count and date. That run's row in the runs table carries the same label.
+  - **To reword a question:** change `WORDING_DATE` the same day. The pinned
+    hash in `tests/test_everyday_12a4.py` fails until you do, and says what
+    to set.
+- **Room to think:** a reasoning model's everyday answers get 4,096 tokens
+  (`EVERYDAY_REASONING_MAX_GEN_TOKS`). Its exam answers keep 2,048.
+  - In #70, 8 of Qwen3-1.7B's 45 quick-maths answers were empty, and
+    Qwen3-0.6B had 5.
+  - Beside each score, *n answers ran out of room* says how many still
+    didn't finish, only when there are any. Those answers still fail.
+- **The badge** is one short line, *not ranked*, plus *· provisional judge*
+  when the judge is provisional. The round is gone; the Everyday tab says
+  which wording it shows (*This wording: 2026-09-25 · 20efe555*). On Home it
+  has a line of its own under the heading, with equal room above and below.
+- **Run everyday tasks** ticks all five instruct models, SmolLM2-135M-Instruct
+  among them.
 
 ## 11. Known gaps, risks, loose ends
 
