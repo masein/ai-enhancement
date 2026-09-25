@@ -22,30 +22,6 @@ def _score(text: str) -> float | None:
 # 7. thirty-six topics
 # ---------------------------------------------------------------------------
 
-def test_the_loop_board_is_weakest_first_searchable_and_paged(live, page):
-    page.goto(live["base"] + "/#tab=loop")
-    page.wait_for_selector("table[data-loop-table] tr[data-loop-row]")
-    rows = page.locator("table[data-loop-table] tr[data-loop-row]")
-    assert rows.count() == 25                              # the shared pager, at 25
-    assert page.locator("[data-pager='loop'] [data-page-range]").get_attribute(
-        "data-page-range") == "1-25"
-    # weakest first, for the model in "Results for"
-    scores = [_score(t) for t in page.locator("[data-loop-score]").all_text_contents()]
-    judged = [s for s in scores if s is not None]
-    assert len(judged) >= 10 and judged == sorted(judged)
-    assert scores[:len(judged)] == judged                  # the ones it has not sat come after
-    # Arts, delivered empty, is in the fold and not a row
-    assert "Arts" in page.locator("tr[data-empty-topics]").text_content()
-    # a search narrows it
-    page.get_by_label("find a topic").fill("law")
-    page.wait_for_function("document.querySelectorAll('tr[data-loop-row]').length === 1")
-    assert page.locator("tr[data-loop-row='law']").count() == 1
-    assert "match" in page.locator("[data-loop-count]").text_content()
-    page.get_by_label("find a topic").fill("")
-    page.wait_for_function("document.querySelectorAll('tr[data-loop-row]').length === 25")
-    assert page.errors == []
-
-
 def test_the_topic_boxes_filter_tick_all_or_none_and_say_what_they_cost(live, page):
     page.goto(live["base"] + "/#topic=law")
     picker = page.locator("[data-picker='sit']")
@@ -188,9 +164,6 @@ def test_a_judge_that_is_down_is_on_the_board_and_stops_queue_this_run(live, pag
     page.wait_for_function("document.querySelector('[data-stamp]').dataset.fresh === "
                            "'judge-offline'")
     assert "judge offline" in stamp.text_content()
-    page.goto(live["base"] + "/#tab=loop")
-    page.wait_for_selector("[data-judge-offline-why]")
-    assert judge_down in page.locator("[data-judge-offline-why]").text_content()
     assert page.errors == []
 
 

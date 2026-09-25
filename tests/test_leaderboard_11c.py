@@ -342,7 +342,7 @@ def test_weakest_topics_says_so_when_nothing_is_judged(live, page):
     page.route("**/api/results*", handle)
     open_lb(page, live["base"])
     assert page.locator("[data-weakest-empty]").text_content() == \
-        "No model has been judged yet — Improve ▸ By topic ▸ Sit the exam"
+        "No model has been judged yet — sit the exam from a model's page"      # 12g.1
     assert page.errors == []
 
 

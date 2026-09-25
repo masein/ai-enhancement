@@ -511,8 +511,10 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
                    for c in row.locator("td").all())
         pg.locator("[data-not-tested-toggle]").click()
         assert pg.locator("tr[data-not-tested-row='fx/good-750m']").count() == 0
+        # 12g.1: the checks' list is the status dot's popover
+        pg.locator("#warnings [data-warn-summary]").click()
         assert "were graded by a local model — not a pinned benchmark" in \
-            pg.locator("#warnings").text_content()
+            pg.locator("#pop-checks").text_content()
         assert s.errors == []
     finally:
         ctx.close()

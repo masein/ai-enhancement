@@ -1636,23 +1636,23 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                            for t in ((m.get("judge") or {}).get("tasks") or {})})
     judge_meta = next(((m["judge"] or {}).get("judge") for m in model_rows if m.get("judge")), None)
     if judged_tasks and cal is None:
-        warn('judge_uncalibrated', 'warning', {'tab': 'loop'}, 'The judge is not calibrated against a person',
+        warn('judge_uncalibrated', 'warning', {'tab': 'exam'}, 'The judge is not calibrated against a person',
             "Judged free-response scores are on file but the judge has not been calibrated "
             "against a person (scripts/judge_calibrate.py). They are shown as preliminary and "
             "enter no average and no rank.")
     elif cal and not cal.get("calibrated"):
-        warn('judge_kappa', 'warning', {'tab': 'loop'}, "The judge's agreement with a person is below the line",
+        warn('judge_kappa', 'warning', {'tab': 'exam'}, "The judge's agreement with a person is below the line",
             f"The judge's agreement with a human grader is Cohen's kappa {cal['kappa']} over "
             f"{cal.get('n')} answers, below the {KAPPA_MIN} line. Judged scores are preliminary: "
             f"shown, never ranked, never averaged.")
     if judge_meta and judge_meta.get("stub"):
-        warn('judge_stub', 'warning', {'tab': 'loop'}, 'Judged scores come from the stub grader',
+        warn('judge_stub', 'warning', {'tab': 'exam'}, 'Judged scores come from the stub grader',
             "Judged scores on this board come from the STUB grader (a word-overlap stand-in "
             "used for plumbing tests). They are not judgements of anything.")
     drifted = [m["name"] for m in model_rows if m.get("judge")
                and (m["judge"].get("canary") or {}).get("drifted")]
     if drifted:
-        warn('judge_canary', 'warning', {'tab': 'loop'}, "The judge's canary moved",
+        warn('judge_canary', 'warning', {'tab': 'exam'}, "The judge's canary moved",
             f"The judge's canary moved on {len(drifted)} run{'s' if len(drifted) > 1 else ''} "
             f"({', '.join(drifted[:4])}): the same thirty scripts were graded differently from "
             f"the previous run. Those judged scores are preliminary — a vendor may have changed "
@@ -1679,20 +1679,20 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             f"room to answer.")
     local_judged = [m["name"] for m in model_rows if provisional_reason(m.get("judge"))]
     if local_judged:
-        warn('judge_local', 'info', {'tab': 'loop'}, f"{len(local_judged)} model{'s' if len(local_judged) > 1 else ''} graded by a local judge: provisional",
+        warn('judge_local', 'info', {'tab': 'exam'}, f"{len(local_judged)} model{'s' if len(local_judged) > 1 else ''} graded by a local judge: provisional",
             f"Judged scores for {len(local_judged)} model{'s' if len(local_judged) > 1 else ''} "
             f"({', '.join(local_judged[:4])}{', …' if len(local_judged) > 4 else ''}) were "
             f"graded by a local model — not a pinned benchmark. They are provisional: shown "
             f"greyed on the model page, never ranked, never in any average.")
     if any((m.get("judge") or {}).get("judge", {}).get("single_provider_loop") for m in model_rows):
-        warn('judge_single_provider', 'info', {'tab': 'loop'}, 'Single-provider loop',
+        warn('judge_single_provider', 'info', {'tab': 'exam'}, 'Single-provider loop',
             "Single-provider loop: the judge shares a provider with the exam writer or the "
             "generator (ALLOW_SINGLE_PROVIDER_LOOP). Every judged score carries that caveat; "
             "self-preference in LLM judges is documented and large.")
     other_judges = sorted({(m["judge"]["judge"] or {}).get("id") for m in model_rows
                            if m.get("judge")} - {current_judge, None})
     if current_judge and other_judges:
-        warn('judge_other', 'warning', {'tab': 'loop'}, 'Some judged scores come from a different judge',
+        warn('judge_other', 'warning', {'tab': 'exam'}, 'Some judged scores come from a different judge',
             f"Some judged scores come from a different judge ({', '.join(other_judges)}) than "
             f"the one this server runs now ({current_judge}). They are shown as their own "
             f"series and never ranked against the current judge's — resubmit with suite=judged "
@@ -2097,6 +2097,41 @@ html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *
   transition:background-color 250ms var(--ease), color 250ms var(--ease),
     border-color 250ms var(--ease) !important; }
 @keyframes livepulse { 0%,100% { opacity:1; } 50% { opacity:.45; } }
+/* 12g.1: the pipeline — four stages, left to right; one column on a phone */
+.imphead .imp-title { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0; }
+.imphead .imp-model { font-size:var(--fs-2); font-weight:600; }
+.stages { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:16px; }
+@media (max-width:1100px) { .stages { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+@media (max-width:640px) { .stages { grid-template-columns:1fr; } }
+.stage { min-width:0; }
+.stage .stage-h { font-size:var(--fs-1); text-transform:uppercase; letter-spacing:.06em;
+  color:var(--text-secondary); margin:0 0 8px; font-weight:600; }
+.stagelist { list-style:none; margin:0; padding:0; border:1px solid var(--border);
+  border-radius:var(--r-2); }
+.stageitem { padding:8px 10px; border-top:1px solid var(--border); display:grid;
+  grid-template-columns:minmax(0, 1fr) auto; gap:2px 8px; align-items:center; }
+.stageitem:first-child { border-top:0; }
+.stageitem .si-main { min-width:0; overflow-wrap:anywhere; }
+.stageitem .si-sub { grid-column:1; font-size:var(--fs-1); color:var(--text-secondary); }
+.stageitem .si-act { grid-column:2; grid-row:1 / span 2; }
+.stageitem.landed { background:var(--heat-1); }
+.stagemore { padding:6px 10px; border-top:1px solid var(--border); }
+.stage-none { margin:0; }
+.watch { margin-top:2px; }
+.watch.dropped, .watch.dropped a { color:var(--warning-text); }
+.imp-past { margin-top:14px; }
+/* the checks: a popover from the status dot, as the run counter's */
+.checkspop { width:min(460px, calc(100vw - 32px)); max-height:min(60vh, 520px); overflow:auto;
+  padding:10px 14px; }
+.checkspop .checklist { margin:0; padding-left:18px; }
+.checkspop .checklist li.checks-judged { list-style:none; color:var(--text-secondary);
+  margin:0 0 6px; }
+.checkspop .known-limits { list-style:none; margin:8px 0 4px; }
+.checkspop .known-limits > details > summary { cursor:pointer; list-style:none;
+  color:var(--text-secondary); }
+.checkspop .known-limits > details > summary::-webkit-details-marker { display:none; }
+.checkspop .known-limits .checklist { margin:6px 0 0; border:1px solid var(--border);
+  border-radius:var(--r-2); padding:6px 6px 6px 22px; }
 /* the checks: the pill lives in the bar, its list opens just under the bar */
 .bar-checks details.checks { position:static; margin:0; }
 .bar-checks > details > summary { display:inline-flex; align-items:center; gap:6px;
@@ -5043,9 +5078,9 @@ function vTaint(m) {
         text: `dataset #${d}` }))),
     tt.proposals.length ? el('span', {}, ' from ',
       tt.proposals.map((pid, i) => el('span', {}, i ? ', ' : '',
-        el('a', { href: '#tab=improve&sub=review', text: `proposal #${pid}`,
-          onclick: e => { e.preventDefault(); state.rv.loaded = false;
-            navigate({ tab: 'review', model: null, topic: null }); } }), ' ',
+        el('a', { href: '#tab=improve&sub=model', text: `proposal #${pid}`,
+          onclick: e => { e.preventDefault(); openImprove(m.trainedFrom
+            ? m.trainedFrom.base : null); } }), ' ',
         overBadge((tt.over_provisional_judge || {})[String(pid)])))) : '',
     '.'));
   for (const [t, c] of Object.entries(tc)) {
@@ -5227,10 +5262,55 @@ function modelHead(m, kinds) {
       el('div', { class: 'mtop-l' },
         el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
           warnBadge(m) || '', dupBadge(m) || ''),
-        el('p', { class: 'mfacts', 'data-model-facts': '1', text: facts }))),
+        el('p', { class: 'mfacts', 'data-model-facts': '1', text: facts }),
+        trainedFromLine(m))),
       // 12b.3: the page's one main action is the header's, which reads Test
       // this model here — two filled buttons side by side was one too many
     el('div', { class: 'ktiles', 'data-kind-tiles': '1' }, kinds.map(k => kindTile(m, k))));
+}
+// 12g.1: what a checkpoint was trained from — set once by a person, from the
+// models on the board, or recorded by its training run. Improve's Retests pair
+// it with that model; a checkpoint without one is not in Improve
+const isCheckpoint = m => m.source === 'artifact' || !!m.trainedFrom
+  || (m.tainted || []).length > 0;
+function trainedFromLine(m) {
+  if (!isCheckpoint(m)) return '';
+  const tf = m.trainedFrom;
+  const base = tf && DATA.models.find(x => x.id === tf.base);
+  const pick = LIVE ? popover(el('button', { class: 'quiet', 'data-trained-from-set': m.id,
+      text: tf ? 'change' : 'Set it ▾' }),
+    () => {
+      const list = el('div', { class: 'mlist' });
+      const fill = q => list.replaceChildren(...DATA.models.filter(x => x.id !== m.id
+          && !x.duplicateOf && (!q || (x.name + ' ' + x.id).toLowerCase().includes(q.toLowerCase())))
+        .map(x => el('button', { role: 'menuitem', 'data-trained-from-pick': x.id,
+          onclick: async () => {
+            if (!whoName()) { popClose(); askName(); return; }
+            try {
+              await post('api/trained-from', { model: m.id, base: x.id, by: whoName() });
+              popClose(true);
+              toast(`${m.name}: trained from ${x.name}`, { key: 'trained-from' });
+              await refreshResults();
+            } catch (e) { toast('Refused. ' + String((e && e.message) || e), { key: 'trained-from' }); }
+          } }, x.name, el('span', { class: 'se', text: ' ' + x.id }))));
+      fill('');
+      return el('div', { class: 'moremenu modelsmenu', id: 'pop-trained-from',
+          'aria-label': 'trained from' },
+        el('input', { type: 'search', placeholder: 'the model it was trained from…',
+          'aria-label': 'search models', 'data-keep': 'trainedfrom',
+          oninput: e => fill(e.target.value) }), list);
+    }, { key: 'trained-from', menu: false }) : '';
+  if (!tf) return el('p', { class: 'small se', 'data-trained-from': 'unset' },
+    'Set what this was trained from to see it in Improve', pick ? [' · ', pick] : '');
+  return el('p', { class: 'small', 'data-trained-from': tf.base },
+    'Trained from ', base ? el('a', { href: '#model=' + encodeURIComponent(base.id),
+      text: base.name }) : el('span', { class: 'mono', text: tf.base }),
+    el('span', { class: 'se', text: tf.source === 'person' ? ` · set by ${tf.by}`
+      : ` · recorded by training run #${tf.run}` }),
+    base ? [' · ', el('a', { href: '#', 'data-trained-from-improve': base.id,
+      text: 'see it in Improve', onclick: e => { e.preventDefault(); openImprove(base.id); } })]
+      : el('span', { class: 'se', text: ' · not on the board, so not in Improve' }),
+    pick ? [' · ', pick] : '');
 }
 function kindTile(m, k) {
   const attrs = { class: 'ktile' + (k.taken ? '' : ' none'), 'data-kind-tile': k.kind };
@@ -5608,7 +5688,7 @@ function needsYou() {
     const L = rvLists();
     add('proposals', L.review.length,
       plural(L.review.length, 'proposal waiting for review', 'proposals waiting for review'),
-      () => { state.rv.view = 'review'; navigate({ tab: 'review', model: null, topic: null }); });
+      () => openImprove((L.review[0] || {}).model));
     if (state.trLoaded) {
       const used = new Set((state.trRuns || []).flatMap(r => r.datasets || []));
       // 12b.3: a Demo only dataset is for trying the loop, not for training on —
@@ -5617,7 +5697,7 @@ function needsYou() {
         && !used.has(d.id) && !dsDemoOnly(d));
       add('datasets', idle.length, plural(idle.length, 'dataset made but not used in training',
         'datasets made but not used in training'),
-        () => { state.rv.view = 'datasets'; navigate({ tab: 'review', model: null, topic: null }); });
+        () => openImprove((idle[0] || {}).model));
     }
   }
   if (LIVE) {
@@ -5637,11 +5717,8 @@ function needsYou() {
 }
 // the status dot's list, opened from Home's line about it
 function openChecks() {
-  const d = document.querySelector('#warnings details.checks');
-  if (!d) return;
-  d.open = true; state.checksOpen = true;
-  const sum = d.querySelector('summary');
-  if (sum) sum.focus();
+  const b = document.querySelector('#warnings [data-pop-anchor="checks"]');
+  if (b && POP.key !== 'checks') b.click();
 }
 
 // the run counter's list, full width
@@ -5679,19 +5756,22 @@ function bestByKind(ms) {
     .sort((a, b) => b.judgedAvg - a.judgedAvg)[0];
   if (exam) cards.push(card('exam', 'Knowledge exam', `${num(exam.judgedAvg, 2)} / 4`, exam));
   // 12b.3: no model has a judged average (none counts yet) but models have
-  // judged topics: the weakest topic across the board, as the old Overview's
-  // card showed — a topic score, which a provisional judge may show
+  // judged topics. 12g.1: the weakest topic OF THE MODEL WITH THE MOST judged
+  // topics — the weakest across the board was a 31M model's 0 / 4, which a
+  // model that scores zero everywhere says about every topic
   let weak = null;
-  if (!exam) for (const m of ms.filter(x => !x.duplicateOf)) {
-    const w = weakestTopic(m);
-    if (w && (!weak || w.v < weak.v)) weak = { ...w, m };
+  if (!exam) {
+    const most = ms.filter(x => !x.duplicateOf && judgedTopics(x).length)
+      .sort((a, b) => judgedTopics(b).length - judgedTopics(a).length || natCmp(a.name, b.name))[0];
+    const w = most && weakestTopic(most);
+    if (w) weak = { ...w, m: most };
   }
   if (weak) cards.push(el('div', { class: 'hcard', 'data-best': 'exam', 'data-best-weakest': '1' },
     el('div', { class: 'eyebrow', text: 'Knowledge exam · weakest topic' }),
     el('div', { class: 'hcard-v', 'data-best-value': 'exam', text: `${num(weak.v, 2)} / 4` }),
     el('div', { class: 'hcard-name', 'data-best-name': 'exam', title: weak.m.id,
-      text: `${frName(weak.task)} · ${weak.m.name}` }),
-    go('exam')));
+      text: `${weak.m.name} · weakest: ${frName(weak.task)} ${num(weak.v, 2)} / 4` }),
+    LIVE ? hlLink('Improve it →', () => openImprove(weak.m.id)) : go('exam')));
   const E = evd();
   const ev = Object.entries(E.models || {}).filter(([id]) => ms.some(m => m.id === id))
     .sort(([a, x], [b, y]) => (y.passed - x.passed) || evdName(a).localeCompare(evdName(b)))[0];
@@ -6151,8 +6231,9 @@ function viewHash(v) {
   if (v === 'leaderboard') return 'tab=models' + (lbHash() ? '&' + lbHash() : '');
   if (place === 'improve' || place === 'benchmarks')
     return `tab=${place}&sub=${SUB_SLUG[v]}`
-      // 11j: which Review view, so a link opens it
-      + (v === 'review' && state.rv.view ? '&view=' + state.rv.view : '');
+      // 12g.1: which model Improve is on, so a link opens it
+      + (v === 'pipeline' && state.imp.model ? '&model=' + encodeURIComponent(state.imp.model)
+        : '');
   return 'tab=' + (PAGE_SLUG[v] || v);
 }
 // where an address lands: its view, and the state it carries. Old names and
@@ -6161,14 +6242,15 @@ function viewOfHash(name, params) {
   const p = new URLSearchParams(params || '');
   const has = v => TABS.some(t => t[0] === v);
   const n = TAB_ALIASES[name] || name;
-  const sub = { topics: 'loop', review: 'review', training: 'training',
+  // 12g.1: By topic and Review are the pipeline now — their addresses land on it
+  const sub = { model: 'pipeline', topics: 'pipeline', review: 'pipeline', training: 'training',
                 standard: 'tasks', exam: 'exam', everyday: 'everyday' }[p.get('sub')];
   let v = { home: 'overview', overview: 'overview', models: 'leaderboard',
-            leaderboard: 'leaderboard', perplexity: 'leaderboard', loop: 'loop',
-            review: 'review', training: 'training', runs: 'queue', queue: 'queue',
+            leaderboard: 'leaderboard', perplexity: 'leaderboard', loop: 'pipeline',
+            review: 'pipeline', training: 'training', runs: 'queue', queue: 'queue',
             submit: 'queue', data: 'provenance', provenance: 'provenance', help: 'help',
             tasks: 'tasks', exam: 'exam', everyday: 'everyday' }[n];
-  if (n === 'improve') v = ['loop', 'review', 'training'].includes(sub) ? sub : 'loop';
+  if (n === 'improve') v = sub || 'pipeline';
   if (n === 'benchmarks') v = ['tasks', 'exam', 'everyday'].includes(sub) ? sub : benchSub();
   if (!v || !has(v)) return null;
   if (v === 'leaderboard') {
@@ -6176,11 +6258,9 @@ function viewOfHash(name, params) {
     // Perplexity & Loss is Models ▸ Standard ▸ Language modelling now
     if (n === 'perplexity') Object.assign(lbS(), { view: 'standard', chip: 'lm' });
   }
-  // "tab=review&view=datasets": Improve ▸ Review, same view
-  if (v === 'review') {
-    const rv = p.get('view');
-    state.rv.view = rv && RV_VIEWS.some(([k]) => k === rv) ? rv : '';
-  }
+  // the model Improve is on, from the address; an old address keeps the
+  // viewer's last one
+  if (v === 'pipeline' && p.get('model')) state.imp.model = p.get('model');
   // Queue ▸ Submit a model is the Test a model dialog now
   if (n === 'submit') state.testOpen = true;
   return v;
@@ -6463,7 +6543,6 @@ function toast(text, opts = {}) {
   return t;
 }
 const goQueue = () => navigate({ tab: 'queue', topic: null, model: null });
-const goReview = () => { state.rv.loaded = false; navigate({ tab: 'review', topic: null, model: null }); };
 
 // ---------------------------------------------------------------------------
 // ⓘ beside a card's title: the long explanation, one click away, instead of a
@@ -8493,7 +8572,7 @@ function weakestChart() {
   const head = el('div', { class: 'ihead' }, el('div', { class: 'eyebrow', text: 'Weakest topics' }));
   if (!judged.length) return el('div', { class: 'ibox', 'data-weakest': '1' }, head,
     el('p', { class: 'small', 'data-weakest-empty': '1',
-      text: 'No model has been judged yet — Improve ▸ By topic ▸ Sit the exam' }));
+      text: 'No model has been judged yet — sit the exam from a model\'s page' }));
   // the model the loop is on: the one judged last, unless someone picked another
   const lastJ = m => Math.max(0, ...Object.values((m.judge || {}).tasks || {}).map(t => t.judged_at || 0));
   const m = judged.find(x => x.id === L.weak) || [...judged].sort((a, b) => lastJ(b) - lastJ(a))[0];
@@ -11070,7 +11149,7 @@ async function loadReview() {
       const had = (state.readData[readKey(open)] || {}).data;
       if (now && JSON.stringify(now) !== JSON.stringify(had)) readFetch(open);
     }
-    if (changed && (state.tab === 'review' || onHome()) && !state.model) render();
+    if (changed && (state.tab === 'pipeline' || onHome()) && !state.model) render();
     // 11k: a Propose row on another page waits for this list to know whether
     // a proposal is already open
     else if (changed && (state.model || state.topic)) render();
@@ -11097,10 +11176,12 @@ async function rvPost(path, body) {
   // card open to say "#9 Waiting for the AI" left the person where they were
   const made = r && r.ok && /generate$/.test(path) ? j.dataset_id : null;
   if (made) {
-    state.rv.view = 'datasets';
     markDataset(made);
     await loadReview();
-    navigate({ tab: 'review', model: null, topic: null, read: null });
+    // 12g.1: to the pipeline of the proposal's model, where it lands in Training data
+    const pr = (state.rv.proposals || []).find(x => String(x.id) === String(pid));
+    if (pr) state.imp.model = pr.model;
+    navigate({ tab: 'pipeline', model: null, topic: null, read: null });
   } else if (r && r.ok && state.read && state.read.kind === 'proposal') {
     // 11j: the card in the sheet is one of these records — reload it too
     readFetch(state.read);
@@ -11117,7 +11198,7 @@ async function rvPost(path, body) {
 function markDataset(did) {
   state.rv.landedDs = did;
   setTimeout(() => { if (state.rv.landedDs === did) { state.rv.landedDs = null;
-    if (state.tab === 'review') render(); } }, LANDED_MS);
+    if (state.tab === 'pipeline') render(); } }, LANDED_MS);
 }
 
 // The name every decision is recorded under. It is remembered for this
@@ -11246,15 +11327,10 @@ function usageLine(llm) {
 }
 
 // ---------------------------------------------------------------------------
-// 11j: the Review tab, rebuilt. masein: "If I want to start a new review, or
-// want to review the pending ones, the approved ones and the generated
-// datasets — I think the UX is bad." Four views with their counts, one
-// compact line per row, + New proposal at the top, and a proposal that opens
-// as a short card in the reader's sheet — not a 1,300 px block on the page.
+// 11j: a proposal opens as a short card in the reader's sheet. 12g.1: the
+// Review tab that listed them is Improve's pipeline now; these are its rows'
+// words and the lists Home counts
 // ---------------------------------------------------------------------------
-const RV_VIEWS = [['review', 'To review'], ['ready', 'Ready to generate'],
-                  ['datasets', 'Datasets'], ['history', 'History']];
-
 function rvLists() {
   const props = state.rv.proposals || [];
   const is = (p, ...s) => s.includes(p.status);
@@ -11262,11 +11338,6 @@ function rvLists() {
            ready: props.filter(p => is(p, 'approved')),
            datasets: state.rv.datasets || [],
            history: props.filter(p => is(p, 'rejected', 'failed')) };
-}
-// it opens on what is waiting, and on the datasets when nothing is
-function rvView() {
-  if (RV_VIEWS.some(([k]) => k === state.rv.view)) return state.rv.view;
-  return rvLists().review.length ? 'review' : 'datasets';
 }
 
 // One badge, not four warning boxes. Its tooltip gives the reasons in plain
@@ -11388,16 +11459,14 @@ function dsWhy(d) {
   return head + String(d.error || 'nothing came back that could be read').replace(/\.$/, '') + '.';
 }
 
-// the row, and for a failed dataset the line under it that explains
-function dsRows(d) {
-  if (!dsFailed(d)) return [dsRow(d)];
+// a failed dataset's line that explains, and every reason one click away:
+// under its row on the model page, under its item in Improve (12g.1)
+function dsWhyBlock(d) {
   const miss = Array.isArray(((d.provenance || {}).items || {}).missing)
     ? d.provenance.items.missing : [];
   const open = !!(state.rv.dsWhyOpen || {})[d.id];
   const pg = paged('ds-why-' + d.id, miss, `${d.id}:${miss.length}`, render, 10);
-  return [dsRow(d), el('tr', { class: 'dsfail', 'data-ds-why': String(d.id) },
-    el('td', { colspan: '8' },
-      el('p', { class: 'warn', 'data-ds-why-line': String(d.id), text: dsWhy(d) }),
+  return [el('p', { class: 'warn', 'data-ds-why-line': String(d.id), text: dsWhy(d) }),
       miss.length ? el('details', { class: 'small', 'data-ds-details': String(d.id),
           open: open ? '' : null,
           ontoggle: e => { state.rv.dsWhyOpen = { ...(state.rv.dsWhyOpen || {}),
@@ -11407,7 +11476,13 @@ function dsRows(d) {
         el('ol', { class: 'dswhy', start: String(pg.from || 1) }, pg.rows.map(m =>
           el('li', { 'data-ds-missing': String(m.request ?? '') },
             `request ${m.request ?? '—'} · ${m.focus || 'no area'} · ${m.why}`))),
-        pg.pager || '') : ''))];
+        pg.pager || '') : ''];
+}
+// the row, and for a failed dataset the line under it that explains
+function dsRows(d) {
+  if (!dsFailed(d)) return [dsRow(d)];
+  return [dsRow(d), el('tr', { class: 'dsfail', 'data-ds-why': String(d.id) },
+    el('td', { colspan: '8' }, ...dsWhyBlock(d)))];
 }
 
 // a proposal row opens the card in the sheet — the whole row, and the link in
@@ -11790,13 +11865,14 @@ function npDialog(pre = {}) {
       state.rv.loaded = false;
       toast(`Proposal #${j.id} requested — ${st.topic}`
         + (t.soft && t.soft.length ? ' · over a provisional judge' : ''),
-        { key: 'propose', go: goReview, link: 'Review' });
+        { key: 'propose', go: () => openImprove(st.model), link: 'See it' });
       await loadReview();
-      // from a topic page, the person stays on it; from the tab, the new
-      // proposal is in To review
+      // from a topic page, the person stays on it; anywhere else, the new
+      // proposal is in its model's Proposals (12g.1)
       if (pre.stay) { state.loop.loaded = false; loadLoop(); render(); return; }
-      state.rv.view = 'review';
-      if (state.tab === 'review') render(); else navigate({ tab: 'review', topic: null, model: null });
+      state.imp.model = st.model;
+      if (state.tab === 'pipeline' && !state.model) render();
+      else navigate({ tab: 'pipeline', topic: null, model: null });
     } catch (e) {
       err.hidden = false;
       err.replaceChildren(el('b', { text: 'Refused. ' }), String((e && e.message) || e));
@@ -11813,61 +11889,259 @@ function npDialog(pre = {}) {
 // the Review lists' columns; the model page's Improve tab shows the same rows
 const RV_PCOLS = ['topic', 'model', 'status', 'asked by', 'when', ''];
 const RV_DCOLS = ['#', 'topic', 'model', 'documents', 'made by', 'when', '', ''];
-function vReview() {
+// ---------------------------------------------------------------------------
+// 12g.1: Improve is one pipeline for one model. Weak spots → Proposals →
+// Training data → Retests, left to right: a count and five one-line items
+// each, every item with one action. The exam is what it trains toward; the
+// Standard benchmarks are never a target, and appear here once — the watch
+// line under a retest, before → after.
+// ---------------------------------------------------------------------------
+state.imp = { model: null, more: {} };
+const IMP_KEY = 'bench-improve-model';
+const IMP_SHOW = 5;
+// a model's judged topics on the current exam: the tasks with a score
+const judgedTopics = m => ((DATA.judged || {}).exam || []).filter(t => {
+  const jt = ((m.judge || {}).tasks || {})[t];
+  return !!jt && pubScore(jt) != null;
+});
+// what Improve can work on: every model with a judged topic, or a proposal or
+// dataset of its own — the most judged topics first
+function impModels() {
+  const own = new Set([...(state.rv.proposals || []), ...(state.rv.datasets || [])]
+    .map(x => x.model));
+  return DATA.models.filter(m => !m.duplicateOf && (judgedTopics(m).length || own.has(m.id)))
+    .sort((a, b) => judgedTopics(b).length - judgedTopics(a).length || natCmp(a.name, b.name));
+}
+// the model shown: the address's, else the viewer's last, else the one with
+// the most judged topics
+function impModel() {
+  const ms = impModels();
+  const ok = id => !!id && ms.some(m => m.id === id);
+  let id = state.imp.model;
+  if (!ok(id)) {
+    let saved = null;
+    try { saved = localStorage.getItem(IMP_KEY); } catch (e) { /* private */ }
+    id = ok(saved) ? saved : (ms[0] || {}).id || null;
+  }
+  state.imp.model = id;
+  return DATA.models.find(m => m.id === id) || null;
+}
+function setImpModel(id) {
+  state.imp.more = {};
+  state.imp.model = id;
+  try { localStorage.setItem(IMP_KEY, id); } catch (e) { /* private */ }
+  navigate({ tab: 'pipeline', model: null, topic: null });
+}
+// Improve, opened on one model — from Home, a dataset, a proposal
+function openImprove(mid) {
+  if (mid) {
+    state.imp.model = mid;
+    try { localStorage.setItem(IMP_KEY, mid); } catch (e) { /* private */ }
+  }
+  state.rv.loaded = false;
+  navigate({ tab: 'pipeline', model: null, topic: null });
+}
+const OPEN_PROPOSAL = ['proposed', 'pending', 'approved'];
+// Weak spots: judged topics, weakest first, with no open proposal
+// — each with what stops a proposal, when something does (the dialog's own
+// reasons: too few hidden questions, no practice answer to read)
+function impWeak(m) {
+  const open = new Set((state.rv.proposals || []).filter(p => p.model === m.id
+    && OPEN_PROPOSAL.includes(p.status)).map(p => p.task));
+  const why = new Map(npTopics(m.id).map(x => [x.task, x.why]));
+  return judgedTopics(m).filter(t => !open.has(t))
+    .map(t => ({ task: t, v: pubScore(m.judge.tasks[t]), why: why.get(t) || '' }))
+    .sort((a, b) => a.v - b.v);
+}
+const newestFirst = (a, b) => (b.created_at || 0) - (a.created_at || 0);
+const impProposals = m => (state.rv.proposals || [])
+  .filter(p => p.model === m.id && OPEN_PROPOSAL.includes(p.status)).sort(newestFirst);
+const impDatasets = m => (state.rv.datasets || []).filter(d => d.model === m.id).sort(newestFirst);
+// Retests: the checkpoints whose page says they were trained from this model
+const impRetests = m => DATA.models.filter(c => !c.duplicateOf
+  && (c.trainedFrom || {}).base === m.id);
+
+// 12g.1: the Standard watch — the checkpoint against what it was trained from,
+// over the benchmarks BOTH were tested on, averaged as 12h.2's "Avg of N" is.
+// "dropped" only where the board's z-test calls a difference real: the
+// averages', or any one benchmark's
+function standardWatch(base, ck) {
+  const has = (m, t) => { const c = cell(t, m.id); return !!c && c.v != null; };
+  const all = lbBenchAll();
+  if (!all.some(t => has(ck, t))) return { state: 'untested', who: ck };
+  const both = all.filter(t => has(base, t) && has(ck, t));
+  if (!both.length) return { state: 'untested', who: base };
+  const a = customAvg(base, both), b = customAvg(ck, both);
+  const real = (va, sa, vb, sb) => sa != null && sb != null
+    && Math.abs(vb - va) / Math.sqrt(sa * sa + sb * sb || 1e-12) > 1.96;
+  const avgDrop = b.v < a.v && real(a.v, a.se, b.v, b.se);
+  const drops = both.map(t => {
+    const ca = cell(t, base.id), cb = cell(t, ck.id);
+    const row = (DATA.sig[t] || []).find(([x, y]) => (x === base.id && y === ck.id)
+      || (x === ck.id && y === base.id));
+    const sig = row ? !!row[4] : real(ca.v, ca.se, cb.v, cb.se);
+    return { t, a: ca.v, b: cb.v, real: sig && cb.v < ca.v };
+  }).filter(x => x.real).sort((x, y) => (y.a - y.b) - (x.a - x.b));
+  return { state: avgDrop || drops.length ? 'dropped' : 'held', n: both.length, a, b, drops };
+}
+// to a model page's block of one kind of test
+function goKind(mid, kind) {
+  (state.mblk[mid] = state.mblk[mid] || {})[kind] = true;
+  state.after = { scroll: `[data-kind-block="${kind}"]` };
+  state.mtab = 'scores';
+  try { localStorage.setItem('bench-model-tab', 'scores'); } catch (e) { /* private */ }
+  navigate({ model: mid, topic: null });
+}
+function watchLine(base, ck) {
+  const w = standardWatch(base, ck);
+  const pc = v => (100 * v).toFixed(1);
+  const mono = t => el('span', { class: 'mono', text: t });
+  if (w.state === 'untested')
+    return el('div', { class: 'small se watch', 'data-watch-line': ck.id, 'data-watch': 'untested' },
+      w.who === ck ? 'Standard: not tested' : `Standard: ${base.name} not tested`,
+      LIVE ? [' · ', el('a', { href: '#', 'data-watch-test': w.who.id, text: 'Test',
+        onclick: e => { e.preventDefault(); state.sub.suite = 'full'; openTest(w.who.id); } })] : '');
+  const drop = w.drops[0];
+  return el('div', { class: 'small watch' + (w.state === 'dropped' ? ' dropped' : ''),
+      'data-watch-line': ck.id, 'data-watch': w.state,
+      title: `the average of the ${w.n} Standard benchmarks both were tested on, `
+        + (state.avgMode === 'raw' ? 'raw accuracy' : 'above chance')
+        + ' — "dropped" only where the z-test calls it real' },
+    `Standard (${w.n}) `, mono(pc(w.a.v)), ' → ', mono(pc(w.b.v)), ' · ',
+    w.state === 'dropped'
+      ? el('a', { href: '#', class: 'watch-drop', 'data-watch-drop': ck.id,
+          onclick: e => { e.preventDefault(); goKind(ck.id, 'standard'); } },
+          'dropped', drop ? [' · ' + benchName(drop.t) + ' ', mono(pc(drop.a)), ' → ',
+            mono(pc(drop.b))] : '')
+      : 'no drop');
+}
+
+// one stage: a count, five items, "+ n more" opening the rest in place — or,
+// with nothing in it, one line and no box
+function impStage(key, title, items, none) {
+  const more = !!state.imp.more[key];
+  const shown = more ? items : items.slice(0, IMP_SHOW);
+  return el('section', { class: 'stage', 'data-stage': key, 'data-stage-n': String(items.length) },
+    el('h3', { class: 'stage-h' }, title + ' ', el('span', { class: 'mono se',
+      text: `(${items.length})` })),
+    items.length ? el('ul', { class: 'stagelist' }, shown,
+      items.length > IMP_SHOW ? el('li', { class: 'stagemore' }, el('button', { class: 'quiet',
+        'data-stage-more': key, 'aria-expanded': String(more),
+        text: more ? 'show fewer' : `+ ${items.length - IMP_SHOW} more`,
+        onclick: () => { state.imp.more[key] = !more; render(); } })) : '')
+      : el('p', { class: 'small se stage-none', 'data-stage-none': key, text: none }));
+}
+const impItem = (attrs, main, sub, action) => el('li', { class: 'stageitem', ...attrs },
+  el('div', { class: 'si-main' }, main), sub ? el('div', { class: 'si-sub' }, sub) : '',
+  action ? el('div', { class: 'si-act' }, action) : '');
+const PROP_WORDS = { proposed: 'waiting for you', pending: 'the AI is writing it',
+  approved: 'approved — ready to generate' };
+
+function vPipeline() {
   if (!state.rv.loaded && netReady()) loadReview();
   rememberedName();
+  const m = impModel();
+  // the address names the model it opened on — a first visit picks it here
+  const want = hashFor();
+  if (m && location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
   const llm = state.rv.llm || {};
-  const L = rvLists();
-  const view = rvView();
-  const howto = el('details', { class: 'howto small', 'data-how-review': '1' },
-    el('summary', { text: 'How this works ▸' }),
-    el('p', { class: 'small', text: 'A proposal reads what the judge wrote about one model\'s '
-      + 'practice answers on a weak topic — never the questions — and names the skill that is '
-      + 'missing. You approve, edit or reject that sentence, and only the approved words reach '
-      + 'the AI that writes documents. Every document is then checked against every exam and '
-      + 'benchmark question: none may copy 13 words in a row. Every decision is recorded under '
-      + 'your name.' }),
-    el('p', { class: 'small' }, el('b', { text: 'the AI ' }), llm.configured
-      ? `${llm.provider}/${llm.model || '—'}` : 'not set up here', ' · ',
-      llm.configured ? usageLine(llm) : '',
-      llm.datasets_quota_bytes ? ` · storage ${(llm.datasets_bytes / 1e6).toFixed(1)} MB of `
-        + `${(llm.datasets_quota_bytes / 1e9).toFixed(0)} GB` : ''));
-  const head = el('div', { class: 'card', 'data-review-head': '1' },
+  if (!m) return [el('div', { class: 'card', 'data-pipeline': 'none' },
+    el('h2', { text: 'Improve' }),
+    empty('Nothing to improve yet: no model has sat the Knowledge exam.', 'Sit the exam',
+      () => navigate({ tab: 'exam', model: null, topic: null })))];
+  const weak = impWeak(m), props = impProposals(m), ds = impDatasets(m), rts = impRetests(m);
+  // the one filled button opens on the weakest topic a proposal can be made from
+  const first = weak.find(w => !w.why);
+  const picker = popover(el('button', { class: 'pill imp-model', id: 'pill-imp-model',
+      'data-imp-model': m.id, text: m.name + ' ▾' }),
+    () => el('div', { class: 'moremenu', id: 'pop-imp-model', 'aria-label': 'model to improve' },
+      impModels().map(x => el('button', { role: 'menuitemradio', 'data-imp-pick': x.id,
+        'aria-checked': String(x.id === m.id), onclick: () => { popClose(true); setImpModel(x.id); } },
+        x.name, el('span', { class: 'se', text: ` · ${judgedTopics(x).length} judged topics` })))),
+    { key: 'imp-model' });
+  const head = el('div', { class: 'card imphead', 'data-pipeline': m.id },
     el('div', { class: 'rvbar' },
-      el('div', {}, el('h2', { text: 'Review' }),
-        el('p', { class: 'sub', text: 'What the AI says each model is missing, and the data '
-          + 'made from it.' })),
-      el('button', { class: 'primary', 'data-new-proposal': '1', text: '+ New proposal',
-        onclick: () => npDialog({ returnTo: '[data-new-proposal]' }) })),
-    howto,
-    el('div', { class: 'rvviews', role: 'tablist', 'aria-label': 'review views' },
-      RV_VIEWS.map(([k, label]) => el('button', { class: 'chip-btn' + (k === view ? ' on' : ''),
-        role: 'tab', 'data-rv-view': k, 'aria-selected': String(k === view),
-        text: `${label} (${L[k].length})`,
-        onclick: () => { state.rv.view = k; navigate({ tab: 'review' }); } }))),
+      el('h2', { class: 'imp-title' }, 'Improving: ', picker),
+      el('button', { class: 'primary', 'data-imp-propose': '1', text: 'Propose',
+        title: first ? `opens on ${frName(first.task)}, the weakest topic a proposal can be `
+          + 'made from' : 'no weak spot a proposal can be made from yet',
+        onclick: () => npDialog({ model: m.id, topic: first ? frName(first.task) : '',
+          returnTo: '[data-imp-propose]' }) })),
+    el('p', { class: 'sub', text: 'What the Knowledge exam says this model is missing, the data '
+      + 'made for it, and what training changed. The Standard benchmarks are only watched here, '
+      + 'never trained toward.' }),
     !llm.configured && llm.reason ? el('p', { class: 'warn', text: llm.reason }) : '',
+    llm.configured ? el('p', { class: 'small se', 'data-imp-ai': '1' }, el('b', { text: 'the AI ' }),
+      `${llm.provider}/${llm.model || '—'} · `, usageLine(llm)) : '',
     state.rv.msg ? el('p', { class: 'small', text: state.rv.msg }) : '');
-  const body = el('div', { class: 'card', 'data-rv-list': view });
-  if (view === 'datasets') {
-    body.append(el('h2', { text: 'Datasets' }),
-      el('p', { class: 'sub', text: 'What the AI wrote, after the copy check. Read one here, '
-        + 'or hand it to a training run.' }),
-      rvTable(RV_DCOLS, L.datasets.flatMap(dsRows),
-        empty('No datasets yet. Approve a proposal, then generate from it.')));
-  } else {
-    const sub = { review: 'Proposals waiting for a person. Open one to read it.',
-      ready: 'Approved. Generate the documents when you are ready.',
-      history: 'Rejected and failed proposals.' }[view];
-    body.append(el('h2', { text: RV_VIEWS.find(([k]) => k === view)[1] }),
-      el('p', { class: 'sub', text: sub }),
-      rvTable(RV_PCOLS, L[view].map(rvRow),
-        empty(view === 'review' ? 'Nothing waiting. Start one with + New proposal.'
-          : view === 'ready' ? 'Nothing approved yet. Approve one in To review.'
-          : 'Nothing rejected or failed.',
-          view === 'review' ? '+ New proposal' : '',
-          view === 'review' ? () => npDialog({ returnTo: '[data-new-proposal]' }) : null)));
-  }
-  return [head, body];
+
+  const weakItems = weak.map(w => impItem({ 'data-weak': w.task },
+    [frName(w.task), ' ', el('span', { class: 'mono', text: `${num(w.v, 2)}/4` })],
+    w.why ? el('span', { 'data-weak-why': w.task, text: w.why }) : '',
+    w.why ? '' : el('button', { class: 'ghost', 'data-weak-propose': w.task, text: 'Propose',
+      onclick: () => npDialog({ model: m.id, topic: frName(w.task),
+        returnTo: `[data-weak-propose="${CSS.escape(w.task)}"]` }) })));
+  const propItems = props.map(p => impItem({ 'data-prop': String(p.id) },
+    [p.category || frName(p.task), demoBadge(p)],
+    el('span', { class: 'se', 'data-rv-status': String(p.id), text: PROP_WORDS[p.status] }),
+    readButton({ kind: 'proposal', id: String(p.id) },
+      p.status === 'approved' ? 'Generate' : p.status === 'proposed' ? 'Review' : 'Read',
+      { 'data-prop-act': String(p.id) })));
+  const dataItems = ds.map(d => impItem({ 'data-ds-item': String(d.id),
+      class: 'stageitem' + (state.rv.landedDs === d.id ? ' landed' : '') },
+    // a ready dataset's name opens it in the reader; its one action hands it on
+    [d.status === 'ready' ? readLink({ kind: 'dataset', id: String(d.id) }, d.category || '—',
+        { 'data-ds-read': String(d.id) }) : d.category || '—', ' · ',
+     el('span', { 'data-doc-line': String(d.id),
+      text: d.status === 'ready' || dsFailed(d) ? dsDocs(d) : 'being written' }), dsDemoBadge(d)],
+    // failed: the count, the word, and why — every reason one click away (11m)
+    dsFailed(d) ? [el('span', { class: 'badge danger', 'data-ds-failed': String(d.id),
+      text: d.status === 'rejected' ? 'Rejected' : 'Failed' }), ...dsWhyBlock(d)] : '',
+    // the one action, and the old row's ⋯: its provenance, the file, its id
+    d.status === 'ready' ? actCell('ds-' + d.id, useInTraining(d), [
+        { label: 'Provenance', act: 'provenance',
+          run: () => openReader({ kind: 'provenance', id: 'dataset:' + d.id }) },
+        d.download ? { label: 'Download', act: 'download',
+                       href: `api/datasets/${d.id}/items.jsonl` } : null,
+        { label: 'Copy dataset id', act: 'copy-id', run: () => copyText(String(d.id), '#' + d.id) }])
+      : dsFailed(d) ? readButton({ kind: 'dataset', id: String(d.id) }, 'Why',
+          { 'data-ds-read': String(d.id) }) : ''));
+  const retestItems = rts.map(c => {
+    const topics = (c.tainted || []).filter(t => t.startsWith('exam_'));
+    const score = (x, t) => { const jt = ((x.judge || {}).tasks || {})[t];
+      return jt && pubScore(jt) != null ? num(pubScore(jt), 2) : 'not sat'; };
+    return impItem({ 'data-retest': c.id },
+      [el('a', { href: '#model=' + encodeURIComponent(c.id), text: c.name }), ckBadge(c) || ''],
+      [...(topics.length ? topics.map(t => el('div', { class: 'small', 'data-retest-topic': t },
+          frName(t) + ' ', el('span', { class: 'mono', text: `${score(m, t)} → ${score(c, t)}` })))
+        : [el('div', { class: 'small se', text: 'trained on no dataset made here' })]),
+       watchLine(m, c)],
+      el('button', { class: 'ghost', 'data-retest-compare': c.id, text: 'Compare',
+        title: 'its page: what the training taught, against ' + m.name,
+        onclick: () => { state.mtab = 'history';
+          try { localStorage.setItem('bench-model-tab', 'history'); } catch (e) { /* private */ }
+          navigate({ model: c.id, topic: null }); } }));
+  });
+  if (!state.rv.loaded) return [head, el('div', { class: 'card', 'data-pipeline-stages': m.id },
+    skeleton(4, { 'data-loading': 'pipeline' }))];
+  const stages = el('div', { class: 'stages', 'data-stages': '1' },
+    impStage('weak', 'Weak spots', weakItems, judgedTopics(m).length
+      ? 'Every judged topic has a proposal' : 'No judged topics yet'),
+    impStage('proposals', 'Proposals', propItems, 'No proposals waiting'),
+    impStage('data', 'Training data', dataItems, 'No training data yet'),
+    impStage('retests', 'Retests', retestItems, 'No retests yet — a checkpoint shows here once '
+      + 'its page says it was trained from ' + m.name));
+  // what is no longer open: rejected and failed, folded
+  const past = (state.rv.proposals || []).filter(p => p.model === m.id
+    && ['rejected', 'failed'].includes(p.status)).sort(newestFirst);
+  const pastFold = past.length ? el('details', { class: 'small imp-past', 'data-imp-past':
+      String(past.length), open: state.imp.pastOpen ? '' : null,
+      ontoggle: e => { state.imp.pastOpen = e.target.open; } },
+    el('summary', { text: `Rejected or failed (${past.length}) ▸` }),
+    el('ul', {}, past.map(p => el('li', {}, readLink({ kind: 'proposal', id: String(p.id) },
+      p.category || frName(p.task)), el('span', { class: 'se', text: ' · '
+        + rvStatusWords(p.status).toLowerCase() }))))) : '';
+  return [head, el('div', { class: 'card', 'data-pipeline-stages': m.id }, stages, pastFold)];
 }
 
 // The judged card's answers section on a model page: pick one of this model's
@@ -11956,14 +12230,13 @@ async function loadLoop() {
                                 items: j.built_items || {}, pace: j.pace || null });
     if (j.judge_health) setJudgeHealth(j.judge_health);
     // the Queue tab reads it too: whether the judged suite is on, and its topics
-    if (changed && (state.tab === 'loop' || state.tab === 'queue' || state.topic)
-        && !state.model) render();
+    if (changed && (state.tab === 'queue' || state.topic) && !state.model) render();
     else if (changed && state.model && state.msitRedraw) state.msitRedraw();
   } catch (e) {
     // netFail already put the banner up and set the backoff; the board itself
     // must also stop saying "Loading…" forever, which is what it did
     state.loop.failed = String((e && e.message) || e);
-    if ((state.tab === 'loop' || state.topic) && !state.model) render();
+    if (state.topic && !state.model) render();
   } finally { _loopInFlight = false; }
 }
 
@@ -11978,7 +12251,7 @@ function setJudgeHealth(h) {
   if (sig === _judgeSig) return;
   _judgeSig = sig;
   renderFresh();
-  if ((state.tab === 'loop' || state.tab === 'queue' || state.topic) && !state.model) render();
+  if ((state.tab === 'queue' || state.topic) && !state.model) render();
   else if (state.model && state.msitRedraw) state.msitRedraw();
 }
 async function loadJudgeHealth() {
@@ -11996,20 +12269,6 @@ function judgeChip() {
 function judgeOfflineLine() {
   if (!judgeDown()) return '';
   return el('p', { class: 'warn', 'data-judge-offline-why': '1' }, judgeChip(), ' ', judgeWhy());
-}
-
-// the same words the network banner uses, inside the card that has no data:
-// what failed, what it said, and that it will try again on its own
-function loopFailure() {
-  if (!state.loop.failed) return '';
-  const secs = Math.max(1, Math.round((NET.nextAt - Date.now()) / 1000));
-  return el('p', { class: 'warn', 'data-loop-failed': '1' },
-    el('b', { text: 'Not reaching the service. ' }),
-    `api/loop — ${state.loop.failed}. `
-    + (NET.nextAt > Date.now() ? `Retrying in ${secs}s` : 'Retrying')
-    + `, backing off to ${NET.MAX / 1000}s. `
-    + (state.loop.rows ? 'The board below is from the last good load.'
-                       : 'Nothing has loaded yet.'));
 }
 
 function loopRowOf(slug) {
@@ -12031,8 +12290,8 @@ function loopGo(r, step) {
     // where the reader had to find it among every other proposal
     state.rv.loaded = false;
     const pid = r.proposal && r.proposal.id;
-    state.rv.view = step === 'generate' ? 'ready' : 'review';
-    return navigate({ tab: 'review', topic: null, model: null,
+    if (r.proposal && r.proposal.model) state.imp.model = r.proposal.model;
+    return navigate({ tab: 'pipeline', topic: null, model: null,
                       read: pid ? { kind: 'proposal', id: String(pid) } : null });
   }
   if (step === 'sit') {
@@ -12130,159 +12389,6 @@ function overBadge(over) {
   return el('span', { class: 'badge over', 'data-over-provisional': '1',
     title: `proposed by ${over.by} over a provisional judge: ${(over.reasons || []).join('; ')}`,
     text: 'over a provisional judge' });
-}
-
-// a row carries one warning badge at most: its own (the model trained on this
-// topic). What is true of every score on the board — a provisional judge, a
-// single provider, draft rubrics — is said once, above it (loopCaveats)
-function judgedBadges(last) {
-  if (!last || !last.tainted) return [];
-  return [el('span', { class: 'badge taint',
-    title: 'this model trained on data derived from this topic', text: 'trained on it' })];
-}
-
-function loopCaveats(rows) {
-  const lasts = rows.map(r => r.last_judged).filter(Boolean);
-  if (!lasts.length) return '';
-  const bits = [];
-  const prov = lasts.find(l => l.provisional);
-  if (prov) bits.push(el('span', { class: 'badge taint', title: prov.provisional_reason,
-    text: 'provisional judge' }));
-  if (lasts.some(l => l.single_provider_loop)) bits.push(el('span', { class: 'badge taint',
-    title: 'the same provider wrote, sat or graded more than one step of this loop',
-    text: 'single provider' }));
-  const draft = rows.filter(r => r.last_judged && r.last_judged.draft_rubric).map(r => r.topic);
-  if (draft.length) bits.push(el('span', { class: 'badge taint',
-    title: 'rubrics their author has not signed off yet', text: `draft rubric: ${draft.join(', ')}` }));
-  if (!bits.length) return '';
-  return el('p', { class: 'caveats', 'data-loop-caveats': '1' },
-    el('span', { class: 'small', text: 'Every score below: ' }), ...bits);
-}
-
-function vLoop() {
-  if (!state.loop.loaded && netReady()) loadLoop();
-  const rows = state.loop.rows || [];
-  const models = state.loop.models || [];
-  const head = el('div', { class: 'card' },
-    el('h2', {}, 'The loop, by topic', infoTip('Write the exam, sit it, read what the judge made '
-      + 'of the answers, propose the skill that is missing, approve it, generate data, hand it '
-      + 'to training. One row per topic, and the one thing to do next. Every refusal below is '
-      + 'the API\'s own, in its words — this table asks, it does not decide.')),
-    el('div', { class: 'frm' },
-      el('label', { class: 'small', for: 'loopModel' }, el('b', { text: 'Results for ' })),
-      models.length ? Combobox('results for', modelGroups(models.map(m => ({ id: m.id,
-          judged: m.topics }))), state.loop.model,
-        v => { state.loop.model = v; state.loop.loaded = false; _loopSig = null; loadLoop(); },
-        { key: 'loop-model', placeholder: 'find a model' })
-        : el('span', { class: 'se', text: 'no model has sat the exam yet' }),
-      // 11i: the exam for this model starts on its page
-      state.loop.model && DATA.models.some(x => x.id === state.loop.model)
-        ? el('button', { class: 'quiet', 'data-loop-sit': state.loop.model, text: 'Sit the exam ▸',
-            title: 'choose its topics on the model\'s page', onclick: () => openSit(state.loop.model) })
-        : '',
-      el('a', { class: 'small', href: 'guide#the-loop', target: '_blank', rel: 'noopener',
-        text: 'what the loop is and whose job each step is' })),
-    state.loop.blocked ? el('p', { class: 'warn', 'data-loop-blocked': '1' },
-      el('b', { text: 'No topic can be sat right now. ' }), state.loop.blocked) : '',
-    judgeOfflineLine(),
-    state.loop.msg ? el('p', { class: 'small', 'data-loop-msg': '1', text: state.loop.msg }) : '',
-    loopFailure(), loopCaveats(rows));
-  const sel = head.querySelector('[aria-label="results for"]');
-  if (sel) sel.id = 'loopModel';
-  if (!state.loop.loaded)
-    return [head, el('div', { class: 'card' }, el('p', { class: 'small',
-      text: state.loop.failed ? 'No board to show yet — see above.' : '' }),
-      state.loop.failed ? '' : skeleton(8, { 'data-loading': 'loop' }))];
-  // topics with questions first; the ones without fold into one row that
-  // says so and opens — ten empty rows were two thirds of the board. Of the
-  // rest, the weakest for the model in "Results for" first — the one the loop
-  // is for — then the ones it has not sat, by name; a search narrows both
-  const q = (state.loop.q || '').trim().toLowerCase();
-  const hit = r => !q || r.topic.toLowerCase().includes(q);
-  const score = r => r.last_judged && r.last_judged.score_report != null
-    ? r.last_judged.score_report : null;
-  const full = rows.filter(r => (r.error || r.bank.accepted) && hit(r)).sort((a, b) => {
-    const sa = score(a), sb = score(b);
-    if (sa != null && sb != null && sa !== sb) return sa - sb;
-    if ((sa == null) !== (sb == null)) return sa == null ? 1 : -1;
-    return natCmp(a.topic, b.topic);
-  });
-  const empty = rows.filter(r => !r.error && !r.bank.accepted && hit(r));
-  const pg = paged('loop', full, JSON.stringify([q, state.loop.model]), render, 25);
-  const who = (models.find(m => m.id === state.loop.model) || {}).name || state.loop.model;
-  const row = r => {
-    const last = r.last_judged;
-    if (r.error) return el('tr', { 'data-loop-row': r.slug, 'data-row-error': '1' },
-      el('td', {}, r.topic),
-      el('td', { class: 'warn', colspan: '6' }, r.error));
-    return el('tr', { 'data-loop-row': r.slug },
-      el('td', {}, el('a', { href: '#topic=' + r.slug, text: r.topic,
-        onclick: e => { e.preventDefault(); loopGo(r, 'topic'); } })),
-      el('td', { class: 'small' }, r.bank.accepted
-        ? `${r.bank.accepted} — ${r.bank.report} report / ${r.bank.diagnose} diagnose`
-        : 'no questions yet',
-        r.bank.accepted && r.bank.under_floor
-          ? el('div', { class: 'se', 'data-under-floor': '1',
-              text: `under ${r.bank.floor} hidden questions` }) : '',
-        r.bank.awaiting ? el('div', { class: 'se', text: `${r.bank.awaiting} awaiting curation` }) : ''),
-      el('td', { class: 'small' },
-        el('a', { href: '#tab=benchmarks&sub=exam', 'data-fallback': r.rubric.fallback ? '1' : null,
-          title: (r.rubric.fallback ? `this topic has no rubric of its own: the shared `
-            + `${r.rubric.name}.md grades it. ` : '') + 'The rubric and criteria panel on Benchmarks ▸ Knowledge exam.',
-          text: r.rubric.fallback ? 'shared rubric' : `${r.rubric.name}.md`,
-          onclick: e => { e.preventDefault(); navigate({ tab: 'exam', topic: null }); } }),
-        r.rubric.status === 'draft' ? el('span', { class: 'badge taint', text: 'DRAFT' }) : '',
-        r.rubric.scoring === 'criteria'
-          ? el('div', { class: 'se', text: `${r.rubric.criteria_count} criteria` }) : ''),
-      el('td', { class: 'small', 'data-loop-score': last ? last.model : '' }, last
-        ? el('span', {}, `${num(last.score_report, 2)} / 4 `,
-            el('span', { class: 'se', text: `(${last.n_report ?? 0} hidden) ` }),
-            ...judgedBadges(last), ' ',
-            el('a', { href: '#topic=' + r.slug, 'data-read': r.slug, text: 'read the results',
-              onclick: e => { e.preventDefault(); loopGo(r, 'read'); } }))
-        : r.bank.accepted
-          ? el('span', { 'data-not-sat': '1' }, el('span', { class: 'se', text: 'Not sat — ' }),
-              el('a', { href: '#topic=' + r.slug, text: 'Sit the exam',
-                onclick: e => { e.preventDefault(); loopGo(r, 'sit'); } }))
-          : el('span', { class: 'se', text: '—' })),
-      el('td', { class: 'small' }, r.proposal
-        ? el('a', { href: '#tab=improve&sub=review', text: `#${r.proposal.id} `
-              + rvStatusWords(r.proposal.status).toLowerCase(),
-            onclick: e => { e.preventDefault(); loopGo(r, 'review'); } })
-        : el('span', { class: 'se', text: '—' })),
-      el('td', { class: 'small' }, r.datasets.length
-        ? r.datasets.map(d => el('div', { class: 'se', text: `#${d.id} ${d.status}` }))
-        : el('span', { class: 'se', text: '—' })),
-      el('td', { class: 'rowacts' }, loopBtn(r)));
-  };
-  const fold = empty.length ? el('tr', { 'data-empty-topics': String(empty.length) },
-    el('td', { colspan: '6', class: 'small' },
-      el('b', { text: `${empty.length} topic${empty.length > 1 ? 's' : ''} without questions: ` }),
-      empty.map(r => r.topic).join(', '), ' ',
-      el('button', { class: 'quiet', 'data-show-empty': '1',
-        text: state.loop.showEmpty ? 'hide them' : 'show them',
-        onclick: () => { state.loop.showEmpty = !state.loop.showEmpty; render(); } })),
-    el('td', {}, el('button', { class: 'primary', 'data-step': 'import', text: 'Import a bank',
-      onclick: () => { eximpState().topic = ''; loopGo({ topic: '' }, 'import'); } }))) : '';
-  const table = el('div', { class: 'card' },
-    el('div', { class: 'lb-wrap stick' }, el('table', { class: 'jd', 'data-loop-table': '1' },
-      el('thead', {}, el('tr', {},
-        el('th', { text: 'topic' }), el('th', { text: 'bank (report / diagnose)' }),
-        el('th', { text: 'rubric' }), el('th', { text: who ? `results — ${who}` : 'results' }),
-        el('th', { text: 'open proposal' }), el('th', { text: 'datasets' }),
-        el('th', { text: 'next step' }))),
-      el('tbody', {}, pg.rows.map(row), fold, state.loop.showEmpty ? empty.map(row) : []))),
-    pg.pager);
-  const search = el('div', { class: 'toolbar' },
-    el('input', { type: 'search', placeholder: 'find a topic', 'aria-label': 'find a topic',
-      'data-keep': 'loop-q', value: state.loop.q || '', style: 'flex:1;min-width:160px',
-      oninput: e => { state.loop.q = e.target.value; render(); } }),
-    el('span', { class: 'count-note', 'data-loop-count': '1',
-      text: `${full.length} topic${full.length === 1 ? '' : 's'}`
-        + (q ? ` match “${state.loop.q.trim()}”` : ' with questions')
-        + (full.some(r => score(r) != null) ? ' · weakest first' : '') }));
-  table.prepend(search);
-  return [head, table];
 }
 
 // ---------------------------------------------------------------------------
@@ -13036,7 +13142,7 @@ function loopOutputPanel(r) {
     el('h2', { text: 'Propose, approve, generate' }),
     el('p', { class: 'sub', text: 'A proposal reads the judge\'s written assessments of the '
       + 'answers above — never the questions — and says what skill is missing. A person '
-      + 'approves that sentence on Improve ▸ Review, and only the approved text reaches a '
+      + 'approves that sentence on Improve, and only the approved text reaches a '
       + 'generator.' }));
   if (r.proposal) {
     card.append(el('p', { class: 'small', 'data-proposal': String(r.proposal.id) },
@@ -13399,7 +13505,11 @@ function exRubrics() {
               state.ex.topic = state.ex.topic === r.topic ? '' : r.topic; state.ex.loaded = false;
               // drop the list with the filter: another topic's questions under
               // this topic's heading, until the fetch lands, is a lie
-              state.ex.candidates = null; render(); } })),
+              state.ex.candidates = null; render(); } }),
+            // 12g.1: the topic's own page — the By topic board that listed
+            // them is Improve's pipeline now, so they are reached from here
+            slugOfTopic(r.topic) ? [' ', el('a', { class: 'small', href: '#topic='
+              + slugOfTopic(r.topic), 'data-topic-link': r.topic, text: 'page ▸' })] : ''),
           // having a rubric is not having questions: three topics shipped
           // with both files and an empty bank, and looked ready
           el('td', { class: 'small' }, bankCell((st.banks || {})[r.topic], r.topic)),
@@ -13573,7 +13683,7 @@ function exportJson() { download('benchmark.json', 'application/json', JSON.stri
 const TABS = [
   ['overview', 'Home', vOverview],
   ['leaderboard', 'Models', vLeaderboard],
-  ...(LIVE ? [['loop', 'By topic', vLoop], ['review', 'Review', vReview],
+  ...(LIVE ? [['pipeline', 'By model', vPipeline],
               ['training', 'Training runs', vTraining]] : []),
   ['tasks', 'Standard', vStandardBench],
   ...(LIVE ? [['exam', 'Knowledge exam', vExam]] : []),
@@ -13585,14 +13695,14 @@ const TABS = [
 ];
 // Playground joins in 12d, between Models and Improve
 const PLACES = [['home', 'Home', ['overview']], ['models', 'Models', ['leaderboard']],
-  ['improve', 'Improve', ['loop', 'review', 'training']],
+  ['improve', 'Improve', ['pipeline', 'training']],
   ['benchmarks', 'Benchmarks', ['tasks', 'exam', 'everyday']]]
   .map(([id, label, views]) => [id, label, views.filter(v => TABS.some(t => t[0] === v))])
   .filter(p => p[2].length);
 const placeOf = v => (PLACES.find(p => p[2].includes(v)) || [])[0] || null;
 const viewLabel = v => (TABS.find(t => t[0] === v) || [, v])[1];
 // the address of each view: its place, and which part of it
-const SUB_SLUG = { loop: 'topics', review: 'review', training: 'training',
+const SUB_SLUG = { pipeline: 'model', training: 'training',
                    tasks: 'standard', exam: 'exam', everyday: 'everyday' };
 const PAGE_SLUG = { overview: 'home', leaderboard: 'models', queue: 'runs',
                     provenance: 'data', help: 'help' };
@@ -13663,6 +13773,9 @@ function render() {
   // 11f: did this render change the view (a tab, a model, a topic)? Only a
   // navigation moves the scroll or plays the entrance; a poll never does
   const vk = viewKey(), changed = _lastView != null && vk !== _lastView;
+  // 12g.1: the checks and the run counter hang from the header, which a page
+  // change does not rebuild — so it closes them
+  if (changed && ['checks', 'runs'].includes(POP.key)) popClose();
   const nav = _navigated && changed;
   _lastView = vk; _navigated = false;
   const aimed = !!(state.after && state.after.scroll);
@@ -14098,16 +14211,18 @@ function renderWarnings() {
     el('details', { class: 'check-more' },
       el('summary', { class: 'small', text: 'why' }),
       el('p', { class: 'warn', text: c.text })));
-  const fold = el('details', { class: 'checks', 'data-warnings': 'collapsed',
-      open: state.checksOpen ? '' : null,
-      ontoggle: e => { state.checksOpen = e.target.open; } },
-    el('summary', { class: 'barpill statusdot' + (n ? ' warn' : ' ok'),
-        'data-warn-summary': String(n),
-        'aria-label': n ? `${n} problem${n > 1 ? 's' : ''} to look at` : 'no problems',
-        title: n ? `${n} problem${n > 1 ? 's' : ''} to look at` : 'no problems'
-          + (limits.length ? ` · ${limits.length} known limit${limits.length > 1 ? 's' : ''}` : '') },
-      el('span', { class: 'dot ' + (n ? 'warn' : 'ok') }),
-      n ? el('span', { class: 'statusn', text: String(n) }) : ''),
+  // 12g.1: the 11a popover, as the run counter is — it closes on Escape, a
+  // click outside and a page change. The <details> it replaces stayed open
+  // through all three
+  const btn = el('button', { class: 'barpill statusdot' + (n ? ' warn' : ' ok'),
+      'data-warn-summary': String(n),
+      'aria-label': n ? `${n} problem${n > 1 ? 's' : ''} to look at` : 'no problems',
+      title: n ? `${n} problem${n > 1 ? 's' : ''} to look at` : 'no problems'
+        + (limits.length ? ` · ${limits.length} known limit${limits.length > 1 ? 's' : ''}` : '') },
+    el('span', { class: 'dot ' + (n ? 'warn' : 'ok') }),
+    n ? el('span', { class: 'statusn', text: String(n) }) : '');
+  const list = () => el('div', { class: 'moremenu checkspop', id: 'pop-checks',
+      'aria-label': 'checks', 'data-warnings': 'open' },
     el('ul', { class: 'checklist' },
       !n ? el('li', { class: 'small', 'data-checks-none': '1', text: 'No problems.' }) : '',
       judged ? el('li', { class: 'small checks-judged', 'data-checks-judged': String(judged),
@@ -14119,7 +14234,9 @@ function renderWarnings() {
           el('summary', { class: 'small', text: `Known limits (${limits.length}) ▸` }),
           el('ul', { class: 'checklist' }, limits.map(row)))) : '',
       steady ? el('li', { class: 'small se', 'data-judge-steady': '1', text: steady }) : ''));
-  box.replaceChildren(fold);
+  box.replaceChildren(popover(btn, list, { key: 'checks', menu: false, placement: 'bottom-end',
+    rebuild: true }));
+  if (POP.key === 'checks') popReanchor();
 }
 
 // the checks that are problems — something happened that a person should act
@@ -14387,14 +14504,14 @@ if (LIVE) {
     // answers: a board that cannot reach it does not ask for four more things
     const answering = DATA && !NET.fails;
     if (answering && onHome()) { loadReview(); loadTruns(); }
-    if (state.tab === 'review' || (answering && state.model && state.mtab === 'improve')) loadReview();
+    if (state.tab === 'pipeline' || (answering && state.model && state.mtab === 'improve')) loadReview();
     if (state.tab === 'exam') loadExam();
     // 12h.2: a view someone else saved reaches this page within half a minute
     if (answering && state.tab === 'leaderboard' && Date.now() - VIEWS_AT > 30000) loadViews();
     // the Loop board and a topic page: without this nothing ever re-fetched
     // /api/loop, so a board whose first load failed stayed empty for as long
     // as the tab was open — which is exactly what happened on the live tree
-    if (state.tab === 'loop' || state.topic || (state.model && state.msit.open)) loadLoop();
+    if (state.topic || (state.model && state.msit.open)) loadLoop();
   }, POLL_MS);
 } else {
   initData(DATA);

@@ -88,18 +88,19 @@ def test_needs_you_lists_what_waits_and_each_line_goes_there(live, page, tidy):
     assert lines == ["1 proposal waiting for review", "1 dataset made but not used in training",
                      "1 run failed in the last seven days", "1 check is not green"]
     # each line is a link to where it is dealt with
+    # 12g.1: to Improve's pipeline, on the model the proposal is for
     page.locator("[data-needs='proposals'] a").click()
-    page.wait_for_selector(f"[data-rv-list='review'] [data-rv-row='{pid}']")
-    assert page.evaluate("location.hash").startswith("#tab=improve&sub=review")
+    page.wait_for_selector(f"[data-stage='proposals'] [data-prop='{pid}']")
+    assert page.evaluate("location.hash").startswith("#tab=improve&sub=model&model=")
     home(page, live["base"])
     page.locator("[data-needs='datasets'] a").click()
-    page.wait_for_selector(f"[data-rv-list='datasets'] [data-ds-row='{did}']")
+    page.wait_for_selector(f"[data-stage='data'] [data-ds-item='{did}']")
     home(page, live["base"])
     page.locator("[data-needs='failed'] a").click()
     page.wait_for_selector(f"[data-all-runs] tr[data-queue-row='{sid}']")
     home(page, live["base"])
     page.locator("[data-needs='checks'] a").click()
-    assert page.locator("#warnings details.checks").get_attribute("open") is not None
+    page.locator("#pop-checks").wait_for()             # 12g.1: the checks are a popover
     # a dataset a training run used is not waiting
     db.trun_create("run-a", "p", "omar", "{}", "", datasets=[did])
     home(page, live["base"])
@@ -211,8 +212,8 @@ def test_a_kind_with_no_data_has_no_card(browser, payload):
 
 def test_judge_steadiness_is_a_line_under_the_checks(live, page):
     home(page, live["base"])
-    page.locator("#warnings summary[data-warn-summary]").click()
-    line = page.locator("#warnings [data-judge-steady]")
+    page.locator("#warnings [data-warn-summary]").click()
+    line = page.locator("#pop-checks [data-judge-steady]")
     line.wait_for()
     assert line.inner_text().startswith("Judge steadiness: steady — 30 fixed scripts re-graded")
     # it is not one of the checks: the dot's count is the checks' (12b.3: the problems)

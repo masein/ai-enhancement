@@ -282,6 +282,43 @@ def parents_for(model_ids) -> dict[str, str]:
     return out
 
 
+def _claims(mid: str, run: dict) -> bool:
+    """12g.1: a run claims a checkpoint it logged, or one whose id is its
+    hf_prefix — alone, or followed by a separator. The taint join above takes
+    any id that starts with the prefix, so "run7" also claims "run70"; what a
+    model was trained from needs the stricter rule."""
+    pre = run["hf_prefix"]
+    if mid in run["checkpoints"]:
+        return True
+    return bool(pre) and (mid == pre or (mid.startswith(pre) and mid[len(pre)] in "-_/."))
+
+
+def bases_for(model_ids) -> dict[str, dict]:
+    """model id -> {base, run}: what the latest training run that claims it
+    recorded it started from (12g.1)"""
+    runs = db.trun_bases()
+    out: dict[str, dict] = {}
+    for mid in model_ids:
+        for run in reversed(runs):
+            if _claims(mid, run) and run["parent"] != mid:
+                out[mid] = {"base": run["parent"], "run": run["run_id"]}
+                break
+    return out
+
+
+def trained_from_for(model_ids) -> dict[str, dict]:
+    """model id -> what it was trained from: a person's word, else the
+    training run's record (12g.1). Retests pair a checkpoint with this."""
+    people = db.trained_from_all()
+    out = {m: {"base": a["base"], "source": "run", "run": a["run"]}
+           for m, a in bases_for(model_ids).items()}
+    for m in model_ids:
+        if m in people and people[m]["base"] != m:
+            out[m] = {"base": people[m]["base"], "source": "person", "by": people[m]["by"],
+                      "at": people[m]["at"]}
+    return out
+
+
 def results_payload() -> dict:
     now = time.time()
     if _cache["payload"] is not None and now - _cache["at"] < 5:
@@ -290,9 +327,14 @@ def results_payload() -> dict:
     if key != _cache["key"] or _cache["payload"] is None:
         runs = report.load_results(config.OUT_DIR) if config.OUT_DIR.is_dir() else []
         by_model = report.merge_runs(runs)
+        # 12g.1: what each checkpoint was trained from is also the "before" of
+        # what its training taught: a person's word first, then the run's
+        trained = trained_from_for(list(by_model.keys()))
+        parents = {**parents_for(by_model.keys()),
+                   **{m: t["base"] for m, t in trained.items()}}
         payload = report.build_payload(by_model, config.TITLE, source=str(config.OUT_DIR),
                                        taint=taint_for(by_model.keys()),
-                                       parents=parents_for(by_model.keys()),
+                                       parents=parents,
                                        calibration=_calibration(),
                                        judge_identity=_judge_identity(),
                                        fingerprints=current_fingerprints(),
@@ -303,6 +345,8 @@ def results_payload() -> dict:
         for m in payload["models"]:
             if trails.get(m["id"]):
                 m["taintTrail"] = trails[m["id"]]
+            if trained.get(m["id"]):
+                m["trainedFrom"] = trained[m["id"]]
         _cache.update(key=key, payload=payload)
     _cache["at"] = now
     return _cache["payload"]
@@ -1700,7 +1744,7 @@ def propose_gate(row: dict | None, topic: str, evidence: bool = True) -> dict:
         dup = db.proposal_active(row["id"], task, topic)
         if dup:
             hard.append((f"proposal #{dup['id']} for this model and topic is already "
-                         f"{dup['status']} — review it on Improve ▸ Review",
+                         f"{dup['status']} — open it on Improve",
                          f"proposal #{dup['id']} is already {dup['status']}"))
         if evidence and not hard and not _has_evidence(row["id"], task):
             hard.append(("the judge wrote no comment on a practice answer that scored below 3 "
@@ -1772,7 +1816,7 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
         "n_shown": len(justifications), **counts,
         "topic_score_report": t.get("score_report"), "topic_n_report": t.get("n_report"),
         "topic_score_diagnose": t.get("score_diagnose"), "topic_n_diagnose": t.get("n_diagnose"),
-        "judge_id": jmeta.get("id"), "mmlu_caution": gate.get("caution"),
+        "judge_id": jmeta.get("id"),
         # what the reviewer sees of what the LLM saw — diagnosis half, with any
         # question text the judge quoted already stripped
         "examples": justifications[:prop.EXAMPLES_SHOWN],
@@ -2087,6 +2131,42 @@ def dataset_delete(did: int, x_token: str = Header(default="")):
     shutil.rmtree(prop.dataset_dir(did), ignore_errors=True)
     db.dataset_update(did, status="deleted", finished_at=time.time())
     return {"deleted": did}
+
+
+# ---- 12g.1: what a checkpoint was trained from --------------------------------
+# Set once by a person, from the models on the board; a training run that
+# recorded its base fills it when no person has. Improve's Retests pair a
+# checkpoint with it, so a checkpoint with none is not in Improve.
+
+class TrainedFromIn(BaseModel):
+    model: str
+    base: str
+    by: str
+
+
+@app.post("/api/trained-from")
+def trained_from_set(t: TrainedFromIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    who = _name(t.by, "setting what a model was trained from")
+    models = {m["id"]: m for m in results_payload()["models"]}
+    if t.model not in models:
+        raise HTTPException(404, f"no such model on the board: {t.model}")
+    if t.base not in models:
+        raise HTTPException(422, f"{t.base} is not on the board — pick a model the board has "
+                                 f"tested")
+    if t.base == t.model:
+        raise HTTPException(422, "a model is not trained from itself")
+    # no loop: the base must not itself come from this model, at any remove
+    seen, cur = set(), t.base
+    while cur and cur not in seen:
+        if cur == t.model:
+            raise HTTPException(422, f"{t.base} was trained from {t.model}, so {t.model} "
+                                     f"cannot be trained from it")
+        seen.add(cur)
+        cur = ((models.get(cur) or {}).get("trainedFrom") or {}).get("base")
+    db.trained_from_set(t.model, t.base, who)
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"model": t.model, "base": t.base, "by": who}
 
 
 # ---- 12h.2: saved views of the Models table ---------------------------------

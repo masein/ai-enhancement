@@ -287,8 +287,9 @@ def test_no_table_paints_over_its_card(live, browser, width):
                       provenance=json.dumps({"items": {"kept": 20, "requested": 20}}))
     ctx, page = new_page(browser, width)
     try:
-        for where in ("/#tab=queue", "/#tab=models", "/#tab=review&view=datasets",
-                      "/#tab=review", "/#tab=loop"):
+        # 12g.1: Review and the By topic board are the pipeline, which has no
+        # table; the Knowledge exam's rubrics table is checked instead
+        for where in ("/#tab=queue", "/#tab=models", "/#tab=benchmarks&sub=exam"):
             page.goto(live["base"] + where)
             page.wait_for_selector("#view table", state="attached")
             page.wait_for_timeout(400)
@@ -409,7 +410,7 @@ def test_the_answers_list_pages_and_clamps(live, page):
 def test_a_mouse_click_leaves_no_ring_and_a_tab_does(live, page):
     page.set_viewport_size({"width": 1400, "height": 900})
     page.goto(live["base"] + "/")
-    pill = page.locator("#warnings summary[data-warn-summary]")
+    pill = page.locator("#warnings [data-warn-summary]")
     pill.wait_for()
     pill.click()                                   # opens
     page.wait_for_timeout(200)

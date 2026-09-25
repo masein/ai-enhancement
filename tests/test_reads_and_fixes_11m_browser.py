@@ -108,7 +108,7 @@ def test_the_model_page_has_no_by_criterion_block_and_the_cards_keep_their_strip
 
 # 12b: the bar's pills are the run counter, the status dot and the name menu —
 # Theme is inside the name menu now
-PILLS = {"checks": "#warnings summary[data-warn-summary]", "who": "button.who",
+PILLS = {"checks": "#warnings [data-warn-summary]", "who": "button.who",
          "theme": "#runs [data-runs]"}
 
 
@@ -188,8 +188,9 @@ def test_a_failed_dataset_says_0_of_n_and_what_went_wrong(live, page):
                          "", "the generator returned no parseable items")
     try:
         page.set_viewport_size({"width": 1400, "height": 1000})
-        page.goto(live["base"] + "/#tab=review&view=datasets")
-        page.wait_for_selector(f"[data-ds-row='{nine}']")
+        # 12g.1: under Training data in its model's pipeline, where the Review row was
+        page.goto(live["base"] + "/#tab=improve&sub=model&model=" + MODEL.replace("/", "%2F"))
+        page.wait_for_selector(f"[data-ds-item='{nine}']")
         # the count where a count belongs; the failure in the status
         assert page.locator(f"[data-doc-line='{nine}']").text_content() == "0 of 26"
         assert page.locator(f"[data-ds-failed='{nine}']").text_content() == "Failed"
@@ -215,7 +216,7 @@ def test_a_failed_dataset_says_0_of_n_and_what_went_wrong(live, page):
         det = page.locator(f"[data-ds-details='{nine}']")
         assert det.evaluate("e => e.open") is True
         assert det.locator("ol").get_attribute("start") == "11"
-        page.locator(f"[data-ds-row='{nine}']").scroll_into_view_if_needed()
+        page.locator(f"[data-ds-item='{nine}']").scroll_into_view_if_needed()
         shot(page, "11m-5-failed-dataset-1400-light.png")
         assert page.errors == []
     finally:

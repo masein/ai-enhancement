@@ -6,6 +6,7 @@ filled buttons."""
 from __future__ import annotations
 
 import json
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -150,15 +151,15 @@ def test_the_dot_counts_problems_and_the_limits_are_one_folded_line(live, page):
     # and preliminary models are its known limits
     assert page.evaluate("DATA.checks.map(c => [c.key, c.limit])") == \
         [["chat_templates", True], ["preliminary", True], ["judge_stub", False]]
-    summary = page.locator("#warnings summary[data-warn-summary]")
+    summary = page.locator("#warnings [data-warn-summary]")
     assert summary.get_attribute("data-warn-summary") == "1"
     assert summary.locator(".statusn").inner_text() == "1"
     summary.click()
     # problems first, then one line for the limits, folded
-    rows = page.locator("#warnings details.checks > .checklist > li[data-check]")
+    rows = page.locator("#pop-checks > .checklist > li[data-check]")
     assert rows.count() == 1 and rows.first.get_attribute("data-limit") is None
     assert rows.first.get_attribute("data-check") == "judge_stub"
-    limits = page.locator("#warnings [data-known-limits]")
+    limits = page.locator("#pop-checks [data-known-limits]")
     assert limits.get_attribute("data-known-limits") == "2"
     assert limits.locator(":scope > details > summary").inner_text() == "Known limits (2) ▸"
     assert not limits.locator("li[data-check]").first.is_visible()
@@ -166,7 +167,7 @@ def test_the_dot_counts_problems_and_the_limits_are_one_folded_line(live, page):
     assert limits.locator("li[data-check][data-limit]").count() == 2
     # opened, they are rows in the panel, under their line — not a second
     # panel floating below it (12a.2: the list took the panel's position)
-    panel = page.locator("#warnings details.checks > .checklist").bounding_box()
+    panel = page.locator("#pop-checks > .checklist").bounding_box()
     head = limits.locator(":scope > details > summary").bounding_box()
     for r in limits.locator("li[data-check][data-limit]").all():
         assert r.is_visible()
@@ -184,7 +185,7 @@ def test_with_only_known_limits_the_dot_is_green_and_home_says_nothing(live, pag
     served(page, only_limits)
     page.goto(live["base"] + "/")
     page.wait_for_selector("#warnings [data-warn-summary]")
-    summary = page.locator("#warnings summary[data-warn-summary]")
+    summary = page.locator("#warnings [data-warn-summary]")
     assert summary.get_attribute("data-warn-summary") == "0"
     assert summary.locator(".dot.ok").count() == 1 and summary.locator(".statusn").count() == 0
     assert page.locator("[data-needs='checks']").count() == 0
@@ -198,7 +199,7 @@ def test_with_only_known_limits_the_dot_is_green_and_home_says_nothing(live, pag
                                "text": "…", "judged": False, "limit": False})
     served(page, one_problem)
     page.reload()
-    page.wait_for_selector("#warnings summary[data-warn-summary='1']")
+    page.wait_for_selector("#warnings [data-warn-summary='1']")
     assert page.locator("#warnings .statusn").inner_text() == "1"
     assert page.locator("[data-needs='checks']").inner_text() == "1 check is not green"
     assert page.errors == []
@@ -219,9 +220,11 @@ def test_needs_you_does_not_count_demo_only_datasets(live, page):
         page.wait_for_selector("[data-needs-you]")
         page.wait_for_function("state.rv.loaded && state.trLoaded")
         assert page.locator("[data-needs='datasets']").count() == 0
-        # it is still in Improve ▸ Review, with its badge
-        page.goto(live["base"] + "/#tab=improve&sub=review&view=datasets")
-        row = page.locator(f"[data-ds-row='{demo}']")
+        # it is still in Improve, with its badge (12g.1: its model's pipeline)
+        with urllib.request.urlopen(live["base"] + f"/api/datasets/{demo}") as r:
+            mid = json.loads(r.read())["model"]
+        page.goto(live["base"] + "/#tab=improve&sub=model&model=" + mid.replace("/", "%2F"))
+        row = page.locator(f"[data-ds-item='{demo}']")
         row.wait_for()
         assert row.locator("[data-demo-only]").count() == 1
         # one that is not Demo only is counted
@@ -268,15 +271,17 @@ def test_a_model_with_judged_topics_shows_them_not_a_dash(live, page):
     head = page.locator("[data-kind-block='exam'] > summary")
     assert head.locator(".kblock-v").inner_text() == f"{n} of {N}"
     assert f"weakest: {topic} {v} / 4" in head.inner_text()
-    # Home: the weakest topic across the board, with one provisional badge
+    # Home: 12g.1 — the weakest topic of the model with the most judged topics,
+    # with one provisional badge
     page.goto(live["base"] + "/")
     card = page.locator("[data-best='exam']")
     card.wait_for()
     assert card.get_attribute("data-best-weakest") == "1"
-    low = page.evaluate("""() => { let w = null;
-      for (const m of DATA.models.filter(x => !x.duplicateOf)) { const t = weakestTopic(m);
-        if (t && (!w || t.v < w.v)) w = { ...t, name: m.name }; }
-      return [num(w.v, 2) + ' / 4', frName(w.task) + ' · ' + w.name]; }""")
+    low = page.evaluate("""() => { const most = DATA.models.filter(x => !x.duplicateOf
+        && judgedTopics(x).length).sort((a, b) => judgedTopics(b).length
+        - judgedTopics(a).length || natCmp(a.name, b.name))[0];
+      const w = weakestTopic(most), v = num(w.v, 2) + ' / 4';
+      return [v, most.name + ' · weakest: ' + frName(w.task) + ' ' + v]; }""")
     assert page.locator("[data-best-value='exam']").inner_text() == low[0]
     assert page.locator("[data-best-name='exam']").inner_text() == low[1]
     assert page.locator("[data-best-by-kind] [data-best-caveat]").count() == 1
@@ -339,8 +344,8 @@ def test_the_screens(live, browser, width):
         pg.wait_for_selector("[data-best] .hcard-link")
         SCREENS.mkdir(parents=True, exist_ok=True)
         pg.screenshot(path=SCREENS / f"12b3-home-{width}-light.png", full_page=True)
-        pg.locator("#warnings summary[data-warn-summary]").click()
-        pg.locator("#warnings [data-known-limits] > details > summary").click()
+        pg.locator("#warnings [data-warn-summary]").click()
+        pg.locator("#pop-checks [data-known-limits] > details > summary").click()
         pg.screenshot(path=SCREENS / f"12b3-status-{width}-light.png")
         pg.keyboard.press("Escape")
         pg.goto(live["base"] + "/#model=" + MODEL.replace("/", "%2F"))

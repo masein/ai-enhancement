@@ -125,11 +125,11 @@ def test_the_board_checks_are_one_line_on_every_tab(live):
     pg.wait_for_selector("#view .card", timeout=20000)
     for label in ("Overview", "Leaderboard", "Exam", "Provenance"):
         go_tab(pg, label)
-        pg.wait_for_selector("[data-warnings='collapsed']", timeout=20000)
-        fold = pg.locator("[data-warnings='collapsed']")
-        assert fold.count() == 1, label
-        assert not fold.locator(":scope > .checklist").is_visible(), label       # one line, closed
-    said = pg.locator("[data-warnings='collapsed'] > summary").text_content()
+        # 12g.1: a button in the header and a popover, closed
+        pg.wait_for_selector("#warnings [data-warn-summary]", timeout=20000)
+        assert pg.locator("#warnings [data-warn-summary]").count() == 1, label
+        assert pg.locator("#pop-checks").count() == 0, label                    # one line, closed
+    said = pg.locator("#warnings [data-warn-summary]").text_content()
     assert pg.evaluate("DATA.checks.length") == pg.evaluate("DATA.warnings.length")
     # 12b.3: the count is the problems; the known limits fold under them
     n = pg.evaluate("boardProblems(DATA.checks).length")
@@ -137,12 +137,12 @@ def test_the_board_checks_are_one_line_on_every_tab(live):
     # 11e: the pill is a button with the count; the kind is the panel's first
     # line. 12b: the pill is a status dot — amber, and the count, nothing else
     assert said.strip() == str(n)
-    assert pg.locator("[data-warnings='collapsed'] > summary .dot.warn").count() == 1
+    assert pg.locator("#warnings [data-warn-summary] .dot.warn").count() == 1
     # folded, never dismissed: they open, one line each
-    pg.locator("[data-warnings='collapsed'] > summary").click()
+    pg.locator("#warnings [data-warn-summary]").click()
     if judged:
         assert f"{judged} of {n}" in pg.locator("[data-checks-judged]").text_content()
-    rows = pg.locator("[data-warnings='collapsed'] > .checklist > li[data-check]")
+    rows = pg.locator("#pop-checks > .checklist > li[data-check]")
     assert rows.count() == n
     first = rows.first
     assert first.locator(".dot").count() == 1

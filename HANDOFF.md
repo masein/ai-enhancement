@@ -2350,6 +2350,68 @@ happens on the server, first with `scripts/trial_generative.py` (§ 5b).
 - **Phone.** The pickers and Filters sit on a row under the chips. The table
   scrolls sideways in its own box, and the page does not.
 
+### 12g.1 — Improve as one pipeline for one model
+
+`docs/prompts/phase-12g-improve-pipeline.md`, part one.
+
+masein decided on 2026-09-25 that the **Knowledge exam and Everyday tasks
+are what Improve trains toward**. The Standard benchmarks (12h's IFEval,
+MMLU-Pro and MATH-500 too) are never a training target. They are the outside
+check, and Improve shows them only as a before → after watch line.
+
+- **By model** replaces By topic and Review.
+  - **Training runs** stays as Improve's second tab.
+  - `#tab=improve&sub=model&model=<id>` is its address.
+  - The old addresses land on it and keep the viewer's last model:
+    `sub=topics`, `sub=review` (any `view=`), `#tab=loop`, `#tab=review`.
+  - **The model:** it is picked at the top. The page remembers the viewer's
+    last one, and on a first visit opens on the model with the most judged
+    topics.
+  - **Four stages:** Weak spots, Proposals, Training data and Retests.
+    - Each shows five one-line items with one action each, then "+ n more".
+    - An empty stage is one line, with no box.
+    - Rejected and failed proposals fold under the stages.
+  - **Weak spots:** a topic the dialog would refuse (too few hidden
+    questions, nothing to propose from) shows its reason instead of Propose.
+    The filled **Propose** opens on the weakest topic that can be proposed.
+  - The proposal card, generating and the dataset reader are unchanged. They
+    open in the reader's sheet from the stage items.
+- **Trained from** (`trained_from` table, `POST /api/trained-from {model,
+  base, by}`).
+  - **What linked a checkpoint to its base before this:** only `truns.parent`
+    (or its config's base_model), and only for runs that recorded a dataset.
+    It went through a prefix match that lets `run7` claim `run70`. Uploaded
+    `local/` checkpoints had nothing at all.
+  - **Now:**
+    - a person sets Trained from on the checkpoint's page, from the models
+      on the board;
+    - otherwise the latest training run that logged the checkpoint (or whose
+      hf_prefix names it, up to a separator) fills it from its recorded base;
+    - a person's word wins;
+    - loops are refused.
+  - The same link is the "before" of what the training taught.
+  - A checkpoint with none says "Set what this was trained from to see it in
+    Improve".
+- **The Standard watch** is one line under each retest: "Standard (7) 52.1 →
+  53.0 · no drop".
+  - It averages only the benchmarks both sides were tested on, computed as
+    12h.2's Avg of N.
+  - "Dropped" appears only when a z-test calls a drop real: the averages', or
+    one benchmark's (the board's pairwise rows). That benchmark is then named,
+    and the word links to the checkpoint's Standard block.
+  - With no Standard result, the line reads "Standard: not tested · Test".
+- **Standard is never a target.**
+  - A proposal is only ever about an exam topic.
+  - The MMLU caution no longer rides on a new proposal's evidence.
+  - `tests/test_improve_12g1.py` asserts that no Standard benchmark name, and
+    no 13 words of any benchmark item, appear in any recorded request body or
+    in the dataset.
+- **The checks** are the 11a popover now, as the run counter is. It closes on
+  Escape, a click outside and a page change; the `<details>` stayed open.
+- **Home's Knowledge exam card** shows the weakest topic of the model with the
+  most judged topics, and names it: "good-750m · weakest: Economics 1.46 / 4 ·
+  Improve it →".
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

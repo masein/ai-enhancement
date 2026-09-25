@@ -168,8 +168,8 @@ def test_two_polls_do_not_close_an_open_menu(live, page):
     keyboard, and the page's scroll are all still there afterwards."""
     base = live["base"]
     page.set_viewport_size({"width": 700, "height": 700})         # Menu ▾ holds the places
-    page.goto(base + "/#tab=loop")
-    page.wait_for_selector("table.jd[data-loop-table] tbody tr")
+    page.goto(base + "/#tab=improve")               # 12g.1: the pipeline, where the board was
+    page.wait_for_selector("[data-stages]")
     page.locator("#menuBtn").focus()
     page.keyboard.press("ArrowDown")
     page.wait_for_selector("[data-pop='places']")
@@ -231,7 +231,7 @@ def test_the_review_card_says_where_the_documents_go_and_what_went_missing(
         page.set_viewport_size({"width": 1280, "height": 900})
         # 11j: the name first — the card opens in the sheet, over the header
         page.goto(base + "/#tab=review")
-        page.wait_for_selector("[data-review-head]")
+        page.wait_for_selector("[data-stages]")      # 12g.1: the pipeline
         set_name(page, "Omar")
         page.goto(base + f"/#tab=review&read=proposal:{pid}")
         page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
@@ -258,11 +258,12 @@ def test_the_review_card_says_where_the_documents_go_and_what_went_missing(
         page.wait_for_selector("[data-toast^='dataset-']", timeout=E2E_MS)
         toast = page.locator("[data-toast^='dataset-']").first.text_content()
         assert "10 of 12 documents · 2 missing — 2 too short (60 words)" in toast
-        # and so does its row, in one line — with the reasons in the reader
-        page.goto(base + "/#tab=review&view=datasets")
-        row = page.locator("[data-ds-row]").first
+        # and so does its line in the pipeline's Training data (12g.1) — with
+        # the reasons in the reader
+        page.goto(base + "/#tab=improve&sub=model&model=fx%2Fgood-750m")
+        row = page.locator("[data-ds-item]").first
         row.wait_for(timeout=E2E_MS)
-        did = row.get_attribute("data-ds-row")
+        did = row.get_attribute("data-ds-item")
         assert page.locator(f"[data-doc-line='{did}']").text_content() == "10 of 12 · 2 missing"
         row.locator("[data-ds-read]").click()
         page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
@@ -290,8 +291,9 @@ def test_a_dataset_from_before_this_pr_says_the_reasons_were_not_recorded(live, 
                            "items": {"generated": 18, "dropped": 0, "kept": 18}}}]
     page.route("**/api/datasets", lambda route: route.fulfill(
         status=200, content_type="application/json", body=json.dumps(old)))
-    page.goto(base + "/#tab=review&view=datasets")
-    page.wait_for_selector("[data-ds-row='99']")
+    # 12g.1: the dataset is in its model's pipeline, under Training data
+    page.goto(base + "/#tab=improve&sub=model&model=fx%2Fgood-750m")
+    page.wait_for_selector("[data-ds-item='99']")
     # 11j: one line on the row; "reasons not recorded (made before 11a)" is
     # in the reader, where the documents are (11g)
     assert page.locator("[data-doc-line='99']").text_content() == "18 of 20 · 2 missing"

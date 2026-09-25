@@ -114,7 +114,7 @@ def test_an_answer_card_shows_the_answer_and_the_reasoning_behind_a_click(live, 
 def test_the_checks_bar_names_the_model(live, page, reasoned):
     page.set_viewport_size({"width": 1400, "height": 900})
     page.goto(live["base"] + "/")
-    pill = page.locator("#warnings summary[data-warn-summary]")
+    pill = page.locator("#warnings [data-warn-summary]")
     pill.wait_for()
     pill.click()
     item = page.get_by_text("Answers that never finished: good-750m", exact=False).first

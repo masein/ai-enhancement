@@ -1,4 +1,6 @@
-"""11j: the Review tab, rebuilt.
+"""11j: the Review tab, rebuilt. 12g.1: the tab is Improve's pipeline for
+one model now; its proposal card, generating and the dataset reader are the
+same, reached from the pipeline's Proposals and Training data.
 
 masein: "If I want to start a new review, or want to review the pending ones,
 the approved ones and the generated datasets — I think the UX is bad." Four
@@ -93,92 +95,17 @@ def clear_proposals():
     PLANTED.clear()
 
 
-def views(page):
-    return {b.get_attribute("data-rv-view"): b.text_content()
-            for b in page.locator("[data-rv-view]").all()}
-
-
-def counts(page):
-    return {k: int(re.search(r"\((\d+)\)", v).group(1)) for k, v in views(page).items()}
-
-
-def open_review(page, base, view=""):
-    page.goto(base + "/#tab=review" + (f"&view={view}" if view else ""))
-    page.wait_for_selector("[data-review-head]")
+def open_review(page, base):
+    """12g.1: Improve's pipeline, on the model these proposals are for"""
+    page.goto(base + "/#tab=improve&sub=model&model=" + MODEL.replace("/", "%2F"))
+    page.wait_for_selector(f"[data-pipeline='{MODEL}']")
     page.wait_for_function("() => state.rv.loaded")
-    return page.locator("[data-review-head]")
+    return page.locator(f"[data-pipeline='{MODEL}']")
 
 
 # ---------------------------------------------------------------------------
 # the four views
 # ---------------------------------------------------------------------------
-
-@pytest.mark.dashboard
-def test_the_four_views_hold_the_right_rows_and_their_counts(live, page):
-    from service import db
-    clear_proposals()
-    a = plant("proposed")
-    b = plant("approved", topic="Law", task="exam_law")
-    c = plant("rejected", topic="Physics & Astronomy", task="exam_physics_astronomy",
-              reject_reason="names a fact, not a skill")
-    d = plant("pending", topic="Sociology", task="exam_sociology")
-    did = db.dataset_create(b, "doc", 20, "masein", {})
-    db.dataset_update(did, status="ready",
-                      provenance=json.dumps({"items": {"kept": 18, "requested": 20,
-                                                       "missing": [{"why": "too short"},
-                                                                   {"why": "not JSON"}]}}))
-    try:
-        open_review(page, live["base"])
-        assert counts(page) == {"review": 2, "ready": 1, "datasets": 1, "history": 1}
-        # it opens on what is waiting
-        assert page.locator("[data-rv-view='review'][aria-selected='true']").count() == 1
-        rows = page.locator("[data-rv-row]")
-        assert sorted(int(r.get_attribute("data-rv-row")) for r in rows.all()) == sorted([a, d])
-        assert "Waiting for the AI" in page.locator(f"[data-rv-status='{d}']").text_content()
-        assert "To review" in page.locator(f"[data-rv-status='{a}']").text_content()
-        page.locator("[data-rv-view='ready']").click()
-        assert [r.get_attribute("data-rv-row") for r in page.locator("[data-rv-row]").all()] \
-            == [str(b)]
-        page.locator("[data-rv-view='history']").click()
-        assert [r.get_attribute("data-rv-row") for r in page.locator("[data-rv-row]").all()] \
-            == [str(c)]
-        page.locator("[data-rv-view='datasets']").click()
-        row = page.locator(f"[data-ds-row='{did}']")
-        assert row.count() == 1
-        assert row.locator("[data-doc-line]").text_content() == "18 of 20 · 2 missing"
-        assert row.locator("[data-ds-read]").count() == 1
-        assert row.locator("[data-ds-flag]").count() == 1
-        assert page.errors == []
-    finally:
-        clear_proposals()
-
-
-@pytest.mark.dashboard
-def test_the_view_is_in_the_hash_and_survives_a_poll(live, page):
-    clear_proposals()
-    plant("proposed")
-    try:
-        open_review(page, live["base"], "datasets")
-        assert page.locator("[data-rv-view='datasets'][aria-selected='true']").count() == 1
-        assert page.locator("[data-rv-list='datasets']").count() == 1
-        page.evaluate("loadReview()")
-        page.wait_for_timeout(600)
-        assert page.locator("[data-rv-view='datasets'][aria-selected='true']").count() == 1
-        # a click writes it into the address, and Back goes where it came from
-        page.locator("[data-rv-view='ready']").click()
-        assert "view=ready" in page.evaluate("location.hash")
-        page.go_back()
-        page.wait_for_selector("[data-rv-list='datasets']")
-        # with nothing waiting it opens on the datasets
-        clear_proposals()
-        page.goto(live["base"] + "/#tab=review")
-        page.evaluate("loadReview()")
-        page.wait_for_function("() => document.querySelector(\"[data-rv-view='datasets']\")"
-                               ".getAttribute('aria-selected') === 'true'")
-        assert page.errors == []
-    finally:
-        clear_proposals()
-
 
 # ---------------------------------------------------------------------------
 # + New proposal
@@ -191,12 +118,11 @@ def test_new_proposal_disables_each_blocked_topic_with_its_reason(live, page):
     try:
         open_review(page, live["base"])
         set_name(page, "masein")
-        page.locator("[data-new-proposal]").click()
+        # 12g.1: the pipeline's Propose, with its model filled in
+        page.locator("[data-imp-propose]").click()
         dlg = page.locator("[data-dialog='propose']")
         dlg.wait_for()
-        assert dlg.locator("[data-np-topic]").count() == 0      # a model first
-        dlg.locator("[data-combobox='model']").click()
-        page.locator(f"[role=option][data-value='{MODEL}']").click()
+        assert dlg.locator("[data-combobox='model']").get_attribute("data-value") == MODEL
         page.wait_for_selector("[data-np-topic]")
         why = {t.get_attribute("data-np-topic"): t.get_attribute("data-np-why")
                for t in dlg.locator("[data-np-topic]").all()}
@@ -205,8 +131,8 @@ def test_new_proposal_disables_each_blocked_topic_with_its_reason(live, page):
         assert why["Arts"] == "not sat yet"
         assert why[TOPIC] is None                                # this one can be proposed
         assert dlg.locator("[data-np-topic='Law'] input").is_disabled()
-        assert dlg.locator("[data-dialog-go]").is_disabled()     # nothing picked yet
-        dlg.locator(f"[data-np-topic='{TOPIC}'] input").check()
+        # it opens on the weakest topic a proposal can be made from
+        assert dlg.locator(f"[data-np-topic='{TOPIC}'] input").is_checked()
         assert dlg.locator("[data-dialog-go]").is_enabled()
         shot(page, "11j-new-proposal-1400-light.png")
         dlg.locator("[data-dialog-go]").click()
@@ -215,8 +141,8 @@ def test_new_proposal_disables_each_blocked_topic_with_its_reason(live, page):
         assert len(made) == 1
         assert made[0]["model"] == MODEL and made[0]["category"] == TOPIC
         assert made[0]["requested_by"] == "masein"
-        # and the tab came back on To review, with it in the list
-        assert page.locator(f"[data-rv-row='{made[0]['id']}']").count() == 1
+        # and it is in the pipeline's Proposals
+        page.locator(f"[data-prop='{made[0]['id']}']").wait_for()
         assert page.errors == []
     finally:
         # the one this test asked the AI for goes too: an open proposal on a
@@ -262,7 +188,7 @@ def test_the_card_says_why_in_one_line_with_the_count_that_was_blank(live, page,
     ev = p["evidence"]
     assert ev["diagnose_weak"] and ev["diagnose_items"]          # the fixture has both
     open_review(page, live["base"])
-    page.locator(f"[data-rv-row='{p['id']}'] [data-rv-open]").click()
+    page.locator(f"[data-prop-act='{p['id']}']").click()
     page.wait_for_selector("#reader[data-ready='1']")
     sheet = page.locator("#reader")
     assert sheet.locator(".rd-title").text_content() == f"{TOPIC} · good-750m"
@@ -436,13 +362,14 @@ def test_generate_closes_the_card_and_lands_on_the_new_dataset(live, page):
         page.wait_for_selector("#reader[data-ready='1']")
         page.locator(f"[data-generate='{pid}']").click()
         page.wait_for_selector("#reader", state="detached")
-        assert "view=datasets" in page.evaluate("location.hash")
+        assert page.evaluate("location.hash").startswith(
+            "#tab=improve&sub=model&model=" + MODEL.replace("/", "%2F"))
         assert "read=" not in page.evaluate("location.hash")
-        assert page.locator("[data-rv-list='datasets']").count() == 1
+        assert page.locator("[data-stage='data']").count() == 1
         toast = page.locator("[data-toast='review']")
         toast.wait_for()
         did = int(re.search(r"Dataset #(\d+)", toast.text_content()).group(1))
-        row = page.locator(f"[data-ds-row='{did}']")
+        row = page.locator(f"[data-ds-item='{did}']")
         row.wait_for()
         assert "landed" in (row.get_attribute("class") or "")
         assert "being written" in row.text_content() or "of" in row.text_content()
@@ -466,9 +393,9 @@ def test_one_demo_only_badge_and_no_repeated_warning(live, page):
                   "served_model": "chat", "base_url": "http://localhost:8000/v1"})
     try:
         open_review(page, live["base"])
-        row = page.locator(f"[data-rv-row='{pid}']")
+        row = page.locator(f"[data-prop='{pid}']")
         assert row.locator("[data-demo-only]").count() == 1
-        page.locator(f"[data-rv-row='{pid}'] [data-rv-open]").click()
+        page.locator(f"[data-prop-act='{pid}']").click()
         page.wait_for_selector("#reader[data-ready='1']")
         sheet = page.locator("#reader")
         badges = sheet.locator("[data-demo-only]")
@@ -507,8 +434,8 @@ def test_dataset_rows_read_and_hand_to_training(live, page):
     db.dataset_update(did, status="ready",
                       provenance=json.dumps({"items": {"kept": 2, "requested": 2}}))
     try:
-        open_review(page, live["base"], "datasets")
-        row = page.locator(f"[data-ds-row='{did}']")
+        open_review(page, live["base"])
+        row = page.locator(f"[data-ds-item='{did}']")
         row.wait_for()
         assert row.locator("[data-doc-line]").text_content() == "2 of 2"
         row.locator("[data-ds-flag]").click()
@@ -526,7 +453,7 @@ def test_dataset_rows_read_and_hand_to_training(live, page):
 
 
 @pytest.mark.dashboard
-def test_the_tab_is_short_with_five_proposals_and_eight_datasets(live, browser):
+def test_the_pipeline_is_short_with_five_proposals_and_eight_datasets(live, browser):
     from service import db
     clear_proposals()
     for i in range(5):
@@ -541,54 +468,14 @@ def test_the_tab_is_short_with_five_proposals_and_eight_datasets(live, browser):
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     try:
-        for view in ("review", "ready", "datasets"):
-            open_review(page, live["base"], view)
-            page.wait_for_timeout(300)
-            tall = page.evaluate("document.documentElement.scrollHeight")
-            assert tall <= 1600, (view, tall)
-            assert page.evaluate(
-                "document.documentElement.scrollWidth <= document.documentElement.clientWidth")
+        # 12g.1: one page for all of them — five items a stage, then "+ n more"
+        open_review(page, live["base"])
+        page.wait_for_timeout(300)
+        tall = page.evaluate("document.documentElement.scrollHeight")
+        assert tall <= 1600, tall
+        assert page.evaluate(
+            "document.documentElement.scrollWidth <= document.documentElement.clientWidth")
         assert errors == []
     finally:
         ctx.close()
         clear_proposals()
-
-
-# ---------------------------------------------------------------------------
-# screenshots
-# ---------------------------------------------------------------------------
-
-@pytest.mark.dashboard
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_screenshots_for_the_pr(live, browser, proposed, theme):
-    from service import db
-    pid = plant("approved", spec_text="Say which way an effect runs, and name the mechanism.")
-    did = db.dataset_create(pid, "doc", 20, "masein", {})
-    db.dataset_update(did, status="ready",
-                      provenance=json.dumps({"items": {"kept": 20, "requested": 20}}))
-    for width in (1400, 400):
-        ctx = browser.new_context(viewport={"width": width, "height": 1000},
-                                  reduced_motion="reduce")
-        page = ctx.new_page()
-        errors = []
-        page.on("pageerror", lambda e: errors.append(str(e)))
-        try:
-            open_review(page, live["base"], "review")
-            page.evaluate(f"applyTheme('{theme}')")
-            page.wait_for_timeout(200)
-            shot(page, f"11j-review-{width}-{theme}.png")
-            open_review(page, live["base"], "datasets")
-            page.evaluate(f"applyTheme('{theme}')")
-            page.wait_for_timeout(200)
-            shot(page, f"11j-datasets-{width}-{theme}.png")
-            page.goto(live["base"] + f"/#tab=review&read=proposal:{proposed['id']}")
-            page.wait_for_selector("#reader[data-ready='1']")
-            page.evaluate(f"applyTheme('{theme}')")
-            page.locator(f"[data-answers-read='{proposed['id']}'] summary").click()
-            page.wait_for_selector("[data-answers-count]")
-            page.wait_for_timeout(200)
-            shot(page, f"11j-card-{width}-{theme}.png")
-            assert errors == []
-        finally:
-            ctx.close()
-    sql(("DELETE FROM datasets WHERE id = ?", did), ("DELETE FROM proposals WHERE id = ?", pid))

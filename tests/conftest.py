@@ -198,7 +198,8 @@ def page(browser):
 PLACE_OF = {
     "Overview": ("home", None), "Home": ("home", None),
     "Leaderboard": ("models", None), "Models": ("models", None),
-    "Loop": ("improve", "topics"), "Review": ("improve", "review"),
+    # 12g.1: By topic and Review are one pipeline, By model
+    "Loop": ("improve", "model"), "Review": ("improve", "model"),
     "Training": ("improve", "training"),
     "Exam": ("benchmarks", "exam"), "Tasks": ("benchmarks", "standard"),
 }

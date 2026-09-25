@@ -11,9 +11,8 @@ import re
 
 import pytest
 
-import exam_build as eb
 import report_lm_eval as report
-from conftest import choice, choose, fresh, go_tab, make_service, set_name
+from conftest import fresh, go_tab, make_service, set_name
 from test_page_recovery import Live
 
 MODEL = "fx/good-750m"
@@ -45,7 +44,8 @@ def test_every_check_is_a_short_line_a_severity_and_a_place(payload):
     for c in checks:
         assert c["severity"] in ("warning", "info")
         assert c["short"] and len(c["short"]) < 90 and "{" not in c["short"]
-        assert c["show"]["tab"] in ("overview", "loop", "models", "leaderboard", "provenance")
+        # 12g.1: the judge's checks point at the Knowledge exam, where the judge is set up
+        assert c["show"]["tab"] in ("overview", "exam", "models", "leaderboard", "provenance")
     prelim = next(c for c in checks if c["key"] == "preliminary")
     assert prelim["show"] == {"tab": "models", "prelim": True}
     assert re.fullmatch(r"\d+ of \d+ models are preliminary", prelim["short"])
@@ -173,84 +173,6 @@ def test_one_name_in_the_header_and_no_box_anywhere_else(live, page):
     page.reload()
     page.wait_for_selector("#who button[data-who='Omar']")      # remembered
     assert page.errors == []
-
-
-@pytest.mark.dashboard
-def test_the_loop_board_shows_one_model_and_what_it_has_not_sat(live, page):
-    from service import app, config
-    base = live["base"]
-    jf = config.OUT_DIR / "fx__chance-160m" / "judge.json"
-    kept = jf.read_bytes()
-    j = json.loads(kept)
-    j["tasks"].pop("exam_law", None)
-    jf.write_text(json.dumps(j), encoding="utf-8")
-    app._cache.update(key=None, payload=None, at=0.0)
-    try:
-        page.goto(base + "/#tab=loop")
-        sel = page.locator("[aria-label='results for']")
-        sel.wait_for()
-        default = choice(sel)
-        for cell in page.locator("[data-loop-score]").all():
-            v = cell.get_attribute("data-loop-score")
-            assert v in ("", default)
-        choose(sel, "fx/chance-160m")
-        page.wait_for_function("state.loop.model === 'fx/chance-160m' && state.loop.loaded")
-        # weakest first: a topic this model has not sat comes after every one it
-        # has, on the second page of 36 — the search finds it (10c)
-        page.get_by_label("find a topic").fill("law")
-        law = page.locator("tr[data-loop-row='law']")
-        law.locator("[data-not-sat]").wait_for()
-        assert "Not sat" in law.text_content()
-        # Sit the exam carries its context: this topic ticked, the caret in the model box
-        law.locator("[data-not-sat] a").click()
-        page.wait_for_selector("[data-topic-page='law']")
-        page.wait_for_function(
-            "document.activeElement === document.querySelector('[data-ms=sit] input')")
-        assert page.locator("input[data-sit-task='exam_law']").is_checked()
-        assert page.locator("input[data-sit-task='exam_economics']").is_checked() is False
-        assert page.errors == []
-    finally:
-        jf.write_bytes(kept)
-        app._cache.update(key=None, payload=None, at=0.0)
-
-
-@pytest.mark.dashboard
-def test_read_the_results_lands_on_the_answers(live, page):
-    page.goto(live["base"] + "/#tab=loop")
-    # low on the board, where the scroll used to land past the answers: the
-    # last row of the first page, weakest first
-    page.locator("tr[data-loop-row] a[data-read]").last.click()
-    page.wait_for_selector("[data-panel='answers']")
-    page.wait_for_function("""() => { const r = document.querySelector('[data-panel=answers]')
-      .getBoundingClientRect(); return r.top >= -2 && r.top < innerHeight / 2; }""")
-    assert page.errors == []
-
-
-@pytest.mark.dashboard
-def test_empty_topics_fold_and_import_carries_the_topic(live, page):
-    base, root = live["base"], live["root"]
-    bank = eb.bank_dir(root / "exam") / "mathematics_statistics.jsonl"
-    kept = bank.read_bytes()
-    bank.unlink()
-    try:
-        page.goto(base + "/#tab=loop")
-        fold = page.locator("tr[data-empty-topics]")
-        fold.wait_for()
-        assert "Mathematics & Statistics" in fold.text_content()
-        assert page.locator("tr[data-loop-row='mathematics_statistics']").count() == 0
-        fold.locator("[data-show-empty]").click()
-        row = page.locator("tr[data-loop-row='mathematics_statistics']")
-        row.wait_for()
-        # Import a bank on the mathematics row: the import panel, mathematics
-        # chosen, the file picker focused
-        row.locator("button[data-step='import']").click()
-        page.wait_for_selector("[data-panel='import']")
-        assert choice(page.locator("[data-panel='import'] [aria-label='topic']")) \
-            == "Mathematics & Statistics"
-        page.wait_for_function("document.activeElement && document.activeElement.type === 'file'")
-        assert page.errors == []
-    finally:
-        bank.write_bytes(kept)
 
 
 @pytest.mark.dashboard

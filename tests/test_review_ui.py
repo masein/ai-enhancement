@@ -167,16 +167,14 @@ E2E_MS = 90000
 
 def test_review_flow_in_the_browser(live, page):
     base = live["base"]
-    # the LLM card says what is configured and what today has cost
-    page.goto(base + "/#tab=review")
-    page.wait_for_selector(".card h2:has-text('Review')")
-    # the AI's line fills in when the service answers
+    # the AI's line says what is configured and what today has cost — 12g.1:
+    # at the top of Improve's pipeline for one model
+    page.goto(base + "/#tab=improve&sub=model&model=fx%2Fgood-750m")
+    page.wait_for_selector("[data-pipeline='fx/good-750m']")
     page.wait_for_function("document.querySelector('#view').textContent.includes('fake/fake-1')")
-    # 11j: with nothing waiting it opens on Datasets, and every view is empty
-    assert page.locator("[data-rv-view='datasets'][aria-selected='true']").count() == 1
-    assert [b.text_content() for b in page.locator("[data-rv-view]").all()] == [
-        "To review (0)", "Ready to generate (0)", "Datasets (0)", "History (0)"]
-    assert "No datasets yet" in page.locator("#view").text_content()
+    # with nothing made yet, each stage is one line
+    assert page.locator("[data-stage-none='proposals']").inner_text() == "No proposals waiting"
+    assert page.locator("[data-stage-none='data']").inner_text() == "No training data yet"
     # a name, once, in the header: every decision on the page records it
     set_name(page, "Omar")
 
@@ -189,14 +187,14 @@ def test_review_flow_in_the_browser(live, page):
     dlg.locator("[data-dialog-go]").click()
     page.wait_for_selector("[data-toast='propose']", timeout=E2E_MS)
     assert "Proposal #" in page.locator("[data-toast='propose']").text_content()
-    # 11j: the tab lists it in To review, and it opens as a card in the sheet
-    page.goto(base + "/#tab=review")
-    page.wait_for_selector("[data-review-head]")
-    row = page.locator("[data-rv-row]").first
+    # 12g.1: the pipeline lists it in Proposals, and it opens as a card in the sheet
+    page.goto(base + "/#tab=improve&sub=model&model=fx%2Fgood-750m")
+    page.wait_for_selector("[data-pipeline='fx/good-750m']")
+    row = page.locator("[data-stage='proposals'] [data-prop]").first
     row.wait_for(timeout=E2E_MS)
-    pid = row.get_attribute("data-rv-row")
-    assert row.locator("td").first.text_content() == "Economics"
-    row.locator("[data-rv-open]").click()
+    pid = row.get_attribute("data-prop")
+    assert row.locator(".si-main").inner_text().startswith("Economics")
+    row.locator("[data-prop-act]").click()
     page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
     card = page.locator("#reader")
     page.wait_for_selector(f"[data-spec-edit='{pid}']", timeout=E2E_MS)
@@ -224,13 +222,13 @@ def test_review_flow_in_the_browser(live, page):
     # generate
     page.locator("#reader input[type=number]").fill("20")
     card.locator(f"[data-generate='{pid}']").click()
-    # 11m: generating closes the card and lands on the Datasets view, on the
-    # row being written
+    # 11m: generating closes the card and lands on the dataset being written —
+    # 12g.1: in the pipeline's Training data
     page.wait_for_selector("#reader", state="detached", timeout=E2E_MS)
-    assert "view=datasets" in page.evaluate("location.hash")
-    ds = page.locator("[data-ds-row]").first
+    assert page.evaluate("location.hash").startswith("#tab=improve&sub=model")
+    ds = page.locator("[data-ds-item]").first
     ds.wait_for(timeout=E2E_MS)
-    did_attr = ds.get_attribute("data-ds-row")
+    did_attr = ds.get_attribute("data-ds-item")
     page.wait_for_function("id => document.querySelector(`[data-doc-line='${id}']`)"
                            ".textContent === '20 of 20'", arg=did_attr, timeout=E2E_MS)
     # 11g: Read opens it in the page; the download is in the row's ⋯ menu, and
@@ -278,15 +276,15 @@ def test_review_flow_in_the_browser(live, page):
     econ = page.locator("tr[data-topic='Economics']")
     assert "trained on it" in econ.locator(".badge.taint").text_content()
     assert "excluding Economics" in page.locator("#view").text_content()
-    # screenshots for the PR: the Review tab, light and dark, desktop and phone
+    # screenshots: Improve's pipeline, light and dark, desktop and phone
     SCREENS.mkdir(exist_ok=True)
     for scheme in ("light", "dark"):
         page.emulate_media(color_scheme=scheme)
         for width in (1240, 430):
             page.set_viewport_size({"width": width, "height": 900})
-            page.goto(base + "/#tab=review&view=datasets")
-            page.wait_for_selector("[data-ds-row]")
-            page.screenshot(path=SCREENS / f"review-{scheme}-{width}.png", full_page=True)
+            page.goto(base + "/#tab=improve&sub=model&model=fx%2Fgood-750m")
+            page.wait_for_selector("[data-ds-item]")
+            page.screenshot(path=SCREENS / f"improve-{scheme}-{width}.png", full_page=True)
             assert page.evaluate("document.documentElement.scrollWidth <= document.documentElement.clientWidth")
             # the model page, exam first, with the before/after on the rubric scale
             page.goto(base + "/#model=fx%2Fskewed-360m")
@@ -492,55 +490,6 @@ def law_under_its_draft_rubric(live):
         app._cache.update(key=None, payload=None, at=0.0)
 
 
-def test_the_loop_tab_is_one_row_per_topic_with_the_next_step(live, page):
-    """Phase 8e P6a: the loop, as a board. Every row says where the topic
-    stands and the one thing to do next — and a refusal says why in words."""
-    base = live["base"]
-    with law_under_its_draft_rubric(live):
-        page.goto(base + "/#tab=loop")
-        page.wait_for_selector("table.jd[data-loop-table] tbody tr")
-        # every topic in categories.yaml: a row for each of the 36 with
-        # questions, and Arts, delivered empty, named in the one folded row
-        assert page.locator("table.jd[data-loop-table] tbody tr[data-loop-row]").count() == 25
-        all_rows(page, "loop")                       # the shared pager, 25 a page (10c)
-        assert page.locator("table.jd[data-loop-table] tbody tr[data-loop-row]").count() == 36
-        fold = page.locator("table.jd[data-loop-table] tbody tr[data-empty-topics]")
-        assert fold.count() == 1 and "Arts" in fold.text_content()
-        med = page.locator("tr[data-loop-row='medicine_clinical_health']")
-        assert "medicine_clinical_health.md" in med.text_content()
-        assert "20 criteria" in med.text_content()
-        assert "/ 4" in med.text_content()                     # the last judged score
-        # a rubric its author has not signed off is stamped on the row that uses it
-        law = page.locator("tr[data-loop-row='law']")
-        assert "law.md" in law.text_content() and "DRAFT" in law.text_content()
-        # and its judged run is named once, above the board, not as a badge per row
-        # (9d: at most one warning badge on a row)
-        caveats = page.locator("[data-loop-caveats]").text_content()
-        assert "draft rubric" in caveats and "Law" in caveats
-        assert "draft rubric" not in law.text_content()
-    # no judge is configured in this fixture, so a topic nobody has sat says
-    # so on the button rather than offering it
-    assert page.locator("[data-loop-blocked]").count() == 1
-    sit = page.locator("button[data-step='sit']").first
-    if sit.count():
-        assert sit.is_disabled()
-    # the step for a judged topic is to propose — the same for everyone who
-    # looks — and the button opens the topic page, where Propose lives
-    btn = med.locator("button[data-step]")
-    assert btn.get_attribute("data-step") == "propose"
-    med.locator("a[data-read]").click()
-    page.wait_for_selector("[data-topic-page='medicine_clinical_health']")
-    assert "#topic=medicine_clinical_health" in page.url
-    SCREENS.mkdir(exist_ok=True)
-    page.goto(base + "/#tab=loop")
-    page.wait_for_selector("table.jd[data-loop-table] tbody tr")
-    page.screenshot(path=SCREENS / "loop-board.png", full_page=True)
-    page.goto(base + "/#topic=medicine_clinical_health")
-    page.wait_for_selector("[data-panel='answers'] [data-answers-table] [data-answer]")
-    page.screenshot(path=SCREENS / "loop-topic.png", full_page=True)
-    assert page.errors == []
-
-
 def test_the_topic_page_shows_the_answers_and_never_the_report_half(live, page):
     """The panel a person reads before proposing anything: the diagnosis half
     in full, the report half as one line and not one row."""
@@ -610,12 +559,15 @@ def test_the_places_are_named_once_and_their_address_says_so(live, page):
     labels = page.locator("#tabs > button[role=tab]").all_text_contents()
     assert labels == ["Home", "Models", "Improve", "Benchmarks"]
     assert page.locator("#moreBtn").count() == 0
-    for label, want in (("Loop", "improve&sub=topics"), ("Models", "models"),
+    # 12g.1: the Loop is Improve's pipeline, and its address names the model
+    for label, want in (("Loop", "improve&sub=model&model="), ("Models", "models"),
                         ("Queue", "runs"), ("Provenance", "data"),
                         ("Exam", "benchmarks&sub=exam")):
         go_tab(page, label)
         page.wait_for_selector("#view > *")
-        assert page.evaluate("location.hash") == f"#tab={want}", label
+        got = page.evaluate("location.hash")
+        assert got.startswith(f"#tab={want}") if want.endswith("=") else got == f"#tab={want}", \
+            label
     # the hashes people already pasted somewhere: the place they are in is lit
     for old, place in (("submit", None), ("evals", None), ("review", "Improve"),
                        ("loop", "Improve"), ("exam", "Benchmarks"), ("leaderboard", "Models")):
@@ -635,47 +587,13 @@ def test_the_places_are_named_once_and_their_address_says_so(live, page):
     assert page.errors == []
 
 
-def test_the_loop_tab_says_what_failed_instead_of_loading_forever(live, page):
-    """The live tree's /api/loop returned 500 and the board said 'Loading…'
-    until someone opened the console. Every other tab already had the 8c
-    error line; this one now does too."""
-    base = live["base"]
-    page.route("**/api/loop*", lambda route: route.fulfill(
-        status=500, content_type="application/json", body='{"detail":"boom"}'))
-    page.goto(base + "/#tab=loop")
-    page.wait_for_selector("[data-loop-failed]", timeout=20000)
-    line = page.locator("[data-loop-failed]").text_content()
-    assert "Not reaching the service." in line
-    assert "api/loop — HTTP 500" in line
-    assert "Retrying" in line and "backing off" in line
-    assert "Nothing has loaded yet." in line
-    assert "Loading…" not in page.locator("#view").text_content()
-    # and when the service comes back, the board does
-    page.unroute("**/api/loop*")
-    page.wait_for_selector("table.jd[data-loop-table] tbody tr", timeout=60000)
-    assert page.locator("[data-loop-failed]").count() == 0
-    # the 500 we injected is the only thing the console should have to say
-    assert all("500" in e for e in page.errors), page.errors
-
-
-def test_a_topic_on_the_shared_rubric_says_so_on_both_boards(live, page, arts_without_rubric):
+def test_a_topic_on_the_shared_rubric_says_so_on_the_exam_board(live, page, arts_without_rubric):
     """Thirteen topics had no rubric of their own; of the 37 none has now, so
     this one takes Arts' files out of the repo copy the judge reads — and the
     page says which file grades it rather than implying each has one. The
-    fixture leaves Arts without questions, so on both boards its row is behind
-    the empty-topics fold."""
+    fixture leaves Arts without questions, so its row is behind the
+    empty-topics fold. (12g.1: the By topic board that also said it is gone.)"""
     base = live["base"]
-    page.goto(base + "/#tab=loop")
-    page.wait_for_selector("table.jd[data-loop-table] tbody tr")
-    page.locator("tr[data-empty-topics] [data-show-empty]").click()
-    arts = page.locator("tr[data-loop-row='arts']")
-    arts.wait_for()
-    assert arts.locator("[data-fallback]").count() == 1
-    assert "shared rubric" in arts.text_content()
-    assert "exam.md" in arts.locator("[data-fallback]").get_attribute("title")
-    assert page.locator("tr[data-loop-row='law'] [data-fallback]").count() == 0
-    # every other topic is graded by its own
-    assert page.locator("tr[data-loop-row] [data-fallback]").count() == 1
     page.goto(base + "/#tab=exam")
     page.wait_for_selector("[data-panel='rubrics'] tr[data-rubric-row]")
     page.locator("[data-panel='rubrics'] tr[data-empty-topics] [data-show-empty]").click()
@@ -760,8 +678,8 @@ def test_typing_survives_the_poll(live, page):
     must not lose it, or the caret, or the field — and the name must still be
     there on the next page they open, and after a reload."""
     base = live["base"]
-    page.goto(base + "/#tab=loop")
-    page.wait_for_selector("table.jd[data-loop-table] tbody tr")
+    page.goto(base + "/#tab=improve&sub=model&model=fx%2Fgood-750m")
+    page.wait_for_selector("[data-stages]")
     # 11b: the name is one control in the sticky bar, and its box is the
     # popover's — a poll rebuilds the button, never the open panel
     page.locator("#who button[data-who]").click()
@@ -786,14 +704,15 @@ def test_typing_survives_the_poll(live, page):
     assert page.errors == []
 
 
-def test_the_loop_board_does_not_rebuild_itself_when_nothing_moved(live, page):
+def test_the_pipeline_does_not_rebuild_itself_when_nothing_moved(live, page):
     """The same fix as the tab bar's: a poll that changes nothing must not
-    hand the person a new DOM. A reference taken to a row survives."""
+    hand the person a new DOM. A reference taken to a row survives. (12g.1:
+    Improve's pipeline, where the By topic board was.)"""
     base = live["base"]
-    page.goto(base + "/#tab=loop")
-    page.wait_for_selector("table.jd[data-loop-table] tbody tr")
-    row = page.locator("tr[data-loop-row='law']")
-    page.evaluate("document.querySelector(\"tr[data-loop-row='law']\").dataset.marked = 'yes'")
+    page.goto(base + "/#tab=improve&sub=model&model=fx%2Fgood-750m")
+    page.wait_for_selector("[data-stage='weak'] [data-weak]")
+    row = page.locator("[data-stage='weak'] [data-weak]").first
+    page.evaluate("document.querySelector(\"[data-stage='weak'] [data-weak]\").dataset.marked = 'yes'")
     page.wait_for_timeout(6500)
     assert row.get_attribute("data-marked") == "yes"     # the same node, two polls later
     assert page.errors == []

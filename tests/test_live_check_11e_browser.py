@@ -95,7 +95,7 @@ def test_the_plan_is_shown_before_approve_and_approve_freezes_it(live, page):
         # 11j: the proposal opens as a card in the reader's sheet. The name
         # goes in first — the sheet covers the header while it is open
         page.goto(base + "/#tab=review")
-        page.wait_for_selector("[data-review-head]")
+        page.wait_for_selector("[data-stages]")      # 12g.1: the pipeline
         set_name(page, "Omar")
         page.goto(base + f"/#tab=review&read=proposal:{pid}")
         page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
@@ -132,7 +132,7 @@ def test_unticking_spread_approves_a_plan_with_no_focus(live, page):
                                            "requested_by": "Omar"})["id"]
         wait_proposed(page, base, pid)
         page.goto(base + "/#tab=review")
-        page.wait_for_selector("[data-review-head]")
+        page.wait_for_selector("[data-stages]")      # 12g.1: the pipeline
         set_name(page, "Omar")
         page.goto(base + f"/#tab=review&read=proposal:{pid}")
         page.wait_for_selector("#reader[data-ready='1']", timeout=E2E_MS)
@@ -165,7 +165,7 @@ def test_every_tab_is_itself_at_its_centre_and_the_strip_never_scrolls(live, pag
     page.set_viewport_size({"width": width, "height": 900})
     page.goto(live["base"] + "/")
     page.wait_for_selector("#tabs [role='tab']")
-    page.wait_for_selector("#warnings summary[data-warn-summary]")
+    page.wait_for_selector("#warnings [data-warn-summary]")
     hits = page.evaluate("""() => [...document.querySelectorAll('#tabs [role="tab"], #moreBtn')]
       .map(t => { const r = t.getBoundingClientRect();
         const at = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
@@ -182,7 +182,7 @@ def test_every_tab_is_itself_at_its_centre_and_the_strip_never_scrolls(live, pag
         for b in parts[i + 1:]:
             assert not boxes_intersect(a, b), (a, b)
     # the pill is one button among the bar's buttons: the same height and type
-    pill = page.locator("#warnings summary[data-warn-summary]")
+    pill = page.locator("#warnings [data-warn-summary]")
     n = int(pill.get_attribute("data-warn-summary"))
     # 12b: the status dot — the count and nothing else
     assert pill.text_content().strip() == (str(n) if n else "")
@@ -200,7 +200,7 @@ def test_every_tab_is_itself_at_its_centre_and_the_strip_never_scrolls(live, pag
     assert len({json.dumps(y) for y in ys}) == 1, ys
     if width == 1512:
         shot(page, "11e-2-bar-1512-light.png", clip={"x": 0, "y": 0, "width": width, "height": 60})
-        page.locator("#warnings summary[data-warn-summary]").click()
+        page.locator("#warnings [data-warn-summary]").click()
         judged = page.locator("[data-checks-judged]")
         assert re.fullmatch(r"\d+ of \d+ (are|is) about the judged suite", judged.text_content().strip())
         shot(page, "11e-2-checks-open-1512-light.png")
@@ -436,7 +436,10 @@ def test_every_best_value_is_one_line(live, page, width):
     # 11h: the name line is 14px, weight 600
     assert look[0] == "14px" and look[1] == "ellipsis" and look[2].startswith("fx/")
     # the canary: two decimals — Judge steadiness is a line under the checks now
-    v = page.locator("#warnings [data-judge-steady]").text_content()
+    # (12g.1: in the checks' popover, open while it is read)
+    page.locator("#warnings [data-warn-summary]").click()
+    v = page.locator("#pop-checks [data-judge-steady]").text_content()
+    page.keyboard.press("Escape")
     for x in re.findall(r"(\d+\.\d+) from the (?:human marks|last run)", v):
         assert re.fullmatch(r"\d+\.\d\d", x), v
     if width == 1512:
@@ -472,7 +475,7 @@ def test_at_400px_the_header_is_one_line_and_the_places_are_one_menu(live, phone
     h = page.evaluate("document.getElementById('bar').getBoundingClientRect().height")
     assert h <= 64, h
     assert not page.locator("#tabs").is_visible()
-    for sel in ("#runs [data-runs]", "[data-test-model]", "#warnings summary", "#who button"):
+    for sel in ("#runs [data-runs]", "[data-test-model]", "#warnings [data-warn-summary]", "#who button"):
         assert page.locator(sel).first.is_visible(), sel
     menu = page.locator("#menuBtn")
     assert menu.is_visible() and menu.get_attribute("aria-expanded") == "false"

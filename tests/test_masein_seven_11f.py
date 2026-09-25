@@ -211,27 +211,25 @@ def test_the_bold_cells_are_exactly_the_z_tests_best_or_tied_set(live, page):
 # ---------------------------------------------------------------------------
 
 def test_a_new_page_starts_at_the_top_and_back_returns_to_where_you_were(live, page):
-    # 12b: rows no longer open in place, so the tall page is Improve ▸ By topic,
-    # thirty-six topics long, and its links open topic pages
+    # 12b: rows no longer open in place. 12g.1: the tall page with topic links
+    # is the Knowledge exam's rubrics table, 37 topics long (By topic is gone)
     page.set_viewport_size({"width": 1280, "height": 600})
-    page.goto(live["base"] + "/#tab=improve&sub=topics")
-    page.wait_for_selector("[data-loop-table] a[href^='#topic=']")
-    page.wait_for_function("document.documentElement.scrollHeight > 2200")
-    page.evaluate("window.scrollTo(0, 1500)")
+    page.goto(live["base"] + "/#tab=benchmarks&sub=exam")
+    page.wait_for_selector("[data-topic-link]")
+    # a link well down the page, brought to 300px from the top: clear of the
+    # sticky bar, so the click does not make the browser scroll first
+    y = page.evaluate("""() => { const a = [...document.querySelectorAll('[data-topic-link]')].pop();
+      return Math.round(a.getBoundingClientRect().top + scrollY - 300); }""")
+    assert y > 600, y
+    page.evaluate(f"window.scrollTo(0, {y})")
     page.wait_for_timeout(300)                            # the scroll is saved on the entry
-    # a link well clear of the sticky bar and the table's sticky header: a
-    # click on a covered one makes the browser scroll first
-    link = page.evaluate("""() => { const a = [...document.querySelectorAll("[data-loop-table] a[href^='#topic=']")]
-        .find(a => { const r = a.getBoundingClientRect(); return r.top > 220 && r.bottom < innerHeight - 40; });
-      return a && a.getAttribute('href'); }""")
-    assert link, "a topic link in view at 1,500px"
-    assert page.evaluate("Math.round(scrollY)") == 1500
-    page.locator(f"[data-loop-table] a[href='{link}']").first.click()
+    assert abs(page.evaluate("Math.round(scrollY)") - y) <= 2
+    page.locator("[data-topic-link]").last.click()
     page.wait_for_selector("[data-topic-back]")
     assert page.evaluate("Math.round(scrollY)") == 0
     page.go_back()
-    page.wait_for_selector("[data-loop-table] a[href^='#topic=']")
-    page.wait_for_function("Math.abs(scrollY - 1500) <= 50", timeout=5000)
+    page.wait_for_selector("[data-topic-link]")
+    page.wait_for_function(f"Math.abs(scrollY - {y}) <= 50", timeout=5000)
     assert page.errors == []
 
 
@@ -246,19 +244,6 @@ def test_a_sort_a_page_or_a_poll_does_not_move_the_scroll(live, page):
     assert page.evaluate("Math.round(scrollY)") == y
     page.evaluate("lbSet({ chip: 'commonsense' })")
     assert abs(page.evaluate("Math.round(scrollY)") - y) <= 2
-    assert page.errors == []
-
-
-def test_read_the_results_still_lands_on_its_section(live, page):
-    page.set_viewport_size({"width": 1280, "height": 800})
-    page.goto(live["base"] + "/#tab=loop")
-    link = page.locator("[data-read]").first
-    link.wait_for()
-    link.click()
-    page.wait_for_selector("[data-panel='answers']")
-    page.wait_for_function("""() => { const r = document.querySelector('[data-panel="answers"]')
-      .getBoundingClientRect(); return r.top >= 0 && r.top < innerHeight / 2; }""", timeout=8000)
-    assert page.evaluate("scrollY") > 0
     assert page.errors == []
 
 

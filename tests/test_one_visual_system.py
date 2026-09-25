@@ -9,7 +9,6 @@ import pytest
 
 from conftest import open_filters, open_submit
 
-from test_review_ui import law_under_its_draft_rubric
 
 pytestmark = pytest.mark.dashboard
 
@@ -82,16 +81,6 @@ def test_one_badge_three_tones_and_one_warning_per_row(live, page):
         return c; };
       return [probe('badge'), probe('badge warn'), probe('badge taint'), probe('badge danger')]; }""")
     assert tones[1] == tones[2] and tones[0] != tones[1] and tones[3] not in (tones[0], tones[1])
-    # the Loop board: what is true of every score is said once, above the board.
-    # Every rubric delivered with the 37 topics is signed off, so nothing would
-    # be: law is graded under its retired draft for this, as it was until then
-    with law_under_its_draft_rubric(live):
-        page.goto(live["base"] + "/#tab=loop")
-        page.wait_for_selector("table[data-loop-table] tbody tr")
-        rows = page.evaluate("""() => [...document.querySelectorAll('table[data-loop-table] tbody tr')]
-          .map(tr => tr.querySelectorAll('.badge.taint').length - tr.querySelectorAll('td:nth-child(3) .badge').length)""")
-        assert max(rows) <= 1
-        assert page.locator("[data-loop-caveats]").count() == 1
     assert page.errors == []
 
 
@@ -127,12 +116,14 @@ def test_an_empty_state_offers_what_fills_it(live, page):
 
 def test_loading_is_a_skeleton_not_a_word(live, page):
     import time
-    page.route("**/api/loop*", lambda route: (time.sleep(1.5), route.continue_())[1])
-    page.goto(live["base"] + "/#tab=loop")
-    page.wait_for_selector("[data-loading='loop'][aria-busy='true']", timeout=10000)
+    # 12g.1: Improve's pipeline, while its proposals and datasets are on the way
+    page.route("**/api/proposals*", lambda route: (time.sleep(1.5), route.continue_())[1])
+    page.goto(live["base"] + "/#tab=improve")
+    page.wait_for_selector("[data-loading='pipeline'][aria-busy='true']", timeout=10000)
     assert "Loading…" not in page.locator("#view").text_content()
-    page.wait_for_selector("table[data-loop-table] tbody tr", timeout=20000)
-    page.unroute("**/api/loop*")
+    assert page.locator("[data-stage-none]").count() == 0      # no "No proposals" meanwhile
+    page.wait_for_selector("[data-stages]", timeout=20000)
+    page.unroute("**/api/proposals*")
 
 
 def test_every_action_is_reachable_from_the_keyboard(live, page):

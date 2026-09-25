@@ -11,7 +11,7 @@ import urllib.request
 
 import pytest
 
-from conftest import choose, open_kind
+from conftest import open_kind
 
 pytestmark = pytest.mark.dashboard
 
@@ -87,22 +87,21 @@ def test_review_the_spec_lands_on_the_proposal_and_marks_it(live, page):
     llm_poller.tick()
     assert _get(base, f"/api/proposals/{pid}")["status"] == "proposed"
     page.set_viewport_size({"width": 1240, "height": 700})
-    page.goto(base + "/#tab=loop")
-    sel = page.locator("[aria-label='results for']")
-    sel.wait_for()
-    choose(sel, model)
-    btn = page.locator("tr[data-loop-row='economics'] button[data-step='review']")
+    # 12g.1: from the model's pipeline, where the proposal waits in Proposals
+    page.goto(base + "/#tab=improve&sub=model&model=" + model.replace("/", "%2F"))
+    btn = page.locator(f"[data-prop-act='{pid}']")
     btn.wait_for()
+    assert btn.inner_text() == "Review"
     btn.click()
-    # 11j: the step opens that proposal's own card in the reader's sheet, and
-    # says so in the address — no hunting for it among the others
+    # 11j: it opens that proposal's own card in the reader's sheet, and says
+    # so in the address — no hunting for it among the others
     page.wait_for_selector("#reader[data-ready='1']")
     assert page.locator("#reader").get_attribute("data-key") == f"proposal:{pid}"
     assert page.evaluate("location.hash").endswith(f"read=proposal:{pid}")
     assert f"#{pid}" in page.locator("#reader .rd-src").text_content()
     assert page.locator(f"[data-why-line='{pid}']").count() == 1
-    # Esc closes it and the tab is behind it, on To review
+    # Esc closes it and the pipeline is behind it
     page.keyboard.press("Escape")
     page.wait_for_selector("#reader", state="detached")
-    assert page.locator("[data-rv-view='review'][aria-selected='true']").count() == 1
+    assert page.locator(f"[data-pipeline='{model}'] ~ [data-pipeline-stages]").count() == 1
     assert page.errors == []

@@ -140,7 +140,11 @@ def test_homes_everyday_badge_is_one_line_with_room(live, page, width):
     card.wait_for()
     badge = card.locator("[data-pilot-badge]")
     assert badge.inner_text() == "not ranked · provisional judge"
-    box = badge.evaluate("""b => { const s = getComputedStyle(b), r = b.getBoundingClientRect(),
+    # found and measured in one step: Home redraws when the queue or the review
+    # lists arrive, and a badge found before a redraw measures as nothing after it
+    box = page.evaluate("""() => {
+      const b = document.querySelector("[data-best='everyday'] [data-pilot-badge]"),
+        s = getComputedStyle(b), r = b.getBoundingClientRect(),
         e = b.closest('.hcard').querySelector('.eyebrow').getBoundingClientRect(),
         v = b.closest('.hcard').querySelector('.hcard-v').getBoundingClientRect();
       return { lines: b.getClientRects().length, h: r.height,

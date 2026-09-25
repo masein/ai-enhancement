@@ -71,12 +71,13 @@ def reach_theme(page):
 
 
 def reach_topic(page):
-    place(page, "improve", "topics")
-    page.locator("[data-loop-table] a[href^='#topic=']").first.click()
+    # 12g.1: from the Knowledge exam's rubrics table — By topic is gone
+    place(page, "benchmarks", "exam")
+    page.locator("[data-topic-link]").first.click()
 
 
 def reach_status(page):
-    page.locator("#warnings summary[data-warn-summary]").click()
+    page.locator("#warnings [data-warn-summary]").click()
 
 
 def reach_facts(page):
@@ -108,8 +109,9 @@ CONTRACT = [
     ("Leaderboard ▸ About these benchmarks", lambda p: place(p, "benchmarks", "standard"),
      ".about"),
     ("Models tab (its facts)", reach_facts, "#pop-columns [data-column-group='facts']"),
-    ("Loop", lambda p: place(p, "improve", "topics"), "[data-loop-table]"),
-    ("More ▸ Review", lambda p: place(p, "improve", "review"), "[data-review-head] [data-rv-view]"),
+    # 12g.1: the Loop and Review are one pipeline for one model
+    ("Loop", lambda p: place(p, "improve", "model"), "[data-pipeline] ~ [data-pipeline-stages]"),
+    ("More ▸ Review", lambda p: place(p, "improve", "model"), "[data-stage='proposals']"),
     ("More ▸ Training", lambda p: place(p, "improve", "training"),
      "#view h2:text-is('Training runs')"),
     ("More ▸ Exam", lambda p: place(p, "benchmarks", "exam"), "[data-panel='rubrics']"),
@@ -123,7 +125,7 @@ CONTRACT = [
     ("Queue", reach_all_runs, "[data-all-runs]"),
     ("Queue ▸ Submit a model", reach_test, "[data-dialog='test'] [data-submit-form]"),
     ("#everyday", lambda p: place(p, "benchmarks", "everyday"), "[data-everyday-table]"),
-    ("7 checks ▾", reach_status, "#warnings .checklist [data-show-me]"),
+    ("7 checks ▾", reach_status, "#pop-checks .checklist [data-show-me]"),
     ("Theme ▾", reach_theme, "#pop-who [data-theme='dark']"),
     ("guide, the loop, How to read", lambda p: name_menu(p, "help"),
      "[data-help-guide], [data-how-to-read]"),
@@ -131,7 +133,7 @@ CONTRACT = [
      "[data-kind-block='standard'], [data-kind-block='exam']"),
     ("Model page: 04 Provenance · 05 Runs", reach_model_tab("history"),
      "[data-model-prov] ~ [data-model-graded]"),
-    ("Overview ▸ Judge steadiness", reach_status, "#warnings .checklist [data-judge-steady]"),
+    ("Overview ▸ Judge steadiness", reach_status, "#pop-checks .checklist [data-judge-steady]"),
 ]
 
 
@@ -165,10 +167,10 @@ OLD = [
     ("#tab=leaderboard&chip=math", "#tab=models&chip=math", "[data-chip='math'][aria-pressed='true']"),
     ("#tab=leaderboard&chip=judged", "#tab=models&view=exam",
      "[data-models-view='exam'][aria-selected='true']"),
-    ("#tab=loop", "#tab=improve&sub=topics", "[data-loop-table]"),
-    ("#tab=review", "#tab=improve&sub=review", "[data-review-head]"),
-    ("#tab=review&view=datasets", "#tab=improve&sub=review&view=datasets",
-     "[data-rv-view='datasets'][aria-selected='true']"),
+    # 12g.1: the pipeline, on the model with the most judged topics (a first visit)
+    ("#tab=loop", "#tab=improve&sub=model&model=", "[data-stages]"),
+    ("#tab=review", "#tab=improve&sub=model&model=", "[data-stages]"),
+    ("#tab=review&view=datasets", "#tab=improve&sub=model&model=", "[data-stages]"),
     ("#tab=training", "#tab=improve&sub=training", "#view h2:text-is('Training runs')"),
     ("#tab=queue", "#tab=runs", "[data-all-runs]"),
     ("#tab=submit", "#tab=runs", "[data-dialog='test'] [data-submit-form]"),
@@ -185,7 +187,9 @@ def test_every_old_address_lands(live, page, old, new, arrived):
     page.set_viewport_size({"width": 1512, "height": 1000})
     page.goto(live["base"] + "/" + old)
     page.locator(arrived).first.wait_for()
-    assert page.evaluate("location.hash") == new
+    got = page.evaluate("location.hash")
+    # an address ending "model=" is the pipeline's, followed by the model it opened on
+    assert got == new or (new.endswith("model=") and got.startswith(new) and len(got) > len(new))
     assert page.errors == []
 
 
@@ -230,7 +234,7 @@ def test_below_720_the_places_are_one_menu_and_the_bar_is_one_line(live, page, w
     assert menu.is_visible()
     boxes = [page.locator(s).bounding_box() for s in
              ("#menuBtn", "#runs [data-runs]", "[data-test-model]",
-              "#warnings summary[data-warn-summary]", "#who button.who")]
+              "#warnings [data-warn-summary]", "#who button.who")]
     assert all(b for b in boxes)
     mid = [b["y"] + b["height"] / 2 for b in boxes]
     assert max(mid) - min(mid) < 4                        # one line
@@ -243,8 +247,8 @@ def test_below_720_the_places_are_one_menu_and_the_bar_is_one_line(live, page, w
     who = page.locator("#who button.who").inner_text().strip()
     assert who == ("masein ▾" if width > 480 else "M ▾"), who
     menu.click()
-    page.locator("#pop-places [data-place-sub='review']").click()
-    page.wait_for_selector("[data-review-head]")
+    page.locator("#pop-places [data-place-sub='pipeline']").click()
+    page.wait_for_selector("[data-stages]")
     shot(page, f"12b-header-{width}-light.png", clip={"x": 0, "y": 0, "width": width, "height": 60})
     assert page.errors == []
 
@@ -252,7 +256,7 @@ def test_below_720_the_places_are_one_menu_and_the_bar_is_one_line(live, page, w
 def test_the_status_dot_is_green_alone_or_amber_with_a_count(live, page):
     home(page, live["base"])
     page.evaluate("DATA.checks = []; _warnSig = null; renderWarnings();")
-    dot = page.locator("#warnings summary[data-warn-summary]")
+    dot = page.locator("#warnings [data-warn-summary]")
     assert dot.get_attribute("data-warn-summary") == "0"
     assert dot.text_content().strip() == ""
     assert dot.locator(".dot.ok").count() == 1
@@ -261,7 +265,7 @@ def test_the_status_dot_is_green_alone_or_amber_with_a_count(live, page):
     page.evaluate("DATA.checks = [{key: 'a', severity: 'info', short: 'first', text: 'x', show: null},"
                   " {key: 'b', severity: 'warning', short: 'second', text: 'y', show: null}];"
                   " _warnSig = null; renderWarnings();")
-    dot = page.locator("#warnings summary[data-warn-summary]")
+    dot = page.locator("#warnings [data-warn-summary]")
     assert dot.text_content().strip() == "2"
     assert dot.locator(".dot.warn").count() == 1
     assert page.errors == []

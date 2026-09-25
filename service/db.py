@@ -173,6 +173,14 @@ CREATE TABLE IF NOT EXISTS repairs (
   ran_at      REAL NOT NULL,
   result      TEXT DEFAULT ''
 );
+-- 12g.1: what a checkpoint was trained from, as a person set it. A training
+-- run that recorded its base fills the gap when no person has (app.bases_for)
+CREATE TABLE IF NOT EXISTS trained_from (
+  model       TEXT PRIMARY KEY,
+  base        TEXT NOT NULL,
+  set_by      TEXT NOT NULL,
+  set_at      REAL NOT NULL
+);
 -- 12h.2: a Models table someone built — its benchmarks, its models — named
 -- and kept for the whole team. Only the name that saved it renames or deletes it
 CREATE TABLE IF NOT EXISTS views (
@@ -707,13 +715,51 @@ def taint_links() -> list[dict]:
 
 
 def taint_stamp() -> tuple:
-    """Changes whenever the taint join could: a cache key for the payload."""
+    """Changes whenever the taint join could — or what a checkpoint was
+    trained from (12g.1): a cache key for the payload."""
     with closing(_conn()) as c:
-        a = c.execute("SELECT COUNT(*), COALESCE(MAX(updated_at), 0) FROM truns "
-                      "WHERE datasets IS NOT NULL AND datasets != '[]'").fetchone()
+        a = c.execute("SELECT COUNT(*), COALESCE(MAX(updated_at), 0) FROM truns").fetchone()
         b = c.execute("SELECT COUNT(*) FROM tevents").fetchone()
         d = c.execute("SELECT COUNT(*), COALESCE(MAX(finished_at), 0) FROM datasets").fetchone()
-    return (a[0], a[1], b[0], d[0], d[1])
+        f = c.execute("SELECT COUNT(*), COALESCE(MAX(set_at), 0) FROM trained_from").fetchone()
+    return (a[0], a[1], b[0], d[0], d[1], f[0], f[1])
+
+
+def trun_bases() -> list[dict]:
+    """12g.1: every training run that recorded what it started from — its
+    `parent`, else its config's base_model — with the checkpoint ids it logged
+    and its hf_prefix, oldest first. Runs with or without a dataset."""
+    out = []
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT id, hf_prefix, parent, config FROM truns ORDER BY id").fetchall()
+        for rid, prefix, parent, cfg in rows:
+            if not parent:
+                try:
+                    parent = str(json.loads(cfg or "{}").get("base_model") or "")
+                except (ValueError, TypeError, AttributeError):
+                    parent = ""
+            if not parent:
+                continue
+            ckpts = [r[0] for r in c.execute(
+                "SELECT DISTINCT detail FROM tevents WHERE run_id=? AND kind='checkpoint' "
+                "AND detail != ''", (rid,)).fetchall()]
+            out.append({"run_id": rid, "hf_prefix": prefix or "", "checkpoints": ckpts,
+                        "parent": parent})
+    return out
+
+
+def trained_from_all() -> dict[str, dict]:
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT model, base, set_by, set_at FROM trained_from").fetchall()
+    return {m: {"base": b, "by": by, "at": at} for m, b, by, at in rows}
+
+
+def trained_from_set(model: str, base: str, by: str) -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO trained_from (model, base, set_by, set_at) VALUES (?,?,?,?) "
+                  "ON CONFLICT(model) DO UPDATE SET base=excluded.base, set_by=excluded.set_by, "
+                  "set_at=excluded.set_at", (model, base, by, time.time()))
+        c.commit()
 
 
 # ---------------------------------------------------------------------------

@@ -358,15 +358,8 @@ def test_every_way_in_opens_the_panel_on_the_model_page(live, page, judged_on):
     page.locator(f"[data-sit-open='{MODEL}']").click()
     page.wait_for_selector("[data-panel='msit']")
     assert page.evaluate("state.model") == MODEL
-    # (the Overview's loop card went with 12b.2's Home; the Loop tab's stays)
-    # the Loop tab, beside "Results for"
-    page.goto(base + "/#tab=loop")
-    btn = page.locator("[data-loop-sit]")
-    btn.wait_for()
-    who = btn.get_attribute("data-loop-sit")
-    btn.click()
-    page.wait_for_selector("[data-panel='msit']")
-    assert page.evaluate("state.model") == who
+    # (the Overview's loop card went with 12b.2's Home, and 12g.1 made the
+    # Loop tab Improve's pipeline: the model page is the way in)
     # ✕ closes it; the hero's button opens it again
     page.locator("[data-msit-close]").click()
     assert page.locator("[data-panel='msit']").count() == 0
