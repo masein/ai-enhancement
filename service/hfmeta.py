@@ -30,7 +30,7 @@ import re
 import struct
 from pathlib import Path
 
-from . import config
+from . import catalog, config
 
 
 class PreflightError(Exception):
@@ -256,6 +256,28 @@ def _template_id(text: str | None, src: str | None) -> dict:
     return out
 
 
+def native_architecture(model_type: str | None) -> bool:
+    """12h.1: does the installed transformers have this architecture built in?
+    Then a repo's own copy of it never has to run: transformers loads its own
+    class and ignores the repo's auto_map while trust_remote_code is off.
+    False where transformers is not installed (the local check)."""
+    if not model_type:
+        return False
+    try:
+        from transformers.models.auto.configuration_auto import CONFIG_MAPPING_NAMES
+    except ImportError:
+        return False
+    return model_type in CONFIG_MAPPING_NAMES
+
+
+def _thinking(hf_id: str, tmpl: str | None) -> dict:
+    """12h.1: how the model thinks (service/catalog.py), for the runner and
+    the page: its mode, which way it defaults, where its thinking ends"""
+    t = catalog.thinking_of(hf_id, tmpl)
+    return {"thinking": t["mode"], "thinking_default_on": t["default_on"],
+            "think_end": t["think_end"]}
+
+
 def reasoning_template(text: str | None) -> bool:
     """A chat template that opens a reasoning block, or offers the switch
     that turns one on. The tags are the judge's own list, so the one setting
@@ -387,6 +409,7 @@ def _preflight_local(name: str, allow_remote_code: bool = False) -> dict:
             "architectures": cfg.get("architectures") or [],
             "archinfo": {**_arch_from_config(cfg),
                          **_template_id(tmpl, tmpl_src if tmpl else None),
+                         **_thinking(LOCAL_PREFIX + name, tmpl),
                          **_moe_params(cfg, params),
                          # the dtype the WEIGHTS are stored in, which is not the
                          # dtype we evaluate in — transformers loads a checkpoint
@@ -456,16 +479,35 @@ def _preflight(hf_id: str, allow_remote_code: bool = False) -> dict:
     if not cfg:
         raise PreflightError(f"{hf_id} has no readable config.json — not a loadable "
                              f"transformers checkpoint.")
+    remote_code, revision, own = False, None, "none"
     if cfg.get("auto_map"):
         # Hub repos stay refused even when remote code is enabled: the gate is
         # "a teammate uploaded this to our box", and a Hub id carries no such
         # signal — anyone could point us at any repo. Upload it as an artifact.
-        raise PreflightError(
-            f"{hf_id} requires trust_remote_code=True (custom modeling code in the "
-            f"repo). Code from the Hub is never executed here, whatever the "
-            f"server settings. If this is your model, upload it as an artifact "
-            f"(POST /api/artifacts/<name>) and submit it with "
-            f"allow_remote_code=true.")
+        # 12h.1, two ways past it, neither of which runs code nobody read:
+        if native_architecture(cfg.get("model_type")):
+            # transformers has the architecture built in: its own class loads
+            # it, and the repo's code is never imported
+            own = "built in"
+        else:
+            # the approved list (service/approved_code.json): this repo's own
+            # code, at the one commit a person read, in the same sandbox as an
+            # uploaded model's
+            ok, why, revision = catalog.approved_code(hf_id)
+            if not ok:
+                raise PreflightError(why)
+            blocked = config.remote_code_blocked()
+            if blocked:
+                raise PreflightError(
+                    f"{hf_id} is on the approved list at commit {revision[:12]}, but this "
+                    f"server does not run model code: {blocked}.")
+            remote_code, own = True, "approved"
+            try:
+                cfg = json.loads(Path(hf_hub_download(hf_id, "config.json",
+                                                      revision=revision)).read_text())
+            except (EntryNotFoundError, OSError, json.JSONDecodeError) as e:
+                raise PreflightError(f"{hf_id} has no readable config.json at the approved "
+                                     f"commit {revision[:12]}.") from e
 
     # vocab_size sometimes lives under text_config for multimodal wrappers
     vocab = cfg.get("vocab_size") or (cfg.get("text_config") or {}).get("vocab_size")
@@ -500,6 +542,12 @@ def _preflight(hf_id: str, allow_remote_code: bool = False) -> dict:
         "kind_detected": "instruct" if tmpl else "base",
         "has_template": bool(tmpl),
         "architectures": cfg.get("architectures") or [],
+        # 12h.1: the approved list's commit, run with its own code
+        "remote_code": remote_code,
+        "revision": revision,
         "archinfo": {**_arch_from_config(cfg),
-                     **_template_id(tmpl, tmpl_src if tmpl else None)},
+                     **_template_id(tmpl, tmpl_src if tmpl else None),
+                     **_thinking(hf_id, tmpl),
+                     "model_type": cfg.get("model_type"),
+                     "own_code": own, "revision": revision},
     }

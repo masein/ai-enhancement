@@ -109,6 +109,9 @@ NFEWSHOT = {
     "mmlu": 5, "hellaswag": 5, "arc_challenge": 5, "arc_easy": 5,
     "winogrande": 5, "piqa": 0, "truthfulqa_mc2": 0, "gsm8k": 5,
     "mmlu_perm": 5,          # the control poses MMLU exactly as mmlu does, shots included
+    # 12h.1: MMLU-Pro is 5-shot chain of thought, as the harness and its
+    # published numbers pose it; IFEval and MATH-500 are asked once, cold
+    "ifeval": 0, "mmlu_pro": 5, "hendrycks_math500": 0,
 }
 FULL_TASKS = ["mmlu", "hellaswag", "arc_challenge", "arc_easy",
               "winogrande", "piqa", "truthfulqa_mc2", "gsm8k"]
@@ -278,9 +281,34 @@ def discovered_ppl_tasks() -> list[str]:
     return sorted(y.stem for y in EVAL_TASKS_DIR.glob("*.yaml"))
 
 
+# 12h.1: three benchmarks that generate text, for instruct models only: they
+# are asked through the chat template and scored on what the model writes
+# (scripts/generative.py reads the answers). A suite of their own — MMLU-Pro
+# alone is 12,032 chain-of-thought answers, hours where the Standard tasks
+# take minutes — and never in the official average: a base model cannot be
+# scored on them fairly
+GEN_TASKS = ["ifeval", "mmlu_pro", "hendrycks_math500"]
+# the answer budget: thinking off, and on
+GEN_MAX_GEN_TOKS = int(os.environ.get("GEN_MAX_GEN_TOKS", "2048"))
+GEN_THINKING_MAX_GEN_TOKS = int(os.environ.get("GEN_THINKING_MAX_GEN_TOKS", "8192"))
+# vllm where the model loads in it (much faster at generating), else hf; "hf"
+# forces the harness's own loader, "vllm" refuses to fall back
+GEN_BACKEND = os.environ.get("GEN_BACKEND", "auto").strip().lower()
+# MMLU-Pro's test split, per subject — what a seeded subset is drawn from.
+# Only a full run is comparable to published numbers; a subset says so
+MMLU_PRO_SUBJECTS = {
+    "biology": 717, "business": 789, "chemistry": 1132, "computer_science": 410,
+    "economics": 844, "engineering": 969, "health": 818, "history": 381, "law": 1101,
+    "math": 1351, "other": 924, "philosophy": 499, "physics": 1299, "psychology": 798}
+GEN_SUBSET_SEED = 1234
+GEN_INSTRUCT_ONLY = ("IFEval, MMLU-Pro and MATH-500 are asked through the chat template and "
+                     "scored on what the model writes, so only an instruct model can sit them "
+                     "fairly — this one runs as a base model (it has no chat template, or "
+                     "was submitted as base)")
+
 # every suite a run can ask for; scripts/check_tasks.py (deploy step 4) asks
 # the installed lm_eval to find every task of each
-SUITES = ("quick", "full", "control", "judged", "everyday")
+SUITES = ("quick", "full", "control", "judged", "everyday", "generative")
 
 
 def tasks_for_suite(suite: str) -> list[str]:
@@ -288,6 +316,8 @@ def tasks_for_suite(suite: str) -> list[str]:
         return list(CONTROL_TASKS)
     if suite == "everyday":
         return [EVERYDAY_TASK]
+    if suite == "generative":
+        return list(GEN_TASKS)
     if suite == "judged":
         return judged_tasks()
     base = QUICK_TASKS if suite == "quick" else FULL_TASKS

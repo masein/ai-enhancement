@@ -322,6 +322,50 @@ Step 4, the task-discovery check inside the container:
 sudo docker compose exec -T bench python scripts/check_tasks.py 2>&1 | tail -15
 ```
 
+**Before a full run of IFEval, MMLU-Pro or MATH-500 (12h.1).** Four trials
+inside the container. They hold the GPU lock and write only to a temporary
+folder.
+- **Trials 1–3** ask a few items of the three exactly as a run does. They
+  print, per item, what the model wrote, what the board read, the correct
+  answer and the verdict, then seconds per item and the time a full
+  MMLU-Pro run would take.
+- **Trial 4** reruns the quick Standard suite on one model already on the
+  board, beside its numbers there. It checks that the old tasks still load
+  and score the same on transformers 5.5.3. A queued run can't do this,
+  because it skips every task it already has.
+
+Trial 1, extraction works: 20 items per benchmark, one model:
+
+```bash
+sudo docker compose exec -T bench python scripts/trial_generative.py --model Qwen/Qwen3-1.7B --limit 20 2>&1 | tail -60
+```
+
+Trial 2, a new model loads, and its full-run estimate:
+
+```bash
+sudo docker compose exec -T bench python scripts/trial_generative.py --model Qwen/Qwen3.5-2B --limit 5 2>&1 | tail -30
+```
+
+Trial 3, Youtu-LLM-2B loads on transformers 5.5.3's own Youtu class (its
+repo ships no code):
+
+```bash
+sudo docker compose exec -T bench python scripts/trial_generative.py --model tencent/Youtu-LLM-2B --limit 5 2>&1 | tail -30
+```
+
+Trial 4, the Standard tasks on transformers 5.5.3: HellaSwag and ARC-Easy,
+whole, on SmolLM2-135M-Instruct, each printed beside the board's number and
+whether the difference is inside the noise:
+
+```bash
+sudo docker compose exec -T bench python scripts/trial_standard.py --model HuggingFaceTB/SmolLM2-135M-Instruct 2>&1 | tail -12
+```
+
+Expected: one line per task, for example "hellaswag · acc_norm 0.4312 ±
+0.0049 · board 0.4309 ± 0.0049 · +0.0003, inside the noise", then "trial
+OK: every task ran". A difference past the noise comes from the image
+change. Send it before anything else is queued.
+
 **Step 3's expected output:** the last line reads `N passed, M deselected
 in …s`, with no `failed` and no `error`.
 - `test_matches_the_installed_harness` skips on a laptop, where lm_eval isn't
@@ -2170,6 +2214,83 @@ drove it.
   has a line of its own under the heading, with equal room above and below.
 - **Run everyday tasks** ticks all five instruct models, SmolLM2-135M-Instruct
   among them.
+
+### 12h.1 — IFEval, MMLU-Pro, MATH-500, and nine small instruct models
+
+`docs/prompts/phase-12h-instruct-benchmarks-and-custom-table.md`, part one.
+No model ran on the Mac: the answer-reading layer is tested on saved chat
+answers (`tests/fixtures/generative_answers.jsonl`), and every real load
+happens on the server, first with `scripts/trial_generative.py` (§ 5b).
+
+- **The tasks.** `ifeval`, `mmlu_pro` and `hendrycks_math500` are all in
+  lm_eval 0.4.12 (MATH-500 is `hendrycks_math/hendrycks_math500.yaml`), so no
+  newer lm_eval was needed.
+  - They are the suite `generative`, shown as **Instruction & maths**:
+    instruct models only, asked through the chat template, and never in any
+    average.
+  - MMLU-Pro is 5-shot chain of thought, as the harness and published
+    numbers pose it. IFEval and MATH-500 are asked with no examples.
+- **Reading the answers** (`scripts/generative.py`). lm_eval's MMLU-Pro
+  regex wants "answer is (X)", and its MATH scorer compares strings, which
+  scores chat models 0.
+  - **MMLU-Pro:** the letter A–J the answer settles on. That covers "answer
+    is (C)", "Answer: C", "**C**", "I think it's C", a line opening "(C)", or
+    the one option named in full.
+  - **MATH-500:** the final answer, meaning the last `\boxed{}`, else the
+    stated answer, else the last number. It is compared with math-verify, so
+    `\frac{1}{2}` and 0.5 are one answer.
+  - **IFEval:** lm_eval's own checker, whose per-answer verdicts are read
+    after any thinking (`think_end_token`).
+  - **Every task** counts the answers that ran out of room.
+  - It writes `generative.json` beside the results. The report takes
+    MMLU-Pro's and MATH-500's scores from it, and each column's tooltip
+    names the scorer.
+- **Thinking** is part of the result (`service/catalog.py`).
+  - **Off by default** for every model that has a switch
+    (`enable_thinking=False`, said out loud, because Qwen3, Youtu and
+    Nemotron think unless told not to).
+  - **A model with no switch** (Nanbeige4.1) thinks, and its row says
+    "thinking".
+  - **A "Think before answering" run** is a row of its own,
+    "Qwen3.5-2B · thinking": its answers live in `<model>__thinking/`, and
+    nothing averages the two rows.
+  - **The budget** is 2,048 tokens per answer with thinking off, 8,192 with
+    it on.
+- **Backend: hf.** The image has no vLLM (masein, 2026-09-25).
+  - vLLM 0.26.0 has no CUDA 12.8 build, and this image's torch is cu128.
+  - It would also move FastAPI below 0.137, away from the version the check
+    tests the service on.
+  - If the trials show hf is too slow for MMLU-Pro, vLLM gets a container of
+    its own, in its own brief.
+  - The runner's vLLM path stays: it runs only when vLLM can be imported,
+    which it can't here, so every run says "on hf". `GEN_BACKEND=hf` forces
+    hf regardless.
+  - `mamba_ssm` and `causal-conv1d` are tried at build and never required
+    (`WITH_MAMBA=0` skips them).
+- **A seeded MMLU-Pro subset** (the submit form's "MMLU-Pro subset") is off
+  by default. It draws items from each subject in its share of the 12,032,
+  with seed 1234, and the board marks the cell "subset". Only a full run is
+  comparable to published numbers.
+- **transformers is pinned to 5.5.3**, where it was `>=4.55`. It is the
+  first version with all nine architectures built in (qwen3_5, gemma4,
+  lfm2, granitemoehybrid, nemotron_h, youtu, llama), and the first vLLM
+  0.26 accepts.
+  - Youtu-LLM-2B's card asks for 4.56–4.57.1, but its repo (commit 8b0e735)
+    was saved with 5.0.0.dev0, ships no code, and 5.5.3 has `youtu` built
+    in. So no second environment is needed.
+- **Own code.** `service/approved_code.json` lists repos whose own model code
+  may run, at one pinned commit each; any other commit is refused.
+  - A Hub repo with an `auto_map` whose architecture the installed
+    transformers has built in loads with transformers' own class, so its
+    code never runs.
+  - Otherwise it runs only from the list, in the uploaded-model sandbox.
+  - Otherwise it gets today's refusal.
+  - The list holds Nemotron-3-Nano-4B at dfaf35d, as the fallback if the
+    built-in `nemotron_h` can't load it.
+  - Youtu-LLM-2B and Nanbeige4.1-3B ship no code, so they are not on it.
+- **Published numbers** (the brief's table) are in the columns' tooltips. A
+  score of ours more than 15 points below one is flagged on its cell: *far
+  below published, check extraction*.
 
 ## 11. Known gaps, risks, loose ends
 

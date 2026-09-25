@@ -709,6 +709,10 @@ def parse_run(blob: dict, source: Path) -> dict:
     la = re.search(r"/artifacts/([^/,\s]+)/?$", model)
     if la:
         model = "local/" + la.group(1)
+    # 12h.1: a thinking-on run of a model that can turn it off is a row of its
+    # own, never averaged with the thinking-off one
+    if re.search(r"enable_thinking=True", str(model_args)):
+        model += " · thinking"
 
     tasks: dict[str, dict] = {}
     for task, metrics in (blob.get("results") or {}).items():
@@ -741,6 +745,15 @@ def parse_run(blob: dict, source: Path) -> dict:
                 bucket[slot] = float(val)
                 bucket[f"_filt_{slot}"] = filt
         tasks[task] = entry
+
+    # 12h.1: MMLU-Pro and MATH-500 as this board reads the answers
+    # (scripts/generative.py) — the harness's readers find one shape each
+    gen = _beside(source, "generative.json")
+    for t, g in ((gen or {}).get("tasks") or {}).items():
+        if t in ("mmlu_pro", "hendrycks_math500") and t in tasks and "acc" in g:
+            tasks[t]["exact_match"] = {"value": float(g["acc"]),
+                                       "stderr": float(g.get("stderr") or 0.0),
+                                       "_filt_value": "board"}
 
     n_samples = {k: (v.get("effective") if isinstance(v, dict) else v)
                  for k, v in (blob.get("n-samples") or {}).items()}
@@ -803,6 +816,7 @@ def parse_run(blob: dict, source: Path) -> dict:
         # rubric scores from scripts/judge.py, same place and pattern as the diagnosis
         "judge": _beside(source, "judge.json"),
         "judge_mtime": _beside_mtime(source, "judge.json"),
+        "generative": gen,
         "tasks": tasks,
     }
 
@@ -845,8 +859,8 @@ def primary_metric(entry: dict) -> tuple[str, float, float] | None:
     code, bits_per_byte for perplexity corpora. The choice is recorded in the output
     so nobody has to guess which number they are looking at.
     """
-    for name in ("acc_norm", "acc", "exact_match", "pass@1", "f1", "em",
-                 "bits_per_byte", "byte_perplexity", "word_perplexity"):
+    for name in ("acc_norm", "acc", "exact_match", "prompt_level_strict_acc", "pass@1", "f1",
+                 "em", "bits_per_byte", "byte_perplexity", "word_perplexity"):
         d = entry.get(name)
         if isinstance(d, dict) and "value" in d:
             return name, d["value"], d.get("stderr", 0.0)
@@ -885,9 +899,13 @@ def significant(a: float, sa: float, b: float, sb: float, z: float = 1.96) -> tu
 # small-model chart. truthfulqa_mc2 has no clean chance level (multi-true, weighted),
 # and gsm8k's is 0.
 _CANON = ["mmlu", "mmlu_perm", "hellaswag", "arc_challenge", "arc_easy",
-          "winogrande", "piqa", "truthfulqa_mc2", "gsm8k"]
+          "winogrande", "piqa", "truthfulqa_mc2", "gsm8k",
+          "ifeval", "mmlu_pro", "hendrycks_math500"]
 _CHANCE = {"mmlu": 0.25, "mmlu_perm": 0.25, "hellaswag": 0.25, "arc_challenge": 0.25,
-           "arc_easy": 0.25, "winogrande": 0.5, "piqa": 0.5, "gsm8k": 0.0}
+           "arc_easy": 0.25, "winogrande": 0.5, "piqa": 0.5, "gsm8k": 0.0,
+           "mmlu_pro": 0.1, "hendrycks_math500": 0.0}
+# 12h.1: the three that generate text, for instruct models only; never in Avg
+GEN_TASKS = ("ifeval", "mmlu_pro", "hendrycks_math500")
 
 # Controls: tasks run to test how we POSE a benchmark, not what a model knows.
 # They are shown wherever the task they control for is shown, and they never
@@ -947,7 +965,68 @@ _TASK_META = {
               "scored by exact match on the final answer. 5-shot, generative. "
               "Reported here but deliberately excluded from the overall average: "
               "it sits near 0% below ~1B and only adds noise to a mean."),
+    # 12h.1: asked through the chat template, scored on what the model writes;
+    # instruct models only, and never in the overall average
+    "ifeval": ("instruction & maths",
+               "Instructions to follow to the letter — no commas, three bullet points, "
+               "under 100 words — over 541 prompts, asked through the chat template. "
+               "Prompt-level strict accuracy: an answer counts only when it keeps every "
+               "instruction; instruction-level, beside it, counts each one. Instruct models "
+               "only, and never in the overall average."),
+    "mmlu_pro": ("instruction & maths",
+                 "MMLU made harder: 12,032 questions with ten options each, answered with "
+                 "the reasoning written out (5-shot chain of thought) and scored on the "
+                 "letter the answer settles on. Hours per model where the other tasks take "
+                 "minutes. Instruct models only, and never in the overall average."),
+    "hendrycks_math500": ("instruction & maths",
+                          "500 competition maths problems (MATH-500), answered in the "
+                          "model's own words and scored on the final answer, compared as "
+                          "maths: 1/2 and 0.5 are one answer. Instruct models only, and "
+                          "never in the overall average."),
 }
+
+# 12h.1: what each model's makers publish, from their model cards (their own
+# setups: shots, templates and thinking differ from ours). Not a target — a
+# neighbourhood: a score of ours more than 15 points below it points at a
+# scoring bug, and the cell says so for masein to look into
+_PUBLISHED = {
+    "Qwen/Qwen3.5-2B": {"ifeval": (61.2, "no thinking"), "mmlu_pro": (55.3, "no thinking")},
+    "LiquidAI/LFM2.5-1.2B-Instruct": {"ifeval": (86.2, ""), "mmlu_pro": (44.4, "")},
+    "ibm-granite/granite-4.0-h-1b": {"ifeval": (78.5, "average"),
+                                     "mmlu_pro": (32.9, "5-shot CoT")},
+    "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16": {"ifeval": (82.8, "prompt, no thinking"),
+                                              "hendrycks_math500": (95.4, "thinking")},
+    "tencent/Youtu-LLM-2B": {"ifeval": (81.2, ""), "mmlu_pro": (61.6, ""),
+                             "hendrycks_math500": (93.7, "")},
+    "google/gemma-4-E2B-it": {"mmlu_pro": (60.0, "")},
+}
+FAR_BELOW = 15.0            # points under the published score that flag a cell
+
+
+def _thinking_modes() -> dict[str, str]:
+    """model id -> switch | always | never, for the catalogue's models
+    (service/catalog.py), read from its file: this script also runs where the
+    service package is not importable"""
+    import importlib.util
+    path = Path(__file__).resolve().parent.parent / "service" / "catalog.py"
+    try:
+        spec = importlib.util.spec_from_file_location("_catalog", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    except (OSError, ImportError, AttributeError):
+        return {}
+    return {m["id"]: m["thinking"] for m in mod.MODELS}
+
+
+def far_below(model: str, task: str, v: float | None) -> dict | None:
+    """{published, note, gap} when our score is more than FAR_BELOW points
+    under what the model's makers publish, else None"""
+    pub = (_PUBLISHED.get(model.removesuffix(" · thinking")) or {}).get(task)
+    if not pub or v is None:
+        return None
+    gap = pub[0] - 100 * v
+    return {"published": pub[0], "note": pub[1], "gap": round(gap, 1)} if gap > FAR_BELOW \
+        else None
 
 # ---------------------------------------------------------------------------
 # Frontier reference — where the ceiling is, for orientation only.
@@ -1053,7 +1132,8 @@ def above_chance(task: str, v: float) -> float:
     return max(0.0, (v - c) / (1 - c))
 
 # Proportion metrics: the only ones the two-proportion z-test is valid for.
-PROPORTION = {"acc", "acc_norm", "exact_match", "pass@1", "f1", "em", "rubric_pass"}
+PROPORTION = {"acc", "acc_norm", "exact_match", "pass@1", "f1", "em", "rubric_pass",
+              "prompt_level_strict_acc"}
 
 _PARAM_RE = re.compile(r"(\d+(?:\.\d+)?)([mb])(?![a-z0-9])", re.I)
 
@@ -1094,6 +1174,7 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
         m["diag"] = m.get("diag") or r.get("diag")
         m["judge"] = m.get("judge") or r.get("judge")
         m["judge_mtime"] = m.get("judge_mtime") or r.get("judge_mtime")
+        m["generative"] = m.get("generative") or r.get("generative")
     return by_model
 
 
@@ -1186,8 +1267,11 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         # treated the same way (shown, never ranked) in their own averages.
         tainted = sorted(set(taint.get(mid, ())))
         tainted_acc = [t for t in tainted if t in acc_tasks]
+        # 12h.1: the three generative tasks are instruct-only and never in any
+        # average, the diagnostic one included
         have = [cells[t][mid]["v"] for t in acc_tasks
-                if mid in cells.get(t, {}) and t not in CONTROL_TASKS and t not in tainted_acc]
+                if mid in cells.get(t, {}) and t not in CONTROL_TASKS and t not in tainted_acc
+                and t not in GEN_TASKS]
         got_req = [t for t in required if mid in cells.get(t, {}) and t not in tainted_acc]
         missing = [t for t in required if mid not in cells.get(t, {})]
         official = bool(required) and not missing and not (set(tainted_acc) & set(required))
@@ -1249,7 +1333,22 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                 topic = EXAM_TOPICS.get(task)
                 mc = (mmlu_cats.get("categories") or {}).get(topic) or {}
                 t["propose"] = topic_gate(task, t, jstate, mc.get("why"), judge.get("judge"))
+        gen = r.get("generative") or {}
         model_rows.append({
+            # 12h.1: how its IFEval, MMLU-Pro and MATH-500 were asked and read —
+            # thinking, backend, a subset, and per task the answers that ran out
+            # of room, the unreadable ones and the scorer; and any score far
+            # below what its makers publish
+            "gen": ({"thinking": gen.get("thinking"), "backend": gen.get("backend"),
+                     "fellBack": gen.get("fell_back"), "subset": gen.get("subset"),
+                     "tasks": {t: {k: g.get(k) for k in ("ran_out", "unreadable", "inst_acc",
+                                                         "n", "scorer")}
+                               for t, g in (gen.get("tasks") or {}).items()},
+                     "far": {t: f for t in GEN_TASKS
+                             if (f := far_below(mid, t, (cells.get(t) or {}).get(mid, {})
+                                                .get("v")))}}
+                    if gen or any(mid in cells.get(t, {}) for t in GEN_TASKS) else None),
+            "thinkingRow": mid.endswith(" · thinking"),
             "id": mid, "name": display[mid],
             "family": re.split(r"[^a-z0-9]", mid.split("/")[-1].lower())[0],
             # uploaded checkpoints are experiment points, not reference models —
@@ -1608,6 +1707,11 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         "accTasks": acc_tasks,
         "pplTasks": ppl_tasks,
         "required": required,          # the protocol list an official average needs
+        # 12h.1: the three generative tasks, and what their makers publish
+        "genTasks": list(GEN_TASKS),
+        "thinkingModes": _thinking_modes(),
+        "published": {m: {t: {"v": v, "note": note} for t, (v, note) in ts.items()}
+                      for m, ts in _PUBLISHED.items()},
         "reqAbsent": req_absent,
         "tasks": {t: {"metric": metric_used.get(t, ""),
                       "lower": is_lower_better(t),
@@ -2120,6 +2224,9 @@ tbody tr.open { background:var(--accent-soft); }
   margin:10px 0; background:var(--plane); display:flex; flex-direction:column; gap:4px; }
 .planbox .plan { margin:0; color:var(--text-primary); }
 .planbox label.spread { display:inline-flex; align-items:center; gap:6px; }
+/* 12h.1: Instruction & maths' two options, under the form */
+.genopts { display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; margin-top:8px; }
+.genopts label.spread { display:inline-flex; align-items:center; gap:6px; }
 /* ---- 11d: Overview ------------------------------------------------------- */
 .hlgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:14px;
   margin-top:10px; }
@@ -2247,6 +2354,11 @@ table.lb thead th[data-tip]:hover .hname, table.lb thead th[data-tip]:focus-visi
   text-decoration:underline dotted; text-underline-offset:3px; }
 /* the cells: plain, and the leaders bold (their wash is --heat-3, inline) */
 table.lb td.tcell { font-weight:400; }
+/* 12h.1: a generative cell's note under its number — ran out of room, a
+   subset, far below published — in words, small, never a second number line */
+table.lb td .cellnote { display:block; font-family:var(--font-sans); font-size:10px;
+  font-weight:400; line-height:1.2; color:var(--muted); white-space:nowrap; }
+table.lb td .cellnote.warn { color:var(--warning-text); }
 table.lb td.tcell.lead b { font-weight:700; }
 table.lb td.tcell:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 .lbcap { font-family:var(--font-sans); font-size:var(--fs-1); color:var(--muted); margin:8px 0 0; }
@@ -5194,6 +5306,14 @@ function kindParts(m, kind) {
     return [el('p', { class: 'mprose', text: modelSentence(m) }),
       el('p', { class: 'small', 'data-avg-verdict': '1', text: avgVerdictOf(m)
         + ((m.missing || []).length ? ` Missing ${m.missing.join(', ')}.` : '') }),
+      // 12h.1: the mode is part of the result
+      m.gen ? el('p', { class: 'small', 'data-gen-mode': m.id,
+        text: 'IFEval, MMLU-Pro and MATH-500: ' + genMode(m) + (() => {
+          const gt = (m.gen || {}).tasks || {};
+          const out = genTasks().filter(t => (gt[t] || {}).ran_out)
+            .map(t => `${gt[t].ran_out} on ${LB_SHORT[t] || t}`);
+          return out.length ? ` · answers that ran out of room: ${out.join(', ')}` : '';
+        })() + '.' }) : '',
       part(resultsPart(m), 'results'),
       // item analysis of the benchmark, not the improvement loop (12b §7)
       diag ? el('details', { class: 'kfold', 'data-cant-show': '1' },
@@ -6723,6 +6843,8 @@ const CATS = [
   ['reasoning',    ['arc_challenge', 'arc_easy']],
   ['math',         ['gsm8k']],
   ['truthfulness', ['truthfulqa_mc2']],
+  // 12h.1: the three that generate text — instruct models only, never in Avg
+  ['instruction',  ['ifeval', 'mmlu_pro', 'hendrycks_math500']],
 ];
 function radarAxes() {
   if (state.radarAxes === 'tasks') return DATA.accTasks.map(t => ({ key: t, label: t, tasks: [t] }));
@@ -6820,7 +6942,7 @@ function aboutBenchmarks(tasks, inline = false) {
 const LB_CHIPS = [
   ['all', 'All tasks'], ['knowledge', 'Knowledge'], ['commonsense', 'Commonsense'],
   ['reasoning', 'Reasoning'], ['math', 'Math'], ['truthfulness', 'Truthfulness'],
-  ['lm', 'Language modelling']];
+  ['instruction', 'Instruction & maths'], ['lm', 'Language modelling']];
 // the four kinds of test, named the same and in the same order everywhere.
 // A kind with no data yet is not offered (On phone arrives in 12f)
 const MODELS_VIEWS = { standard: 'Standard', exam: 'Knowledge exam', everyday: 'Everyday tasks' };
@@ -6849,7 +6971,37 @@ function lbFactsShown() {
   catch (e) { return []; }
 }
 const LB_GROUP = { knowledge: 'Knowledge', commonsense: 'Commonsense', reasoning: 'Reasoning',
-  math: 'Math', truthfulness: 'Truthfulness' };
+  math: 'Math', truthfulness: 'Truthfulness', instruction: 'Instruction & maths' };
+// 12h.1: IFEval, MMLU-Pro and MATH-500 — asked through the chat template and
+// scored on what the model writes; instruct models only, never in Avg
+const genTasks = () => DATA.genTasks || [];
+const isGen = t => genTasks().includes(t);
+// how a model thinks — the catalogue's word for the nine, else what its last
+// preflight read from its chat template: switch, always or never
+const thinkingModeOf = id => (DATA.thinkingModes || {})[id]
+  || (((DATA.models.find(x => x.id === id) || {}).archinfo) || {}).thinking || null;
+// how a model's generative answers were asked: "thinking off · on vllm"
+function genMode(m) {
+  const g = m.gen || {}, th = g.thinking || {};
+  const on = m.thinkingRow || th.on || th.mode === 'always';
+  return [(on ? 'thinking on' : 'thinking off') + (th.mode === 'always'
+      ? ' (it cannot turn thinking off)' : ''),
+    g.backend ? 'on ' + g.backend + (g.fellBack ? ` (${g.fellBack})` : '') : '',
+    g.subset ? `MMLU-Pro: a seeded subset of ${g.subset.n.toLocaleString('en')} of `
+      + `${g.subset.of.toLocaleString('en')}, not comparable to published numbers` : '']
+    .filter(Boolean).join(' · ');
+}
+// a column's words: who scores it, how it is asked, what its makers publish
+function genTip(t) {
+  const scorer = (DATA.models.map(m => ((m.gen || {}).tasks || {})[t]).find(x => x && x.scorer)
+    || {}).scorer;
+  const pub = Object.entries(DATA.published || {}).filter(([, ts]) => ts[t])
+    .map(([mid, ts]) => `${mid.split('/').pop()} ${ts[t].v}${ts[t].note ? ` (${ts[t].note})` : ''}`);
+  return [scorer ? 'scored by ' + scorer : '',
+    'thinking off unless the row says thinking; a thinking run is a row of its own',
+    pub.length ? 'published by the makers, in their own setups: ' + pub.join(' · ') : '',
+    'instruct models only, and never part of Avg'].filter(Boolean);
+}
 const LB_KINDS = [['all', 'All'], ['base', 'base'], ['instruct', 'instruct'],
   ['checkpoint', 'checkpoint']];
 const LB_SIZES = [['all', 'All'], ['s', '< 200M'], ['m', '200M–1B'], ['l', '1–3B'],
@@ -7071,12 +7223,17 @@ function lbColumns(ms) {
   } else {
     mid = (CATS.find(([g]) => g === L.chip) || [null, []])[1]
       .filter(t => DATA.accTasks.includes(t)).map(task);
+    // 12h.1: Instruction & maths stands on its own three numbers — the
+    // Standard rank and average are Standard's, and none of these is in them
+    if (L.chip === 'instruction')
+      lead.splice(0, lead.length, ...lead.filter(c => c.key !== 'rank' && c.key !== 'avg'));
   }
   return [...lead, ...mid, ...tail];
 }
 
 // 11f: one word per column name; the long ones are the tooltip's
-const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'TruthfulQA' };
+const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'TruthfulQA',
+  ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro', hendrycks_math500: 'MATH-500' };
 
 // A column's setup, in words — its tooltip, and its accessible name. The
 // header shows only the name; this is where the n-shot, the unit and the
@@ -7097,7 +7254,8 @@ function lbColTip(c) {
     return [c.lower ? `${c.task} — ${c.unit}, lower is better`
                     : `${c.task} — ${c.shot || 'n-shot unknown'}, % accuracy`,
       ...(info.control ? ['CONTROL — never in Avg'] : []),
-      ...[info.domain, info.desc].filter(Boolean)];
+      ...[info.domain, info.desc].filter(Boolean),
+      ...(isGen(c.task) ? genTip(c.task) : [])];
   }
   if (c.area) return [`${c.area} — MMLU, % ${scaleWords()}`, 'the hidden questions of each topic',
     'pooled over ' + ((DATA.meta.areas || {})[c.area] || []).join(', ')];
@@ -7230,7 +7388,7 @@ function modelsHead(badge) {
         onclick: () => setModelsView(v) }))) : ''];
 }
 // "Not tested on this (12) ▸": one collapsed line, each model with its Test
-function notTestedRows(none, ncols, suite) {
+function notTestedRows(none, ncols, suite, whyNot = null) {
   if (!none.length) return [];
   const open = !!state.lbNotTested;
   const head = el('tr', { class: 'nottested', 'data-not-tested': String(none.length) },
@@ -7241,7 +7399,9 @@ function notTestedRows(none, ncols, suite) {
   return [head, ...none.map(m => el('tr', { class: 'nottested-row', 'data-not-tested-row': m.id },
     el('td', { colspan: String(ncols) },
       el('a', { href: '#model=' + encodeURIComponent(m.id), text: m.name }),
-      LIVE ? [el('span', { class: 'se', text: ' · ' }), el('a', { href: '#',
+      whyNot && whyNot(m) ? el('span', { class: 'se', 'data-instruct-only': m.id,
+        text: ' · ' + whyNot(m) })
+      : LIVE ? [el('span', { class: 'se', text: ' · ' }), el('a', { href: '#',
         'data-not-tested-test': m.id, text: 'Test', onclick: e => { e.preventDefault();
           state.sub.suite = suite; openTest(m.id); } })] : '')))];
 }
@@ -7281,6 +7441,29 @@ function lbEveryday(ms) {
     el('p', { class: 'lbcap', text: `${(evd().questions || []).length} questions in seven groups, `
       + 'typed the way people type on a phone. Open a model for its answers; Benchmarks ▸ '
       + 'Everyday tasks has the questions and every answer.' }))];
+}
+
+// 12h.1: one generative cell — its number, and under it, only when there is
+// something to say: the answers that ran out of room, IFEval's instruction-
+// level score, a subset, a score far below what its makers publish
+function genCell(c, m, cc, one, pctn) {
+  const g = ((m.gen || {}).tasks || {})[c.task] || {}, far = ((m.gen || {}).far || {})[c.task];
+  const sub = c.task === 'mmlu_pro' && (m.gen || {}).subset;
+  const td = one(c, m, cc.v, cc.se ? (100 * cc.se).toFixed(1) : null, pctn, {
+    title: [genMode(m), g.inst_acc != null ? `instruction-level ${pctn(g.inst_acc)}` : '',
+      g.ran_out ? `${g.ran_out} answer${g.ran_out === 1 ? '' : 's'} ran out of room` : '',
+      far ? `far below published (${far.published}${far.note ? ', ' + far.note : ''}): `
+        + 'check extraction' : ''].filter(Boolean).join(' · '),
+    'data-gen-cell': c.task });
+  const note = (text, attrs, warn) => el('span', { class: 'cellnote' + (warn ? ' warn' : ''),
+    ...attrs, text });
+  if (g.inst_acc != null) td.append(note(`${pctn(g.inst_acc)} by instruction`,
+    { 'data-inst-level': c.task }));
+  if (g.ran_out) td.append(note(`${g.ran_out} ran out of room`, { 'data-ran-out': String(g.ran_out) }));
+  if (sub) td.append(note('subset', { 'data-subset': c.task }));
+  if (far) td.append(note('far below published, check extraction', { 'data-far-below': c.task },
+    true));
+  return td;
 }
 
 function vLeaderboard(ms) {
@@ -7443,7 +7626,12 @@ function vLeaderboard(ms) {
             ckBadge(m) || (m.kind === 'instruct'
               ? el('span', { class: 'badge instruct', text: 'instruct' })
               : el('span', { class: 'badge', text: 'base' })),
-            warnBadge(m) || '', dupBadge(m) || '',
+            // 12h.1: a thinking row, or a model that cannot stop thinking
+            m.thinkingRow || ((m.gen || {}).thinking || {}).mode === 'always'
+              ? el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
+                  title: genMode(m), text: 'thinking' }) : '',
+            // a thinking row has only these three: Standard's "preliminary" is not its
+            m.thinkingRow ? '' : warnBadge(m) || '', dupBadge(m) || '',
             dupsOf[m.id] ? dupToggle(m, dupsOf[m.id]) : ''));
         if (c.key === 'params') {
           const a = m.archinfo || {};
@@ -7509,13 +7697,21 @@ function vLeaderboard(ms) {
           return one(c, m, g.score_report, null, pctn, { title: `${g.n_report} leaderboard-half items` });
         }
         const cc = cell(c.task, m.id);
-        if (!cc) return el('td', { class: 'num se', text: '—' });
+        if (!cc) return el('td', { class: 'num se', text: '—',
+          title: isGen(c.task) && m.kind === 'base'
+            ? 'instruct only: asked through the chat template' : null });
+        if (isGen(c.task)) return genCell(c, m, cc, one, pctn);
         return one(c, m, cc.v, cc.se && !c.lower ? (100 * cc.se).toFixed(1) : null,
           c.lower ? x => num(x, 3) : pctn);
       }));
     tbody.append(tr);
   });
-  tbody.append(...notTestedRows(notTested, ncols, L.view === 'exam' ? 'judged' : 'full'));
+  // 12h.1: under Instruction & maths, a base model is not "not tested" but
+  // "instruct only", said once here, never as an empty cell
+  const genView = dataCols.length > 0 && dataCols.every(c => c.task && isGen(c.task));
+  tbody.append(...notTestedRows(notTested, ncols,
+    genView ? 'generative' : L.view === 'exam' ? 'judged' : 'full',
+    genView ? m => (m.kind === 'base' ? 'instruct only' : null) : null));
 
   const table = el('table', { class: 'lb' + (L.tint ? ' tinted' : '')
       + (visCols.some(c => c.key === 'rank') ? '' : ' norank'), 'data-lb-table': '1' },
@@ -10022,12 +10218,33 @@ function vQueue(part = { form: true, list: true }) {
           sub: 'The exam topics, answered in writing and graded by the judge: the model\'s '
             + 'judged score per topic.' }],
       // 12a: the pilot. 12c replaces this drop-down with cards
-      ['everyday', `Everyday tasks — ${(evd().questions || []).length || 111} questions, a few minutes`]],
+      ['everyday', `Everyday tasks — ${(evd().questions || []).length || 111} questions, a few minutes`],
+      // 12h.1: instruct models only; MMLU-Pro alone is hours
+      ['generative', 'Instruction & maths — IFEval, MMLU-Pro, MATH-500, hours',
+        { sub: 'Asked through the chat template and scored on what the model writes. '
+          + 'Instruct models only; never in the average.' }]],
       sf.suite || 'full', v => { sf.suite = v; render(); }, { key: 'submit-suite' }),
     note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px',
       'aria-label': 'note', 'data-keep': 'submit-note', value: sf.note,
       oninput: e => { sf.note = e.target.value; } }),
   };
+  // 12h.1: Instruction & maths asks two more things, and only then — whether
+  // the model thinks first (a model with a switch only; off by default, and a
+  // row of its own), and a seeded MMLU-Pro subset (off: the full 12,032 is the
+  // only run comparable to published numbers)
+  const canThink = thinkingModeOf(sf.hf_id.trim()) === 'switch';
+  if (!canThink) sf.thinking = false;
+  const genOpts = sf.suite === 'generative' ? el('div', { class: 'genopts', 'data-gen-opts': '1' },
+    canThink ? el('label', { class: 'spread', 'data-think-switch': '1' },
+      el('input', { type: 'checkbox', checked: sf.thinking ? '' : null,
+        onchange: e => { sf.thinking = e.target.checked; } }),
+      ' Think before answering', el('span', { class: 'small se',
+        text: ' — off by default; its scores are a row of their own' })) : '',
+    el('label', { class: 'spread small' }, 'MMLU-Pro subset ',
+      el('input', { type: 'number', min: '0', max: '12031', step: '100', placeholder: 'all',
+        'aria-label': 'MMLU-Pro subset', 'data-subset-input': '1', value: sf.subset || '',
+        style: 'width:7em', oninput: e => { sf.subset = parseInt(e.target.value, 10) || 0; } }),
+      el('span', { class: 'se', text: ' items, seeded — empty runs all 12,032' }))) : '';
   // judged: 11i's grouped picker, the one the model page uses — every exam
   // topic ticked to begin with, the MMLU control off. The ticks are sent as
   // they are: the whole exam is 37 names, not an empty list
@@ -10045,6 +10262,10 @@ function vQueue(part = { form: true, list: true }) {
   const btn = el('button', { class: 'primary', text: 'Submit model', onclick: async () => {
     const body = { hf_id: sf.hf_id.trim(), kind: sf.kind, suite: sf.suite,
                    submitter: whoName(), note: sf.note };
+    if (sf.suite === 'generative') {
+      if (sf.thinking) body.thinking = true;
+      if (sf.subset) body.subset = sf.subset;
+    }
     if (sf.suite === 'judged') {
       body.tasks = [...(sf.tasks || []), ...(sf.control && J.control ? [J.control] : [])];
       if (!body.tasks.length) { state.qmsg = 'pick at least one topic'; render(); return; }
@@ -10236,7 +10457,7 @@ function vQueue(part = { form: true, list: true }) {
           ? el('span', { class: 'propwhy', 'data-why': 'submit', text: judgeWhy() }) : '',
         ownWhy),
       ownCodeBox(info, sf.allow, v => { sf.allow = v; gateSubmit(); }, 'submit'),
-      topicBoxes,
+      topicBoxes, genOpts,
       state.qmsg ? el('p', { class: 'warn', 'data-qmsg': '1', style: 'margin-top:8px',
         text: state.qmsg }) : '') : null,
     part.list ? el('div', { class: 'card', 'data-all-runs': '1' },
@@ -10260,8 +10481,11 @@ function openTest(prefill) {
   const id = prefill || state.model;
   if (id) {
     const m = DATA.models.find(x => x.id === id);
-    Object.assign(state.sub, { hf_id: id, allow: false,
-      ...(m && m.kind && m.kind !== 'checkpoint' ? { kind: m.kind } : {}) });
+    // 12h.1: a thinking row is its model, asked to think
+    const think = / · thinking$/.test(id);
+    Object.assign(state.sub, { hf_id: id.replace(/ · thinking$/, ''), allow: false,
+      ...(m && m.kind && m.kind !== 'checkpoint' ? { kind: m.kind } : {}),
+      ...(think ? { suite: 'generative', thinking: true } : {}) });
   }
   state.testOpen = true;
   state.qmsg = '';

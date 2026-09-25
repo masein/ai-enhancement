@@ -67,7 +67,9 @@ CREATE TABLE IF NOT EXISTS submissions (
   tasks       TEXT DEFAULT '[]',                 -- JSON: narrow a suite to these tasks (one exam topic)
   judge_batch TEXT DEFAULT '',                   -- the judge batch THIS run submitted (not the model's newest)
   reuse_note  TEXT DEFAULT '',                   -- "answers reused from #46 (same questions) · re-graded"
-  bank_version TEXT DEFAULT ''                   -- 12a.4: the Everyday wording this run answered (its hash)
+  bank_version TEXT DEFAULT '',                  -- 12a.4: the Everyday wording this run answered (its hash)
+  thinking    INTEGER NOT NULL DEFAULT 0,        -- 12h.1: "Think before answering" asked for
+  subset      INTEGER NOT NULL DEFAULT 0         -- 12h.1: MMLU-Pro items, a seeded subset; 0 = all
 );
 CREATE INDEX IF NOT EXISTS idx_submissions_status ON submissions(status);
 -- find-the-gap: an LLM proposes a skill spec from diagnose-half failures, a
@@ -176,7 +178,7 @@ CREATE TABLE IF NOT EXISTS repairs (
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
          "error", "params", "vocab", "batch", "need_gb", "created_at", "started_at",
          "finished_at", "gpu_seconds", "arch", "allow_remote_code", "load_missing",
-         "tasks", "judge_batch", "reuse_note", "bank_version"]
+         "tasks", "judge_batch", "reuse_note", "bank_version", "thinking", "subset"]
 
 
 def _conn() -> sqlite3.Connection:
@@ -206,7 +208,9 @@ def init() -> None:
                      # 11e: the focus plan Approve froze (JSON), NULL before then
                      "ALTER TABLE proposals ADD COLUMN approved_focus TEXT",
                      "ALTER TABLE submissions ADD COLUMN reuse_note TEXT DEFAULT ''",
-                     "ALTER TABLE submissions ADD COLUMN bank_version TEXT DEFAULT ''"):
+                     "ALTER TABLE submissions ADD COLUMN bank_version TEXT DEFAULT ''",
+                     "ALTER TABLE submissions ADD COLUMN thinking INTEGER NOT NULL DEFAULT 0",
+                     "ALTER TABLE submissions ADD COLUMN subset INTEGER NOT NULL DEFAULT 0"):
             try:
                 c.execute(stmt)
             except sqlite3.OperationalError:
@@ -258,13 +262,14 @@ def _backfill_judge_batch(c: sqlite3.Connection) -> None:
 
 
 def add(hf_id: str, kind: str, suite: str, submitter: str, note: str,
-        allow_remote_code: bool = False, tasks: list[str] | None = None) -> int:
+        allow_remote_code: bool = False, tasks: list[str] | None = None,
+        thinking: bool = False, subset: int = 0) -> int:
     with closing(_conn()) as c:
         cur = c.execute(
             "INSERT INTO submissions (hf_id, kind, suite, submitter, note, created_at, "
-            "allow_remote_code, tasks) VALUES (?,?,?,?,?,?,?,?)",
+            "allow_remote_code, tasks, thinking, subset) VALUES (?,?,?,?,?,?,?,?,?,?)",
             (hf_id, kind, suite, submitter, note, time.time(), int(allow_remote_code),
-             json.dumps(sorted(tasks or []))))
+             json.dumps(sorted(tasks or [])), int(bool(thinking)), int(subset or 0)))
         c.commit()
         return int(cur.lastrowid)
 

@@ -323,6 +323,12 @@ class SubmissionIn(BaseModel):
     # suite, which is what it has always meant — one topic at a time is the
     # loop's unit of work, and a person should not have to sit fifteen.
     tasks: list[str] = []
+    # 12h.1, the generative suite only: think before answering (a model with
+    # a switch; its run is a row of its own), and a seeded MMLU-Pro subset
+    # of this many items (0: all 12,032 — the only run comparable to
+    # published numbers)
+    thinking: bool = False
+    subset: int = 0
 
 
 ACTIVE = ("queued", "preflight", "waiting_gpu", "waiting_lock", "running")
@@ -340,7 +346,17 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         raise HTTPException(422, "kind must be auto, base or instruct")
     if s.suite not in config.SUITES:
         raise HTTPException(422, "suite must be quick, full, control (mmlu_perm only), "
-                                 "judged (free response + judge) or everyday (Everyday tasks)")
+                                 "judged (free response + judge), everyday (Everyday tasks) "
+                                 "or generative (IFEval, MMLU-Pro, MATH-500)")
+    if s.suite != "generative" and (s.thinking or s.subset):
+        raise HTTPException(422, "thinking and subset are for IFEval, MMLU-Pro and MATH-500 "
+                                 "(suite generative) only")
+    if s.suite == "generative" and s.kind == "base":
+        raise HTTPException(422, config.GEN_INSTRUCT_ONLY + ". Nothing was queued.")
+    total = sum(config.MMLU_PRO_SUBJECTS.values())
+    if s.subset and not 0 < s.subset < total:
+        raise HTTPException(422, f"subset is a number of MMLU-Pro items, from 1 to {total - 1}; "
+                                 f"0 runs all {total}")
     chosen: list[str] = []
     if s.suite == "judged":
         # before a GPU second is spent on answers nobody could grade
@@ -412,11 +428,15 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
             same = sorted(json.loads(row.get("tasks") or "[]")) == sorted(chosen)
         except ValueError:
             same = not chosen
+        # 12h.1: thinking on is another row, and a subset another run
+        same = same and bool(row.get("thinking")) == s.thinking \
+            and int(row.get("subset") or 0) == s.subset
         if row["suite"] == s.suite and same:
             return {"id": row["id"], "status": row["status"],
                     "note": "already in the queue — joining the existing run"}
     sid = db.add(hf_id, s.kind, s.suite, s.submitter.strip()[:80], s.note.strip()[:200],
-                 allow_remote_code=s.allow_remote_code, tasks=chosen)
+                 allow_remote_code=s.allow_remote_code, tasks=chosen,
+                 thinking=s.thinking, subset=s.subset)
     return {"id": sid, "status": "queued", "tasks": sorted(chosen)}
 
 

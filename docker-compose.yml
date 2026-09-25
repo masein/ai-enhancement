@@ -27,6 +27,9 @@ services:
       args:
         # EVALBOARD_BUILD=$(git rev-parse --short HEAD) docker compose up -d --build
         EVALBOARD_BUILD: ${EVALBOARD_BUILD:-}
+        # 12h.1: the Mamba kernels, tried at build and never required;
+        # WITH_MAMBA=0 builds without them
+        WITH_MAMBA: ${WITH_MAMBA:-1}
     image: aienh-bench
     pid: "host"
     # the box's loopback, reachable from inside the container: the `local`

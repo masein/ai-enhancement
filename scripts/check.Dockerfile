@@ -29,6 +29,11 @@ RUN pip install --retries 10 --timeout 120 -r /tmp/requirements-dev.txt \
     && playwright install --with-deps --only-shell chromium \
     && chmod -R a+rX "$PLAYWRIGHT_BROWSERS_PATH"
 
+# 12h.1: math-verify, so the tests compare MATH-500 answers as the server
+# does (scripts/generative.py). A layer of its own, pinned as requirements.txt
+# pins it: the layers above keep their cache, Chromium included
+RUN pip install --retries 10 --timeout 120 "math-verify[antlr4_11_0]==0.9.0"
+
 # the host's user, by name, uid and gid: the check runs as it (nothing in the
 # mounted repo ends up owned by root), and a test that asks who is running —
 # getpass.getuser(), as the service does for EVAL_USER — gets an answer. Last,

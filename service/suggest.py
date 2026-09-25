@@ -108,6 +108,16 @@ def local_candidates(payload: dict, queue: list[dict], artifacts: list[str]) -> 
         if mid not in seen:
             seen[mid] = {"id": mid, "params": None, "kind": None, "on_board": False,
                          "judged": 0, "artifact": True, "weights": True}
+    # 12h.1: the models the board suggests before anyone has run them
+    from . import catalog
+    for c in catalog.MODELS:
+        if c["id"] not in seen:
+            seen[c["id"]] = {"id": c["id"], "params": c["params"], "kind": "instruct",
+                             "on_board": False, "judged": 0, "catalog": True}
+    for c in seen.values():
+        k = catalog.known(c["id"])
+        if k:
+            c["thinking"] = k["thinking"]
     return list(seen.values())
 
 

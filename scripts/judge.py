@@ -912,7 +912,9 @@ def _answer(rec: dict) -> str:
 # The wrappers are a setting: REASONING_WRAPPERS="<think>,</think>;<r>,</r>"
 # adds pairs to the default, so the next model's tag is a config change.
 # ---------------------------------------------------------------------------
-DEFAULT_REASONING_WRAPPERS = (("<think>", "</think>"),)
+# 12h.1: Gemma 4 thinks inside "<|channel>thought … <channel|>" (its chat
+# template's strip_thinking), not <think>
+DEFAULT_REASONING_WRAPPERS = (("<think>", "</think>"), ("<|channel>", "<channel|>"))
 NO_ANSWER_WHY = "the model never finished answering: these questions were not scored"
 
 

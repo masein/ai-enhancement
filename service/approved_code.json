@@ -1,0 +1,7 @@
+{
+  "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16": {
+    "commit": "dfaf35de3e30f1867dd8dbc38a7fc9fb52d3914f",
+    "why": "Mamba2 hybrid; the repo ships configuration_nemotron_h.py, modeling_nemotron_h.py and a reasoning parser. transformers 5.5.3 has nemotron_h built in and that is tried first; this entry lets its own code run, at this commit only, if the built-in one cannot load it",
+    "added": "2026-09-25"
+  }
+}

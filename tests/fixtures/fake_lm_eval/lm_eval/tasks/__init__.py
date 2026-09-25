@@ -3,7 +3,9 @@ from pathlib import Path
 
 # what the harness ships, of what the board runs
 BUILT_IN = {"mmlu", "hellaswag", "arc_challenge", "arc_easy", "winogrande", "piqa",
-            "truthfulqa_mc2", "gsm8k"}
+            "truthfulqa_mc2", "gsm8k",
+            # 12h.1: all three are in 0.4.12 (hendrycks_math500 in hendrycks_math/)
+            "ifeval", "mmlu_pro", "hendrycks_math500"}
 
 
 def names_in(yaml_text: str) -> set[str]:

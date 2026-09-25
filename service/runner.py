@@ -316,26 +316,123 @@ def include_args_for(task: str) -> list[str]:
 
 
 def lm_eval_cmd(model_args: str, task: str, shots: int, batch, task_out: Path, *,
-                chat: bool, max_gen_toks: int | None = None) -> list[str]:
+                chat: bool, max_gen_toks: int | None = None, backend: str = "hf",
+                samples: Path | None = None, limit: int | None = None) -> list[str]:
     """The lm_eval command for one task. Built here only, so that
     scripts/check_tasks.py (deploy step 4) hands the installed harness exactly
-    what a run hands it."""
+    what a run hands it. 12h.1: `backend` is "hf" or "vllm" (vLLM sizes its
+    own batches and picks its own device), and `samples` a seeded subset."""
     cmd = ["lm_eval",
-           "--model", "hf",
+           "--model", backend,
            "--model_args", model_args,
            "--tasks", task,
            "--num_fewshot", str(shots),
-           "--batch_size", str(batch),
+           "--batch_size", "auto" if backend == "vllm" else str(batch),
            "--seed", str(config.SEED),
            "--output_path", str(task_out),
            "--log_samples",
-           "--device", "cuda:0",
+           *([] if backend == "vllm" else ["--device", "cuda:0"]),
            *include_args_for(task)]
     if chat:
         cmd.append("--apply_chat_template")
     if max_gen_toks:
         cmd += ["--gen_kwargs", f"max_gen_toks={max_gen_toks}"]
+    if samples:
+        cmd += ["--samples", str(samples)]
+    if limit:                        # scripts/trial_generative.py only: a few items
+        cmd += ["--limit", str(limit)]
     return cmd
+
+
+# ---------------------------------------------------------------------------
+# 12h.1: IFEval, MMLU-Pro and MATH-500 — instruct models, thinking on or off,
+# on vLLM where the model loads in it
+# ---------------------------------------------------------------------------
+
+def gen_thinking(sub: dict, meta: dict) -> dict:
+    """{mode, on, separate, budget, think_end}: how this run asks it. Off by
+    default for every model that can turn it off (a phone assistant answers
+    straight away); on for one that cannot; on when a person asked, for a
+    model with a switch — and that run is a row of its own, never averaged
+    with the model's thinking-off row"""
+    a = meta.get("archinfo") or {}
+    mode = a.get("thinking") or "never"
+    on = mode == "always" or (mode == "switch" and bool(sub.get("thinking")))
+    return {"mode": mode, "on": on, "separate": mode == "switch" and on,
+            "budget": config.GEN_THINKING_MAX_GEN_TOKS if on else config.GEN_MAX_GEN_TOKS,
+            "think_end": a.get("think_end") or "</think>"}
+
+
+def gen_model_args(pretrained: str, th: dict, *, backend: str, remote_code: bool = False,
+                   revision: str | None = None, gpu_util: float | None = None) -> str:
+    """The model_args of a generative run: the thinking switch said out loud
+    (both ways — Qwen3 thinks unless told not to, Qwen3.5 only when told), the
+    end of the thinking when it thinks (the harness scores what follows it),
+    the approved commit of a model that runs its own code, and vLLM's share
+    of the card"""
+    parts = [f"pretrained={pretrained}", "dtype=bfloat16"]
+    if th["mode"] == "switch":
+        parts.append(f"enable_thinking={th['on']}")
+    if th["on"]:
+        parts.append(f"think_end_token={th['think_end']}")
+    if remote_code:
+        parts.append("trust_remote_code=True")
+    if revision:
+        parts.append(f"revision={revision}")
+    if backend == "vllm":
+        parts += [f"gpu_memory_utilization={gpu_util or 0.8}",
+                  f"max_model_len={th['budget'] + 6144}"]
+    return ",".join(parts)
+
+
+def vllm_available() -> bool:
+    """vLLM is in the image (12h.1 builds it in; a build without it runs
+    everything on hf)"""
+    import importlib.util
+    return importlib.util.find_spec("vllm") is not None
+
+
+def gen_backend() -> tuple[str, str]:
+    """(backend, why not vLLM)"""
+    if config.GEN_BACKEND == "hf":
+        return "hf", "GEN_BACKEND=hf"
+    if not vllm_available():
+        return "hf", "vLLM is not installed in this image"
+    return "vllm", ""
+
+
+def gpu_util_for(free_mib: int, total_mib: int | None) -> float:
+    """vLLM takes a fraction of the WHOLE card up front: a share of what is
+    free, never more than 0.9 (the CLI's rule, run_benchmarks.sh)"""
+    if not total_mib:
+        return 0.8
+    return round(max(0.1, min(0.9, free_mib * 0.85 / total_mib)), 2)
+
+
+def gpu_total_mib() -> int | None:
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=memory.total",
+                              "--format=csv,noheader,nounits"],
+                             capture_output=True, text=True, timeout=10)
+        return int(out.stdout.split()[0])
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        return None
+
+
+def mmlu_pro_subset(n: int, seed: int = config.GEN_SUBSET_SEED) -> dict[str, list[int]]:
+    """A fixed, seeded subset of MMLU-Pro: `n` items, each subject in its
+    share of the 12,032, the same items for every model. Only a full run is
+    comparable to published numbers, and the page says which this is"""
+    import random
+    subj = config.MMLU_PRO_SUBJECTS
+    total = sum(subj.values())
+    n = max(1, min(n, total))
+    raw = {k: n * v / total for k, v in subj.items()}
+    take = {k: int(x) for k, x in raw.items()}
+    for k in sorted(raw, key=lambda k: raw[k] - take[k], reverse=True)[:n - sum(take.values())]:
+        take[k] += 1
+    rng = random.Random(seed)
+    return {f"mmlu_pro_{k}": sorted(rng.sample(range(subj[k]), take[k])) for k in subj}
 
 
 def lm_eval_cwd(task_out: Path) -> Path:
@@ -472,6 +569,7 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path) -> int
 def run_submission(sub: dict) -> None:
     sid = sub["id"]
     everyday = sub["suite"] == "everyday"
+    generative = sub["suite"] == "generative"
 
     # -- preflight: metadata only, no GPU, seconds --------------------------------
     try:
@@ -484,6 +582,10 @@ def run_submission(sub: dict) -> None:
                          allow_remote_code=bool(sub.get("allow_remote_code")))
         if everyday and not meta.get("has_template"):
             raise PreflightError(config.NO_CHAT_TEMPLATE)
+        # 12h.1: asked through the chat template and scored on what it
+        # writes, so only an instruct model can sit them fairly
+        if generative and meta["kind"] != "instruct":
+            raise PreflightError(config.GEN_INSTRUCT_ONLY)
     except PreflightError as e:
         db.update(sid, status="failed", error=str(e), finished_at=time.time())
         return
@@ -505,6 +607,11 @@ def run_submission(sub: dict) -> None:
         tasks = only
     safe = sub["hf_id"].replace("/", "__")
     log_path = config.LOGS_DIR / f"service_{sid}_{safe}.log"
+    # 12h.1: a thinking-on run of a model that can turn thinking off is a row
+    # of its own, "Qwen3.5-2B · thinking": its answers live apart, so nothing
+    # ever averages them with the thinking-off ones
+    th = gen_thinking(sub, meta) if generative else None
+    row_safe = safe + "__thinking" if th and th["separate"] else safe
     config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
     config.OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -520,12 +627,32 @@ def run_submission(sub: dict) -> None:
             {"model": sub["hf_id"], "kind": kind, "params": meta["params"],
              "kind_reason": meta.get("kind_reason"),
              **(meta.get("archinfo") or {})}), encoding="utf-8")
+    if row_safe != safe:
+        (config.OUT_DIR / row_safe).mkdir(parents=True, exist_ok=True)
+        (config.OUT_DIR / row_safe / "model_meta.json").write_text(json.dumps(
+            {"model": sub["hf_id"] + " · thinking", "base_model": sub["hf_id"], "kind": kind,
+             "params": meta["params"], "kind_reason": meta.get("kind_reason"),
+             **(meta.get("archinfo") or {})}), encoding="utf-8")
+    backend, not_vllm = gen_backend() if generative else ("hf", "")
+    fell_back = ""
     if everyday:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import everyday as _everyday
         _everyday.build_task(config.EVERYDAY_TASKS_DIR)
     if remote_code:      # the code that produced the scores is part of the record
         db.update(sid, progress=f"preflight ok · custom model code · batch={meta['batch']}")
+    # 12h.1: a Hub model on the approved list runs its own code offline, as
+    # an uploaded one does: its pinned commit is fetched here, before the job
+    # drops privileges and loses the network
+    if meta.get("revision") and not sub["hf_id"].startswith("local/"):
+        try:
+            from huggingface_hub import snapshot_download
+            snapshot_download(sub["hf_id"], revision=meta["revision"])
+        except Exception as e:                          # noqa: BLE001 — said on the row
+            db.update(sid, status="failed", finished_at=time.time(),
+                      error=f"could not fetch {sub['hf_id']} at the approved commit "
+                            f"{meta['revision'][:12]}: {e}")
+            return
 
     # -- one run at a time: wait for the shared lock ------------------------------
     t0 = time.time()
@@ -599,7 +726,7 @@ def run_submission(sub: dict) -> None:
                 canceled = True
                 break
             shots = config.NFEWSHOT.get(task, 0)
-            task_out = config.OUT_DIR / safe / f"{task}_{shots}shot"
+            task_out = config.OUT_DIR / row_safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
             if everyday and _has_results(task_out):
                 # everyday tasks are a few minutes: "run again" answers again.
@@ -629,6 +756,8 @@ def run_submission(sub: dict) -> None:
             margs = f"pretrained={pretrained},dtype=bfloat16"
             if remote_code:
                 margs += ",trust_remote_code=True"
+            if meta.get("revision"):         # 12h.1: the approved commit, no other
+                margs += f",revision={meta['revision']}"
             # 11l: a reasoning model thinks before it answers, and 256 tokens
             # ran out inside the thinking on every question of run #60. Only
             # its judged answers get more room, and only when its template is
@@ -640,6 +769,22 @@ def run_submission(sub: dict) -> None:
                     else config.REASONING_MAX_GEN_TOKS) if thinks else None
             cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
                               chat=kind == "instruct" or everyday, max_gen_toks=room)
+            if generative:
+                def gen_cmd(be):
+                    samples = None
+                    if task == "mmlu_pro" and int(sub.get("subset") or 0) > 0:
+                        samples = task_out / "subset.json"
+                        samples.parent.mkdir(parents=True, exist_ok=True)
+                        samples.write_text(json.dumps(mmlu_pro_subset(int(sub["subset"]))),
+                                           encoding="utf-8")
+                    return lm_eval_cmd(
+                        gen_model_args(pretrained, th, backend=be, remote_code=remote_code,
+                                       revision=meta.get("revision"),
+                                       gpu_util=gpu_util_for(gpu_free_mib(), gpu_total_mib())
+                                       if be == "vllm" else None),
+                        task, shots, meta["batch"], task_out, chat=True,
+                        max_gen_toks=th["budget"], backend=be, samples=samples)
+                cmd = gen_cmd(backend)
 
             t_task = time.time()
             # the dropped-privilege child cannot create its own output dir under
@@ -652,10 +797,17 @@ def run_submission(sub: dict) -> None:
                     pass
             with open(log_path, "a") as lf:
                 lf.write(f"\n===== [{sid}] {task} ({shots}-shot) =====\n")
-                if room:
+                if room and not generative:
                     lf.write(f"[reasoning model] answers get {room} tokens, not "
                              f"{512 if everyday else 256}: the chat template writes its "
                              f"reasoning before the answer\n")
+                if generative:
+                    lf.write(f"[generative] thinking {'on' if th['on'] else 'off'} "
+                             f"({th['mode']}) · {th['budget']} tokens per answer · on {backend}"
+                             + (f" ({not_vllm})" if not_vllm else "")
+                             + (f" · MMLU-Pro subset of {sub['subset']}"
+                                if task == "mmlu_pro" and int(sub.get("subset") or 0) > 0
+                                else "") + "\n")
                 if remote_code:
                     lf.write(f"[trust_remote_code] running as "
                              f"{config.EVAL_USER or 'root (EVAL_USER unset!)'}, "
@@ -665,6 +817,18 @@ def run_submission(sub: dict) -> None:
                 status = _run_task(sid, cmd, lf, job_env, run_as, cwd=lm_eval_cwd(task_out))
                 if status == CANCELED:
                     canceled = True
+                # 12h.1: a model vLLM cannot load runs on the harness's own
+                # loader instead, and the result says which models fell back
+                if (generative and backend == "vllm" and status not in (0, CANCELED)
+                        and config.GEN_BACKEND != "vllm"):
+                    fell_back = f"vLLM could not run it (exit {status}); ran on hf"
+                    backend = "hf"
+                    lf.write(f"\n[service] {fell_back}\n")
+                    lf.flush()
+                    status = _run_task(sid, gen_cmd("hf"), lf, job_env, run_as,
+                                       cwd=lm_eval_cwd(task_out))
+                    if status == CANCELED:
+                        canceled = True
             gpu_seconds += time.time() - t_task
             db.update(sid, gpu_seconds=gpu_seconds)
             if canceled:
@@ -744,6 +908,32 @@ def run_submission(sub: dict) -> None:
                 db.update(sid, error=f"marking: {e}")
                 with open(log_path, "a") as lf:
                     lf.write(f"\n[service] everyday tasks could not be marked: {e!r}\n")
+        # 12h.1: the three read again, in this board's words — the letter an
+        # answer settles on, the final answer compared as maths, the harness's
+        # own IFEval verdicts — and the answers that ran out of room counted
+        if generative and not failed_tasks:
+            db.update(sid, status="running", progress="reading the answers")
+            try:
+                sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+                import generative as _gen
+                n_sub = int(sub.get("subset") or 0)
+                out = _gen.mark(config.OUT_DIR / row_safe, extra={
+                    "thinking": {"mode": th["mode"], "on": th["on"], "budget": th["budget"]},
+                    "backend": backend, "fell_back": fell_back or None,
+                    "not_vllm": not_vllm or None,
+                    "subset": ({"n": min(n_sub, sum(config.MMLU_PRO_SUBJECTS.values())),
+                                "of": sum(config.MMLU_PRO_SUBJECTS.values()),
+                                "seed": config.GEN_SUBSET_SEED} if n_sub > 0 else None)})
+                if out:
+                    _gen.write(config.OUT_DIR / row_safe, out)
+                    judge_note = " · " + _gen.summary(out)
+                    with open(log_path, "a") as lf:
+                        lf.write(f"\n===== [{sid}] generative: {_gen.summary(out)} =====\n")
+            except Exception as e:                      # noqa: BLE001 — the answers are on disk
+                failed_tasks.append("reading")
+                db.update(sid, error=f"reading the answers: {e}")
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] the answers could not be read: {e!r}\n")
         if sub["suite"] == "judged" and not failed_tasks:
             db.update(sid, status="running", progress="submitting the answers to the judge")
             sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))

@@ -98,7 +98,9 @@ def test_the_check_finds_every_task_of_every_suite(harness, bench, capsys):
     assert out[1:] == ["quick     2 of 2 found", "full      8 of 8 found",
                        "control   1 of 1 found", "judged    3 of 3 found",
                        "everyday  1 of 1 found",
-                       "tasks OK: 13 of 13 found by lm_eval 0.4.12-fake"]
+                       # 12h.1: IFEval, MMLU-Pro and MATH-500 are in deploy step 4's list
+                       "generative 3 of 3 found",
+                       "tasks OK: 16 of 16 found by lm_eval 0.4.12-fake"]
     # it wrote nothing outside its temporary folder
     assert sorted(p.name for p in bench.iterdir()) == ["everyday", "exam"]
     assert list((bench / "everyday" / "tasks").iterdir()) == []
@@ -113,7 +115,7 @@ def test_the_check_catches_what_failed_62_to_65(harness, bench, capsys, monkeypa
             f"lm_eval runs, and lm_eval reads a --tasks value that names a folder as a folder "
             f"of task files") in out
     assert "everyday  0 of 1 found" in out and "judged    3 of 3 found" in out
-    assert out.rstrip().endswith("tasks FAILED: 12 of 13 found by lm_eval 0.4.12-fake — "
+    assert out.rstrip().endswith("tasks FAILED: 15 of 16 found by lm_eval 0.4.12-fake — "
                                  "not found: everyday")
 
 
