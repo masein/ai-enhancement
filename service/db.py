@@ -1020,6 +1020,14 @@ def jt_marks(who: str) -> dict[str, int | None]:
     return {a: m for a, m in rows}
 
 
+def jt_marks_by(who: str) -> set[str]:
+    """the names that gave these marks (12f.0: History says whose they were)"""
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT DISTINCT by FROM judge_test_marks WHERE who=? AND by != ''",
+                         (who,)).fetchall()
+    return {r[0] for r in rows}
+
+
 def jt_whos() -> list[str]:
     with closing(_conn()) as c:
         rows = c.execute("SELECT DISTINCT who FROM judge_test_marks").fetchall()

@@ -3500,6 +3500,7 @@ button.who.ask { border-color:var(--warning);
   vertical-align:1px; flex:none; }
 .dot.ok { background:var(--good); }
 .dot.warn { background:var(--warning); }
+.dot.bad { background:var(--critical); }
 /* 11e: a warning dot and a warning badge are not a warning paragraph — the
    paragraph's padding, margin and left rule made the checks pill 40px tall
    and the "provisional" badge a 30px box */
@@ -14434,6 +14435,9 @@ function judgeTestCard() {
       : el('p', { class: 'small', 'data-jt-progress': `${pr.marked}|${pr.total}` },
         `You’ve marked ${pr.marked} of ${pr.total}` + (pr.skipped ? ` · ${pr.skipped} skipped`
           : '') + '.'),
+    // 12f.0: a new sample is a new version; the earlier ones keep their marks
+    jt && jt.changed ? el('p', { class: 'warn', 'data-jt-changed': '1',
+      text: 'the sample changed; mark the new one' }) : '',
     cal && cal.method ? el('p', { class: 'small', 'data-jt-calibration': '1',
       text: cal.calibrated ? `The judge now: checked against ${cal.by} on ${cal.n} answers · `
         + `κ ${cal.kappa}` : `The judge now: κ ${cal.kappa} on ${cal.n} answers — `
@@ -14457,7 +14461,20 @@ function judgeTestCard() {
                 + 'table fills in as each finishes', { key: 'ai' });
             } catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
           } }), est)) : '',
-    res && res.rows.length ? judgeTestTable(res) : '');
+    res && res.rows.length ? judgeTestTable(res) : '',
+    jt && (jt.history || []).length ? jtHistory(jt.history) : '');
+}
+// 12f.0: the earlier samples, as they were marked — never deleted
+function jtHistory(hist) {
+  const day = t => t ? new Date(t * 1000).toISOString().slice(0, 10) : '';
+  return el('details', { class: 'jthistory', 'data-jt-history': String(hist.length) },
+    el('summary', { class: 'small', text: `History: ${hist.length} earlier sample`
+      + `${hist.length === 1 ? '' : 's'} ▸` }),
+    hist.map(h => el('div', { class: 'small', 'data-jt-history-version': h.version },
+      el('p', { text: `The sample of ${day(h.at) || 'before versions'}: ${h.marked} of ${h.n} `
+        + `marked` + (h.by.length ? ` by ${h.by.join(', ')}` : '') + '.' }),
+      h.rows.length ? el('ul', {}, h.rows.map(r => el('li', { class: 'mono',
+        text: `${r.name}: κ ${r.kappa == null ? '—' : r.kappa.toFixed(2)} · ${r.n}` }))) : '')));
 }
 
 function judgeTestTable(res) {
@@ -16019,9 +16036,12 @@ function renderWarnings() {
   // 12b: a status dot, not a pill of words — green and nothing else when every
   // check passes, amber with the count when any does not
   const n = problems.length;
+  // 12f.0: red when one of them stops runs (a full disk)
+  const red = problems.some(c => c.severity === 'error');
   const row = c => el('li', { class: 'check warnrow',
       'data-check': c.key, 'data-severity': c.severity, 'data-limit': c.limit ? '1' : null },
-    el('span', { class: 'dot ' + (c.severity === 'warning' && !c.limit ? 'warn' : 'info'),
+    el('span', { class: 'dot ' + (c.severity === 'error' ? 'bad'
+      : c.severity === 'warning' && !c.limit ? 'warn' : 'info'),
       title: c.limit ? 'a known limit of the setup' : c.severity === 'warning' ? 'warning'
         : 'for information' }),
     el('span', { class: 'check-short', text: c.short }),
@@ -16033,12 +16053,12 @@ function renderWarnings() {
   // 12g.1: the 11a popover, as the run counter is — it closes on Escape, a
   // click outside and a page change. The <details> it replaces stayed open
   // through all three
-  const btn = el('button', { class: 'barpill statusdot' + (n ? ' warn' : ' ok'),
-      'data-warn-summary': String(n),
+  const btn = el('button', { class: 'barpill statusdot' + (red ? ' bad' : n ? ' warn' : ' ok'),
+      'data-warn-summary': String(n), 'data-dot': red ? 'red' : n ? 'amber' : 'green',
       'aria-label': n ? `${n} problem${n > 1 ? 's' : ''} to look at` : 'no problems',
       title: n ? `${n} problem${n > 1 ? 's' : ''} to look at` : 'no problems'
         + (limits.length ? ` · ${limits.length} known limit${limits.length > 1 ? 's' : ''}` : '') },
-    el('span', { class: 'dot ' + (n ? 'warn' : 'ok') }),
+    el('span', { class: 'dot ' + (red ? 'bad' : n ? 'warn' : 'ok') }),
     n ? el('span', { class: 'statusn', text: String(n) }) : '');
   const list = () => el('div', { class: 'moremenu checkspop', id: 'pop-checks',
       'aria-label': 'checks', 'data-warnings': 'open' },

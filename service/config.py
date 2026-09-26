@@ -24,6 +24,11 @@ TITLE = os.environ.get("TITLE", "Team model benchmark")
 SEED = int(os.environ.get("SEED", "1234"))
 MAX_JOB_GB = float(os.environ.get("MAX_JOB_GB", "10"))     # logits+weights+overhead budget
 FREE_MARGIN_MIB = int(os.environ.get("FREE_MARGIN_MIB", "512"))
+# 12f.0: the server's free disk (the results folder's filesystem, and /):
+# amber on the status dot under DISK_AMBER_GB, red under DISK_RED_GB — and
+# below red, a run does not start
+DISK_AMBER_GB = float(os.environ.get("DISK_AMBER_GB", "10"))
+DISK_RED_GB = float(os.environ.get("DISK_RED_GB", "3"))
 GPU_POLL_S = int(os.environ.get("GPU_POLL_S", "60"))
 GPU_WAIT_MAX_S = int(os.environ.get("GPU_WAIT_MAX_S", str(6 * 3600)))
 TASK_TIMEOUT_S = int(os.environ.get("TASK_TIMEOUT_S", str(3 * 3600)))

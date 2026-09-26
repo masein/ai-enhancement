@@ -615,6 +615,12 @@ def run_submission(sub: dict) -> None:
     sid = sub["id"]
     everyday = sub["suite"] == "everyday"
     generative = sub["suite"] == "generative"
+    # 12f.0: a run that can't save doesn't start — in the status dot's words
+    from . import disk
+    why = disk.blocks_run()
+    if why:
+        db.update(sid, status="failed", finished_at=time.time(), error=why)
+        return
 
     # -- preflight: metadata only, no GPU, seconds --------------------------------
     try:
