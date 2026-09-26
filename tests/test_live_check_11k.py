@@ -12,6 +12,7 @@ field.
 from __future__ import annotations
 
 import json
+import time
 import urllib.request
 from pathlib import Path
 
@@ -170,13 +171,16 @@ def grading_row(n_done=240, n=570):
     from service import db
     sid = db.add(MODEL, "base", "judged", "masein", "", tasks=[TASK])
     bid = "fake_grading_1"
-    db.batch_add(bid, "judge", sid, n, "fake", "stub")
+    # the service's own poller finishes a 'submitted' batch within a second,
+    # and this test is about the row while the judge is still working: the
+    # batch is written in flight where the poller does not reach (it takes
+    # status='submitted') — written 'submitted' and moved after, the poller
+    # could finish it in between
+    sql(("INSERT INTO llm_batches (batch_id, kind, ref_id, n_items, provider, model, created_at, "
+         "status) VALUES (?,?,?,?,?,?,?,?)", bid, "judge", sid, n, "fake", "stub", time.time(),
+         "pending"))
     db.judge_run_create(MODEL, bid, n, "stub/overlap-v1", "{}")
     db.batch_progress(bid, f"{n_done}/{n} done")
-    # the service's own poller finishes a 'submitted' batch within a second,
-    # and this test is about the row while the judge is still working: hold it
-    # in flight where the poller does not reach (it takes status='submitted')
-    sql(("UPDATE llm_batches SET status='pending' WHERE batch_id=?", bid))
     db.update(sid, status="done", judge_batch=bid,
               progress=f"judge batch {bid} submitted ({n} answers)")
     return sid, bid
