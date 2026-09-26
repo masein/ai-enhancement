@@ -125,6 +125,14 @@ CHAT_YIELD_WAIT_S = int(os.environ.get("CHAT_YIELD_WAIT_S", "60"))
 # the chats kept listed per person
 CHAT_LIST_N = 50
 
+# 12f.1: a model served elsewhere. Questions go this many at a time —
+# llama-server starts with one slot, so one unless it was started with more
+SERVED_CONCURRENCY = int(os.environ.get("SERVED_CONCURRENCY", "1"))
+# a server that stops answering is retried this long, then the run stops
+SERVED_RETRY_S = int(os.environ.get("SERVED_RETRY_S", "120"))
+# one answer may take this long: a thinking answer on a CPU-offloaded model
+SERVED_TIMEOUT_S = int(os.environ.get("SERVED_TIMEOUT_S", "900"))
+
 # The benchmark suite — one place, mirrored from run_benchmarks.sh. quick is for
 # iteration (minutes); full is the comparable number. Both write into the same
 # tree, so a quick run later "upgrades" to full by running only the missing tasks.

@@ -80,7 +80,8 @@ def hub(q: str) -> tuple[list[dict], bool]:
         return [], False
 
 
-def local_candidates(payload: dict, queue: list[dict], artifacts: list[str]) -> list[dict]:
+def local_candidates(payload: dict, queue: list[dict], artifacts: list[str],
+                     served: list[dict] | None = None) -> list[dict]:
     """Every model this board knows, with what it knows about each — and, for
     a `local/` id, whether its weights are on THIS server. #53 picked
     local/qwen35-delta-moe-…-step945 from the search: it is on the board
@@ -108,6 +109,11 @@ def local_candidates(payload: dict, queue: list[dict], artifacts: list[str]) -> 
         if mid not in seen:
             seen[mid] = {"id": mid, "params": None, "kind": None, "on_board": False,
                          "judged": 0, "artifact": True, "weights": True}
+    # 12f.1: the models served elsewhere, by the name they were registered with
+    for r in served or []:
+        c = seen.setdefault(r["id"], {"id": r["id"], "params": None, "on_board": False,
+                                      "judged": 0})
+        c.update({"kind": "instruct", "name": r["name"], "served": {"how": r["how"]}})
     # 12h.1: the models the board suggests before anyone has run them
     from . import catalog
     for c in catalog.MODELS:
@@ -130,7 +136,7 @@ def suggest(q: str, local: list[dict]) -> dict:
         return {"items": [], "hub_ok": True, "footer": ""}
     ql = q.lower()
     mine = [dict(c, source="board" if c.get("on_board") else "known")
-            for c in local if ql in c["id"].lower()]
+            for c in local if ql in c["id"].lower() or ql in (c.get("name") or "").lower()]
     # the board's own first, most-judged first, then by name
     mine.sort(key=lambda c: (not c.get("on_board"), -(c.get("judged") or 0), c["id"].lower()))
     mine = mine[:LOCAL_LIMIT]

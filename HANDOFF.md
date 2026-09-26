@@ -423,6 +423,35 @@ in …s`, with no `failed` and no `error`.
   - A run of that task would fail the same way. Hold off queueing it, and
     send the output.
 
+## 5c. A model served elsewhere — masein's llama-server (12f.1)
+
+The board tests a model another program serves over an OpenAI-compatible
+address; it never starts, stops or restarts that program. The phone build
+(Qwen3.6-35B-A3B k=4 + LDA, UD-Q4_K_XL) runs only on the team's llama.cpp fork,
+so masein runs its `llama-server` outside Docker:
+- on port 8090 (8081 is soft-label-explorer's, on the tailnet address);
+- on the Docker bridge address with `--api-key`, where the container reaches
+  it as `host.docker.internal` (the `extra_hosts` line in
+  `docker-compose.yml`). **Never on 0.0.0.0 without a key**: the server is on
+  the tailnet.
+
+masein's working setup, as he runs it (the paths are his):
+
+```
+# start (from ~/llama.cpp-teraformer; build-lda built with ~/lda-env)
+GGML_CPU_DISABLE_FUSION=1 LLAMA_MOE_ROUTE_MODE=lookahead LLAMA_MOE_ROUTE_LOOKAHEAD=1 \
+LD_LIBRARY_PATH=$HOME/lda-env/lib:$PWD/build-lda/bin \
+nohup build-lda/bin/llama-server -m ~/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf \
+  -ngl 99 --cpu-moe -c 16384 --jinja --host 172.17.0.1 --port 8090 --api-key "$LDA_KEY" \
+  > ~/lda-server.log 2>&1 &
+# stop
+pkill -f build-lda/bin/llama-server
+```
+
+Then, on the board: Test a model ▸ A model served elsewhere, with the address
+`http://host.docker.internal:8090/v1` and `$LDA_KEY`'s value as the key.
+Check shows what the server serves; Save pins it.
+
 ---
 
 ## 6. How we got here — the decisions and their reasons
@@ -2940,6 +2969,68 @@ items 9–12.
   - a red disk turns the status dot red, `POST /api/submissions` refuses with
     that line (409), and `run_submission` fails a queued run with it before
     anything starts.
+
+### 12f.1 — models served elsewhere
+
+`docs/prompts/phase-12f-served-models-on-phone.md` §3–7. The board tests a
+model another program serves over an OpenAI-compatible address — the phone
+build on masein's llama-server (§ 5c) — and never starts, stops or restarts
+that program. `service/served.py` holds it.
+- **Registered** in Test a model ▸ A model served elsewhere: Name, Address,
+  Key, Based on, How it's served (required), Thinking (on, off, the model
+  decides). **Check** asks the server `GET /v1/models`, and `/props` and
+  `/health` if they answer, and shows the file, its size, the context and
+  the build. **Save** asks again and keeps it (`served_models` in the
+  service database), pinned to those four; nothing answering is one line,
+  and nothing is kept. Its id is `served/<name>`, and its name is the one
+  typed.
+- **The key** stays in the database. No endpoint returns it (`has_key`
+  only), and no log, results file or page shows it. lm_eval gets it in its
+  child's `OPENAI_API_KEY`, never on its command line.
+- **Every run compares the pin first.** A different file, size, context or
+  build stops the run: "The server now serves a different file than the one
+  registered. Register it again if that's intended."
+- **What it sits:**
+  - **Everyday tasks and the Knowledge exam**: asked here, one chat message a
+    question, with the settings a local run uses — `runner._everyday_settings`
+    (`everyday.run_settings`, 12d.1's one function) and
+    `runner._exam_settings`, which the local exam run now reads too.
+    Thinking on or off is sent as `chat_template_kwargs.enable_thinking`;
+    "the model decides" sends nothing. The answers are written as lm_eval
+    writes them (`<task>_0shot/served/results_*.json` and `samples_*.jsonl`),
+    so the marking, the judge and the page read them unchanged. Thinking the
+    server returns apart (`reasoning_content`) is put back in its tags.
+  - **IFEval, MMLU-Pro and MATH-500**: through lm_eval's
+    `local-chat-completions`, one request at a time per slot, with
+    `--use_cache` per pinned file. The results are then marked with the
+    served id (`pretrained=served/…`). lm_eval sends no thinking switch: the
+    server's default applies, and the log says so.
+  - **Not the log-likelihood tasks**: full, quick and control are refused at
+    submit and at start, and greyed in the form, with "Multiple-choice
+    benchmarks need the model loaded here; this one is served elsewhere."
+    The model page says it once, in its header; no dashes.
+  - **Not Improve**: no tab, not in Improve's models, and `POST
+    /api/proposals` refuses it. Not in the Playground either.
+- **Runs:** the same run lock; no wait for free VRAM. Questions go
+  `SERVED_CONCURRENCY` at a time (1). The row's progress says "140 of 200 ·
+  4.1 s an answer · about 4 min left", from the seconds each answer took (for
+  lm_eval, from its own progress bar).
+- **A server that stops answering** is asked again for `SERVED_RETRY_S`
+  (120 s), then the run stops. What it answered is kept, marked and judged;
+  the row says "everyday: the server stopped answering at 140 of 388 · the
+  140 answered are kept and marked", and the results say `partial`. The next
+  Everyday run asks only the rest. Under lm_eval, the answers it gave stay in
+  its cache and the next run asks only the rest.
+- **Each answer records** the pinned details and the request's settings
+  (`served` in every samples line and results file).
+- **On the page:** a normal row on Models with a grey **served** tag, its
+  tooltip the How text. The model page's header: how it's served, what its
+  server reported, the one line, and "Compared with <base> loaded here:
+  Everyday 171 vs 176 · …" when its base is on the board. History shows each
+  run's pinned details, and Run provenance where and how it is served. A
+  served model's scores are its own row's: never averaged with another's.
+- **Compose:** `extra_hosts: host.docker.internal:host-gateway` was already
+  on the bench service; a test now holds it there.
 
 ## 11. Known gaps, risks, loose ends
 

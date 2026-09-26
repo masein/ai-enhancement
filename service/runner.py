@@ -24,6 +24,7 @@ import time
 from pathlib import Path
 
 from . import config, db
+from . import served as _served
 from .hfmeta import PreflightError, preflight
 
 LOCK = config.RESULTS_ROOT / ".run.lock"
@@ -187,6 +188,30 @@ def _everyday_settings(meta: dict) -> dict:
     generated (12d.1)"""
     import everyday as _ev          # scripts/, on sys.path in the service
     return _ev.run_settings(meta.get("archinfo"))
+
+
+# the exam's own template (eval_tasks/fr/_fr_template_yaml): what it stops on
+EXAM_UNTIL = ["\n\n\n"]
+EXAM_MAX_GEN_TOKS = 256
+
+
+def _exam_settings(meta: dict) -> dict:
+    """how a Knowledge exam answer is generated, said once (12f.1): a local
+    run's lm_eval command and a served model's questions both read it. 11l:
+    a reasoning model thinks before it answers, and 256 tokens ran out
+    inside the thinking on every question of run #60"""
+    thinks = bool((meta.get("archinfo") or {}).get("reasoning_template"))
+    return {"until": EXAM_UNTIL, "do_sample": False, "temperature": 0.0,
+            "max_gen_toks": config.REASONING_MAX_GEN_TOKS if thinks else EXAM_MAX_GEN_TOKS}
+
+
+def time_left(done: int, total: int, secs_each: float) -> str:
+    """"140 of 200 · 4.1 s an answer · about 4 min left": a slow run's
+    progress, from the seconds each answer has taken so far"""
+    left = max(0, total - done) * secs_each
+    when = (f"about {left / 3600:.1f} h left" if left >= 5400 else
+            f"about {max(1, round(left / 60))} min left" if left >= 60 else "under a minute left")
+    return f"{done} of {total} · {secs_each:.1f} s an answer · " + (when if done < total else "done")
 
 
 def gpu_free_mib() -> int:
@@ -362,21 +387,26 @@ def include_args_for(task: str) -> list[str]:
 
 def lm_eval_cmd(model_args: str, task: str, shots: int, batch, task_out: Path, *,
                 chat: bool, max_gen_toks: int | None = None, backend: str = "hf",
-                samples: Path | None = None, limit: int | None = None) -> list[str]:
+                samples: Path | None = None, limit: int | None = None,
+                cache: Path | None = None) -> list[str]:
     """The lm_eval command for one task. Built here only, so that
     scripts/check_tasks.py (deploy step 4) hands the installed harness exactly
     what a run hands it. 12h.1: `backend` is "hf" or "vllm" (vLLM sizes its
-    own batches and picks its own device), and `samples` a seeded subset."""
+    own batches and picks its own device), and `samples` a seeded subset.
+    12f.1: "local-chat-completions" asks a model served elsewhere — no device
+    here, one request a message, and `cache`, the answers it has, so a run
+    the server stopped asks only the rest next time."""
     cmd = ["lm_eval",
            "--model", backend,
            "--model_args", model_args,
            "--tasks", task,
            "--num_fewshot", str(shots),
-           "--batch_size", "auto" if backend == "vllm" else str(batch),
+           "--batch_size", "auto" if backend == "vllm" else
+           "1" if backend == _served.BACKEND else str(batch),
            "--seed", str(config.SEED),
            "--output_path", str(task_out),
            "--log_samples",
-           *([] if backend == "vllm" else ["--device", "cuda:0"]),
+           *([] if backend in ("vllm", _served.BACKEND) else ["--device", "cuda:0"]),
            *include_args_for(task)]
     if chat:
         cmd.append("--apply_chat_template")
@@ -386,6 +416,8 @@ def lm_eval_cmd(model_args: str, task: str, shots: int, batch, task_out: Path, *
         cmd += ["--samples", str(samples)]
     if limit:                        # scripts/trial_generative.py only: a few items
         cmd += ["--limit", str(limit)]
+    if cache:
+        cmd += ["--use_cache", str(cache)]
     return cmd
 
 
@@ -583,11 +615,13 @@ def reuse_note(reused: dict[str, int | None], tasks: list[str]) -> str:
 CANCELED = -15
 
 
-def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path) -> int:
+def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
+              on_poll=None) -> int:
     """One lm_eval task, as a child we watch: its exit code, -1 on timeout, or
     CANCELED when someone asked the queue to stop this run. Polled every two
     seconds, so a cancel costs at most that plus a clean shutdown. `cwd` is
-    lm_eval_cwd(), never BENCH_ROOT."""
+    lm_eval_cwd(), never BENCH_ROOT. `on_poll()` is called at each poll: a
+    served run's progress, read from the harness's own progress bar."""
     proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=cwd,
                             env=env, **({"user": run_as[0], "group": run_as[1]}
                                         if run_as else {}))
@@ -597,6 +631,8 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path) -> int
             return proc.wait(timeout=2)
         except subprocess.TimeoutExpired:
             pass
+        if on_poll:
+            on_poll()
         why = ("canceled by request" if db.cancel_requested(sid)
                else f"killed after {config.TASK_TIMEOUT_S}s timeout"
                if time.time() - t0 > config.TASK_TIMEOUT_S else "")
@@ -611,6 +647,82 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path) -> int
             return CANCELED if why.startswith("canceled") else -1
 
 
+# ---------------------------------------------------------------------------
+# 12f.1: a model served elsewhere
+# ---------------------------------------------------------------------------
+
+def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, label: str,
+                log_path: Path, everyday: bool, asked: list[str] | None):
+    """one Everyday or exam task, asked over the model's server. (status,
+    stopped): 0 or CANCELED, and a ServerStopped when it stopped answering —
+    what it answered before that is written and kept"""
+    if everyday:
+        items = config.EVERYDAY_TASKS_DIR / f"{config.EVERYDAY_TASK}.jsonl"   # build_task's
+    else:
+        items = config.JUDGED_TASKS_DIR / f"{task}.jsonl"                     # exam_build's
+    docs = [json.loads(line) for line in items.read_text(encoding="utf-8").splitlines()
+            if line.strip()]
+    if everyday and asked is not None:
+        docs = [d for d in docs if d.get("id") in set(asked)]
+    s = _served.settings_for(rec, meta, everyday)
+    with open(log_path, "a") as lf:
+        lf.write(f"\n===== [{sid}] {task} · served: {rec['name']} at {rec['base_url']} · "
+                 f"{rec['pin'].get('file')} · {len(docs)} question(s), "
+                 f"{config.SERVED_CONCURRENCY} at a time · {json.dumps(s)} =====\n")
+
+    def progress(done: int, total: int, each: float) -> None:
+        db.update(sid, status="running", progress=f"{label} · {time_left(done, total, each)}")
+    try:
+        status = _served.answer_task(rec, task, docs, task_out, s, everyday,
+                                     on_progress=progress,
+                                     canceled=lambda: db.cancel_requested(sid))
+        return status, None
+    except _served.ServerStopped as e:
+        e.task = task
+        with open(log_path, "a") as lf:
+            lf.write(f"\n[service] {task}: {e} ({e.why}); the {e.done} answered are kept\n")
+        return 0, e
+
+
+_TQDM = re.compile(r"(\d+)/(\d+) \[(?:(\d+):)?(\d+):(\d+)<")
+
+
+def _tqdm_last(text: str) -> tuple[int, int, float] | None:
+    """the harness's last progress bar in `text`: (done, total, seconds so far)"""
+    m = None
+    for m in _TQDM.finditer(text):
+        pass
+    if not m:
+        return None
+    h, mi, se = int(m.group(3) or 0), int(m.group(4)), int(m.group(5))
+    return int(m.group(1)), int(m.group(2)), float(h * 3600 + mi * 60 + se)
+
+
+def _served_poll(sid: int, label: str, log_path: Path, mark: int) -> None:
+    """a served generative task's progress, from lm_eval's own bar"""
+    try:
+        size = log_path.stat().st_size
+        got = _tqdm_last(_read_from(log_path, max(mark, size - 4096)))
+    except OSError:
+        return
+    if got and got[0]:
+        done, total, secs = got
+        db.update(sid, progress=f"{label} · {time_left(done, total, secs / done)}")
+
+
+_SERVER_GONE = re.compile(r"ConnectionError|Connection refused|ClientConnectorError|"
+                          r"ServerDisconnected|RetryError|Cannot connect|ConnectTimeout|"
+                          r"ReadTimeout|RemoteDisconnected")
+
+
+def _served_stopped_in_log(text: str) -> _served.ServerStopped | None:
+    """lm_eval gave up on the server: at which answer, from its bar"""
+    if not _SERVER_GONE.search(text):
+        return None
+    got = _tqdm_last(text) or (0, 0, 0.0)
+    return _served.ServerStopped(got[0], got[1], "lm_eval could not reach it")
+
+
 def run_submission(sub: dict) -> None:
     sid = sub["id"]
     everyday = sub["suite"] == "everyday"
@@ -622,31 +734,41 @@ def run_submission(sub: dict) -> None:
         db.update(sid, status="failed", finished_at=time.time(), error=why)
         return
 
+    # 12f.1: a model served elsewhere — asked over its server, never loaded here
+    srv = _served.is_served(sub["hf_id"])
+
     # -- preflight: metadata only, no GPU, seconds --------------------------------
     try:
-        # the submitter's kind is passed in: 'auto' is resolved here, and refused
-        # when it is genuinely ambiguous rather than guessed. 12a: the pilot
-        # asks through the chat template whatever kind the board lists — a
-        # model with one is asked as a person would ask it, a model without
-        # one cannot be
-        meta = preflight(sub["hf_id"], "instruct" if everyday else sub["kind"],
-                         allow_remote_code=bool(sub.get("allow_remote_code")))
-        if everyday and not meta.get("has_template"):
-            raise PreflightError(config.NO_CHAT_TEMPLATE)
-        # 12h.1: asked through the chat template and scored on what it
-        # writes, so only an instruct model can sit them fairly
-        if generative and meta["kind"] != "instruct":
-            raise PreflightError(config.GEN_INSTRUCT_ONLY)
+        if srv:
+            # its registration, the suites it can sit, and the file its server
+            # serves now against the one registered: a different file stops here
+            meta = _served.preflight(sub)
+        else:
+            # the submitter's kind is passed in: 'auto' is resolved here, and
+            # refused when it is genuinely ambiguous rather than guessed. 12a:
+            # the pilot asks through the chat template whatever kind the board
+            # lists — a model with one is asked as a person would ask it, a
+            # model without one cannot be
+            meta = preflight(sub["hf_id"], "instruct" if everyday else sub["kind"],
+                             allow_remote_code=bool(sub.get("allow_remote_code")))
+            if everyday and not meta.get("has_template"):
+                raise PreflightError(config.NO_CHAT_TEMPLATE)
+            # 12h.1: asked through the chat template and scored on what it
+            # writes, so only an instruct model can sit them fairly
+            if generative and meta["kind"] != "instruct":
+                raise PreflightError(config.GEN_INSTRUCT_ONLY)
     except PreflightError as e:
         db.update(sid, status="failed", error=str(e), finished_at=time.time())
         return
+    rec = meta.get("served")
     kind = meta["kind"]
     remote_code = bool(meta.get("remote_code"))
     db.update(sid, kind=kind, params=meta["params"], vocab=meta["vocab"],
               batch=meta["batch"], need_gb=meta["need_gb"],
               arch=json.dumps(meta.get("archinfo") or {}),
               progress=f"preflight ok · batch={meta['batch']} · "
-                       f"needs ~{meta['need_gb']:g} GB")
+                       f"needs ~{meta['need_gb']:g} GB" if not rec else
+                       f"preflight ok · served elsewhere: {rec['pin'].get('file') or rec['name']}")
 
     tasks = config.tasks_for_suite(sub["suite"])
     judged = set(config.judged_tasks())
@@ -684,7 +806,8 @@ def run_submission(sub: dict) -> None:
             {"model": sub["hf_id"] + " · thinking", "base_model": sub["hf_id"], "kind": kind,
              "params": meta["params"], "kind_reason": meta.get("kind_reason"),
              **(meta.get("archinfo") or {})}), encoding="utf-8")
-    backend, not_vllm = gen_backend() if generative else ("hf", "")
+    backend, not_vllm = (gen_backend() if generative and not rec else
+                         (_served.BACKEND, "") if generative else ("hf", ""))
     fell_back = ""
     if everyday:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -732,7 +855,8 @@ def run_submission(sub: dict) -> None:
         # -- wait for VRAM, then run the missing tasks ----------------------------
         need_mib = int(meta["need_gb"] * 1024) + config.FREE_MARGIN_MIB
         t0 = time.time()
-        while (free := gpu_free_mib()) < need_mib:
+        # 12f.1: a served model's memory is its server's: nothing to wait for here
+        while not rec and (free := gpu_free_mib()) < need_mib:
             if db.cancel_requested(sid):
                 db.update(sid, status="canceled", finished_at=time.time(),
                           progress="canceled by request while waiting for VRAM")
@@ -780,6 +904,7 @@ def run_submission(sub: dict) -> None:
         canceled = False
         reused: dict[str, int | None] = {}
         asked: list[str] | None = None
+        stopped: _served.ServerStopped | None = None       # 12f.1: the server stopped
         for i, task in enumerate(tasks, 1):
             if canceled or db.cancel_requested(sid):
                 canceled = True
@@ -824,6 +949,26 @@ def run_submission(sub: dict) -> None:
                              f"than the task holds now; kept at {moved}, answering again\n")
             db.update(sid, status="running", progress=label)
 
+            if rec and not generative:
+                # 12f.1: Everyday and the exam, asked over the server with the
+                # settings a local run uses, into the files lm_eval writes
+                t_task = time.time()
+                status, stopped = _ask_served(sid, rec, meta, task, task_out, label, log_path,
+                                              everyday, asked)
+                gpu_seconds += time.time() - t_task
+                db.update(sid, gpu_seconds=gpu_seconds)
+                if status == CANCELED:
+                    canceled = True
+                    break
+                if status == 0 and not stopped and current_fingerprint(task):
+                    (task_out / BANK_FILE).write_text(current_fingerprint(task) + "\n",
+                                                      encoding="utf-8")
+                    (task_out / ANSWERED_BY).write_text(json.dumps(
+                        {"submission": sid, "at": time.time()}), encoding="utf-8")
+                if stopped:
+                    break          # every task after this one asks the same server
+                continue
+
             # 12d.1: how the model loads, said once (load_spec) — the Playground
             # loads through the same decision
             spec = load_spec(sub["hf_id"], meta)
@@ -838,7 +983,7 @@ def run_submission(sub: dict) -> None:
             # 12a.4: its everyday answers get more room still — 12d.1: said
             # by everyday.run_settings, the function the Playground reads too
             room = (_everyday_settings(meta)["max_gen_toks"] if everyday
-                    else config.REASONING_MAX_GEN_TOKS) if thinks else None
+                    else _exam_settings(meta)["max_gen_toks"]) if thinks else None
             cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
                               chat=kind == "instruct" or everyday, max_gen_toks=room)
             if generative:
@@ -849,6 +994,13 @@ def run_submission(sub: dict) -> None:
                         samples.parent.mkdir(parents=True, exist_ok=True)
                         samples.write_text(json.dumps(mmlu_pro_subset(int(sub["subset"]))),
                                            encoding="utf-8")
+                    if rec:
+                        # 12f.1: through lm_eval's local-chat-completions; the
+                        # answers it has are kept in its cache, by what was served
+                        return lm_eval_cmd(
+                            _served.lm_eval_model_args(rec), task, shots, 1, task_out,
+                            chat=True, max_gen_toks=th["budget"], backend=be,
+                            samples=samples, cache=_served.cache_path(rec, task))
                     return lm_eval_cmd(
                         gen_model_args(pretrained, th, backend=be, remote_code=remote_code,
                                        revision=meta.get("revision"),
@@ -886,7 +1038,18 @@ def run_submission(sub: dict) -> None:
                              f"hub offline, token withheld\n")
                 lf.flush()
                 mark = log_path.stat().st_size      # this task's output starts here
-                status = _run_task(sid, cmd, lf, job_env, run_as, cwd=lm_eval_cwd(task_out))
+                if rec:
+                    lf.write(f"[served] {rec['name']} at {rec['base_url']} · "
+                             f"{rec['pin'].get('file')} · thinking as the server does "
+                             f"(lm_eval sends no switch) · {config.SERVED_CONCURRENCY} at a time\n")
+                    lf.flush()
+                # 12f.1: a served run's key, and its progress from lm_eval's bar;
+                # a local run is called as it always was
+                served_kw = ({"on_poll": lambda: _served_poll(sid, label, log_path, mark)}
+                             if rec else {})
+                status = _run_task(sid, cmd, lf,
+                                   _served.job_env(job_env, rec) if rec else job_env, run_as,
+                                   cwd=lm_eval_cwd(task_out), **served_kw)
                 if status == CANCELED:
                     canceled = True
                 # 12h.1: a model vLLM cannot load runs on the harness's own
@@ -926,6 +1089,16 @@ def run_submission(sub: dict) -> None:
                               more=f" (+{len(missing) - 6} more)"
                                    if len(missing) > 6 else ""))
                 break          # every remaining task would load the same model
+
+            if rec and status == 0:
+                _served.adopt_lm_eval_results(task_out, rec)
+            if rec and status not in (0, CANCELED):
+                got = _served_stopped_in_log(_read_from(log_path, mark))
+                if got:
+                    stopped = got
+                    failed_tasks.append(task)
+                    db.update(sid, error=f"{task}: {got}" + _served.KEPT_FOR_NEXT)
+                    break
 
             if status == 0 and current_fingerprint(task):
                 # which questions these answers answer, and which row asked
@@ -1034,6 +1207,13 @@ def run_submission(sub: dict) -> None:
         if failed_tasks:
             db.update(sid, status="failed", finished_at=time.time(),
                       progress=f"failed on: {', '.join(failed_tasks)}")
+        elif stopped:
+            # 12f.1: a partial result, and it says so — what was answered is
+            # marked (and judged) like any answer; the rest is asked next time
+            db.update(sid, status="failed", finished_at=time.time(),
+                      error=f"{stopped.task}: {stopped} · the {stopped.done} answered are kept "
+                            f"and marked",
+                      progress=(judge_note or "").strip(" ·"))
         else:
             what = (f"all {len(tasks)} tasks" if not only
                     else f"{', '.join(t.replace('exam_', '') for t in tasks)}")

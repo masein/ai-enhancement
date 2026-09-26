@@ -236,6 +236,14 @@ CREATE TABLE IF NOT EXISTS chats (
   updated_at  REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_chats_who ON chats(who, updated_at);
+-- 12f.1: models served elsewhere (llama-server, say): where, how, and what
+-- the server reported when it was registered, pinned. The key stays here,
+-- and no endpoint returns it
+CREATE TABLE IF NOT EXISTS served_models (
+  id          TEXT PRIMARY KEY,
+  data        TEXT NOT NULL,
+  updated_at  REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS qb_drafts (
   id          TEXT PRIMARY KEY,
   kind        TEXT NOT NULL,                      -- 'knowledge' | 'everyday'
@@ -1086,6 +1094,26 @@ def chat_list(who: str, n: int) -> list[dict]:
     with closing(_conn()) as c:
         rows = c.execute("SELECT data FROM chats WHERE who=? ORDER BY updated_at DESC LIMIT ?",
                          (who, n)).fetchall()
+    return [json.loads(r[0]) for r in rows]
+
+
+def served_put(rec: dict) -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO served_models (id, data, updated_at) VALUES (?,?,?) "
+                  "ON CONFLICT(id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at",
+                  (rec["id"], json.dumps(rec), time.time()))
+        c.commit()
+
+
+def served_get(model_id: str) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute("SELECT data FROM served_models WHERE id=?", (model_id,)).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def served_all() -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT data FROM served_models ORDER BY updated_at DESC").fetchall()
     return [json.loads(r[0]) for r in rows]
 
 
