@@ -417,7 +417,7 @@ def test_own_code_the_server_will_not_run_disables_submit_with_the_reason(live, 
                            ".textContent")
     for words in ("ALLOW_REMOTE_CODE=1", "EVAL_USER", "SERVICE.md § custom model code"):
         assert words in why.text_content()
-    assert page.get_by_role("button", name="Submit model").is_disabled()
+    assert page.get_by_role("button", name="Start test").is_disabled()
     assert page.locator("[data-own-code-box]").count() == 0
     shot(page, "11i-own-code-refused-1400-light.png")
     assert page.errors == []
@@ -442,7 +442,7 @@ def test_own_code_the_server_runs_needs_the_box_and_sends_it(live, page, upload,
                             + upload[:4] + "…)")
     assert label.endswith(f"as the unprivileged {getpass.getuser()} user")
     assert not box.is_checked()
-    submit = page.get_by_role("button", name="Submit model")
+    submit = page.get_by_role("button", name="Start test")
     assert submit.is_disabled()
     shot(page, "11i-own-code-box-1400-light.png")
     box.check()
@@ -467,7 +467,7 @@ def test_a_sha_off_the_allowlist_is_named_on_the_page(live, page, upload, monkey
                            ".textContent")
     why = page.locator("[data-why='own-code']").text_content()
     assert f"sha {upload}" in why and f"add {upload} to REMOTE_CODE_SHAS" in why
-    assert page.get_by_role("button", name="Submit model").is_disabled()
+    assert page.get_by_role("button", name="Start test").is_disabled()
     assert page.errors == []
 
 

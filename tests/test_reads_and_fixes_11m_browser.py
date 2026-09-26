@@ -232,10 +232,9 @@ def test_each_suite_option_says_what_it_gets_you(live, page):
     open_submit(page, live["base"])
     help_ = page.locator("[data-suite-help]")
     help_.wait_for()
-    assert help_.text_content() == (
-        "full and judged are separate runs, not one inside the other: a model needs both to "
-        "have an average and a judged score. Resubmitting is free — each run does only the "
-        "tasks still missing, which is also how a quick run becomes a full one.")
+    # 12i.0: one line, no system words
+    assert help_.text_content() == ("Pick a model and what to test. One test runs at a time; "
+                                    "results appear on Models.")
     page.get_by_label("suite").click()
     page.wait_for_selector("[role=listbox][aria-label='suite']")
     opts = page.locator("#pop-sel-submit-suite [role=option]")

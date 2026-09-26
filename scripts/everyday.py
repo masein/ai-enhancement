@@ -471,6 +471,15 @@ def _outside_json(a: str) -> str:
     return outside
 
 
+# 12i.0: numbers_from_source's two rules from the long-summary runs
+LENGTH_NOTE = re.compile(r'\(?\s*(?:word count|words?)\s*[:=]?\s*\d+\s*\)?|\(\s*\d+\s*words?\s*\)'
+                         r'|\b\d+\s*words?\b(?=\s*\)?\s*$)', re.I)
+MONTH_DAYS = {"january": 31, "february": 28, "march": 31, "april": 30, "may": 31, "june": 30,
+              "july": 31, "august": 31, "september": 30, "october": 31, "november": 30,
+              "december": 31}
+END_OF_MONTH = re.compile(r'\bend of (' + '|'.join(MONTH_DAYS) + r')\b', re.I)
+
+
 def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
     """One check on one answer: (True, '') or (False, why). A judge check is
     (None, 'judge'): the script cannot decide it."""
@@ -535,8 +544,11 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
             return False, f"made up a {check['what']}"
         return True, ''
     if t == 'numbers_from_source':
-        # 12a.5: list markers ("1. ", "2) ") aren't claims, so they don't count
+        # 12a.5: list markers ("1. ", "2) ") aren't claims, so they don't count;
+        # 12i.0: nor is a note of the answer's own length — "(109 words)",
+        # "(Word count: 89)", "… 12 words" at the very end (Qwen3 adds them)
         body = re.sub(r'(?m)^\s*(?:[-*•]\s*)?\d{1,2}[.)]\s+', '', a)
+        body = LENGTH_NOTE.sub('', body)
         # times are compared as times: "3 pm", "15:00" and "3:00 pm" are the
         # same; "noon" is 12:00
         given, bad = clock_times(_norm(prompt)), []
@@ -553,6 +565,10 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
             return False, 'invented the time ' + bad[0]
         # …and a number the question writes in words is one it gives
         src = set(numbers(_norm(prompt))) | word_numbers(prompt)
+        # 12i.0: "end of October" gives that month's last day, so "by October
+        # 31" isn't invented
+        for mo in END_OF_MONTH.findall(prompt):
+            src.add(float(MONTH_DAYS[mo.lower()]))
         extra = [n for n in numbers(body) if n not in src]
         return not extra, f'invented {extra[0]:g}' if extra else ''
     if t == 'word_count':

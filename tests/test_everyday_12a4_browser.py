@@ -57,9 +57,11 @@ def test_the_new_checks_are_said_in_plain_words(live, page):
 def test_the_tab_says_which_wording_it_shows(live, page):
     everyday_page(page, live["base"])
     line = page.locator(f"[data-everyday-head] [data-evd-version='{HASH}']")
-    # 12g.2: the version is the wording and the split
-    assert line.inner_text().startswith(
-        f"This version: 2026-09-25 · {HASH}, the wording and the split.")
+    # 12g.2: the version is the wording and the split — 12i.0: said in words,
+    # the hash and what it covers on hover
+    assert line.inner_text() == "Questions updated 25 Sep"
+    assert line.get_attribute("title").startswith(
+        f"version {HASH}: the wording and the split.")
     # the two that answered this wording; the two that sat only the pilot are not here
     assert [th.get_attribute("data-evd-model") for th in
             page.locator("[data-everyday-table] th[data-evd-model]").all()] == \

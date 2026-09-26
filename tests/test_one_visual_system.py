@@ -63,7 +63,7 @@ def test_a_disabled_button_looks_disabled_and_says_why(live, page):
     assert why.is_visible() and "under the 30" in why.text_content()
     # the four kinds of button look like four kinds
     open_submit(page, live["base"])
-    primary = page.get_by_role("button", name="Submit model")
+    primary = page.get_by_role("button", name="Start test")
     bg = primary.evaluate("b => getComputedStyle(b).backgroundColor")
     accent = page.evaluate("getComputedStyle(document.body).getPropertyValue('--accent').trim()")
     assert bg != "rgba(0, 0, 0, 0)" and accent

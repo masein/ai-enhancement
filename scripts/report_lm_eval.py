@@ -3237,6 +3237,9 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .evm-th { text-align:center; min-width:96px; font-family:var(--font-sans); text-transform:none;
   letter-spacing:0; font-size:var(--fs-2); color:var(--text-primary); }
 .evm-th a, .evm-th > span:first-child { display:block; font-weight:600; }
+.evm-count .evsep { display:none; }
+.evm-count .evmissing { display:block; white-space:nowrap; }
+.evpart .evcell { color:var(--text-secondary); font-weight:500; }
 .evm-count { display:block; font-family:var(--font-mono); font-size:var(--fs-1);
   color:var(--text-secondary); font-weight:400; margin-top:2px; }
 .evq-cell { text-align:left; font-family:var(--font-sans); text-transform:none; letter-spacing:0;
@@ -5365,7 +5368,8 @@ function kindValue(m, kind) {
       + (w ? ` · weakest: ${frName(w.task)} ${num(w.v, 2)} / 4` : '')];
   }
   const e = evdOf(m.id);
-  return [e ? evdCount(e) : '—', ''];
+  // 12i.0: a partial count says so under it
+  return [e ? evdCount(e) : '—', e && evdMissing(e) ? `${evdMissing(e)} not asked yet` : ''];
 }
 // a model's weakest judged topic on the current exam: { task, v }, or null
 function weakestTopic(m) {
@@ -5928,8 +5932,10 @@ function bestByKind(ms) {
       text: `${weak.m.name} · weakest: ${frName(weak.task)} ${num(weak.v, 2)} / 4` }),
     LIVE ? hlLink('Improve it →', () => openImprove(weak.m.id)) : go('exam')));
   const E = evd();
+  // 12i.0: counts over the whole set first — a partial one is never ranked beside them
   const ev = Object.entries(E.models || {}).filter(([id]) => ms.some(m => m.id === id))
-    .sort(([a, x], [b, y]) => (y.passed - x.passed) || evdName(a).localeCompare(evdName(b)))[0];
+    .sort(([a, x], [b, y]) => (!!evdMissing(x) - !!evdMissing(y)) || (y.passed - x.passed)
+      || evdName(a).localeCompare(evdName(b)))[0];
   if (ev) cards.push(card('everyday', 'Everyday tasks', evdCount(ev[1]),
     DATA.models.find(m => m.id === ev[0]), evdBadge(ev[1].provisional)));
   // the provisional-judge caveat, once, in the block's header
@@ -6043,6 +6049,34 @@ function evdRanOut(e) {
 }
 const evdName = id => (DATA.models.find(x => x.id === id) || {}).name || String(id).split('/').pop();
 const evdCount = e => `${e.passed} of ${e.total}`;
+// 12i.0: a model that hasn't answered the whole current hidden set is scored
+// over fewer questions — "84 of 169" — so it is never shown as if beside a
+// full count: greyed, with how many are not asked yet, and its Run
+function evdMissing(e) {
+  if (!e || (e.total || 0) >= evdHidden()) return 0;
+  return e.unasked > 0 ? e.unasked : evdHidden() - (e.total || 0);
+}
+function evdTotal(e, id, attrs = {}) {
+  const miss = evdMissing(e);
+  const count = el('span', { 'data-everyday-count': evdCount(e), ...attrs,
+    class: [attrs.class, miss ? 'se' : ''].filter(Boolean).join(' ') || null,
+    title: miss ? `over the ${e.total} hidden questions it has answered, not all `
+      + `${evdHidden()} — not comparable with a full count` : null, text: evdCount(e) });
+  if (!miss) return count;
+  // in a narrow column head the note takes its own line (.evm-count .evmissing)
+  return el('span', { class: 'evpartial', 'data-evd-partial': String(miss) }, count,
+    el('span', { class: 'small se evsep', text: ' · ' }),
+    el('span', { class: 'evmissing' },
+      el('span', { class: 'small se', text: `${miss} not asked yet` }),
+      LIVE && id ? [el('span', { class: 'small se', text: ' · ' }),
+        el('a', { href: '#', class: 'small', 'data-evd-run': id, text: 'Run',
+          onclick: ev => { ev.preventDefault(); ev.stopPropagation();
+            evdDialog({ only: id, returnTo: `[data-evd-run="${CSS.escape(id)}"]` }); } })] : ''));
+}
+// "2026-09-25" -> "25 Sep"
+const evdDay = d => { const [y, mo, da] = String(d || '').split('-').map(Number);
+  return y ? `${da} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct',
+    'Nov', 'Dec'][mo - 1]}` : String(d || ''); };
 function evdBadge(provisional) {
   return el('span', { class: 'badge prelim', 'data-pilot-badge': '1',
     title: `${evdHidden()} hidden questions score it and ${evdPractice()} practice ones are shown: `
@@ -6148,7 +6182,7 @@ function vEverydayBlock(m) {
     el('div', { class: 'sechead evhead' },
       el('h2', {}, 'Everyday tasks', evdBadge(e.provisional)),
       el('div', { class: 'acts evscore' },
-        el('span', { class: 'evcount', 'data-everyday-count': evdCount(e), text: evdCount(e) }),
+        evdTotal(e, m.id, { class: 'evcount' }),
         e.waiting ? el('span', { class: 'small se', text: `${e.waiting} with the judge` }) : '',
         evdRanOut(e),
         el('a', { href: '#tab=benchmarks&sub=everyday', 'data-everyday-compare': '1',
@@ -6193,10 +6227,11 @@ function vEverydayPage() {
           + 'group\u2019s count to read them.' }),
         // 12a.4: the wording these answers are to — 12g.2: and the split;
         // earlier ones are in each model's History
+        // 12i.0: in words; the hash, and what it covers, on hover
         E.version ? el('p', { class: 'small se', 'data-evd-version': E.version.hash,
-          text: `This version: ${E.version.date} · ${E.version.hash}, the wording and the split. `
-            + 'Answers from before it are in each model\u2019s History, and in no score here.' })
-          : ''),
+          title: `version ${E.version.hash}: the wording and the split. Answers from before it `
+            + 'are in each model\u2019s History, and in no score here.',
+          text: `Questions updated ${evdDay(E.version.date)}` }) : ''),
       run));
   if (!ids.length) {
     return [head, el('div', { class: 'card' }, empty('No model has taken everyday tasks yet.',
@@ -6209,7 +6244,9 @@ function vEverydayPage() {
     const n = evdGroupCount(E.models[id], g);
     if (!n) return el('td', { class: 'evcell-td se', title: 'not asked', text: '—' });
     const on = !!(sel && sel.id === id && sel.g === g);
-    return el('td', { class: 'evcell-td' }, el('button', { class: 'evcell' + (on ? ' on' : ''),
+    // 12i.0: over fewer questions than the others: greyed, as its total is
+    return el('td', { class: 'evcell-td' + (evdMissing(E.models[id]) ? ' evpart' : '') },
+      el('button', { class: 'evcell' + (on ? ' on' : ''),
       'data-evd-cell': `${id}|${g}`, 'aria-pressed': String(on),
       'aria-label': `${evdName(id)}, ${(groups.find(x => x[0] === g) || [, g])[1]}: ${n}`,
       text: n, onclick: () => { state.evdCell = on ? null : { id, g }; render(); } }));
@@ -6221,7 +6258,7 @@ function vEverydayPage() {
           ? el('a', { href: '#model=' + encodeURIComponent(id), text: evdName(id),
               onclick: ev => { ev.preventDefault(); navigate({ model: id, topic: null }); } })
           : el('span', { text: evdName(id) }),
-        el('span', { class: 'evm-count', 'data-evd-count': id, text: evdCount(E.models[id]) }),
+        el('span', { class: 'evm-count', 'data-evd-count': id }, evdTotal(E.models[id], id)),
         evdRanOut(E.models[id]))))),
     el('tbody', {}, groups.map(([g, label]) => el('tr', { 'data-evd-g': g },
       el('th', { scope: 'row', class: 'evq-cell' },
@@ -6337,9 +6374,11 @@ function evdDialog(pre = {}) {
   const board = DATA.models.filter(m => m.kind === 'instruct').map(m => m.id);
   const ids = [...EVD_DEFAULTS, ...board.filter(id => !EVD_DEFAULTS.includes(id))
     .sort((a, b) => evdName(a).localeCompare(evdName(b)))];
+  // 12i.0: a model's own "Run" ticks that model alone
+  if (pre.only && !ids.includes(pre.only)) ids.push(pre.only);
   // 12a.5: and the ones with questions not asked yet — a run asks them only those
-  const pick = Object.fromEntries(ids.map(id => [id, EVD_DEFAULTS.includes(id)
-    && (!evdOf(id) || evdOf(id).unasked > 0)]));
+  const pick = Object.fromEntries(ids.map(id => [id, pre.only ? id === pre.only
+    : EVD_DEFAULTS.includes(id) && (!evdOf(id) || evdOf(id).unasked > 0)]));
   const back = el('div', { class: 'dlg-back', 'data-dialog': 'everyday' });
   const err = el('div', { class: 'warn', hidden: '', 'data-dialog-error': '1' });
   const go = el('button', { class: 'primary', 'data-dialog-go': '1' });
@@ -7873,11 +7912,10 @@ function lbEveryday(ms) {
           el('a', { class: 'mname mlink', href: '#model=' + encodeURIComponent(m.id), text: m.name })),
         groups.map(([g, label]) => {
           const n = evdGroupCount(e, g);
-          return el('td', { class: 'num' + (n ? '' : ' se'), 'data-evd-g': g,
+          return el('td', { class: 'num' + (n && !evdMissing(e) ? '' : ' se'), 'data-evd-g': g,
             title: n ? label : 'not asked', text: n || '—' });
         }),
-        el('td', { class: 'num' },
-          el('span', { 'data-everyday-count': evdCount(e), text: evdCount(e) }), evdRanOut(e)));
+        el('td', { class: 'num' }, evdTotal(e, m.id), evdRanOut(e)));
     }), notTestedRows(none, ncols, 'everyday')));
   return [el('div', { class: 'card', 'data-lb-card': '1' },
     ...modelsHead(evdBadge(prov)),
@@ -10960,7 +10998,7 @@ function vQueue(part = { form: true, list: true }) {
       it => { sf.hf_id = it.id; if (it.kind) sf.kind = it.kind; sf.allow = false;
               delete state.codeInfo[it.id]; render(); },
       { 'aria-label': 'model id',
-        placeholder: 'search: org/model on the Hub, or local/<name> for an uploaded artifact' }),
+        placeholder: 'search Hugging Face or uploads' }),
     kind: Select('kind', [['auto', 'kind: auto-detect'], ['base', 'kind: base'],
       ['instruct', 'kind: instruct']], sf.kind || 'auto', v => { sf.kind = v; },
       { key: 'submit-kind' }),
@@ -11019,10 +11057,10 @@ function vQueue(part = { form: true, list: true }) {
     examPicker(sf, sf.hf_id.trim(), 'submit', () => gateSubmit())) : '';
   const judgedOff = () => (sf.suite === 'judged' && judgeDown()) || cannotRun(sf.hf_id);
   // 11i: a picked checkpoint that ships its own model code says so here,
-  // before Submit — the box to allow it, or why this server will not
+  // before Start test — the box to allow it, or why this server will not
   const info = codeInfo(sf.hf_id);
   const ownWhy = el('span', { class: 'propwhy', 'data-why': 'own-code' });
-  const btn = el('button', { class: 'primary', text: 'Submit model', onclick: async () => {
+  const btn = el('button', { class: 'primary', text: 'Start test', onclick: async () => {
     const body = { hf_id: sf.hf_id.trim(), kind: sf.kind, suite: sf.suite,
                    submitter: whoName(), note: sf.note };
     if (sf.suite === 'generative') {
@@ -11203,15 +11241,9 @@ function vQueue(part = { form: true, list: true }) {
   return [
     part.form ? el('div', { class: 'card', 'data-submit-form': '1' },
       el('h2', { id: 'test-title', text: 'Test a model' }),
-      el('p', { class: 'sub', text:
-        'Any public (or server-accessible) Hugging Face model up to the size cap. Preflight '
-        + 'checks the repo before any GPU is spent, and one run goes at a time. Results land '
-        + 'on Models automatically.' }),
-      el('p', { class: 'small', 'data-suite-help': '1' },
-        el('b', { text: 'full' }), ' and ', el('b', { text: 'judged' }),
-        ' are separate runs, not one inside the other: a model needs both to have an average '
-        + 'and a judged score. Resubmitting is free — each run does only the tasks still '
-        + 'missing, which is also how a quick run becomes a full one.'),
+      // 12i.0: one line, no system words
+      el('p', { class: 'sub', 'data-suite-help': '1', text: 'Pick a model and what to test. '
+        + 'One test runs at a time; results appear on Models.' }),
       el('div', { class: 'frm' }, f.hf_id, f.kind, f.suite, f.note, btn,
         cannotRun(sf.hf_id)
           ? el('span', { class: 'propwhy', 'data-why': 'weights',
