@@ -225,6 +225,17 @@ CREATE TABLE IF NOT EXISTS judge_test_marks (
 -- 12i.2: the question builder's drafts — one row per batch of questions,
 -- its whole state as JSON (the spec, the prompt used, every question with
 -- its review and flags), so a draft survives a reload and a restart
+-- 12d.1: the Playground's chats, per person (the name in masein ▾, folded to
+-- lower case): the model, its settings and every message, as JSON
+CREATE TABLE IF NOT EXISTS chats (
+  id          TEXT PRIMARY KEY,
+  who         TEXT NOT NULL,
+  model       TEXT NOT NULL,
+  data        TEXT NOT NULL,
+  created_at  REAL NOT NULL,
+  updated_at  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chats_who ON chats(who, updated_at);
 CREATE TABLE IF NOT EXISTS qb_drafts (
   id          TEXT PRIMARY KEY,
   kind        TEXT NOT NULL,                      -- 'knowledge' | 'everyday'
@@ -1043,3 +1054,34 @@ def qb_list() -> list[dict]:
     with closing(_conn()) as c:
         rows = c.execute("SELECT data FROM qb_drafts ORDER BY updated_at DESC").fetchall()
     return [json.loads(r[0]) for r in rows]
+
+
+def chat_put(chat: dict) -> None:
+    chat["updated_at"] = time.time()
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO chats (id, who, model, data, created_at, updated_at) "
+                  "VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data, "
+                  "model=excluded.model, updated_at=excluded.updated_at",
+                  (chat["id"], chat["who"], chat["model"], json.dumps(chat),
+                   chat.get("created_at") or time.time(), chat["updated_at"]))
+        c.commit()
+
+
+def chat_get(chat_id: str) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute("SELECT data FROM chats WHERE id=?", (chat_id,)).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def chat_list(who: str, n: int) -> list[dict]:
+    """a person's chats, the latest first"""
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT data FROM chats WHERE who=? ORDER BY updated_at DESC LIMIT ?",
+                         (who, n)).fetchall()
+    return [json.loads(r[0]) for r in rows]
+
+
+def chat_delete(chat_id: str) -> None:
+    with closing(_conn()) as c:
+        c.execute("DELETE FROM chats WHERE id=?", (chat_id,))
+        c.commit()

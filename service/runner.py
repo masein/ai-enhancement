@@ -144,6 +144,51 @@ def _env_canary(env: dict, run_as: tuple[int, int] | None) -> str:
 # the shared-GPU primitives
 # ---------------------------------------------------------------------------
 
+def load_spec(hf_id: str, meta: dict) -> dict:
+    """How a model loads, for a run and (12d.1) for the Playground: its path —
+    local/<name> artifacts resolve to their directory, and the report
+    normalizes the path back to local/<name> so ids stay consistent — the
+    dtype, and its own code only at the approved commit (12h.1: that commit,
+    no other)"""
+    pretrained = hf_id
+    if pretrained.startswith("local/"):
+        pretrained = str((config.ARTIFACTS_DIR / pretrained[6:]).resolve())
+    return {"pretrained": pretrained, "dtype": "bfloat16",
+            "trust_remote_code": bool(meta.get("remote_code")),
+            "revision": meta.get("revision") or None}
+
+
+def model_args(spec: dict) -> str:
+    """lm_eval's --model_args for a load_spec"""
+    margs = f"pretrained={spec['pretrained']},dtype={spec['dtype']}"
+    if spec["trust_remote_code"]:
+        margs += ",trust_remote_code=True"
+    if spec["revision"]:
+        margs += f",revision={spec['revision']}"
+    return margs
+
+
+def run_holding() -> dict | None:
+    """12d.1: the run holding the GPU lock, as far as the service can say —
+    {sid, hf_id, suite} (sid 0 and no model for a command-line run) — or None"""
+    if not LOCK.exists():
+        return None
+    try:
+        sid = int((LOCK / "submission").read_text().strip() or 0)
+    except (OSError, ValueError):
+        sid = 0
+    sub = db.get(sid) if sid else None
+    return {"sid": sid, "hf_id": (sub or {}).get("hf_id") or "",
+            "suite": (sub or {}).get("suite") or ""}
+
+
+def _everyday_settings(meta: dict) -> dict:
+    """everyday.run_settings for this model: how its Everyday answers are
+    generated (12d.1)"""
+    import everyday as _ev          # scripts/, on sys.path in the service
+    return _ev.run_settings(meta.get("archinfo"))
+
+
 def gpu_free_mib() -> int:
     out = subprocess.run(["nvidia-smi", "--query-gpu=memory.free",
                           "--format=csv,noheader,nounits"],
@@ -655,6 +700,13 @@ def run_submission(sub: dict) -> None:
             return
 
     # -- one run at a time: wait for the shared lock ------------------------------
+    # 12d.1: the Playground lets go of the GPU first — its replies there stop,
+    # its models unload — within CHAT_YIELD_WAIT_S; chat never takes the lock
+    try:
+        from . import chat as _chat
+        _chat.ENGINE.yield_gpu()
+    except Exception:                                  # noqa: BLE001 — a run never waits on chat
+        pass
     t0 = time.time()
     while not acquire_lock(sid):
         if db.cancel_requested(sid):
@@ -766,24 +818,20 @@ def run_submission(sub: dict) -> None:
                              f"than the task holds now; kept at {moved}, answering again\n")
             db.update(sid, status="running", progress=label)
 
-            # local/<name> artifacts resolve to their on-disk directory; the report
-            # normalizes the path back to local/<name> so ids stay consistent
-            pretrained = sub["hf_id"]
-            if pretrained.startswith("local/"):
-                pretrained = str((config.ARTIFACTS_DIR / pretrained[6:]).resolve())
-            margs = f"pretrained={pretrained},dtype=bfloat16"
-            if remote_code:
-                margs += ",trust_remote_code=True"
-            if meta.get("revision"):         # 12h.1: the approved commit, no other
-                margs += f",revision={meta['revision']}"
+            # 12d.1: how the model loads, said once (load_spec) — the Playground
+            # loads through the same decision
+            spec = load_spec(sub["hf_id"], meta)
+            pretrained = spec["pretrained"]
+            margs = model_args(spec)
             # 11l: a reasoning model thinks before it answers, and 256 tokens
             # ran out inside the thinking on every question of run #60. Only
             # its judged answers get more room, and only when its template is
             # the one that thinks; lm_eval records the override in its results
             thinks = ((kind == "instruct" and task in judged or everyday)
                       and (meta.get("archinfo") or {}).get("reasoning_template"))
-            # 12a.4: its everyday answers get more room still
-            room = (config.EVERYDAY_REASONING_MAX_GEN_TOKS if everyday
+            # 12a.4: its everyday answers get more room still — 12d.1: said
+            # by everyday.run_settings, the function the Playground reads too
+            room = (_everyday_settings(meta)["max_gen_toks"] if everyday
                     else config.REASONING_MAX_GEN_TOKS) if thinks else None
             cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
                               chat=kind == "instruct" or everyday, max_gen_toks=room)

@@ -102,6 +102,24 @@ REASONING_MAX_GEN_TOKS = int(os.environ.get("REASONING_MAX_GEN_TOKS", "2048"))
 # 5. A reasoning model's everyday answers get this many; the exam's stay above
 EVERYDAY_REASONING_MAX_GEN_TOKS = int(os.environ.get("EVERYDAY_REASONING_MAX_GEN_TOKS", "4096"))
 
+# 12d.1: the Playground's chat engine. "hf" loads through lm_eval's own HF
+# loader (the one runs use); "fake" streams canned text (tests, no model).
+CHAT_BACKEND = os.environ.get("CHAT_BACKEND", "hf")
+# a loaded model is unloaded after this long with no message
+CHAT_IDLE_UNLOAD_S = int(os.environ.get("CHAT_IDLE_UNLOAD_S", "600"))
+# below this many parameters a model may answer on the CPU while a run holds
+# the GPU. To be measured on the server after deploy: if a 0.6B model is
+# under about 3 words a second there, lower it (brief 12d §2)
+CHAT_CPU_MAX_PARAMS_B = float(os.environ.get("CHAT_CPU_MAX_PARAMS_B", "1.0"))
+# free GPU memory a model needs beyond its weights (bf16) before it loads —
+# activations, the KV cache of one reply, CUDA's context. To be measured on
+# the server after deploy (brief 12d §2)
+CHAT_GPU_MARGIN_GB = float(os.environ.get("CHAT_GPU_MARGIN_GB", "2.0"))
+# how long a run waits for chat to let go of the GPU before taking its lock
+CHAT_YIELD_WAIT_S = int(os.environ.get("CHAT_YIELD_WAIT_S", "60"))
+# the chats kept listed per person
+CHAT_LIST_N = 50
+
 # The benchmark suite — one place, mirrored from run_benchmarks.sh. quick is for
 # iteration (minutes); full is the comparable number. Both write into the same
 # tree, so a quick run later "upgrades" to full by running only the missing tasks.

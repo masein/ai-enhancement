@@ -482,7 +482,7 @@ def test_at_400px_the_header_is_one_line_and_the_places_are_one_menu(live, phone
     shot(page, "11e-10-header-400-light.png", clip={"x": 0, "y": 0, "width": 400, "height": 120})
     menu.click()
     assert menu.get_attribute("aria-expanded") == "true"
-    assert page.locator("#pop-places [data-place]").count() == 4
+    assert page.locator("#pop-places [data-place]").count() == 5         # 12d.1: Playground
     shot(page, "11e-10-header-menu-400-light.png")
     page.keyboard.press("Escape")
     assert page.locator("#pop-places").count() == 0

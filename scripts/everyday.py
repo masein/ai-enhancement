@@ -1097,6 +1097,30 @@ def summary(out: dict) -> str:
 # the service's side: the task the harness runs, and the judge's one request
 # ---------------------------------------------------------------------------
 
+# 12d.1: how an Everyday answer is generated. Everything below is the ONE
+# place these are said: build_task writes them into the task, the runner reads
+# the reasoning budget from here, and the Playground's defaults are this dict —
+# "what you see is what was scored"
+MAX_GEN_TOKS = 512
+UNTIL = ["\n\n\n\n"]
+
+
+def run_settings(archinfo: dict | None) -> dict:
+    """The settings an Everyday answer is generated with, for a model whose
+    archinfo this is (None: the task's defaults). `thinking` is None: the run
+    passes no enable_thinking, so the chat template's own default applies;
+    `thinking_on` says what that default is, for a page to show."""
+    from service import config
+    a = archinfo or {}
+    reasoning = bool(a.get("reasoning_template"))
+    on = bool(a.get("thinking_default_on") if a.get("thinking") == "switch"
+              else a.get("thinking") == "always" or reasoning)
+    return {"chat_template": True, "system": "", "thinking": None, "thinking_on": on,
+            "can_think": reasoning or a.get("thinking") in ("switch", "always"),
+            "max_gen_toks": config.EVERYDAY_REASONING_MAX_GEN_TOKS if reasoning else MAX_GEN_TOKS,
+            "do_sample": False, "temperature": 0.0, "until": list(UNTIL)}
+
+
 def build_task(dest: Path, only: list[str] | None = None) -> Path:
     """The bank as a harness task under `dest`: the items, and the yaml with
     their absolute path filled in. Returns the directory for --include_path.
@@ -1111,8 +1135,13 @@ def build_task(dest: Path, only: list[str] | None = None) -> Path:
         want = set(only) if only is not None else {q["id"] for q in bank}
         items.write_text("".join(json.dumps(q, ensure_ascii=False) + "\n"
                                  for q in bank if q["id"] in want), encoding="utf-8")
-    yaml = TEMPLATE_PATH.read_text(encoding="utf-8").replace("__ITEMS_PATH__",
-                                                             str(items.resolve()))
+    s = run_settings(None)            # 12d.1: the settings the Playground shows too
+    yaml = (TEMPLATE_PATH.read_text(encoding="utf-8")
+            .replace("__ITEMS_PATH__", str(items.resolve()))
+            .replace("__UNTIL__", json.dumps(s["until"]))
+            .replace("__MAX_GEN_TOKS__", str(s["max_gen_toks"]))
+            .replace("__DO_SAMPLE__", "true" if s["do_sample"] else "false")
+            .replace("__TEMPERATURE__", f"{float(s['temperature'])}"))
     (dest / f"{TASK}.yaml").write_text(f"task: {TASK}\n" + yaml, encoding="utf-8")
     return dest
 

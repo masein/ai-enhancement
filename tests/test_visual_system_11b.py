@@ -112,8 +112,8 @@ def test_the_bar_is_sticky_and_56px(live, page):
     assert box["y"] <= 0.5, box                   # still at the top of the window
     assert page.evaluate("getComputedStyle(document.querySelector('#bar')).position") == "sticky"
     # the places are in the bar, so a place is reachable without scrolling back
-    # up (12b: four of them)
-    assert page.locator("#bar #tabs button[role=tab]").count() == 4
+    # up (12b: four of them; 12d.1: five, with Playground)
+    assert page.locator("#bar #tabs button[role=tab]").count() == 5
     assert page.errors == []
 
 

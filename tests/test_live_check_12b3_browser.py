@@ -16,7 +16,7 @@ from test_live_check_11k import clear, plant_proposal
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12b"
 MODEL = "fx/good-750m"
-PLACES = ["Home", "Models", "Improve", "Benchmarks"]
+PLACES = ["Home", "Models", "Playground", "Improve", "Benchmarks"]      # 12d.1: Playground
 
 
 def served(page, edit):
