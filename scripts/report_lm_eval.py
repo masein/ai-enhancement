@@ -3031,6 +3031,8 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 .benchmenu .benchlist { max-height:min(60vh, 520px); overflow:auto; }
 .benchmenu .colgroup { display:flex; flex-direction:column; gap:2px; margin:6px 0 8px; }
 .benchmenu .colgroup label { display:flex; align-items:center; gap:4px; white-space:nowrap; }
+/* 12i.0: a benchmark nothing has run yet, listed and greyed */
+.benchmenu .colgroup label.notrun { color:var(--text-secondary); }
 .modelsmenu .mgroup { margin:6px 0 2px; text-transform:none; }
 @media (max-width:720px) {
   .lbbar.narrow .chiprow { flex-wrap:wrap; row-gap:8px; }
@@ -7270,6 +7272,15 @@ function lbBenchGroups() {
   return out;
 }
 const lbBenchAll = () => lbBenchGroups().flatMap(([, , ts]) => ts);
+// 12i.0: the picker lists every benchmark the board knows, in its group; one
+// nothing has run yet is there too, greyed — IFEval, MMLU-Pro and MATH-500 were
+// missing until something had run them
+function lbBenchPicker() {
+  const have = new Set(lbBenchAll());
+  return CATS.map(([g, ts]) => [g, LB_GROUP[g], ts.map(t => [t, have.has(t)])])
+    .concat(lbBenchGroups().filter(([g]) => g === 'other')
+      .map(([g, name, ts]) => [g, name, ts.map(t => [t, true])]));
+}
 // the chosen benchmarks in the checklist's order, the unknown ones dropped;
 // none left is the default (the chip's own). Before the scores arrive the
 // names are kept as given, and checked on the first paint
@@ -7279,7 +7290,13 @@ function lbKnownCols(ts) {
   const out = lbBenchAll().filter(t => want.has(t));
   return out.length ? out : null;
 }
-const benchName = t => LB_SHORT[t] || t;
+// 12i.0: a benchmark by its own name, wherever it is named in words — the
+// column headers keep LB_SHORT's short forms
+const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogrande: 'WinoGrande',
+  arc_challenge: 'ARC-Challenge', arc_easy: 'ARC-Easy', gsm8k: 'GSM8K',
+  truthfulqa_mc2: 'TruthfulQA', ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro',
+  hendrycks_math500: 'MATH-500' };
+const benchName = t => BENCH_NAMES[t] || LB_SHORT[t] || t;
 // the mean of the chosen benchmarks, on the Scale pill's scale; each error
 // scales as its score does, and the errors add as variances (separate item
 // sets), so the mean's is √Σse² / k. Null when a benchmark is missing; no ±
@@ -7465,8 +7482,10 @@ function lbColumns(ms) {
   // 12h.2: the chosen benchmarks, and their own average: "Avg of 3"
   if (L.view === 'standard' && L.cols) {
     if (!L.cols.length) return [...lead.slice(1, 3), ...tail];
-    lead[3] = { key: 'cavg', label: `Avg of ${L.cols.length}`, num: true, group: '',
-      unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' };
+    // 12i.0: it says what it is — a reader who averaged the columns by hand
+    // got another number and took this one for wrong
+    lead[3] = { key: 'cavg', label: state.avgMode === 'raw' ? 'Avg, raw' : 'Avg above chance',
+      num: true, group: '', unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' };
     return [...lead, ...L.cols.map(task), ...tail];
   }
   let mid;
@@ -7513,13 +7532,12 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
 // scale went (11f).
 function lbColTip(c) {
   const scale = state.avgMode === 'raw' ? 'raw accuracy' : 'above chance';
-  if (c.key === 'rank' && lbS().cols) return [`# — rank by Avg of ${lbS().cols.length} among `
-    + 'the models on this board that have every one of these'];
+  if (c.key === 'rank' && (lbS().cols || lbS().models)) return ['# — this table\u2019s rows, '
+    + 'in the order they are sorted'];
   if (c.key === 'rank') return ['# — rank among the ranked models on this board'];
-  if (c.key === 'cavg') return [`Avg of ${lbS().cols.length} — the mean of `
-    + lbS().cols.map(benchName).join(', ') + `, % ${scale}`,
-    'its ± combines the chosen columns\' errors; bold is the same z-test as Avg',
-    'the Scale pill switches it'];
+  if (c.key === 'cavg') return [state.avgMode === 'raw'
+    ? 'the mean of the chosen benchmarks\u2019 raw scores; the Scale pill switches it'
+    : '0 = guessing, 100 = perfect, so a 25% guess on a 4-option test counts as 0'];
   if (c.key === 'name') return ['Model — sort by name'];
   if (c.key === 'params') return ['Params — parameter count, from the harness config or the name'];
   if (c.key === 'date') return ['Updated — when the model was last evaluated'];
@@ -7788,6 +7806,8 @@ function vLeaderboard(ms) {
     : (m.tainted || []).includes(c.judged) ? null      // shown on the page, never ranked here
     : (((m.judge || {}).tasks || {})[c.judged] ? pubScore(m.judge.tasks[c.judged]) : null);
   const custom = L.view === 'standard' && !!L.cols;
+  // 12i.0: a table someone built numbers its rows 1, 2, 3, not by board ranks
+  const built = L.view === 'standard' && (!!L.cols || !!L.models);
   const val = (m, c) => c.key === 'avg' ? officialAvg(m)
     : c.key === 'cavg' ? (customAvg(m, L.cols) || {}).v
     : c.key === 'params' ? m.params
@@ -7906,11 +7926,19 @@ function vLeaderboard(ms) {
       } },
       visCols.map(c => {
         if (c.key === 'rank') {
-          const r = custom ? customRankOf(m, L.cols) : rankOf(m);
+          if (built) {
+            // an opened duplicate sits under its row and takes no number
+            const at = lbPg.rows.indexOf(m);
+            const n = at < 0 ? '' : String(lbPg.from + at);
+            return el('td', { class: 'rank pin0 num' },
+              el('span', { class: 'mono', 'data-row-n': n, text: n,
+                title: n ? `row ${n} of ${lbAll.length}, in the order the table is sorted`
+                  : 'a duplicate of the row above' }));
+          }
+          const r = rankOf(m);
           return el('td', { class: 'rank pin0 num' },
             el('span', { class: 'mono', text: r ? String(r.n) : '—',
-              title: r ? (custom ? `rank ${r.n} of ${r.of} on Avg of ${L.cols.length}`
-                                 : `rank ${r.n} of ${r.of} ranked models on this board`)
+              title: r ? `rank ${r.n} of ${r.of} ranked models on this board`
                        : 'preliminary — not ranked' }));
         }
         if (c.key === 'family') return el('td', { class: 'small', 'data-fact': 'family',
@@ -8046,7 +8074,9 @@ function vLeaderboard(ms) {
       lbToolbar(ms, cols, shown, nHidden),
       L.chip === 'knowledge' && staleSentence(ms) && !custom
         ? el('p', { class: 'warn', 'data-stale-diag': '1', text: staleSentence(ms) }) : '',
-      lbCustomLine(lbAll.length, notTested.length),
+      // 12i.0: a chosen model with no score in these columns is not "tested"
+      lbCustomLine(lbAll.length, lbAll.filter(m => (L.cols || DATA.accTasks)
+        .some(t => (cell(t, m.id) || {}).v != null)).length),
       statusLine(lbPg, 'models', [
         L.chip === 'judged' || custom ? null
           : `${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
@@ -8058,7 +8088,10 @@ function vLeaderboard(ms) {
         + 'of these — each one is under the line with what it is missing.', 'Reset',
         () => lbSet({ cols: null, models: null }))
         : '',
-      !rowsIn.length ? empty('No model matches these filters.', 'Clear the filters',
+      // 12i.0: Clear in Models ▾ applies at once, and leaves this
+      L.models && !L.models.length ? empty('No model chosen: tick one under Models ▾.',
+        'All ranked', () => lbSet({ models: null }), { 'data-no-models': '1' })
+      : !rowsIn.length ? empty('No model matches these filters.', 'Clear the filters',
         () => lbSet({ kind: 'all', size: 'all', status: 'all', models: null }))
         : hfade('lb', el('div', { class: 'lb-wrap stick' + (state.lbWide ? ' hscroll' : ''),
           'data-hkeep': 'lb' }, table)),
@@ -8241,9 +8274,10 @@ function lbColumnsPill(cols, shown, nHidden) {
   }, { key: 'columns', menu: false, rebuild: true });
 }
 
-// Models ▾ — a search, a checklist with each family's colour, and Apply
+// Models ▾ — a search and a checklist with each family's colour
 // 12h.2: "Models: 6 ▾", beside Filters on Standard — grouped as the board
-// groups them (instruct, base, checkpoints); "All ranked" is today's default
+// groups them (instruct, base, checkpoints); "All ranked" is today's default.
+// 12i.0: a tick applies at once, as Benchmarks ▾ does — there is no Apply
 function lbModelsPill(ms) {
   const L = lbS();
   const btn = el('button', { class: 'pill' + (L.models ? ' on' : ''), id: 'pill-models',
@@ -8254,11 +8288,13 @@ function lbModelsPill(ms) {
     const foot = el('p', { class: 'small se', 'data-models-foot': '1' });
     const say = () => { foot.textContent = pick.size === ms.length ? 'All models shown'
       : `${pick.size} of ${ms.length} shown`; };
+    const apply = () => lbSet({ models: pick.size === ms.length ? null : [...pick] });
     const groupOf = m => m.source === 'artifact' ? 'checkpoints'
       : m.kind === 'instruct' ? 'instruct' : 'base';
     const row = m => el('label', { class: 'small mrow' },
       el('input', { type: 'checkbox', 'data-model-pick': m.id, checked: pick.has(m.id) ? '' : null,
-        onchange: e => { if (e.target.checked) pick.add(m.id); else pick.delete(m.id); say(); } }),
+        onchange: e => { if (e.target.checked) pick.add(m.id); else pick.delete(m.id);
+          say(); apply(); } }),
       el('span', { class: 'famdot', style: `background:${famColor(m)}`, title: famOf(m) }),
       ' ' + m.name, el('span', { class: 'se', text: ' ' + famOf(m) }));
     const fill = q => {
@@ -8270,22 +8306,20 @@ function lbModelsPill(ms) {
           ...gs.map(row)] : [];
       }));
     };
-    fill('');
+    fill(state.lbModelsQ || '');
     say();
     return el('div', { class: 'moremenu modelsmenu', id: 'pop-models', 'aria-label': 'models' },
       el('div', { class: 'frm' },
         el('button', { class: 'quiet', text: 'All ranked', 'data-models-default': '1',
           title: 'every model, the ranked ones first — the default', onclick: () => {
             popClose(true); lbSet({ models: null }); } }),
-        el('button', { class: 'quiet', text: 'Clear', onclick: () => {
-          pick.clear(); fill(''); say(); } })),
+        el('button', { class: 'quiet', text: 'Clear', 'data-models-clear': '1', onclick: () => {
+          pick.clear(); say(); apply(); } })),
       el('input', { type: 'search', placeholder: 'search models…', 'aria-label': 'search models',
-        'data-keep': 'lbmodels', oninput: e => fill(e.target.value) }),
-      list, foot,
-      el('button', { class: 'primary', 'data-models-apply': '1', text: 'Apply', onclick: () => {
-        popClose(true);
-        lbSet({ models: pick.size === ms.length ? null : [...pick] }); } }));
-  }, { key: 'models', menu: false });
+        'data-keep': 'lbmodels', value: state.lbModelsQ || '',
+        oninput: e => { state.lbModelsQ = e.target.value; fill(e.target.value); } }),
+      list, foot);
+  }, { key: 'models', menu: false, rebuild: true, inCard: true });
 }
 
 // 12h.2: "Benchmarks: 3 ▾" — every Standard benchmark in its chip groups,
@@ -8306,16 +8340,19 @@ function lbBenchPill() {
     const fill = () => {
       const q = (state.lbBenchQ || '').trim().toLowerCase();
       // a benchmark's own names: "math" finds MATH-500, not its whole group
-      const hit = t => !q || (t + ' ' + benchName(t)).toLowerCase().includes(q);
-      const groups = lbBenchGroups().map(([g, name, ts]) => [g, name, ts.filter(hit)])
+      const hit = ([t]) => !q || (t + ' ' + benchName(t)).toLowerCase().includes(q);
+      const groups = lbBenchPicker().map(([g, name, ts]) => [g, name, ts.filter(hit)])
         .filter(([, , ts]) => ts.length);
+      // 12i.0: each by its own name alone; one not run yet is greyed and says so
       list.replaceChildren(...(groups.length ? groups.map(([g, name, ts]) =>
         el('div', { class: 'colgroup', 'data-bench-group': g },
           el('div', { class: 'small se', text: name }),
-          ts.map(t => el('label', { class: 'small' },
+          ts.map(([t, ran]) => el('label', { class: 'small' + (ran ? '' : ' notrun'),
+              'data-bench-row': t },
             el('input', { type: 'checkbox', 'data-bench': t, checked: now.has(t) ? '' : null,
-              onchange: e => set(t, e.target.checked) }),
-            ' ' + benchName(t), benchName(t) !== t ? el('span', { class: 'se', text: ' ' + t }) : ''))))
+              disabled: ran ? null : '', onchange: e => set(t, e.target.checked) }),
+            ' ' + benchName(t),
+            ran ? '' : el('span', { class: 'se', 'data-not-run': t, text: ' · not run yet' })))))
         : [el('p', { class: 'small se', text: 'No benchmark matches.' })]));
     };
     fill();
@@ -8329,13 +8366,17 @@ function lbBenchPill() {
           onclick: () => lbSet({ cols: [] }) })),
       el('p', { class: 'small se', 'data-bench-foot': '1', text: 'The average is over the ticked '
         + 'ones only. Everyday tasks and the Knowledge exam keep their own tables.' }));
-  }, { key: 'benchmarks', menu: false, rebuild: true });
+  }, { key: 'benchmarks', menu: false, rebuild: true, inCard: true });
 }
 
 // 12h.2: one line above a table someone built — what is shown, Save view,
 // Reset, and ⋯ Copy as CSV. Nothing when the table is today's
-function lbCustomLine(nRows) {
+function lbCustomLine(nRows, nTested = nRows) {
   const L = lbS();
+  // 12i.0: models chosen that have no scores here say so: "3 chosen · 2 tested"
+  const chosen = L.models ? L.models.length : null;
+  const count = chosen != null && nTested < chosen ? `${chosen} chosen · ${nTested} tested`
+    : `${nRows} model${nRows === 1 ? '' : 's'}`;
   if (L.view !== 'standard' || (!L.cols && !L.models)) return '';
   const what = L.cols ? (L.cols.length ? L.cols.map(benchName).join(', ') : 'no benchmarks')
     : (LB_CHIPS.find(([v]) => v === L.chip) || [null, 'All tasks'])[1];
@@ -8349,7 +8390,7 @@ function lbCustomLine(nRows) {
     { key: 'custom-more' });
   return el('div', { class: 'customline', 'data-custom-line': '1' },
     el('span', { class: 'cl-what', 'data-custom-what': '1' }, el('b', { text: 'Custom' }),
-      ` · ${what} · ${nRows} model${nRows === 1 ? '' : 's'}`),
+      ` · ${what} · ${count}`),
     el('span', { class: 'cl-acts' },
       LIVE ? el('button', { class: 'quiet', 'data-save-view': '1', text: 'Save view',
         'aria-expanded': String(state.lbForm === 'save'),
@@ -11406,18 +11447,22 @@ function docLine(d) {
   return line + [...by].map(([why, n]) => `${n} ${why}`).join(', ');
 }
 
+// 12i.0: Improve's one line about the AI, in plain words — "AI: the local
+// model on this server · 47 requests today". 12i.1 names the model per job
+function aiLine(llm) {
+  const who = llm.provider === 'local' ? 'the local model on this server'
+    : `${llm.provider[0].toUpperCase()}${llm.provider.slice(1)} ${llm.model || ''}`.trim();
+  const rows = (llm.usage || []).length ? llm.usage : [{ items: llm.usage_today || 0 }];
+  const used = rows.reduce((a, u) => a + (u.items || 0), 0);
+  const cap = rows.length === 1 && rows[0].cap != null ? rows[0].cap : null;
+  return `AI: ${who} · ${used.toLocaleString('en')} request${used === 1 ? '' : 's'} today`
+    + (cap != null ? ` of ${cap.toLocaleString('en')}` + (used >= cap ? ', the limit until '
+      + 'tomorrow' : '') : '');
+}
+
 // the daily limit is per provider (a paid API's, or LOCAL_DAILY_ITEM_CAP):
 // null is no limit, and the judge's spend is on the judge's line
 const underCap = u => u.daily_cap == null || (u.usage_today || 0) < u.daily_cap;
-function usageLine(llm) {
-  const rows = (llm.usage || []).length ? llm.usage
-    : [{ provider: llm.provider, items: llm.usage_today, cap: llm.daily_cap, roles: ['generator'] }];
-  return el('span', { 'data-usage': '1' }, el('b', { text: 'today ' }),
-    rows.map(u => `${u.provider}${u.roles && u.roles.length ? ` (${u.roles.join(', ')})` : ''}: `
-      + (u.cap == null ? `${u.items} items, no daily limit`
-         : `${u.items} of ${u.cap} items` + (u.items >= u.cap ? ' — cap reached until tomorrow' : '')))
-      .join(' · '));
-}
 
 // ---------------------------------------------------------------------------
 // 11j: a proposal opens as a short card in the reader's sheet. 12g.1: the
@@ -12147,12 +12192,11 @@ function vPipeline() {
           + 'made from' : 'no weak spot a proposal can be made from yet',
         onclick: () => npDialog({ model: m.id, topic: first ? frName(first.task) : '',
           returnTo: '[data-imp-propose]' }) })),
-    el('p', { class: 'sub', text: 'What the Knowledge exam says this model is missing, the data '
-      + 'made for it, and what training changed. The Standard benchmarks are only watched here, '
+    el('p', { class: 'sub', text: 'What the Knowledge exam and Everyday tasks say this model is '
+      + 'missing, the data made for it, and what training changed. The Standard benchmarks are only watched here, '
       + 'never trained toward.' }),
     !llm.configured && llm.reason ? el('p', { class: 'warn', text: llm.reason }) : '',
-    llm.configured ? el('p', { class: 'small se', 'data-imp-ai': '1' }, el('b', { text: 'the AI ' }),
-      `${llm.provider}/${llm.model || '—'} · `, usageLine(llm)) : '',
+    llm.configured ? el('p', { class: 'small se', 'data-imp-ai': '1', text: aiLine(llm) }) : '',
     state.rv.msg ? el('p', { class: 'small', text: state.rv.msg }) : '');
 
   return [head, impStagesCard(m)];
@@ -14090,15 +14134,20 @@ function popPlace() {
   // its button has scrolled out of the window: there is nothing to hang from
   if (r.bottom < 0 || r.top > innerHeight) { popClose(); return; }
   panel.style.maxHeight = '';
-  // never wider than the window it has to sit 8px inside
-  panel.style.maxWidth = `${Math.max(160, innerWidth - 2 * POP_EDGE)}px`;
+  // never wider than the window it has to sit 8px inside — 12i.0: or the
+  // page card its button is on, for a picker that must not run past it
+  const card = (opts || {}).inCard && anchor.closest('.card');
+  const cr = card ? card.getBoundingClientRect() : null;
+  const lo = Math.max(POP_EDGE, cr ? cr.left + 4 : 0);
+  const hi = Math.min(innerWidth - POP_EDGE, cr ? cr.right - 4 : innerWidth);
+  panel.style.maxWidth = `${Math.max(160, hi - lo)}px`;
   const pr = panel.getBoundingClientRect();
   const below = innerHeight - r.bottom - 4, above = r.top - 4;
   const flip = pr.height > below && above > below;
   const room = Math.max(120, (flip ? above : below) - POP_EDGE);
   const top = flip ? Math.max(POP_EDGE, r.top - 4 - Math.min(pr.height, room)) : r.bottom + 4;
   let left = (opts || {}).placement === 'bottom-end' ? r.right - pr.width : r.left;
-  left = Math.min(Math.max(POP_EDGE, left), Math.max(POP_EDGE, innerWidth - POP_EDGE - pr.width));
+  left = Math.min(Math.max(lo, left), Math.max(lo, hi - pr.width));
   panel.classList.toggle('flip', flip);        // it comes in from the side away from its button
   panel.style.top = `${Math.min(top, innerHeight - POP_EDGE - Math.min(pr.height, room))}px`;
   panel.style.left = `${left}px`;

@@ -102,7 +102,8 @@ def test_three_benchmarks_make_an_average_of_those_three(live, page):
     assert page.locator("#pill-benchmarks").inner_text() == "Benchmarks: 3 ▾"
     heads = [h.lower() for h in page.locator("[data-lb-table] thead tr.names th .hname")
              .all_inner_texts()]
-    assert heads == ["model", "params", "avg of 3", "ifeval", "mmlu-pro", "math-500"]
+    # 12i.0: it says what it is
+    assert heads == ["model", "params", "avg above chance", "ifeval", "mmlu-pro", "math-500"]
     assert page.locator("th[data-col='avg']").count() == 0        # not the board's Avg
     # the rows: the models with all three, ranked on this average
     assert rows(page) == [THINK, MODEL]                             # thinking: the better IFEval
@@ -159,7 +160,9 @@ def test_a_chip_fills_the_checklist_and_a_tick_makes_it_custom(live, page):
     # every Standard benchmark, in its chip groups — no Everyday, no exam, no perplexity
     groups = page.locator("#pop-benchmarks [data-bench-group]").evaluate_all(
         "es => es.map(e => e.dataset.benchGroup)")
-    assert groups == ["knowledge", "commonsense", "reasoning", "truthfulness", "instruction"]
+    # 12i.0: a group nothing has run yet (Math: GSM8K) is listed too, greyed
+    assert groups == ["knowledge", "commonsense", "reasoning", "math", "truthfulness",
+                      "instruction"]
     offered = page.locator("#pop-benchmarks [data-bench]").evaluate_all(
         "es => es.map(e => e.dataset.bench)")
     assert not [t for t in offered if t.startswith(("exam_", "fr_", "everyday")) or t == "mmlu_perm"]
@@ -172,7 +175,8 @@ def test_a_chip_fills_the_checklist_and_a_tick_makes_it_custom(live, page):
     page.locator("#pop-benchmarks [data-bench='hendrycks_math500']").uncheck()
     page.keyboard.press("Escape")
     page.wait_for_selector("th[data-col='cavg']")
-    assert page.locator("th[data-col='cavg'] .hname").inner_text().lower() == "avg of 2"
+    assert page.locator("th[data-col='cavg'] .hname").inner_text().lower() == "avg above chance"
+    assert page.locator("#pill-benchmarks").inner_text() == "Benchmarks: 2 ▾"
     assert page.locator("[data-chip='instruction']").get_attribute("aria-pressed") == "false"
     # the chip again: today's view, no line
     page.locator("[data-chip='instruction']").click()
@@ -195,11 +199,13 @@ def test_a_model_subset_shows_only_those_rows_and_all_ranked_brings_the_default(
     assert panel.locator("[data-model-group]").evaluate_all(
         "es => es.map(e => e.dataset.modelGroup)")[:2] == ["instruct", "base"]
     shot(page, "12h2-models-1400-light.png")
+    # 12i.0: each tick applies at once — there is no Apply
     panel.get_by_role("button", name="Clear").click()
+    page.wait_for_selector("[data-no-models]")
     panel.locator(f"[data-model-pick='{MODEL}']").check()
     panel.locator(f"[data-model-pick='{BASE}']").check()
-    panel.locator("[data-models-apply]").click()
     page.wait_for_function("document.querySelectorAll('tr[data-lb-row]').length === 2")
+    page.keyboard.press("Escape")
     assert sorted(rows(page)) == sorted([MODEL, BASE])
     assert page.locator("#pill-models").inner_text() == "Models: 2 ▾"
     assert page.locator("[data-custom-what]").inner_text() == "Custom · All tasks · 2 models"
@@ -228,7 +234,7 @@ def test_the_url_round_trips(live, page, browser):
     page.locator("#pop-models").get_by_role("button", name="Clear").click()
     page.locator(f"#pop-models [data-model-pick='{MODEL}']").check()
     page.locator(f"#pop-models [data-model-pick='{SHORT}']").check()
-    page.locator("#pop-models [data-models-apply]").click()
+    page.keyboard.press("Escape")
     page.wait_for_function("document.querySelectorAll('tr[data-lb-row]').length === 1")
     url = page.url
     assert url.endswith("#tab=models&" + THREE_URL + "&models="
@@ -351,7 +357,8 @@ def test_the_csv_is_the_table_with_the_average_and_its_errors(live, page):
     models_tab(page, live["base"], THREE_URL)
     page.wait_for_selector("td[data-cavg]")
     got = list(csv.reader(io.StringIO(page.evaluate("lbCsv()"))))
-    assert got[0] == ["#", "Model", "Params", "Avg of 3", "Avg of 3 ±", "IFEval", "IFEval ±",
+    assert got[0] == ["#", "Model", "Params", "Avg above chance", "Avg above chance ±", "IFEval",
+                      "IFEval ±",
                       "MMLU-Pro", "MMLU-Pro ±", "MATH-500", "MATH-500 ±"]
     want = []
     for tr in page.locator("tr[data-lb-row]").all():

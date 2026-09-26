@@ -253,7 +253,8 @@ def test_the_models_popover_narrows_the_rows_and_says_how_many(live, page):
     assert page.locator("[data-models-foot]").text_content() == f"2 of {n} shown"
     # each model carries its family's colour — the legend of the family bar
     assert page.locator("#pop-models .famdot").count() == n
-    page.locator("[data-models-apply]").click()
+    # 12i.0: the ticks applied as they were made
+    page.keyboard.press("Escape")
     page.wait_for_function(f"document.querySelectorAll('{LB} tbody tr[data-lb-row]').length === 2")
     assert page.locator("#pill-models").text_content() == "Models: 2 ▾"     # 12h.2
     assert page.errors == []

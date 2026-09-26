@@ -227,16 +227,26 @@ them with him if you disagree.
 
 ---
 
-## 5b. Checks — there is no GitHub CI
+## 5b. Checks — CI on the mirror
 
-Since 2026-09-24 the account's 2,000 Actions minutes are used up.
-`.github/workflows/ci.yml` is kept but runs only when started by hand
-(`workflow_dispatch`, Actions ▸ ci ▸ Run workflow). A push or a PR starts
-nothing, so PRs show no failed job and use no minutes. **The check is
-local, and it is the gate.**
+Since 2026-09-24 Teraformer's Actions minutes are used up, until the org's
+billing resets. `.github/workflows/ci.yml` runs only when started by hand
+(`workflow_dispatch`). **Since 2026-09-26 it runs on masein's personal repo,
+`origin` (masein/ai-enhancement), as a mirror, and that run is the gate.**
+- **The mirror is public.** masein chose that, knowing Teraformer's code is
+  public there, and hosted-runner minutes are free on it. A check is the
+  `test` job alone; the image build runs only with `-f build_image=true`
+  (#76). One check takes about 30–35 minutes.
+- **Per PR branch:** `git push origin <branch>`, then
+  `gh workflow run ci.yml -R masein/ai-enhancement --ref <branch>`. Put the
+  run's link, the commit and the result in the PR description under "Local
+  check". No green run, no merge; a push after the run needs a new one.
+- **PRs, merges and main stay on Teraformer.** After a merge, push
+  evalboard/main to origin's main. origin's history from before the mirror
+  is its `old-main` branch.
 
-1. **Before every merge, run `scripts/check.sh` on the branch head**, with
-   nothing left uncommitted.
+1. **`scripts/check.sh` runs the same steps locally**, on the branch head
+   with nothing left uncommitted, for a check before pushing.
    - It runs what CI ran, in CI's order:
      - ruff;
      - a compile pass over `scripts/ service/ clients/`;
@@ -258,13 +268,16 @@ local, and it is the gate.**
      ```
    - `(UNCOMMITTED CHANGES)` in place of `(clean)` means it checked
      something other than the commit, so it doesn't count.
-2. **Paste the summary line, the commit and the date into the PR description
-   under "Local check".** No summary, no merge. A push after the check needs
-   a new check.
-3. **After every deploy, run the unit suite inside the running `bench`
-   container.** This tests the real image's Python and packages, not only the
-   laptop's. It is deploy step 3 (below). The image has carried pytest and
-   httpx since 12b.1.
+2. **The run on the mirror goes in the PR** (above). A local check can go
+   there too, but it doesn't replace the run.
+3. **Deploy step 3 — the unit suite inside the running `bench` container —
+   only when the image changes (12i.0).** Each PR says which applies:
+   - **Code only (the image doesn't change):** skip step 3. CI already ran
+     the unit tests on that commit.
+   - **The image changes** (the Dockerfile, `requirements.txt`, the build
+     args in `docker-compose.yml`): run step 3. It's the only test of the real
+     image's Python and packages. The image has carried pytest and httpx since
+     12b.1.
    - **The tests aren't in the image.** They read files the image leaves out
      (the Dockerfile, `.dockerignore`, `docker-compose.yml`, the docs), so
      step 3 streams the commit just deployed into `/tmp/check` inside the
@@ -275,8 +288,8 @@ local, and it is the gate.**
      test doesn't redirect, and a key in the environment changes what a
      "not configured" test sees. With `env -i`, every fallback lands in
      `/tmp/check`, as in a fresh CI checkout.
-4. **After every deploy, ask the real lm_eval in the running container to
-   find every task the board runs.** It is deploy step 4 (below), from 12a.3.
+4. **Deploy step 4, always: after every deploy, ask the real lm_eval in the
+   running container to find every task the board runs** (from 12a.3).
    `scripts/check_tasks.py` does it.
    - **What it covers:** every task of every suite (`config.SUITES`): the
      standard tasks, the perplexity slices, `mmlu_perm`, each exam topic

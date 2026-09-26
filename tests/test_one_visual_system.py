@@ -104,11 +104,12 @@ def test_an_empty_state_offers_what_fills_it(live, page):
     # 12b: the Models tab's search is the Models ▾ picker in Filters
     open_filters(page)
     page.locator("#pill-models").click()
+    # 12i.0: Clear applies at once; the empty table says what fills it
     page.locator("#pop-models button", has_text="Clear").click()
-    page.locator("#pop-models [data-models-apply]").click()
+    page.keyboard.press("Escape")
     empty = page.locator("[data-lb-card] [data-empty]")
     empty.wait_for()
-    assert "No model matches" in empty.text_content()
+    assert empty.locator("p").text_content() == "No model chosen: tick one under Models ▾."
     empty.locator("[data-empty-action]").click()
     page.wait_for_selector("table[data-lb-table] tbody tr")
     assert page.errors == []
