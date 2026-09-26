@@ -6,6 +6,7 @@ want (the API thread and the worker thread interleave short transactions).
 
 from __future__ import annotations
 
+import calendar
 import json
 import re
 import sqlite3
@@ -190,6 +191,36 @@ CREATE TABLE IF NOT EXISTS views (
   saved_by    TEXT NOT NULL,
   created_at  REAL NOT NULL,
   updated_at  REAL NOT NULL
+);
+-- 12i.1: the AI models page — which model does each job, pinned (JSON), and
+-- the monthly limit; one row per key
+CREATE TABLE IF NOT EXISTS ai_settings (
+  key         TEXT PRIMARY KEY,                   -- job:<judge|writer|data|checker> | spend_limit | ...
+  value       TEXT NOT NULL,                      -- JSON
+  set_by      TEXT DEFAULT '',
+  updated_at  REAL NOT NULL
+);
+-- every paid AI request's cost, as the provider reported it (or tokens x price)
+CREATE TABLE IF NOT EXISTS ai_spend (
+  at          REAL NOT NULL,
+  job         TEXT NOT NULL,
+  model       TEXT NOT NULL,
+  provider    TEXT DEFAULT '',
+  tokens_in   INTEGER DEFAULT 0,
+  tokens_out  INTEGER DEFAULT 0,
+  usd         REAL NOT NULL DEFAULT 0,
+  batch_id    TEXT DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_ai_spend_at ON ai_spend(at);
+-- 12i.1: the judge test — a person's marks, and each candidate judge's, on the
+-- same answers (answer: a stable key for one judged answer on file)
+CREATE TABLE IF NOT EXISTS judge_test_marks (
+  who         TEXT NOT NULL,                      -- 'person' | a candidate's version key
+  answer      TEXT NOT NULL,
+  mark        INTEGER,                            -- 0-4, or 4/0 for an Everyday pass/fail; NULL skipped
+  by          TEXT DEFAULT '',
+  at          REAL NOT NULL,
+  PRIMARY KEY (who, answer)
 );
 """
 
@@ -886,3 +917,95 @@ def view_delete(vid: int) -> None:
     with closing(_conn()) as c:
         c.execute("DELETE FROM views WHERE id=?", (vid,))
         c.commit()
+
+
+# ---------------------------------------------------------------------------
+# 12i.1: the AI models page, spend, and the judge test
+# ---------------------------------------------------------------------------
+
+def ai_get(key: str, default=None):
+    """a setting, or `default` — also when there is no database yet (a
+    command-line script before the service ever started): reading a setting
+    never creates one"""
+    if not config.DB_PATH.exists():
+        return default
+    try:
+        with closing(_conn()) as c:
+            row = c.execute("SELECT value FROM ai_settings WHERE key=?", (key,)).fetchone()
+    except sqlite3.OperationalError:            # a database from before 12i.1, not migrated yet
+        return default
+    return json.loads(row[0]) if row else default
+
+
+def ai_get_meta(key: str) -> dict | None:
+    """the value with who set it and when"""
+    with closing(_conn()) as c:
+        row = c.execute("SELECT value, set_by, updated_at FROM ai_settings WHERE key=?",
+                        (key,)).fetchone()
+    return {"value": json.loads(row[0]), "by": row[1], "at": row[2]} if row else None
+
+
+def ai_set(key: str, value, by: str = "") -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO ai_settings (key, value, set_by, updated_at) VALUES (?,?,?,?) "
+                  "ON CONFLICT(key) DO UPDATE SET value=excluded.value, set_by=excluded.set_by, "
+                  "updated_at=excluded.updated_at", (key, json.dumps(value), by, time.time()))
+        c.commit()
+
+
+def _month_start() -> float:
+    """the first second of this month, UTC"""
+    now = time.gmtime()
+    return float(calendar.timegm((now.tm_year, now.tm_mon, 1, 0, 0, 0, 0, 0, 0)))
+
+
+def spend_add(job: str, model: str, provider: str, tokens_in: int, tokens_out: int,
+              usd: float, batch_id: str = "") -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO ai_spend (at, job, model, provider, tokens_in, tokens_out, usd, "
+                  "batch_id) VALUES (?,?,?,?,?,?,?,?)",
+                  (time.time(), job, model, provider, int(tokens_in or 0), int(tokens_out or 0),
+                   float(usd or 0.0), batch_id))
+        c.commit()
+
+
+def spend_this_month() -> float:
+    with closing(_conn()) as c:
+        row = c.execute("SELECT COALESCE(SUM(usd), 0) FROM ai_spend WHERE at>=?",
+                        (_month_start(),)).fetchone()
+    return float(row[0] or 0.0)
+
+
+def spend_this_month_by_job() -> dict[str, float]:
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT job, SUM(usd) FROM ai_spend WHERE at>=? GROUP BY job",
+                         (_month_start(),)).fetchall()
+    return {j: float(u or 0.0) for j, u in rows}
+
+
+def jt_mark(who: str, answer: str, mark: int | None, by: str = "") -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO judge_test_marks (who, answer, mark, by, at) VALUES (?,?,?,?,?) "
+                  "ON CONFLICT(who, answer) DO UPDATE SET mark=excluded.mark, by=excluded.by, "
+                  "at=excluded.at", (who, answer, mark, by, time.time()))
+        c.commit()
+
+
+def jt_marks(who: str) -> dict[str, int | None]:
+    """answer -> mark (None: skipped)"""
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT answer, mark FROM judge_test_marks WHERE who=?", (who,)).fetchall()
+    return {a: m for a, m in rows}
+
+
+def jt_whos() -> list[str]:
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT DISTINCT who FROM judge_test_marks").fetchall()
+    return [r[0] for r in rows]
+
+
+def spend_of_batch(batch_id: str) -> float:
+    with closing(_conn()) as c:
+        row = c.execute("SELECT COALESCE(SUM(usd), 0) FROM ai_spend WHERE batch_id=?",
+                        (batch_id,)).fetchone()
+    return float(row[0] or 0.0)

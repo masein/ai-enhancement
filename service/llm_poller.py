@@ -18,7 +18,7 @@ import traceback
 import sys
 from pathlib import Path
 
-from . import config, contamination, db, llm, proposals
+from . import config, contamination, db, judge_test, llm, proposals
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import everyday as _everyday  # noqa: E402
@@ -332,7 +332,9 @@ def tick() -> int:
     done = 0
     for r in rows:
         try:
-            backend = llm.client("judge" if r["kind"] in ("judge", "everyday") else "llm")
+            # 12i.1: a judge test batch belongs to the candidate that ran it
+            backend = (judge_test.batch_backend(r["batch_id"]) if r["kind"] == "judge_test"
+                       else llm.client("judge" if r["kind"] in ("judge", "everyday") else "llm"))
         except llm.LocalUnreachable as e:
             # vLLM restarting (or still loading after a reboot) is not a reason
             # to throw away batches whose finished results are on disk
@@ -370,6 +372,8 @@ def tick() -> int:
                 _finish_judge(r, results)
             elif r["kind"] == "everyday":
                 _finish_everyday(r, results)
+            elif r["kind"] == "judge_test":
+                judge_test.finish(r["batch_id"], results)
             db.batch_finish(r["batch_id"], "done", "")
         except Exception as e:                       # noqa: BLE001 — one batch must not kill the loop
             traceback.print_exc()

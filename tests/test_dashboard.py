@@ -462,7 +462,9 @@ def local_judged(tmp_path_factory) -> Path:
         ident = {"provider": "local", "model": "chat", "id": "local/chat", "family": "chat"}
         jd.write_judge(d, jd.assemble(plan, results, ident, "local_0123456789ab",
                                       tree["out_dir"], 0.5, False, record=False))
-        return make_fixture.frozen_report(root, root / "report.html")
+        # 12i.1: the local judge is the board's judge now — another judge's
+        # scores would be in History, not on the page this test reads
+        return make_fixture.frozen_report(root, root / "report.html", judge_identity=ident)
     finally:
         config.BENCH_ROOT = saved
 
@@ -502,15 +504,14 @@ def test_a_local_judge_is_greyed_labelled_and_never_ranked(browser, local_judged
         # never ranked: on the Knowledge exam view its judged cells are blank,
         # with the reason on hover. It was tested, so it is a row, not one
         # of the "Not tested on this" (12b)
+        # 12i.1: the local judge is the only judge on this board, so no judged
+        # score is ranked, and the Knowledge exam view says why in one line
         s.open("#tab=models&view=exam")
-        row = pg.locator("table.lb tbody tr[data-lb-row='fx/good-750m']")
-        row.wait_for()
-        assert "/4" not in row.text_content()
-        assert row.locator("[data-judged-avg]").count() == 0
-        assert any("graded by a local model" in (c.get_attribute("title") or "")
-                   for c in row.locator("td").all())
-        pg.locator("[data-not-tested-toggle]").click()
-        assert pg.locator("tr[data-not-tested-row='fx/good-750m']").count() == 0
+        view = pg.locator("#view")
+        pg.wait_for_function("document.querySelector('#view').textContent"
+                             ".includes('not ranked here yet')")
+        assert "today: not calibrated, local judge." in view.text_content()
+        assert pg.locator("[data-judged-avg]").count() == 0 and "/4" not in view.text_content()
         # 12g.1: the checks' list is the status dot's popover
         pg.locator("#warnings [data-warn-summary]").click()
         assert "were graded by a local model — not a pinned benchmark" in \

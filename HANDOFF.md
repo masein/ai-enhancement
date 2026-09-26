@@ -288,6 +288,13 @@ billing resets. `.github/workflows/ci.yml` runs only when started by hand
      test doesn't redirect, and a key in the environment changes what a
      "not configured" test sees. With `env -i`, every fallback lands in
      `/tmp/check`, as in a fresh CI checkout.
+   - **The OpenRouter key (12i.1), once, before the first deploy that
+     needs it.** It goes in `.env` beside the compose file, never in the repo:
+     ```
+     cd ~/benchmarks/aienh && echo 'OPENROUTER_API_KEY=sk-or-...' | sudo tee -a .env >/dev/null && sudo docker compose up -d
+     ```
+     Expected: no output, then compose recreating `bench`. AI models then
+     lists OpenRouter's models. The key never shows in a log or a page.
 4. **Deploy step 4, always: after every deploy, ask the real lm_eval in the
    running container to find every task the board runs** (from 12a.3).
    `scripts/check_tasks.py` does it.
@@ -2554,6 +2561,96 @@ check, and Improve shows them only as a before → after watch line.
     questions · 333 re-marked", or "333 re-marked · 55 not asked yet".
 - **Why an answer failed.** A failed item keeps `failed`: each check it
   failed, its reason and its plain words. The answer reader lists them.
+
+### 12i.1 — AI models, and the judge test
+
+`docs/prompts/phase-12i-ai-models-judge-test-question-builder.md`, 12i.1.
+
+- **AI models** is under the name menu (masein ▾ → AI models, `#tab=ai`).
+  It has one row per job:
+  - Judge;
+  - Question writer;
+  - Training-data writer;
+  - Checker.
+
+  Each row shows its model, the provider in small text, the price per million
+  tokens in and out, and **change ▾**.
+  - **change ▾** lists Local first, then the suggested model (marked, with
+    one line why), then OpenRouter's text models, with a search box.
+  - Free models and models that don't write text are left out.
+  - The list comes from OpenRouter's `/models` and is cached for a day in
+    `BENCH_ROOT/ai/openrouter_models.json`.
+  - Before a job is chosen here, it keeps the model `.env` set up
+    (`service/ai_models.py::JOBS`, `effective`).
+- **Pinning.** Choosing a model saves:
+  - its dated version (`canonical_slug`), never an alias;
+  - the first provider OpenRouter lists for it (`/models/{id}/endpoints`),
+    with that provider's precision and price.
+
+  Every request sends `provider: {order: [that provider], allow_fallbacks:
+  false}`. If OpenRouter later drops that version or that provider, the job
+  waits and says why (`ai_models.drifted`). It never falls back to another
+  model or provider.
+- **Warnings,** one line each, shown only when they hold
+  (`ai_models.warnings`):
+  - the judge shares a family with another job;
+  - the checker shares a family with the question writer;
+  - a writer shares a family with a model being improved;
+  - the training-data writer is OpenAI, Google or Anthropic
+    (`RESTRICTED_TRAINING`, a small list to edit).
+- **Spend.**
+  - Every OpenRouter request adds a row to `ai_spend`, using OpenRouter's
+    own `usage.cost`, or tokens × the pinned price when that's missing.
+  - The page shows this month's total against a limit: $20 to start
+    (`AI_MONTHLY_LIMIT_USD`), changeable on the page.
+  - At the limit, OpenRouter jobs wait with the line "waiting: this month's AI
+    spend has reached its $X limit …". Nothing switches model.
+- **The key.**
+  - `OPENROUTER_API_KEY` goes in the server's `.env` only, and compose passes
+    it through.
+  - It's in `_child_env`'s strip list, so a submitted model never sees it.
+  - No page or reply carries it; `/api/ai` says only whether there is one.
+  - With no key, the page says so in one line and offers only Local.
+- **A judge version** is the judge's model, its pinned provider and the hash
+  of both judge prompts (`judge.version`).
+  - Every judged answer carries it (`judge_version`), and `judge.json`'s head
+    carries it too.
+  - Tables, Improve, Home and the model page show only the current
+    version's scores.
+  - Another version's scores are on the model's History as "judged by
+    <model>" (`judgedEarlier`). With none current, Improve says so and
+    points at AI models.
+- **Changing the judge asks first:** "Re-judge the N answers on file with the
+  new judge? About $X."
+  - **Re-judge them** queues a judge-only run per model (`POST
+    /api/ai/rejudge`) and clears the Everyday verdicts, so the next marking
+    asks the new judge. None of it uses the GPU.
+  - **Later** leaves the old scores in History.
+- **The judge test** is on the same page.
+  1. masein marks 100 answers already on file (`JUDGE_TEST_N`).
+     - The mix is exam topics and models, with about one in seven from the
+       Everyday questions that use a judge.
+     - The sample is frozen in `BENCH_ROOT/ai/judge_test.json`.
+     - Keys are 0–4, or P and F, and S skips. Marks save as he gives them,
+       and a reload lands where he stopped.
+     - The judges' marks never reach the page while he marks.
+  2. He ticks up to four candidates, sees the cost, and runs them. Each marks
+     the same answers with the board's own judge prompts, as a batch the
+     poller finishes.
+  3. The result table: same mark, within 1 point, weighted κ (quadratic),
+     and cost per 1,000 answers. The best row is marked, and **Use this
+     judge** makes it the judge: a new version, with the re-judge prompt.
+  - **Provisional comes off** when the current judge agrees with masein at
+    κ ≥ 0.7 (`JUDGE_KAPPA_MIN`) on at least 100 answers (`JUDGE_TEST_MIN`).
+    `judge_test.calibrate` writes `results/full/judge_calibration.json` for
+    that judge's id and version.
+  - The Knowledge exam view, the model page and Home then carry "judge
+    checked against masein on 120 answers · κ 0.78".
+  - A calibration for another version of the judge doesn't count.
+- **One line on Improve and on the Knowledge exam:** "AI: judge DeepSeek V4.1
+  Flash · writer GLM 5.3 · change". "change" opens AI models.
+- **Tests** use a fake OpenRouter (`tests/fixtures/fake_openrouter.py`, at
+  `service.llm._http`). Nothing leaves the machine in a test.
 
 ## 11. Known gaps, risks, loose ends
 

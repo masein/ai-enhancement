@@ -87,7 +87,7 @@ def _job_scratch(sid: int, run_as: tuple[int, int] | None) -> Path:
 SECRET_ENV_VARS = ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HUGGINGFACE_TOKEN",
                    "HF_API_TOKEN", "AWS_SECRET_ACCESS_KEY", "OPENAI_API_KEY",
                    "LLM_API_KEY", "ANTHROPIC_API_KEY", "SUBMIT_TOKEN",
-                   "EXAM_API_KEY", "JUDGE_API_KEY")
+                   "EXAM_API_KEY", "JUDGE_API_KEY", "OPENROUTER_API_KEY")
 
 
 def _child_env(remote_code: bool, scratch: Path | None = None) -> dict:

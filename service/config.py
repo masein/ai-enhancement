@@ -258,6 +258,26 @@ ALLOW_SINGLE_PROVIDER_LOOP = os.environ.get("ALLOW_SINGLE_PROVIDER_LOOP", "0") =
 ALLOW_PRELIMINARY_OVERRIDE = os.environ.get("ALLOW_PRELIMINARY_OVERRIDE", "1") == "1"
 JUDGED_TASKS_DIR = Path(os.environ.get("JUDGED_TASKS_DIR", EXAM_DIR / "tasks"))
 
+# 12i.1: OpenRouter, for any of the four jobs chosen on the AI models page
+# (service/ai_models.py). The key lives in the server's environment (.env,
+# interpolated by docker-compose), never in the repo or a page, and is stripped
+# from every evaluation subprocess. With none, only the local model is offered
+# and nothing calls OpenRouter.
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL",
+                                     "https://openrouter.ai/api/v1").strip().rstrip("/")
+OPENROUTER_CONCURRENCY = int(os.environ.get("OPENROUTER_CONCURRENCY", "8"))
+OPENROUTER_MAX_TOKENS = int(os.environ.get("OPENROUTER_MAX_TOKENS", "4096"))
+# the monthly AI spend limit, in dollars; the page changes it. At the limit AI
+# jobs wait, with a plain message — they never fall back to another model
+AI_MONTHLY_LIMIT_USD = float(os.environ.get("AI_MONTHLY_LIMIT_USD", "20"))
+# the judge test: how many answers masein marks, and what takes "provisional"
+# off the judge — a weighted kappa of JUDGE_KAPPA_MIN or more against his
+# marks, on at least JUDGE_TEST_MIN answers
+JUDGE_TEST_N = int(os.environ.get("JUDGE_TEST_N", "100"))
+JUDGE_KAPPA_MIN = float(os.environ.get("JUDGE_KAPPA_MIN", "0.7"))
+JUDGE_TEST_MIN = int(os.environ.get("JUDGE_TEST_MIN", "100"))
+
 
 def judged_tasks() -> list[str]:
     if not JUDGED_TASKS_DIR.is_dir():

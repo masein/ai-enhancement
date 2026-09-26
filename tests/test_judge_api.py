@@ -195,11 +195,12 @@ def test_judged_run_is_submitted_then_finished_by_the_poller(tmp_path, monkeypat
         assert row["judgeState"]["ok"] is False
         assert any("not the judge this server runs now" not in r for r in row["judgeState"]["reasons"])
         assert any("calibration on file is for stub/overlap-v1" in r for r in row["judgeState"]["reasons"])
-        # the other models were graded by the stub — a different judge from the current one
+        # the other models were graded by the stub — a different judge from the
+        # current one. 12i.1: their scores are in History, not in today's views
         other = next(m for m in p["models"] if m["id"] == "fx/good-750m")
-        assert other["judgeState"]["current"] is False
-        assert any("different series" in r for r in other["judgeState"]["reasons"])
-        assert any("different judge" in w for w in p["warnings"])
+        assert other["judge"] is None and other["judgeState"] is None
+        assert other["judgedEarlier"]["id"] == "stub/overlap-v1"
+        assert any("in each model's History until they are judged again" in w for w in p["warnings"])
         assert p["judged"]["current"]["id"] == "fake/fake-judge-20250101"
     finally:
         client.__exit__(None, None, None)
@@ -253,9 +254,11 @@ def test_fixture_rows_count_and_a_different_current_judge_demotes_them(payload, 
     p = report.build_payload(report.merge_runs(runs), "t", "", calibration=cal,
                              judge_identity={"provider": "anthropic", "model": "claude-x-20250101",
                                              "id": "anthropic/claude-x-20250101", "family": "claude"})
+    # 12i.1: another judge's scores leave today's views for the model's History
     good = next(m for m in p["models"] if m["id"] == "fx/good-750m")
-    assert good["judgeState"]["ok"] is False and good["judgeState"]["current"] is False
-    assert any("different judge" in w for w in p["warnings"])
+    assert good["judge"] is None and good["judgeState"] is None
+    assert good["judgedEarlier"]["by"] == "overlap-v1"
+    assert any("in each model's History until they are judged again" in w for w in p["warnings"])
 
 
 def test_an_old_local_judge_file_is_labelled_local():

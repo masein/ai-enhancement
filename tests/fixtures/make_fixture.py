@@ -939,7 +939,14 @@ def write_everyday(out_dir: Path) -> dict[str, dict]:
     return out
 
 
-def frozen_report(root: Path, path: Path, title: str = "Fixture board") -> Path:
+STUB_JUDGE = {"provider": "stub", "model": "overlap-v1", "id": "stub/overlap-v1",
+              "family": "stub"}
+
+
+def frozen_report(root: Path, path: Path, title: str = "Fixture board",
+                  judge_identity: dict | None = None) -> Path:
+    """judge_identity: the judge the board runs now (12i.1: only its scores are
+    in tables; another judge's are in a model's History)"""
     import report_lm_eval as report
     out_dir = root / "results" / "full"
     runs = report.load_results(out_dir)
@@ -947,8 +954,7 @@ def frozen_report(root: Path, path: Path, title: str = "Fixture board") -> Path:
     cal = json.loads(cal_path.read_text(encoding="utf-8")) if cal_path.exists() else None
     return report.build_report(runs, path, title, calibration=cal,
                                taint=TAINT, parents=PARENTS,
-                               judge_identity={"provider": "stub", "model": "overlap-v1",
-                                               "id": "stub/overlap-v1", "family": "stub"},
+                               judge_identity=judge_identity or STUB_JUDGE,
                                everyday=report.load_everyday(out_dir))
 
 

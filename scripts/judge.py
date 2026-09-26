@@ -703,8 +703,19 @@ def parse_grade(text: str) -> tuple[int | None, str]:
 # ---------------------------------------------------------------------------
 
 def identity() -> dict:
-    """{provider, model, id, family} of the judge this server is configured with."""
-    from service import config
+    """{provider, model, id, family} of the judge this server is configured with.
+    12i.1: the AI models page's choice when there is one — an OpenRouter model
+    by its dated version, with the provider it is pinned to ("pin")"""
+    from service import ai_models, config
+    c = ai_models.choice("judge")
+    if c and c.get("kind") == "openrouter":
+        return {"provider": "openrouter", "model": c["version"], "id": f"openrouter/{c['version']}",
+                "family": ai_models.family(c["id"]), "pin": c.get("provider") or "",
+                "slug": c["id"], "name": ai_models.label("judge")}
+    if c and c.get("kind") == "local":
+        model = ai_models.local_model()
+        return {"provider": "local", "model": model, "id": f"local/{model}",
+                "family": family(model) if model else "", "name": ai_models.label("judge")}
     model = config.JUDGE_MODEL
     if model == "stub":
         return {"provider": "stub", "model": "overlap-v1", "id": "stub/overlap-v1", "family": "stub"}
@@ -740,10 +751,36 @@ def single_provider_loop() -> bool:
     return bool(provider_clash()) and config.ALLOW_SINGLE_PROVIDER_LOOP
 
 
+def is_stub() -> bool:
+    """the deterministic stand-in grades: JUDGE_MODEL=stub, and no model
+    chosen on the AI models page"""
+    from service import ai_models, config
+    return config.JUDGE_MODEL == "stub" and not ai_models.choice("judge")
+
+
+def version(ident: dict | None = None) -> dict:
+    """12i.1: a judge version — the model (its dated version), the provider it
+    is pinned to, and the hash of the judge's prompts. A judged score is
+    comparable only with scores of the same version; `key` names it"""
+    ident = ident or identity()
+    psha = hashlib.sha256((prompt_sha(PROMPT) + prompt_sha(PROMPT_CRITERIA)).encode()).hexdigest()
+    key = hashlib.sha256(f"{ident['id']}|{ident.get('pin', '')}|{psha}".encode()).hexdigest()[:12]
+    return {"model": ident["model"], "provider": ident.get("pin", ""), "prompt_sha256": psha,
+            "key": key, "label": ident.get("name") or ident["model"]}
+
+
 def blocked() -> str:
     """'' when a judged run can be graded, else the reason — shown on the page
     rather than crashing the container (the exam and the board still work)."""
-    from service import config, llm
+    from service import ai_models, config, llm
+    # 12i.1: a judge chosen on the AI models page: its own refusals (no key,
+    # a model that moved), and the same-family rule is a warning there
+    c = ai_models.choice("judge")
+    if c and c.get("kind") == "openrouter":
+        return llm.blocked("judge")
+    if c and c.get("kind") == "local":
+        return "" if ai_models.local_model() else ("the local model's id is not known on this "
+                                                   "server (set LOCAL_MODEL in .env)")
     if not config.JUDGE_MODEL:
         return ("no judge is configured on this server (JUDGE_MODEL is unset) — the judged "
                 "suite is off")
@@ -1323,6 +1360,8 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
                       "family": ident["family"], "batch_id": batch_id,
                       "prompt_sha256": prompt_sha(), "prompt_version": PROMPT_VERSION,
                       "stub": ident["provider"] == "stub", "single_provider_loop": caveat,
+                      # 12i.1: the version it is — scores compare only within one
+                      "version": version(ident), "pin": ident.get("pin", ""),
                       # per task, because the rubric is now per topic: which
                       # one graded it, its sha, its version, and whether its
                       # author has signed it off
@@ -1411,6 +1450,11 @@ def assemble(plan: dict, results: dict, ident: dict, batch_id: str, results_root
         if gen:
             t["generation"] = gen
         tasks[task] = t
+    # 12i.1: every judged answer records the judge version that marked it
+    vkey = head["judge"]["version"]["key"]
+    for t in tasks.values():
+        for it in t.get("items") or []:
+            it["judge_version"] = vkey
     return {**head, "canary": canary, "preliminary_reasons": reasons, "tasks": tasks}
 
 
@@ -1781,7 +1825,7 @@ def start_run(model_dir: Path, results_root: Path, only: list[str] | None = None
     does not know it."""
     from service import config, db, llm
     ident = identity()
-    if config.JUDGE_MODEL == "stub":
+    if is_stub():
         out = run_stub(model_dir, results_root, record=True,
                        threshold=config.JUDGE_CANARY_MAX_DRIFT, only=only)
         if out is None:

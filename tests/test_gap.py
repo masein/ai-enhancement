@@ -513,7 +513,9 @@ def test_a_failed_batch_marks_the_proposal_failed(gap, monkeypatch):
 # secrets
 # ---------------------------------------------------------------------------
 
-KEY_PATTERNS = [r"sk-ant-[A-Za-z0-9_\-]{10,}", r"\bsk-(?:proj-)?[A-Za-z0-9]{20,}"]
+# 12i.1: and OpenRouter's, sk-or-v1-<hex>
+KEY_PATTERNS = [r"sk-ant-[A-Za-z0-9_\-]{10,}", r"\bsk-(?:proj-)?[A-Za-z0-9]{20,}",
+                r"sk-or-v1-[A-Za-z0-9]{20,}"]
 
 
 def tracked_files() -> list[str]:

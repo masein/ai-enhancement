@@ -267,7 +267,10 @@ def _trim_judge(j: dict | None) -> dict | None:
                       "provisional", "provisional_reason", "base_url", "served_model",
                       "weights",
                       # a rubric whose author has not signed it off yet
-                      "rubric_status", "rubrics_draft")},
+                      "rubric_status", "rubrics_draft",
+                      # 12i.1: the judge version — what decides whether today's
+                      # views show these scores — and the provider it was pinned to
+                      "version", "pin")},
            "skipped": j.get("skipped"), "correct_at": j.get("correct_at"),
            "canary": ({k: v for k, v in (j.get("canary") or {}).items()
                        if k in ("n", "graded", "mad_vs_human", "mad_vs_previous", "threshold",
@@ -325,6 +328,28 @@ def published_score(t: dict) -> float | None:
     return t.get("mean") if "n_report" not in t else None
 
 
+def judged_current(trimmed: dict | None, current_id: str | None,
+                   current_version: str | None) -> bool:
+    """12i.1: were these judged scores marked by the judge version this server
+    runs now? A version is the model, the provider it is pinned to and the
+    judge's prompts; a file from before versions is the current one's while
+    its judge id is. With no judge on the server (a frozen report) nothing
+    is set aside"""
+    j = (trimmed or {}).get("judge") or {}
+    if not current_id:
+        return True
+    v = (j.get("version") or {}).get("key")
+    if current_version and v:
+        return v == current_version
+    return j.get("id") == current_id
+
+
+def judged_by(trimmed: dict | None) -> str:
+    """the judge that marked a file, in words: "DeepSeek V4.1 Flash", "local/chat" """
+    j = (trimmed or {}).get("judge") or {}
+    return (j.get("version") or {}).get("label") or j.get("id") or j.get("model") or "an earlier judge"
+
+
 def judged_state(trimmed: dict | None, cal: dict | None, current_id: str | None) -> dict:
     """Whether this model's judged numbers may be ranked: {ok, reasons,
     current}. Preliminary when the judge is uncalibrated, calibrated as a
@@ -341,9 +366,18 @@ def judged_state(trimmed: dict | None, cal: dict | None, current_id: str | None)
     if not cal:
         reasons.append("the judge has not been calibrated against a person")
     elif not cal.get("calibrated"):
-        reasons.append(f"Cohen's kappa {cal.get('kappa')} is below {KAPPA_MIN}")
+        if cal.get("by"):
+            # 12i.1: the judge test's — a weighted kappa over enough answers
+            reasons.append(f"weighted kappa {cal.get('kappa')} on {cal.get('n')} answers against "
+                           f"{cal['by']} — {cal.get('kappa_min')} on {cal.get('n_min')} is needed")
+        else:
+            reasons.append(f"Cohen's kappa {cal.get('kappa')} is below {KAPPA_MIN}")
     elif cal.get("judge_id") and jid and cal["judge_id"] != jid:
         reasons.append(f"the calibration on file is for {cal['judge_id']}, not {jid}")
+    elif cal.get("judge_version") and ((trimmed.get("judge") or {}).get("version") or {}) \
+            .get("key") not in (None, cal["judge_version"]):
+        reasons.append("the calibration on file is for another version of this judge (its "
+                       "provider or prompts changed)")
     reasons.extend(trimmed.get("preliminaryReasons") or [])
     prov = provisional_reason(trimmed)
     if prov and prov not in reasons:
@@ -1226,11 +1260,14 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     taint = taint or {}
     parents = parents or {}      # tainted model id -> the model its training run started from
     current_judge = (judge_identity or {}).get("id") or None
+    current_version = (judge_identity or {}).get("version") or None
     cal = calibration if isinstance(calibration, dict) and calibration.get("kappa") is not None \
         else None
     if cal is not None:
-        cal = {**{k: cal.get(k) for k in ("kappa", "n", "calibrated", "kappa_min", "per_category")},
-               "judge_id": (cal.get("judge") or {}).get("id")}
+        cal = {**{k: cal.get(k) for k in ("kappa", "n", "calibrated", "kappa_min", "per_category",
+                                          "n_min", "by", "method")},
+               "judge_id": (cal.get("judge") or {}).get("id"),
+               "judge_version": (cal.get("judge") or {}).get("version")}
 
     # display names: short unless two orgs publish the same repo name
     # (google/gemma-3-270m vs unsloth/gemma-3-270m must not collapse into one row)
@@ -1300,6 +1337,15 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         official = bool(required) and not missing and not (set(tainted_acc) & set(required))
         params = r["num_params"] or params_from_name(mid)
         judge = _judged_now(r, fingerprints)
+        # 12i.1: only the current judge version's scores are in today's views;
+        # an earlier one's go to the model's History, "judged by <model>"
+        judged_earlier = None
+        if judge and not judged_current(judge, current_judge, current_version):
+            judged_earlier = {"by": judged_by(judge), "id": (judge.get("judge") or {}).get("id"),
+                              "avg": judged_avg(judge, tainted),
+                              "topics": len(judge.get("tasks") or {}),
+                              "at": r.get("judge_mtime")}
+            judge = None
         jstate = judged_state(judge, cal, current_judge) if judge else None
         diag = _trim_diag(r.get("diag"))
         compare = {}
@@ -1395,6 +1441,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             # judged average exists only when every category was judged
             "judge": judge,
             "judgedAvg": judged_avg(judge, tainted),
+            "judgedEarlier": judged_earlier,
             # may these judged numbers be ranked? uncalibrated, a different
             # judge, or a moved canary all say no, in words
             "judgeState": jstate,
@@ -1712,14 +1759,14 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             "Single-provider loop: the judge shares a provider with the exam writer or the "
             "generator (ALLOW_SINGLE_PROVIDER_LOOP). Every judged score carries that caveat; "
             "self-preference in LLM judges is documented and large.")
-    other_judges = sorted({(m["judge"]["judge"] or {}).get("id") for m in model_rows
-                           if m.get("judge")} - {current_judge, None})
-    if current_judge and other_judges:
-        warn('judge_other', 'warning', {'tab': 'exam'}, 'Some judged scores come from a different judge',
-            f"Some judged scores come from a different judge ({', '.join(other_judges)}) than "
-            f"the one this server runs now ({current_judge}). They are shown as their own "
-            f"series and never ranked against the current judge's — resubmit with suite=judged "
-            f"to re-grade.")
+    earlier = [m for m in model_rows if m.get("judgedEarlier")]
+    if current_judge and earlier:
+        by = sorted({m["judgedEarlier"]["by"] for m in earlier})
+        warn('judge_other', 'warning', {'tab': 'exam'}, 'Some judged scores come from an earlier judge',
+            f"{len(earlier)} model{'s' if len(earlier) != 1 else ''}' Knowledge exam scores were "
+            f"judged by {', '.join(by)}, not the judge this server runs now. A score compares "
+            f"only with the same judge's, so they are in each model's History until they are "
+            f"judged again (AI models ▸ Re-judge).")
 
     dates = sorted(str(r["date"]) for r in by_model.values() if r["date"])
     return {
@@ -2293,6 +2340,35 @@ tbody tr.open { background:var(--accent-soft); }
 .planbox .plan { margin:0; color:var(--text-primary); }
 .planbox label.spread { display:inline-flex; align-items:center; gap:6px; }
 /* 12h.1: Instruction & maths' two options, under the form */
+/* 12i.1: AI models and the judge test */
+table.aijobs { width:100%; border-collapse:collapse; margin-top:10px; }
+table.aijobs th, table.aijobs td { text-align:left; padding:8px 10px 8px 0; vertical-align:top;
+  border-bottom:1px solid var(--border); }
+table.aijobs th { font-size:var(--fs-1); color:var(--text-secondary); font-weight:600; }
+.aiprice { white-space:nowrap; }
+.aimenu.pop { min-width:320px; max-width:min(92vw, 460px); padding:10px 12px; gap:6px; }
+.aimenu .ailist { display:flex; flex-direction:column; gap:2px; max-height:min(60vh, 460px);
+  overflow:auto; }
+.aiitem { display:flex; flex-direction:column; align-items:flex-start; text-align:left; gap:2px;
+  padding:6px 8px; border-radius:6px; }
+.aiitem:hover, .aiitem:focus-visible { background:var(--accent-soft); }
+.aiitem-sub { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.aiwhy { margin:0 8px 6px; }
+.warntext { color:var(--warning-text); }
+.airejudge .frm { display:flex; gap:8px; }
+.jtcands { margin-top:10px; }
+.jtpick { display:flex; flex-wrap:wrap; gap:6px 16px; margin:6px 0; }
+.jtpick label { display:inline-flex; align-items:center; gap:6px; }
+table.jtresult { width:100%; border-collapse:collapse; margin-top:12px; }
+table.jtresult th, table.jtresult td { text-align:left; padding:8px 10px 8px 0;
+  border-bottom:1px solid var(--border); }
+table.jtresult th { font-size:var(--fs-1); color:var(--text-secondary); font-weight:600; }
+table.jtresult tr.best td:first-child { font-weight:600; }
+.jtmark .jtcrit { margin:4px 0 10px; padding-left:20px; }
+.jtmark .jtrubric { white-space:pre-wrap; font-size:var(--fs-2); margin-bottom:10px; }
+.jtmark .jtkeys { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 6px; }
+.jtmark .jtkeys .chip-btn { min-width:44px; min-height:40px; font-family:var(--font-mono); }
+.jtref { margin:0 0 10px; }
 .genopts { display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; margin-top:8px; }
 .genopts label.spread { display:inline-flex; align-items:center; gap:6px; }
 /* ---- 11d: Overview ------------------------------------------------------- */
@@ -3503,6 +3579,7 @@ const state = {
   lbHeat: false,                       // leaderboard cells: plain | heat-shaded
   lbAbout: false,                      // "about these benchmarks" panel open
   lbView: 'tasks',                     // leaderboard columns: 'tasks' | 'cats' (MMLU by category)
+  ai: {},                        // 12i.1: the AI models page and the judge test
   rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '',
         // 11j: which of the four views, and the small per-proposal choices
         view: '', focus: {}, watch: new Set(), answers: {}, answersOpen: 0,
@@ -4837,7 +4914,8 @@ function vJudged(m, more = []) {
   // weights behind the served id changed between runs.
   const prov = !!(m.judge && m.judge.judge && m.judge.judge.provisional);
   const card = el('div', { class: 'card' },
-    el('h2', { text: 'Judged free response — the exam' }),
+    el('div', { class: 'sechead' }, el('h2', { text: 'Judged free response — the exam' }),
+      ok ? judgeChecked() : ''),
     // 11h: say what it is, then how it works behind a click
     el('p', { class: 'sub', text: 'Open questions per topic, answered in writing and graded 0–4 '
       + 'against a written rubric.' }),
@@ -5585,8 +5663,22 @@ function modelImproveTab(m) {
 }
 // ---- History: the runs, what produced the numbers, how they were graded ----
 function modelHistoryTab(m) {
-  return [LIVE ? vModelRuns(m) : null, evdEarlierCard(m), provRecord(m), gradedCard(m),
-    vTaint(m)].filter(Boolean);
+  return [LIVE ? vModelRuns(m) : null, judgedEarlierCard(m), evdEarlierCard(m), provRecord(m),
+    gradedCard(m), vTaint(m)].filter(Boolean);
+}
+// 12i.1: Knowledge exam scores an earlier judge marked — a score compares only
+// with the same judge's, so they are kept here, said once, and nowhere else
+function judgedEarlierCard(m) {
+  const x = m.judgedEarlier;
+  if (!x) return null;
+  const when = x.at ? new Date(x.at * 1000).toISOString().slice(0, 10) : '';
+  return el('div', { class: 'card', 'data-judged-earlier': m.id },
+    el('div', { class: 'sechead' }, el('h2', { text: 'Knowledge exam' }),
+      el('span', { class: 'badge', 'data-judged-by': x.by, text: 'judged by ' + x.by })),
+    el('p', { class: 'sub', text: (x.avg != null ? `${x.avg.toFixed(2)} of 4 on average, over `
+        : 'Over ') + `${x.topics} topic${x.topics === 1 ? '' : 's'}${when ? ', judged ' + when : ''}. `
+      + 'A score compares only with scores from the same judge, and this server runs another one '
+      + 'now, so these are in no table and no comparison until they are judged again.' }));
 }
 // 12a.4: its everyday answers to an earlier wording — kept, and said once, as
 // what they were; never in a score or beside this wording's answers
@@ -5821,7 +5913,7 @@ function bestByKind(ms) {
   const caveat = (exam && !(judgedCalibrated() && judgedOkM(exam))) || (weak && !judgedOkM(weak.m))
     ? el('span', { class: 'badge prelim', 'data-best-caveat': '1',
         title: judgedCalibrated() ? whyProvisional(exam || weak.m) : judgedOffWhy(),
-        text: 'Knowledge exam: provisional judge' }) : '';
+        text: 'Knowledge exam: provisional judge' }) : exam ? judgeChecked() : '';
   return el('div', { class: 'card', 'data-best-by-kind': String(cards.length) },
     el('div', { class: 'sechead' }, el('h2', { text: 'Best in each kind of test' }), caveat),
     cards.length ? el('div', { class: 'hlgrid' }, cards)
@@ -6314,6 +6406,8 @@ const hashFor = () => (state.model ? 'model=' + encodeURIComponent(state.model)
 function viewHash(v) {
   const place = placeOf(v);
   if (v === 'leaderboard') return 'tab=models' + (lbHash() ? '&' + lbHash() : '');
+  // 12i.1: the judge test's marking is a view of its own, so Back leaves it
+  if (v === 'ai') return 'tab=ai' + (state.ai.mark ? '&sub=mark' : '');
   if (place === 'improve' || place === 'benchmarks')
     return `tab=${place}&sub=${SUB_SLUG[v]}`
       // 12g.1: which model Improve is on, so a link opens it
@@ -6334,7 +6428,8 @@ function viewOfHash(name, params) {
             leaderboard: 'leaderboard', perplexity: 'leaderboard', loop: 'pipeline',
             review: 'pipeline', training: 'training', runs: 'queue', queue: 'queue',
             submit: 'queue', data: 'provenance', provenance: 'provenance', help: 'help',
-            tasks: 'tasks', exam: 'exam', everyday: 'everyday' }[n];
+            tasks: 'tasks', exam: 'exam', everyday: 'everyday', ai: 'ai' }[n];
+  if (n === 'ai') state.ai.mark = p.get('sub') === 'mark';
   if (n === 'improve') v = sub || 'pipeline';
   if (n === 'benchmarks') v = ['tasks', 'exam', 'everyday'].includes(sub) ? sub : benchSub();
   if (!v || !has(v)) return null;
@@ -7365,6 +7460,14 @@ const refreshedAt = () => (String((DATA || {}).generated || '').match(/\b\d{1,2}
 const judgedCalibrated = () => !!(DATA.judged && DATA.judged.calibration
   && DATA.judged.calibration.calibrated && DATA.models.some(m => m.judgeState && m.judgeState.ok));
 const judgedOkM = m => !!(m.judgeState && m.judgeState.ok);
+// 12i.1: what taking "provisional" off rests on, where judged scores rank
+function judgeChecked() {
+  const cal = (DATA.judged || {}).calibration;
+  if (!judgedCalibrated() || !cal.by) return '';
+  return el('span', { class: 'badge', 'data-judge-checked': String(cal.n),
+    title: cal.method || null,
+    text: `judge checked against ${cal.by} on ${cal.n} answers · κ ${cal.kappa}` });
+}
 // why the judged chip, column set and radar source are off, in words
 function judgedOffWhy() {
   const cal = (DATA.judged || {}).calibration;
@@ -8070,7 +8173,7 @@ function vLeaderboard(ms) {
       + (visCols.some(c => c.key === 'rank') ? '' : ' norank'), 'data-lb-table': '1' },
     thead, tbody);
   return [el('div', { class: 'card', 'data-lb-card': '1' },
-      ...modelsHead(),
+      ...modelsHead(L.view === 'exam' ? judgeChecked() : ''),
       lbToolbar(ms, cols, shown, nHidden),
       L.chip === 'knowledge' && staleSentence(ms) && !custom
         ? el('p', { class: 'warn', 'data-stale-diag': '1', text: staleSentence(ms) }) : '',
@@ -11417,6 +11520,9 @@ function renderWho(force = false) {
           role: 'menuitemradio', 'data-theme': t, class: 'chip-btn',
           'aria-checked': String(THEMES[themeIdx] === t), text: labels[t],
           onclick: () => { themeIdx = THEMES.indexOf(t); themeFade(); applyTheme(t); } })))),
+      // 12i.1: which AI model does each job, and the judge test
+      LIVE ? el('button', { role: 'menuitem', class: 'menulink', 'data-menu': 'ai',
+        text: 'AI models', onclick: () => go('ai') }) : '',
       el('button', { role: 'menuitem', class: 'menulink', 'data-menu': 'data',
         text: 'Data & sources', onclick: () => go('provenance') }),
       el('button', { role: 'menuitem', class: 'menulink', 'data-menu': 'help',
@@ -11447,17 +11553,17 @@ function docLine(d) {
   return line + [...by].map(([why, n]) => `${n} ${why}`).join(', ');
 }
 
-// 12i.0: Improve's one line about the AI, in plain words — "AI: the local
-// model on this server · 47 requests today". 12i.1 names the model per job
-function aiLine(llm) {
-  const who = llm.provider === 'local' ? 'the local model on this server'
-    : `${llm.provider[0].toUpperCase()}${llm.provider.slice(1)} ${llm.model || ''}`.trim();
-  const rows = (llm.usage || []).length ? llm.usage : [{ items: llm.usage_today || 0 }];
-  const used = rows.reduce((a, u) => a + (u.items || 0), 0);
-  const cap = rows.length === 1 && rows[0].cap != null ? rows[0].cap : null;
-  return `AI: ${who} · ${used.toLocaleString('en')} request${used === 1 ? '' : 's'} today`
-    + (cap != null ? ` of ${cap.toLocaleString('en')}` + (used >= cap ? ', the limit until '
-      + 'tomorrow' : '') : '');
+// 12i.0: one line about the AI, in plain words. 12i.1: each job's model —
+// "AI: judge DeepSeek V4.1 Flash · writer GLM 5.3 · change". `writer` is the
+// job that writes here: training data on Improve, questions on the exam
+function aiLine(llm, writer = 'data') {
+  const ai = llm.ai || {};
+  return el('span', { 'data-ai-line': writer },
+    `AI: judge ${ai.judge || 'none'} · writer ${ai[writer] || 'none'}`,
+    llm.ai_waiting ? ` · ${llm.ai_waiting}` : '',
+    LIVE ? [' · ', el('a', { href: '#tab=ai', 'data-ai-change': '1', text: 'change',
+      onclick: e => { e.preventDefault(); navigate({ tab: 'ai', model: null, topic: null }); } })]
+      : '');
 }
 
 // the daily limit is per provider (a paid API's, or LOCAL_DAILY_ITEM_CAP):
@@ -12170,10 +12276,15 @@ function vPipeline() {
   const want = hashFor();
   if (m && location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
   const llm = state.rv.llm || {};
+  // 12i.1: after a new judge, the answers on file wait for it — not "no exam"
+  const earlier = DATA.models.some(x => x.judgedEarlier);
   if (!m) return [el('div', { class: 'card', 'data-pipeline': 'none' },
     el('h2', { text: 'Improve' }),
-    empty('Nothing to improve yet: no model has sat the Knowledge exam.', 'Sit the exam',
-      () => navigate({ tab: 'exam', model: null, topic: null })))];
+    earlier ? empty('Nothing to improve yet: the exam answers on file were judged by another '
+      + 'judge, and a score compares only with its own judge’s.', 'Re-judge them',
+      () => navigate({ tab: 'ai', model: null, topic: null }))
+      : empty('Nothing to improve yet: no model has sat the Knowledge exam.', 'Sit the exam',
+        () => navigate({ tab: 'exam', model: null, topic: null })))];
   const weak = impWeak(m), props = impProposals(m), ds = impDatasets(m), rts = impRetests(m);
   // the one filled button opens on the weakest topic a proposal can be made from
   const first = weak.find(w => !w.why);
@@ -12196,7 +12307,7 @@ function vPipeline() {
       + 'missing, the data made for it, and what training changed. The Standard benchmarks are only watched here, '
       + 'never trained toward.' }),
     !llm.configured && llm.reason ? el('p', { class: 'warn', text: llm.reason }) : '',
-    llm.configured ? el('p', { class: 'small se', 'data-imp-ai': '1', text: aiLine(llm) }) : '',
+    llm.configured ? el('p', { class: 'small se', 'data-imp-ai': '1' }, aiLine(llm)) : '',
     state.rv.msg ? el('p', { class: 'small', text: state.rv.msg }) : '');
 
   return [head, impStagesCard(m)];
@@ -13444,6 +13555,7 @@ function exCandidate(c) {
 
 function vExam() {
   if (!state.ex.loaded && netReady()) loadExam();
+  if (!state.rv.loaded && netReady()) loadReview();
   rememberedName();
   const st = state.ex.status || {};
   const sum = st.summary || {};
@@ -13457,9 +13569,10 @@ function vExam() {
       + 'the published per-topic score — and a diagnose half — the only half a proposal may '
       + 'read. That split is what lets the loop train on what the exam finds and still have an '
       + 'honest number.')),
+    // 12i.1: the judge and the question writer, in words, and where to change them
+    state.rv.llm ? el('p', { class: 'small se', 'data-exam-ai': '1' },
+      aiLine(state.rv.llm, 'writer')) : '',
     el('div', { class: 'kvs' },
-      el('span', {}, el('b', { text: 'exam writer ' }), st.configured
-        ? `${st.provider}/${st.model || '—'}` : 'not configured'),
       el('span', {}, el('b', { text: 'bank ' }), `${total} questions across ${topics.filter(t => sum[t].accepted).length} of ${topics.length} topics`),
       el('span', {}, el('b', { text: 'awaiting curation ' }), String(pending)),
       el('span', {}, el('b', { text: 'tasks built ' }), String((st.tasks_built || []).length))),
@@ -13882,6 +13995,347 @@ function exportCsv() {
 }
 function exportJson() { download('benchmark.json', 'application/json', JSON.stringify(DATA, null, 1)); }
 
+// ===========================================================================
+// 12i.1: AI models — which model does each job (the judge, the question
+// writer, the training-data writer, the checker), what it costs, and the
+// judge test that picks the judge. Under the name menu: settings, not a place
+// ===========================================================================
+const AI_DEFAULT_CANDIDATES = ['deepseek/deepseek-v4.1-flash', 'openai/gpt-6-luna',
+  'z-ai/glm-5.3-flash', 'local'];
+async function loadAi() {
+  if (state.ai.asked) return;
+  state.ai.asked = true;
+  try { state.ai.page = await api('api/ai'); } catch (e) { state.ai.msg = e.message; }
+  if (state.ai.page && state.ai.page.has_key && !state.ai.models) {
+    try { state.ai.models = (await api('api/ai/models')).models; } catch (e) { /* the page stands */ }
+  }
+  state.ai.asked = false;
+  if (state.tab === 'ai') render();
+}
+async function loadJudgeTest() {
+  if (state.ai.jtAsked) return;
+  state.ai.jtAsked = true;
+  try {
+    const [jt, res] = await Promise.all([api('api/judge-test'), api('api/judge-test/result')]);
+    state.ai.jt = jt; state.ai.res = res;
+  } catch (e) { state.ai.msg = e.message; }
+  state.ai.jtAsked = false;
+  if (state.tab === 'ai') render();
+}
+// "$0.14" — dollars per million tokens, or a month's spend
+const usd = (v, d = 2) => v == null ? '—' : '$' + Number(v).toLocaleString('en',
+  { minimumFractionDigits: d, maximumFractionDigits: Math.max(d, 4) });
+const aiName = c => !c ? '—' : c.kind === 'local' ? `Local (${(state.ai.page || {}).local
+  ? state.ai.page.local.name : 'the local model'} on this server)` : String(c.name || c.id)
+  .split(': ').pop();
+function aiPrice(j) {
+  const c = j.chosen;
+  if (c && c.kind === 'openrouter')
+    return `${usd(c.price_in)} in · ${usd(c.price_out)} out`;
+  if ((c && c.kind === 'local') || j.provider === 'local') return 'free';
+  return '—';
+}
+
+// change ▾ — Local, then the suggested model, then OpenRouter's text models
+function aiChange(j) {
+  const A = state.ai;
+  const btn = el('button', { class: 'quiet', 'data-ai-change-menu': j.job, text: 'change ▾',
+    'aria-label': `change the ${j.label.toLowerCase()}'s model` });
+  return popover(btn, () => {
+    const list = el('div', { class: 'ailist' });
+    const pick = async id => {
+      if (!whoName()) { popClose(); askName(); return; }
+      popClose(true);
+      try {
+        const r = await post(`api/ai/jobs/${j.job}`, { model: id, by: whoName() });
+        A.page = r.page;
+        if (r.rejudge && r.rejudge.n) A.confirm = r.rejudge;
+        toast(`${j.label}: ${aiName(r.saved)}`, { key: 'ai' });
+      } catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
+      render();
+    };
+    const item = (id, name, sub, attrs = {}) => el('button', { role: 'menuitem',
+        class: 'aiitem', 'data-ai-pick': id, onclick: () => pick(id), ...attrs },
+      el('span', { class: 'aiitem-name', text: name }), sub);
+    const fill = q => {
+      q = (q || '').trim().toLowerCase();
+      const ms = (A.models || []).filter(m => !q || (m.id + ' ' + m.name).toLowerCase()
+        .includes(q));
+      const sug = ms.find(m => m.id === j.suggested);
+      const rest = ms.filter(m => m !== sug).slice(0, 60);
+      const row = (m, extra) => item(m.id, m.name.split(': ').pop(),
+        el('span', { class: 'small se aiitem-sub' }, extra || '',
+          el('span', { class: 'mono', text: `${usd(m.price_in)} in · ${usd(m.price_out)} out` }),
+          m.context ? ` · ${Math.round(m.context / 1000).toLocaleString('en')}k context` : ''));
+      list.replaceChildren(
+        !q || 'local'.includes(q) ? item('local', `Local (${A.page.local.name} on this server)`,
+          el('span', { class: 'small se aiitem-sub', text: 'free · no key needed' })) : '',
+        sug ? row(sug, el('span', { class: 'badge', 'data-ai-suggested': sug.id,
+          text: 'suggested' })) : '',
+        sug ? el('p', { class: 'small se aiwhy', 'data-ai-why': j.job, text: j.why }) : '',
+        ...rest.map(m => row(m)),
+        !A.page.has_key ? el('p', { class: 'small se', text: 'OpenRouter’s models show once '
+          + 'the server has its key.' }) : !ms.length && q ? el('p', { class: 'small se',
+          text: 'No model matches.' }) : '');
+    };
+    fill(A.q || '');
+    return el('div', { class: 'moremenu aimenu', id: 'pop-ai-' + j.job, 'aria-label': 'models' },
+      A.page.has_key ? el('input', { type: 'search', placeholder: 'search models…',
+        'aria-label': 'search models', 'data-keep': 'aiq', value: A.q || '',
+        oninput: e => { A.q = e.target.value; fill(A.q); } }) : '',
+      list);
+  }, { key: 'ai-' + j.job, menu: false });
+}
+
+function aiJobsTable(P) {
+  const rows = P.jobs.map(j => el('tr', { 'data-ai-job': j.job },
+    el('td', {}, el('b', { text: j.label }), el('div', { class: 'small se', text: j.does })),
+    el('td', {}, el('span', { 'data-ai-now': j.job, text: j.chosen ? aiName(j.chosen) : j.now }),
+      j.chosen && j.chosen.kind === 'openrouter' ? el('div', { class: 'small se',
+        'data-ai-provider': j.job, text: `on ${j.chosen.provider_name || j.chosen.provider}`
+          + (j.chosen.precision && j.chosen.precision !== 'unknown' ? ` · ${j.chosen.precision}` : '')
+          + ` · ${j.chosen.version}` }) : '',
+      j.blocked ? el('div', { class: 'small warntext', 'data-ai-blocked': j.job, text: j.blocked })
+        : ''),
+    el('td', { class: 'mono small aiprice', 'data-ai-price': j.job, text: aiPrice(j) }),
+    el('td', { class: 'aiact' }, LIVE ? aiChange(j) : '')));
+  return el('table', { class: 'aijobs', 'data-ai-jobs': '1' },
+    el('thead', {}, el('tr', {}, el('th', { text: 'Job' }), el('th', { text: 'Model' }),
+      el('th', { text: 'Price per million tokens' }), el('th', {}))),
+    el('tbody', {}, rows));
+}
+
+function aiSpendLine(P) {
+  const A = state.ai, s = P.spend;
+  const edit = A.editLimit;
+  const input = el('input', { type: 'number', min: '0', step: '1', value: String(s.limit),
+    'aria-label': 'monthly limit in dollars', 'data-ai-limit-input': '1', style: 'width:6em' });
+  return el('div', { class: 'aispend', 'data-ai-spend': String(s.month) },
+    el('p', { class: 'small' }, 'This month: ', el('span', { class: 'mono', text: usd(s.month) }),
+      ' of ', el('span', { class: 'mono', 'data-ai-limit': String(s.limit), text: usd(s.limit) }),
+      ' · ', edit ? el('span', {}, input, ' ', el('button', { class: 'quiet', text: 'Save',
+        'data-ai-limit-save': '1', onclick: async () => {
+          if (!whoName()) { askName(); return; }
+          try { A.page = await post('api/ai/limit', { usd: Number(input.value), by: whoName() });
+            A.editLimit = false; } catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
+          render(); } }))
+        : el('button', { class: 'quiet', 'data-ai-limit-edit': '1', text: 'change the limit',
+          onclick: () => { A.editLimit = true; render(); } })),
+    s.waiting ? el('p', { class: 'warn', 'data-ai-waiting': '1', text: s.waiting }) : '');
+}
+
+// changing the judge asks first: re-judge what another judge marked, or later
+function aiRejudgeBox() {
+  const A = state.ai, c = A.confirm;
+  return el('div', { class: 'note airejudge', 'data-ai-rejudge': String(c.n) },
+    el('p', {}, `Re-judge the ${c.n.toLocaleString('en')} answer${c.n === 1 ? '' : 's'} on file `
+      + `with the new judge? About ${usd(c.usd)}.`),
+    el('p', { class: 'small se', text: 'It uses no GPU. Until then, the scores the last judge '
+      + 'gave are in each model’s History, not in today’s tables.' }),
+    el('div', { class: 'frm' },
+      el('button', { class: 'primary', 'data-ai-rejudge-yes': '1', text: 'Re-judge them',
+        onclick: async () => {
+          try {
+            const r = await post('api/ai/rejudge', { by: whoName() });
+            toast(`${r.queued.length} run${r.queued.length === 1 ? '' : 's'} queued to re-judge `
+              + `${r.n.toLocaleString('en')} answers`, { key: 'ai' });
+            A.confirm = null;
+          } catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
+          render(); } }),
+      el('button', { class: 'quiet', 'data-ai-rejudge-later': '1', text: 'Later',
+        onclick: () => { A.confirm = null; render(); } })));
+}
+
+function vAiModels() {
+  const A = state.ai;
+  if (!A.page && netReady()) loadAi();
+  if (A.mark) return vJudgeMark();
+  if (!A.page) return [el('div', { class: 'card' }, skeleton(4, { 'data-loading': 'ai' }))];
+  const P = A.page;
+  return [el('div', { class: 'card', 'data-ai-page': '1' },
+      el('h2', { text: 'AI models' }),
+      el('p', { class: 'sub', text: 'Which AI model does each job. A model chosen here is '
+        + 'pinned — its dated version and the provider running it — so its marks cannot change '
+        + 'quietly. Before one is chosen, a job keeps the model the server was set up with.' }),
+      P.has_key ? '' : el('p', { class: 'note', 'data-ai-no-key': '1', text: 'OpenRouter has no '
+        + 'key on this server, so only the local model is offered. Add OPENROUTER_API_KEY to '
+        + 'the server’s .env to choose others.' }),
+      aiSpendLine(P),
+      ...(P.warnings || []).map(w => el('p', { class: 'warn', 'data-ai-warning': w.job,
+        text: w.text })),
+      A.confirm ? aiRejudgeBox() : '',
+      aiJobsTable(P)),
+    judgeTestCard()];
+}
+
+// ---- the judge test ----------------------------------------------------------
+const jtPct = v => v == null ? '—' : `${Math.round(100 * v)}%`;
+function judgeTestCard() {
+  const A = state.ai;
+  if (!A.jt && netReady()) loadJudgeTest();
+  const jt = A.jt, res = A.res;
+  const pr = jt ? jt.progress : null;
+  const started = pr && (pr.marked + pr.skipped) > 0;
+  const done = pr && pr.next == null;
+  if (!A.pick) A.pick = new Set(AI_DEFAULT_CANDIDATES.filter(id => id === 'local'
+    || (A.models || []).some(m => m.id === id)));
+  const cands = [...AI_DEFAULT_CANDIDATES.filter(id => id === 'local'
+      || (A.models || []).some(m => m.id === id)),
+    ...(A.models || []).map(m => m.id).filter(id => !AI_DEFAULT_CANDIDATES.includes(id))
+      .filter(id => A.pick.has(id))];
+  const nameOf = id => id === 'local' ? `Local (${A.page.local.name})`
+    : ((A.models || []).find(m => m.id === id) || { name: id }).name.split(': ').pop();
+  const est = el('span', { class: 'small se', 'data-jt-estimate': '1' });
+  const estimate = async () => {
+    const ids = [...A.pick];
+    if (!ids.length) { est.textContent = ''; return; }
+    try {
+      const e = await api('api/judge-test/estimate?models=' + ids.map(encodeURIComponent).join(','));
+      est.textContent = `about ${usd(e.usd)} for ${e.n} answers`;
+    } catch (x) { est.textContent = ''; }
+  };
+  if (jt && started) setTimeout(estimate, 0);
+  const cal = ((DATA.judged || {}).calibration) || null;
+  return el('div', { class: 'card', 'data-judge-test': '1' },
+    el('div', { class: 'rvbar' },
+      el('div', {}, el('h2', { text: 'Judge test' }),
+        el('p', { class: 'sub', text: 'How to pick the judge: you mark answers already on file, '
+          + 'up to four candidate judges mark the same ones, and the table says which agrees '
+          + 'with you. The judge you run now loses "provisional" at a weighted kappa of '
+          + `${jt ? jt.kappa_min : 0.7} on ${jt ? jt.n_min : 100} answers or more.` })),
+      jt && jt.answers.length ? el('button', { class: 'primary', 'data-jt-mark': '1',
+        text: done ? 'Look at your marks' : started ? 'Continue marking' : 'Start marking',
+        onclick: () => { A.mark = true; A.at = done ? 0 : pr.next; navigate({ tab: 'ai' }); } })
+        : ''),
+    !jt ? skeleton(2) : !jt.answers.length ? el('p', { class: 'note', 'data-jt-empty': '1',
+      text: 'No judged answers are on file yet. Sit the Knowledge exam with a model first.' })
+      : el('p', { class: 'small', 'data-jt-progress': `${pr.marked}|${pr.total}` },
+        `You’ve marked ${pr.marked} of ${pr.total}` + (pr.skipped ? ` · ${pr.skipped} skipped`
+          : '') + '.'),
+    cal && cal.method ? el('p', { class: 'small', 'data-jt-calibration': '1',
+      text: cal.calibrated ? `The judge now: checked against ${cal.by} on ${cal.n} answers · `
+        + `κ ${cal.kappa}` : `The judge now: κ ${cal.kappa} on ${cal.n} answers — `
+        + `${cal.kappa_min} on ${cal.n_min} takes "provisional" off.` }) : '',
+    jt && started ? el('div', { class: 'jtcands', 'data-jt-candidates': '1' },
+      el('p', { class: 'small', text: 'Candidates — tick up to four; each marks the same '
+        + 'answers with the board’s judge prompts:' }),
+      el('div', { class: 'jtpick' }, cands.map(id => el('label', { class: 'small',
+          'data-jt-cand': id },
+        el('input', { type: 'checkbox', checked: A.pick.has(id) ? '' : null,
+          disabled: !A.pick.has(id) && A.pick.size >= 4 ? '' : null,
+          onchange: e => { if (e.target.checked) A.pick.add(id); else A.pick.delete(id);
+            render(); } }), ' ' + nameOf(id)))),
+      el('div', { class: 'frm' },
+        el('button', { class: 'secondary', 'data-jt-run': '1', text: 'Run the candidates',
+          disabled: A.pick.size ? null : '', onclick: async () => {
+            if (!whoName()) { askName(); return; }
+            try {
+              const r = await post('api/judge-test/run', { models: [...A.pick], by: whoName() });
+              toast(`${r.runs.length} candidate${r.runs.length === 1 ? '' : 's'} marking — the `
+                + 'table fills in as each finishes', { key: 'ai' });
+            } catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
+          } }), est)) : '',
+    res && res.rows.length ? judgeTestTable(res) : '');
+}
+
+function judgeTestTable(res) {
+  const A = state.ai;
+  return el('table', { class: 'jtresult', 'data-jt-result': '1' },
+    el('thead', {}, el('tr', {}, ['Judge', 'Same mark as you', 'Within 1 point',
+      'Agreement (weighted κ)', 'Cost per 1,000 answers', ''].map(h => el('th', { text: h })))),
+    el('tbody', {}, res.rows.map(r => el('tr', { 'data-jt-row': r.key,
+        class: r.best ? 'best' : null },
+      el('td', {}, r.name, r.current ? el('span', { class: 'small se', text: ' · the judge now' })
+        : '', r.best ? el('span', { class: 'badge', 'data-jt-best': '1', text: 'best' }) : '',
+        r.provider ? el('div', { class: 'small se', text: 'on ' + r.provider }) : ''),
+      el('td', { class: 'mono num', 'data-jt-exact': String(r.exact), text: jtPct(r.exact) }),
+      el('td', { class: 'mono num', text: jtPct(r.within1) }),
+      el('td', { class: 'mono num', 'data-jt-kappa': String(r.kappa),
+        text: r.kappa == null ? '—' : `${r.kappa.toFixed(2)} · ${r.n}` }),
+      el('td', { class: 'mono num', text: r.per_1000 == null ? '—' : usd(r.per_1000) }),
+      el('td', {}, r.current || !LIVE ? '' : el('button', { class: r.best ? 'primary' : 'quiet',
+        'data-jt-use': r.key, text: 'Use this judge', onclick: async () => {
+          if (!whoName()) { askName(); return; }
+          try {
+            const x = await post('api/judge-test/use', { key: r.key, by: whoName() });
+            if (x.rejudge && x.rejudge.n) A.confirm = x.rejudge;
+            A.page = null; A.res = null; A.jt = null;
+            toast(`The judge is ${r.name} now`, { key: 'ai' });
+          } catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
+          render(); } }))))));
+}
+
+// one answer at a time: the question, what a full answer contains, the answer;
+// keys 0–4 (or P and F), S to skip. The judges' marks are never shown here
+function vJudgeMark() {
+  const A = state.ai, jt = A.jt;
+  if (!jt) { if (netReady()) loadJudgeTest(); return [el('div', { class: 'card' }, skeleton(4))]; }
+  const list = jt.answers;
+  // opened from the address (a reload): where the marking stopped
+  if (A.at == null) A.at = jt.progress.next == null ? 0 : jt.progress.next;
+  const i = Math.max(0, Math.min(list.length - 1, A.at));
+  const a = list[i];
+  const mine = jt.marks[a.key];
+  const give = async v => {
+    if (!whoName()) { askName(); return; }
+    try {
+      jt.progress = await post('api/judge-test/mark', { key: a.key, mark: v, by: whoName() });
+      jt.marks[a.key] = v === 'P' ? 4 : v === 'F' ? 0 : v;
+      A.at = i + 1 < list.length ? i + 1 : i;
+      if (i + 1 >= list.length) { A.mark = false; A.res = null; loadJudgeTest(); }
+    } catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
+    render();
+  };
+  A.give = give;
+  const pf = a.scale === 'pf';
+  const scale = pf ? [['P', 'Pass', 4], ['F', 'Fail', 0]]
+    : [0, 1, 2, 3, 4].map(n => [n, String(n), n]);
+  const pr = jt.progress;
+  return [el('div', { class: 'card jtmark', 'data-jt-answer': a.key, 'data-jt-scale': a.scale },
+    el('div', { class: 'rvbar' },
+      el('a', { href: '#tab=ai', 'data-jt-back': '1', text: '← AI models', onclick: e => {
+        e.preventDefault(); A.mark = false; A.res = null; loadJudgeTest(); navigate({ tab: 'ai' }); } }),
+      el('span', { class: 'small mono', 'data-jt-at': `${i + 1}|${list.length}`,
+        text: `${i + 1} of ${list.length} · ${pr.marked} marked` })),
+    el('p', { class: 'small se', text: `${a.kind_label} · ${a.topic}` }),
+    el('p', { class: 'evq-label', text: 'Question' }),
+    el('blockquote', { class: 'evq', text: a.question }),
+    el('p', { class: 'evq-label', text: pf ? 'It passes if' : 'A full answer' }),
+    a.criteria.length ? el('ul', { class: 'jtcrit', 'data-jt-criteria': '1' },
+      a.criteria.map(c => el('li', { text: c })),
+      ...a.flags.map(f => el('li', { class: 'se', text: 'flag: ' + f })))
+      : el('div', { class: 'jtrubric', 'data-jt-rubric': '1', text: a.rubric }),
+    a.reference ? el('details', { class: 'jtref' }, el('summary', { text: 'the reference answer' }),
+      el('div', { class: 'small', text: a.reference })) : '',
+    el('p', { class: 'evq-label', text: 'Answer' }),
+    el('div', { class: 'evans', 'data-jt-text': '1', text: a.answer }),
+    el('div', { class: 'jtkeys', role: 'group', 'aria-label': 'your mark' },
+      ...scale.map(([key, label, val]) => el('button', { class: 'chip-btn' + (mine === val ? ' on' : ''),
+        'data-jt-give': String(key), 'aria-pressed': String(mine === val),
+        'aria-keyshortcuts': String(key), text: pf ? `${label} (${key})` : label,
+        onclick: () => give(key) })),
+      el('button', { class: 'quiet', 'data-jt-give': 'S', 'aria-keyshortcuts': 'S',
+        text: 'Skip (S)', onclick: () => give(null) })),
+    el('p', { class: 'small se', text: pf ? 'Keys: P, F, S to skip; ← and → move.'
+      : 'Keys: 0 to 4, S to skip; ← and → move. Your marks save as you give them.' }))];
+}
+addEventListener('keydown', e => {
+  const A = state.ai;
+  if (!A || !A.mark || state.tab !== 'ai' || e.target.closest('input, textarea, select')
+      || e.metaKey || e.ctrlKey || e.altKey || !A.give) return;
+  const k = e.key.toUpperCase();
+  const a = ((A.jt || {}).answers || [])[A.at || 0];
+  if (!a) return;
+  if (a.scale === 'pf' ? (k === 'P' || k === 'F') : /^[0-4]$/.test(k)) {
+    e.preventDefault(); A.give(a.scale === 'pf' ? k : Number(k));
+  } else if (k === 'S') { e.preventDefault(); A.give(null); }
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    A.at = Math.max(0, Math.min(A.jt.answers.length - 1, (A.at || 0) + (e.key === 'ArrowRight' ? 1 : -1)));
+    render();
+  }
+});
+
 // ---------- shell ----------
 // 12b: five places, organised around what people come to do. A table, a
 // reader or a dialog keeps its code and changes container: the views below
@@ -13899,6 +14353,8 @@ const TABS = [
   ...(LIVE ? [['queue', 'All runs', vAllRuns]] : []),
   ['provenance', 'Data & sources', vRuns],
   ['help', 'Help', vHelp],
+  // 12i.1: settings, under the name menu
+  ...(LIVE ? [['ai', 'AI models', vAiModels]] : []),
 ];
 // Playground joins in 12d, between Models and Improve
 const PLACES = [['home', 'Home', ['overview']], ['models', 'Models', ['leaderboard']],
@@ -13912,7 +14368,7 @@ const viewLabel = v => (TABS.find(t => t[0] === v) || [, v])[1];
 const SUB_SLUG = { pipeline: 'model', training: 'training',
                    tasks: 'standard', exam: 'exam', everyday: 'everyday' };
 const PAGE_SLUG = { overview: 'home', leaderboard: 'models', queue: 'runs',
-                    provenance: 'data', help: 'help' };
+                    provenance: 'data', help: 'help', ai: 'ai' };
 
 // Old hashes keep working (§8): a link someone pasted into a message last
 // month still lands, and the address bar then shows where it lives now.

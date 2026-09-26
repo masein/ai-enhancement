@@ -330,7 +330,7 @@ def test_the_name_menu_holds_theme_data_and_help(live, page):
     shot(page, "12b-name-menu-1512-dark.png")
     pop.locator("[data-theme='auto']").click()
     assert [b.text_content() for b in pop.locator("[data-menu]").all()] == \
-        ["Data & sources", "Help"]
+        ["AI models", "Data & sources", "Help"]                     # 12i.1: AI models
     assert page.errors == []
 
 

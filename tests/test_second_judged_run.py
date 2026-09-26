@@ -407,6 +407,15 @@ def test_an_open_topic_page_lists_a_model_judged_while_it_was_open(svc, monkeypa
     for f in config.OUT_DIR.glob("*/judge.json"):         # one model judged on economics
         if f.parent.name != "fx__good-750m":
             f.unlink()
+    # 12i.1: only the board's own judge's scores are listed — the fixture's were
+    # the stub's, so they are stamped as this board's judge (fake/fake-1)
+    import judge
+    f = config.OUT_DIR / "fx__good-750m" / "judge.json"
+    j = json.loads(f.read_text(encoding="utf-8"))
+    ident = judge.identity()
+    j["judge"].update(id=ident["id"], provider=ident["provider"], model=ident["model"],
+                      version=judge.version(ident))
+    f.write_text(json.dumps(j), encoding="utf-8")
     fresh(appmod)
     s = Served(browser, client, appmod)
     try:

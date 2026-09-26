@@ -152,7 +152,8 @@ def test_improve_says_what_it_reads_and_names_its_ai_plainly(live, page):
     ai = page.locator("[data-imp-ai]")
     ai.wait_for()
     line = ai.inner_text()
-    assert re.fullmatch(r"AI: .+ · [\d,]+ requests? today( of [\d,]+.*)?", line), line
+    # 12i.1: each job's model, and where to change it
+    assert re.fullmatch(r"AI: judge .+ · writer .+ · change", line), line
     for word in ("/", "(generator", "exam writer", "items", "no daily limit"):
         assert word not in line, word
     assert page.errors == []
