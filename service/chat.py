@@ -34,6 +34,7 @@ from . import config, db, runner
 
 CUT_RUN = "a run started"
 WAIT_WORDS = "answering another message, yours is next"
+WAIT_GPU = "waiting for the GPU"
 CPU_NOTE = "on the CPU while a run uses the GPU — slower"
 SUITE_WORDS = {"full": "Standard tests", "quick": "quick tests", "control": "control tests",
                "judged": "Knowledge exam", "everyday": "Everyday tasks",
@@ -364,12 +365,28 @@ class Engine:
 
     # -- a reply -------------------------------------------------------------
     def start(self, chat: dict, messages: list[dict], settings: dict, row: dict,
-              on_done, stream_id: str | None = None) -> Stream:
+              on_done, stream_id: str | None = None, after: Stream | None = None) -> Stream:
+        """a reply, streamed; `after` (12d.2): a reply that must finish first —
+        two models that don't both fit answer one after the other"""
         st = Stream(stream_id or uuid.uuid4().hex, chat["id"], row["id"])
         self.streams[st.id] = st
-        threading.Thread(target=self._run, args=(st, messages, settings, row, on_done),
+        threading.Thread(target=self._run, args=(st, messages, settings, row, on_done, after),
                          daemon=True, name=f"chat-{st.id[:6]}").start()
         return st
+
+    def fits_both(self, a: dict, b: dict) -> bool:
+        """12d.2: can two models answer at once? Both on the GPU, with room for
+        both (what is loaded already needs nothing more), or both on the CPU"""
+        pa, pb = self.place(a)[0], self.place(b)[0]
+        if not pa or not pb:
+            return False
+        if pa == "cpu" or pb == "cpu":
+            return pa == pb == "cpu"
+        need = sum(float(r.get("params") or 0) * 2 + config.CHAT_GPU_MARGIN_GB * 1e9
+                   for r in (a, b) if not (self.loaded.get(r["id"])
+                                           and self.loaded[r["id"]].device == "cuda"))
+        free = gpu_free_bytes()
+        return free is not None and free >= need
 
     def stop(self, stream_id: str) -> bool:
         st = self.streams.get(stream_id)
@@ -378,9 +395,22 @@ class Engine:
         st.stop.set()
         return True
 
-    def _run(self, st: Stream, messages, settings, row, on_done) -> None:
+    def _run(self, st: Stream, messages, settings, row, on_done, after=None) -> None:
         reply = {"text": "", "thinking": "", "cut": "", "device": "", "secs": 0.0}
         try:
+            if after is not None and not after.done:
+                st.emit({"t": "wait", "why": WAIT_GPU})
+                while not after.done:
+                    if st.stop.is_set():
+                        on_done(None, "stopped before it began")
+                        st.emit({"t": "done", "reply": None, "stopped": True})
+                        return
+                    time.sleep(0.05)
+                # the first one's model gives its memory back for this one
+                first = self.loaded.get(after.model)
+                if first and first.device == "cuda" and not first.busy.locked() \
+                        and first.model != row["id"]:
+                    self._unload(first)
             device, why = self.place(row)
             if not device:
                 on_done(None, why)                  # the message waits: the page asks again
@@ -513,12 +543,17 @@ def title_of(text: str) -> str:
     return " ".join(w[:6]) + ("…" if len(w) > 6 else "")
 
 
-def new_chat(model: str, by: str, settings: dict | None = None) -> dict:
-    row = model_row(model)
-    if not row or not row["chat"]:
-        raise ValueError("that model isn't offered here" + (
-            ": base models have no chat format" if row and row["why_not"] == "base" else ""))
+def new_chat(model: str, by: str, settings: dict | None = None, model2: str = "") -> dict:
+    """a chat with one model, or (12d.2) two answering the same messages"""
+    for mid in (model, model2) if model2 else (model,):
+        row = model_row(mid)
+        if not row or not row["chat"]:
+            raise ValueError("that model isn't offered here" + (
+                ": base models have no chat format" if row and row["why_not"] == "base" else ""))
+    if model2 == model:
+        raise ValueError("compare two different models")
     c = {"id": uuid.uuid4().hex[:12], "who": _who(by), "by": by, "model": model,
+         "model2": model2 or "",
          "settings": {k: v for k, v in (settings or {}).items() if k in FIELDS},
          "title": "", "messages": [], "created_at": now(), "updated_at": now()}
     db.chat_put(c)
@@ -535,5 +570,8 @@ def get_chat(chat_id: str, by: str) -> dict:
 
 def list_chats(by: str) -> list[dict]:
     return [{"id": c["id"], "title": c["title"] or "New chat", "model": c["model"],
+             "model2": c.get("model2") or "",
+             # 12d.2: "Qwen3-0.6B vs SmolLM2-360M"
+             "names": " vs ".join(m.split("/")[-1] for m in (c["model"], c.get("model2")) if m),
              "updated_at": c["updated_at"]}
             for c in db.chat_list(_who(by), config.CHAT_LIST_N)]

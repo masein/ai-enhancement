@@ -7,6 +7,7 @@ is the chat's own record: never a score, never on the board."""
 from __future__ import annotations
 
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -23,13 +24,40 @@ def _scripts() -> None:
         sys.path.insert(0, here)
 
 
+def _trained() -> dict[str, dict]:
+    """12d.2: a model trained in Improve ("Trained from" set): its base, and
+    the day it was trained — its upload's, else the day it was said"""
+    out = {}
+    for mid, t in db.trained_from_all().items():
+        at = t.get("at") or 0
+        if mid.startswith("local/"):
+            p = config.ARTIFACTS_DIR / mid[6:]
+            try:
+                at = p.stat().st_mtime
+            except OSError:
+                pass
+        out[mid] = {"base": t["base"], "date": time.strftime("%Y-%m-%d", time.localtime(at))}
+    return out
+
+
 def models() -> dict:
-    """what the picker lists — each with its scored settings — and the
-    line for what it leaves out"""
+    """what the picker lists — each with its scored settings, a trained model
+    right under its base — and the line for what it leaves out"""
     rows = chat.board_models()
+    trained = _trained()
     offered = [{"id": m["id"], "name": m["name"], "source": m["source"],
                 "params": m["params"], "ctx": (m["archinfo"] or {}).get("ctx"),
-                "scored": chat.scored_settings(m)} for m in rows if m["chat"]]
+                "scored": chat.scored_settings(m),
+                "trained_from": (trained.get(m["id"]) or {}).get("base") or "",
+                "trained_on": (trained.get(m["id"]) or {}).get("date") or ""}
+               for m in rows if m["chat"]]
+    ids = {m["id"] for m in offered}
+    bases = [m for m in offered if not (m["trained_from"] and m["trained_from"] in ids)]
+    order = []
+    for m in bases:
+        order.append(m)
+        order.extend(x for x in offered if x["trained_from"] == m["id"])
+    offered = order
     lines = []
     if any(m["why_not"] == "base" for m in rows):
         lines.append(BASE_LINE)
@@ -123,21 +151,31 @@ def view(c: dict) -> dict:
     row = chat.model_row(c["model"]) or {"id": c["model"], "name": c["model"].split("/")[-1],
                                            "archinfo": {}, "params": None}
     return {**{k: v for k, v in c.items() if k != "who"},
-            "name": row["name"], "scored": chat.scored_settings(row),
+            "name": row["name"], "name2": (c.get("model2") or "").split("/")[-1],
+            "scored": chat.scored_settings(row),
             "is_scored": chat.is_scored(c["settings"], row)}
 
 
-def history(c: dict, upto: int) -> list[dict]:
-    """what the model is sent: the system message, then each message up to
-    `upto`, a reply as the text shown (never its thinking)"""
-    row = chat.model_row(c["model"])
+def _side(m: dict, col: str) -> dict:
+    """an answer's column: "a" is the chat's model, "b" (12d.2) the one it is
+    compared with"""
+    return m if col == "a" else m.setdefault("b", {"replies": [], "shown": 0})
+
+
+def history(c: dict, upto: int, col: str = "a") -> list[dict]:
+    """what a model is sent: the system message, then each message up to
+    `upto`, a reply as the text shown (never its thinking) — its own replies"""
+    row = chat.model_row(c["model"] if col == "a" else c["model2"])
     s = chat.effective(c["settings"], row)
     out = [{"role": "system", "content": s["system"]}] if s["system"] else []
     for m in c["messages"][:upto]:
         if m["role"] == "user":
             out.append({"role": "user", "content": m["text"]})
-        elif m.get("replies"):
-            out.append({"role": "assistant", "content": m["replies"][m.get("shown", 0)]["text"]})
+        else:
+            side = _side(dict(m), col)
+            if side.get("replies"):
+                out.append({"role": "assistant",
+                            "content": side["replies"][side.get("shown", 0)]["text"]})
     return out
 
 
@@ -157,7 +195,7 @@ def send(chat_id: str, text: str, by: str, practice_ref: dict | None = None) -> 
     text = (text or "").strip()
     if not text:
         raise ValueError("an empty message")
-    if any(m["role"] == "assistant" and m.get("pending") for m in c["messages"]):
+    if _pending(c):
         raise ValueError("a reply is still coming — stop it first")
     why = _too_long(c, text)
     if why:
@@ -165,62 +203,94 @@ def send(chat_id: str, text: str, by: str, practice_ref: dict | None = None) -> 
     first = not c["messages"]
     ref = practice_ref if practice_item(practice_ref) else None
     c["messages"].append({"role": "user", "text": text, "at": time.time(), "practice": ref})
-    c["messages"].append({"role": "assistant", "replies": [], "shown": 0, "pending": True})
+    a = {"role": "assistant", "replies": [], "shown": 0, "pending": True}
+    if c.get("model2"):
+        a["b"] = {"replies": [], "shown": 0, "pending": True}
+    c["messages"].append(a)
     c["title"] = c["title"] or chat.title_of(text)
     db.chat_put(c)
     n = len(c["messages"]) - 1
-    return _start(c, n, {"ref": ref, "text": text, "first": first})
+    return _start(c, n, {"ref": ref, "text": text, "first": first},
+                  cols=("a", "b") if c.get("model2") else ("a",))
 
 
-def again(chat_id: str, n: int, by: str) -> dict:
-    """the same message asked again: both replies kept, ‹ 1 of 2 ›"""
+def _pending(c: dict) -> bool:
+    return any(m["role"] == "assistant" and (m.get("pending") or (m.get("b") or {}).get("pending"))
+               for m in c["messages"])
+
+
+def again(chat_id: str, n: int, by: str, col: str = "a") -> dict:
+    """the same message asked again of one column's model: both replies
+    kept, ‹ 1 of 2 ›"""
     c = chat.get_chat(chat_id, by)
     if not (0 < n < len(c["messages"])) or c["messages"][n]["role"] != "assistant":
         raise ValueError("no reply there")
-    if any(m["role"] == "assistant" and m.get("pending") for m in c["messages"]):
+    if col == "b" and not c.get("model2"):
+        raise ValueError("this chat compares no second model")
+    if _pending(c):
         raise ValueError("a reply is still coming — stop it first")
     u = c["messages"][n - 1]
-    c["messages"][n]["pending"] = True
+    _side(c["messages"][n], col)["pending"] = True
     db.chat_put(c)
-    return _start(c, n, {"ref": u.get("practice"), "text": u["text"], "first": n == 1})
+    return _start(c, n, {"ref": u.get("practice"), "text": u["text"], "first": n == 1},
+                  cols=(col,))
 
 
-def _start(c: dict, n: int, sent: dict) -> dict:
-    row = chat.model_row(c["model"])
-    if not row or not row["chat"]:
+_store = threading.Lock()           # 12d.2: two columns finish at once: one write at a time
+
+
+def _start(c: dict, n: int, sent: dict, cols=("a",)) -> dict:
+    rows = {col: chat.model_row(c["model"] if col == "a" else c["model2"]) for col in cols}
+    if any(not r or not r["chat"] for r in rows.values()):
         raise ValueError("this model isn't offered here any more")
-    settings = chat.effective(c["settings"], row)
-    scored = chat.is_scored(c["settings"], row)
 
-    def on_done(reply: dict | None, why: str = "") -> dict | None:
-        cc = db.chat_get(c["id"])
-        m = cc["messages"][n]
-        m.pop("pending", None)
-        if reply is None:                   # refused, stopped before it began, or failed
-            m["refused"] = why
-            db.chat_put(cc)
-            return None
-        m.pop("refused", None)
-        reply["at"] = time.time()
-        reply["mark"] = mark(sent["ref"], sent["text"], sent["first"], scored, reply["text"])
-        m.setdefault("replies", []).append(reply)
-        m["shown"] = len(m["replies"]) - 1
-        db.chat_put(cc)
-        return reply
+    def on_done_for(col: str, scored: bool):
+        def on_done(reply: dict | None, why: str = "") -> dict | None:
+            with _store:
+                cc = db.chat_get(c["id"])
+                m = _side(cc["messages"][n], col)
+                m.pop("pending", None)
+                if reply is None:           # refused, stopped before it began, or failed
+                    m["refused"] = why
+                    db.chat_put(cc)
+                    return None
+                m.pop("refused", None)
+                reply["at"] = time.time()
+                reply["mark"] = mark(sent["ref"], sent["text"], sent["first"], scored,
+                                     reply["text"])
+                m.setdefault("replies", []).append(reply)
+                m["shown"] = len(m["replies"]) - 1
+                db.chat_put(cc)
+                return reply
+        return on_done
 
-    # the stream's id is kept before it starts: a fast reply is stored by
+    # each stream's id is kept before it starts: a fast reply is stored by
     # on_done, and nothing here may write an older copy over it
-    sid = chat.uuid.uuid4().hex
-    c["messages"][n]["stream"] = sid
+    sids = {col: chat.uuid.uuid4().hex for col in cols}
+    for col in cols:
+        _side(c["messages"][n], col)["stream"] = sids[col]
     db.chat_put(c)
+    # 12d.2: both at once when both fit; else the second after the first
+    together = len(cols) < 2 or chat.ENGINE.fits_both(rows["a"], rows["b"])
+    first = None
     try:
-        chat.ENGINE.start(c, history(c, n), settings, row, on_done, stream_id=sid)
+        for col in cols:
+            row = rows[col]
+            st = chat.ENGINE.start(c, history(c, n, col), chat.effective(c["settings"], row), row,
+                                   on_done_for(col, chat.is_scored(c["settings"], row)),
+                                   stream_id=sids[col], after=None if together else first)
+            first = first or st
     except Exception:
-        cc = db.chat_get(c["id"])
-        cc["messages"][n].pop("pending", None)
-        db.chat_put(cc)
+        with _store:
+            cc = db.chat_get(c["id"])
+            for col in cols:
+                _side(cc["messages"][n], col).pop("pending", None)
+            db.chat_put(cc)
         raise
-    return {"stream": sid, "chat": view(db.chat_get(c["id"]))}
+    out = {"stream": sids.get("a") or sids["b"], "chat": view(db.chat_get(c["id"]))}
+    if "b" in sids:
+        out["stream_b"] = sids["b"]
+    return out
 
 
 def set_settings(chat_id: str, settings: dict, by: str) -> dict:

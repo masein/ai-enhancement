@@ -1196,6 +1196,7 @@ def playground_chats(x_who: str = Header(default="")):
 
 class ChatIn(BaseModel):
     model: str
+    model2: str = ""                     # 12d.2: a second model, answering the same messages
     by: str = ""
     settings: dict = {}
 
@@ -1205,7 +1206,7 @@ def playground_new(a: ChatIn, x_token: str = Header(default="")):
     _check_token(x_token)
     by = _who_of(a.by, "")
     try:
-        c = chat.new_chat(a.model, by, a.settings)
+        c = chat.new_chat(a.model, by, a.settings, a.model2)
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
     return playground.view(c)
@@ -1271,6 +1272,7 @@ def playground_send(chat_id: str, a: MessageIn, x_token: str = Header(default=""
 
 class AgainIn(BaseModel):
     n: int
+    col: str = "a"                       # 12d.2: "b", the compared model's column
     by: str = ""
 
 
@@ -1280,7 +1282,7 @@ def playground_again(chat_id: str, a: AgainIn, x_token: str = Header(default="")
     by = _who_of(a.by, "")
     _chat_or_404(chat_id, by)
     try:
-        return playground.again(chat_id, a.n, by)
+        return playground.again(chat_id, a.n, by, "b" if a.col == "b" else "a")
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
 

@@ -2435,6 +2435,15 @@ table.jtresult tr.best td:first-child { font-weight:600; }
 .pgmark.ok { color:var(--good-text, var(--text-primary)); }
 .pgmark.no { color:var(--warning-text); }
 .pginputwrap { border-top:1px solid var(--border); padding-top:10px; }
+/* 12d.2: two models side by side, stacked on a phone */
+.pgpair { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:12px 20px; }
+.pgpair > .pgmsg { border-left:2px solid var(--border); padding-left:10px; }
+.pgvs { display:inline-flex; gap:6px; align-items:center; }
+.pgpick { display:inline-flex; flex-wrap:wrap; gap:6px 10px; align-items:center; }
+.pgitem a { display:flex; flex-direction:column; }
+.pgtitle { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pgnames { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media (max-width: 720px) { .pgpair { grid-template-columns:minmax(0, 1fr); } }
 .pginput { width:100%; box-sizing:border-box; resize:vertical; }
 .pginputwrap .frm { display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
 .pgamber { margin:0 0 6px; }
@@ -5376,6 +5385,7 @@ function vModel() {
       id: 'mtab-' + id, 'aria-selected': String(id === cur), 'aria-controls': 'mpanel',
       tabindex: id === cur ? '0' : '-1', text: label, onclick: () => setModelTab(id) })));
   const body = cur === 'answers' ? modelAnswersTab(m, kinds)
+    : cur === 'chat' ? modelChatTab(m)
     : cur === 'improve' ? modelImproveTab(m)
     : cur === 'history' ? modelHistoryTab(m)
     : modelScoresTab(m, kinds);
@@ -5558,9 +5568,12 @@ function showKind(m, kind) {
   setModelTab('scores');
 }
 
-const MODEL_TABS = { scores: 'Scores', answers: 'Answers', improve: 'Improve', history: 'History' };
+const MODEL_TABS = { scores: 'Scores', answers: 'Answers', chat: 'Chat', improve: 'Improve',
+                     history: 'History' };
 function modelTabs(m) {
-  return ['scores', 'answers', ...(modelImproveRows(m).n ? ['improve'] : []), 'history']
+  // 12d.2: Chat on every model page (live) — a base model's says why it can't
+  return ['scores', 'answers', ...(LIVE ? ['chat'] : []),
+    ...(modelImproveRows(m).n ? ['improve'] : []), 'history']
     .map(id => [id, MODEL_TABS[id]]);
 }
 // remembered per viewer; a tab this model has not got (Improve) falls back
@@ -5730,8 +5743,59 @@ function evdAnswersList(m) {
           el('span', { class: 'evgroup', text: q.groupLabel }),
           el('span', { class: 'evmark ' + mk.cls, 'aria-label': mk.words, text: mk.t }),
           el('span', { class: 'evreason', text: it ? it.reason : 'not asked' })),
-        evdAnswer(q, it));
+        evdAnswer(q, it),
+        LIVE ? el('button', { class: 'quiet', 'data-ask-again': q.id, text: 'Ask it again ▸',
+          onclick: () => askAgain(m, 'everyday', q.id, q.prompt) }) : '');
     }));
+}
+
+// ---- Chat (12d.2): the Playground's own component, the model fixed ----
+const BASE_NO_CHAT = 'This is a base model: it has no chat format, so there\u2019s nothing to chat with.';
+function modelChatTab(m) {
+  const P = state.pg;
+  if (!P.page && netReady()) loadPg();
+  if (!P.page) return [el('div', { class: 'card' }, skeleton(4, { 'data-loading': 'model-chat' }))];
+  const offered = pgModel(m.id);
+  if (!offered) return [el('div', { class: 'card', 'data-model-chat': m.id, 'data-model-chat-none': '1' },
+    el('h2', { text: 'Chat' }),
+    el('p', { class: 'small', 'data-model-chat-why': '1', text: m.kind === 'instruct'
+      ? 'This model can\u2019t chat here: it runs its own code, which chat doesn\u2019t run.'
+      : BASE_NO_CHAT }))];
+  if (!whoName()) return [el('div', { class: 'card', 'data-model-chat': m.id },
+    el('h2', { text: 'Chat' }),
+    empty('Your chats are kept under your name: say who you are first.', 'Who are you?',
+      () => askName()))];
+  // the Playground's state, with this model fixed; a chat with another model
+  // stays in the Playground
+  if (P.fixed !== m.id || (P.chat && P.chat.model !== m.id && P.chat.model2 !== m.id)) {
+    Object.assign(P, { fixed: m.id, pick: m.id, pick2: null });
+    if (P.chat && P.chat.model !== m.id && P.chat.model2 !== m.id) { P.id = null; P.chat = null; }
+  }
+  if (P.id && (!P.chat || P.chat.id !== P.id) && netReady()) loadPgChat(P.id);
+  const mine = (P.chats || []).filter(x => x.model === m.id || x.model2 === m.id).slice(0, 6);
+  return [el('div', { class: 'card', 'data-model-chat': m.id },
+      el('div', { class: 'rvbar' },
+        el('div', {}, el('h2', { text: 'Chat' }),
+          el('p', { class: 'sub', text: 'What it says, streamed, on the settings its Everyday '
+            + 'answers were scored on — until you change them.' })),
+        el('a', { href: '#tab=playground' + (P.id ? '&chat=' + P.id : ''), 'data-pg-open': '1',
+          text: 'Open in Playground →', onclick: e => { e.preventDefault(); P.fixed = null;
+            navigate({ tab: 'playground', model: null, topic: null }); } })),
+      mine.length ? el('p', { class: 'small', 'data-model-chats': String(mine.length) },
+        el('span', { class: 'se', text: 'Your chats with it: ' }),
+        mine.flatMap((x, i) => [i ? ' · ' : '', el('a', { href: '#', 'data-pg-chat-link': x.id,
+          text: x.title, onclick: e => { e.preventDefault(); pgOpen(x.id); } })]),
+        ' · ', el('a', { href: '#', 'data-pg-new': '1', text: 'new chat',
+          onclick: e => { e.preventDefault(); pgNew(); } })) : ''),
+    pgMain(matchMedia('(max-width: 720px)').matches)];
+}
+// "Ask it again ▸": a practice question it answered, in the Chat tab's input, unsent
+function askAgain(m, kind, id, prompt) {
+  const P = state.pg;
+  pgCloseStreams();
+  Object.assign(P, { fixed: m.id, pick: m.id, pick2: null, id: null, chat: null,
+    input: prompt, ref: { kind, id } });
+  setModelTab('chat');
 }
 
 // ---- Improve: this model's proposals and datasets, the Review lists ----
@@ -12640,7 +12704,7 @@ function modelAnswers(m, cats) {
     JSON.stringify([a.model, a.topic, a.acuity, a.flag, a.score, a.crit, a.sort]));
   wrap.append(pg.pager);
   wrap.append(el('div', { class: 'anslist', 'data-answers-table': '1' },
-    pg.rows.map(it => ansCard(it, j))));
+    pg.rows.map(it => ansCard(it, j, m))));
   if (pg.pager) wrap.append(pager('answers', rows.length));
   return wrap;
 }
@@ -13451,7 +13515,7 @@ function ansWeakest(it, criteria, n = 3) {
 // sideways — the judge's note is the most useful text here and it wraps.
 const wordsIn = t => (String(t || '').match(/\S+/g) || []).length;
 
-function ansCard(it, j) {
+function ansCard(it, j, askOf = null) {
   const meta = it.meta || {};
   const flags = (j.flags || []).filter(f => (it.flags || {})[f.id]);
   const open = state.ans.open[it.qid];
@@ -13503,7 +13567,10 @@ function ansCard(it, j) {
       it.graded ? '' : el('div', { class: 'se', text: it.no_answer ? 'no answer — not scored'
         : 'the judge\'s reply was unreadable' }),
       el('div', {}, flags.map(f => el('span', { class: 'badge danger', title: f.effect_words,
-        'data-flag': f.id, text: f.label })))));
+        'data-flag': f.id, text: f.label }))),
+      // 12d.2: on the model page, the question again, in its Chat tab
+      askOf && LIVE && it.prompt ? el('button', { class: 'quiet', 'data-ask-again': it.qid,
+        text: 'Ask it again ▸', onclick: () => askAgain(askOf, 'knowledge', it.qid, it.prompt) }) : ''));
 }
 
 function loopAnswersPanel(r) {
@@ -14957,7 +15024,7 @@ async function loadPg(force) {
     if (whoName()) P.chats = (await pgGet('api/playground/chats')).chats;
   } catch (e) { P.msg = e.message; }
   P.asked = false;
-  if (state.tab === 'playground') render();
+  if (pgActive()) render();
 }
 async function loadPgChat(id) {
   const P = state.pg;
@@ -14966,24 +15033,32 @@ async function loadPgChat(id) {
   try { P.chat = await pgGet('api/playground/chats/' + encodeURIComponent(id)); P.msg = ''; }
   catch (e) { P.chat = null; P.msg = e.message; P.id = null; }
   P.chatAsked = null;
-  if (state.tab === 'playground') render();
+  if (pgActive()) render();
 }
 const pgModel = id => ((state.pg.page || {}).models || []).find(m => m.id === id) || null;
+function pgCloseStreams() {
+  const P = state.pg;
+  for (const L of Object.values((P.live || {}).cols || {})) if (L.es) L.es.close();
+  P.live = null;
+}
 function pgOpen(id) {
   const P = state.pg;
-  if (P.es) { P.es.close(); P.es = null; }
-  Object.assign(P, { id, chat: null, live: null, input: P.input || '', ref: null });
+  pgCloseStreams();
+  Object.assign(P, { id, chat: null, input: P.input || '', ref: null });
+  if (P.fixed && state.model) { render(); return; }      // the Chat tab keeps its place
   navigate({ tab: 'playground', model: null, topic: null });
 }
 function pgNew() {
   const P = state.pg;
-  if (P.es) { P.es.close(); P.es = null; }
-  Object.assign(P, { id: null, chat: null, live: null });
+  pgCloseStreams();
+  Object.assign(P, { id: null, chat: null, pick2: null });
+  if (P.fixed && state.model) { render(); return; }
   navigate({ tab: 'playground', model: null, topic: null });
 }
 
 function vPlayground() {
   const P = state.pg;
+  P.fixed = null;                                        // the whole Playground: any model
   if (!P.page && netReady()) loadPg();
   if (P.id && (!P.chat || P.chat.id !== P.id) && netReady()) loadPgChat(P.id);
   if (!P.page) return [el('div', { class: 'card' }, skeleton(5, { 'data-loading': 'playground' }))];
@@ -15002,9 +15077,11 @@ function pgChatItems() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const chats = P.chats || [];
   const item = c => el('li', { class: 'pgitem' + (c.id === P.id ? ' on' : ''), 'data-pg-chat': c.id },
-    el('a', { href: '#tab=playground&chat=' + c.id, text: c.title,
-      title: (pgModel(c.model) || {}).name || c.model,
-      onclick: e => { e.preventDefault(); popClose(); pgOpen(c.id); } }),
+    el('a', { href: '#tab=playground&chat=' + c.id, title: c.names || c.model,
+        onclick: e => { e.preventDefault(); popClose(); pgOpen(c.id); } },
+      el('span', { class: 'pgtitle', text: c.title }),
+      // 12d.2: "Qwen3-0.6B vs SmolLM2-360M"
+      c.model2 ? el('span', { class: 'small se pgnames', 'data-pg-names': '1', text: c.names }) : ''),
     P.confirm === c.id
       ? el('span', { class: 'small' }, el('button', { class: 'quiet danger', 'data-pg-delete-yes': c.id,
           text: 'Delete?', onclick: () => pgDelete(c.id) }), ' ',
@@ -15033,20 +15110,54 @@ async function pgDelete(id) {
 }
 
 // ---- the chat ---------------------------------------------------------------
+// the Playground is open: its own page, or (12d.2) a model page's Chat tab
+const pgActive = () => state.tab === 'playground' || (!!state.model && state.mtab === 'chat');
+// 12d.2: a trained model sits right under its base (the server orders them),
+// in its base's group, labelled with the day it was trained
+function pgOptions(models, cur, skip) {
+  const byId = Object.fromEntries(models.map(m => [m.id, m]));
+  const groupOf = m => ((m.trained_from && byId[m.trained_from]) || m).source;
+  const groups = [['hub', 'On the Hub'], ['artifact', 'Uploaded here']];
+  return groups.map(([g, label]) => {
+    const ms = models.filter(m => groupOf(m) === g && m.id !== skip);
+    return ms.length ? el('optgroup', { label }, ms.map(m => el('option', { value: m.id,
+      selected: m.id === cur ? '' : null,
+      text: m.trained_from && byId[m.trained_from] ? `↳ ${m.name} · trained · ${m.trained_on}` : m.name })))
+      : '';
+  });
+}
 function pgPicker(P, c) {
   const models = P.page.models;
-  const cur = c ? c.model : (P.pick || (models[0] || {}).id);
-  if (!c && !P.pick && models[0]) P.pick = models[0].id;
-  const groups = [['hub', 'On the Hub'], ['artifact', 'Trained or uploaded here']];
+  if (P.fixed) {
+    // the model page's Chat tab: its model, fixed
+    if (!c) P.pick = P.fixed;
+  } else if (!c && !P.pick && models[0]) P.pick = models[0].id;
+  const cur = c ? c.model : P.pick;
+  const m = pgModel(cur);
+  const base = m && m.trained_from ? pgModel(m.trained_from) : null;
+  const other = c ? (c.model2 || '') : (P.pick2 || '');
   return el('span', { class: 'pgpick' },
-    el('select', { 'aria-label': 'model', 'data-pg-model': cur || '', disabled: c ? '' : null,
-        title: c ? 'a chat keeps its model: start a new chat for another' : null,
-        onchange: e => { P.pick = e.target.value; render(); } },
-      groups.map(([g, label]) => {
-        const ms = models.filter(m => m.source === g);
-        return ms.length ? el('optgroup', { label }, ms.map(m => el('option', { value: m.id,
-          selected: m.id === cur ? '' : null, text: m.name }))) : '';
-      })));
+    P.fixed && !c ? el('b', { 'data-pg-model': cur, text: (m || {}).name || cur })
+      : el('select', { 'aria-label': 'model', 'data-pg-model': cur || '', disabled: c ? '' : null,
+          title: c ? 'a chat keeps its model: start a new chat for another' : null,
+          onchange: e => { P.pick = e.target.value; if (P.pick2 === P.pick) P.pick2 = null; render(); } },
+        pgOptions(models, cur)),
+    // 12d.2: + Compare — one message to two models, side by side
+    c ? (c.model2 ? el('span', { class: 'pgvs', 'data-pg-vs': c.model2 }, ' vs ',
+        el('b', { text: c.name2 })) : '')
+      : P.pick2 != null ? el('span', { class: 'pgvs', 'data-pg-vs': P.pick2 }, ' vs ',
+          el('select', { 'aria-label': 'second model', 'data-pg-model2': P.pick2 || '',
+            onchange: e => { P.pick2 = e.target.value; render(); } },
+            pgOptions(models, P.pick2, cur)),
+          el('button', { class: 'quiet', 'data-pg-uncompare': '1', 'aria-label': 'compare with no model',
+            text: '✕', onclick: () => { P.pick2 = null; render(); } }))
+        : el('button', { class: 'quiet', 'data-pg-compare': '1', text: '+ Compare',
+            onclick: () => { P.pick2 = (base || models.find(x => x.id !== cur) || {}).id || null;
+              render(); } }),
+    // a trained model: what training changed, one click away
+    !c && base && other !== base.id ? el('button', { class: 'quiet', 'data-pg-suggest': base.id,
+      text: `Compare with ${base.name} (before training)`,
+      onclick: () => { P.pick2 = base.id; render(); } }) : '');
 }
 function pgSettings(P, c, m) {
   const base = m.scored;
@@ -15090,10 +15201,11 @@ function pgDiff(s, base) {
 function pgMain(narrow) {
   const P = state.pg, c = P.id && P.chat && P.chat.id === P.id ? P.chat : null;
   if (P.id && !c) return el('div', { class: 'card pgmain' }, skeleton(4, { 'data-loading': 'pg-chat' }));
-  const m = pgModel(c ? c.model : (P.pick || ((P.page.models[0] || {}).id)));
+  const m = pgModel(c ? c.model : (P.fixed || P.pick || ((P.page.models[0] || {}).id)));
+  const m2 = pgModel(c ? c.model2 : P.pick2);
   const changed = c ? !c.is_scored : Object.keys(P.draftSettings || {}).length > 0;
   const head = el('div', { class: 'pgbar' },
-    narrow ? popover(el('button', { class: 'quiet', 'data-pg-chats': '1', text: 'Chats ▾' }),
+    narrow && !P.fixed ? popover(el('button', { class: 'quiet', 'data-pg-chats': '1', text: 'Chats ▾' }),
       () => el('div', { class: 'moremenu pgchatsmenu', id: 'pop-pg-chats' },
         el('button', { role: 'menuitem', 'data-pg-new': '1', text: '+ New chat',
           onclick: () => { popClose(); pgNew(); } }), ...pgChatItems()),
@@ -15108,28 +15220,33 @@ function pgMain(narrow) {
   const conv = el('div', { class: 'pgconv', 'data-pg-conv': '1' },
     !msgs.length && !P.live ? el('div', { class: 'pgempty', 'data-pg-empty': '1' },
       el('p', { text: 'Ask anything, or try a practice question.' }), pgPracticeButton('empty'))
-      : msgs.map((x, i) => x.role === 'user' ? pgUser(x) : pgReply(c, m, x, i)));
+      : msgs.map((x, i) => x.role === 'user' ? pgUser(x)
+        : x.b ? el('div', { class: 'pgpair', 'data-pg-pair': String(i) },
+            pgReply(c, m, x, i, 'a'), pgReply(c, m2, x.b, i, 'b'))
+        : pgReply(c, m, x, i, 'a')));
   return el('div', { class: 'card pgmain', 'data-pg-main': c ? c.id : 'new' },
-    head, lines.length && !c ? lines : '', conv, pgInput(P, c, m, changed));
+    head, lines.length && !c && !P.fixed ? lines : '', conv, pgInput(P, c, m, changed));
 }
 function pgUser(x) {
   return el('div', { class: 'pgmsg you', 'data-pg-you': '1' },
     el('span', { class: 'pgwho', text: 'you ›' }), el('div', { class: 'pgtext', text: x.text }));
 }
-function pgReply(c, m, x, i) {
-  const P = state.pg, live = P.live && P.live.n === i ? P.live : null;
+// one model's answer to a message — its column, when two are compared (12d.2)
+function pgReply(c, m, x, i, col = 'a') {
+  const P = state.pg, live = P.live && P.live.n === i ? (P.live.cols || {})[col] : null;
   const k = x.replies && x.replies.length ? Math.min(x.shown || 0, x.replies.length - 1) : -1;
-  const r = live ? null : (k >= 0 ? x.replies[k] : null);
-  const name = m ? m.name : c.model.split('/').pop();
-  const wrap = el('div', { class: 'pgmsg it', 'data-pg-reply': String(i) },
+  const r = live && !live.over ? null : (k >= 0 ? x.replies[k] : null);
+  const name = m ? m.name : String((col === 'a' ? c.model : c.model2) || '').split('/').pop();
+  const wrap = el('div', { class: 'pgmsg it', 'data-pg-reply': col === 'a' ? String(i) : `${i}|b`,
+      'data-pg-col': col },
     el('span', { class: 'pgwho', text: name + ' ›' }));
-  if (live) {
+  if (live && !r) {
     wrap.append(
       live.note ? el('p', { class: 'small se', 'data-pg-note': '1', text: live.note }) : '',
       live.wait ? el('p', { class: 'small se', 'data-pg-wait': '1', text: live.wait }) : '',
-      el('details', { class: 'pgthink', 'data-pg-think': '1', hidden: live.think ? null : '' },
+      el('details', { class: 'pgthink', 'data-pg-think': col, hidden: live.think ? null : '' },
         el('summary', { text: 'Thinking ▸' }), el('div', { class: 'small pgthinktext', text: live.think })),
-      el('div', { class: 'pgtext', 'data-pg-live': '1', text: live.text }),
+      el('div', { class: 'pgtext', 'data-pg-live': col, text: live.text }),
       live.refused ? el('p', { class: 'warn', 'data-pg-refused': '1', text: live.refused }) : '');
     return wrap;
   }
@@ -15151,8 +15268,8 @@ function pgReply(c, m, x, i) {
       el('button', { class: 'quiet', 'data-pg-copy': '1', text: 'copy', onclick: () => {
         try { navigator.clipboard.writeText(r.text); toast('Copied', { key: 'pg' }); }
         catch (e) { toast('Copy failed', { key: 'pg' }); } } }), ' · ',
-      el('button', { class: 'quiet', 'data-pg-again': String(i), text: 'again',
-        onclick: () => pgAgain(c, i) }),
+      el('button', { class: 'quiet', 'data-pg-again': col === 'a' ? String(i) : `${i}|b`, text: 'again',
+        onclick: () => pgAgain(c, i, col) }),
       x.replies.length > 1 ? [' · ', el('span', { class: 'pgalt', 'data-pg-alt': `${k + 1}|${x.replies.length}` },
         el('button', { class: 'quiet', 'aria-label': 'previous reply', text: '‹', disabled: k ? null : '',
           onclick: () => { x.shown = k - 1; render(); } }),
@@ -15177,7 +15294,7 @@ function pgMark(mk) {
     (mk.checks || []).length ? el('p', { class: 'small se', text: 'The check: ' + mk.checks.join(' · ') }) : '');
 }
 function pgInput(P, c, m, changed) {
-  const live = !!P.live && !P.live.over;
+  const live = pgLive();
   // the reply keeps at most half the context (chat.context_words, the server's rule)
   const ctx = (m && m.ctx) || 4096;
   const budget = (c ? { ...m.scored, ...c.settings } : { ...m.scored, ...(P.draftSettings || {}) })
@@ -15192,8 +15309,9 @@ function pgInput(P, c, m, changed) {
     oninput: e => { P.input = e.target.value; pgLongLine(m, fits); },
     onkeydown: e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); pgSend(); } } });
   // a run took the GPU in the middle of the last reply: said once, above the input
-  const lastR = c && c.messages.length ? ((c.messages[c.messages.length - 1].replies || [])
-    .slice(-1)[0] || {}) : {};
+  const lastM = c && c.messages.length ? c.messages[c.messages.length - 1] : {};
+  const lastR = [lastM, lastM.b || {}].map(x => (x.replies || []).slice(-1)[0] || {})
+    .find(r => r.cut === 'a run started') || {};
   return el('div', { class: 'pginputwrap' },
     lastR.cut === 'a run started' ? el('p', { class: 'small se', 'data-pg-paused': '1',
       text: 'Paused: a run started. Your conversation is kept.' }) : '',
@@ -15262,20 +15380,23 @@ function pgPracticeButton(where) {
 }
 
 // ---- sending, streaming, stopping -------------------------------------------------
+// a reply is streaming in some column
+const pgLive = () => !!state.pg.live && Object.values(state.pg.live.cols || {}).some(l => !l.over);
 async function pgSend() {
   const P = state.pg;
   if (!whoName()) { askName(); return; }
   const text = (P.input || '').trim();
-  if (!text || P.live) return;
+  if (!text || pgLive()) return;
   try {
     let c = P.chat && P.chat.id === P.id ? P.chat : null;
     if (!c) {
-      c = await post('api/playground/chats', { model: P.pick || P.page.models[0].id, by: whoName(),
-        settings: P.draftSettings || {} });
-      P.chats = [{ id: c.id, title: 'New chat', model: c.model, updated_at: Date.now() / 1000 },
+      c = await post('api/playground/chats', { model: P.fixed || P.pick || P.page.models[0].id,
+        model2: P.pick2 || '', by: whoName(), settings: P.draftSettings || {} });
+      P.chats = [{ id: c.id, title: 'New chat', model: c.model, model2: c.model2 || '',
+        names: [c.name, c.name2].filter(Boolean).join(' vs '), updated_at: Date.now() / 1000 },
         ...(P.chats || [])];
-      P.id = c.id; P.chat = c; P.draftSettings = {};
-      history.replaceState(history.state, '', '#' + hashFor());
+      P.id = c.id; P.chat = c; P.draftSettings = {}; P.pick2 = null;
+      if (state.tab === 'playground') history.replaceState(history.state, '', '#' + hashFor());
     }
     const r = await post(`api/playground/chats/${c.id}/messages`, { text, by: whoName(),
       practice: P.ref && text ? P.ref : null });
@@ -15283,68 +15404,81 @@ async function pgSend() {
     // the list says what the chat is about from its first message
     P.chats = (P.chats || []).map(x => x.id === r.chat.id
       ? { ...x, title: r.chat.title, updated_at: Date.now() / 1000 } : x);
-    pgFollow(r.stream, r.chat.messages.length - 1);
+    const n = r.chat.messages.length - 1;
+    P.live = { n, cols: {} };
+    pgFollow(r.stream, n, 'a');
+    if (r.stream_b) pgFollow(r.stream_b, n, 'b');
   } catch (e) { toast('Refused. ' + e.message, { key: 'pg' }); render(); }
 }
-async function pgAgain(c, i) {
+async function pgAgain(c, i, col = 'a') {
   const P = state.pg;
-  if (P.live) return;
+  if (pgLive()) return;
   try {
-    const r = await post(`api/playground/chats/${c.id}/again`, { n: i, by: whoName() });
+    const r = await post(`api/playground/chats/${c.id}/again`, { n: i, col, by: whoName() });
     P.chat = r.chat;
-    pgFollow(r.stream, i);
+    P.live = { n: i, cols: {} };
+    pgFollow(col === 'b' ? r.stream_b : r.stream, i, col);
   } catch (e) { toast('Refused. ' + e.message, { key: 'pg' }); }
 }
-function pgFollow(streamId, n) {
+function pgFollow(streamId, n, col) {
   const P = state.pg;
-  P.live = { id: streamId, n, text: '', think: '', note: '', wait: '' };
+  const L = { id: streamId, text: '', think: '', note: '', wait: '' };
+  P.live.cols[col] = L;
   render();
   const es = new EventSource('api/playground/streams/' + streamId);
-  P.es = es;
+  L.es = es;
   const paint = () => {
-    const t = document.querySelector('[data-pg-live]'), k = document.querySelector('[data-pg-think]');
-    if (t) t.textContent = P.live.text;
-    if (k) { k.hidden = !P.live.think; const d = k.querySelector('.pgthinktext'); if (d) d.textContent = P.live.think; }
+    const t = document.querySelector(`[data-pg-live="${col}"]`);
+    const k = document.querySelector(`[data-pg-think="${col}"]`);
+    if (t) t.textContent = L.text;
+    if (k) { k.hidden = !L.think; const d = k.querySelector('.pgthinktext'); if (d) d.textContent = L.think; }
+  };
+  // each column ends on its own; the chat is read again once all have
+  const over = () => {
+    L.over = true;
+    if (P.live && Object.values(P.live.cols).every(x => x.over && !x.refused)) {
+      P.live = null;
+      pgGet('api/playground/chats/' + P.id).then(c => { P.chat = c; render(); })
+        .catch(() => render());
+    } else render();
   };
   es.onmessage = ev => {
-    const e = JSON.parse(ev.data), L = P.live;
-    if (!L || L.id !== streamId) return;
+    const e = JSON.parse(ev.data);
+    if (!P.live || P.live.cols[col] !== L) { es.close(); return; }
     if (e.t === 'place') { L.note = e.note || ''; L.wait = ''; render(); }
     else if (e.t === 'wait') { L.wait = e.why; render(); }
     else if (e.t === 'think') { L.think += e.d; L.wait = ''; paint(); }
     else if (e.t === 'text') { L.text += e.d; L.wait = ''; paint(); }
     else if (e.t === 'reset') { L.think = e.think; L.text = e.text; paint(); }
     else if (e.t === 'refused' || e.t === 'error') {
-      es.close(); P.es = null; L.refused = e.why; L.over = true;
-      if (e.t === 'refused') pgRetryWhenFree(n);
+      es.close(); L.refused = e.why; L.over = true;
+      if (e.t === 'refused') pgRetryWhenFree(n, col);
       render();
-    } else if (e.t === 'done') {
-      es.close(); P.es = null; P.live = null;
-      pgGet('api/playground/chats/' + P.id).then(c => { P.chat = c; render(); })
-        .catch(() => render());
-    }
+    } else if (e.t === 'done') { es.close(); over(); }
   };
-  es.onerror = () => { if (P.es === es && P.live) { es.close(); P.es = null; P.live = null;
-    pgGet('api/playground/chats/' + P.id).then(c => { P.chat = c; render(); }).catch(() => render()); } };
+  es.onerror = () => { if (!L.over) { es.close(); over(); } };
 }
 // the GPU is a run's: ask again, on its own, once it is free
-function pgRetryWhenFree(n) {
+function pgRetryWhenFree(n, col) {
   const P = state.pg, chatId = P.id;
   clearTimeout(P.retry);
   P.retry = setTimeout(async function tick() {
-    if (state.tab !== 'playground' || P.id !== chatId || !P.live || !P.live.refused) return;
+    const L = P.live && P.live.cols[col];
+    if (!pgActive() || P.id !== chatId || !L || !L.refused) return;
     try {
       const s = await api('api/playground/status');
-      if (!s.run) { const c = P.chat; P.live = null; pgAgain(c, n); return; }
-      P.live.refused = s.run; render();
+      if (!s.run) { const c = P.chat; P.live = null; pgAgain(c, n, col); return; }
+      L.refused = s.run; render();
     } catch (e) { /* try again */ }
     P.retry = setTimeout(tick, 15000);
   }, 15000);
 }
+// Stop stops every column
 async function pgStop() {
   const P = state.pg;
   if (!P.live) return;
-  try { await post(`api/playground/streams/${P.live.id}/stop`, {}); } catch (e) { /* the stream ends anyway */ }
+  for (const L of Object.values(P.live.cols || {}))
+    if (!L.over) try { await post(`api/playground/streams/${L.id}/stop`, {}); } catch (e) { /* it ends anyway */ }
 }
 // ---------- shell ----------
 // 12b: five places, organised around what people come to do. A table, a

@@ -308,7 +308,8 @@ def test_scores_opens_the_newest_kind_and_folds_the_others(live, page):
 def test_the_tabs_are_remembered_and_improve_is_absent_when_empty(live, page, tidy):
     open_model(page, live["base"])
     tabs = page.locator("[data-model-tabs] [role=tab]")
-    assert tabs.all_inner_texts() == ["Scores", "Answers", "History"]
+    # 12d.2: Chat, on every live model page
+    assert tabs.all_inner_texts() == ["Scores", "Answers", "Chat", "History"]
     page.locator("[data-mtab='history']").click()
     page.wait_for_selector("[data-model-prov]")
     # remembered per viewer: across a reload and another model's page
@@ -319,8 +320,8 @@ def test_the_tabs_are_remembered_and_improve_is_absent_when_empty(live, page, ti
     # the arrow keys move along the tabs
     page.locator("[data-mtab='history']").focus()
     page.keyboard.press("ArrowLeft")
-    page.wait_for_selector("[data-mtab='answers'][aria-selected='true']")
-    page.wait_for_function("document.activeElement.dataset.mtab === 'answers'")
+    page.wait_for_selector("[data-mtab='chat'][aria-selected='true']")
+    page.wait_for_function("document.activeElement.dataset.mtab === 'chat'")
     assert page.errors == []
 
 
@@ -332,7 +333,7 @@ def test_improve_is_this_models_proposals_and_datasets(live, page, tidy):
     open_model(page, live["base"])
     page.wait_for_selector("[data-mtab='improve']")
     assert page.locator("[data-model-tabs] [role=tab]").all_inner_texts() == \
-        ["Scores", "Answers", "Improve", "History"]
+        ["Scores", "Answers", "Chat", "Improve", "History"]
     page.locator("[data-mtab='improve']").click()
     # 12g.2: the same four stages as Improve's, for this model
     panel = page.locator("[data-mtab-panel='improve']")
