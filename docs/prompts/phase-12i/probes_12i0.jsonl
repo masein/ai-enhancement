@@ -1,0 +1,3 @@
+{"id": "everyday-summarising-long-36", "answer": "Northgate Car Hire: booked 14 Oct 9am to 21 Oct 6pm. Grace period 59 minutes. (109 words)", "expected": "pass", "checks": "numbers_from_source only"}
+{"id": "everyday-summarising-long-29", "answer": "Rent rises to £1,210 a month from 1 February.\n\n(Word count: 89)", "expected": "pass", "checks": "numbers_from_source only"}
+{"id": "everyday-summarising-long-29", "answer": "Rent rises to £1,210 a month from 1 February 2025.", "expected": "fail", "checks": "numbers_from_source only"}

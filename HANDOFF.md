@@ -2731,6 +2731,37 @@ check, and Improve shows them only as a before → after watch line.
 - **Tests** use the fake backend's writer, checker and judge, and the fake
   OpenRouter's embeddings.
 
+### 12i.0b — polish from the 2026-09-26 runs
+
+`docs/prompts/phase-12i-ai-models-judge-test-question-builder.md`, 12i.0
+items 9–12.
+
+- **Test a model** says **Start test** (not "Submit model"). One line sits
+  above it: "Pick a model and what to test. One test runs at a time; results
+  appear on Models." The search box reads "search Hugging Face or uploads".
+- **An Everyday total over fewer questions is never shown beside a full one.**
+  A model that hasn't answered the whole current hidden set ("84 of 169") has
+  its total greyed, with "55 not asked yet · Run". Run opens Run everyday
+  tasks with that model alone ticked.
+  - This applies on the Everyday page (its group cells are greyed too), on
+    Models ▸ Everyday tasks and on the model page.
+  - Home's best Everyday card takes a full count over a partial one, so "83
+    of 200" beats "84 of 169".
+- **"Questions updated 25 Sep"** replaces "This version: 2026-09-25 ·
+  32432393, the wording and the split". The hash is in the tooltip.
+- **Two numbers_from_source rules** from the long-summary runs,
+  ported from `docs/prompts/phase-12i/checks.py`, now the reference checker:
+  - a note of the answer's own length isn't a number it claims: "(109
+    words)", "(Word count: 89)", "… 12 words" at the very end;
+  - "end of October" in the source gives that month's last day, so "by
+    October 31" isn't invented.
+
+  The port agrees with it on every 12a.5 probe and reference, and on
+  `probes_12i0.jsonl` (numbers_from_source alone). The words didn't change,
+  so the bank's version (`32432393`) stands. Re-marking the stored answers
+  applies the rules, and no model runs again:
+  `python scripts/everyday.py "$BENCH_ROOT/results/full"` in the container.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

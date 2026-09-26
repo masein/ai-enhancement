@@ -359,7 +359,7 @@ def test_a_model_whose_weights_are_not_here_is_greyed_and_cannot_be_queued(live,
                    f"it first (POST /api/artifacts/qwen35-delta-moe-7d560104-step945) to run "
                    f"it here.")
     assert box.input_value() == DELTA
-    submit = page.get_by_role("button", name="Submit model")
+    submit = page.get_by_role("button", name="Start test")
     assert submit.is_disabled()
     assert submit.get_attribute("title") == why
     SCREENS.mkdir(parents=True, exist_ok=True)

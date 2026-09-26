@@ -32,6 +32,21 @@ From the live check of #71–#73:
 7. **Improve's intro** says "What the Knowledge exam **and Everyday tasks** say this model is missing…".
 8. **Improve's header line** ("the AI local/chat · today local (generator, judge, exam writer): 47 items, no daily limit") is replaced by one plain line from 12i.1: **"AI: local gemma · change"**. Until 12i.1 lands, just drop the system words.
 
+From the 2026-09-26 runs:
+
+9. **The Test a model dialog:**
+   - The button reads **"Start test"**, not "Submit model".
+   - The text above it drops system words ("full and judged are separate runs…", "Preflight", "local/<name>"). Replace it with one line: "Pick a model and what to test. One test runs at a time; results appear on Models."
+10. **Everyday totals with different denominators aren't shown side by side.** A model that hasn't answered the whole current set shows its total greyed, with "N not asked yet · Run". Today "58 of 200" sat next to "84 of 169".
+11. **"This version: 2026-09-25 · 32432393, the wording and the split"** becomes "Questions updated 25 Sep", with the hash in the tooltip.
+12. **Two checker rules** for `numbers_from_source`, found in the long-summary runs. Port them from `docs/prompts/phase-12i/checks.py`, so it and `scripts/everyday.py` agree on all probes in `docs/prompts/phase-12a5/` plus `docs/prompts/phase-12i/probes_12i0.jsonl`:
+    - **A note of the answer's own length isn't a number it claims:** "(109 words)", "(Word count: 89)", or "… 12 words" at the very end. Qwen3 adds these.
+    - **"end of October" in the source gives that month's last day,** so "by October 31" isn't invented.
+
+    The 12i.0 probes test `numbers_from_source` alone, as their `checks` field says.
+
+    Re-mark the stored answers after deploy. No model needs to run again.
+
 **HANDOFF § 5b rule, and each PR says which applies:**
 - **Code only (the image doesn't change):** skip deploy step 3. CI already ran the unit tests on that commit.
 - **The image changes:** run step 3. It's the only test of the real image.
@@ -203,7 +218,7 @@ Use a fake writer, checker, judge and embeddings.
 
 ## Done when
 
-1. **12i.0:** the eight polish items are live, and HANDOFF says when step 3 is needed.
+1. **12i.0:** the twelve polish items are live, the checker agrees on every probe, and HANDOFF says when step 3 is needed.
 2. **12i.1:** masein can pick each job's model from a live OpenRouter list, with prices and warnings. A changed judge starts a new judge version. The judge test runs, shows agreement, and can make a judge current.
 3. **12i.2:** masein can build 60 Everyday or Knowledge questions in three steps, review only what's flagged plus a sample, and publish a new bank version.
 4. Each PR has its CI run link, and deploy step 4 passes.

@@ -117,7 +117,7 @@ def test_submit_answers_with_a_toast_and_no_line_that_stays(live, page):
     open_submit(page, live["base"], "Omar")
     box = page.locator("[data-ms='submit'] input")
     box.fill("org/toast-me")
-    page.get_by_role("button", name="Submit model").click()
+    page.get_by_role("button", name="Start test").click()
     t = page.locator("[data-toast='submit']")
     t.wait_for()
     # 11l: the confirmation names the run it made and links to its row
@@ -198,7 +198,7 @@ def test_a_queued_submission_clears_the_form_and_links_to_its_row(live, page, mo
     box.fill("org/clears-itself")
     note = page.get_by_label("note")
     note.fill("a note that goes")
-    page.get_by_role("button", name="Submit model").click()
+    page.get_by_role("button", name="Start test").click()
     t = page.locator("[data-toast='submit']")
     t.wait_for()
     rid = int(re.search(r"Run #(\d+)", t.locator(".toast-text").text_content()).group(1))
@@ -218,7 +218,7 @@ def test_a_queued_submission_clears_the_form_and_links_to_its_row(live, page, mo
     page.locator("[data-test-model]").click()
     assert box.input_value() == ""
     assert note.input_value() == ""
-    assert page.get_by_role("button", name="Submit model").is_enabled()
+    assert page.get_by_role("button", name="Start test").is_enabled()
     # and the ticks are the ones the form opens with: every topic, no control
     boxes = picker.locator("input[data-exam-task]:not([disabled])")
     assert boxes.count() > 1
@@ -234,7 +234,7 @@ def test_the_submit_button_is_held_while_the_request_is_in_flight(live, page):
     page.locator("[data-ms='submit'] input").fill("org/held-while-in-flight")
     # read the button one tick after the click, while the POST is out
     page.evaluate("""() => { const b = [...document.querySelectorAll('button')]
-        .find(x => x.textContent === 'Submit model');
+        .find(x => x.textContent === 'Start test');
       window.__held = [];
       b.addEventListener('click', () => setTimeout(
         () => window.__held.push([b.textContent, b.disabled]), 0));
@@ -243,7 +243,7 @@ def test_the_submit_button_is_held_while_the_request_is_in_flight(live, page):
     held = page.evaluate("window.__held")
     assert held and held[0] == ["Queueing…", True], held
     page.locator("[data-test-model]").click()             # 12b: closed on success
-    assert page.get_by_role("button", name="Submit model").is_enabled()
+    assert page.get_by_role("button", name="Start test").is_enabled()
     assert page.errors == []
 
 
@@ -254,14 +254,14 @@ def test_a_refused_submission_keeps_every_field_and_says_why(live, page):
     box.fill("not-a-model-id")
     note = page.get_by_label("note")
     note.fill("keep me")
-    page.get_by_role("button", name="Submit model").click()
+    page.get_by_role("button", name="Start test").click()
     msg = page.locator("[data-qmsg]")
     msg.wait_for()
     assert msg.text_content().startswith("Refused. ")
     assert "org/name" in msg.text_content()            # the server's own words
     assert box.input_value() == "not-a-model-id"       # nothing was cleared
     assert note.input_value() == "keep me"
-    assert page.get_by_role("button", name="Submit model").is_enabled()
+    assert page.get_by_role("button", name="Start test").is_enabled()
     assert page.locator("[data-toast='submit']").count() == 0
     # the refusal itself is the 422 the browser logs; nothing else
     assert all("422" in e for e in page.errors), page.errors
@@ -280,7 +280,7 @@ def test_a_judged_submit_chooses_its_topics(live, page, monkeypatch):
     page.locator("[data-exam-picker='submit'] [data-quick='none']").click()
     page.locator("[data-exam-picker='submit'] input[data-exam-task='exam_law']").check()
     page.locator("[data-ms='submit'] input").fill("org/judged-law-only")
-    page.get_by_role("button", name="Submit model").click()
+    page.get_by_role("button", name="Start test").click()
     page.wait_for_selector("[data-toast='submit']")
     row = next(x for x in db.recent(50) if x["hf_id"] == "org/judged-law-only")
     assert json.loads(row["tasks"]) == ["exam_law"] and row["suite"] == "judged"
