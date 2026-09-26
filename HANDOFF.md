@@ -2762,6 +2762,45 @@ items 9–12.
   applies the rules, and no model runs again:
   `python scripts/everyday.py "$BENCH_ROOT/results/full"` in the container.
 
+### 12i.3 — the live check of 12i
+
+- **Build questions got a 500 on the server:** `GET /api/builder` read its
+  default prompts from `docs/prompts/phase-12i/`, and the image carries no
+  `docs/`.
+  - The builder now reads `eval_tasks/fr/question-builder-prompt.md` and
+    `eval_tasks/everyday/question-builder-prompt.md`, which the image copies.
+  - Both are on `startup.REQUIRED_REPO_FILES`, so `test_image_contents`
+    covers them and the service refuses to start without them.
+  - The `docs/` copies stay as the brief names them, and a test keeps them
+    the same text.
+  - **A new file the service reads at run time goes on that list**; that is
+    what the list is for.
+- **AI models:** it is in the name menu (since 12i.1). Improve's "AI: … ·
+  change" now shows even when the training-data writer isn't set up, which is
+  exactly when it's needed. The Knowledge exam's line links there too.
+- **The model picker:**
+  - it opens under its row (the list is 300px at most, so a low row doesn't
+    flip it to the page's top);
+  - rows keep their height (a flex column under a height cap shrank them into
+    each other);
+  - the suggested row holds its reason;
+  - the order is this job's suggested model, the other jobs' suggested ones,
+    then the rest by price, cheapest or dearest first. OpenRouter publishes no
+    measure of strength.
+- **The local model is named by its weights**, e.g. "Local (gemma on this
+  server)", in the jobs, the picker and the judge test's "the judge now", not
+  "chat" or "local the local model".
+  - When no client has asked yet, `llm.served_weights()` asks vLLM's
+    `/models` once, in 3 s at most, and at most once a minute while it doesn't
+    answer.
+  - It asks only when a job runs locally, and only for a page that shows the
+    name (AI models, the jobs' labels, the judge test). A hot path, like the
+    judge's identity or its health probe, names only what is already known.
+  - Choosing Local as the judge no longer sends `ai_models.label` and
+    `judge.identity` round in a loop.
+- **"Agreement (0–1)"** heads the judge test's κ column, with weighted kappa
+  explained in its tooltip.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

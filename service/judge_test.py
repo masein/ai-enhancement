@@ -212,8 +212,8 @@ def candidate(model_id: str) -> dict:
     """a candidate judge, pinned as a job would be: {kind, id, version, name,
     provider, price_in, price_out, key}. `key` names its marks"""
     if model_id == ai_models.LOCAL:
-        c = {"kind": ai_models.LOCAL, "id": ai_models.LOCAL, "name": "local "
-             + ai_models.local_name(), "version": "local/" + ai_models.local_model(),
+        c = {"kind": ai_models.LOCAL, "id": ai_models.LOCAL, "name": ai_models.local_label(ask=True),
+             "version": "local/" + ai_models.local_model(),
              "provider": "", "price_in": 0.0, "price_out": 0.0}
     else:
         m = ai_models.model(model_id)
@@ -388,6 +388,8 @@ def result() -> dict:
     import judge
     person = db.jt_marks(PERSON)
     rows = []
+    # a page shows this: a local judge is named by its weights, asked once
+    ai_models.local_name(ask=True)
     cur_key = judge.version()["key"]
     runs = db.ai_get("judge_test:candidates", {})
     cur = current_marks()

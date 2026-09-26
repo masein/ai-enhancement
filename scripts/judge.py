@@ -715,14 +715,19 @@ def identity() -> dict:
     if c and c.get("kind") == "local":
         model = ai_models.local_model()
         return {"provider": "local", "model": model, "id": f"local/{model}",
-                "family": family(model) if model else "", "name": ai_models.label("judge")}
+                "family": family(model) if model else "", "name": ai_models.local_label()}
     model = config.JUDGE_MODEL
     if model == "stub":
         return {"provider": "stub", "model": "overlap-v1", "id": "stub/overlap-v1", "family": "stub"}
     provider = config.JUDGE_PROVIDER
-    return {"provider": provider, "model": model,
-            "id": f"{provider}/{model}" if provider and model else (model or ""),
-            "family": family(model) if model else ""}
+    out = {"provider": provider, "model": model,
+           "id": f"{provider}/{model}" if provider and model else (model or ""),
+           "family": family(model) if model else ""}
+    # 12i.3: a local judge is named by its weights, not by the id vLLM serves
+    # it under ("chat")
+    if provider == "local":
+        out["name"] = ai_models.local_label()
+    return out
 
 
 def judge_family(ident: dict, stamp: dict | None = None) -> str:

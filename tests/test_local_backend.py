@@ -320,9 +320,13 @@ def test_a_local_judge_runs_provisional_instead_of_being_refused(monkeypatch):
                      "ALLOW_SINGLE_PROVIDER_LOOP": False, **kw}.items():
             monkeypatch.setattr(config, k, v)
     cfg()
+    # the weights behind "chat", as the server said them (12i.3: the judge is
+    # named by them, not by the served id)
+    monkeypatch.setattr(llm, "_SERVED", {config.LOCAL_BASE_URL.rstrip("/"):
+                                         {"chat": "google/gemma-4-E4B-it"}})
     assert jd.blocked() == ""                     # undated and keyless: a stamp, not a refusal
     assert jd.identity() == {"provider": "local", "model": "chat", "id": "local/chat",
-                             "family": "chat"}
+                             "family": "chat", "name": "Local (gemma on this server)"}
     cfg(JUDGE_MODEL="")
     assert "JUDGE_MODEL is unset" in jd.blocked()
     # every other refusal stands

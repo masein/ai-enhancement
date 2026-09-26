@@ -86,7 +86,8 @@ def test_step_one_offers_topics_groups_and_the_instructions_with_their_output_lo
     for kind in ("knowledge", "everyday"):
         p = page["prompts"][kind]
         assert p["locked"].startswith("## Output") and "## Output" not in p["editable"]
-    assert page["prompts"]["everyday"]["path"] == "docs/prompts/phase-12i/everyday-question-prompt.md"
+    # 12i.3: the image's copy — docs/ is not in the image
+    assert page["prompts"]["everyday"]["path"] == "eval_tasks/everyday/question-builder-prompt.md"
     assert page["writer"]["label"] == "fake fake-exam" and page["checker_blocked"] == ""
     assert page["drafts"] == []
 
