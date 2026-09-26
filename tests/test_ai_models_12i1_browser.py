@@ -241,7 +241,7 @@ def test_the_result_table_marks_the_best_and_offers_it_as_the_judge(live, page, 
     table = page.locator("[data-jt-result]")
     table.wait_for()
     assert table.locator("thead th").all_text_contents()[:5] == [
-        "Judge", "Same mark as you", "Within 1 point", "Agreement (weighted κ)",
+        "Judge", "Same mark as you", "Within 1 point", "Agreement (0–1)",     # 12i.3
         "Cost per 1,000 answers"]
     best = table.locator("tr[data-jt-row='ds']")
     assert best.locator("[data-jt-best]").inner_text() == "best"

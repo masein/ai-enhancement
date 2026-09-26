@@ -56,6 +56,8 @@ REQUIRED_REPO_FILES = [
     "eval_tasks/mmlu_perm/utils.py",        # …and the tasks in it import this
     "eval_tasks/everyday/bank.jsonl",       # the Everyday bank (12a.5: 388 questions)
     "eval_tasks/everyday/_everyday_template_yaml",  # …and the task everyday.build_task writes
+    "eval_tasks/fr/question-builder-prompt.md",        # 12i.2: Build questions' defaults —
+    "eval_tasks/everyday/question-builder-prompt.md",  # GET /api/builder reads both
     "FRIENDS.md",                           # served at /guide
     "clients/bench_client.py",              # served at /client
     *DELIVERED_TOPIC_FILES,

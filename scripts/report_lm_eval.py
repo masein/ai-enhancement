@@ -2348,13 +2348,19 @@ table.aijobs th, table.aijobs td { text-align:left; padding:8px 10px 8px 0; vert
 table.aijobs th { font-size:var(--fs-1); color:var(--text-secondary); font-weight:600; }
 .aiprice { white-space:nowrap; }
 .aimenu.pop { min-width:320px; max-width:min(92vw, 460px); padding:10px 12px; gap:6px; }
-.aimenu .ailist { display:flex; flex-direction:column; gap:2px; max-height:min(60vh, 460px);
+/* 12i.3: short enough to open under a low row rather than flip to the top,
+   and rows that keep their height: a flex column under a cap shrinks them */
+.aimenu .ailist { display:flex; flex-direction:column; gap:4px; max-height:min(40vh, 300px);
   overflow:auto; }
-.aiitem { display:flex; flex-direction:column; align-items:flex-start; text-align:left; gap:2px;
-  padding:6px 8px; border-radius:6px; }
+.aimenu .ailist > * { flex-shrink:0; }
+.aiitem { display:flex; flex-direction:column; align-items:flex-start; text-align:left; gap:3px;
+  padding:8px 10px; border-radius:6px; height:auto; line-height:1.35; }
 .aiitem:hover, .aiitem:focus-visible { background:var(--accent-soft); }
 .aiitem-sub { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-.aiwhy { margin:0 8px 6px; }
+.aiitem .aiwhy { display:block; white-space:normal; }
+.aisort { padding:6px 10px 2px; border-top:1px solid var(--border); margin-top:2px; }
+.aisort button[aria-pressed="true"] { font-weight:600; text-decoration:underline; }
+.badge.quiet { opacity:.75; }
 .warntext { color:var(--warning-text); }
 .airejudge .frm { display:flex; gap:8px; }
 .jtcands { margin-top:10px; }
@@ -12371,7 +12377,9 @@ function vPipeline() {
       + 'missing, the data made for it, and what training changed. The Standard benchmarks are only watched here, '
       + 'never trained toward.' }),
     !llm.configured && llm.reason ? el('p', { class: 'warn', text: llm.reason }) : '',
-    llm.configured ? el('p', { class: 'small se', 'data-imp-ai': '1' }, aiLine(llm)) : '',
+    // 12i.3: the way to AI models, set up or not — a job without a model is
+    // exactly when it is needed
+    llm.ai ? el('p', { class: 'small se', 'data-imp-ai': '1' }, aiLine(llm)) : '',
     state.rv.msg ? el('p', { class: 'small', text: state.rv.msg }) : '');
 
   return [head, impStagesCard(m)];
@@ -14121,25 +14129,45 @@ function aiChange(j) {
       } catch (e) { toast('Refused. ' + e.message, { key: 'ai' }); }
       render();
     };
-    const item = (id, name, sub, attrs = {}) => el('button', { role: 'menuitem',
+    const item = (id, name, sub, why, attrs = {}) => el('button', { role: 'menuitem',
         class: 'aiitem', 'data-ai-pick': id, onclick: () => pick(id), ...attrs },
-      el('span', { class: 'aiitem-name', text: name }), sub);
+      el('span', { class: 'aiitem-name', text: name }), sub, why || '');
+    // 12i.3: this job's suggested model, then the other jobs' suggested ones,
+    // then the rest by price in and out together — cheapest first, or dearest
+    // (OpenRouter publishes no measure of strength; price is the one it has)
+    const cost = m => (m.price_in || 0) + (m.price_out || 0);
+    const others = (A.page.jobs || []).map(x => x.suggested).filter(id => id !== j.suggested);
     const fill = q => {
       q = (q || '').trim().toLowerCase();
       const ms = (A.models || []).filter(m => !q || (m.id + ' ' + m.name).toLowerCase()
         .includes(q));
       const sug = ms.find(m => m.id === j.suggested);
-      const rest = ms.filter(m => m !== sug).slice(0, 60);
-      const row = (m, extra) => item(m.id, m.name.split(': ').pop(),
+      const also = others.map(id => ms.find(m => m.id === id)).filter(Boolean)
+        .filter((m, i, a) => a.indexOf(m) === i);
+      const rest = ms.filter(m => m !== sug && !also.includes(m))
+        .sort((a, b) => (A.sortDear ? cost(b) - cost(a) : cost(a) - cost(b))
+          || a.name.localeCompare(b.name)).slice(0, 60);
+      const row = (m, extra, why) => item(m.id, m.name.split(': ').pop(),
         el('span', { class: 'small se aiitem-sub' }, extra || '',
           el('span', { class: 'mono', text: `${usd(m.price_in)} in · ${usd(m.price_out)} out` }),
-          m.context ? ` · ${Math.round(m.context / 1000).toLocaleString('en')}k context` : ''));
+          m.context ? ` · ${Math.round(m.context / 1000).toLocaleString('en')}k context` : ''),
+        why || '');
       list.replaceChildren(
         !q || 'local'.includes(q) ? item('local', `Local (${A.page.local.name} on this server)`,
           el('span', { class: 'small se aiitem-sub', text: 'free · no key needed' })) : '',
+        // the reason sits inside the suggested row, under its price
         sug ? row(sug, el('span', { class: 'badge', 'data-ai-suggested': sug.id,
-          text: 'suggested' })) : '',
-        sug ? el('p', { class: 'small se aiwhy', 'data-ai-why': j.job, text: j.why }) : '',
+          text: 'suggested' }), el('span', { class: 'small se aiwhy', 'data-ai-why': j.job,
+          text: j.why })) : '',
+        ...also.map(m => row(m, el('span', { class: 'badge quiet', 'data-ai-also': m.id,
+          text: 'suggested for another job' }))),
+        rest.length ? el('div', { class: 'aisort small se', 'data-ai-sort': A.sortDear ? 'dear' : 'cheap' },
+          'The rest, ', el('button', { class: 'quiet', 'aria-pressed': String(!A.sortDear),
+            'data-ai-sort-cheap': '1', text: 'cheapest first',
+            onclick: () => { A.sortDear = false; fill(A.q || ''); } }), ' · ',
+          el('button', { class: 'quiet', 'aria-pressed': String(!!A.sortDear),
+            'data-ai-sort-dear': '1', text: 'dearest first',
+            onclick: () => { A.sortDear = true; fill(A.q || ''); } })) : '',
         ...rest.map(m => row(m)),
         !A.page.has_key ? el('p', { class: 'small se', text: 'OpenRouter’s models show once '
           + 'the server has its key.' }) : !ms.length && q ? el('p', { class: 'small se',
@@ -14250,7 +14278,7 @@ function judgeTestCard() {
       || (A.models || []).some(m => m.id === id)),
     ...(A.models || []).map(m => m.id).filter(id => !AI_DEFAULT_CANDIDATES.includes(id))
       .filter(id => A.pick.has(id))];
-  const nameOf = id => id === 'local' ? `Local (${A.page.local.name})`
+  const nameOf = id => id === 'local' ? `Local (${A.page.local.name} on this server)`
     : ((A.models || []).find(m => m.id === id) || { name: id }).name.split(': ').pop();
   const est = el('span', { class: 'small se', 'data-jt-estimate': '1' });
   const estimate = async () => {
@@ -14308,8 +14336,11 @@ function judgeTestCard() {
 function judgeTestTable(res) {
   const A = state.ai;
   return el('table', { class: 'jtresult', 'data-jt-result': '1' },
-    el('thead', {}, el('tr', {}, ['Judge', 'Same mark as you', 'Within 1 point',
-      'Agreement (weighted κ)', 'Cost per 1,000 answers', ''].map(h => el('th', { text: h })))),
+    // 12i.3: in words; the technical name on hover
+    el('thead', {}, el('tr', {}, [['Judge'], ['Same mark as you'], ['Within 1 point'],
+      ['Agreement (0–1)', 'weighted kappa (quadratic) against your marks: 1 is full agreement, '
+        + '0 is what chance would give, and a mark far off counts more than one close'],
+      ['Cost per 1,000 answers'], ['']].map(([h, t]) => el('th', { text: h, title: t || null })))),
     el('tbody', {}, res.rows.map(r => el('tr', { 'data-jt-row': r.key,
         class: r.best ? 'best' : null },
       el('td', {}, r.name, r.current ? el('span', { class: 'small se', text: ' · the judge now' })

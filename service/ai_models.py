@@ -202,15 +202,33 @@ def effective(role: str) -> tuple[str, str, str] | None:
     return (LOCAL, local_model(), "")
 
 
-def local_name() -> str:
-    """"gemma" — the local model by its weights, when the server says them"""
+def _local_in_use() -> bool:
+    """a job runs on the local model — only then is its server asked its name"""
+    if any(getattr(config, pv, "") == LOCAL for pv in
+           ("JUDGE_PROVIDER", "LLM_PROVIDER", "EXAM_PROVIDER", "CHECKER_PROVIDER")):
+        return True
+    return any((choice(j) or {}).get("kind") == LOCAL for j in JOBS)
+
+
+def local_name(ask: bool = False) -> str:
+    """"gemma" — the local model by its weights, when the server says them.
+    12i.3: with `ask`, a page that shows the name asks the server itself when
+    no client has yet; a hot path (a judge's identity, its health probe) never
+    does — it names what is already known"""
     from . import llm
     served = {}
     for v in llm._SERVED.values():
         served.update(v)
+    if ask and not any(served.values()) and _local_in_use():
+        served = llm.served_weights()
     root = next((w for w in served.values() if w), "")
     name = (root.rstrip("/").split("/")[-1] or "").split("-")[0].lower()
-    return name or "the local model"
+    return name or "the model"
+
+
+def local_label(ask: bool = False) -> str:
+    """"Local (gemma on this server)" — the local model wherever it is named"""
+    return f"Local ({local_name(ask)} on this server)"
 
 
 def _env(job: str) -> tuple[str, str]:
@@ -226,13 +244,17 @@ def _env(job: str) -> tuple[str, str]:
 
 
 def label(job: str) -> str:
-    """the job's model in words: "DeepSeek V4.1 Flash", "local gemma" """
+    """the job's model in words: "DeepSeek V4.1 Flash", "Local (gemma on this server)" """
     c = choice(job)
     if c and c.get("kind") == "openrouter":
         return (c.get("name") or c["id"]).split(": ", 1)[-1]
+    # before the environment's: a judge chosen Local names itself through
+    # this (judge.identity), and must not ask back (12i.3)
+    if c and c.get("kind") == LOCAL:
+        return local_label(ask=True)
     p, m = _env(job)
-    if c and c.get("kind") == LOCAL or p == LOCAL:
-        return "local " + local_name()
+    if p == LOCAL:
+        return local_label(ask=True)
     return f"{p} {m}".strip() if p else "none"
 
 

@@ -321,4 +321,5 @@ def test_with_no_key_only_local_is_offered_and_nothing_breaks(svc, monkeypatch):
     assert client.post("/api/ai/jobs/writer", json={"model": "local", "by": "masein"}) \
         .status_code == 200
     assert client.get("/api/llm").status_code == 200
-    assert called == []
+    # 12i.3: the local server may be asked its model's name; OpenRouter never
+    assert not [c for c in called if c[1].startswith(config.OPENROUTER_BASE_URL)]

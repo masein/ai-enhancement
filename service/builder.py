@@ -31,8 +31,11 @@ from pathlib import Path
 from . import ai_models, config, contamination, db, llm
 
 REPO = Path(__file__).resolve().parent.parent
-PROMPTS = {"knowledge": REPO / "docs" / "prompts" / "phase-12i" / "knowledge-question-prompt.md",
-           "everyday": REPO / "docs" / "prompts" / "phase-12i" / "everyday-question-prompt.md"}
+# the default writing instructions, where the image carries them (docs/ is not
+# in it: 12i.3). docs/prompts/phase-12i/ holds the same text, as the brief
+# names it, and a test keeps the two the same
+PROMPTS = {"knowledge": REPO / "eval_tasks" / "fr" / "question-builder-prompt.md",
+           "everyday": REPO / "eval_tasks" / "everyday" / "question-builder-prompt.md"}
 KINDS = ("knowledge", "everyday")
 LEVELS = ("general public", "specialist")
 TRY_N = 10                   # step 2's first ten

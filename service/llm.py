@@ -703,6 +703,29 @@ LOCAL_REASON = "{} by a local model — not a pinned benchmark"
 _SERVED: dict[str, dict[str, str]] = {}
 _OOM = re.compile(r"out of memory|\boom\b", re.I)
 _BATCH_ID = re.compile(r"(?:local|or)_[0-9a-f]{12}")
+_SERVED_ASKED: dict[str, float] = {}
+
+
+def served_weights(base_url: str | None = None) -> dict[str, str]:
+    """{served id: weights} of the local model server — what a client learns at
+    construction, or (12i.3) asked once here, briefly, and at most once a
+    minute while nothing answers: a page must not wait on vLLM"""
+    base = (base_url or config.LOCAL_BASE_URL or "").rstrip("/")
+    if not base:
+        return {}
+    if base in _SERVED:
+        return _SERVED[base]
+    if time.time() - _SERVED_ASKED.get(base, 0.0) < 60:
+        return {}
+    _SERVED_ASKED[base] = time.time()
+    try:
+        _, raw = _http("GET", f"{base}/models", {"content-type": "application/json"}, timeout=3)
+        data = json.loads(raw).get("data") or []
+    except Exception:                                   # noqa: BLE001 — a name, not a request
+        return {}
+    _SERVED[base] = {str(m["id"]): str(m.get("root") or "") for m in data
+                     if isinstance(m, dict) and m.get("id") and m.get("root")}
+    return _SERVED[base]
 
 
 def local_mark(provider: str, model: str, verb: str, base_url: str | None = None) -> dict:

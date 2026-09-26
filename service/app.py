@@ -930,7 +930,7 @@ def _ai_page() -> dict:
                      "blocked": llm.blocked(j["role"]) if (c or p) else ""})
     ident = _judge.identity()
     return {"has_key": ai_models.has_key(), "jobs": jobs,
-            "local": {"name": ai_models.local_name(), "model": ai_models.local_model()},
+            "local": {"name": ai_models.local_name(ask=True), "model": ai_models.local_model()},
             "spend": {"month": round(db.spend_this_month(), 4), "limit": ai_models.limit(),
                       "by_job": db.spend_this_month_by_job(), "waiting": ai_models.over_limit()},
             "warnings": ai_models.warnings(_improving()),
