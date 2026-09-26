@@ -1,7 +1,7 @@
-"""12i.1: a fake OpenRouter — its models list, each model's providers, and
-chat completions with usage and cost — at service.llm._http, so the service's
-own client runs unchanged and nothing leaves the machine. A request to any
-other address goes to the real _http, which no test here reaches.
+"""12i.1: a fake OpenRouter — its models list, each model's providers, chat
+completions with usage and cost, and (12i.2) embeddings — at service.llm._http,
+so the service's own client runs unchanged and nothing leaves the machine. A
+request to any other address goes to the real _http, which no test here reaches.
 
     fake = FakeOpenRouter.install(monkeypatch)
     ... fake.chat[0]["provider"] == {"order": ["inference-net"], "allow_fallbacks": False}
@@ -59,11 +59,22 @@ def default_reply(req: dict) -> str:
     return json.dumps({"score": 3, "justification": "mostly right"})
 
 
+def embedding(text: str, dims: int = 256) -> list[float]:
+    """12i.2: a word-count vector, so texts sharing most of their words sit
+    close (a near-duplicate's cosine is well over 0.9) and unrelated ones don't"""
+    import hashlib
+    v = [0.0] * dims
+    for w in re.findall(r"[a-z0-9]+", text.lower()):
+        v[int(hashlib.md5(w.encode()).hexdigest(), 16) % dims] += 1.0
+    return v
+
+
 class FakeOpenRouter:
     def __init__(self, real):
         self.real = real
         self.calls: list[tuple[str, str]] = []      # (method, path)
         self.chat: list[dict] = []                   # every chat completion's body
+        self.embedded: list[dict] = []               # every embeddings request's body
         self.reply = default_reply
         self.cost = 0.001                            # dollars a completion reports
 
@@ -96,4 +107,10 @@ class FakeOpenRouter:
                 "provider": "InferenceNet",
                 "usage": {"prompt_tokens": 1000, "completion_tokens": 100,
                           "cost": self.cost}}).encode()
+        if path == "/embeddings":
+            req = json.loads(body)
+            self.embedded.append(req)
+            return 200, json.dumps({
+                "data": [{"index": i, "embedding": embedding(t)} for i, t in enumerate(req["input"])],
+                "usage": {"prompt_tokens": 10 * len(req["input"]), "cost": 0.00001}}).encode()
         raise AssertionError(f"the fake OpenRouter has no {method} {path}")

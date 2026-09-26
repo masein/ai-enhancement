@@ -124,11 +124,46 @@ def _bad_check(c) -> str:
     return _bad_shape(c)
 
 
-def load_bank(path: Path = BANK_PATH) -> list[dict]:
+def built_dir() -> Path:
+    """12i.2: what the question builder published — on the data volume
+    (BENCH_ROOT/everyday), not in the repo, so a rebuild keeps it"""
+    from service import config
+    return config.BENCH_ROOT / "everyday"
+
+
+def built_path() -> Path:
+    return built_dir() / "built.jsonl"
+
+
+def groups() -> dict[str, str]:
+    """the eight groups, then any the question builder added (id -> label),
+    in the order the page shows them"""
+    p = built_dir() / "groups.json"
+    extra = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    return {**GROUPS, **{k: v for k, v in extra.items() if k not in GROUPS}}
+
+
+def load_bank(path: Path | None = None) -> list[dict]:
     """The bank, checked as it is read: an invalid line, a duplicate id, an
     unknown group or an unknown check type fails here, naming the line —
-    never later, on a model's answer."""
+    never later, on a model's answer. 12i.2: with no path, the repo's bank
+    and then what the question builder published (built_path)"""
+    if path is None:
+        rows = _read_bank(BANK_PATH)
+        built = built_path()
+        if built.exists():
+            ids = {q["id"] for q in rows}
+            for q in _read_bank(built):
+                if q["id"] in ids:
+                    raise ValueError(f"{built.name}: {q['id']} is in the repo's bank too")
+                rows.append(q)
+        return rows
+    return _read_bank(path)
+
+
+def _read_bank(path: Path) -> list[dict]:
     out, seen = [], set()
+    known = groups()
     for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
             continue
@@ -144,7 +179,7 @@ def load_bank(path: Path = BANK_PATH) -> list[dict]:
         if q["id"] in seen:
             raise ValueError(f"{path.name} line {n}: {q['id']} is there twice")
         seen.add(q["id"])
-        if q["group"] not in GROUPS:
+        if q["group"] not in known:
             raise ValueError(f"{path.name} line {n}: unknown group {q['group']!r}")
         if not isinstance(q["checks"], list):
             raise ValueError(f"{path.name} line {n}: checks is not a list")
@@ -761,7 +796,7 @@ def half(q: dict) -> str:
 def split_counts(questions=None) -> dict[str, dict]:
     """{group: {"hidden": n, "practice": m}}, in the groups' order"""
     qs = load_bank() if questions is None else questions
-    out = {g: {"hidden": 0, "practice": 0} for g in GROUPS}
+    out = {g: {"hidden": 0, "practice": 0} for g in groups()}
     for q in qs:
         out[q["group"]]["hidden" if half(q) == HIDDEN else "practice"] += 1
     return {g: c for g, c in out.items() if c["hidden"] or c["practice"]}
@@ -1003,7 +1038,7 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
 def _group_counts(items: list[dict]) -> dict:
     return {g: {"passed": sum(1 for it in items if it["group"] == g and it["pass"] is True),
                 "total": sum(1 for it in items if it["group"] == g)}
-            for g in GROUPS if any(it["group"] == g for it in items)}
+            for g in groups() if any(it["group"] == g for it in items)}
 
 
 def _ran_out(items: list[dict]) -> int:
@@ -1054,10 +1089,10 @@ def build_task(dest: Path, only: list[str] | None = None) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
     bank = load_bank()                # a bad bank fails here, before any GPU
     items = dest / f"{TASK}.jsonl"
-    if only is None:
+    if only is None and not built_path().exists():
         shutil.copyfile(BANK_PATH, items)
     else:
-        want = set(only)
+        want = set(only) if only is not None else {q["id"] for q in bank}
         items.write_text("".join(json.dumps(q, ensure_ascii=False) + "\n"
                                  for q in bank if q["id"] in want), encoding="utf-8")
     yaml = TEMPLATE_PATH.read_text(encoding="utf-8").replace("__ITEMS_PATH__",

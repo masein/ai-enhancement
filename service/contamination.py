@@ -97,10 +97,18 @@ class BenchmarkIndex:
         d = (self.exam_root / "bank") if self.exam_root else None
         return sorted(d.glob("*.jsonl")) if d and d.is_dir() else []
 
+    @staticmethod
+    def _everyday_files() -> list[Path]:
+        """the repo's Everyday bank, and (12i.2) what the question builder
+        published beside the data"""
+        from . import config
+        return [p for p in (EVERYDAY_BANK, config.BENCH_ROOT / "everyday" / "built.jsonl")
+                if p.exists()]
+
     def _key(self) -> tuple:
         files = list(self.root.rglob("samples_*.jsonl")) if self.root.is_dir() else []
         bank = self._bank_files()
-        evd = EVERYDAY_BANK.stat().st_mtime if EVERYDAY_BANK.exists() else 0.0
+        evd = tuple(p.stat().st_mtime for p in self._everyday_files())
         return (len(files), max((f.stat().st_mtime for f in files), default=0.0),
                 len(bank), max((f.stat().st_mtime for f in bank), default=0.0), evd)
 
@@ -146,8 +154,8 @@ class BenchmarkIndex:
         evd: set[int] = set()
         exact: set[str] = set()
         n_evd = 0
-        if EVERYDAY_BANK.exists():
-            for line in EVERYDAY_BANK.read_text(encoding="utf-8", errors="replace").splitlines():
+        for path in self._everyday_files():
+            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
                 if not line.strip():
                     continue
                 try:
