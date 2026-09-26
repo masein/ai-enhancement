@@ -721,6 +721,7 @@ def run_submission(sub: dict) -> None:
         failed_tasks: list[str] = []
         canceled = False
         reused: dict[str, int | None] = {}
+        asked: list[str] | None = None
         for i, task in enumerate(tasks, 1):
             if canceled or db.cancel_requested(sid):
                 canceled = True
@@ -728,13 +729,30 @@ def run_submission(sub: dict) -> None:
             shots = config.NFEWSHOT.get(task, 0)
             task_out = config.OUT_DIR / row_safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
-            if everyday and _has_results(task_out):
-                # everyday tasks are a few minutes: "run again" answers again.
-                # The last answers move beside the tree, whole
-                moved = _set_aside(task_out, task)
+            if everyday:
+                # 12a.5: the model is asked only what it has no answer to on
+                # today's words; the answers it gave before are kept (beside
+                # its marks, first) and marked again, with no GPU
+                todo = _everyday.unanswered(config.OUT_DIR / safe)
+                asked = [q["id"] for q in todo]
+                if not todo:
+                    with open(log_path, "a") as lf:
+                        lf.write(f"\n[service] {task}: every question is answered already; "
+                                 f"marking them again\n")
+                    db.update(sid, status="running",
+                              progress=f"{label} — no new questions, marking again")
+                    continue
+                _everyday.build_task(config.EVERYDAY_TASKS_DIR, only=asked)
                 with open(log_path, "a") as lf:
-                    lf.write(f"\n[service] {task}: answering again; the last answers are "
-                             f"kept at {moved}\n")
+                    lf.write(f"\n[service] {task}: asking the {len(todo)} question(s) it has "
+                             f"no answer to on today's words\n")
+                if _has_results(task_out):
+                    # the last run's folder moves beside the tree, whole; its
+                    # answers are kept already
+                    moved = _set_aside(task_out, task)
+                    with open(log_path, "a") as lf:
+                        lf.write(f"\n[service] {task}: the last run's folder is kept at "
+                                 f"{moved}\n")
             if _task_done(task_out, task):
                 if current_fingerprint(task):
                     reused[task] = _answered_by(task_out)
@@ -891,7 +909,7 @@ def run_submission(sub: dict) -> None:
         if everyday and not failed_tasks:
             db.update(sid, status="running", progress="marking the answers")
             try:
-                ev = _everyday.start(config.OUT_DIR / safe, submission=sid)
+                ev = _everyday.start(config.OUT_DIR / safe, submission=sid, asked=asked)
                 judge_note = _everyday.summary(ev)
                 # 12a.4: the wording this run answered, on the run itself
                 ver = ev.get("version") or {}

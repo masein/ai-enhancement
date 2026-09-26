@@ -1,4 +1,4 @@
-"""12a: Everyday tasks, off the page — since 12a.3 the bank of 333 questions.
+"""12a: Everyday tasks, off the page — since 12a.5 the bank of 388 questions.
 
 Questions typed the way people type into an assistant on a phone, marked by
 their checks on the text after any thinking (#59's split). Each check says
@@ -108,6 +108,8 @@ def test_the_thinking_is_never_marked(tmp_path):
         "paid.",
         "<think>names: Bean There: cozy</think>\n\nBean There\nDaily Grind\nBrew Haven"))
     out = ev.mark(mdir)
+    # 12a.5: answers to today's words, marked as today's — the five of 388
+    assert out["earlier"] is False and out["unasked"] == 383
     got = {it["id"][-2:]: (it["pass"], it["reason"]) for it in out["items"]}
     assert got["01"] == (False, "never mentions: 29, twenty-nine, twenty nine")   # 12a.4
     assert got["02"][0] is True and got["02"][1].startswith("valid JSON with sara")
@@ -118,10 +120,12 @@ def test_the_thinking_is_never_marked(tmp_path):
     assert first["answer_text"] == "I am not sure."
     assert first["reasoning_text"] == "a leap year has 29 days in february"
     assert first["reasoning_words"] == 8
-    # the groups say n of k, k being what this model was asked in each
-    assert out["groups"]["understanding"] == {"passed": 0, "total": 1}
-    assert out["groups"]["instructions"] == {"passed": 1, "total": 1}
-    assert "quick_maths" not in out["groups"]
+    # the groups say n of k, k being what this model was asked in each —
+    # 12g.2: each half apart; the first and the fifth are practice questions
+    assert out["practice"]["understanding"] == {"passed": 0, "total": 1}
+    assert out["practice"]["instructions"] == {"passed": 1, "total": 1}
+    assert out["groups"]["shorten"] == {"passed": 0, "total": 1}      # 03, with the judge
+    assert "quick_maths" not in out["groups"] and "quick_maths" not in out["practice"]
 
 
 def test_a_script_check_that_fails_is_never_sent_to_the_judge(tmp_path):
@@ -183,7 +187,7 @@ def queue_pilot(client, hf_id=MODEL):
 
 
 # every question answered with its reference, but the pilot's email left
-# unfixed: 332 of 333 once the judge has agreed with the eleven it marks
+# unfixed: 387 of 388 once the judge has agreed with the eleven it marks
 DEFAULT_ANSWERS = {**{q["id"]: q["reference"] for q in BANK}, "everyday-pilot-04": "I writing"}
 
 
@@ -201,7 +205,12 @@ def fake_gpu(monkeypatch, has_template=True, reasoning=False, answers=None):
     def run(sid, cmd, *a, **k):
         seen.append(cmd)
         out = Path(cmd[cmd.index("--output_path") + 1])
-        write_bank(out.parent, answers or DEFAULT_ANSWERS,
+        # 12a.5: the harness answers the questions the task holds — the ones
+        # the model has no answer to — and no others
+        asked = [json.loads(ln)["id"] for ln in (config.EVERYDAY_TASKS_DIR / "everyday.jsonl")
+                 .read_text(encoding="utf-8").splitlines()]
+        said = answers or DEFAULT_ANSWERS
+        write_bank(out.parent, {i: said[i] for i in asked if i in said},
                    budget=config.EVERYDAY_REASONING_MAX_GEN_TOKS if reasoning else 512)
         return 0
     monkeypatch.setattr(runner, "_run_task", run)
@@ -250,31 +259,39 @@ def test_the_bank_is_asked_through_the_chat_template_and_marked_in_the_same_run(
     assert 'doc_to_text: "{{prompt}}"' in y and not any("Answer:" in ln for ln in y)
     assert "max_gen_toks: 512" in y
     assert f"test: {config.EVERYDAY_TASKS_DIR / 'everyday.jsonl'}" in y
+    # a model never asked before is asked all 388
     assert len((config.EVERYDAY_TASKS_DIR / "everyday.jsonl").read_text(encoding="utf-8")
-               .splitlines()) == 333
+               .splitlines()) == 388
     # marked straight after, the judge's question too (the stub is in-process)
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
-    # 12g.2: all 333 asked, the score the hidden half's — the one it fails is practice
+    # 12g.2: all 388 asked, the score the hidden half's — the one it fails is practice
     hidden = sum(c["hidden"] for c in ev.split_counts().values())
-    assert out["model"] == MODEL and out["passed"] == out["total"] == hidden == 169
-    assert out["waiting"] == 0 and len(out["items"]) == 333
+    assert out["model"] == MODEL and out["passed"] == out["total"] == hidden == 200
+    assert out["waiting"] == 0 and len(out["items"]) == 388
     row = db.get(sid)
-    assert row["status"] == "done" and row["progress"] == "Everyday tasks: 169 of 169 hidden"
+    assert row["status"] == "done" and row["progress"] == \
+        "Everyday tasks: 200 of 200 hidden · 388 new questions"
     assert (mdir / "model_meta.json").read_text(encoding="utf-8") == meta_before
 
 
-def test_run_again_answers_again_and_keeps_the_last_answers(svc, monkeypatch):
+def test_run_again_asks_nothing_it_has_answered_and_marks_it_again(svc, monkeypatch):
+    """12a.5: where 12a run everything again, a run asks only what the model
+    has no answer to on today's words. With nothing new it asks nothing — no
+    GPU — and marks the answers it has again"""
     client, _, tree = svc
     monkeypatch.setattr(config, "JUDGE_MODEL", "stub")
     mdir = tree["models"][MODEL]["dir"]
     fake_gpu(monkeypatch)
     runner.run_submission(db.get(queue_pilot(client)))
     seen = fake_gpu(monkeypatch, answers={q["id"]: "" for q in BANK})
-    runner.run_submission(db.get(queue_pilot(client)))
-    assert len(seen) == 1                                     # answered again, not resumed
-    assert json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))["passed"] == 0
-    kept = list((config.OUT_DIR.with_name("earlier") / mdir.name).glob("everyday_0shot-*"))
-    assert len(kept) == 1                                     # the last answers, kept whole
+    sid = queue_pilot(client)
+    runner.run_submission(db.get(sid))
+    assert seen == []                                         # nothing asked again
+    out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
+    assert out["passed"] == out["total"] == 200 and out["marking"] == {"new": 0, "remarked": 388}
+    assert db.get(sid)["progress"] == "Everyday tasks: 200 of 200 hidden · 388 re-marked"
+    # the run folder stays where it is: nothing replaced it
+    assert not (config.OUT_DIR.with_name("earlier") / mdir.name).exists()
 
 
 def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeypatch):
@@ -288,7 +305,8 @@ def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeyp
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
     assert row["status"] == "done"
     # 12g.2: the hidden half's score; the judge marks both halves' 11
-    assert row["progress"] == "Everyday tasks: 161 of 169 hidden · the judge is marking 11"
+    assert row["progress"] == ("Everyday tasks: 192 of 200 hidden · the judge is marking 11"
+                               " · 388 new questions")
     assert row["judge"]["n_items"] == 11 and row["judge"]["progress"] == "0/11 done"
     assert row["judge"]["status"] == "submitted"
     # one request per judged question, and nothing else
@@ -298,11 +316,12 @@ def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeyp
     llm_poller.tick()
     mdir = tree["models"][MODEL]["dir"]
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
-    assert out["passed"] == out["total"] == 169 and out["waiting"] == 0      # 12g.2: hidden
+    assert out["passed"] == out["total"] == 200 and out["waiting"] == 0      # 12g.2: hidden
     tldr = next(it for it in out["items"] if it["id"] == "everyday-pilot-03")
     assert tldr["reason"] == "closes 11:30 on Thursday, in two sentences or fewer"
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
-    assert row["progress"] == "Everyday tasks: 169 of 169 hidden"
+    # the run's line stays the run's once the judge is in
+    assert row["progress"] == "Everyday tasks: 200 of 200 hidden · 388 new questions"
     assert row["judge"]["status"] == "done"
 
 

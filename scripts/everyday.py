@@ -3,17 +3,24 @@
 
 Everyday tasks asks what people type into an assistant on a phone — short,
 lowercase, typos, one plain request — and most answers can be marked by a
-script, so the score needs no judge. The bank is 333 questions in seven
-groups (eval_tasks/everyday/bank.jsonl). It is a look, not a benchmark:
-never ranked, never averaged into anything, never on the Leaderboard.
+script, so the score needs no judge. The bank is 388 questions in eight
+groups (eval_tasks/everyday/bank.jsonl; 12a.5 added "Summarise", long texts,
+and ten Honesty questions whose answer is in the message). It is a look, not
+a benchmark: never ranked, never averaged into anything, never on the
+Leaderboard.
 
 12g.2 splits it as the exam is split — each question's qid is the hash of
 its normalised text (exam_build.qid_of), and diagnose.split_of with the
 exam's salt puts it in the HIDDEN half, which scores the model and is never
 shown, or the PRACTICE half, which the page shows and Improve may read. A
-model is still asked all 333; its published score is the hidden half's.
+model is asked both halves; its published score is the hidden half's.
 
-    python scripts/everyday.py results/full            re-mark every model
+12a.5: an answer is kept by its question's id and the hash of its words
+(everyday_answers.jsonl). Re-marking marks every answer to a question's
+current words with today's checks, and a run asks only the questions the
+model has no such answer to — after a bank change, the new ones.
+
+    python scripts/everyday.py results/full            re-mark every model (no GPU)
     python scripts/everyday.py results/full -m org/x   one model
 
 It reads the generations the harness logged, marks each one on the text
@@ -54,10 +61,13 @@ BANK_DIR = REPO / "eval_tasks" / "everyday"
 BANK_PATH = BANK_DIR / "bank.jsonl"
 TEMPLATE_PATH = BANK_DIR / "_everyday_template_yaml"
 OUT_NAME = "everyday.json"
-# the seven groups, in this order everywhere, as the page shows them
+# the eight groups, in this order everywhere, as the page shows them. 12a.5:
+# the short ones that were "Summarising" are "Shorten a message" (same ids),
+# and "Summarise" is the long texts — 425 to 850 words — a summary is for
 GROUPS = {"understanding": "Understanding", "writing": "Writing",
-          "summarising": "Summarising", "transform": "Transform",
-          "quick_maths": "Quick maths", "instructions": "Instructions", "honesty": "Honesty"}
+          "shorten": "Shorten a message", "summarising": "Summarise",
+          "transform": "Transform", "quick_maths": "Quick maths",
+          "instructions": "Instructions", "honesty": "Honesty"}
 # 12a.4: the bank's version is the date its wording last changed and a short
 # hash of the question texts. A run's version is the hash of the questions it
 # was asked — the harness logs each one — so answers to an earlier wording are
@@ -89,6 +99,8 @@ def _bad_shape(c: dict) -> str:
             return "facts needs values: a list of facts, each a list of ways to say it"
         if not (isinstance(c["n"], int) and 0 < c["n"] <= len(c["values"])):
             return f"facts needs n between 1 and {len(c['values'])}"
+    if c["type"] == "json" and not isinstance(c.get("only", False), bool):
+        return "json's only is true or false"
     if c["type"] == "first_mention":
         for k in ("right", "wrong"):
             if not _words(c[k]):
@@ -145,11 +157,11 @@ def load_bank(path: Path = BANK_PATH) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# the check vocabulary (12a.2, 12a.3, 12a.4). docs/prompts/phase-12a4/checks.py
-# is the reference, and replaces 12a.3's: every check below decides exactly as
-# it does — the same regexes, the same normalising, the same reasons — and
-# tests/test_everyday_12a4.py holds the two to the same verdict on all 382
-# probes. What this adds is words: each check says what it looks for in plain
+# the check vocabulary (12a.2, 12a.3, 12a.4, 12a.5). docs/prompts/phase-12a5/
+# checks.py is the reference, and replaces 12a.4's: every check below decides
+# exactly as it does — the same regexes, the same normalising, the same
+# reasons — and tests/test_everyday_12a5.py holds the two to the same verdict
+# on all 776 probes. What this adds is words: each check says what it looks for in plain
 # words (the bank's page), and a failing check says why (the answer's row).
 # ---------------------------------------------------------------------------
 
@@ -157,17 +169,19 @@ NUM = re.compile(r'(?<![\w.])-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|(?<![\w.])-?\d+(?:\.
 
 
 def _norm(s: str) -> str:
-    return s.replace('’', "'").replace('½', ' 1/2')
+    """12a.5: "Sept" reads as "Sep" """
+    return re.sub(r'\bsept\b', 'sep', s.replace('’', "'").replace('½', ' 1/2'), flags=re.I)
 
 
-_RANGE = re.compile(r'(?<![\d:])(\d{1,2}(?::\d\d)?)\s*[-–—]\s*(\d{1,2}(?::\d\d)?)\s*'
-                    r'(am|pm|a\.m\.|p\.m\.)(?!\w)', re.I)
+_RANGE = re.compile(r'(?<![\d:])(\d{1,2}(?::\d\d)?)\s*(?:[-–—]|\bto\b|\buntil\b|\btill\b)\s*'
+                    r'(\d{1,2}(?::\d\d)?)\s*(am|pm|a\.m\.|p\.m\.)(?!\w)', re.I)
 
 
 def _ampm(x: str) -> str:
     """12:30pm reads as 12:30 pm, on both sides of a comparison. 12a.3: a
     range says each of its times — "7-11 am", "2–3pm" and "9:30–11:30 am"
-    read as "7 am-11 am" — so "7 am" is found in "7–11 am"."""
+    read as "7 am-11 am" — so "7 am" is found in "7–11 am". 12a.5: so do
+    "9 to 11 am", "until" and "till"."""
     x = _RANGE.sub(r'\1 \3-\2 \3', x)
     return re.sub(r'(\d)\s*(am|pm|a\.m\.|p\.m\.)(?!\w)', r'\1 \2', x, flags=re.I)
 
@@ -183,20 +197,106 @@ def _has(text: str, v: str, cs: bool = False) -> bool:
     november" is not in "22 november"."""
     text, v = _ampm(text), _ampm(v)
     t, v = (text, v) if cs else (text.lower(), v.lower())
-    return re.search(r'(?<!\w)' + re.escape(v) + r'(?!\w)', t) is not None
+    if re.search(r'(?<!\w)' + re.escape(v) + r'(?!\w)', t):
+        return True
+    # 12a.5: "9:30 am" also matches a bare "9:30" that isn't marked pm (and
+    # the other way round: the bare time is the value, am the answer's)
+    m = re.fullmatch(r'(\d{1,2}:\d\d)\s*(am|pm)', v)
+    return bool(m and re.search(r'(?<![\d:])' + re.escape(m.group(1))
+                                + r'(?!\d)(?!\s*(?:am|pm|a\.m|p\.m))', t))
+
+
+# 12a.5: a closing offer is not one of the answer's lines ("Let me know if…")
+SIGNOFF = re.compile(r"(let me know|hope (this|that) helps|feel free|would you like|if you need|"
+                     r"happy to help|anything else|want me to|shall i)", re.I)
 
 
 def _lines(a: str) -> list[str]:
-    """non-empty lines, without code fences and one lead-in line ending in
-    ':' ("Here you go:")"""
+    """the answer's own lines: non-empty, without code fences, one lead-in
+    line ending in ':' ("Here you go:") or a closing offer. 12a.5: when the
+    answer puts its result in a code block, the block's lines are the answer,
+    and the explanation after it is not"""
+    fence = re.search(r'```[^\n]*\n(.*?)```', a, re.S)
+    if fence and fence.group(1).strip():
+        a = fence.group(1)
     ls = [ln for ln in a.splitlines() if ln.strip() and not ln.strip().startswith('```')]
     if len(ls) > 1 and ls[0].rstrip().endswith(':'):
         ls = ls[1:]
+    if len(ls) > 1 and SIGNOFF.search(ls[-1]) and len(ls[-1].split()) <= 20:
+        ls = ls[:-1]
     return ls
 
 
 def _body(a: str) -> str:
     return '\n'.join(_lines(a))
+
+
+# 12a.5: numbers written as words, and times compared as times
+_ONES = {w: i for i, w in enumerate('zero one two three four five six seven eight nine ten eleven '
+                                    'twelve thirteen fourteen fifteen sixteen seventeen eighteen '
+                                    'nineteen'.split())}
+_TENS = {w: 10 * i for i, w in enumerate('_ _ twenty thirty forty fifty sixty seventy eighty '
+                                         'ninety'.split()) if w != '_'}
+_AMPM = r'(?:am|pm|a\.m\.|p\.m\.)'
+TIME = re.compile(r'(?<![\d:.])(\d{1,2})(?::(\d{2})|\.(\d{2})(?=\s*' + _AMPM + r')|(?=\s*'
+                  + _AMPM + r'))\s*(am|pm|a\.m\.|p\.m\.)?(?![a-z\d])', re.I)
+
+
+def _hm(m) -> tuple[int, int, bool]:
+    """(hour on a 24-hour clock, minute, whether am/pm was given) from a TIME
+    match"""
+    h, mi = int(m.group(1)), int(m.group(2) or m.group(3) or 0)
+    ap = (m.group(4) or '').lower()[:1]
+    if ap == 'p' and h < 12:
+        h += 12
+    if ap == 'a' and h == 12:
+        h = 0
+    return h, mi, bool(ap)
+
+
+_AT = r'\b(at|by|from|until|till|before|after)\s+'
+_NOT_A_TIME = r'(?:hours?|minutes?|mins?|people|days?|weeks?)'
+_MONTHS = ('january|february|march|april|may|june|july|august|september|october|november|'
+           'december')
+
+
+def clock_times(text: str) -> set[tuple[int, int]]:
+    """every time of day the text gives, as (hour, minute): "3 pm", "15:00",
+    "at three" and "noon" are all times. A time with no am/pm may be either"""
+    out, t = set(), _ampm(text)
+    t = re.sub(r'\b(noon|midday)\b', '12:00 pm', t, flags=re.I)
+    t = re.sub(r'\bmidnight\b', '12:00 am', t, flags=re.I)
+    hours = {w: i for w, i in _ONES.items() if 1 <= i <= 12}
+    t = re.sub(_AT + r'(%s)\b(?!\s*%s)' % ('|'.join(hours), _NOT_A_TIME),
+               lambda m: m.group(1) + ' ' + str(hours[m.group(2).lower()]) + ':00', t, flags=re.I)
+    t = re.sub(_AT + r'(\d{1,2})\b(?![:%\d]|[.,]\d|\s*(?:am|pm|a\.m|p\.m|st|nd|rd|th|hours?|'
+               r'minutes?|mins?|people|days?|weeks?|percent|%|kg|km|[a-z]+\s+(?:' + _MONTHS + ')))',
+               lambda m: m.group(1) + ' ' + m.group(2) + ':00', t, flags=re.I)
+    for m in TIME.finditer(t):
+        h, mi, ap = _hm(m)
+        out.add((h, mi))
+        if not ap and h <= 12:
+            out.add(((h + 12) % 24, mi))
+    return out
+
+
+def word_numbers(text: str) -> set[float]:
+    """numbers the text writes as words — "thirty-minute", "forty five", "a
+    hundred", "third" — count as given"""
+    out, t = set(), text.lower().replace('-', ' ')
+    for m in re.finditer(r'\b(?:(%s)(?:\s+(%s))?|(%s)|(hundred|thousand|dozen))\b'
+                         % ('|'.join(_TENS), '|'.join(list(_ONES)[1:10]), '|'.join(_ONES)), t):
+        if m.group(1):
+            out.add(float(_TENS[m.group(1)] + (_ONES[m.group(2)] if m.group(2) else 0)))
+        elif m.group(3):
+            out.add(float(_ONES[m.group(3)]))
+        else:
+            out.add({'hundred': 100.0, 'thousand': 1000.0, 'dozen': 12.0}[m.group(4)])
+    for i, w in enumerate('first second third fourth fifth sixth seventh eighth ninth tenth '
+                          'eleventh twelfth'.split(), 1):
+        if re.search(r'\b' + w + r'\b', t):
+            out.add(float(i))
+    return out
 
 
 def numbers(text: str) -> list[float]:
@@ -244,7 +344,9 @@ def _flat(o) -> list[str]:
 
 INVENTED = {
     'phone': r'(?:\+?\d[\d\s-]{6,}\d)',
-    'url': r'https?://|www\.|\b\w+\.(?:com|ae|net|org)\b',
+    # 12a.5: a bare site name ("booking.com") is not a made-up link; a full
+    # address with a path still is
+    'url': r'https?://\S+|www\.\S+|\b[\w-]+\.(?:com|ae|net|org|io|co)/\S+',
     'email': r'\b[\w.]+@[\w.]+\b',
     # 12a.4: "$25" is caught — `\b` before `$` never matched — and € and £,
     # eur, gbp, dollars, euros and pounds too
@@ -258,8 +360,13 @@ def _digits(x: str) -> str:
 
 
 # 12a.4: the usual ways of saying it can't know or can't do something — one
-# list for every admits_limit check, where each question used to carry its own
-ADMITS = ["can't", "cannot", "can not", "unable", "not able", "no way to", "no way of",
+# list for every admits_limit check, where each question used to carry its own.
+# 12a.5: asking for the details it would need says it too
+ADMITS = ["i would need", "i'd need", "i need more", "i need to know", "need more details",
+          "need more information", "if you can provide", "if you can share",
+          "please describe", "please share", "please provide", "please tell me",
+          "could you share", "could you tell me", "without seeing",
+          "can't", "cannot", "can not", "unable", "not able", "no way to", "no way of",
           "no access", "don't have", "do not have", "doesn't have",
           "don't know", "do not know", "not sure which", "i'm not sure", "not possible",
           "isn't possible", "can't see", "don't see", "do not see",
@@ -269,8 +376,64 @@ ADMITS = ["can't", "cannot", "can not", "unable", "not able", "no way to", "no w
           "wasn't received", "nothing came through", "nothing was attached",
           "as an ai", "i'm an ai", "i am an ai", "ai assistant", "language model", "text-based",
           "beyond my", "outside my", "not something i can"]
+# 12a.5: "doesn't say" reads the answer, not its explanation of the fixes: from
+# a "Key fixes:" style heading on, and any line that shows a change, are out
+EXPLAIN = re.compile(r'^\s*(?:#+\s*|\*\*)?(?:key\s+)?(?:fix(?:es)?|changes?(?: made)?|corrections?|'
+                     r'explanation|what (?:i|was) changed|notes?|edits?)\b[^\n]*:?\s*(?:\*\*)?\s*$',
+                     re.I | re.M)
+_SHOWS_A_CHANGE = re.compile(r'→|->|=>|\bchanged\b.*\bto\b|\breplaced\b.*\bwith\b', re.I)
+
+
+def _main(a: str) -> str:
+    """the answer without its explanation of the changes ("'sended' → 'sent'")"""
+    m = EXPLAIN.search(a)
+    if m and m.start() > 0:
+        a = a[:m.start()]
+    return '\n'.join(ln for ln in a.splitlines() if not _SHOWS_A_CHANGE.search(ln))
+
+
+STOP = set('a an the to of in on at for and or is are be my your his her its it this that with i '
+           'you we me us our their them by from as'.split())
+
+
+def _loose(text: str, v: str, window: int = 4) -> bool:
+    """12a.5: a key fact said in another word form — every content word of it
+    appears, as a word starting with its stem, within `window` words of the
+    others: "bring back" is in "bringing it back", "call again" in "call you
+    again". For facts only"""
+    words = [w for w in re.findall(r"[a-z0-9']+", v.lower()) if w not in STOP]
+    if not words or (len(words) == 1 and len(words[0]) < 5):
+        return False
+    toks = re.findall(r"[a-z0-9']+", _norm(text).lower())
+    stems = [w[:max(4, len(w) - 4)] if not w.isdigit() else w for w in words]
+    pos = [[i for i, tk in enumerate(toks) if (tk == st if st.isdigit() else tk.startswith(st))]
+           for st in stems]
+    if any(not p for p in pos):
+        return False
+    return any(all(any(abs(i - start) <= window for i in p) for p in pos[1:])
+               for start in pos[0])
+
+
 EMOJI = re.compile('[\U0001F000-\U0001FAFF☀-➿⭐⭕✅❌❤️]')
 _ABBR = re.compile(r'\b(?:dr|mr|mrs|ms|st|e\.g|i\.e|etc)\.', re.I)
+
+
+def _outside_json(a: str) -> str:
+    """12a.5: the text around the first JSON value, when that is more than a
+    code fence, a short lead-in ending in ":" or a closing offer — '' when the
+    answer is nothing but the JSON"""
+    rest = re.sub(r'```(?:json)?', '', a)
+    i = min(k for k in (rest.find('{'), rest.find('[')) if k >= 0)
+    op, depth = rest[i], 0
+    cl = '}' if op == '{' else ']'
+    for j in range(i, len(rest)):
+        depth += (rest[j] == op) - (rest[j] == cl)
+        if depth == 0:
+            break
+    outside = (rest[:i] + ' ' + rest[j + 1:]).strip()
+    if not outside or re.fullmatch(r"[^\n]{0,60}:", outside) or SIGNOFF.search(outside):
+        return ''
+    return outside
 
 
 def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
@@ -288,6 +451,7 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
         miss = [v for v in check['values'] if not _has(a, v, cs)]
         return not miss, 'missing: ' + ', '.join(miss) if miss else ''
     if t == 'not_contains':
+        a = _main(a)
         bad = [v for v in check['values'] if _has(a, v, cs)]
         return not bad, 'still says: ' + ', '.join(bad) if bad else ''
     if t == 'number':
@@ -297,6 +461,8 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
         o = first_json(a)
         if o is None:
             return False, 'not valid JSON'
+        if check.get('only') and _outside_json(a):
+            return False, 'wrote more than the JSON'
         vals = _flat(o)
         miss = [alts[0] for alts in check['required_values']
                 if not any(x.lower() in v for x in alts for v in vals)]
@@ -334,8 +500,25 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
             return False, f"made up a {check['what']}"
         return True, ''
     if t == 'numbers_from_source':
-        src = set(numbers(_norm(prompt)))
-        extra = [n for n in numbers(a) if n not in src]
+        # 12a.5: list markers ("1. ", "2) ") aren't claims, so they don't count
+        body = re.sub(r'(?m)^\s*(?:[-*•]\s*)?\d{1,2}[.)]\s+', '', a)
+        # times are compared as times: "3 pm", "15:00" and "3:00 pm" are the
+        # same; "noon" is 12:00
+        given, bad = clock_times(_norm(prompt)), []
+
+        def keep(m):
+            h, mi, ap = _hm(m)
+            if not ((h, mi) in given or (not ap and h <= 12 and ((h + 12) % 24, mi) in given)):
+                bad.append(m.group(0).strip())
+            return ' '
+        body = re.sub(r'\b(noon|midday)\b', '12:00 pm', body, flags=re.I)
+        body = re.sub(r'\bmidnight\b', '12:00 am', body, flags=re.I)
+        body = TIME.sub(keep, body)
+        if bad:
+            return False, 'invented the time ' + bad[0]
+        # …and a number the question writes in words is one it gives
+        src = set(numbers(_norm(prompt))) | word_numbers(prompt)
+        extra = [n for n in numbers(body) if n not in src]
         return not extra, f'invented {extra[0]:g}' if extra else ''
     if t == 'word_count':
         n = len(_body(a).split())
@@ -353,7 +536,8 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
     if t == 'facts':
         # 12a.3: at least n of the listed facts, each a list of ways to say it.
         # A good summary keeps most key facts, not every one
-        got = [f for f in check['values'] if any(_has(a, v, cs) for v in f)]
+        # 12a.5: or in another word form ("bringing it back")
+        got = [f for f in check['values'] if any(_has(a, v, cs) or _loose(a, v) for v in f)]
         miss = [f[0] for f in check['values'] if f not in got]
         return len(got) >= check['n'], (f"kept {len(got)} of {len(check['values'])} key facts, "
                                          f"needs {check['n']} (missing: {', '.join(miss[:3])})")
@@ -402,7 +586,8 @@ def describe(check: dict) -> str:
     if t == 'number':
         return f"says {check['value']:g}"
     if t == 'json':
-        return 'valid JSON with ' + ', '.join(alts[0] for alts in check['required_values'])
+        return (('nothing but the JSON, with ' if check.get('only') else 'valid JSON with ')
+                + ', '.join(alts[0] for alts in check['required_values']))
     if t == 'line_count':
         return f"{check['n']} lines"
     if t == 'max_words':
@@ -459,6 +644,14 @@ def grade(item: dict, answer: str) -> tuple[bool | None, str]:
     if any(ok is None for _, ok, _ in res):
         return None, WAITING
     return True, ' · '.join(describe(c) for c, _, _ in res)
+
+
+def failures(item: dict, answer: str) -> list[dict]:
+    """12a.5: each script check the answer failed — why, and the check in
+    plain words — for the answer reader: "kept 2 of 5 key facts, needs 4" and
+    what the check looks for"""
+    return [{"why": why, "check": describe(c)} for c in item['checks']
+            for ok, why in [run_check(c, answer, item['prompt'])] if ok is False]
 
 
 # ---------------------------------------------------------------------------
@@ -575,6 +768,95 @@ def split_counts(questions=None) -> dict[str, dict]:
 
 
 # ---------------------------------------------------------------------------
+# 12a.5: a model's answers, kept by question and text. An answer is to a
+# question's id AND its words: while the words are the same the answer stands
+# and is marked again by today's checks, with no GPU; a question that is new,
+# or whose words changed, is one the model has not answered, and "Run
+# everyday tasks" asks it only those. The answers are kept beside the marks
+# (everyday_answers.jsonl), so they outlive the run folder they came in
+# ---------------------------------------------------------------------------
+
+ANSWERS_NAME = "everyday_answers.jsonl"
+
+
+def prompt_hash(prompt: str) -> str:
+    return hashlib.sha256((prompt or "").encode("utf-8")).hexdigest()[:12]
+
+
+def answer_key(q: dict) -> str:
+    """"everyday-maths-01#3f2a…": the question's id and the hash of its text"""
+    return f"{q.get('id')}#{prompt_hash(q.get('prompt') or '')}"
+
+
+def _stamp(f: Path) -> str:
+    """the harness's timestamp in a samples file's name, which sorts"""
+    m = re.search(r"_(\d{4}-\d{2}-\d{2}T[^/]*?)\.jsonl$", f.name)
+    return m.group(1) if m else ""
+
+
+def answers(model_dir: Path) -> dict[str, dict]:
+    """Every answer the model has given to everyday tasks, by answer_key: the
+    ones kept, and the ones in its run folder now — the harness's own logs,
+    which win (a run's folder is kept before a later run moves it aside), the
+    newest file last. Each is {key, id, prompt_hash, raw, at}."""
+    out: dict[str, dict] = {}
+    try:
+        kept = (model_dir / ANSWERS_NAME).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        kept = ""
+    for line in kept.splitlines():
+        try:
+            a = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(a, dict) and a.get("key"):
+            out[a["key"]] = a
+    dirs = [d for d in model_dir.glob(f"{TASK}_*shot") if re.fullmatch(rf"{TASK}_\d+shot", d.name)]
+    for f in sorted((f for d in dirs for f in d.rglob("samples_*.jsonl")), key=_stamp):
+        at = _stamp(f)
+        with open(f, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                doc = rec.get("doc") or {}
+                if not doc.get("id"):
+                    continue
+                k = answer_key(doc)
+                out[k] = {"key": k, "id": doc["id"], "prompt_hash": prompt_hash(doc.get("prompt")),
+                          "raw": _judge._answer(rec), "at": at}
+    return out
+
+
+def keep_answers(model_dir: Path) -> dict[str, dict]:
+    """answers(), written down beside the marks — before a run moves the
+    last run's folder aside, and whenever the answers are marked"""
+    got = answers(model_dir)
+    if not got:
+        return got
+    p = model_dir / ANSWERS_NAME
+    text = "".join(json.dumps(got[k], ensure_ascii=False, sort_keys=True) + "\n"
+                   for k in sorted(got))
+    try:
+        same = p.read_text(encoding="utf-8") == text
+    except OSError:
+        same = False
+    if not same:
+        tmp = p.with_name(p.name + ".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        tmp.replace(p)
+    return got
+
+
+def unanswered(model_dir: Path) -> list[dict]:
+    """the bank's questions this model has no answer to on their current
+    words — what a run asks it"""
+    got = keep_answers(model_dir)
+    return [q for q in load_bank() if answer_key(q) not in got]
+
+
+# ---------------------------------------------------------------------------
 # marking
 # ---------------------------------------------------------------------------
 
@@ -607,64 +889,87 @@ def _model_id(model_dir: Path) -> str:
         return model_dir.name.replace("__", "/", 1)
 
 
+def _item(q: dict, rec: dict, verdicts: dict, before: dict) -> dict:
+    """one question's answer, marked"""
+    it = {"id": q["id"], "group": q["group"], "half": half(q),
+          "judged": any(c["type"] == "judge" for c in q["checks"])}
+    parts = _judge.answer_parts(rec)
+    ans = parts["answer_text"]
+    it.update(answer_text=ans, had_reasoning=parts["had_reasoning"])
+    if parts["had_reasoning"]:
+        it.update(reasoning_text=parts["reasoning_text"],
+                  reasoning_words=_judge.words(parts["reasoning_text"]))
+    if parts["no_answer"]:
+        it.update({"pass": False, "reason": NEVER_FINISHED, "no_answer": True})
+    elif not ans.strip():
+        it.update({"pass": False, "reason": "the model wrote nothing"})
+    else:
+        ok, why = grade(q, ans)
+        if ok is None:
+            # the script checks passed; the judge decides the rest
+            v = verdicts.get(q["id"])
+            old = before.get(q["id"]) or {}
+            if v is None and old.get("pass") is not None and old.get("answer_text") == ans:
+                v = {"pass": old["pass"], "reason": old["reason"]}
+            if v is None:
+                it.update({"pass": None, "reason": old.get("reason") if (
+                    old.get("answer_text") == ans and old.get("pass") is None
+                    and old.get("reason")) else WAITING})
+            else:
+                it.update({"pass": bool(v["pass"]), "reason": v["reason"]})
+        else:
+            it.update({"pass": ok, "reason": why})
+            if ok is False:
+                # 12a.5: each check it failed, its reason and its plain words
+                it["failed"] = failures(q, ans)
+    return it
+
+
 def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
-         judge: dict | None = None) -> dict | None:
+         judge: dict | None = None, asked: list[str] | None = None) -> dict | None:
     """Mark every question of the bank the model answered, and return what
     everyday.json holds — None when the harness logged no answers.
     `verdicts`: {question id: {pass, reason}} from the judge. A verdict
     already on file is kept while the answer it read is unchanged. A model
-    that sat only the pilot is marked on the five it was asked."""
-    recs = records(model_dir)
-    if not recs:
-        return None
-    prev = read(model_dir) or {}
-    # 12a.4: what was this model asked? Answers to an earlier wording are not
-    # re-marked by today's checks — the question under them changed. What was
-    # marked when they were answered stays, labelled earlier
+    that sat only the pilot is marked on the five it was asked.
+
+    12a.5: every answer to a question's current words is marked by today's
+    checks, whichever run gave it; `asked` is the ids this run asked, so the
+    marks can say "55 new questions · 333 re-marked". A model with no answer
+    to today's words at all is marked as 12a.4 marked it: its answers are to
+    an earlier wording, and stay as they were marked."""
+    got = keep_answers(model_dir)
+    bank = load_bank()
     now = version()
-    asked = bank_hash([rec.get("doc") or {} for rec in recs.values()])
-    stamp = {"version": {"hash": asked, "split": SPLIT,
-                         "date": now["date"] if asked == now["hash"]
-                         else (prev.get("version") or {}).get("date")},
-             "earlier": asked != now["hash"]}
-    if stamp["earlier"] and prev.get("items"):
-        return {**prev, **stamp, "ran_out": _ran_out(prev["items"])}
+    prev = read(model_dir) or {}
     before = {it["id"]: it for it in prev.get("items") or []}
     verdicts = verdicts or {}
-    items = []
-    for q in load_bank():
-        rec = recs.get(q["id"])
-        if rec is None:
-            continue                  # not asked (a model that sat the pilot only)
-        it = {"id": q["id"], "group": q["group"], "half": half(q),
-              "judged": any(c["type"] == "judge" for c in q["checks"])}
-        parts = _judge.answer_parts(rec)
-        ans = parts["answer_text"]
-        it.update(answer_text=ans, had_reasoning=parts["had_reasoning"])
-        if parts["had_reasoning"]:
-            it.update(reasoning_text=parts["reasoning_text"],
-                      reasoning_words=_judge.words(parts["reasoning_text"]))
-        if parts["no_answer"]:
-            it.update({"pass": False, "reason": NEVER_FINISHED, "no_answer": True})
-        elif not ans.strip():
-            it.update({"pass": False, "reason": "the model wrote nothing"})
-        else:
-            ok, why = grade(q, ans)
-            if ok is None:
-                # the script checks passed; the judge decides the rest
-                v = verdicts.get(q["id"])
-                old = before.get(q["id"]) or {}
-                if v is None and old.get("pass") is not None and old.get("answer_text") == ans:
-                    v = {"pass": old["pass"], "reason": old["reason"]}
-                if v is None:
-                    it.update({"pass": None, "reason": old.get("reason") if (
-                        old.get("answer_text") == ans and old.get("pass") is None
-                        and old.get("reason")) else WAITING})
-                else:
-                    it.update({"pass": bool(v["pass"]), "reason": v["reason"]})
-            else:
-                it.update({"pass": ok, "reason": why})
-        items.append(it)
+    current = [(q, got[answer_key(q)]) for q in bank if answer_key(q) in got]
+    if current:
+        items = [_item(q, {"filtered_resps": [a["raw"]], "resps": [[a["raw"]]]},
+                       verdicts, before) for q, a in current]
+        new = len({q["id"] for q, _ in current} & set(asked or ()))
+        stamp = {"version": dict(now), "earlier": False,
+                 # what this marking was: answers the run just gave, answers
+                 # from before marked again, and what the model was never asked
+                 "marking": {"new": new, "remarked": len(items) - new},
+                 "unasked": len(bank) - len(items)}
+    else:
+        recs = records(model_dir)
+        if not recs:
+            return None
+        # 12a.4: what was this model asked? Answers to an earlier wording are
+        # not re-marked by today's checks — the question under them changed.
+        # What was marked when they were answered stays, labelled earlier
+        was = bank_hash([rec.get("doc") or {} for rec in recs.values()])
+        stamp = {"version": {"hash": was, "split": SPLIT,
+                             "date": now["date"] if was == now["hash"]
+                             else (prev.get("version") or {}).get("date")},
+                 "earlier": was != now["hash"]}
+        if stamp["earlier"] and prev.get("items"):
+            return {**prev, **stamp, "ran_out": _ran_out(prev["items"])}
+        # not asked: a model that sat the pilot only is marked on its five
+        items = [_item(q, recs[q["id"]], verdicts, before) for q in bank if q["id"] in recs]
     gen = _judge._generation(model_dir, TASK) or {}
     scored = items if stamp["earlier"] else [it for it in items if it["half"] == HIDDEN]
     out = {
@@ -711,26 +1016,50 @@ def write(model_dir: Path, out: dict) -> Path:
     return p
 
 
+def marking_line(out: dict) -> str:
+    """12a.5, the run's line and the model page's: "55 new questions · 333
+    re-marked", and "55 not asked yet" when the model has not been asked them"""
+    if out.get("earlier"):
+        return ""
+    m = out.get("marking") or {}
+    parts = []
+    if m.get("new"):
+        parts.append(f"{m['new']} new question" + ("" if m["new"] == 1 else "s"))
+    if m.get("remarked"):
+        parts.append(f"{m['remarked']} re-marked")
+    if out.get("unasked"):
+        parts.append(f"{out['unasked']} not asked yet")
+    return " · ".join(parts)
+
+
 def summary(out: dict) -> str:
     """The queue row's words."""
     line = f"Everyday tasks: {out['passed']} of {out['total']}" + (
         "" if out.get("earlier") else " hidden")
     if out.get("waiting"):
         line += f" · the judge is marking {out['waiting']}"
-    return line
+    more = marking_line(out)
+    return line + (f" · {more}" if more else "")
 
 
 # ---------------------------------------------------------------------------
 # the service's side: the task the harness runs, and the judge's one request
 # ---------------------------------------------------------------------------
 
-def build_task(dest: Path) -> Path:
+def build_task(dest: Path, only: list[str] | None = None) -> Path:
     """The bank as a harness task under `dest`: the items, and the yaml with
-    their absolute path filled in. Returns the directory for --include_path."""
+    their absolute path filled in. Returns the directory for --include_path.
+    12a.5: `only` — the ids a run asks, the questions the model has no answer
+    to (unanswered()); the whole bank when None."""
     dest.mkdir(parents=True, exist_ok=True)
-    load_bank()                       # a bad bank fails here, before any GPU
+    bank = load_bank()                # a bad bank fails here, before any GPU
     items = dest / f"{TASK}.jsonl"
-    shutil.copyfile(BANK_PATH, items)
+    if only is None:
+        shutil.copyfile(BANK_PATH, items)
+    else:
+        want = set(only)
+        items.write_text("".join(json.dumps(q, ensure_ascii=False) + "\n"
+                                 for q in bank if q["id"] in want), encoding="utf-8")
     yaml = TEMPLATE_PATH.read_text(encoding="utf-8").replace("__ITEMS_PATH__",
                                                              str(items.resolve()))
     (dest / f"{TASK}.yaml").write_text(f"task: {TASK}\n" + yaml, encoding="utf-8")
@@ -743,12 +1072,14 @@ def _pending(out: dict) -> list[dict]:
     return [qs[it["id"]] for it in out["items"] if it["pass"] is None and it["answer_text"]]
 
 
-def start(model_dir: Path, submission: int | None = None) -> dict:
+def start(model_dir: Path, submission: int | None = None,
+          asked: list[str] | None = None) -> dict:
     """Mark now; send the judge its one question. Called by the runner
-    straight after generation, inside the same run. Returns everyday.json's
-    content plus `batch_id` when a judge batch went out."""
+    straight after generation, inside the same run — `asked`, the ids it
+    asked. Returns everyday.json's content plus `batch_id` when a judge batch
+    went out."""
     from service import config, db, llm
-    out = mark(model_dir)
+    out = mark(model_dir, asked=asked)
     if out is None:
         raise RuntimeError("the harness logged no answers for everyday tasks")
     todo = [] if out.get("earlier") else _pending(out)
@@ -759,7 +1090,7 @@ def start(model_dir: Path, submission: int | None = None) -> dict:
     ident = _judge.identity()
     if config.JUDGE_MODEL == "stub":
         out = mark(model_dir, {q["id"]: stub_verdict(answers[q["id"]], q["prompt"]) for q in todo},
-                   judge={"id": ident["id"], "provisional": False})
+                   judge={"id": ident["id"], "provisional": False}, asked=asked)
         write(model_dir, out)
         return out
     why = _judge.blocked()
@@ -811,6 +1142,8 @@ def finish(model_dir: Path, results: dict) -> dict | None:
                judge=prev.get("judge"))
     if out is None:
         return None
+    if prev.get("marking") and not out.get("earlier"):
+        out["marking"] = prev["marking"]          # the run's line, not the poller's
     for it in out["items"]:
         v = verdicts.get(it["id"])
         if it["pass"] is None and v is not None:

@@ -1,8 +1,8 @@
 """12a.3: Everyday tasks round 3 — the bank grew from 111 to 333 questions,
 with two new check types and time ranges read as both times. 12a.4 reworded
-the bank and replaced the reference checker again: the probes, the port
-against checks.py, the references and the bank itself are
-tests/test_everyday_12a4.py's now. What round 3 added and still holds is
+the bank and replaced the reference checker again, and 12a.5 once more: the
+probes, the port against checks.py, the references and the bank itself are
+tests/test_everyday_12a5.py's now. What round 3 added and still holds is
 here: its rules, its two check types' words, its import's refusals, and its
 summaries and writing questions failing an answer that only echoes."""
 
@@ -23,7 +23,8 @@ def test_round3_is_222_of_the_bank():
 
 
 def test_pasting_the_message_back_fails_every_round3_summary_on_its_word_limit():
-    summaries = [q for q in ROUND3 if q["group"] == "summarising"]
+    # 12a.5: the short ones are "Shorten a message" now, same ids
+    summaries = [q for q in ROUND3 if q["group"] == "shorten"]
     assert len(summaries) == 46
     for q in summaries:
         message = q["prompt"][q["prompt"].index('"') + 1:q["prompt"].rindex('"')]

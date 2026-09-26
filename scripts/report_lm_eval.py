@@ -625,7 +625,7 @@ def load_results(path: Path) -> list[dict]:
 
 # what the page needs of each marked answer; everything else stays on disk
 _EVERYDAY_ITEM = ("id", "group", "pass", "reason", "answer_text", "had_reasoning",
-                  "reasoning_text", "reasoning_words", "no_answer")
+                  "reasoning_text", "reasoning_words", "no_answer", "failed")
 
 
 def _evd_label(q: dict) -> str:
@@ -636,7 +636,7 @@ def _evd_label(q: dict) -> str:
 
 
 def load_everyday(out_dir: Path | None) -> dict | None:
-    """12a.3: the Everyday bank — 333 questions in seven groups, split by
+    """12a.3: the Everyday bank — 12a.5: 388 questions in eight groups, split by
     12g.2 into a hidden half that scores and a practice half that is shown —
     and every model's marks, from
     the everyday.json beside its results. Kept apart from the models' rows,
@@ -696,6 +696,9 @@ def load_everyday(out_dir: Path | None) -> dict | None:
             "version": ver,
             # 12a.4: answers whose thinking used the whole budget
             "ran_out": sum(1 for it in hidden if it.get("no_answer")),
+            # 12a.5: "55 new questions · 333 re-marked", and the questions it
+            # has not been asked yet
+            "marking": ev.marking_line(e), "unasked": int(e.get("unasked") or 0),
             "groups": by_group(hidden),
             # the practice half: its counts, and its answers — the only ones shown
             "practice": by_group(practice), "items": practice,
@@ -3168,6 +3171,8 @@ ol.evbank { margin:8px 0 4px; padding-left:22px; display:flex; flex-direction:co
 ol.evbank li p { margin:2px 0; }
 .evverdict { display:flex; gap:8px; align-items:baseline; margin:0 0 8px; font-size:var(--fs-2);
   font-weight:600; }
+.evfail-check { display:block; margin-top:2px; font-weight:400; font-size:var(--fs-1);
+  color:var(--text-secondary); }
 /* on a phone the question column gives the marks room: its label and group
    stay, the full question wraps under them */
 @media (max-width:600px) {
@@ -5878,7 +5883,7 @@ const whyProvisional = m => {
 // 12a: Everyday tasks — what people type into an assistant on a phone,
 // marked by checks (scripts/everyday.py) on the text after any thinking.
 // 12a.2: one bank in seven groups, the pilot's five in it; 12a.3: round 3
-// grew it to 333. Still a look, not a benchmark: every question readable,
+// grew it to 333; 12a.5 to 388 in eight groups. Still a look, not a benchmark: every question readable,
 // never ranked, never averaged into anything, read by nothing that proposes
 // or generates. One badge wherever it is shown: not ranked (12a.4: one short
 // line; the wording's version is on the Everyday tab, not in the badge).
@@ -5897,8 +5902,10 @@ const evdPractice = g => g ? ((evd().practice || {})[g] || 0)
   : Object.values(evd().practice || {}).reduce((a, b) => a + b, 0);
 // every question a run asks: both halves (the page shows the practice half)
 const evdAll = () => evdHidden() + evdPractice() || (evd().questions || []).length;
-// the seven groups, in their order, and a group's questions
+// the groups, in their order, and a group's questions — "eight groups"
 const evdGroups = () => evd().groups || [];
+const evdGroupsWord = () => ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight',
+  'nine', 'ten'][evdGroups().length] || String(evdGroups().length);
 const evdQs = g => (evd().questions || []).filter(q => q.group === g);
 // "12 of 16": what this model passed of what it was asked in the group
 function evdGroupCount(e, g) {
@@ -6008,7 +6015,7 @@ function vEverydayBlock(m) {
   const e = evdOf(m.id);
   // 12b: an untested model is its Everyday tile's "Not tested · Test"
   if (!e) return null;
-  // 12a.2: the seven groups, n of k each; a group opens to its answers
+  // 12a.2: the groups, n of k each; a group opens to its answers
   const open = state.evdOpen || (state.evdOpen = {});
   const rows = evdGroups().filter(([g]) => (e.groups || {})[g]).map(([g, label]) => {
     const key = m.id + '|' + g, on = !!open[key];
@@ -6031,8 +6038,11 @@ function vEverydayBlock(m) {
           text: 'Compare models →',
           onclick: ev => { ev.preventDefault();
             navigate({ tab: 'everyday', model: null, topic: null }); } }))),
-    el('p', { class: 'sub', text: `Questions typed the way people type on a phone, in seven `
-      + `groups, each marked by its checks. The score is the ${evdHidden()} hidden questions; `
+    // 12a.5: what the last marking was, in one line — "55 new questions · 333
+    // re-marked", and the questions this model has not been asked yet
+    e.marking ? el('p', { class: 'small se', 'data-evd-marking': m.id, text: e.marking }) : '',
+    el('p', { class: 'sub', text: `Questions typed the way people type on a phone, in `
+      + `${evdGroupsWord()} groups, each marked by its checks. The score is the ${evdHidden()} hidden questions; `
       + `open a group to read the answers to its practice ones.` }),
     el('div', { class: 'evrows' }, rows));
 }
@@ -6060,8 +6070,8 @@ function vEverydayPage() {
     el('div', { class: 'rvbar' },
       el('div', {}, el('h2', {}, 'Everyday tasks', evdBadge(prov)),
         el('p', { class: 'sub', text: `${evdHidden() + evdPractice()} questions people type `
-          + 'into an assistant on a phone — lowercase, typos, one plain request — in seven '
-          + `groups. Each model is scored on the ${evdHidden()} hidden ones, which are never `
+          + 'into an assistant on a phone — lowercase, typos, one plain request — in '
+          + `${evdGroupsWord()} groups. Each model is scored on the ${evdHidden()} hidden ones, which are never `
           + `shown; the ${evdPractice()} practice ones are here, with its answers. Click a `
           + 'group\u2019s count to read them.' }),
         // 12a.4: the wording these answers are to — 12g.2: and the split;
@@ -6076,7 +6086,7 @@ function vEverydayPage() {
       LIVE ? 'Run everyday tasks' : '', () => evdDialog({ returnTo: '[data-empty-action]' }),
       { 'data-everyday-empty': '1' })), evdBankCard()];
   }
-  // 12a.2: models across the top, the seven groups down the side, n of k
+  // 12a.2: models across the top, the groups down the side, n of k
   const sel = state.evdCell;
   const cell = (id, g) => {
     const n = evdGroupCount(E.models[id], g);
@@ -6124,7 +6134,7 @@ function evdBankCard() {
   return el('div', { class: 'card', 'data-everyday-bank': '1' },
     el('div', {}, el('h2', { text: 'The practice questions' }),
       el('p', { class: 'sub', 'data-evd-bank-split': `${evdHidden()}|${evdPractice()}`,
-        text: `${(E.questions || []).length} practice questions in seven groups; `
+        text: `${(E.questions || []).length} practice questions in ${evdGroupsWord()} groups; `
         + `${evdHidden()} more are hidden — they score the models, and are never shown. `
         + 'An answer passes when every one of its checks does; where the judge is one of them, '
         + 'it only decides once the others have passed.' })),
@@ -6172,9 +6182,19 @@ function readEveryday(wrap, r) {
         step('→ Model', 'data-evd-next-m', i >= 0 && i < ids.length - 1, () => go(ids[i + 1], q.n))),
       evdAnswer(q, it, { 'data-evd-read': `${rr.id}|${q.id}` },
         // a question it was not asked has nothing to mark: the answer says so
-        it ? el('p', { class: 'evverdict ' + mk.cls, 'data-evd-verdict': mk.cls },
-          el('span', { class: 'evmark ' + mk.cls, text: mk.t }),
-          el('span', { text: it.reason })) : null));
+        !it ? null
+        // 12a.5: a failed answer lists each check it failed — why, and what
+        // the check looks for, in the question list's words
+        : it.pass === false && (it.failed || []).length
+          ? el('div', { class: 'evverdicts', 'data-evd-verdict': mk.cls },
+              it.failed.map(f => el('p', { class: 'evverdict ' + mk.cls, 'data-evd-fail': '1' },
+                el('span', { class: 'evmark ' + mk.cls, text: mk.t }),
+                el('span', {}, el('span', { 'data-evd-fail-why': '1', text: f.why }),
+                  el('span', { class: 'evfail-check', 'data-evd-fail-check': '1',
+                    text: 'The check: ' + f.check })))))
+          : el('p', { class: 'evverdict ' + mk.cls, 'data-evd-verdict': mk.cls },
+              el('span', { class: 'evmark ' + mk.cls, text: mk.t }),
+              el('span', { text: it.reason }))));
     if (had) {
       const again = stepAttr && wrap._body.querySelector(`[${stepAttr}]:not([disabled])`);
       (again || wrap._aside).focus();
@@ -6197,7 +6217,9 @@ function evdDialog(pre = {}) {
   const board = DATA.models.filter(m => m.kind === 'instruct').map(m => m.id);
   const ids = [...EVD_DEFAULTS, ...board.filter(id => !EVD_DEFAULTS.includes(id))
     .sort((a, b) => evdName(a).localeCompare(evdName(b)))];
-  const pick = Object.fromEntries(ids.map(id => [id, EVD_DEFAULTS.includes(id) && !evdOf(id)]));
+  // 12a.5: and the ones with questions not asked yet — a run asks them only those
+  const pick = Object.fromEntries(ids.map(id => [id, EVD_DEFAULTS.includes(id)
+    && (!evdOf(id) || evdOf(id).unasked > 0)]));
   const back = el('div', { class: 'dlg-back', 'data-dialog': 'everyday' });
   const err = el('div', { class: 'warn', hidden: '', 'data-dialog-error': '1' });
   const go = el('button', { class: 'primary', 'data-dialog-go': '1' });
@@ -6213,7 +6235,10 @@ function evdDialog(pre = {}) {
       el('input', { type: 'checkbox', checked: pick[id] ? '' : null,
         onchange: ev => { pick[id] = ev.target.checked; sync(); } }),
       el('span', { class: 'evpick-name', title: id, text: evdName(id) }),
-      evdOf(id) ? el('span', { class: 'small se', 'data-evd-done': id, text: 'done · run again' })
+      // 12a.5: a run asks only what the model has no answer to on today's words
+      evdOf(id) ? el('span', { class: 'small se', 'data-evd-done': id,
+          text: evdOf(id).unasked > 0 ? `${evdOf(id).unasked} not asked yet · asks only those`
+            : 'all answered · marks them again' })
         // 12a.4: its answers are to an earlier wording (the pilot's five, or
         // a run before the questions were reworded)
         : evdEarlier(id) ? el('span', { class: 'small se', 'data-evd-done': id,
@@ -6221,8 +6246,9 @@ function evdDialog(pre = {}) {
   const box = el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true',
       'aria-labelledby': 'dlg-title' },
     el('h2', { id: 'dlg-title', text: 'Run everyday tasks' }),
-    el('p', { class: 'small', text: `One run per model: ${evdAll()} questions, asked through `
-      + `the model's chat template, then marked — the ${evdHidden()} hidden ones make its score. `
+    el('p', { class: 'small', text: `One run per model. It asks the questions the model has no `
+      + `answer to on today's words — all ${evdAll()} the first time — through its chat `
+      + `template, then marks every answer; the ${evdHidden()} hidden ones make its score. `
       + 'A few minutes each.' }),
     list, err, el('div', { class: 'dlg-actions' }, cancel, go));
   back.append(box);
@@ -7704,7 +7730,7 @@ function lbEveryday(ms) {
     ...modelsHead(evdBadge(prov)),
     lbToolbar(ms, lbColumns(ms), new Set(), 0),
     hfade('lb', el('div', { class: 'lb-wrap', 'data-hkeep': 'lb' }, table)),
-    el('p', { class: 'lbcap', text: `${evdAll()} questions in seven groups, typed the way `
+    el('p', { class: 'lbcap', text: `${evdAll()} questions in ${evdGroupsWord()} groups, typed the way `
       + `people type on a phone; each count is the ${evdHidden()} hidden ones. Open a model for `
       + 'its answers to the practice ones; Benchmarks ▸ Everyday tasks has those questions.' }))];
 }

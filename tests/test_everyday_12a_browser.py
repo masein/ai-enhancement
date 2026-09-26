@@ -20,8 +20,8 @@ from conftest import open_kind
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12a"
 TWO = ["good-750m", "skewed-360m"]            # by name, not by score; on this wording
-GROUPS = ["Understanding", "Writing", "Summarising", "Transform", "Quick maths", "Instructions",
-          "Honesty"]
+GROUPS = ["Understanding", "Writing", "Shorten a message", "Summarise", "Transform",
+          "Quick maths", "Instructions", "Honesty"]
 UNTESTED = "fx/one-option-70m"
 
 
@@ -63,7 +63,7 @@ def test_the_page_names_the_models_and_has_one_action_and_one_badge(live, page):
     counts = {h.get_attribute("data-evd-model"): h.locator("[data-evd-count]").text_content()
               for h in heads.all()}
     # 12g.2: the hidden half's — good-750m's three misses, one of them hidden
-    assert counts == {"fx/good-750m": "168 of 169", "fx/skewed-360m": "90 of 169"}
+    assert counts == {"fx/good-750m": "199 of 200", "fx/skewed-360m": "123 of 200"}
     # one badge on the page, in the header; no row repeats it
     assert page.locator("[data-pilot-badge]").count() == 1
     assert page.locator("[data-everyday-head] [data-pilot-badge]").text_content() \
@@ -150,9 +150,9 @@ def test_no_answer_to_every_question_leaves_nothing_empty(live, page):
         assert box.locator("button").text_content() == "Run everyday tasks"
         assert page.locator("[data-everyday-table]").count() == 0
         # 12g.2: the practice half, readable; the hidden half's count beside it
-        assert page.locator("[data-everyday-bank] [data-evd-bank-q]").count() == 164
+        assert page.locator("[data-everyday-bank] [data-evd-bank-q]").count() == 188
         assert page.locator("[data-evd-bank-split]").get_attribute(
-            "data-evd-bank-split") == "169|164"
+            "data-evd-bank-split") == "200|188"
     finally:
         for f in moved:
             f.with_suffix(".json.bak").rename(f)
@@ -182,7 +182,7 @@ def test_the_model_page_has_its_everyday_block_after_the_exam(live, page):
     block.wait_for()
     assert page.locator("[data-pilot-badge]:visible").count() == 1
     assert page.locator("[data-kind-tile='everyday'] [data-pilot-badge]").is_visible()
-    assert block.locator("[data-everyday-count]").text_content() == "168 of 169"   # 12g.2
+    assert block.locator("[data-everyday-count]").text_content() == "199 of 200"   # 12g.2
     # 12a.2: a row a group, each its n of k
     groups = block.locator("[data-evd-group]")
     assert [g.locator(".evgroup").text_content() for g in groups.all()] == GROUPS
@@ -265,7 +265,7 @@ def test_run_everyday_tasks_queues_one_run_per_ticked_model(live, page):
     assert ticked == ids[:5]
     # an instruct model on the board that sat the pilot: an earlier wording, unticked
     done = dlg.locator("[data-evd-pick='fx/below-135m-it']")
-    assert done.locator("[data-evd-done]").text_content() == "earlier wording · run all 333"
+    assert done.locator("[data-evd-done]").text_content() == "earlier wording · run all 388"
     assert not done.locator("input").is_checked()
     go = dlg.locator("[data-dialog-go]")
     assert go.text_content() == "Queue 5 runs"
@@ -303,7 +303,7 @@ def test_it_is_reached_from_benchmarks_and_test_a_model_offers_it(live, page):
     page.wait_for_selector("[data-dialog='test'] [data-suite-help]")
     page.get_by_label("suite").click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='everyday']")
-    assert opt.text_content() == "Everyday tasks — 333 questions, a few minutes"
+    assert opt.text_content() == "Everyday tasks — 388 questions, a few minutes"
     page.keyboard.press("Escape")
     assert page.errors == []
 
