@@ -80,7 +80,7 @@ def _everyday_rows() -> list[dict]:
             rubric = next(c["rubric"] for c in q["checks"] if c["type"] == "judge")
             out.append({"key": f"everyday:{f.parent.name}|{it['id']}", "kind": "everyday",
                         "model": e.get("model") or f.parent.name, "task": it["id"],
-                        "topic": ev.GROUPS.get(q["group"], q["group"]), "question": q["prompt"],
+                        "topic": ev.groups().get(q["group"], q["group"]), "question": q["prompt"],
                         "reference": q.get("reference") or "", "rubric": rubric,
                         "answer": it["answer_text"], "judge": 4 if it["pass"] else 0})
     return out

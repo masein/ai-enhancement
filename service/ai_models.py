@@ -294,6 +294,45 @@ def over_limit() -> str:
             f"AI models, or wait for next month")
 
 
+# ---------------------------------------------------------------------------
+# 12i.2: embeddings, for the question builder's duplicate check
+# ---------------------------------------------------------------------------
+
+def embed(texts: list[str], job: str = "writer") -> list[list[float]] | None:
+    """One vector per text from OPENROUTER_EMBED_MODEL, or None — no key, the
+    month's limit reached, or OpenRouter refused: the caller keeps its 13-gram
+    check alone. Counted against the month like any other call"""
+    if not texts or not has_key() or over_limit():
+        return None
+    from . import llm
+    out: list[list[float]] = []
+    for i in range(0, len(texts), 64):
+        chunk = texts[i:i + 64]
+        try:
+            status, raw = llm._http("POST", config.OPENROUTER_BASE_URL + "/embeddings", _headers(),
+                                    json.dumps({"model": config.OPENROUTER_EMBED_MODEL,
+                                                "input": chunk}).encode(), timeout=60)
+            got = json.loads(raw)
+        except Exception:                           # noqa: BLE001 — the 13-gram check stands
+            return None
+        rows = sorted(got.get("data") or [], key=lambda r: r.get("index", 0))
+        if status != 200 or len(rows) != len(chunk):
+            return None
+        out.extend(r["embedding"] for r in rows)
+        usage = got.get("usage") or {}
+        usd = usage.get("cost")
+        db.spend_add(job, config.OPENROUTER_EMBED_MODEL, "openrouter",
+                     int(usage.get("prompt_tokens") or 0), 0, float(usd or 0.0))
+    return out
+
+
+def cosine(a: list[float], b: list[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = sum(x * x for x in a) ** 0.5
+    nb = sum(y * y for y in b) ** 0.5
+    return dot / (na * nb) if na and nb else 0.0
+
+
 def cost(c: dict, tokens_in: int, tokens_out: int) -> float:
     return ((c.get("price_in") or 0) * tokens_in + (c.get("price_out") or 0) * tokens_out) / 1e6
 

@@ -720,7 +720,7 @@ def load_everyday(out_dir: Path | None) -> dict | None:
         def by_group(xs):
             return {g: {"passed": sum(1 for it in xs if it["group"] == g and it.get("pass") is True),
                         "total": sum(1 for it in xs if it["group"] == g)}
-                    for g in ev.GROUPS if any(it["group"] == g for it in xs)}
+                    for g in ev.groups() if any(it["group"] == g for it in xs)}
         models[e["model"]] = {
             # the published score: the hidden half's
             "passed": sum(1 for it in hidden if it.get("pass") is True), "total": len(hidden),
@@ -738,10 +738,11 @@ def load_everyday(out_dir: Path | None) -> dict | None:
             "practice": by_group(practice), "items": practice,
         }
     shown = [q for q in qs if half_of[q["id"]] == ev.PRACTICE]
-    return {"groups": [[k, v] for k, v in ev.GROUPS.items()],
+    names = ev.groups()
+    return {"groups": [[k, v] for k, v in names.items()],
             # 12g.2: the practice half only; the hidden half is its counts
             "questions": [{"id": q["id"], "n": i, "group": q["group"],
-                           "groupLabel": ev.GROUPS[q["group"]],
+                           "groupLabel": names[q["group"]],
                            "label": _evd_label(q), "skill": q.get("skill") or "",
                            "prompt": q["prompt"], "reference": q.get("reference") or "",
                            "checks": [ev.describe(c) for c in q["checks"]],
@@ -2369,6 +2370,27 @@ table.jtresult tr.best td:first-child { font-weight:600; }
 .jtmark .jtkeys { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 6px; }
 .jtmark .jtkeys .chip-btn { min-width:44px; min-height:40px; font-family:var(--font-mono); }
 .jtref { margin:0 0 10px; }
+/* 12i.2: Build questions */
+.qbopen { float:right; margin-left:12px; }
+.qbsteps { display:flex; flex-wrap:wrap; gap:6px 18px; list-style:none; padding:0; margin:10px 0 0; }
+.qbsteps li { color:var(--text-secondary); font-size:var(--fs-2); }
+.qbsteps li.on { color:var(--text-primary); font-weight:600; }
+.qbsteps li.done { color:var(--text-secondary); text-decoration:line-through; }
+.qbprompt { margin:10px 0; }
+.qbprompt textarea { width:100%; box-sizing:border-box; }
+.qblocked { white-space:pre-wrap; background:var(--plane); border:1px solid var(--border);
+  border-radius:6px; padding:8px 10px; max-height:14em; overflow:auto; color:var(--text-secondary); }
+.qbdrafts { margin:6px 0 0; padding-left:18px; }
+.qbitem { border-top:1px solid var(--border); margin-top:10px; padding-top:10px; }
+.qbflags { margin:6px 0; padding-left:18px; }
+.qbdup { display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; margin:8px 0;
+  padding:8px 10px; border:1px solid var(--border); border-radius:6px; }
+.qbdup .frm { grid-column:1 / -1; display:flex; gap:8px; flex-wrap:wrap; }
+.qbreasons, .qbacts { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
+.qbacts .chip-btn { min-height:40px; }
+.qbedit textarea { width:100%; box-sizing:border-box; }
+.qbaside { margin-top:10px; }
+@media (max-width: 640px) { .qbdup { grid-template-columns:1fr; } .qbopen { float:none; margin:0 0 8px; } }
 .genopts { display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; margin-top:8px; }
 .genopts label.spread { display:inline-flex; align-items:center; gap:6px; }
 /* ---- 11d: Overview ------------------------------------------------------- */
@@ -3580,6 +3602,7 @@ const state = {
   lbAbout: false,                      // "about these benchmarks" panel open
   lbView: 'tasks',                     // leaderboard columns: 'tasks' | 'cats' (MMLU by category)
   ai: {},                        // 12i.1: the AI models page and the judge test
+  qb: {},                        // 12i.2: the question builder
   rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '',
         // 11j: which of the four views, and the small per-proposal choices
         view: '', focus: {}, watch: new Set(), answers: {}, answersOpen: 0,
@@ -6226,6 +6249,9 @@ function evdBankCard() {
   // its heading sits in a div, as the page head's does: the page's three
   // cards are not steps, and this one alone took a section number
   return el('div', { class: 'card', 'data-everyday-bank': '1' },
+    // 12i.2: new questions for a group, or a new group
+    LIVE ? el('div', { class: 'qbopen' }, el('button', { class: 'secondary', 'data-qb-open': 'everyday',
+      text: 'Build questions', onclick: () => openBuilder('everyday') })) : '',
     el('div', {}, el('h2', { text: 'The practice questions' }),
       el('p', { class: 'sub', 'data-evd-bank-split': `${evdHidden()}|${evdPractice()}`,
         text: `${(E.questions || []).length} practice questions in ${evdGroupsWord()} groups; `
@@ -6408,6 +6434,8 @@ function viewHash(v) {
   if (v === 'leaderboard') return 'tab=models' + (lbHash() ? '&' + lbHash() : '');
   // 12i.1: the judge test's marking is a view of its own, so Back leaves it
   if (v === 'ai') return 'tab=ai' + (state.ai.mark ? '&sub=mark' : '');
+  // 12i.2: the draft open, so a reload lands on it
+  if (v === 'build') return 'tab=build' + (state.qb.id ? '&draft=' + state.qb.id : '');
   if (place === 'improve' || place === 'benchmarks')
     return `tab=${place}&sub=${SUB_SLUG[v]}`
       // 12g.1: which model Improve is on, so a link opens it
@@ -6428,8 +6456,12 @@ function viewOfHash(name, params) {
             leaderboard: 'leaderboard', perplexity: 'leaderboard', loop: 'pipeline',
             review: 'pipeline', training: 'training', runs: 'queue', queue: 'queue',
             submit: 'queue', data: 'provenance', provenance: 'provenance', help: 'help',
-            tasks: 'tasks', exam: 'exam', everyday: 'everyday', ai: 'ai' }[n];
+            tasks: 'tasks', exam: 'exam', everyday: 'everyday', ai: 'ai', build: 'build' }[n];
   if (n === 'ai') state.ai.mark = p.get('sub') === 'mark';
+  if (n === 'build') {
+    const id = p.get('draft') || null;
+    if (id !== state.qb.id) Object.assign(state.qb, { id, draft: null, at: 0, editing: null });
+  }
   if (n === 'improve') v = sub || 'pipeline';
   if (n === 'benchmarks') v = ['tasks', 'exam', 'everyday'].includes(sub) ? sub : benchSub();
   if (!v || !has(v)) return null;
@@ -13674,6 +13706,9 @@ function exImport() {
   };
   const p = s.preview;
   return el('div', { class: 'card', 'data-panel': 'import' },
+    // 12i.2: or have them written, checked and reviewed here
+    LIVE ? el('div', { class: 'qbopen' }, el('button', { class: 'secondary', 'data-qb-open': 'knowledge',
+      text: 'Build questions', onclick: () => openBuilder('knowledge') })) : '',
     el('h2', {}, 'Import a bank', infoTip('A JSON array of questions written by a person — '
       + 'or an object holding one — read exactly as the command-line import reads it. The '
       + 'author\'s name goes on every question and the source says which file they came '
@@ -14336,6 +14371,446 @@ addEventListener('keydown', e => {
   }
 });
 
+// ===========================================================================
+// 12i.2: Build questions — new Knowledge exam or Everyday questions in three
+// steps: What, Try 10, Make the rest (checked). Opened from the exam's and the
+// Everyday page's questions; a draft lives on the server, so it survives a
+// reload, and the address names it
+// ===========================================================================
+const QB_FORM_KEY = 'qb-form';
+function qbForm() {
+  const Q = state.qb;
+  if (!Q.form) {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(QB_FORM_KEY) || 'null'); } catch (e) { /* private */ }
+    Q.form = Object.assign({ kind: 'knowledge', topic: '', subtopics: null, level: 'general public',
+      group: '', newLabel: '', newAbout: '', count: 60, writer: '', checker: '', dedup: true,
+      prompt: { knowledge: null, everyday: null } }, saved || {});
+  }
+  if (Q.kind && Q.kind !== Q.form.kind) { Q.form.kind = Q.kind; }
+  Q.kind = null;
+  return Q.form;
+}
+function qbSave() {
+  try { localStorage.setItem(QB_FORM_KEY, JSON.stringify(state.qb.form)); } catch (e) { /* private */ }
+}
+async function loadQb(force) {
+  const Q = state.qb;
+  if (Q.asked || (Q.page && !force)) return;
+  Q.asked = true;
+  try {
+    Q.page = await api('api/builder');
+    if (Q.page.has_key && !Q.models) {
+      try { Q.models = (await api('api/ai/models')).models; } catch (e) { /* the page stands */ }
+    }
+  } catch (e) { Q.msg = e.message; }
+  Q.asked = false;
+  if (state.tab === 'build') render();
+}
+async function loadQbDraft(id) {
+  const Q = state.qb;
+  if (Q.draftAsked) return;
+  Q.draftAsked = true;
+  try { Q.draft = await api('api/builder/' + encodeURIComponent(id)); Q.msg = ''; }
+  catch (e) { Q.msg = e.message; Q.draft = null; }
+  Q.draftAsked = false;
+  if (state.tab === 'build') render();
+  qbPoll();
+}
+// while the writer or the checker is at work, the page asks again
+function qbPoll() {
+  const Q = state.qb, d = Q.draft;
+  clearTimeout(Q.timer);
+  if (!d || !['writing', 'checking'].includes(d.status)) return;
+  Q.timer = setTimeout(() => {
+    if (state.tab === 'build' && Q.id === d.id) loadQbDraft(d.id);
+  }, 1500);
+}
+function openBuilder(kind) {
+  Object.assign(state.qb, { id: null, draft: null, kind, at: 0, editing: null });
+  navigate({ tab: 'build', model: null, topic: null });
+}
+function qbOpen(id) {
+  Object.assign(state.qb, { id, draft: null, at: 0, editing: null });
+  navigate({ tab: 'build', model: null, topic: null });
+}
+const qbWhat = d => d.kind === 'knowledge' ? `${d.spec.topic} · ${d.spec.level}`
+  : `Everyday · ${d.spec.group_label || d.spec.group}`;
+
+function vBuild() {
+  const Q = state.qb;
+  if (!Q.page && netReady()) loadQb();
+  if (Q.id && (!Q.draft || Q.draft.id !== Q.id) && netReady()) loadQbDraft(Q.id);
+  const d = Q.id && Q.draft && Q.draft.id === Q.id ? Q.draft : null;
+  const step = !d ? 1 : d.stage === 'try' ? 2 : 3;
+  const steps = el('ol', { class: 'qbsteps', 'data-qb-steps': String(step) },
+    ['What', `Try ${Q.page ? Q.page.try_n : 10}`, 'Make the rest, checked'].map((t, i) =>
+      el('li', { class: i + 1 === step ? 'on' : i + 1 < step ? 'done' : '',
+        'aria-current': i + 1 === step ? 'step' : null, text: `${i + 1} ${t}` })));
+  const head = el('div', { class: 'card', 'data-qb': '1' },
+    el('div', { class: 'rvbar' }, el('h2', { text: 'Build questions' }),
+      d ? el('a', { href: '#tab=build', 'data-qb-new': '1', text: 'Start another',
+        onclick: e => { e.preventDefault(); Q.id = null; Q.draft = null; navigate({ tab: 'build' }); } })
+        : ''),
+    el('p', { class: 'sub', text: 'An AI model writes new questions, another answers them blind to '
+      + 'check them, and you review the ones it flags. Published questions join the bank as a new '
+      + 'version and split into practice and hidden halves, as the bank’s always do.' }),
+    steps, Q.msg ? el('p', { class: 'warn', text: Q.msg }) : '');
+  if (!Q.page) return [head, el('div', { class: 'card' }, skeleton(4, { 'data-loading': 'qb' }))];
+  if (Q.id && !d) return [head, el('div', { class: 'card' }, skeleton(4, { 'data-loading': 'qb-draft' }))];
+  if (!d) return [head, qbStepOne(), qbDrafts()];
+  return [head, qbDraftCard(d)];
+}
+
+function qbDrafts() {
+  const ds = (state.qb.page.drafts || []).filter(x => !x.published);
+  if (!ds.length) return '';
+  return el('div', { class: 'card', 'data-qb-drafts': String(ds.length) },
+    el('h2', { text: 'Drafts' }),
+    el('ul', { class: 'qbdrafts' }, ds.map(x => el('li', { 'data-qb-draft': x.id },
+      el('a', { href: '#tab=build&draft=' + x.id, text: qbWhat(x),
+        onclick: e => { e.preventDefault(); qbOpen(x.id); } }),
+      el('span', { class: 'small se', text: ` · ${x.progress.line} · ${x.status}` }
+      )))));
+}
+
+// ---- step 1: what ------------------------------------------------------------
+function qbModelSelect(job, F) {
+  const Q = state.qb, P = Q.page, now = P[job];
+  const opts = [['', `as on AI models: ${now.label}`], ['local', 'Local (the model on this server)'],
+    ...(Q.models || []).map(m => [m.id, m.name.split(': ').pop()])];
+  return el('select', { 'aria-label': job === 'writer' ? 'question writer' : 'checker',
+      'data-qb-model': job, onchange: e => { F[job] = e.target.value; qbSave(); render(); } },
+    opts.map(([v, t]) => el('option', { value: v, selected: F[job] === v ? '' : null, text: t })));
+}
+function qbStepOne() {
+  const Q = state.qb, P = Q.page, F = qbForm();
+  const kn = F.kind === 'knowledge';
+  const topics = P.topics || [];
+  if (kn && !F.topic && topics.length) F.topic = topics[0].name;
+  if (!kn && !F.group && (P.groups || []).length) F.group = P.groups[0].id;
+  const topic = topics.find(t => t.name === F.topic);
+  const subs = F.subtopics && F.subtopicsFor === F.topic ? F.subtopics
+    : (topic ? topic.subtopics.join('\n') : '');
+  const fld = (label, control, note) => el('label', { class: 'fld' },
+    el('span', { class: 'fld-label', text: label }), control, note || '');
+  const count = Number(F.count) || 0;
+  const under = count > 0 && count < P.suggest_min;
+  const prompt = P.prompts[F.kind];
+  const edited = F.prompt[F.kind];
+  const est = el('p', { class: 'small', 'data-qb-estimate': '1' },
+    'Estimated cost: ', el('span', { class: 'mono', text: Q.est ? Q.est.line : '…' }));
+  qbEstimate(F);
+  const nTry = Math.min(P.try_n, count || P.try_n);
+  return el('div', { class: 'card', 'data-qb-what': F.kind },
+    el('h2', { text: 'What' }),
+    el('div', { class: 'subswitch', role: 'radiogroup', 'aria-label': 'kind of question' },
+      [['knowledge', 'Knowledge exam'], ['everyday', 'Everyday tasks']].map(([k, t]) =>
+        el('button', { class: 'chip-btn' + (F.kind === k ? ' on' : ''), role: 'radio',
+          'aria-checked': String(F.kind === k), 'data-qb-kind': k, text: t,
+          onclick: () => { F.kind = k; Q.est = null; qbSave(); render(); } }))),
+    el('div', { class: 'frm fields' },
+      kn ? fld('Topic', el('select', { 'aria-label': 'topic', 'data-qb-topic': '1',
+          onchange: e => { F.topic = e.target.value; F.subtopics = null; qbSave(); render(); } },
+        topics.map(t => el('option', { value: t.name, selected: t.name === F.topic ? '' : null,
+          text: `${t.name} · ${t.bank} in the bank` }))))
+        : fld('Group', el('select', { 'aria-label': 'group', 'data-qb-group': '1',
+          onchange: e => { F.group = e.target.value; Q.est = null; qbSave(); render(); } },
+        [...(P.groups || []).map(g => el('option', { value: g.id, selected: g.id === F.group ? '' : null,
+          text: `${g.label} · ${g.bank} in the bank` })),
+         el('option', { value: 'new', selected: F.group === 'new' ? '' : null, text: 'New group…' })])),
+      !kn && F.group === 'new' ? fld('Its name', el('input', { type: 'text', value: F.newLabel,
+        'data-keep': 'qb-new-label', 'data-qb-new-label': '1', placeholder: 'e.g. Travel plans',
+        oninput: e => { F.newLabel = e.target.value; qbSave(); } })) : '',
+      !kn && F.group === 'new' ? fld('What it tests, in one line', el('input', { type: 'text',
+        value: F.newAbout, 'data-keep': 'qb-new-about', 'data-qb-new-about': '1',
+        oninput: e => { F.newAbout = e.target.value; qbSave(); } })) : '',
+      kn ? fld('Level', el('div', { role: 'radiogroup', 'aria-label': 'level', class: 'frm' },
+        P.levels.map(l => el('label', { class: 'small' }, el('input', { type: 'radio', name: 'qb-level',
+          value: l, 'data-qb-level': l, checked: F.level === l ? '' : null,
+          onchange: () => { F.level = l; qbSave(); } }), ' ' + l)))) : '',
+      fld('How many', el('input', { type: 'number', min: '1', step: '1', value: String(F.count),
+        'data-keep': 'qb-count', 'data-qb-count': '1', style: 'width:7em',
+        oninput: e => { F.count = e.target.value; Q.est = null; qbSave(); render(); } }),
+        under ? el('span', { class: 'small se', 'data-qb-under': '1', text: `fewer than `
+          + `${P.suggest_min} won’t give this ${kn ? 'topic' : 'group'} its own score in Improve` })
+          : ''),
+      fld('Question writer', qbModelSelect('writer', F)),
+      fld('Checker', qbModelSelect('checker', F))),
+    kn ? fld('Subtopics — one a line, edit freely', el('textarea', { rows: '4',
+      'data-keep': 'qb-subtopics', 'data-qb-subtopics': '1', text: subs,
+      oninput: e => { F.subtopics = e.target.value; F.subtopicsFor = F.topic; qbSave(); } })) : '',
+    el('label', { class: 'small' }, el('input', { type: 'checkbox', 'data-qb-dedup': '1',
+      checked: F.dedup ? '' : null, onchange: e => { F.dedup = e.target.checked; qbSave(); } }),
+      ' Check for duplicates', el('span', { class: 'se', text: ` — against this bank, earlier `
+        + `batches and each other (${P.dedup_how})` })),
+    el('details', { class: 'qbprompt', 'data-qb-prompt': '1', open: Q.promptOpen ? '' : null,
+        ontoggle: e => { Q.promptOpen = e.target.open; } },
+      el('summary', { text: 'Edit the writing instructions ▸' }),
+      el('p', { class: 'small se', text: `From ${prompt.path}. Your edits apply to this batch, `
+        + 'and the instructions used are saved with it.' }),
+      el('textarea', { rows: '16', class: 'mono small', 'aria-label': 'writing instructions',
+        'data-keep': 'qb-prompt-' + F.kind, 'data-qb-prompt-text': '1',
+        text: edited == null ? prompt.editable : edited,
+        oninput: e => { F.prompt[F.kind] = e.target.value === prompt.editable ? null : e.target.value;
+          qbSave(); } }),
+      el('p', { class: 'small', text: 'The output section is locked, so the result can always be read:' }),
+      el('pre', { class: 'qblocked small', 'data-qb-locked': '1', text: prompt.locked }),
+      el('button', { class: 'quiet', 'data-qb-prompt-reset': '1', text: 'Reset to default',
+        disabled: edited == null ? '' : null,
+        onclick: () => { F.prompt[F.kind] = null; qbSave(); render(); } })),
+    est,
+    el('div', { class: 'frm' },
+      el('button', { class: 'primary', 'data-qb-try': '1', text: `Try ${nTry}`,
+        disabled: count >= 1 ? null : '', onclick: () => qbCreate(F, subs) })),
+    P.writer_blocked ? el('p', { class: 'warn', text: 'The question writer can’t run: '
+      + P.writer_blocked }) : '',
+    // the checker has no .env of its own: it is chosen on AI models, or here
+    P.checker_blocked && !F.checker ? el('p', { class: 'small se', 'data-qb-no-checker': '1',
+      text: 'No checker yet: choose one on AI models, or above for this batch. Try 10 runs '
+        + 'without it; Make the rest needs it.' }) : '');
+}
+let qbEstTimer = null;
+function qbEstimate(F) {
+  const Q = state.qb;
+  const want = JSON.stringify([F.kind, F.count, F.group, F.writer, F.checker]);
+  if (Q.estFor === want) return;
+  Q.estFor = want;
+  clearTimeout(qbEstTimer);
+  qbEstTimer = setTimeout(async () => {
+    try {
+      Q.est = await post('api/builder/estimate', { kind: F.kind, count: Number(F.count) || 0,
+        group: F.kind === 'everyday' ? F.group : '', writer: F.writer, checker: F.checker });
+    } catch (e) { Q.est = { line: '—' }; }
+    const n = document.querySelector('[data-qb-estimate] .mono');
+    if (n) n.textContent = Q.est.line;
+  }, 250);
+}
+async function qbCreate(F, subs) {
+  const Q = state.qb;
+  if (!whoName()) { askName(); return; }
+  const kn = F.kind === 'knowledge';
+  try {
+    const d = await post('api/builder', {
+      kind: F.kind, count: Number(F.count) || 0, dedup: !!F.dedup, by: whoName(),
+      writer: F.writer, checker: F.checker, prompt: F.prompt[F.kind] || '',
+      ...(kn ? { topic: F.topic, level: F.level,
+                 subtopics: String(subs || '').split('\n').map(x => x.trim()).filter(Boolean) }
+             : { group: F.group, new_label: F.newLabel, new_about: F.newAbout }) });
+    Q.draft = d; Q.id = d.id; Q.at = 0;
+    Q.page = null;                        // the drafts list has a new one
+    navigate({ tab: 'build' });
+    qbPoll();
+  } catch (e) { toast('Refused. ' + e.message, { key: 'qb' }); }
+}
+
+// ---- steps 2 and 3: a draft --------------------------------------------------
+function qbReviewable(d) {
+  // step 2: the first ten; step 3: the flagged, then the sample
+  if (d.stage === 'try') return d.items.filter(it => !it.auto);
+  const need = d.items.filter(it => !it.auto && (it.flags.length || it.sample));
+  return [...need.filter(it => it.flags.length), ...need.filter(it => !it.flags.length)];
+}
+function qbDraftCard(d) {
+  const Q = state.qb, pr = d.progress;
+  const busy = ['writing', 'checking'].includes(d.status);
+  const bits = [];
+  bits.push(el('div', { class: 'rvbar' },
+    el('div', {}, el('h2', { text: d.stage === 'try' ? `Try ${Math.min(Q.page.try_n,
+      d.spec.count)}` : 'Make the rest, checked' }),
+      el('p', { class: 'small se', 'data-qb-what-line': '1', text: `${qbWhat(d)} · ${d.spec.count} `
+        + `questions · writer ${d.writer.label} · checker ${d.checker.label}` })),
+    busy ? el('button', { class: 'quiet', 'data-qb-cancel': '1', text: 'Cancel',
+      onclick: () => qbStep(d, 'cancel') }) : ''));
+  bits.push(el('p', { class: 'small', 'data-qb-progress': `${pr.written}|${pr.count}|${pr.flagged}`,
+    text: (busy ? (d.status === 'writing' ? 'Writing… ' : 'Checking… ') : '') + pr.line
+      + (d.stage === 'rest' && d.status === 'checking' ? ` · ${pr.checked} checked` : '') }));
+  if (d.status === 'cancelled' || d.status === 'failed')
+    bits.push(el('p', { class: 'warn', 'data-qb-stopped': d.status,
+      text: d.status === 'cancelled' ? 'Cancelled. What was written is kept here.'
+        : `Stopped: ${d.error}` }),
+      el('div', { class: 'frm' }, el('button', { class: 'secondary', 'data-qb-resume': '1',
+        text: 'Resume', onclick: () => qbStep(d, 'resume') })));
+  if (d.published) {
+    const p = d.published;
+    bits.push(el('p', { class: 'note', 'data-qb-published': String(p.n), text: `Published `
+      + `${p.added} question${p.added === 1 ? '' : 's'} — ` + (p.kind === 'knowledge'
+        ? `${p.topic}, bank version ${p.version || 'rebuilt'}` : `Everyday, bank version ${p.version}`)
+      + '. They split into practice and hidden halves as the bank’s always do.' }),
+      el('div', { class: 'frm' }, el('button', { class: 'secondary', 'data-qb-see': '1',
+        text: 'See the bank', onclick: () => navigate({ tab: p.kind === 'knowledge' ? 'exam' : 'everyday',
+          model: null, topic: null }) })));
+    return el('div', { class: 'card', 'data-qb-draft-open': d.id }, bits);
+  }
+  const aside = d.items.filter(it => it.auto);
+  const list = busy && d.stage === 'rest' ? [] : qbReviewable(d);
+  if (!busy || d.stage === 'try') {
+    if (list.length) {
+      Q.at = Math.max(0, Math.min(list.length - 1, Q.at || 0));
+      bits.push(qbItemCard(d, list[Q.at], Q.at, list.length));
+    } else if (d.stage === 'rest' && d.status === 'review') {
+      bits.push(el('p', { class: 'small', text: 'Nothing is flagged, and the sample is reviewed.' }));
+    }
+  }
+  if (aside.length)
+    bits.push(el('details', { class: 'qbaside', 'data-qb-aside': String(aside.length) },
+      el('summary', { text: `Set aside before review (${aside.length})` }),
+      el('ul', { class: 'small' }, aside.map(it => el('li', {},
+        el('span', { class: 'mono', text: `#${it.n} ` }), qbText(d, it.q).slice(0, 90),
+        el('span', { class: 'se', text: ` — ${it.auto}` }))))));
+  if (d.stage === 'try') {
+    const live = d.items.filter(it => !it.auto).length;
+    bits.push(el('div', { class: 'frm' },
+      el('button', { class: 'primary', 'data-qb-rest': '1', text: 'Make the rest',
+        disabled: d.can_rest ? '' : null, title: d.can_rest || null,
+        onclick: () => qbStep(d, 'rest') }),
+      el('span', { class: 'small se', 'data-qb-reviewed': String(pr.reviewed_try),
+        text: `${pr.reviewed_try} of ${live} reviewed` + (d.can_rest ? ` · ${d.can_rest}` : '') })));
+  } else if (d.status === 'review') {
+    const n = pr.publishable;
+    bits.push(el('p', { class: 'small', 'data-qb-left': String(pr.to_review),
+      text: `${pr.to_review} to review · ${n} ready to publish` }),
+      el('div', { class: 'frm' }, el('button', { class: 'primary', 'data-qb-publish': '1',
+        text: `Publish ${n} question${n === 1 ? '' : 's'}`, disabled: d.can_publish ? '' : null,
+        title: d.can_publish || null, onclick: () => qbStep(d, 'publish') })));
+  }
+  return el('div', { class: 'card', 'data-qb-draft-open': d.id }, bits);
+}
+const qbText = (d, q) => d.kind === 'knowledge' ? q.question : q.prompt;
+function qbItemCard(d, it, i, n) {
+  const Q = state.qb, q = it.q, kn = d.kind === 'knowledge';
+  const editing = Q.editing === it.n;
+  const dup = it.flags.find(f => f.kind === 'dup' && !f.resolved);
+  const verdictWord = { accept: 'accepted', edit: 'edited', reject: 'rejected' }[it.verdict];
+  const nav = el('div', { class: 'rvbar' },
+    el('span', { class: 'small mono', 'data-qb-at': `${i + 1}|${n}`,
+      text: `${i + 1} of ${n} · #${it.n}` + (it.sample && !it.flags.length ? ' · sampled at random' : '') }),
+    el('span', { class: 'frm' },
+      el('button', { class: 'quiet', 'aria-label': 'previous', text: '←', disabled: i ? null : '',
+        onclick: () => { Q.at = i - 1; Q.editing = null; render(); } }),
+      el('button', { class: 'quiet', 'aria-label': 'next', text: '→', disabled: i + 1 < n ? null : '',
+        onclick: () => { Q.at = i + 1; Q.editing = null; render(); } })));
+  const flags = it.flags.length ? el('ul', { class: 'qbflags' }, it.flags.map(f =>
+    el('li', { class: 'warntext', 'data-qb-flag': f.kind, text: f.text }))) : '';
+  const body = editing ? qbEditor(d, it) : el('div', {},
+    el('p', { class: 'evq-label', text: 'Question' }),
+    el('blockquote', { class: 'evq', 'data-qb-q': '1', text: qbText(d, q) }),
+    el('p', { class: 'evq-label', text: 'Reference answer' }),
+    el('div', { class: 'small', 'data-qb-ref': '1', text: q.reference }),
+    el('p', { class: 'evq-label', text: kn ? 'A full answer' : 'Checks' }),
+    el('ul', { class: 'small', 'data-qb-checks': '1' }, (kn ? q.criteria : it.checks_words || [])
+      .map(c => el('li', { text: c }))),
+    it.answer != null ? el('details', { class: 'small', 'data-qb-answer': '1' },
+      el('summary', { text: 'the checker’s own answer' + (it.mark != null ? ` · the judge’s mark ${it.mark}/4` : '') }),
+      el('div', { text: it.answer || '(none)' })) : '',
+    q.notes ? el('p', { class: 'small se', text: 'The writer’s note: ' + q.notes }) : '');
+  const dupBox = dup ? el('div', { class: 'qbdup', 'data-qb-dup': String(it.n) },
+    el('div', {}, el('b', { class: 'small', text: 'This one' }), el('p', { class: 'small', text: qbText(d, q) })),
+    el('div', {}, el('b', { class: 'small', text: dup.other.label }),
+      el('p', { class: 'small', 'data-qb-dup-other': '1', text: dup.other.text })),
+    el('div', { class: 'frm' }, ['new', 'old', 'both'].map(k => el('button', {
+      class: k === 'old' ? 'secondary' : 'quiet', 'data-qb-keep': k, text: `keep ${k}`,
+      disabled: k === 'new' && dup.other.src !== 'batch' ? '' : null,
+      title: k === 'new' && dup.other.src !== 'batch' ? 'the other one is already in the bank' : null,
+      onclick: () => qbDup(d, it, k) })))) : '';
+  const reasons = el('div', { class: 'qbreasons', role: 'group', 'aria-label': 'reason' },
+    Q.page.reasons.map(r => el('button', { class: 'chip-btn' + (Q.reason === r ? ' on' : ''),
+      'data-qb-reason': r, 'aria-pressed': String(Q.reason === r), text: r,
+      onclick: () => { Q.reason = Q.reason === r ? '' : r; render(); } })));
+  const acts = editing ? '' : el('div', { class: 'frm qbacts' },
+    el('button', { class: 'chip-btn', 'data-qb-verdict': 'accept', 'aria-keyshortcuts': 'A',
+      text: 'Accept (A)', onclick: () => qbGive(d, it, 'accept') }),
+    el('button', { class: 'chip-btn', 'data-qb-verdict': 'edit', 'aria-keyshortcuts': 'E',
+      text: 'Edit (E)', onclick: () => { Q.editing = it.n; render(); } }),
+    el('button', { class: 'chip-btn', 'data-qb-verdict': 'reject', 'aria-keyshortcuts': 'R',
+      text: 'Reject (R)', onclick: () => qbGive(d, it, 'reject') }));
+  return el('div', { class: 'qbitem', 'data-qb-item': String(it.n),
+      'data-qb-verdict-now': it.verdict || '' },
+    nav, flags, dupBox, body,
+    verdictWord ? el('p', { class: 'small se', 'data-qb-done': it.verdict,
+      text: verdictWord + (it.reason ? ` · ${it.reason}` : '') }) : '',
+    editing ? '' : reasons, acts,
+    editing ? '' : el('p', { class: 'small se', text: 'Keys: A, E, R; ← and → move. A reason is optional.' }));
+}
+function qbEditor(d, it) {
+  const Q = state.qb, q = it.q, kn = d.kind === 'knowledge';
+  const f = { text: qbText(d, q), reference: q.reference,
+              extra: kn ? q.criteria.join('\n') : JSON.stringify(q.checks, null, 1) };
+  const ta = (key, label, v, rows) => el('label', { class: 'fld' },
+    el('span', { class: 'fld-label', text: label }),
+    el('textarea', { rows: String(rows), 'data-qb-edit': key, 'data-keep': 'qb-edit-' + key,
+      text: v, oninput: e => { f[key] = e.target.value; } }));
+  return el('div', { class: 'qbedit' },
+    ta('text', 'Question', f.text, 3), ta('reference', 'Reference answer', f.reference, 3),
+    ta('extra', kn ? 'A full answer — one point a line' : 'Checks (JSON)', f.extra, 5),
+    el('div', { class: 'frm' },
+      el('button', { class: 'primary', 'data-qb-save': '1', text: 'Save the edit', onclick: () => {
+        let edited;
+        try {
+          edited = kn ? { question: f.text, reference: f.reference,
+                          criteria: f.extra.split('\n').map(x => x.trim()).filter(Boolean) }
+            : { prompt: f.text, reference: f.reference, checks: JSON.parse(f.extra) };
+        } catch (e) { toast('The checks are not valid JSON.', { key: 'qb' }); return; }
+        qbGive(d, it, 'edit', edited);
+      } }),
+      el('button', { class: 'quiet', text: 'Cancel', onclick: () => { Q.editing = null; render(); } })));
+}
+async function qbGive(d, it, verdict, edited) {
+  const Q = state.qb;
+  if (!whoName()) { askName(); return; }
+  try {
+    Q.draft = await post(`api/builder/${d.id}/review`, { n: it.n, verdict, reason: Q.reason || '',
+      edited: edited || {}, by: whoName() });
+    Q.reason = ''; Q.editing = null;
+    const list = qbReviewable(Q.draft);
+    // on to the next one still to review, else stay
+    const next = list.findIndex((x, j) => j > Q.at && !x.verdict);
+    Q.at = next >= 0 ? next : Q.at;
+  } catch (e) { toast('Refused. ' + e.message, { key: 'qb' }); }
+  render();
+}
+async function qbDup(d, it, keep) {
+  const Q = state.qb;
+  if (!whoName()) { askName(); return; }
+  try { Q.draft = await post(`api/builder/${d.id}/duplicate`, { n: it.n, keep, by: whoName() }); }
+  catch (e) { toast('Refused. ' + e.message, { key: 'qb' }); }
+  render();
+}
+async function qbStep(d, step) {
+  const Q = state.qb;
+  if (!whoName()) { askName(); return; }
+  try {
+    const r = await post(`api/builder/${d.id}/${step}`, { by: whoName() });
+    if (step === 'publish') {
+      Q.draft = r.draft;
+      toast(`Published ${r.published.added} questions — a new bank version`, { key: 'qb' });
+      if (LIVE) refreshResults();
+    } else Q.draft = r;
+    Q.at = 0;
+  } catch (e) { toast('Refused. ' + e.message, { key: 'qb' }); }
+  render();
+  qbPoll();
+}
+addEventListener('keydown', e => {
+  const Q = state.qb;
+  if (!Q || state.tab !== 'build' || !Q.draft || Q.editing != null
+      || e.target.closest('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
+  const d = Q.draft;
+  if (['writing', 'checking'].includes(d.status) && d.stage === 'rest') return;
+  const list = qbReviewable(d);
+  const it = list[Q.at || 0];
+  if (!it) return;
+  const k = e.key.toUpperCase();
+  if (k === 'A') { e.preventDefault(); qbGive(d, it, 'accept'); }
+  else if (k === 'R') { e.preventDefault(); qbGive(d, it, 'reject'); }
+  else if (k === 'E') { e.preventDefault(); Q.editing = it.n; render(); }
+  else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    Q.at = Math.max(0, Math.min(list.length - 1, (Q.at || 0) + (e.key === 'ArrowRight' ? 1 : -1)));
+    render();
+  }
+});
+
 // ---------- shell ----------
 // 12b: five places, organised around what people come to do. A table, a
 // reader or a dialog keeps its code and changes container: the views below
@@ -14355,6 +14830,8 @@ const TABS = [
   ['help', 'Help', vHelp],
   // 12i.1: settings, under the name menu
   ...(LIVE ? [['ai', 'AI models', vAiModels]] : []),
+  // 12i.2: reached from the Knowledge exam's and the Everyday page's questions
+  ...(LIVE ? [['build', 'Build questions', vBuild]] : []),
 ];
 // Playground joins in 12d, between Models and Improve
 const PLACES = [['home', 'Home', ['overview']], ['models', 'Models', ['leaderboard']],
@@ -14368,7 +14845,7 @@ const viewLabel = v => (TABS.find(t => t[0] === v) || [, v])[1];
 const SUB_SLUG = { pipeline: 'model', training: 'training',
                    tasks: 'standard', exam: 'exam', everyday: 'everyday' };
 const PAGE_SLUG = { overview: 'home', leaderboard: 'models', queue: 'runs',
-                    provenance: 'data', help: 'help', ai: 'ai' };
+                    provenance: 'data', help: 'help', ai: 'ai', build: 'build' };
 
 // Old hashes keep working (§8): a link someone pasted into a message last
 // month still lands, and the address bar then shows where it lives now.

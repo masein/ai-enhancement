@@ -29,7 +29,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from . import ai_models, config, db, hfmeta, judge_test, llm, llm_poller, startup, suggest, worker
+from . import ai_models, builder, config, db, hfmeta, judge_test, llm, llm_poller, startup, suggest, worker
 from . import proposals as prop
 from . import reader
 
@@ -1154,6 +1154,157 @@ def judge_test_use(a: JtUseIn, x_token: str = Header(default="")):
 
 
 # ---------------------------------------------------------------------------
+# 12i.2: the question builder — Knowledge exam or Everyday questions, written,
+# checked and reviewed in three steps, published as a new bank version
+# ---------------------------------------------------------------------------
+
+@app.get("/api/builder")
+def builder_page():
+    """what step 1 offers: kinds, topics with suggested subtopics, groups, the
+    default writing instructions (their output section locked), each job's
+    model, and the drafts so far"""
+    return {"topics": builder.topics(), "groups": builder.everyday_groups(),
+            "levels": list(builder.LEVELS), "reasons": list(builder.REASONS),
+            "try_n": builder.TRY_N, "min_reviewed": builder.MIN_REVIEWED,
+            "suggest_min": builder.SUGGEST_MIN,
+            "prompts": {k: builder.default_prompt(k) for k in builder.KINDS},
+            "writer": builder.who("writer"), "checker": builder.who("checker"),
+            "writer_blocked": builder.blocked("writer"),
+            "checker_blocked": builder.blocked("checker"),
+            "has_key": ai_models.has_key(),
+            "dedup_how": "13-gram and embeddings" if ai_models.has_key() else "13-gram",
+            "drafts": [{"id": d["id"], "kind": d["kind"], "spec": d["spec"],
+                        "stage": d["stage"], "status": d["status"], "by": d.get("by", ""),
+                        "updated_at": d.get("updated_at"), "published": d.get("published"),
+                        "progress": builder.progress(d)} for d in db.qb_list()]}
+
+
+class BuildEstimateIn(BaseModel):
+    kind: str
+    count: int = 0
+    group: str = ""
+    writer: str = ""
+    checker: str = ""
+
+
+@app.post("/api/builder/estimate")
+def builder_estimate(a: BuildEstimateIn):
+    try:
+        w = builder.who("writer", builder._override(a.writer))
+        c = builder.who("checker", builder._override(a.checker))
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return builder.estimate(a.kind, a.count, w, c, a.group)
+
+
+class BuildIn(BaseModel):
+    kind: str
+    count: int = 0
+    topic: str = ""
+    subtopics: list[str] = []
+    level: str = ""
+    group: str = ""
+    new_label: str = ""
+    new_about: str = ""
+    writer: str = ""
+    checker: str = ""
+    dedup: bool = True
+    prompt: str = ""
+    by: str = ""
+
+
+@app.post("/api/builder")
+def builder_create(a: BuildIn, x_token: str = Header(default="")):
+    """step 1 done: a draft, and its first ten being written"""
+    _check_token(x_token)
+    by = _name(a.by, "a batch of questions")
+    try:
+        d = builder.create(a.model_dump(), by)
+    except (ValueError, llm.LLMError) as e:
+        raise HTTPException(422, str(e)) from None
+    return builder.view(d)
+
+
+def _draft(draft_id: str) -> dict:
+    try:
+        return builder.get(draft_id)
+    except KeyError:
+        raise HTTPException(404, f"no draft {draft_id}") from None
+
+
+@app.get("/api/builder/{draft_id}")
+def builder_draft(draft_id: str):
+    return builder.view(_draft(draft_id))
+
+
+class BuildReviewIn(BaseModel):
+    n: int
+    verdict: str
+    reason: str = ""
+    edited: dict = {}
+    by: str = ""
+
+
+@app.post("/api/builder/{draft_id}/review")
+def builder_review(draft_id: str, a: BuildReviewIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    _draft(draft_id)
+    by = _name(a.by, "a review")
+    try:
+        d = builder.review(draft_id, a.n, a.verdict, by, a.reason, a.edited or None)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return builder.view(d)
+
+
+class BuildDupIn(BaseModel):
+    n: int
+    keep: str
+    by: str = ""
+
+
+@app.post("/api/builder/{draft_id}/duplicate")
+def builder_duplicate(draft_id: str, a: BuildDupIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    _draft(draft_id)
+    by = _name(a.by, "a choice between duplicates")
+    try:
+        d = builder.resolve_dup(draft_id, a.n, a.keep, by)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return builder.view(d)
+
+
+class BuildByIn(BaseModel):
+    by: str = ""
+
+
+@app.post("/api/builder/{draft_id}/{step}")
+def builder_step(draft_id: str, step: str, a: BuildByIn, x_token: str = Header(default="")):
+    """rest (make the rest, checked), cancel, resume, publish"""
+    _check_token(x_token)
+    _draft(draft_id)
+    by = _name(a.by, "this step")
+    fn = {"rest": builder.rest, "cancel": builder.cancel, "resume": builder.resume,
+          "publish": builder.publish}.get(step)
+    if fn is None:
+        raise HTTPException(404, f"no step {step}")
+    try:
+        out = fn(draft_id, by)
+    except (ValueError, llm.LLMError) as e:
+        raise HTTPException(422, str(e)) from None
+    if step != "publish":
+        return builder.view(out)
+    # a new bank version: the exam's tasks rebuilt, the page's data fresh
+    if out["kind"] == "knowledge":
+        out["build"] = _rebuild_if_idle()
+        fp = exam_build.current_fingerprints(config.JUDGED_TASKS_DIR) or {}
+        out["version"] = (fp.get(builder._task(_draft(draft_id))) or "")[:12]
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"published": out, "draft": builder.view(_draft(draft_id))}
+
+
+# ---------------------------------------------------------------------------
 # the exam: drafted by an LLM, curated by a person, split by qid
 # ---------------------------------------------------------------------------
 
@@ -2118,10 +2269,11 @@ def _propose_everyday(p: ProposalIn, backend) -> dict:
     least EVERYDAY_MIN_HIDDEN hidden questions: a score from fewer is noise."""
     import everyday as ev
     g = p.everyday.strip()
-    if g not in ev.GROUPS:
+    known = ev.groups()
+    if g not in known:
         raise HTTPException(422, f"{g!r} is not an Everyday group — the groups are "
-                                 + ", ".join(ev.GROUPS))
-    label = ev.GROUPS[g]
+                                 + ", ".join(known))
+    label = known[g]
     hidden = ev.split_counts().get(g, {}).get("hidden", 0)
     if hidden < config.EVERYDAY_MIN_HIDDEN:
         need = config.EVERYDAY_MIN_HIDDEN - hidden

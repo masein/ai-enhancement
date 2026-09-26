@@ -2652,6 +2652,85 @@ check, and Improve shows them only as a before → after watch line.
 - **Tests** use a fake OpenRouter (`tests/fixtures/fake_openrouter.py`, at
   `service.llm._http`). Nothing leaves the machine in a test.
 
+### 12i.2 — the question builder
+
+`docs/prompts/phase-12i-ai-models-judge-test-question-builder.md`, 12i.2.
+
+- **Build questions** (`#tab=build`) opens from the Knowledge exam page (on
+  the Import a bank card) and from the Everyday page (on its practice
+  questions card). It makes new questions in each bank's own shape:
+  - Knowledge: a question, a reference, and 3–5 criteria;
+  - Everyday: a question, a reference, and checks.
+
+  Three steps (`service/builder.py`):
+  1. **What.**
+     - The kind, then:
+       - Knowledge: a topic, its suggested subtopics (the topic's brief,
+         editable) and the level;
+       - Everyday: a group, or a new one with a name and one line on what it
+         tests.
+     - How many, typed freely. Under 40 there's a note that the topic won't
+       get its own score in Improve.
+     - The writer and the checker: the AI models page's, or another for this
+       batch only.
+     - Check for duplicates, on by default.
+     - **Edit the writing instructions ▸.** The defaults are
+       `docs/prompts/phase-12i/knowledge-question-prompt.md` and
+       `docs/prompts/phase-12i/everyday-question-prompt.md`.
+       - The Everyday one is 12a.4's with the groups brought up to 12a.5's
+         eight: Shorten added, and Summarise the long texts.
+       - The `## Output` section is locked. It is always the default's, and
+         goes last in the prompt sent.
+       - "Reset to default" restores them.
+     - The estimated cost, then **Try 10**.
+  2. **Try 10.** Review the first ten one at a time: A accept, E edit, R
+     reject, with an optional reason chip. Make the rest is enabled after
+     five. The reasons and edits go into the rest's prompt as a short "avoid
+     / do more of" list.
+  3. **Make the rest, checked.** The writer is asked in batches of ten, so
+     progress reads "34 of 60 written · 5 flagged", and a batch can be
+     cancelled (and resumed).
+     - **Everyday:** a question whose reference fails its own checks is set
+       aside before review. So is a Shorten or Summarise question that
+       pasting the message back passes. The checker answers each question as
+       a person would type it (no checks, no reference), and a failed answer
+       is flagged, with the check's reason.
+     - **Knowledge:** the checker answers without the reference and says if
+       the question is ambiguous, time-sensitive or trivia. The judge marks
+       its answer against the topic's rubric, with the question's own
+       criteria in the reference. Under 3/4 is flagged: "the checker
+       answered …; the criteria expect …".
+     - **Duplicates** are checked against this bank, earlier unpublished
+       batches and each other:
+       - the 13-gram check (`contamination`), always;
+       - an embeddings model through OpenRouter (`OPENROUTER_EMBED_MODEL`),
+         flagging a pair at a cosine of 0.9 or more (`QB_DUP_COSINE`). With
+         no key, the 13-gram check runs alone.
+       - A flagged pair is shown side by side, with keep new, keep old or
+         keep both. Keep new is offered only against another question of
+         the same batch.
+     - **Review:** every flagged question, and a tenth of the rest drawn at
+       random. Then **Publish**.
+- **Publishing makes a new bank version.** Every question carries
+  `written_by`, `checked_by`, `approved_by`, `batch_id` and `prompt_sha256`
+  (the exact prompt that wrote it).
+  - Knowledge rows go to `EXAM_DIR/bank/<topic>.jsonl` (source "question
+    builder", the criteria under `meta`), and the tasks are rebuilt: a new
+    fingerprint.
+  - Everyday rows go to `BENCH_ROOT/everyday/built.jsonl`, on the data
+    volume, not in the repo. A new group goes to `groups.json` beside it.
+    `everyday.load_bank()` reads the repo's bank then that file, so the
+    version hash changes, and a run asks the new questions only (12a.5a).
+  - Both halves split as always (`split_of` of the question's hash). The
+    copy check (`contamination`) reads the built file too.
+- **Drafts live in `qb_drafts`**, their whole state as JSON. A reload or a
+  restart lands where it was; `#tab=build&draft=<id>` opens one.
+  - The model calls are poller batches of kind `qb`, each pinned as its
+    draft chose (`builder.batch_backend`).
+  - With `JUDGE_MODEL=stub`, the judge's marks come from the stub, at once.
+- **Tests** use the fake backend's writer, checker and judge, and the fake
+  OpenRouter's embeddings.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

@@ -277,6 +277,11 @@ AI_MONTHLY_LIMIT_USD = float(os.environ.get("AI_MONTHLY_LIMIT_USD", "20"))
 JUDGE_TEST_N = int(os.environ.get("JUDGE_TEST_N", "100"))
 JUDGE_KAPPA_MIN = float(os.environ.get("JUDGE_KAPPA_MIN", "0.7"))
 JUDGE_TEST_MIN = int(os.environ.get("JUDGE_TEST_MIN", "100"))
+# 12i.2: the question builder's duplicate check — an embeddings model through
+# OpenRouter, a pair at this cosine or above is flagged, beside the 13-gram
+# check (alone when there is no key)
+OPENROUTER_EMBED_MODEL = os.environ.get("OPENROUTER_EMBED_MODEL", "openai/text-embedding-3-small")
+QB_DUP_COSINE = float(os.environ.get("QB_DUP_COSINE", "0.9"))
 
 
 def judged_tasks() -> list[str]:

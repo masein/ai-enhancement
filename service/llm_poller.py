@@ -18,7 +18,7 @@ import traceback
 import sys
 from pathlib import Path
 
-from . import config, contamination, db, judge_test, llm, proposals
+from . import builder, config, contamination, db, judge_test, llm, proposals
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import everyday as _everyday  # noqa: E402
@@ -313,6 +313,8 @@ def _mark_failed(r: dict, why: str) -> None:
         db.dataset_update(r["ref_id"], status="failed", finished_at=time.time(), error=why[:400])
     elif r["kind"] == "judge":
         db.judge_run_update(r["ref_id"], status="failed", finished_at=time.time(), error=why[:400])
+    elif r["kind"] == "qb":
+        builder.failed(r["batch_id"], why)
     elif r["kind"] == "everyday":
         d, sub = _everyday_dir(r)
         if d is not None:
@@ -332,8 +334,10 @@ def tick() -> int:
     done = 0
     for r in rows:
         try:
-            # 12i.1: a judge test batch belongs to the candidate that ran it
+            # 12i.1: a judge test batch belongs to the candidate that ran it;
+            # 12i.2: a question builder batch to the job, as that draft chose it
             backend = (judge_test.batch_backend(r["batch_id"]) if r["kind"] == "judge_test"
+                       else builder.batch_backend(r["batch_id"]) if r["kind"] == "qb"
                        else llm.client("judge" if r["kind"] in ("judge", "everyday") else "llm"))
         except llm.LocalUnreachable as e:
             # vLLM restarting (or still loading after a reboot) is not a reason
@@ -374,6 +378,8 @@ def tick() -> int:
                 _finish_everyday(r, results)
             elif r["kind"] == "judge_test":
                 judge_test.finish(r["batch_id"], results)
+            elif r["kind"] == "qb":
+                builder.finish(r["batch_id"], results)
             db.batch_finish(r["batch_id"], "done", "")
         except Exception as e:                       # noqa: BLE001 — one batch must not kill the loop
             traceback.print_exc()

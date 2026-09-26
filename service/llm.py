@@ -406,6 +406,19 @@ def default_responder(req: Request) -> str:
             return StubGrader.reply(req.user)         # single-score or per-criterion, as asked
         except Exception:                             # noqa: BLE001 — a fixed grade beats a crash
             return json.dumps({"score": 2, "justification": "fake grade"})
+    if req.custom_id.startswith("qbw:"):
+        # 12i.2: the question builder's writer, one JSON line per question
+        return "\n".join(json.dumps(q) for q in _fake_qb_questions(req.meta))
+    if req.custom_id.startswith("qbc:"):
+        # its checker answers as the reference does (meta is never sent anywhere)
+        ref = req.meta.get("ref", "")
+        return json.dumps({"answer": ref, "concerns": []}) if req.json and req.system else ref
+    if req.custom_id.startswith("qbj:"):
+        if req.meta.get("draft_kind") == "everyday":
+            from everyday import stub_reply            # scripts/, on sys.path in the service
+            return stub_reply(req.user)
+        from judge import StubGrader
+        return StubGrader.reply(req.user)
     if req.custom_id.startswith("exam:"):
         topic = req.meta.get("topic", "the topic")
         n = int(req.meta.get("count", 4))
@@ -512,6 +525,69 @@ def default_responder(req: Request) -> str:
             item["choices"] = opts[k:] + opts[:k]
         items.append(item)
     return json.dumps(items)
+
+
+# 12i.2: the fake writer's words — enough of them that two of its questions
+# share few, so neither the 13-gram check nor the embeddings call them the same
+_QB_A = ["river silt", "tidal pull", "leaf pores", "copper wire", "bread yeast", "glacier ice",
+         "bird flocks", "coral reefs", "tax credits", "bridge cables", "kidney filters",
+         "solar panels", "rubber soles", "ocean salt", "city parks", "moth wings", "clay bricks"]
+_QB_B = ["expands", "slows down", "gathers charge", "releases heat", "loses mass", "cracks",
+         "holds water", "drifts north", "changes colour", "grows denser", "wears thin"]
+_QB_C = ["the air turns humid", "night falls", "pressure rises", "the load doubles",
+         "prices climb", "winter arrives", "a drought begins", "the current reverses",
+         "demand drops", "the soil dries"]
+_QB_THINGS = ["mangoes", "bus tickets", "paper cups", "chargers", "tomato plants", "library books",
+              "bike lights", "coffee pods", "hair ties", "spare keys", "stamps", "candles",
+              "notebooks", "umbrellas", "batteries", "socks", "lemons", "towels", "pencils"]
+_QB_NAMES = ["priya", "tomas", "wen", "aisha", "leo", "marta", "kofi", "yuki", "sam", "ines",
+             "omar", "ruth", "dmitri", "lena", "ade"]
+_QB_PLACES = ["Northgate", "Maple Park", "King Street", "the harbour", "the old mill",
+              "Elm Road", "the market hall", "Riverside", "the sports club"]
+
+
+def _fake_qb_questions(meta: dict) -> list[dict]:
+    start, n = int(meta.get("start", 0)), int(meta.get("count", 10))
+    # each draft its own run of the pools: two drafts' questions differ too
+    off = int(hashlib.sha256(meta.get("draft", "").encode()).hexdigest()[:6], 16) % 1870 \
+        if meta.get("draft") else 0
+    out = []
+    for i in range(start + off, start + off + n):
+        a, b = _QB_A[i % len(_QB_A)], _QB_B[(i * 3) % len(_QB_B)]
+        c, c2 = _QB_C[(i * 7) % len(_QB_C)], _QB_C[(i * 7 + 3) % len(_QB_C)]
+        if meta.get("draft_kind") == "knowledge":
+            out.append({"subtopic": meta.get("topic", ""), "level": "general public",
+                        # every 13 words in a row hold the thing, a condition and
+                        # the effect, whose cycles (17, 10, 11) are coprime
+                        "question": f"What changes for {a} once {c2}, and why do they "
+                                    f"{b.split()[0]} when {c}? (item {i + 1})",
+                        "reference": f"When {c}, {a} {b} because the balance of forces on "
+                                     f"them shifts. Once {c2}, that shift reverses.",
+                        "criteria": [f"says {a} {b} when {c}", "names the shift in forces",
+                                     f"says what happens once {c2}"],
+                        "notes": "weak answers name the effect without the cause"})
+            continue
+        t, who = _QB_THINGS[i % len(_QB_THINGS)], _QB_NAMES[(i * 4) % len(_QB_NAMES)]
+        x, y, place = 3 + i % 17, 2 + (i * 7) % 13, _QB_PLACES[(i * 5) % len(_QB_PLACES)]
+        g = meta.get("group", "")
+        if g in ("shorten", "summarising"):
+            words = " ".join(f"{_QB_THINGS[(i + k) % len(_QB_THINGS)]} at "
+                             f"{_QB_PLACES[(i + k) % len(_QB_PLACES)]}" for k in range(12))
+            out.append({"group": g, "skill": "shorten a note", "difficulty": 2,
+                        "prompt": f"shorten this to one line pls: {who} says the list for "
+                                  f"{place} is {words}, and we meet at {x} pm",
+                        "reference": f"{who.title()}: meet at {x} pm, list for {place}.",
+                        "checks": [{"type": "max_words", "n": 15},
+                                   {"type": "contains_any", "values": [f"{x} pm", f"{x}pm"]}],
+                        "notes": "weak models repeat the whole list"})
+            continue
+        out.append({"group": g, "skill": "add two amounts", "difficulty": 1,
+                    "prompt": f"{who} has {x} {t} from {place} and buys {y} more, how many "
+                              f"now? (q{i + 1})",
+                    "reference": f"{x + y} {t}.",
+                    "checks": [{"type": "number", "value": x + y, "tolerance": 0}],
+                    "notes": "weak models subtract"})
+    return out
 
 
 def _fake_chat(i: int) -> dict:

@@ -222,6 +222,17 @@ CREATE TABLE IF NOT EXISTS judge_test_marks (
   at          REAL NOT NULL,
   PRIMARY KEY (who, answer)
 );
+-- 12i.2: the question builder's drafts — one row per batch of questions,
+-- its whole state as JSON (the spec, the prompt used, every question with
+-- its review and flags), so a draft survives a reload and a restart
+CREATE TABLE IF NOT EXISTS qb_drafts (
+  id          TEXT PRIMARY KEY,
+  kind        TEXT NOT NULL,                      -- 'knowledge' | 'everyday'
+  data        TEXT NOT NULL,
+  created_by  TEXT DEFAULT '',
+  created_at  REAL NOT NULL,
+  updated_at  REAL NOT NULL
+);
 """
 
 _COLS = ["id", "hf_id", "kind", "suite", "submitter", "note", "status", "progress",
@@ -1009,3 +1020,26 @@ def spend_of_batch(batch_id: str) -> float:
         row = c.execute("SELECT COALESCE(SUM(usd), 0) FROM ai_spend WHERE batch_id=?",
                         (batch_id,)).fetchone()
     return float(row[0] or 0.0)
+
+
+def qb_put(draft: dict) -> None:
+    with closing(_conn()) as c:
+        now = time.time()
+        c.execute("INSERT INTO qb_drafts (id, kind, data, created_by, created_at, updated_at) "
+                  "VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data, "
+                  "updated_at=excluded.updated_at",
+                  (draft["id"], draft["kind"], json.dumps(draft), draft.get("by", ""), now, now))
+        c.commit()
+
+
+def qb_get(draft_id: str) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute("SELECT data FROM qb_drafts WHERE id=?", (draft_id,)).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def qb_list() -> list[dict]:
+    """every draft, newest first"""
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT data FROM qb_drafts ORDER BY updated_at DESC").fetchall()
+    return [json.loads(r[0]) for r in rows]
