@@ -3032,6 +3032,39 @@ that program. `service/served.py` holds it.
 - **Compose:** `extra_hosts: host.docker.internal:host-gateway` was already
   on the bench service; a test now holds it there.
 
+### 12f.2 — On phone
+
+`docs/prompts/phase-12f-served-models-on-phone.md` §8–9; `service/phone.py`.
+- **A phone build** is a served model (12f.1) registered with "It's a phone
+  build" ticked, or with "phone" in how it's served.
+- **The On phone kind appears only when one exists:** the fourth switch on
+  Models, after Everyday tasks, and the fourth kind on its model page.
+- **Its card holds numbers someone measured on the phone, typed in:**
+  - the device, the chip and RAM;
+  - decode tokens per second, the median and the best, and how they were
+    repeated;
+  - the settings (streaming, lookahead, MTP);
+  - any quality they reported, with how it was measured;
+  - the date, who measured it, and the source.
+- **Every number is shown "reported by <name>"**, with the date and the
+  source, and who typed it in when that's someone else.
+  - The board never computes or estimates a phone's speed.
+  - It doesn't show its server's own speed there: the fork's README says CUDA
+    throughput doesn't represent the phone.
+- **Beside it:** what the board measured through the served model — Everyday,
+  the Knowledge exam, IFEval, MMLU-Pro, MATH-500 — each with the base model
+  beside it when the base is on the board.
+- **Reported and measured are never mixed.** Reports live in their own table
+  (`phone_reports`) and reach the page only through `GET /api/phone`: never a
+  results file, `/api/results`, a column or an average. The reported MMLU is
+  shown as reported, with its source, never in the Standard column.
+- **The first card:** the form's "Fill in the fork's README numbers" fills in
+  the brief's numbers (OnePlus 15, Snapdragon 8 Elite Gen 5, 16 GB; 13.5 tok/s
+  median, 16.0 best, 3 cold repeats at ≤65 °C; MMLU 81.98% over all 14,042 on
+  Metal). Nothing is saved until someone enters who measured them and when:
+  masein confirms them with the colleague first.
+- A later report is the card's; the earlier ones are listed under it.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

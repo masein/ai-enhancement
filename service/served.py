@@ -62,6 +62,13 @@ def is_served(model_id: str) -> bool:
     return (model_id or "").startswith(PREFIX)
 
 
+def is_phone(rec: dict | None) -> bool:
+    """12f.2: a phone build — its registration's box, or "phone" in how it's
+    served"""
+    return bool(rec) and (bool(rec.get("phone"))
+                          or bool(re.search(r"\bphone\b", rec.get("how") or "", re.I)))
+
+
 # ---------------------------------------------------------------------------
 # talking to the server
 # ---------------------------------------------------------------------------
@@ -186,6 +193,7 @@ def register(f: dict, by: str) -> dict:
     p = probe(base, key)
     rec = {"id": mid, "name": name, "base_url": base, "key": key,
            "based_on": (f.get("based_on") or "").strip(), "how": how, "thinking": thinking,
+           "phone": bool(f.get("phone")),
            "pin": pin_of(p), "answered": p["answered"], "by": by, "at": time.time()}
     db.served_put(rec)
     write_meta(rec)
@@ -199,7 +207,8 @@ def model_dir(rec: dict) -> Path:
 def view(rec: dict) -> dict:
     """what History and the page show: how it was served and what was pinned"""
     return {"name": rec["name"], "base_url": rec["base_url"], "how": rec["how"],
-            "based_on": rec["based_on"], "thinking": rec["thinking"], "pin": rec["pin"]}
+            "based_on": rec["based_on"], "thinking": rec["thinking"], "pin": rec["pin"],
+            "phone": is_phone(rec)}
 
 
 def archinfo(rec: dict) -> dict:

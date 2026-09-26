@@ -34,7 +34,7 @@ from pydantic import BaseModel
 from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
                startup, suggest, worker)
 from . import playground
-from . import served
+from . import phone, served
 from . import proposals as prop
 from . import reader
 
@@ -828,6 +828,7 @@ class ServedIn(BaseModel):
     based_on: str = ""
     how: str = ""
     thinking: str = "auto"
+    phone: bool = False                # 12f.2: a phone build
     by: str = ""
 
 
@@ -858,6 +859,41 @@ def served_add(f: ServedIn, x_token: str = Header(default="")):
         raise HTTPException(422, str(e)) from None
     _cache.update(key=None, payload=None, at=0.0)       # on Models at the next look
     return out
+
+
+# ---------------------------------------------------------------------------
+# 12f.2: On phone — numbers measured on the phone, as reported, beside what
+# the board measured through the served model. Never in a column or average
+# ---------------------------------------------------------------------------
+
+class PhoneIn(BaseModel):
+    model: str
+    device: str = ""
+    chip: str = ""
+    ram_gb: float | None = None
+    decode_median: float | None = None
+    decode_best: float | None = None
+    repeats: str = ""
+    settings: str = ""
+    date: str = ""
+    by: str = ""                       # who measured it
+    quality: list[dict] = []
+    source: str = ""
+    entered_by: str = ""               # who typed it in
+
+
+@app.get("/api/phone")
+def phone_builds():
+    return {"builds": phone.builds(), "readme": phone.README}
+
+
+@app.post("/api/phone/reports")
+def phone_report_add(f: PhoneIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    try:
+        return {"report": phone.add(f.model_dump(), f.entered_by)}
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
 
 
 @app.get("/api/models/code")
