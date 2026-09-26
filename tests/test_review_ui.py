@@ -171,7 +171,11 @@ def test_review_flow_in_the_browser(live, page):
     # at the top of Improve's pipeline for one model
     page.goto(base + "/#tab=improve&sub=model&model=fx%2Fgood-750m")
     page.wait_for_selector("[data-pipeline='fx/good-750m']")
-    page.wait_for_function("document.querySelector('#view').textContent.includes('fake/fake-1')")
+    # 12i.0: in plain words — the provider and model, and today's requests
+    ai = page.locator("[data-imp-ai]")
+    ai.wait_for()
+    assert re.fullmatch(r"AI: Fake fake-1 · \d+ requests? today( of \d+.*)?", ai.inner_text()), \
+        ai.inner_text()
     # with nothing made yet, each stage is one line
     assert page.locator("[data-stage-none='proposals']").inner_text() == "No proposals waiting"
     assert page.locator("[data-stage-none='data']").inner_text() == "No training data yet"

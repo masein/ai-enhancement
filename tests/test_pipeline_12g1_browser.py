@@ -295,7 +295,8 @@ def test_a_retest_carries_the_standard_watch_and_dropped_only_when_real(live, pa
     if case == "dropped":
         hs = page.evaluate(f"[cell('hellaswag', {json.dumps(MODEL)}).v, "
                            f"cell('hellaswag', {json.dumps(CK)}).v]")
-        assert line.inner_text() == head + (f"dropped · hellaswag {100 * hs[0]:.1f} → "
+        # 12i.0: a benchmark by its own name
+        assert line.inner_text() == head + (f"dropped · HellaSwag {100 * hs[0]:.1f} → "
                                             f"{100 * hs[1]:.1f}")
         assert "dropped" in line.get_attribute("class")
         shot(page, "12g1-retest-dropped-1400-light.png")
