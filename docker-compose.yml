@@ -73,6 +73,9 @@ services:
       EXAM_API_KEY: ${EXAM_API_KEY:-}
       # the judge — an API call, batch mode, its own identity; a DATED model id;
       # a different provider from the exam writer and the generator
+      # 12i.1: OpenRouter, for the jobs chosen on the AI models page; the key
+      # only ever in .env, never here or in a page
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       JUDGE_PROVIDER: ${JUDGE_PROVIDER:-}
       JUDGE_MODEL: ${JUDGE_MODEL:-}
       JUDGE_API_KEY: ${JUDGE_API_KEY:-}

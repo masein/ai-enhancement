@@ -1078,7 +1078,7 @@ def start(model_dir: Path, submission: int | None = None,
     straight after generation, inside the same run — `asked`, the ids it
     asked. Returns everyday.json's content plus `batch_id` when a judge batch
     went out."""
-    from service import config, db, llm
+    from service import db, llm
     out = mark(model_dir, asked=asked)
     if out is None:
         raise RuntimeError("the harness logged no answers for everyday tasks")
@@ -1088,9 +1088,10 @@ def start(model_dir: Path, submission: int | None = None,
         return out
     answers = {it["id"]: it["answer_text"] for it in out["items"]}
     ident = _judge.identity()
-    if config.JUDGE_MODEL == "stub":
+    if _judge.is_stub():
         out = mark(model_dir, {q["id"]: stub_verdict(answers[q["id"]], q["prompt"]) for q in todo},
-                   judge={"id": ident["id"], "provisional": False}, asked=asked)
+                   judge={"id": ident["id"], "version": _judge.version(ident)["key"],
+                          "provisional": False}, asked=asked)
         write(model_dir, out)
         return out
     why = _judge.blocked()
@@ -1116,7 +1117,8 @@ def start(model_dir: Path, submission: int | None = None,
         write(model_dir, out)
         out["error"] = str(e)
         return out
-    out["judge"] = {"id": ident["id"], "provisional": bool(stamp), "batch_id": bid}
+    out["judge"] = {"id": ident["id"], "version": _judge.version(ident)["key"],
+                    "provisional": bool(stamp), "batch_id": bid}
     write(model_dir, out)
     if submission:
         db.update(submission, judge_batch=bid)
@@ -1151,6 +1153,29 @@ def finish(model_dir: Path, results: dict) -> dict | None:
     out["waiting"] = 0
     write(model_dir, out)
     return out
+
+
+def judged_verdicts(out: dict | None) -> list[dict]:
+    """the items whose mark is the judge's: a judged question whose script
+    checks passed, with a verdict"""
+    if not out or out.get("earlier"):
+        return []
+    qs = {q["id"]: q for q in load_bank()}
+    return [it for it in out.get("items") or [] if it.get("judged") and it.get("pass") is not None
+            and it["id"] in qs and grade(qs[it["id"]], it.get("answer_text") or "")[0] is None]
+
+
+def clear_verdicts(model_dir: Path) -> int:
+    """12i.1: a new judge — every verdict the last one gave is dropped, so the
+    next marking asks the judge now; the script checks' marks stand. How many"""
+    out = read(model_dir)
+    todo = {it["id"] for it in judged_verdicts(out)}
+    for it in (out or {}).get("items") or []:
+        if it["id"] in todo:
+            it.update({"pass": None, "reason": WAITING})
+    if todo:
+        write(model_dir, out)
+    return len(todo)
 
 
 def judge_failed(model_dir: Path, why: str) -> None:

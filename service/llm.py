@@ -626,7 +626,7 @@ LOCAL_REASON = "{} by a local model — not a pinned benchmark"
 # a provenance record can name the weights without another network call
 _SERVED: dict[str, dict[str, str]] = {}
 _OOM = re.compile(r"out of memory|\boom\b", re.I)
-_BATCH_ID = re.compile(r"local_[0-9a-f]{12}")
+_BATCH_ID = re.compile(r"(?:local|or)_[0-9a-f]{12}")
 
 
 def local_mark(provider: str, model: str, verb: str, base_url: str | None = None) -> dict:
@@ -676,6 +676,7 @@ class LocalOpenAI(Backend):
                          the process dies, which is how a restart knows to resume
     """
     name = "local"
+    prefix = "local"              # its batch ids: local_<12 hex>
     BACKOFF = (2, 8, 30)          # seconds before each retry; the tests set zeros
 
     def __init__(self, model: str, key: str, root: Path, base_url: str | None = None,
@@ -765,7 +766,7 @@ class LocalOpenAI(Backend):
         return out
 
     def submit(self, requests: list[Request]) -> str:
-        bid = "local_" + uuid.uuid4().hex[:12]
+        bid = f"{self.prefix}_" + uuid.uuid4().hex[:12]
         d = self.dir / bid
         d.mkdir(parents=True)
         (d / "batch.json").write_text(json.dumps({
@@ -843,11 +844,15 @@ class LocalOpenAI(Backend):
 
             def drain() -> None:
                 while True:
+                    # 12i.1: a paid backend may have to wait (its monthly
+                    # limit): what is left stays unanswered, the batch pending
+                    if self.waiting():
+                        return
                     try:
                         row = todo.get_nowait()
                     except queue.Empty:
                         return
-                    rec = self._complete(row)
+                    rec = self._complete({**row, "batch_id": batch_id})
                     with write, open(out, "a", encoding="utf-8") as fh:
                         fh.write(json.dumps(rec) + "\n")
 
@@ -859,6 +864,10 @@ class LocalOpenAI(Backend):
                 t.join()
         finally:
             os.close(fd)          # releases the flock
+
+    def waiting(self) -> str:
+        """'' when requests may go out; the local server never waits"""
+        return ""
 
     @staticmethod
     def _transient(e: LLMError) -> bool:
@@ -894,11 +903,97 @@ class LocalOpenAI(Backend):
             return rec
 
 
+class OpenRouterChat(LocalOpenAI):
+    """12i.1: a model on OpenRouter, pinned on the AI models page
+    (service/ai_models.py), run as LocalOpenAI runs the local server: the
+    batch on disk, a few chat completions at a time, a restart resuming.
+
+    What it adds: the pinned provider on every request, with
+    `allow_fallbacks: false` — another provider can run another precision,
+    and that shifts marks; the cost of each request, from OpenRouter's usage
+    figures (tokens times the pinned price when it gives none), counted
+    against the monthly limit; and at the limit, or when the pinned id has
+    moved to another version, the batch waits with a plain message and sends
+    nothing — it never falls back to another model."""
+    name = "openrouter"
+    prefix = "or"
+
+    def __init__(self, model: str, key: str, root: Path, pin: dict | None = None,
+                 role: str = "llm"):
+        self.model, self.key, self.role = model, key, role
+        self.pin = dict(pin or {})
+        self.base = config.OPENROUTER_BASE_URL
+        self.concurrency = max(1, config.OPENROUTER_CONCURRENCY)
+        self.max_tokens = config.OPENROUTER_MAX_TOKENS
+        self.timeout = float(config.LOCAL_TIMEOUT_S)
+        self.dir = Path(root) / "llm_batches" / "openrouter"
+        self.served_models = [model]
+
+    @property
+    def cap_name(self) -> str:
+        return "OPENROUTER_MAX_TOKENS"
+
+    def _h(self) -> dict:
+        return {"content-type": "application/json", "authorization": f"Bearer {self.key}",
+                "x-title": "evalboard"}
+
+    def waiting(self) -> str:
+        """'' when requests may go out; else why this batch waits"""
+        from . import ai_models
+        return ai_models.over_limit() or ai_models.drifted(self.pin)
+
+    def status(self, batch_id: str) -> tuple[str, str]:
+        state, detail = super().status(batch_id)
+        why = self.waiting() if state == "pending" else ""
+        return state, (f"{detail} · {why}" if why else detail)
+
+    def _complete(self, row: dict) -> dict:
+        from . import ai_models, db
+        body = {"model": self.model, "max_tokens": min(int(row["max_tokens"]), self.max_tokens),
+                "messages": ([{"role": "system", "content": row["system"]}] if row["system"] else [])
+                + [{"role": "user", "content": row["user"]}],
+                "provider": {"order": [self.pin.get("provider")] if self.pin.get("provider")
+                             else [], "allow_fallbacks": False},
+                "usage": {"include": True}}
+        if row.get("json"):
+            body["response_format"] = {"type": "json_object"}
+        payload = json.dumps(body).encode()
+        rec = {"custom_id": row["custom_id"], "text": "", "error": "", "attempts": 0}
+        for wait in (*self.BACKOFF, None):
+            rec["attempts"] += 1
+            try:
+                _, raw = _http("POST", f"{self.base}/chat/completions", self._h(), payload,
+                               self.timeout)
+            except LLMError as e:
+                if wait is None or not self._transient(e):
+                    rec["error"] = str(e)[:400]
+                    return rec
+                time.sleep(wait)
+                continue
+            try:
+                reply = json.loads(raw)
+                choice = reply["choices"][0]
+                rec["text"] = choice["message"].get("content") or ""
+                rec["finish_reason"] = choice.get("finish_reason")
+            except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+                rec["error"] = f"unreadable reply from OpenRouter: {raw[:200]!r}"
+                return rec
+            u = reply.get("usage") or {}
+            tin, tout = int(u.get("prompt_tokens") or 0), int(u.get("completion_tokens") or 0)
+            usd = u.get("cost")
+            usd = float(usd) if isinstance(usd, (int, float)) else ai_models.cost(self.pin, tin, tout)
+            rec.update(tokens_in=tin, tokens_out=tout, usd=usd,
+                       provider=(reply.get("provider") or self.pin.get("provider_name") or ""))
+            db.spend_add(ai_models.ROLE_JOB.get(self.role, self.role), self.model,
+                         rec["provider"], tin, tout, usd, row.get("batch_id", ""))
+            return rec
+
+
 # ---------------------------------------------------------------------------
 # configuration
 # ---------------------------------------------------------------------------
 
-PROVIDERS = ("anthropic", "openai", "local", "fake")
+PROVIDERS = ("anthropic", "openai", "local", "fake", "openrouter")
 # providers that need no API key: the test double, and a server on the box's
 # loopback that ignores one. Both still need a model id except the fake.
 KEYLESS = ("fake", "local")
@@ -913,10 +1008,19 @@ def needs_key(provider: str) -> bool:
 # triple in config; the same backends serve all three.
 ROLES = {"llm": ("LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "proposals and generation"),
          "exam": ("EXAM_PROVIDER", "EXAM_MODEL", "EXAM_API_KEY", "exam drafting"),
-         "judge": ("JUDGE_PROVIDER", "JUDGE_MODEL", "JUDGE_API_KEY", "judging")}
+         "judge": ("JUDGE_PROVIDER", "JUDGE_MODEL", "JUDGE_API_KEY", "judging"),
+         # 12i.1: answers new questions without their reference (12i.2); it
+         # has no environment of its own, only the AI models page
+         "checker": ("CHECKER_PROVIDER", "CHECKER_MODEL", "CHECKER_API_KEY", "checking questions")}
 
 
 def identity(role: str = "llm") -> tuple[str, str, str]:
+    """(provider, model, key) — 12i.1: the model the AI models page chose for
+    this job, else the environment's, as before"""
+    from . import ai_models
+    chosen = ai_models.effective(role)
+    if chosen:
+        return chosen
     pv, mv, kv, _ = ROLES[role]
     return (getattr(config, pv, "") or "", getattr(config, mv, "") or "",
             getattr(config, kv, "") or "")
@@ -925,6 +1029,13 @@ def identity(role: str = "llm") -> tuple[str, str, str]:
 def blocked(role: str = "llm") -> str:
     """'' when that identity is usable, else the reason — shown in the UI in
     those words, so nobody wonders why a button is missing."""
+    from . import ai_models
+    chosen = ai_models.choice(ai_models.ROLE_JOB.get(role, ""))
+    if chosen and chosen.get("kind") == "openrouter":
+        if not config.OPENROUTER_API_KEY:
+            return ("OpenRouter has no key on this server (OPENROUTER_API_KEY in .env) — choose "
+                    "Local on AI models, or add the key")
+        return ai_models.drifted(chosen)
     pv, mv, kv, what = ROLES[role]
     p, m, k = identity(role)
     if not p:
@@ -953,6 +1064,10 @@ def startup_check() -> None:
 
 def backend_for(provider: str, model: str, key: str, root: Path | None = None,
                 role: str = "llm") -> Backend:
+    if provider == "openrouter":
+        from . import ai_models
+        pin = ai_models.choice(ai_models.ROLE_JOB.get(role, "")) or {}
+        return OpenRouterChat(model, key, root or config.BENCH_ROOT, pin=pin, role=role)
     if provider == "anthropic":
         return AnthropicBatches(model, key)
     if provider == "openai":
@@ -972,7 +1087,10 @@ def client(role: str = "llm") -> Backend:
     building it asks the server what it serves, so this can raise
     LocalUnreachable (try later) or LLMError (the configuration is wrong)."""
     p, m, k = identity(role)
-    key = (p, m, bool(k), str(config.BENCH_ROOT), config.LOCAL_BASE_URL if p == "local" else "")
+    from . import ai_models
+    pin = ai_models.choice(ai_models.ROLE_JOB.get(role, "")) if p == "openrouter" else None
+    key = (p, m, bool(k), str(config.BENCH_ROOT), config.LOCAL_BASE_URL if p == "local" else "",
+           json.dumps(pin, sort_keys=True) if pin else "")
     hit = _clients.get(role)
     if hit is None or hit[0] != key:
         why = blocked(role)

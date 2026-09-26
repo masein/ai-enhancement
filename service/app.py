@@ -29,7 +29,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from . import config, db, hfmeta, llm, llm_poller, startup, suggest, worker
+from . import ai_models, config, db, hfmeta, judge_test, llm, llm_poller, startup, suggest, worker
 from . import proposals as prop
 from . import reader
 
@@ -144,8 +144,10 @@ def judge_health(force: bool = False) -> dict:
     now = time.time()
     if not force and _JUDGE_HEALTH["value"] and now - _JUDGE_HEALTH["at"] < JUDGE_HEALTH_TTL:
         return _JUDGE_HEALTH["value"]
-    prov = config.JUDGE_PROVIDER
-    if prov != "local" or config.JUDGE_MODEL == "stub":
+    import judge as _judge
+    # 12i.1: the judge the AI models page chose, when it chose one
+    prov = _judge.identity()["provider"]
+    if prov != "local" or _judge.is_stub():
         v = {"ok": True, "checked": False, "provider": prov, "url": "", "why": ""}
     else:
         url = config.LOCAL_BASE_URL.rstrip("/")
@@ -200,8 +202,11 @@ def judge_health_endpoint():
 
 
 def _judge_identity() -> dict:
+    """the judge this server runs now — 12i.1: with its version's key, which
+    decides what judged scores the page shows today"""
     import judge as _judge
-    return _judge.identity()
+    ident = _judge.identity()
+    return {**ident, "version": _judge.version(ident)["key"]}
 
 
 def _calibration() -> dict | None:
@@ -221,11 +226,14 @@ def _tree_key() -> tuple:
     # and so is the built exam: a rebuild with other questions turns every
     # judged result on the old ones into history without touching a judge.json
     exam = _mtime(config.JUDGED_TASKS_DIR / "manifest.json")
+    # 12i.1: and the judge version this server runs: a new judge moves every
+    # judged score marked by another into History without touching a file
+    judge_v = _judge_identity().get("version")
     if not config.OUT_DIR.is_dir():
-        return (0, 0.0, db.taint_stamp(), exam)
+        return (0, 0.0, db.taint_stamp(), exam, judge_v)
     files = [f for pat in _WATCH for f in config.OUT_DIR.rglob(pat)]
     return (len(files), max((f.stat().st_mtime for f in files), default=0.0),
-            db.taint_stamp(), exam)
+            db.taint_stamp(), exam, judge_v)
 
 
 def taint_for(model_ids) -> dict[str, list[str]]:
@@ -885,6 +893,10 @@ def _llm_status() -> dict:
             "items_per_generation_request": {f: prop.items_per_request(f) for f in prop.FORMATS},
             "formats": list(prop.FORMATS), "default_format": prop.DEFAULT_FORMAT,
             "datasets_bytes": used, "datasets_quota_bytes": int(config.DATASET_QUOTA_GB * 1e9),
+            # 12i.1: each job's model in words, for the one line on Improve and
+            # the Knowledge exam ("AI: judge DeepSeek V4.1 Flash · writer GLM 5.3")
+            "ai": {j: ai_models.label(j) for j in ai_models.JOBS},
+            "ai_waiting": ai_models.over_limit(),
             "note": "the tailnet is the auth boundary: approvals record a typed name, "
                     "nothing more"}
 
@@ -892,6 +904,253 @@ def _llm_status() -> dict:
 @app.get("/api/llm")
 def llm_status():
     return _llm_status()
+
+
+# ---------------------------------------------------------------------------
+# 12i.1: the AI models page — which model does each job, what it costs, and
+# the judge test. The OpenRouter key is never in a reply: only whether there
+# is one
+# ---------------------------------------------------------------------------
+
+def _improving() -> list[str]:
+    """the models Improve is working on: the ones with proposals"""
+    return sorted({p["model"] for p in db.proposal_list(limit=500)})
+
+
+def _ai_page() -> dict:
+    import judge as _judge
+    jobs = []
+    for k, j in ai_models.JOBS.items():
+        c = ai_models.choice(k)
+        p, m, _ = llm.identity(j["role"])
+        jobs.append({"job": k, "label": j["label"], "does": j["does"],
+                     "suggested": j["suggested"], "why": j["why"],
+                     "chosen": c, "from": "page" if c else ("environment" if p else None),
+                     "provider": p, "model": m, "now": ai_models.label(k),
+                     "blocked": llm.blocked(j["role"]) if (c or p) else ""})
+    ident = _judge.identity()
+    return {"has_key": ai_models.has_key(), "jobs": jobs,
+            "local": {"name": ai_models.local_name(), "model": ai_models.local_model()},
+            "spend": {"month": round(db.spend_this_month(), 4), "limit": ai_models.limit(),
+                      "by_job": db.spend_this_month_by_job(), "waiting": ai_models.over_limit()},
+            "warnings": ai_models.warnings(_improving()),
+            "judge": {"id": ident["id"], "version": _judge.version(ident)}}
+
+
+@app.get("/api/ai")
+def ai_page():
+    return _ai_page()
+
+
+@app.get("/api/ai/models")
+def ai_models_list(refresh: int = 0):
+    """OpenRouter's text models with their prices, the suggested one per job
+    first. Nothing is asked of OpenRouter without a key"""
+    if not ai_models.has_key():
+        return {"has_key": False, "models": []}
+    return {"has_key": True, "models": ai_models.models(refresh=bool(refresh)),
+            "suggested": {k: {"id": j["suggested"], "why": j["why"]}
+                          for k, j in ai_models.JOBS.items()}}
+
+
+class AiJobIn(BaseModel):
+    model: str
+    by: str
+
+
+def _rejudge_scope() -> dict:
+    """what a new judge would re-judge: the Knowledge exam answers on file
+    marked by another judge version, and the Everyday judged questions"""
+    import everyday as _ev
+    import judge as _judge
+    key = _judge.version()["key"]
+    ident = _judge.identity()
+    exam, evd = {}, {}
+    for d in sorted(config.OUT_DIR.glob("*")) if config.OUT_DIR.is_dir() else []:
+        try:
+            j = json.loads((d / "judge.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            j = None
+        if j and not j.get("skipped"):
+            head = j.get("judge") or {}
+            v = (head.get("version") or {}).get("key")
+            if not ((v and v == key) or (not v and head.get("id") == ident["id"])):
+                n = sum(1 for t in (j.get("tasks") or {}).values()
+                        for it in t.get("items") or [] if not it.get("no_answer"))
+                if n:
+                    exam[j.get("model") or d.name.replace("__", "/", 1)] = {
+                        "n": n, "tasks": sorted(j.get("tasks") or {})}
+        e = _ev.read(d)
+        if e and (e.get("judge") or {}).get("version") != key:
+            n = len(_ev.judged_verdicts(e))
+            if n:
+                evd[e.get("model") or d.name.replace("__", "/", 1)] = n
+    return {"exam": exam, "everyday": evd}
+
+
+def _rejudge_estimate() -> dict:
+    s = _rejudge_scope()
+    n = sum(x["n"] for x in s["exam"].values()) + sum(s["everyday"].values())
+    c = ai_models.choice("judge") or {}
+    usd = n * ((c.get("price_in") or 0) * judge_test.TOKENS_IN
+               + (c.get("price_out") or 0) * judge_test.TOKENS_OUT) / 1e6
+    return {"n": n, "usd": round(usd, 2), "models": len(set(s["exam"]) | set(s["everyday"]))}
+
+
+@app.post("/api/ai/jobs/{job}")
+def ai_job_set(job: str, a: AiJobIn, x_token: str = Header(default="")):
+    """Pin a job to a model. For the judge, a new model is a new judge
+    version: the reply says how many answers on file another judge marked,
+    and about what re-judging them would cost — the page asks first"""
+    import judge as _judge
+    _check_token(x_token)
+    if not a.by.strip():
+        raise HTTPException(422, "type your name first — it is recorded with the choice")
+    before = _judge.version()["key"]
+    try:
+        saved = ai_models.save(job, a.model.strip(), a.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    llm.reset()
+    out = {"saved": saved, "page": _ai_page()}
+    if job == "judge" and _judge.version()["key"] != before:
+        out["rejudge"] = _rejudge_estimate()
+    return out
+
+
+class AiLimitIn(BaseModel):
+    usd: float
+    by: str
+
+
+@app.post("/api/ai/limit")
+def ai_limit_set(a: AiLimitIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    if not a.by.strip():
+        raise HTTPException(422, "type your name first — it is recorded with the limit")
+    if not 0 <= a.usd <= 10000:
+        raise HTTPException(422, "the monthly limit is between $0 and $10,000")
+    db.ai_set("spend_limit", round(float(a.usd), 2), a.by.strip()[:80])
+    return _ai_page()
+
+
+@app.get("/api/ai/rejudge")
+def ai_rejudge_estimate():
+    return _rejudge_estimate()
+
+
+class ByIn(BaseModel):
+    by: str
+
+
+@app.post("/api/ai/rejudge")
+def ai_rejudge(a: ByIn, x_token: str = Header(default="")):
+    """Re-judge every answer on file another judge marked, with the judge now:
+    a judged run per model whose exam answers are on disk (it only grades
+    them — no GPU), and an everyday run per model whose judged questions had
+    another judge's verdicts (it asks nothing new, only the judge)"""
+    import everyday as _ev
+    import judge as _judge
+    _check_token(x_token)
+    if not a.by.strip():
+        raise HTTPException(422, "type your name first — it is recorded on each run")
+    why = _judge.blocked() or ai_models.over_limit()
+    if why:
+        raise HTTPException(409, why)
+    s = _rejudge_scope()
+    queued = []
+    for model, x in s["exam"].items():
+        queued.append(db.add(model, "auto", "judged", a.by.strip()[:80],
+                             "judged again: a new judge", tasks=x["tasks"]))
+    for model in s["everyday"]:
+        _ev.clear_verdicts(config.OUT_DIR / model.replace("/", "__"))
+        queued.append(db.add(model, "instruct", "everyday", a.by.strip()[:80],
+                             "judged again: a new judge"))
+    return {"queued": queued, "n": _rejudge_estimate()["n"]}
+
+
+# -- the judge test ------------------------------------------------------------
+
+@app.get("/api/judge-test")
+def judge_test_page():
+    """the answers to mark, as masein sees them — never a judge's mark — his
+    marks so far, and where he got to"""
+    return {"answers": [judge_test.shown(x) for x in judge_test.answers()],
+            "marks": db.jt_marks(judge_test.PERSON), "progress": judge_test.progress(),
+            "kappa_min": config.JUDGE_KAPPA_MIN, "n_min": config.JUDGE_TEST_MIN}
+
+
+class JtMarkIn(BaseModel):
+    key: str
+    mark: int | str | None = None
+    by: str
+
+
+@app.post("/api/judge-test/mark")
+def judge_test_mark(a: JtMarkIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    if not a.by.strip():
+        raise HTTPException(422, "type your name first — it is recorded with each mark")
+    try:
+        judge_test.mark(a.key, a.mark, a.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return judge_test.progress()
+
+
+@app.get("/api/judge-test/estimate")
+def judge_test_estimate(models: str = ""):
+    ids = [m for m in models.split(",") if m.strip()]
+    try:
+        return judge_test.estimate(ids)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+
+
+class JtRunIn(BaseModel):
+    models: list[str]
+    by: str
+
+
+@app.post("/api/judge-test/run")
+def judge_test_run(a: JtRunIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    if not a.by.strip():
+        raise HTTPException(422, "type your name first — it is recorded with the run")
+    try:
+        runs = judge_test.run([m.strip() for m in a.models if m.strip()], a.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return {"runs": [{"batch_id": r["batch_id"], "name": r["candidate"]["name"]} for r in runs]}
+
+
+@app.get("/api/judge-test/result")
+def judge_test_result():
+    return judge_test.result()
+
+
+class JtUseIn(BaseModel):
+    key: str
+    by: str
+
+
+@app.post("/api/judge-test/use")
+def judge_test_use(a: JtUseIn, x_token: str = Header(default="")):
+    """make a candidate the judge: a new judge version, as AI models does"""
+    import judge as _judge
+    _check_token(x_token)
+    if not a.by.strip():
+        raise HTTPException(422, "type your name first — it is recorded with the choice")
+    before = _judge.version()["key"]
+    try:
+        saved = judge_test.use(a.key, a.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    llm.reset()
+    out = {"saved": saved}
+    if _judge.version()["key"] != before:
+        out["rejudge"] = _rejudge_estimate()
+    return out
 
 
 # ---------------------------------------------------------------------------

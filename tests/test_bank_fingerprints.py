@@ -211,8 +211,10 @@ def test_every_judged_topic_records_the_question_set_it_was_graded_on(svc):
         assert t["topic"] == (eb.TASK_TOPIC.get(task) or jd.CONTROL_LABEL)
 
 
-def test_a_pre_10b_entry_is_history_not_the_current_law_result(svc):
-    client, appmod, tree = svc
+# 12i.1: on `plain`, whose judge is the one that graded the fixture — under
+# another judge every judged score is in History, whatever its question set
+def test_a_pre_10b_entry_is_history_not_the_current_law_result(plain):
+    client, appmod, tree = plain
     _as_before_10b(tree)
     fresh(appmod)
     m = next(x for x in client.get("/api/results").json()["models"] if x["id"] == MODEL)
@@ -229,8 +231,8 @@ def test_a_pre_10b_entry_is_history_not_the_current_law_result(svc):
     assert m.get("judgedAvg") is None or LAW not in (m.get("judgedTopics") or [])
 
 
-def test_a_grade_on_another_question_set_is_history_too(svc):
-    client, appmod, tree = svc
+def test_a_grade_on_another_question_set_is_history_too(plain):
+    client, appmod, tree = plain
     _as_before_10b(tree, bank="0" * 64)
     fresh(appmod)
     m = next(x for x in client.get("/api/results").json()["models"] if x["id"] == MODEL)
