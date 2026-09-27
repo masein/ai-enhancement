@@ -104,9 +104,17 @@ def test_past_batches_and_a_batch_with_every_question_it_wrote(live, page, batch
     cards = page.locator("[data-qb-batch-q]")
     assert cards.count() == len(d["items"])
     hidden = [it for it in d["items"] if it["went"]["to"] == "hidden"]
-    first = page.locator(f"[data-qb-batch-q='{hidden[0]['n']}']")
-    assert hidden[0]["q"]["prompt"].split("\n")[0][:40] in first.inner_text()
+    # which questions went to the hidden half is the publish's own split, and
+    # only the tried ten, the flagged and a sample are reviewed: a hidden one
+    # that was accepted, not simply the first hidden one (12f.4 — that was chance)
+    seen = next(it for it in hidden if it.get("verdict") == "accept")
+    first = page.locator(f"[data-qb-batch-q='{seen['n']}']")
+    assert seen["q"]["prompt"].split("\n")[0][:40] in first.inner_text()
     assert first.locator("[data-qb-review]").inner_text() == "A · accepted by masein"
+    unseen = [it for it in hidden if it.get("verdict") is None]
+    if unseen:
+        assert page.locator(f"[data-qb-batch-q='{unseen[0]['n']}'] [data-qb-review]").inner_text() \
+            == "not reviewed"
     assert first.locator("[data-qb-checker-ok]").inner_text() in ("checker matched",
                                                                    "checker didn’t match")
     rejected = page.locator("[data-qb-review='reject']")

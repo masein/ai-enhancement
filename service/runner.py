@@ -290,6 +290,10 @@ _FRIENDLY = [
 def classify(log_tail: str) -> str:
     for pat, msg in _FRIENDLY:
         if re.search(pat, log_tail, re.I):
+            # 12f.4: which package — "missing package: tiktoken" says what to install
+            gone = re.findall(r"No module named '([\w.]+)'", log_tail)
+            if gone and "(missing package)" in msg:
+                msg = msg.replace("(missing package)", f"(missing package: {gone[-1].split('.')[0]})")
             return msg
     return "task failed — see the log link for the raw error."
 

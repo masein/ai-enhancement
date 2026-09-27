@@ -44,6 +44,7 @@ RUN if [ "$WITH_MAMBA" = "1" ]; then \
 # landed in a different interpreter than torch).
 RUN python -c "import torch, lm_eval, transformers, accelerate, datasets, fastapi, uvicorn, pytest, httpx; \
 import math_verify, langdetect, nltk, immutabledict; \
+import lm_eval.models.openai_completions, aiohttp, tenacity, tiktoken; \
 import importlib.util as u; \
 print('image env OK — torch', torch.__version__, '| built for CUDA', torch.version.cuda, \
 '| lm_eval', lm_eval.__version__, '| transformers', transformers.__version__, \

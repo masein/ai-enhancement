@@ -242,7 +242,11 @@ billing resets. `.github/workflows/ci.yml` runs only when started by hand
     A 4-core runner gives its workers only about 2.3 times one core, so it
     takes more machines, not more workers;
   - `browser`: `-m dashboard` in five shards run at once (pytest-split);
-  - `ci`: green only when both are.
+  - `image-deps` (12f.4): the image's `requirements.txt` over a CPU torch of
+    the base image's version, and `tests/test_image_deps.py` with
+    `EVALBOARD_IMAGE_DEPS=1`. So an import a run needs and the image lacks
+    fails CI, not a run. Its log lists what lm_eval's `api` extra resolved to;
+  - `ci`: green only when all three are.
 
   Every test still runs. The plugins are in `requirements-ci.txt`, not
   `requirements-dev.txt`, so the local check's image doesn't rebuild. A
@@ -513,6 +517,27 @@ pkill -INT -f scripts/gguf_worker.py
 
 `--time-limit-h` (24) stops a job the same way. The board says "The GGUF
 worker isn't running" while `results/gguf_worker.json` is older than a minute.
+
+**12f.4, after the first night:**
+- **It checks its binary before anything else.** When llama-perplexity is
+  missing, can't be executed, or doesn't start (`--version`), the worker
+  says so in one line and exits 2, without a heartbeat. Example: `gguf
+  worker: not started. llama-perplexity isn't at …: build it (HANDOFF § 5d),
+  or give its path with --binary.`
+- **A crash in a job ends that job**: "The worker failed on this job:
+  <what>". The lock is released, any llama-perplexity it started is stopped,
+  and the worker goes on to the next request.
+- **A job whose worker went quiet for over two minutes is released by the
+  board**: "The GGUF worker stopped while this ran (last seen N min ago):
+  start it again (HANDOFF § 5d) and queue this again." Its request is
+  canceled, so a restarted worker doesn't take it up. The worker also beats
+  while it hashes a large file.
+- **Measure on the GGUF is a dialog.** It opens from Test a model ▸ A GGUF
+  file ▸ Measure ▸, from the model page (an unmeasured GGUF's Scores say
+  "Not measured on its GGUF yet."), and from the header's button on a
+  GGUF-only model's page, "Measure this model". It has the benchmarks with
+  their counts, the setups, the full sets or a subset, the estimate and
+  Start.
 
 **Setups:** a GGUF is measured "as built", and in each setup registered with
 it, one line each: `lookahead 1: LLAMA_MOE_ROUTE_MODE=lookahead
@@ -3390,6 +3415,33 @@ it never scrolled, and it hid that column's numbers.
   (`tests/fake_openai.py`). CI uploads the Playground's screenshots (1280 and
   400 px, light and dark) as `playground-screenshots-shard-N`, whatever the
   result. `tests/conftest.py`'s `pg_choose` picks a model in the new picker.
+
+### 12f.4 — served models sit the generative suite; the GGUF worker's first night
+
+- **The image lacked lm_eval's `api` extra.** Served models sit IFEval,
+  MMLU-Pro and MATH-500 through lm_eval's `local-chat-completions`, which
+  needs it. The first two served generative runs failed at once with "missing
+  package".
+  - `requirements.txt` now pins `lm_eval[ifeval,math,api]==0.4.12`, and the
+    three packages it brings that had no pin: `aiohttp==3.14.3`,
+    `tenacity==9.1.4`, `tiktoken==0.14.0` (as CI's image-deps job resolved
+    them).
+  - The Dockerfile's build check imports `lm_eval.models.openai_completions`,
+    aiohttp, tenacity and tiktoken, so a missing extra fails the build.
+  - `tests/test_image_deps.py` checks the pin carries the extras.
+    - Where lm_eval is installed (CI's image-deps job, and deploy step 3
+      inside the image), it also checks local-chat-completions and every
+      package lm_eval's `api` extra declares import.
+    - Elsewhere those two skip. The fake-server tests never import lm_eval,
+      which is why they missed it.
+  - **This changes the image: deploy step 3.**
+- **A missing package is named:** "the server's python environment is broken
+  (missing package: tiktoken)" (`runner.classify`).
+- **The GGUF worker** (§ 5d):
+  - it checks its binary at start;
+  - a crash ends its job, with what happened;
+  - the board releases a job whose worker went quiet;
+  - Measure is a dialog.
 
 ## 11. Known gaps, risks, loose ends
 

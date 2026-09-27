@@ -39,6 +39,11 @@ HEARTBEAT_S = 60
 GUESS_S = {"multiple-choice": 0.25, "hellaswag": 0.4, "winogrande": 0.1}
 ACTIVE = ("queued", "waiting_lock", "running")
 DOWN = "The GGUF worker isn't running."
+# 12f.4: a job the worker was on when it went quiet this long is released — as
+# long as the run lock trusts a worker's heartbeat (runner.LOCK_BEAT_S)
+STALE_S = 120
+GONE = ("The GGUF worker stopped while this ran{ago}: start it again (HANDOFF § 5d) and queue "
+        "this again.")
 
 
 def root() -> Path:
@@ -339,6 +344,16 @@ def sync() -> None:
         if row["suite"] != "gguf" or row["status"] not in ACTIVE + ("canceling",):
             continue
         res = _read(root() / "gguf_results" / f"{row['id']}.json")
+        # 12f.4: a job never stays "running" after its worker is gone: it fails,
+        # saying so, and its request is canceled so a restarted worker skips it
+        quiet = time.time() - (w["at"] or 0)
+        if res and res.get("status") in ("running", "waiting") and quiet > STALE_S:
+            ago = f" (last seen {max(1, round(quiet / 60))} min ago)" if w["at"] else ""
+            line = GONE.format(ago=ago)
+            cancel(row["id"])
+            db.update(row["id"], status="failed", finished_at=time.time(), progress=line,
+                      error=line)
+            continue
         if not res or res.get("status") == "queued":
             db.update(row["id"], progress="waiting for the GGUF worker"
                       + ("" if w["alive"] else f" · {DOWN}"))

@@ -156,18 +156,21 @@ def test_the_model_page_shows_its_gguf_scores_the_pairing_and_the_phone_card(liv
         "xs => xs.map(x => x.textContent)") == ["as built", "lookahead 1"]
     own = part.locator("[data-gguf-pair='setup:lookahead 1']").inner_text()
     assert own.startswith("lookahead 1 vs as built: MMLU \u221233.3")
-    # Measure on the GGUF ▸: the estimate from the run it had, the worker's line
-    part.locator("[data-gg-measure] > summary").click()
-    assert part.locator("[data-gg-setup]").count() == 2
-    assert part.locator("[data-gg-mtp]").inner_text() == (
+    shot(part, "model-page-gguf.png")
+    # Measure on the GGUF: a dialog since 12f.4 — the estimate from the run it
+    # had, the worker's line
+    part.locator(f"[data-gg-measure='{PHONE}']").click()
+    dlg = page.locator("[data-dialog='gguf-measure']")
+    dlg.wait_for()
+    assert dlg.locator("[data-gg-setup]").count() == 2
+    assert dlg.locator("[data-gg-mtp]").inner_text() == (
         "No MTP setups: llama-perplexity only scores the choices, so there is nothing for MTP "
         "to draft.")
-    est = page.locator("[data-gg-estimate]")
-    est.wait_for()
-    assert est.inner_text().startswith("It takes about ") and "rough guess" not in est.inner_text()
-    assert "The GGUF worker isn't running." in page.locator("[data-gguf-worker-down]").first \
-        .inner_text()
-    shot(part, "model-page-gguf.png")
+    page.wait_for_function("document.querySelector('[data-gg-estimate]').textContent.startsWith('It takes')")
+    est = dlg.locator("[data-gg-estimate]").inner_text()
+    assert est.startswith("It takes about ") and "rough guess" not in est
+    assert "The GGUF worker isn't running." in dlg.locator("[data-gguf-worker-down]").inner_text()
+    page.keyboard.press("Escape")
     # On phone: the measured MMLU beside the reported one, each labelled, never merged
     page.locator("[data-kind-tile='phone']").click()
     card = page.locator(f"[data-phone-card='{PHONE}']")
