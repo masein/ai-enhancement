@@ -2877,6 +2877,38 @@ items 9–12.
 - **Not in 12d.1:** the kernels from 12a.5b (#75, not merged); comparing two
   models, the model page's Chat tab and trained models (12d.2).
 
+### 12d.2 — side by side, the Chat tab, trained models
+
+`docs/prompts/phase-12d-playground.md`, §7–9.
+
+- **+ Compare** next to the model picker adds a second model; two at most.
+  - One message goes to both, and the replies sit side by side, each
+    labelled (stacked below 720 px).
+  - A chat keeps both: `model2`, and each answer's second column under `b`.
+    Each model is sent its own earlier replies.
+  - **They answer at once when both fit** (`Engine.fits_both`): both on the
+    GPU with room for both, or both on the CPU. **Otherwise one after the
+    other:** the second waits for the first ("waiting for the GPU"), and the
+    first model unloads before the second loads.
+  - **Stop stops both.** "again" asks one column's model again.
+  - The chat list names both: "Qwen3-0.6B vs SmolLM2-360M".
+  - A practice question is marked for both, on the same terms as §5.
+- **The model page's Chat tab** (Scores · Answers · Chat · Improve ·
+  History) is on every live model page, so the tabs don't move.
+  - It's the Playground's component, with the model fixed: your recent chats
+    with it, and **Open in Playground →**.
+  - A base model's tab says "This is a base model: it has no chat format, so
+    there's nothing to chat with."
+  - In **Answers**, every practice answer, Everyday and exam, has **Ask it
+    again ▸**: its question goes into the Chat tab's input, unsent, marked
+    the way §5 marks it.
+- **Trained models** (Trained from set) sit in the picker right under their
+  base, "↳ name · trained · <date>" (the upload's day), in their base's
+  group. Compare suggests the base: "Compare with Qwen3-1.7B (before
+  training)". They load through the same `load_spec`: a `local/<name>` is
+  its directory, as for a run. The repo has no adapters: a trained model is
+  a full safetensors upload.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,
