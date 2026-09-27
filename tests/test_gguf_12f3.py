@@ -390,3 +390,87 @@ def test_two_ggufs_of_one_base_are_compared_and_a_small_gap_is_not_a_clear_one(s
     [pair] = client.get("/api/results").json()["gguf"]["pairs"]
     assert {pair["a"], pair["b"]} == set(ids)
     assert pair["by"]["mmlu"]["diff"] == 0 and pair["by"]["mmlu"]["clear"] is False
+
+
+# ---------------------------------------------------------------------------
+# the addendum: setups — environment variables and flags a run of their own
+# ---------------------------------------------------------------------------
+
+LOOK = "lookahead 1: LLAMA_MOE_ROUTE_MODE=lookahead LLAMA_MOE_ROUTE_LOOKAHEAD=1"
+
+
+def test_setups_are_read_and_mtp_is_not_one():
+    [s] = gguf.parse_setups(LOOK)
+    assert s["name"] == "lookahead 1" and s["flags"] == []
+    assert s["env"] == {"LLAMA_MOE_ROUTE_MODE": "lookahead", "LLAMA_MOE_ROUTE_LOOKAHEAD": "1"}
+    assert s["id"] == gb.setup_id(s["env"], []) != gb.AS_BUILT["id"]
+    two = gguf.parse_setups(LOOK + "\nbig batch: -b 4096")
+    assert two[1]["flags"] == ["-b", "4096"] and two[1]["env"] == {}
+    for bad, why in (("mtp 3: --mtp 3", gb.MTP_LINE), ("draft: -md x.gguf", gb.MTP_LINE),
+                     ("nothing:", "nothing set"), ("x: lowercase=1", "neither KEY=VALUE"),
+                     ("no colon here", "one a line"), ("p: PATH=/x", "the worker's own")):
+        with pytest.raises(ValueError) as e:
+            gguf.parse_setups(bad)
+        assert why in str(e.value), (bad, str(e.value))
+
+
+def test_the_worker_passes_a_setups_variables_and_flags(box):
+    [s] = gguf.parse_setups("lookahead 1: LLAMA_MOE_ROUTE_MODE=lookahead "
+                            "LLAMA_MOE_ROUTE_LOOKAHEAD=1 --no-warmup")
+    w = gw.Worker(box["res"], box["bin"], poll=0.05)
+    request(box, benchmarks=["mmlu"], setup=s)
+    w.once()
+    r = result(box)
+    log = (box["res"] / "gguf_results" / "1.mmlu.log").read_text()
+    assert "env LLAMA_MOE_ROUTE_MODE=lookahead" in log and "env LLAMA_MOE_ROUTE_LOOKAHEAD=1" in log
+    cmd = r["benchmarks"]["mmlu"]["command"]
+    assert cmd[cmd.index("--cpu-moe") + 1] == "--no-warmup"       # after the model's own flags
+    assert r["setup"] == s and r["benchmarks"]["mmlu"]["env"] == s["env"]
+
+
+def test_a_gguf_is_measured_in_each_setup_and_they_sit_side_by_side(svc, monkeypatch):
+    client, appmod, box = svc
+    monkeypatch.setenv("FAKE_PPL_ACC", "0.5")
+    monkeypatch.setenv("FAKE_PPL_ACC_LOOKAHEAD", "0.8")
+    r = client.post("/api/gguf/models", json={"name": "LDA", "path": str(box["model"]),
+                                              "based_on": "Qwen/Qwen3.6-35B-A3B", "how": "k4",
+                                              "setups": LOOK, "by": "masein"})
+    assert r.status_code == 200, r.text
+    gid = r.json()["model"]["id"]
+    assert [x["name"] for x in r.json()["model"]["setups"]] == ["as built", "lookahead 1"]
+    # MTP is refused where setups are entered, in the one line
+    bad = client.post("/api/gguf/models", json={"name": "x", "path": "/x.gguf", "how": "x",
+                                                "setups": "mtp: --mtp 3", "by": "masein"})
+    assert bad.status_code == 422 and bad.json()["detail"] == gb.MTP_LINE
+    # one run a setup
+    j = client.post("/api/gguf/runs", json={"model": gid, "benchmarks": ["mmlu", "arc_easy"],
+                                            "by": "masein"}).json()
+    assert len(j["ids"]) == 2
+    rows = {x["id"]: x for x in client.get("/api/submissions").json()}
+    assert [rows[i]["note"] for i in j["ids"]] == ["setup: as built", "setup: lookahead 1"]
+    for _ in j["ids"]:
+        gw.Worker(config.RESULTS_ROOT, box["bin"], poll=0.05).once()
+    client.get("/api/submissions")
+    appmod._cache.update(key=None, payload=None, at=0.0)
+    g = client.get("/api/results").json()["gguf"]
+    sets = {x["name"]: x for x in g["setups"][gid]}
+    assert abs(sets["as built"]["benches"]["mmlu"]["v"] - 3 / 6) < 1e-6
+    assert abs(sets["lookahead 1"]["benches"]["mmlu"]["v"] - 5 / 6) < 1e-6
+    assert sets["lookahead 1"]["env"]["LLAMA_MOE_ROUTE_MODE"] == "lookahead"
+    # Models shows it as built; the pairing puts the setup against as built
+    assert g["models"][gid]["mmlu"]["setup"] == "as built"
+    [pair] = [p for p in g["pairs"] if p["a"] == p["b"] == gid]
+    assert (pair["setup_a"], pair["setup_b"]) == ("lookahead 1", "as built")
+    assert abs(pair["by"]["mmlu"]["diff"] - 2 / 6) < 1e-6
+    # each run's settings, pinned in its History
+    hist = {h["setup"]["name"]: h for h in g["history"][gid]}
+    assert hist["lookahead 1"]["setup"]["env"] == sets["lookahead 1"]["env"]
+    # the setup's settings changed: another setup, and the old results say so
+    client.post("/api/gguf/models", json={"name": "LDA", "path": str(box["model"]),
+                                          "based_on": "Qwen/Qwen3.6-35B-A3B", "how": "k4",
+                                          "setups": LOOK.replace("=1", "=2"), "by": "masein"})
+    appmod._cache.update(key=None, payload=None, at=0.0)
+    g = client.get("/api/results").json()["gguf"]
+    names = [(x["name"], x["current"], bool(x["benches"])) for x in g["setups"][gid]]
+    assert names == [("as built", True, True), ("lookahead 1", True, False),
+                     ("lookahead 1", False, True)]

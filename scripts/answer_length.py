@@ -123,7 +123,12 @@ def stats(model_dir: Path, kind: str, repos: list[str], artifacts: Path | None =
         return None
     count, repo = tokenizer(repos, artifacts)
     lengths, ran_out, sources = [], 0, {"server": 0, "tokenizer": 0, "estimate": 0}
+    drafted = accepted = 0                    # 12f.3 addendum: MTP's, when the server says
     for rec in recs:
+        d = rec.get("draft") or {}
+        if isinstance(d.get("n"), int) and d["n"] > 0:
+            drafted += d["n"]
+            accepted += int(d.get("accepted") or 0)
         t = rec.get("tokens")
         if isinstance(t, int) and t >= 0:
             lengths.append(t)
@@ -140,7 +145,9 @@ def stats(model_dir: Path, kind: str, repos: list[str], artifacts: Path | None =
             ran_out += 1
     how = max(sources, key=sources.get)
     out = {"median": int(statistics.median(lengths)), "ran_out": ran_out, "n": len(lengths),
-           "how": how, "tokenizer": repo if how == "tokenizer" else ""}
+           "how": how, "tokenizer": repo if how == "tokenizer" else "",
+           "draft": {"n": drafted, "accepted": accepted, "rate": accepted / drafted}
+           if drafted else None}
     cache[kind] = {"key": key, "stats": out}
     try:
         cache_path.write_text(json.dumps(cache), encoding="utf-8")

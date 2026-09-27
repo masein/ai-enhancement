@@ -843,6 +843,7 @@ class ServedIn(BaseModel):
     phone: bool = False                # 12f.2: a phone build
     gguf_path: str = ""                # 12f.3: its GGUF file on the server
     gguf_flags: str = ""
+    gguf_setups: str = ""              # 12f.3 addendum: "name: KEY=VALUE --flag", a line each
     by: str = ""
 
 
@@ -920,6 +921,7 @@ class GgufIn(BaseModel):
     based_on: str = ""
     how: str = ""
     flags: str = ""
+    setups: str = ""                   # 12f.3 addendum
     by: str = ""
 
 
@@ -927,6 +929,7 @@ class GgufRunIn(BaseModel):
     model: str
     benchmarks: list[str] = []
     subset: int = 0
+    setups: list[str] = []             # 12f.3 addendum: none is every one
     by: str = ""
 
 
@@ -937,10 +940,11 @@ def gguf_page():
     models += [{"id": r["id"], "name": r["name"], "path": r["gguf_path"],
                 "based_on": r.get("based_on", ""), "how": r.get("how", ""),
                 "flags": gguf.flags_of(r.get("gguf_flags")), "pin": r.get("gguf_pin") or {},
+                "setups": [gguf.gb.AS_BUILT] + (r.get("gguf_setups") or []),
                 "served": True} for r in db.served_all() if r.get("gguf_path")]
     return {"worker": gguf.worker(), "benchmarks": gguf.gb.BENCHMARKS, "order": gguf.gb.ORDER,
             "datasets": gguf.manifest(), "models": models,
-            "default_flags": " ".join(gguf.gb.DEFAULT_FLAGS)}
+            "default_flags": " ".join(gguf.gb.DEFAULT_FLAGS), "mtp_line": gguf.gb.MTP_LINE}
 
 
 @app.post("/api/gguf/models")
@@ -956,7 +960,10 @@ def gguf_register(f: GgufIn, x_token: str = Header(default="")):
 
 @app.post("/api/gguf/estimate")
 def gguf_estimate(a: GgufRunIn):
-    return gguf.estimate(a.model, a.benchmarks or gguf.gb.ORDER, a.subset)
+    try:
+        return gguf.estimate(a.model, a.benchmarks or gguf.gb.ORDER, a.subset, a.setups or None)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
 
 
 @app.post("/api/gguf/runs")
@@ -967,11 +974,11 @@ def gguf_run(a: GgufRunIn, x_token: str = Header(default="")):
     if why:
         raise HTTPException(409, why)
     try:
-        sid = gguf.queue(a.model, a.benchmarks, a.subset, by)
+        ids = gguf.queue(a.model, a.benchmarks, a.subset, by, setups=a.setups or None)
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
     w = gguf.worker()
-    return {"id": sid, "status": "queued", "worker": w}
+    return {"id": ids[0], "ids": ids, "status": "queued", "worker": w}
 
 
 @app.get("/api/models/code")

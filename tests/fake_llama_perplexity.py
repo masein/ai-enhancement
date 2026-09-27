@@ -6,7 +6,9 @@ Its environment sets the rest:
 - FAKE_PPL_ACC: the fraction it gets right (0.6);
 - FAKE_PPL_DELAY: seconds a task (0);
 - FAKE_PPL_FAIL: print a context-window error and no score;
-- FAKE_PPL_LOCK: a path; "lock held" is printed while it exists.
+- FAKE_PPL_LOCK: a path; "lock held" is printed while it exists;
+- FAKE_PPL_ACC_LOOKAHEAD: its fraction under LLAMA_MOE_ROUTE_MODE=lookahead.
+It prints the routing variables it was given ("env LLAMA_MOE_ROUTE_MODE=…").
 """
 
 from __future__ import annotations
@@ -44,6 +46,12 @@ def main(argv: list[str]) -> int:
         want = int(arg.get("--multiple-choice-tasks", 0))
     n = count if not want or want >= count else want
     acc = float(os.environ.get("FAKE_PPL_ACC", "0.6"))
+    for k in ("LLAMA_MOE_ROUTE_MODE", "LLAMA_MOE_ROUTE_LOOKAHEAD"):
+        if k in os.environ:
+            print(f"env {k}={os.environ[k]}", file=sys.stderr)
+    if os.environ.get("LLAMA_MOE_ROUTE_MODE") == "lookahead" and \
+            os.environ.get("FAKE_PPL_ACC_LOOKAHEAD"):
+        acc = float(os.environ["FAKE_PPL_ACC_LOOKAHEAD"])
     delay = float(os.environ.get("FAKE_PPL_DELAY", "0"))
     lock = os.environ.get("FAKE_PPL_LOCK", "")
     out = sys.stdout

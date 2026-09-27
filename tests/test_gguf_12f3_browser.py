@@ -25,6 +25,8 @@ from test_gguf_12f3 import docs_of, fake_binary
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12f3"
 PHONE = "served/LDA-phone-build"
+MTP = "served/LDA-phone-build-MTP-3"
+LOOK = "lookahead 1: LLAMA_MOE_ROUTE_MODE=lookahead LLAMA_MOE_ROUTE_LOOKAHEAD=1"
 BASE = "Qwen/Qwen3.6-35B-A3B"
 TIP = ("Scored by llama.cpp's llama-perplexity on the quantised file. Not comparable with the "
        "lm_eval columns to its left: different prompts and no examples.")
@@ -55,17 +57,36 @@ def measured(live, tmp_path_factory):
     fake = FakeServer()
     api(live, "/api/served", {"name": "LDA phone build", "base_url": fake.base, "based_on": BASE,
                               "how": "llama.cpp fork, k=4 + LDA", "thinking": "off",
-                              "phone": True, "gguf_path": str(lda), "by": "masein"})
+                              "phone": True, "gguf_path": str(lda), "gguf_setups": LOOK,
+                              "by": "masein"})
+    # the same file, served with MTP: a setup of it
+    api(live, "/api/served", {"name": "LDA phone build, MTP 3", "base_url": fake.base,
+                              "based_on": BASE, "how": "llama.cpp fork, k=4 + LDA, MTP n_max 3",
+                              "thinking": "off", "by": "masein"})
     gid = api(live, "/api/gguf/models", {"name": "Qwen3.6 original", "path": str(orig),
                                          "based_on": BASE, "how": "unsloth MTP UD-Q4_K_XL",
-                                         "by": "masein"})["model"]["id"]
+                                         "setups": LOOK, "by": "masein"})["model"]["id"]
     binary = fake_binary(tmp)
     gw._stop["why"] = ""
     for mid, acc in ((PHONE, "0.8"), (gid, "0.7")):
-        api(live, "/api/gguf/runs", {"model": mid, "by": "masein"})
+        ids = api(live, "/api/gguf/runs", {"model": mid, "by": "masein"})["ids"]
         os.environ["FAKE_PPL_ACC"] = acc
-        gw.Worker(config.RESULTS_ROOT, binary, poll=0.05).once()
-    os.environ.pop("FAKE_PPL_ACC", None)
+        os.environ["FAKE_PPL_ACC_LOOKAHEAD"] = "0.5"
+        for _ in ids:
+            gw.Worker(config.RESULTS_ROOT, binary, poll=0.05).once()
+    for k in ("FAKE_PPL_ACC", "FAKE_PPL_ACC_LOOKAHEAD"):
+        os.environ.pop(k, None)
+    # Everyday through both served setups, the MTP one reporting its drafts
+    from service import db, runner
+    saved = runner.acquire_lock, runner.release_lock, config.JUDGE_MODEL
+    runner.acquire_lock, runner.release_lock = (lambda sid: True), (lambda: None)
+    config.JUDGE_MODEL = "stub"
+    try:
+        for mid, t in ((MTP, {"draft_n": 12, "draft_n_accepted": 9}), (PHONE, {})):
+            fake.timings = lambda body, t=t: t
+            runner.run_submission(db.get(db.add(mid, "instruct", "everyday", "masein", "")))
+    finally:
+        runner.acquire_lock, runner.release_lock, config.JUDGE_MODEL = saved
     api(live, "/api/phone/reports", {"model": PHONE, "device": "OnePlus 15",
                                      "decode_median": 13.5, "date": "2026-09-25", "by": "Sam",
                                      "quality": [{"name": "MMLU", "value": "81.98%",
@@ -125,11 +146,20 @@ def test_the_model_page_shows_its_gguf_scores_the_pairing_and_the_phone_card(liv
     part.wait_for()
     assert part.locator("h3").inner_text() == "Measured on the GGUF · llama.cpp, 0-shot"
     assert part.locator("[data-gguf-row]").count() == 6
-    pair = part.locator(f"[data-gguf-pair='{measured['gid']}']").inner_text()
-    assert pair.startswith("LDA phone build vs Qwen3.6 original: MMLU +16.7")
-    assert "(not a clear difference)" in pair
+    pairs = part.locator(f"[data-gguf-pair='{measured['gid']}']").all_inner_texts()
+    assert any(p.startswith("LDA phone build vs Qwen3.6 original, as built: MMLU +16.7")
+               and "(not a clear difference)" in p for p in pairs), pairs
+    # the addendum: its setups side by side, and each against it as built
+    assert part.locator("thead [data-gguf-setup]").evaluate_all(
+        "xs => xs.map(x => x.textContent)") == ["as built", "lookahead 1"]
+    own = part.locator("[data-gguf-pair='setup:lookahead 1']").inner_text()
+    assert own.startswith("lookahead 1 vs as built: MMLU \u221233.3")
     # Measure on the GGUF ▸: the estimate from the run it had, the worker's line
     part.locator("[data-gg-measure] > summary").click()
+    assert part.locator("[data-gg-setup]").count() == 2
+    assert part.locator("[data-gg-mtp]").inner_text() == (
+        "No MTP setups: llama-perplexity only scores the choices, so there is nothing for MTP "
+        "to draft.")
     est = page.locator("[data-gg-estimate]")
     est.wait_for()
     assert est.inner_text().startswith("It takes about ") and "rough guess" not in est.inner_text()
@@ -173,4 +203,20 @@ def test_test_a_model_has_a_gguf_file_and_says_the_worker_is_down(live, page, me
     assert page.locator("[data-gguf-card] [data-gguf-worker-down]").count() == 0
     assert page.locator(f"[data-gg-row='{measured['gid']}']").count() == 1
     shot(page.locator("[data-gguf-card]"), "test-a-model-gguf.png")
+    assert page.errors == []
+
+
+def test_served_setups_of_one_file_sit_side_by_side_with_mtps_acceptance(live, page, measured):
+    page.set_viewport_size({"width": 1400, "height": 1000})
+    page.goto(live["base"] + "/#model=" + PHONE.replace("/", "%2F"))
+    table = page.locator("[data-served-setups]")
+    table.wait_for()
+    rows = table.locator("tbody tr")
+    assert rows.count() == 2
+    mtp = table.locator(f"[data-served-setup='{MTP}']")
+    assert mtp.locator(f"[data-served-draft='{MTP}']").inner_text() == "75.0%"
+    assert table.locator(f"[data-served-draft='{PHONE}']").inner_text() == "not reported"
+    cells = mtp.locator("td").all_inner_texts()
+    assert cells[0] == "LDA phone build, MTP 3" and " of " in cells[1] and " of " in cells[4]
+    shot(table, "served-setups-of-one-file.png")
     assert page.errors == []

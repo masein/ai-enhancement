@@ -492,6 +492,13 @@ pkill -INT -f scripts/gguf_worker.py
 `--time-limit-h` (24) stops a job the same way. The board says "The GGUF
 worker isn't running" while `results/gguf_worker.json` is older than a minute.
 
+**Setups:** a GGUF is measured "as built", and in each setup registered with
+it, one line each: `lookahead 1: LLAMA_MOE_ROUTE_MODE=lookahead
+LLAMA_MOE_ROUTE_LOOKAHEAD=1`. The worker passes a setup's variables in
+llama-perplexity's environment and its flags after the model's. There are no
+MTP setups: llama-perplexity only scores the choices, so there is nothing to
+draft.
+
 ---
 
 ## 6. How we got here — the decisions and their reasons
@@ -3216,6 +3223,29 @@ that program. `service/served.py` holds it.
   - History lists each run's file, build and flags;
   - the On phone card shows "MMLU 81.5% — measured here (llama.cpp, 0-shot,
     full 14042)" beside the reported line, never merged.
+- **Setups (the addendum from the model's author):**
+  - A GGUF, or a served model's GGUF, has setups besides "as built": a name,
+    environment variables and extra flags, one a line (`gguf.parse_setups`).
+  - **MTP is refused**, with the line "No MTP setups: llama-perplexity only
+    scores the choices, so there is nothing for MTP to draft." It is shown
+    where setups are entered and where they are chosen.
+  - **A setup's id is its settings' hash** (`gguf_bench.setup_id`), so
+    changing them makes another setup; results measured under the old
+    settings stay, marked "(earlier)".
+  - **Measure on the GGUF ▸** queues a run a setup (the row's note: "setup:
+    lookahead 1"). The worker passes the variables and appends the flags, and
+    the result pins the setup with what it measured.
+  - **The model page** has a column a setup, side by side. The pairing
+    compares each setup against "as built", and two GGUFs of one base setup
+    by setup. History shows each run's setup and its settings. Models shows
+    "as built" (or the first registered setup with results).
+- **Served setups of one file:**
+  - served entries whose servers report the same file (name and size) are
+    grouped on the model page, "Setups of this file", side by side: Everyday,
+    Knowledge exam, median tokens, ran out, and MTP drafts accepted;
+  - each served answer records `timings.draft_n` and `draft_n_accepted` when
+    llama-server reports them (`draft` in the samples). `answer_length` sums
+    them into the rate, and says "not reported" when a server gives none.
 
 ## 11. Known gaps, risks, loose ends
 

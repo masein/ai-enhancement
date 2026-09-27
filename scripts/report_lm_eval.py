@@ -731,13 +731,17 @@ def answer_lengths(mid: str, r: dict, bases: set[str], served: dict) -> dict | N
 def load_gguf(results_root: Path | None, out_dir: Path | None = None,
               served: dict | None = None) -> dict | None:
     """12f.3: what the host's GGUF worker measured (results/gguf_results/), by
-    model and benchmark — its own column group, never in an lm_eval average.
+    model, setup and benchmark — its own column group, never in an lm_eval
+    average.
 
-    A benchmark's column shows the newest full run on the current dataset
-    (gguf_data/manifest.json); a subset only while there is no full one, and
-    labelled so. Runs on an earlier dataset, and every run, are the model's
-    History. Two GGUFs based on the same model are paired, benchmark by
-    benchmark, with the board's own significance test."""
+    Each setup (as built, lookahead routing, …) is a column of its own on the
+    model page. A benchmark's cell is the newest full run on the current
+    dataset (gguf_data/manifest.json); a subset only while there is no full
+    one, and labelled so. Models shows the "as built" setup, or the first
+    registered one with results. Runs on an earlier dataset, and every run,
+    are the model's History. Pairs, benchmark by benchmark, with the board's
+    own significance test: two GGUFs of one base model in the same setup, and
+    each setup of a GGUF against it as built."""
     import gguf_bench as gb
     if not results_root or not Path(results_root).is_dir():
         return None
@@ -768,14 +772,19 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
         if sv.get("gguf_path"):
             registered[sid] = {"name": sv["name"], "path": sv["gguf_path"],
                                "based_on": sv.get("based_on", ""), "how": sv.get("how", ""),
-                               "served": True}
+                               "served": True,
+                               "setups": [gb.AS_BUILT] + (sv.get("gguf_setups") or [])}
     if not runs and not registered:
         return None
     runs.sort(key=lambda r: -(r.get("finished_at") or r.get("started_at") or 0))
-    models: dict[str, dict] = {}
+    per: dict[str, dict[str, dict]] = {}          # model -> setup id -> benchmark -> cell
+    seen_setup: dict[str, dict[str, dict]] = {}   # model -> setup id -> its settings
     history: dict[str, list] = {}
     for r in runs:
         mid = r["model"]
+        setup = r.get("setup") or gb.AS_BUILT
+        su = setup.get("id") or gb.AS_BUILT["id"]
+        seen_setup.setdefault(mid, {}).setdefault(su, setup)
         benches = {}
         for b, v in (r.get("benchmarks") or {}).items():
             ds = ((r.get("datasets") or {}).get(b) or {}).get("sha256") or ""
@@ -791,38 +800,69 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
             cell = {"v": v["acc"], "se": v.get("se"), "n": v.get("n"), "full": full,
                     "subset": r.get("subset") or 0, "chance": v.get("chance"),
                     "sid": r.get("sid"), "at": r.get("finished_at"), "dataset": ds[:12],
-                    "file": (r.get("file") or {}).get("name"), "build": r.get("build") or ""}
-            have = models.setdefault(mid, {}).get(b)
+                    "file": (r.get("file") or {}).get("name"), "build": r.get("build") or "",
+                    "setup": setup.get("name") or "as built"}
+            have = per.setdefault(mid, {}).setdefault(su, {}).get(b)
             if have is None or (full and not have["full"]):
-                models[mid][b] = cell
+                per[mid][su][b] = cell
         history.setdefault(mid, []).append({
             "sid": r.get("sid"), "status": r.get("status"), "line": r.get("line") or "",
             "at": r.get("finished_at") or r.get("started_at"), "file": r.get("file"),
-            "build": r.get("build") or "", "flags": r.get("flags") or [],
+            "build": r.get("build") or "", "flags": r.get("flags") or [], "setup": setup,
             "subset": r.get("subset") or 0, "benchmarks": benches})
-    # pairs: two GGUFs of one base model, per benchmark, full against full
+    setups_out: dict[str, list] = {}
+    models: dict[str, dict] = {}
+    for mid in set(per) | set(registered):
+        reg = (registered.get(mid) or {}).get("setups") or [gb.AS_BUILT]
+        now_ids = [x["id"] for x in reg]
+        rows = [{**x, "current": True, "benches": (per.get(mid) or {}).get(x["id"], {})}
+                for x in reg]
+        # measured in settings no longer registered: shown, and marked so
+        rows += [{**seen_setup[mid][su], "current": False, "benches": cells}
+                 for su, cells in (per.get(mid) or {}).items() if su not in now_ids]
+        setups_out[mid] = rows
+        show = next((x for x in rows if x["current"] and x["benches"]), None)
+        if show:
+            models[mid] = show["benches"]
     base_of = {mid: str((registered.get(mid) or (served or {}).get(mid) or {}).get("based_on")
-                        or "").lower() for mid in models}
+                        or "").lower() for mid in per}
+
+    def compare(x_cells, y_cells):
+        by = {}
+        for k in gb.ORDER:
+            x, y = x_cells.get(k), y_cells.get(k)
+            if not x or not y or x["full"] != y["full"] or (not x["full"] and x["n"] != y["n"]):
+                continue
+            ok, z = significant(x["v"], x["se"] or 0.0, y["v"], y["se"] or 0.0)
+            by[k] = {"diff": x["v"] - y["v"], "z": z if math.isfinite(z) else None,
+                     "clear": bool(ok)}
+        return by
     pairs = []
-    ids = sorted(models)
+    ids = sorted(per)
     for i, a in enumerate(ids):
+        # each setup of one GGUF against it as built
+        for su, cells in per[a].items():
+            if su == gb.AS_BUILT["id"] or gb.AS_BUILT["id"] not in per[a]:
+                continue
+            by = compare(cells, per[a][gb.AS_BUILT["id"]])
+            if by:
+                pairs.append({"a": a, "b": a, "setup_a": seen_setup[a][su]["name"],
+                              "setup_b": gb.AS_BUILT["name"], "by": by})
+        # two GGUFs of one base, setup by setup
         for b in ids[i + 1:]:
             if not base_of[a] or base_of[a] != base_of[b]:
                 continue
-            by = {}
-            for k in gb.ORDER:
-                x, y = models[a].get(k), models[b].get(k)
-                if not x or not y or x["full"] != y["full"] or (not x["full"] and x["n"] != y["n"]):
-                    continue
-                ok, z = significant(x["v"], x["se"] or 0.0, y["v"], y["se"] or 0.0)
-                by[k] = {"diff": x["v"] - y["v"], "z": z if math.isfinite(z) else None,
-                         "clear": bool(ok)}
-            if by:
-                pairs.append({"a": a, "b": b, "based_on": base_of[a], "by": by})
-    return {"group": gb.GROUP, "tip": gb.TIP, "order": gb.ORDER,
+            for su in [x for x in per[a] if x in per[b]]:
+                by = compare(per[a][su], per[b][su])
+                if by:
+                    pairs.append({"a": a, "b": b, "setup_a": seen_setup[a][su]["name"],
+                                  "setup_b": seen_setup[b][su]["name"],
+                                  "based_on": base_of[a], "by": by})
+    return {"group": gb.GROUP, "tip": gb.TIP, "order": gb.ORDER, "mtp_line": gb.MTP_LINE,
             "benchmarks": {k: {"label": v["label"], "n": (man.get(k) or {}).get("n") or v["n"],
                                "note": v.get("note", "")} for k, v in gb.BENCHMARKS.items()},
-            "models": models, "history": history, "pairs": pairs, "registered": registered}
+            "models": models, "setups": setups_out, "history": history, "pairs": pairs,
+            "registered": registered}
 
 
 def load_served(out_dir: Path | None) -> dict:
@@ -3061,6 +3101,7 @@ select { max-width:100%; }
 .qbbatch h3 { margin:0 0 4px; }
 .qbbatch .rd-q-meta .chip { margin-right:6px; }
 .qbpast li { margin:2px 0; }
+pre.gg-cmd { white-space:pre-wrap; overflow-wrap:anywhere; }
 td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .srvsum::-webkit-details-marker { display:none; }
 /* 12f.2: On phone — reported beside measured, stacked on a phone */
@@ -5826,7 +5867,39 @@ function servedHead(m) {
     el('p', { class: 'small se', 'data-served-pin': m.id, text: 'Its server reported '
       + pinLine(s.pin) + '. Every run checks it still does.' }),
     el('p', { class: 'small', 'data-served-loglik': m.id, text: SERVED_LINE }),
-    servedCompare(m));
+    servedCompare(m), servedSetups(m));
+}
+// 12f.3 addendum: served entries whose servers report the same file are setups
+// of it — side by side: the score, the answers' median length, how many ran
+// out, and MTP's draft acceptance when the server reports it
+function servedSetups(m) {
+  const s = servedOf(m.id), pin = (s || {}).pin || {};
+  if (!pin.file) return '';
+  const same = Object.entries(DATA.served || {}).filter(([, x]) => (x.pin || {}).file === pin.file
+    && (x.pin || {}).size === pin.size).map(([id, x]) => ({ id, ...x }));
+  if (same.length < 2) return '';
+  const row = id => DATA.models.find(x => x.id === id) || {};
+  const al = id => alOf(row(id), 'everyday') || alOf(row(id), 'exam');
+  return el('div', { class: 'lb-wrap', 'data-served-setups': pin.file },
+    el('p', { class: 'small', text: `Setups of this file (${pin.file}), side by side:` }),
+    el('table', { class: 'lb mtbl' },
+      el('thead', {}, el('tr', {}, ['Setup', 'Everyday', 'Knowledge exam', 'Median tokens',
+        'Ran out', 'MTP drafts accepted'].map((t, i) => el('th', { class: i ? 'num' : '',
+        text: t })))),
+      el('tbody', {}, same.map(x => {
+        const e = evdOf(x.id), a = al(x.id), d = (a || {}).draft, r = row(x.id);
+        return el('tr', { 'data-served-setup': x.id, class: x.id === m.id ? 'open' : null },
+          el('td', { title: x.how }, x.id === m.id ? el('b', { text: x.name })
+            : el('a', { href: '#model=' + encodeURIComponent(x.id), text: x.name })),
+          el('td', { class: 'num', text: e ? `${e.passed} of ${e.total}` : '—' }),
+          el('td', { class: 'num', text: r.judgedAvg != null ? num(r.judgedAvg, 2) : '—' }),
+          el('td', { class: 'num', text: a ? a.median.toLocaleString('en') : '—' }),
+          el('td', { class: 'num', text: a ? `${a.ran_out} of ${a.n}` : '—' }),
+          el('td', { class: 'num', 'data-served-draft': x.id, title: d
+            ? `${d.accepted.toLocaleString('en')} of ${d.n.toLocaleString('en')} drafted tokens `
+              + 'accepted (timings.draft_n_accepted / draft_n)' : 'the server reported no drafts',
+            text: d ? pct(d.rate) : 'not reported' }));
+      }))));
 }
 function modelHead(m, kinds) {
   const facts = [m.params ? P(m.params) : null, m.source === 'artifact' ? 'checkpoint' : m.kind,
@@ -5835,7 +5908,7 @@ function modelHead(m, kinds) {
     el('div', { class: 'mtop' },
       el('div', { class: 'mtop-l' },
         el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
-          (m.served ? '' : warnBadge(m)) || '', dupBadge(m) || ''),
+          (m.served || ggufOnly(m) ? '' : warnBadge(m)) || '', dupBadge(m) || ''),
         el('p', { class: 'mfacts', 'data-model-facts': '1', text: facts }),
         trainedFromLine(m), servedHead(m), ggufHead(m))),
       // 12b.3: the page's one main action is the header's, which reads Test
@@ -6195,35 +6268,50 @@ function ggufPairLines(m) {
   return (G().pairs || []).filter(p => p.a === m.id || p.b === m.id).map(p => {
     const other = p.a === m.id ? p.b : p.a, sign = p.a === m.id ? 1 : -1;
     const name = id => (DATA.models.find(x => x.id === id) || {}).name || id;
+    // 12f.3 addendum: which setups; one GGUF's setup against it as built
+    const who = p.a === p.b ? `${p.setup_a} vs ${p.setup_b}`
+      : `${name(m.id)} vs ${name(other)}` + (p.setup_a ? `, ${p.setup_a}` : '');
     const bits = (G().order || []).filter(b => p.by[b]).map(b => {
       const d = p.by[b];
       return `${ggufLabel(b)} ${signed(100 * sign * d.diff)}`
         + (d.clear ? '' : ' (not a clear difference)');
     });
-    return el('p', { class: 'small', 'data-gguf-pair': other },
-      `${name(m.id)} vs ${name(other)}: ${bits.join(', ')}`,
+    return el('p', { class: 'small', 'data-gguf-pair': p.a === p.b ? `setup:${p.setup_a}` : other },
+      `${who}: ${bits.join(', ')}`,
       el('span', { class: 'se', text: ' · points; the board\u2019s z-test on the two '
         + 'proportions, 95%' }));
   });
 }
+// 12f.3 addendum: a setup's settings, in a line
+const setupWords = x => [...Object.entries(x.env || {}).map(([k, v]) => `${k}=${v}`),
+  ...(x.flags || [])].join(' ') || 'nothing added';
 function ggufPart(m) {
   const reg = ((G().registered || {})[m.id]);
   if (!ggufHas(m.id) && !reg) return '';
-  const rows = (G().order || []).map(b => [b, ggufOf(m.id, b)]).filter(([, g]) => g);
+  // a column a setup: as built, then each setup, side by side
+  const sets = ((G().setups || {})[m.id] || []).filter(x => x.current || Object.keys(x.benches
+    || {}).length);
+  const rows = (G().order || []).filter(b => sets.some(x => (x.benches || {})[b]));
+  const one = g => g ? [el('span', { text: pct(g.v) }), g.se != null ? el('span', { class: 'se',
+      text: ` \u00b1${(100 * g.se).toFixed(1)}` }) : '', g.full ? '' : el('span', { class: 'se',
+      text: ` · subset of ${Number(g.subset).toLocaleString('en')}` })] : '—';
   return el('div', { class: 'kpart', 'data-gguf-part': m.id },
     el('h3', { text: G().group }),
     el('p', { class: 'small se', text: G().tip + ' Never in any average.' }),
     rows.length ? el('div', { class: 'lb-wrap' }, el('table', { class: 'lb mtbl' },
       el('thead', {}, el('tr', {}, el('th', { text: 'Benchmark' }),
-        el('th', { class: 'num', text: 'Score' }), el('th', { class: 'num', text: 'Questions' }),
-        el('th', { class: 'num', text: 'Chance' }))),
-      el('tbody', {}, rows.map(([b, g]) => el('tr', { 'data-gguf-row': b },
-        el('td', { text: ggufLabel(b) }),
-        el('td', { class: 'num', text: pct(g.v) },
-          g.se != null ? el('span', { class: 'se', text: ` \u00b1${(100 * g.se).toFixed(1)}` }) : ''),
-        el('td', { class: 'num se', text: g.full ? `all ${Number(g.n).toLocaleString('en')}`
-          : `subset of ${Number(g.subset).toLocaleString('en')}` }),
-        el('td', { class: 'num se', text: g.chance != null ? pct(g.chance) : '—' }))))))
+        sets.map(x => el('th', { class: 'num', 'data-gguf-setup': x.name, title: setupWords(x)
+          + (x.current ? '' : ' · settings no longer registered'),
+          text: x.name + (x.current ? '' : ' (earlier)') })),
+        el('th', { class: 'num', text: 'Questions' }))),
+      el('tbody', {}, rows.map(b => {
+        const any = sets.map(x => (x.benches || {})[b]).find(Boolean);
+        return el('tr', { 'data-gguf-row': b }, el('td', { text: ggufLabel(b) }),
+          sets.map(x => el('td', { class: 'num', 'data-gguf-cell-setup': x.name },
+            ...[].concat(one((x.benches || {})[b])))),
+          el('td', { class: 'num se', text: any && any.full
+            ? `all ${Number(any.n).toLocaleString('en')}` : '' }));
+      }))))
       : el('p', { class: 'small', text: 'Not measured on its GGUF yet.' }),
     ...ggufPairLines(m),
     LIVE && reg ? ggufStartPanel(m.id) : '');
@@ -6239,6 +6327,8 @@ function ggufHistoryCard(m) {
       r.file ? ` · ${r.file.name} (${String(r.file.sha256 || '').slice(0, 12)})` : '',
       r.build ? ` · ${r.build}` : '', (r.flags || []).length ? ` · ${r.flags.join(' ')}` : '',
       r.subset ? ` · subset of ${r.subset}` : '',
+      r.setup ? el('div', { 'data-gguf-run-setup': String(r.sid) },
+        `setup: ${r.setup.name} (${setupWords(r.setup)})`) : '',
       el('div', { class: 'se' }, Object.entries(r.benchmarks || {}).map(([b, v]) =>
         `${ggufLabel(b)} ${v.acc != null ? pct(v.acc) : v.status}`
         + (v.acc != null && !v.current ? ' (an earlier dataset)' : '')).join(' · ')),
@@ -6364,7 +6454,9 @@ function runServedLine(r) {
   const g = a.gguf;
   if (g) return el('div', { 'data-run-gguf': String(r.id), text: 'GGUF: ' + [
     g.file ? `${g.file.name} (${String(g.file.sha256 || '').slice(0, 12)})` : g.path,
-    g.build, (g.flags || []).join(' '), g.subset ? `subset of ${g.subset}` : 'full sets']
+    g.build, (g.flags || []).join(' '),
+    g.setup ? `setup ${g.setup.name}: ${setupWords(g.setup)}` : '',
+    g.subset ? `subset of ${g.subset}` : 'full sets']
     .filter(Boolean).join(' · ') });
   const s = a.served;
   if (!s) return '';
@@ -8059,6 +8151,8 @@ const G = () => DATA.gguf || {};
 const isGgufKey = t => String(t).startsWith('gguf:');
 const ggufOf = (id, b) => ((G().models || {})[id] || {})[b] || null;
 const ggufHas = id => !!Object.keys((G().models || {})[id] || {}).length;
+// a GGUF file with no server: its Standard is llama-perplexity's, never an average
+const ggufOnly = m => { const g = (G().registered || {})[m.id]; return !!g && !g.served; };
 const ggufLabel = b => ((G().benchmarks || {})[b] || {}).label || b;
 function ggufCol(b) {
   return { key: 'gguf:' + b, gguf: b, label: ggufLabel(b), short: ggufLabel(b), num: true,
@@ -8935,7 +9029,7 @@ function vLeaderboard(ms) {
               ? el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
                   title: genMode(m), text: 'thinking' }) : '',
             // a thinking row has only these three: Standard's "preliminary" is not its
-            m.thinkingRow || m.served ? '' : warnBadge(m) || '', dupBadge(m) || '',
+            m.thinkingRow || m.served || ggufOnly(m) ? '' : warnBadge(m) || '', dupBadge(m) || '',
             dupsOf[m.id] ? dupToggle(m, dupsOf[m.id]) : ''));
         if (c.key === 'params') {
           const a = m.archinfo || {};
@@ -12105,7 +12199,7 @@ function ggWorkerLine(w) {
   if (!w || w.alive) return '';
   return el('div', { class: 'warn small', 'data-gguf-worker-down': '1' },
     el('p', { text: `${w.line} It measures on the host, outside Docker: start it with` }),
-    el('pre', { class: 'mono small', text: w.command }));
+    el('pre', { class: 'mono small gg-cmd', text: w.command }));
 }
 function ggufCard() {
   const Q = state.gg, F = Q.f;
@@ -12142,7 +12236,16 @@ function ggufCard() {
         placeholder: 'llama.cpp build, quantisation, what changed',
         oninput: e => { F.how = e.target.value; } }, F.how || ''),
       el('label', { for: 'gg-flags', text: 'Flags' }),
-      inp('flags', { placeholder: ((Q.page || {}).default_flags) || '-ngl 99 --cpu-moe' })),
+      inp('flags', { placeholder: ((Q.page || {}).default_flags) || '-ngl 99 --cpu-moe' }),
+      el('label', { for: 'gg-setups', text: 'Setups' }),
+      el('div', {}, el('textarea', { id: 'gg-setups', 'data-gg': 'setups', 'data-keep': 'gg-setups',
+          rows: '2', placeholder: 'lookahead 1: LLAMA_MOE_ROUTE_MODE=lookahead LLAMA_MOE_ROUTE_LOOKAHEAD=1',
+          oninput: e => { F.setups = e.target.value; } }, F.setups || ''),
+        el('p', { class: 'small se', text: 'One a line, "name: KEY=VALUE --flag …"; it is also '
+          + 'measured as built, with nothing added.' }),
+        el('p', { class: 'small se', 'data-gg-mtp': 'register', text: ((Q.page || {}).mtp_line)
+          || 'No MTP setups: llama-perplexity only scores the choices, so there is nothing for '
+          + 'MTP to draft.' }))),
     el('div', { class: 'frm', style: 'margin-top:10px' },
       el('button', { class: 'primary', 'data-gg-save': '1', disabled: Q.busy ? '' : null,
         text: Q.busy === 'save' ? 'Saving…' : 'Save', onclick: save })),
@@ -12159,15 +12262,16 @@ async function ggEstimate(id) {
   const S = state.gg.start[id];
   try {
     S.est = await post('api/gguf/estimate', { model: id, benchmarks: [...S.benches],
-      subset: S.subset ? S.n : 0 });
+      subset: S.subset ? S.n : 0, setups: [...(S.setups || [])] });
   } catch (e) { S.est = null; }
   render();
 }
 function ggufStartPanel(id) {
   const Q = state.gg;
   if (!Q.page && !Q.loading && netReady()) loadGg();
+  const sets = (((G().registered || {})[id] || {}).setups) || [{ id: 'as-built', name: 'as built' }];
   const S = Q.start[id] = Q.start[id] || { benches: new Set(G().order || []), subset: false,
-    n: 2000, open: false };
+    n: 2000, open: false, setups: new Set(sets.map(x => x.id)) };
   const order = G().order || [];
   const bits = [el('p', { class: 'small', text: 'The full sets by default: the only runs that '
     + 'compare with another GGUF\u2019s. A subset is llama-perplexity\u2019s own seeded choice, '
@@ -12176,6 +12280,13 @@ function ggufStartPanel(id) {
       el('input', { type: 'checkbox', 'data-gg-bench': b, checked: S.benches.has(b) ? '' : null,
         onchange: e => { if (e.target.checked) S.benches.add(b); else S.benches.delete(b);
           ggEstimate(id); } }), ' ' + ggufLabel(b)))),
+    // 12f.3 addendum: each setup is a run of its own
+    el('div', { class: 'frm', 'data-gg-setups': id }, el('span', { class: 'small', text: 'Setups:' }),
+      sets.map(x => el('label', { class: 'spread small', title: setupWords(x) },
+        el('input', { type: 'checkbox', 'data-gg-setup': x.id, checked: S.setups.has(x.id) ? '' : null,
+          onchange: e => { if (e.target.checked) S.setups.add(x.id); else S.setups.delete(x.id);
+            ggEstimate(id); } }), ' ' + x.name))),
+    el('p', { class: 'small se', 'data-gg-mtp': '1', text: G().mtp_line || '' }),
     el('label', { class: 'spread small' }, el('input', { type: 'checkbox', 'data-gg-subset': '1',
       checked: S.subset ? '' : null, onchange: e => { S.subset = e.target.checked; ggEstimate(id); } }),
       ' A subset of ', el('input', { type: 'number', min: '100', step: '100', value: String(S.n),
@@ -12186,15 +12297,18 @@ function ggufStartPanel(id) {
       + '.' }) : '',
     ggWorkerLine((Q.page || {}).worker),
     el('div', { class: 'frm' }, el('button', { class: 'primary', 'data-gg-start': id,
-      disabled: S.busy || !S.benches.size ? '' : null, text: S.busy ? 'Queueing…' : 'Start',
+      disabled: S.busy || !S.benches.size || !S.setups.size ? '' : null,
+      text: S.busy ? 'Queueing…' : 'Start',
       onclick: async () => {
         if (!whoName()) { askName(); return; }
         S.busy = true; S.msg = ''; render();
         try {
           const j = await post('api/gguf/runs', { model: id, benchmarks: order.filter(b =>
-            S.benches.has(b)), subset: S.subset ? S.n : 0, by: whoName() });
-          rememberQueued(j.id);
-          toast(`Run #${j.id} queued for the GGUF worker —`, { key: 'gguf',
+            S.benches.has(b)), subset: S.subset ? S.n : 0, setups: sets.map(x => x.id)
+            .filter(x => S.setups.has(x)), by: whoName() });
+          (j.ids || [j.id]).forEach(rememberQueued);
+          toast((j.ids || []).length > 1 ? `Runs #${j.ids.join(', #')} queued for the GGUF worker —`
+            : `Run #${j.id} queued for the GGUF worker —`, { key: 'gguf',
             go: () => followRun(j.id), link: 'follow it →' });
           S.open = false;
         } catch (e) { S.msg = String((e && e.message) || e); }
@@ -12270,6 +12384,13 @@ function servedCard(sf) {
       // 12f.3: its GGUF file, for the benchmarks llama-perplexity measures
       el('label', { for: 'srv-gguf_path', text: 'GGUF file on the server' }),
       inp('gguf_path', { placeholder: 'optional · /home/masein/model.gguf' }),
+      el('label', { for: 'srv-gguf_setups', text: 'Its GGUF setups' }),
+      el('div', {}, el('textarea', { id: 'srv-gguf_setups', 'data-srv': 'gguf_setups',
+          'data-keep': 'srv-gguf_setups', rows: '2',
+          placeholder: 'optional · lookahead 1: LLAMA_MOE_ROUTE_MODE=lookahead LLAMA_MOE_ROUTE_LOOKAHEAD=1',
+          oninput: e => { F.gguf_setups = e.target.value; } }, F.gguf_setups || ''),
+        el('p', { class: 'small se', 'data-srv-mtp': '1', text: 'No MTP setups: llama-perplexity '
+          + 'only scores the choices, so there is nothing for MTP to draft.' })),
       el('label', { for: 'srv-how', text: 'How it’s served' }),
       el('textarea', { id: 'srv-how', 'data-srv': 'how', 'data-keep': 'srv-how', rows: '2',
         placeholder: 'llama.cpp build, quantisation, offload flags, routing',

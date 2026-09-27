@@ -97,8 +97,10 @@ class Worker:
         except (OSError, subprocess.SubprocessError):
             return ""
 
-    def env(self) -> dict:
+    def env(self, extra: dict | None = None) -> dict:
         e = dict(os.environ)
+        # 12f.3 addendum: the setup's own variables (lookahead routing, say)
+        e.update({str(k): str(v) for k, v in (extra or {}).items()})
         if self.ld_path:
             e["LD_LIBRARY_PATH"] = self.ld_path + (
                 ":" + e["LD_LIBRARY_PATH"] if e.get("LD_LIBRARY_PATH") else "")
@@ -219,6 +221,8 @@ class Worker:
         return {"id": req["id"], "sid": req.get("sid"), "model": req["model"],
                 "name": req.get("name", ""), "status": "queued", "line": "",
                 "flags": req.get("flags") or [], "subset": int(req.get("subset") or 0),
+                # 12f.3 addendum: the setup, pinned with what it measured
+                "setup": req.get("setup") or gb.AS_BUILT,
                 "benchmarks": {b: {"status": "queued"} for b in req["benchmarks"]},
                 "build": self.build, "binary": self.binary, "host": socket.gethostname(),
                 "queued_at": req.get("at")}
@@ -301,18 +305,20 @@ class Worker:
         data = self.data / info["data"]
         n = int(req.get("subset") or 0) or int(((req.get("datasets") or {}).get(b) or {})
                                                 .get("n") or info["n"])
-        cmd = gb.command(b, self.binary, str(model), req.get("flags") or gb.DEFAULT_FLAGS,
+        setup = req.get("setup") or gb.AS_BUILT
+        cmd = gb.command(b, self.binary, str(model),
+                         (req.get("flags") or gb.DEFAULT_FLAGS) + list(setup.get("flags") or []),
                          str(data), n)
         log = self.out / f"{req['id']}.{b}.log"
-        cur = {"status": "running", "command": cmd, "log": log.name, "started_at": now(),
-               "done": 0, "total": n}
+        cur = {"status": "running", "command": cmd, "env": setup.get("env") or {},
+               "log": log.name, "started_at": now(), "done": 0, "total": n}
         res["benchmarks"][b] = cur
         res["line"] = f"{info['label']}: starting"
         write_json(res_path, res)
         mode = info["mode"]
         with open(log, "w", encoding="utf-8") as lf:
-            proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT, env=self.env(),
-                                    start_new_session=True)
+            proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT,
+                                    env=self.env(setup.get("env")), start_new_session=True)
             last = 0.0
             while True:
                 try:

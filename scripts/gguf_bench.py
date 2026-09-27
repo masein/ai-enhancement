@@ -27,6 +27,8 @@ perplexity.cpp and common/arg.cpp (teraformer/lda-2026-09-22, 91428471f):
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import re
 
@@ -63,6 +65,21 @@ MODES = {
                         "file": "-bf", "chance": None},
 }
 DEFAULT_FLAGS = ["-ngl", "99", "--cpu-moe"]     # as the servers run: it fits beside the judge
+
+# 12f.3 addendum: a GGUF is measured in setups — environment variables and
+# extra flags passed to llama-perplexity (lookahead routing, say). "As built"
+# is always one: nothing added. A setup's id is its settings' hash, so
+# changed settings are another setup, and results never mix them
+AS_BUILT = {"id": "as-built", "name": "as built", "env": {}, "flags": []}
+MTP_LINE = ("No MTP setups: llama-perplexity only scores the choices, so there is nothing for "
+            "MTP to draft.")
+
+
+def setup_id(env: dict, flags: list[str]) -> str:
+    if not env and not flags:
+        return AS_BUILT["id"]
+    canon = json.dumps({"env": dict(sorted(env.items())), "flags": list(flags)})
+    return "s" + hashlib.sha256(canon.encode()).hexdigest()[:8]
 
 
 def command(bench: str, binary: str, model: str, flags: list[str], data: str,

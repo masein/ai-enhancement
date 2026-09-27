@@ -111,6 +111,52 @@ def flags_of(text) -> list[str]:
     return shlex.split(text) if text else list(gb.DEFAULT_FLAGS)
 
 
+# 12f.3 addendum: setups — "name: KEY=VALUE … --flag …", a line each
+ENV_KEY = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+_MTP = re.compile(r"\bmtp\b|draft|--spec|speculative", re.I)
+
+
+def parse_setups(text) -> list[dict]:
+    """the setups a GGUF is measured in besides "as built": each a name, the
+    environment variables and extra flags it passes to llama-perplexity"""
+    if isinstance(text, list):
+        return [s for s in text if s.get("id") != gb.AS_BUILT["id"]]
+    out = []
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if _MTP.search(line):
+            raise ValueError(gb.MTP_LINE)
+        name, colon, rest = line.partition(":")
+        name = name.strip()
+        if not colon or not name:
+            raise ValueError(f'A setup is "name: KEY=VALUE --flag …", one a line: {line!r}')
+        env, flags = {}, []
+        for tok in shlex.split(rest):
+            if flags or tok.startswith("-"):
+                flags.append(tok)
+                continue
+            k, eq, v = tok.partition("=")
+            if not eq or not ENV_KEY.match(k):
+                raise ValueError(f"{name}: {tok!r} is neither KEY=VALUE nor a flag")
+            if k in ("LD_LIBRARY_PATH", "PATH"):
+                raise ValueError(f"{name}: {k} is the worker's own")
+            env[k] = v
+        if not env and not flags:
+            raise ValueError(f"{name}: nothing set — as built is always measured")
+        out.append({"id": gb.setup_id(env, flags), "name": name, "env": env, "flags": flags})
+    ids = [s["id"] for s in out]
+    if len(set(ids)) != len(ids):
+        raise ValueError("two setups with the same settings")
+    return out
+
+
+def setups_text(setups: list[dict]) -> str:
+    return "\n".join(f"{s['name']}: " + " ".join([f"{k}={v}" for k, v in s["env"].items()]
+                                                  + s["flags"]) for s in setups or [])
+
+
 def _check_path(path: str) -> str:
     path = (path or "").strip()
     if not path.startswith(("/", "~/")):
@@ -122,7 +168,8 @@ def _check_path(path: str) -> str:
 def view(rec: dict) -> dict:
     """what the page shows of a GGUF-only model"""
     return {"name": rec["name"], "path": rec["path"], "based_on": rec.get("based_on", ""),
-            "how": rec["how"], "flags": rec["flags"], "pin": rec.get("pin") or {}}
+            "how": rec["how"], "flags": rec["flags"], "pin": rec.get("pin") or {},
+            "setups": [gb.AS_BUILT] + (rec.get("setups") or [])}
 
 
 def write_meta(rec: dict) -> None:
@@ -145,7 +192,8 @@ def register(f: dict, by: str) -> dict:
                          "It is the record of what was measured")
     rec = {"id": slug(name), "name": name, "path": _check_path(f.get("path")),
            "based_on": (f.get("based_on") or "").strip(), "how": how,
-           "flags": flags_of(f.get("flags")), "by": by, "at": time.time()}
+           "flags": flags_of(f.get("flags")), "setups": parse_setups(f.get("setups")),
+           "by": by, "at": time.time()}
     old = db.gguf_get(rec["id"]) or {}
     if old.get("path") == rec["path"] and old.get("pin"):
         rec["pin"] = old["pin"]
@@ -163,7 +211,8 @@ def model(model_id: str) -> dict | None:
     if rec and rec.get("gguf_path"):
         return {"id": rec["id"], "name": rec["name"], "path": rec["gguf_path"],
                 "flags": flags_of(rec.get("gguf_flags")), "based_on": rec.get("based_on", ""),
-                "how": rec.get("how", ""), "pin": rec.get("gguf_pin") or {}}
+                "how": rec.get("how", ""), "pin": rec.get("gguf_pin") or {},
+                "setups": rec.get("gguf_setups") or []}
     return None
 
 
@@ -188,9 +237,23 @@ def _pin(model_id: str, file: dict) -> None:
 # a job
 # ---------------------------------------------------------------------------
 
-def estimate(model_id: str, benchmarks: list[str], subset: int = 0) -> dict:
-    """seconds for each benchmark: from the newest run of this file that
-    measured it, else a rough guess"""
+def setups_of(model_id: str, want: list[str] | None = None) -> list[dict]:
+    """as built, then the model's own setups — those asked for, in that order"""
+    m = model(model_id) or {}
+    have = [gb.AS_BUILT] + list(m.get("setups") or [])
+    if not want:
+        return have
+    unknown = [w for w in want if w not in {s["id"] for s in have}]
+    if unknown:
+        raise ValueError(f"no setup {', '.join(unknown)} on {model_id}")
+    return [s for s in have if s["id"] in want]
+
+
+def estimate(model_id: str, benchmarks: list[str], subset: int = 0,
+             setups: list[str] | None = None) -> dict:
+    """seconds for each benchmark, times the setups chosen: from the newest run
+    of this file that measured it, else a rough guess"""
+    k = len(setups_of(model_id, setups)) if model(model_id) else 1
     m = model(model_id) or {}
     sha = (m.get("pin") or {}).get("sha256")
     man = manifest()
@@ -208,7 +271,7 @@ def estimate(model_id: str, benchmarks: list[str], subset: int = 0) -> dict:
         if each is None:
             rough = True
             each = GUESS_S[gb.BENCHMARKS[b]["mode"]]
-        out[b] = {"n": n, "seconds": round(n * each)}
+        out[b] = {"n": n, "seconds": round(n * each * k)}
     total = sum(v["seconds"] for v in out.values())
     return {"by": out, "seconds": total, "rough": rough, "line": _dur(total) + (
         ", a rough guess" if rough else "")}
@@ -219,7 +282,14 @@ def _dur(s: float) -> str:
 
 
 def queue(model_id: str, benchmarks: list[str], subset: int, by: str,
-          time_limit_h: float = 24.0) -> int:
+          time_limit_h: float = 24.0, setups: list[str] | None = None) -> list[int]:
+    """a run for each setup chosen (every one when none is)"""
+    return [_queue_one(model_id, benchmarks, subset, by, time_limit_h, s)
+            for s in setups_of(model_id, setups)]
+
+
+def _queue_one(model_id: str, benchmarks: list[str], subset: int, by: str,
+               time_limit_h: float, setup: dict) -> int:
     m = model(model_id)
     if not m:
         raise ValueError(f"{model_id} has no GGUF file registered")
@@ -235,9 +305,10 @@ def queue(model_id: str, benchmarks: list[str], subset: int, by: str,
     subset = int(subset or 0)
     if subset < 0:
         raise ValueError("a subset is a number of tasks; 0 is every one")
-    sid = db.add(model_id, "instruct", "gguf", by, "", tasks=want, subset=subset)
+    sid = db.add(model_id, "instruct", "gguf", by, f"setup: {setup['name']}", tasks=want,
+                 subset=subset)
     req = {"id": str(sid), "sid": sid, "model": model_id, "name": m["name"], "path": m["path"],
-           "flags": m["flags"], "benchmarks": want, "subset": subset,
+           "flags": m["flags"], "setup": setup, "benchmarks": want, "subset": subset,
            "pin": m.get("pin") or {},
            "datasets": {b: {"sha256": man[b]["sha256"], "n": man[b]["n"]} for b in want},
            "time_limit_s": time_limit_h * 3600, "by": by, "at": time.time()}
@@ -245,7 +316,7 @@ def queue(model_id: str, benchmarks: list[str], subset: int, by: str,
     _write(_dir("gguf_requests") / f"{sid}.json", req)
     w = worker()
     db.update(sid, progress="waiting for the GGUF worker" + ("" if w["alive"] else f" · {DOWN}"),
-              arch=json.dumps({"gguf": {"path": m["path"], "flags": m["flags"],
+              arch=json.dumps({"gguf": {"path": m["path"], "flags": m["flags"], "setup": setup,
                                         "subset": subset, "benchmarks": want}}))
     return sid
 
@@ -275,6 +346,7 @@ def sync() -> None:
         st, line = res.get("status"), res.get("line") or ""
         arch = {"gguf": {"file": res.get("file"), "build": res.get("build"),
                          "flags": res.get("flags"), "subset": res.get("subset"),
+                         "setup": res.get("setup"),
                          "datasets": res.get("datasets")}}
         if st == "waiting":
             db.update(row["id"], status="waiting_lock", progress=line)
