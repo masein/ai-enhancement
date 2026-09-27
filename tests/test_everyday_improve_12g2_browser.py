@@ -60,9 +60,9 @@ def test_the_everyday_page_shows_the_practice_half_and_counts_the_hidden(live, p
     page.set_viewport_size({"width": 1400, "height": 1000})
     page.goto(live["base"] + "/#tab=benchmarks&sub=everyday")
     page.wait_for_selector("[data-everyday-table]")
-    assert page.locator("[data-evd-bank-split]").get_attribute("data-evd-bank-split") == "200|188"
+    assert page.locator("[data-evd-bank-split]").get_attribute("data-evd-bank-split") == "179|161"
     shown = {e.get_attribute("data-evd-bank-q") for e in page.locator("[data-evd-bank-q]").all()}
-    assert len(shown) == 188 and not shown & hidden_ids()
+    assert len(shown) == 161 and not shown & hidden_ids()                       # 12a.6
     assert page.locator("[data-evd-group-split='honesty']").inner_text() == \
         "24 hidden · 27 practice"                                       # 12a.5: was 19 · 22
     # no hidden question's text anywhere in what the page holds
@@ -72,8 +72,8 @@ def test_the_everyday_page_shows_the_practice_half_and_counts_the_hidden(live, p
             assert q["prompt"] not in held, q["id"]
     # a model's score is its hidden half's
     tot = page.evaluate(f"DATA.everyday.models[{json.dumps(GOOD)}].total")
-    assert tot == 200
-    assert page.locator(f"[data-evd-count='{GOOD}']").inner_text().endswith(" of 200")
+    assert tot == 179                                                          # 12a.6
+    assert page.locator(f"[data-evd-count='{GOOD}']").inner_text().endswith(" of 179")
     shot(page, "12g2-everyday-1400-light.png", full_page=True)
     assert page.errors == []
 

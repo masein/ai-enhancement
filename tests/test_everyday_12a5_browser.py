@@ -38,19 +38,19 @@ def everyday_page(page, base, width=1400):
     page.wait_for_selector("[data-everyday-table]")
 
 
-def test_the_page_has_eight_groups(live, page):
+def test_the_page_has_seven_groups(live, page):
+    """12a.6: "Shorten a message" merged into Summarise"""
     everyday_page(page, live["base"])
     assert page.locator("[data-everyday-table] .evq-short").all_inner_texts() == [
-        "Understanding", "Writing", "Shorten a message", "Summarise", "Transform",
+        "Understanding", "Writing", "Summarise", "Transform",
         "Quick maths", "Instructions", "Honesty"]
-    assert "in eight groups" in page.locator("[data-everyday-head]").inner_text()
-    assert "practice questions in eight groups" in \
+    assert "in seven groups" in page.locator("[data-everyday-head]").inner_text()
+    assert "practice questions in seven groups" in \
         page.locator("[data-everyday-bank]").inner_text()
-    # the long texts: each group's split beside it
+    # each group's split beside it
     assert page.locator("[data-evd-group-split='summarising']").inner_text() == \
-        "26 hidden · 19 practice"
-    assert page.locator("[data-evd-group-split='shorten']").inner_text() == \
-        "26 hidden · 37 practice"
+        "31 hidden · 29 practice"
+    assert page.locator("[data-evd-group-split='shorten']").count() == 0
     shot(page, "12a5-everyday-1400-light.png", full_page=True)
     assert page.errors == []
 
@@ -60,7 +60,7 @@ def test_the_model_page_says_what_the_last_marking_was(live, page):
     page.goto(live["base"] + "/#model=" + GOOD.replace("/", "%2F"))
     open_kind(page, "everyday")
     # the fixture's answers were marked, not asked by a run
-    assert page.locator(f"[data-evd-marking='{GOOD}']").inner_text() == "388 re-marked"
+    assert page.locator(f"[data-evd-marking='{GOOD}']").inner_text() == "340 re-marked"
     assert page.errors == []
 
 

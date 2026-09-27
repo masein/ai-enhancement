@@ -17,6 +17,8 @@ from test_live_check_11k import clear, plant_proposal, sql
 from test_page_recovery import Live
 
 pytestmark = pytest.mark.dashboard
+# 12a.6: good-750m's hidden Summarise answers, the short ones kept among them
+SUMMARISE_CHIP = "Summarise · 31 of 31"
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12b"
 MODEL = "fx/good-750m"                        # Standard, the exam and the pilot
 STANDARD_ONLY = "fx/good-750m-tuned-skill"    # no exam, no pilot
@@ -159,7 +161,7 @@ def test_best_in_each_kind_is_one_card_per_kind_with_data(live, page):
     for key, (value, name) in zip(("standard", "exam"), want):
         assert page.locator(f"[data-best-value='{key}']").inner_text() == value
         assert page.locator(f"[data-best-name='{key}']").inner_text() == name
-    assert page.locator("[data-best-value='everyday']").inner_text() == "199 of 200"   # 12g.2
+    assert page.locator("[data-best-value='everyday']").inner_text() == "178 of 179"   # 12g.2, 12a.6
     assert page.locator("[data-best='everyday'] [data-pilot-badge]").count() == 1
     # one link each, to that kind on Models
     for key in ("standard", "exam", "everyday"):
@@ -244,7 +246,7 @@ def test_the_header_is_the_name_the_facts_one_action_and_a_tile_per_kind(live, p
     assert hero.locator("[data-kind-tile='standard'] .ktile-sub").inner_text() == \
         f"above chance · 7 of 7 tasks · #{r['n']} of {r['of']}"
     assert hero.locator("[data-kind-value='exam']").inner_text() == jav
-    assert hero.locator("[data-kind-value='everyday']").inner_text() == "199 of 200"  # 12g.2
+    assert hero.locator("[data-kind-value='everyday']").inner_text() == "178 of 179"  # 12g.2, 12a.6
     assert hero.locator("[data-kind-tile='everyday'] [data-pilot-badge]").count() == 1
     # the main action: the Test a model dialog, this model filled in
     page.locator("[data-test-this]").click()
@@ -359,14 +361,13 @@ def test_answers_are_by_kind_then_topic_or_group(live, page):
     # half's answers (Understanding's 18), beside the hidden half's score
     qs = page.locator("[data-answers-q]")
     assert qs.count() == 18
-    # 12a.5: the short summaries are "Shorten a message"
-    group = page.locator("[data-answers-group='shorten']")
-    assert group.inner_text() == "Shorten a message · 26 of 26"
+    # 12a.6: the short summaries are Summarise's, with the long texts
+    group = page.locator("[data-answers-group='summarising']")
+    assert group.inner_text() == SUMMARISE_CHIP
     group.click()
-    page.wait_for_function("document.querySelectorAll('[data-answers-q]').length === 37")
-    assert set(page.locator("[data-answers-q] .evgroup").all_inner_texts()) == \
-        {"Shorten a message"}
-    assert page.locator("[data-answers-q] [data-evd-question]").count() == 37
+    page.wait_for_function("document.querySelectorAll('[data-answers-q]').length === 29")
+    assert set(page.locator("[data-answers-q] .evgroup").all_inner_texts()) == {"Summarise"}
+    assert page.locator("[data-answers-q] [data-evd-question]").count() == 29
     # a model that has written nothing says so in one line
     open_model(page, live["base"], STANDARD_ONLY)
     page.locator("[data-mtab='answers']").click()

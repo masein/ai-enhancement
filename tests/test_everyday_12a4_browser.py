@@ -59,7 +59,7 @@ def test_the_tab_says_which_wording_it_shows(live, page):
     line = page.locator(f"[data-everyday-head] [data-evd-version='{HASH}']")
     # 12g.2: the version is the wording and the split — 12i.0: said in words,
     # the hash and what it covers on hover
-    assert line.inner_text() == "Questions updated 25 Sep"
+    assert line.inner_text() == "Questions updated 27 Sep"                  # 12a.6
     assert line.get_attribute("title").startswith(
         f"version {HASH}: the wording and the split.")
     # the two that answered this wording; the two that sat only the pilot are not here
