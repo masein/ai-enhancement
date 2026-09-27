@@ -11579,7 +11579,9 @@ async function srvDo(what) {
 }
 function servedCard(sf) {
   const S = state.srv, F = S.f;
-  if (S.list == null && !S.loading && netReady()) loadServed();
+  // the list loads when the card is opened, never with the dialog: its answer
+  // redraws the dialog, and a redraw under someone picking a model moves it
+  if (S.open && S.list == null && !S.loading && netReady()) loadServed();
   const inp = (key, attrs = {}) => el('input', { type: 'text', id: 'srv-' + key, 'data-srv': key,
     'data-keep': 'srv-' + key, value: F[key] || '', autocomplete: 'off', spellcheck: 'false',
     oninput: e => { F[key] = e.target.value; }, ...attrs });
@@ -11587,7 +11589,10 @@ function servedCard(sf) {
     .map(m => el('option', { value: m.id })));
   const busy = !!S.busy;
   return el('details', { class: 'card', 'data-served-card': '1', open: S.open ? '' : null,
-      ontoggle: e => { S.open = e.target.open; } },
+      ontoggle: e => {
+        S.open = e.target.open;
+        if (S.open && S.list == null && !S.loading && netReady()) loadServed();
+      } },
     el('summary', { class: 'srvsum', text: 'A model served elsewhere ▸' }),
     el('p', { class: 'sub', text: 'A model another program serves over an OpenAI-compatible '
       + 'address, such as llama-server. The board asks it questions; it never starts or stops '
