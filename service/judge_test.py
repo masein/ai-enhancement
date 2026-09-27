@@ -398,8 +398,10 @@ def read_mark(a: dict, text: str) -> int | None:
     _scripts()
     if a["kind"] == "everyday":
         import everyday as ev
-        v = ev.parse_verdict(text)
-        return None if v is None else (4 if v["pass"] else 0)
+        q = next((q for q in ev.load_bank() if q["id"] == a["task"]), {})
+        v = ev.parse_verdict(text, ev.judge_check(q))
+        # 12a.6: a rubric that scores gives its score; a pass or fail, the ends
+        return None if v is None else v.get("score", 4 if v["pass"] else 0)
     import judge
     spec = judge.rubric_for(a["task"]).criteria
     if spec:

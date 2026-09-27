@@ -38,8 +38,9 @@ LOCAL = ["aed", "dirham", "dubai", "abu dhabi", "sharjah", "emirates", "uae", "n
          "talabat", "dewa", "careem", "salik"]
 # the wording of 2026-09-25: change WORDING_DATE with the wording, and this with it
 # 12g.2: the split is part of what a score means, so it is part of the version.
-# 12a.5: 55 new questions, the same day — a new hash
-WORDING = {"date": "2026-09-25", "hash": "32432393", "split": "evalboard-split-v1"}
+# 12a.5: 55 new questions, the same day — a new hash. 12a.6: 48 short summaries
+# retired, "Shorten a message" merged into Summarise
+WORDING = {"date": "2026-09-27", "hash": "7489950e", "split": "evalboard-split-v1"}
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +52,12 @@ def test_the_neutral_wording_stands():
     own; the 328's words, and who wrote them, are still 12a.4's"""
     qs = ev.load_bank()
     assert len(NEUTRAL) == 328
+    # 12a.6: the ones still in the bank — the rest are the retired short summaries
+    retired = {json.loads(x)["id"] for x in ev.RETIRED_PATH.read_text(encoding="utf-8").splitlines()}
+    assert {q["id"] for q in NEUTRAL} - set(BANK) <= retired
     for q in NEUTRAL:
+        if q["id"] in retired:
+            continue
         assert {k: BANK[q["id"]][k] for k in ("prompt", "reference", "written_by")} == \
             {k: q[k] for k in ("prompt", "reference", "written_by")}, q["id"]
     assert [q["id"] for q in qs].index("everyday-pilot-01") == 15
@@ -167,8 +173,13 @@ def test_a_run_on_this_wording_is_stamped_with_it(tmp_path):
     _asked(mdir, ev.load_bank())
     out = ev.mark(mdir)
     assert out["version"] == WORDING and out["earlier"] is False
-    # 12g.2: the hidden half's score; the judge's eleven wait, in both halves
-    assert out["passed"] == 192 and out["total"] == 200 and out["waiting"] == 11
+    # 12g.2: the hidden half's score; the judge's questions wait, in both halves —
+    # 12a.6: seventy of them, Summarise's sixty among them
+    bank = ev.load_bank()
+    judged = [q for q in bank if ev.judge_check(q)]
+    hidden_judged = sum(1 for q in judged if ev.half(q) == ev.HIDDEN)
+    assert out["total"] == 179 and out["waiting"] == len(judged) == 70
+    assert out["passed"] == 179 - hidden_judged
 
 
 def test_answers_to_an_earlier_wording_are_never_re_marked(tmp_path):

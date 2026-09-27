@@ -33,14 +33,19 @@ FULL = '{"name": "Sara Ahmed", "age": 34, "role": "product manager", "city": "To
 BANK = ev.load_bank()
 Q = {q["id"]: q for q in BANK}
 JUDGED = [q["id"] for q in BANK if any(c["type"] == "judge" for c in q["checks"])]
+# 12a.6: 340 questions after the merge, 179 of them hidden
+N, HIDDEN = 340, 179
+HIDDEN_JUDGED = sum(1 for q in BANK if q["id"] in JUDGED and ev.half(q) == ev.HIDDEN)
 
 
 def test_the_judges_questions_and_its_stand_in():
     """12b.3: English only — the TL;DR's judge reads the rubric the question
     carries; nothing is written for Arabic. 12a.3: eleven questions carry a
     judge check (the TL;DR, round 2's five and round 3's five), each beside
-    script checks."""
-    assert len(JUDGED) == 11 and "everyday-pilot-03" in JUDGED
+    script checks. 12a.6: and all of Summarise, 60 — the TL;DR among them —
+    on a rubric that scores 0 to 4, passing at 3."""
+    assert len(JUDGED) == 70 and "everyday-pilot-03" in JUDGED
+    assert all(q["id"] in JUDGED for q in BANK if q["group"] == "summarising")
     q = Q["everyday-pilot-03"]
     assert q["prompt"].startswith("tldr pls:")
     p = ev.judge_prompt(q, TLDR)
@@ -49,6 +54,10 @@ def test_the_judges_questions_and_its_stand_in():
     assert "arabic" not in p.lower()
     assert ev.parse_verdict(ev.stub_reply(p)) == {
         "pass": True, "reason": "closes 11:30 on Thursday, in two sentences or fewer"}
+    # read against the question's rubric, the stand-in's pass is the top score
+    assert ev.parse_verdict(ev.stub_reply(p), ev.judge_check(q)) == {
+        "pass": True, "score": 4, "scale": 4,
+        "reason": "4 of 4: closes 11:30 on Thursday, in two sentences or fewer"}
     assert ev.stub_verdict("School closes early on Thursday.")["pass"] is False
     assert ev.stub_verdict("Thursday: closes at 11:30. Buses at 11:15. Pickup by 11:45.") == {
         "pass": False, "reason": "more than two sentences"}
@@ -108,8 +117,8 @@ def test_the_thinking_is_never_marked(tmp_path):
         "paid.",
         "<think>names: Bean There: cozy</think>\n\nBean There\nDaily Grind\nBrew Haven"))
     out = ev.mark(mdir)
-    # 12a.5: answers to today's words, marked as today's — the five of 388
-    assert out["earlier"] is False and out["unasked"] == 383
+    # 12a.5: answers to today's words, marked as today's — the five of 340 (12a.6)
+    assert out["earlier"] is False and out["unasked"] == N - 5
     got = {it["id"][-2:]: (it["pass"], it["reason"]) for it in out["items"]}
     assert got["01"] == (False, "never mentions: 29, twenty-nine, twenty nine")   # 12a.4
     assert got["02"][0] is True and got["02"][1].startswith("valid JSON with sara")
@@ -124,17 +133,19 @@ def test_the_thinking_is_never_marked(tmp_path):
     # 12g.2: each half apart; the first and the fifth are practice questions
     assert out["practice"]["understanding"] == {"passed": 0, "total": 1}
     assert out["practice"]["instructions"] == {"passed": 1, "total": 1}
-    assert out["groups"]["shorten"] == {"passed": 0, "total": 1}      # 03, with the judge
+    assert out["groups"]["summarising"] == {"passed": 0, "total": 1}  # 03, with the judge (12a.6)
     assert "quick_maths" not in out["groups"] and "quick_maths" not in out["practice"]
 
 
 def test_a_script_check_that_fails_is_never_sent_to_the_judge(tmp_path):
     """A judged question also has script checks; the judge only decides once
-    they pass (the TL;DR without 11:30 fails before any judge)."""
+    they pass. 12a.6: the TL;DR's is Summarise's gate — a time the notice
+    never gives fails before any judge"""
     mdir = tmp_path / "fx__x"
-    write_bank(mdir, pilot("29", FULL, "School closes early on Thursday.", "x", "a\nb\nc"))
+    write_bank(mdir, pilot("29", FULL, "School closes early at 10:30 on Thursday.", "x",
+                           "a\nb\nc"))
     it = ev.mark(mdir)["items"][2]
-    assert it["pass"] is False and it["reason"] == "missing: 11:30"
+    assert it["pass"] is False and it["reason"] == "invented the time 10:30"
 
 
 def test_a_verdict_is_kept_while_the_answer_is_the_same(tmp_path):
@@ -259,18 +270,18 @@ def test_the_bank_is_asked_through_the_chat_template_and_marked_in_the_same_run(
     assert 'doc_to_text: "{{prompt}}"' in y and not any("Answer:" in ln for ln in y)
     assert "max_gen_toks: 512" in y
     assert f"test: {config.EVERYDAY_TASKS_DIR / 'everyday.jsonl'}" in y
-    # a model never asked before is asked all 388
+    # a model never asked before is asked all 340 (12a.6)
     assert len((config.EVERYDAY_TASKS_DIR / "everyday.jsonl").read_text(encoding="utf-8")
-               .splitlines()) == 388
+               .splitlines()) == N
     # marked straight after, the judge's question too (the stub is in-process)
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
-    # 12g.2: all 388 asked, the score the hidden half's — the one it fails is practice
+    # 12g.2: all asked, the score the hidden half's — the one it fails is practice
     hidden = sum(c["hidden"] for c in ev.split_counts().values())
-    assert out["model"] == MODEL and out["passed"] == out["total"] == hidden == 200
-    assert out["waiting"] == 0 and len(out["items"]) == 388
+    assert out["model"] == MODEL and out["passed"] == out["total"] == hidden == HIDDEN
+    assert out["waiting"] == 0 and len(out["items"]) == N
     row = db.get(sid)
     assert row["status"] == "done" and row["progress"] == \
-        "Everyday tasks: 200 of 200 hidden · 388 new questions"
+        f"Everyday tasks: {HIDDEN} of {HIDDEN} hidden · {N} new questions"
     assert (mdir / "model_meta.json").read_text(encoding="utf-8") == meta_before
 
 
@@ -288,8 +299,8 @@ def test_run_again_asks_nothing_it_has_answered_and_marks_it_again(svc, monkeypa
     runner.run_submission(db.get(sid))
     assert seen == []                                         # nothing asked again
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
-    assert out["passed"] == out["total"] == 200 and out["marking"] == {"new": 0, "remarked": 388}
-    assert db.get(sid)["progress"] == "Everyday tasks: 200 of 200 hidden · 388 re-marked"
+    assert out["passed"] == out["total"] == HIDDEN and out["marking"] == {"new": 0, "remarked": N}
+    assert db.get(sid)["progress"] == f"Everyday tasks: {HIDDEN} of {HIDDEN} hidden · {N} re-marked"
     # the run folder stays where it is: nothing replaced it
     assert not (config.OUT_DIR.with_name("earlier") / mdir.name).exists()
 
@@ -304,10 +315,10 @@ def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeyp
     runner.run_submission(db.get(sid))
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
     assert row["status"] == "done"
-    # 12g.2: the hidden half's score; the judge marks both halves' 11
-    assert row["progress"] == ("Everyday tasks: 192 of 200 hidden · the judge is marking 11"
-                               " · 388 new questions")
-    assert row["judge"]["n_items"] == 11 and row["judge"]["progress"] == "0/11 done"
+    # 12g.2: the hidden half's score; the judge marks both halves' 70 (12a.6: Summarise's 60)
+    assert row["progress"] == (f"Everyday tasks: {HIDDEN - HIDDEN_JUDGED} of {HIDDEN} hidden · "
+                               f"the judge is marking 70 · {N} new questions")
+    assert row["judge"]["n_items"] == 70 and row["judge"]["progress"] == "0/70 done"
     assert row["judge"]["status"] == "submitted"
     # one request per judged question, and nothing else
     sent = [r for r in llm.FakeBatches("fake-judge", config.BENCH_ROOT).recorded()
@@ -316,12 +327,14 @@ def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeyp
     llm_poller.tick()
     mdir = tree["models"][MODEL]["dir"]
     out = json.loads((mdir / "everyday.json").read_text(encoding="utf-8"))
-    assert out["passed"] == out["total"] == 200 and out["waiting"] == 0      # 12g.2: hidden
+    assert out["passed"] == out["total"] == HIDDEN and out["waiting"] == 0   # 12g.2: hidden
     tldr = next(it for it in out["items"] if it["id"] == "everyday-pilot-03")
-    assert tldr["reason"] == "closes 11:30 on Thursday, in two sentences or fewer"
+    # 12a.6: on its rubric, scored
+    assert tldr["reason"] == "4 of 4: closes 11:30 on Thursday, in two sentences or fewer"
+    assert tldr["score"] == 4
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
     # the run's line stays the run's once the judge is in
-    assert row["progress"] == "Everyday tasks: 200 of 200 hidden · 388 new questions"
+    assert row["progress"] == f"Everyday tasks: {HIDDEN} of {HIDDEN} hidden · {N} new questions"
     assert row["judge"]["status"] == "done"
 
 

@@ -18,20 +18,22 @@ BANK = {q["id"]: q for q in ev.load_bank()}
 ROUND3 = [q for q in BANK.values() if "-r3-" in q["id"]]
 
 
-def test_round3_is_222_of_the_bank():
-    assert len(ROUND3) == 222 and all(q["written_by"] for q in ROUND3)
+def test_round3_is_176_of_the_bank():
+    """222, less its 46 short summaries — 12a.6 retired them"""
+    assert len(ROUND3) == 176 and all(q["written_by"] for q in ROUND3)
 
 
-def test_pasting_the_message_back_fails_every_round3_summary_on_its_word_limit():
-    # 12a.5: the short ones are "Shorten a message" now, same ids
-    summaries = [q for q in ROUND3 if q["group"] == "shorten"]
-    assert len(summaries) == 46
-    for q in summaries:
-        message = q["prompt"][q["prompt"].index('"') + 1:q["prompt"].rindex('"')]
-        failed = [c["type"] for c in q["checks"]
-                  if ev.run_check(c, message, q["prompt"])[0] is False]
-        assert failed == ["max_words"], (q["id"], failed)      # it keeps every fact
-        assert ev.grade(q, message)[0] is False
+def test_round3s_short_summaries_are_retired_each_with_why():
+    """12a.5 made them "Shorten a message"; 12a.6 merged that group into
+    Summarise and retired these 46: longer messages with many details, more
+    than one fair summary each. They wait in retired.jsonl, with the date and
+    why; that pasting the message back fails is the Summarise rubric's now"""
+    retired = [json.loads(x) for x in ev.RETIRED_PATH.read_text(encoding="utf-8").splitlines()]
+    r3 = [q for q in retired if "-r3-" in q["id"]]
+    assert len(r3) == 46 and all(q["group"] == "shorten" for q in r3)
+    assert {q["retired"] for q in r3} == {"2026-09-27"}
+    assert all("more than one summary is fair" in q["why"] for q in r3)
+    assert not {q["id"] for q in r3} & set(BANK)
 
 
 def test_repeating_the_request_back_fails_every_round3_writing_question():

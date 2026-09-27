@@ -88,7 +88,7 @@ def test_the_builder_loads_with_the_servers_data_shape(server):
     assert page["writer"]["label"] == "Local (gemma on this server)"
     assert page["writer"]["price_in"] == 0.0 and page["writer_blocked"] == ""
     assert sum(t["bank"] for t in page["topics"]) > 0
-    assert sum(g["bank"] for g in page["groups"]) == 388
+    assert sum(g["bank"] for g in page["groups"]) == 340                # 12a.6: was 388
     for kind in ("knowledge", "everyday"):
         p = page["prompts"][kind]
         assert p["editable"] and p["locked"].startswith("## Output")

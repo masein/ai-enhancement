@@ -3443,6 +3443,60 @@ it never scrolled, and it hid that column's numbers.
   - the board releases a job whose worker went quiet;
   - Measure is a dialog.
 
+### 12a.6 — Summarise, one group, marked by the judge on a rubric
+
+masein's live answers (Qwen3-1.7B, and the served phone build and original):
+Shorten passed 10 of 111, with 95 of the 101 failures on the word limit
+alone. Summarise passed 24 of 57, with 31 of 33 failures on the word limit.
+The causes:
+- the limit counted the whole reply (lead-ins, headings, 2–3 options);
+- some limits were never asked for;
+- fact lists wanted exact strings ("8,320.75");
+- `numbers_from_source` flagged "1100" (a time).
+
+What changed:
+- **One group, "Summarise"** (`everyday.GROUPS`).
+  - The fifteen clearest short questions are kept: the TL;DR
+    (`everyday-pilot-03`) and `everyday-summarising-01` to `-15`, without
+    `-06` and `-16`.
+  - The other 48 are retired to `eval_tasks/everyday/retired.jsonl`, each
+    with the day and why. Their answers stay on disk and are no longer
+    marked.
+  - Bank version 2026-09-27 · 7489950e: 340 questions, 179 hidden;
+    Summarise has 60, 31 hidden.
+  - A question written for the old group (a builder publish, say) reads as
+    Summarise (`MERGED`), rubric and all.
+  - The one-off conversion is `docs/prompts/phase-12a6/merge_summarise.py`.
+- **Marking (`everyday.summarise_checks`):**
+  - One script gate, `numbers_from_source`.
+  - Then a judge check with `scale: 4, pass_at: 3`, whose rubric is built
+    from the question:
+    - one summary, not options: options or a lead-in cost 1;
+    - a copy of the text scores 0;
+    - the key facts: its facts list, judged by meaning;
+    - invents nothing: costs 2;
+    - a length only if the request, the words before the pasted text,
+      states one (`stated_length`). "shorter", "tldr" or "short" means
+      shorter than the text.
+  - The judge replies `{"score", "reason"}`, and the item shows "3 of 4: …".
+  - A judge verdict is kept only while the answer and the rubric
+    (`rubric_key`) are the ones it read, so an old script mark is never
+    taken for the judge's.
+- **`numbers_from_source` reads four-digit times.** "1100", "0930" and "1430
+  hrs" are the same as "11:00" or "11 am". In the text they give that time.
+  In an answer they are the text's time when it gives it, and a number
+  otherwise.
+- **Re-mark, no model runs:**
+  - `python scripts/everyday.py …/full --judge` re-marks every model and
+    sends every answer that waits on the judge in one batch (kind
+    `everyday_remark`), which the poller lands.
+  - The marks from before its first run are kept in `full/everyday_before_12a6.json`.
+  - `--compare` prints before and after, model by model: the PR's table.
+- **The question builder:** a Summarise question it writes gets the gate and
+  the rubric from the facts the writer listed. Its instructions (and the
+  brief's copy, `docs/prompts/phase-12i/everyday-question-prompt.md`) say
+  so. The judge test reads a rubric's 0–4 score.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,
