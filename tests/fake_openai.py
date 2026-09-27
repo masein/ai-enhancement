@@ -1,5 +1,9 @@
 """A fake OpenAI-compatible server, answering as llama-server does: /v1/models,
 /props, /health and /v1/chat/completions, with canned replies. No model runs.
+12d.3: `stream: true` is answered as llama-server streams — its thinking as
+`reasoning_content` deltas, then the reply a word at a time, then a last chunk
+with `timings` and, when asked, `usage` — and a client that hangs up is
+counted.
 
 It runs in a thread on a free port. A test changes the file it serves, asks
 for a key, or makes it stop answering after so many answers (a 503 each
@@ -7,6 +11,9 @@ time after, as a server that has gone away behind a proxy would)."""
 
 from __future__ import annotations
 
+import asyncio
+import json
+import re
 import socket
 import threading
 import time
@@ -14,7 +21,7 @@ import urllib.request
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 LDA_FILE = "/home/masein/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf"
 
@@ -41,6 +48,8 @@ class FakeServer:
         self.in_flight = 0
         self.max_in_flight = 0
         self.on_request = None                   # called with each chat body
+        self.stream_delay_s = 0.0                # 12d.3: between streamed pieces
+        self.hung_up = 0                         # streams the client closed early
         self._lock = threading.Lock()
         app = FastAPI()
 
@@ -81,6 +90,8 @@ class FakeServer:
                 self.max_in_flight = max(self.max_in_flight, self.in_flight)
             if self.on_request:
                 self.on_request(body)
+            if body.get("stream"):
+                return self._stream(request, body)
             try:
                 if self.delay_s:
                     time.sleep(self.delay_s)
@@ -118,6 +129,43 @@ class FakeServer:
                 time.sleep(0.05)
         else:
             raise RuntimeError("the fake server did not come up")
+
+    def _stream(self, request: Request, body: dict):
+        content = self.reply(body)
+        think = self.reasoning(body) if callable(self.reasoning) else self.reasoning
+        used = (self.tokens(body) if callable(self.tokens)
+                else len(content.split()) + len((think or "").split()))
+
+        def chunk(delta: dict, **more) -> str:
+            return "data: " + json.dumps({"id": "chatcmpl-1", "object": "chat.completion.chunk",
+                                          "choices": [{"index": 0, "delta": delta,
+                                                       "finish_reason": more.pop("finish", None)}],
+                                          **more}) + "\n\n"
+
+        async def events():
+            try:
+                pieces = [("reasoning_content", w) for w in re.findall(r"\S+\s*", think or "")]
+                pieces += [("content", w) for w in re.findall(r"\S+\s*|\s+", content)]
+                yield chunk({"role": "assistant", "content": None})
+                for k, w in pieces:
+                    if await request.is_disconnected():
+                        self.hung_up += 1
+                        return
+                    yield chunk({k: w})
+                    await asyncio.sleep(self.stream_delay_s)
+                last = {"finish": "stop"}
+                if callable(self.timings):
+                    last["timings"] = self.timings(body)
+                if (body.get("stream_options") or {}).get("include_usage"):
+                    last["usage"] = {"prompt_tokens": 10, "completion_tokens": used}
+                yield chunk({}, **last)
+                yield "data: [DONE]\n\n"
+                with self._lock:
+                    self.answered += 1
+            finally:
+                with self._lock:
+                    self.in_flight -= 1
+        return StreamingResponse(events(), media_type="text/event-stream")
 
     @property
     def base(self) -> str:

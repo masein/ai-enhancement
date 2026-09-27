@@ -861,6 +861,16 @@ def run_submission(sub: dict) -> None:
             return
         time.sleep(config.GPU_POLL_S)
 
+    # 12d.3: the lock is this run's, so a new chat message to the model it
+    # tests waits (chat.Engine.place); the replies already streaming to it
+    # stop first, so no chat request is interleaved with a scored one
+    if rec:
+        try:
+            from . import chat as _chat
+            _chat.ENGINE.yield_served(sub["hf_id"])
+        except Exception:                              # noqa: BLE001 — a run never waits on chat
+            pass
+
     try:
         # -- wait for VRAM, then run the missing tasks ----------------------------
         need_mib = int(meta["need_gb"] * 1024) + config.FREE_MARGIN_MIB

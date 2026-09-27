@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 import everyday as ev
-from conftest import set_name
+from conftest import pg_choose, set_name
 from service import chat, config, db
 
 pytestmark = pytest.mark.dashboard
@@ -59,9 +59,9 @@ def pg(page, base, width=1400):
 @pytest.mark.parametrize("width", [1400, 400])
 def test_compare_two_models_side_by_side(live, page, width):
     pg(page, live["base"], width)
-    page.locator("[data-pg-model]").select_option(SMALL)
+    pg_choose(page, SMALL)
     page.locator("[data-pg-compare]").click()
-    page.locator("[data-pg-model2]").select_option(BIG)
+    pg_choose(page, BIG, second=True)
     page.locator("[data-pg-input]").fill("say hi to both")
     page.locator("[data-pg-send]").click()
     a = page.locator("[data-pg-pair='1'] [data-pg-col='a'] [data-pg-stats]")
@@ -69,7 +69,7 @@ def test_compare_two_models_side_by_side(live, page, width):
     a.wait_for()
     b.wait_for()
     names = page.locator("[data-pg-pair='1'] .pgwho").all_inner_texts()
-    assert names == ["below-135m-it ›", "chat-1.7b-it ›"]
+    assert names == ["below-135m-it", "chat-1.7b-it"]
     ra = page.locator("[data-pg-pair='1'] [data-pg-col='a']").bounding_box()
     rb = page.locator("[data-pg-pair='1'] [data-pg-col='b']").bounding_box()
     if width > 720:
@@ -87,17 +87,21 @@ def test_compare_two_models_side_by_side(live, page, width):
 
 def test_a_trained_model_sits_under_its_base_and_compare_suggests_it(live, page):
     pg(page, live["base"])
-    opts = page.locator("[data-pg-model] option").evaluate_all(
-        "os => os.map(o => [o.value, o.textContent])")
-    ids = [v for v, _ in opts]
+    page.locator("[data-pg-model]").click()
+    opts = page.locator("#pop-pg-model-a [data-pg-option]").evaluate_all(
+        "os => os.map(o => [o.dataset.pgOption, o.querySelector('.pgoname').textContent, "
+        "o.querySelector('[data-pg-tag=trained]')?.textContent || ''])")
+    ids = [v for v, _, _ in opts]
     assert ids.index(TUNED) == ids.index(BIG) + 1
     import re
-    assert re.fullmatch(r"↳ chat-1\.7b-tuned · trained · \d{4}-\d\d-\d\d", dict(opts)[TUNED])
-    page.locator("[data-pg-model]").select_option(TUNED)
+    name, tag = next((n, t) for v, n, t in opts if v == TUNED)
+    assert name == "↳ chat-1.7b-tuned" and re.fullmatch(r"trained · \d{4}-\d\d-\d\d", tag)
+    page.keyboard.press("Escape")
+    pg_choose(page, TUNED)
     sug = page.locator(f"[data-pg-suggest='{BIG}']")
     assert sug.inner_text() == "Compare with chat-1.7b-it (before training)"
     sug.click()
-    assert page.locator("[data-pg-model2]").input_value() == BIG
+    assert page.locator("[data-pg-model2]").get_attribute("data-pg-model2") == BIG
     shot(page.locator("[data-pg-main]"), "12d2-trained-suggest-1400-light.png")
     assert page.errors == []
 

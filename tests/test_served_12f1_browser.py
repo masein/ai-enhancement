@@ -116,16 +116,15 @@ def test_its_page_says_how_it_is_served_once_and_has_no_improve(live, page, srv)
         assert cmp.startswith("Compared with good-750m loaded here: Everyday ")
         assert " vs " in cmp
         # no Improve: there are no weights here to train. Chat stays, as on every
-        # model page (12d.2), and says why it can't chat with this one
+        # model page (12d.2), and (12d.3) chats with it through its server
         tabs = page.locator("[data-model-tabs] [role=tab]").all_inner_texts()
         assert tabs == ["Scores", "Answers", "Chat", "History"]
         assert no_sideways(page)
         shot(page, f"model-page-{width}.png", full_page=True)
     page.set_viewport_size({"width": 1400, "height": 900})
     page.locator("[data-mtab='chat']").click()
-    assert page.locator("[data-model-chat-why]").inner_text() == (
-        "This model is served elsewhere: the Playground chats only with models loaded on "
-        "this server.")
+    page.wait_for_selector(f"[data-model-chat='{SID}']")
+    assert page.locator("[data-model-chat-none]").count() == 0          # offered, not refused
     assert page.errors == []
 
 

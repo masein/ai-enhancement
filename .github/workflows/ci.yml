@@ -104,6 +104,15 @@ jobs:
           name: dashboard-screenshots-shard-${{ matrix.shard }}
           path: tests/_screens/
           if-no-files-found: ignore
+      # 12d.3: the Playground at 1280 and 400 px, light and dark, whatever the
+      # result — the new layout, seen before a deploy; only the shards that
+      # ran those tests have any
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playground-screenshots-shard-${{ matrix.shard }}
+          path: tests/_screens/phase12d3/
+          if-no-files-found: ignore
 
   ci:
     needs: [lint-unit, browser]

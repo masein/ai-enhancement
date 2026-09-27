@@ -374,12 +374,14 @@ def test_log_likelihood_tasks_are_not_offered_and_the_line_says_why(svc, fake):
         assert client.post("/api/submissions", json={"hf_id": SID, "suite": suite}).status_code == 200
 
 
-def test_improve_and_the_playground_leave_it_out(svc, fake):
+def test_improve_leaves_it_out_and_the_playground_chats_through_its_server(svc, fake):
     client, _, _ = svc
     assert register(client, fake).status_code == 200
     r = client.post("/api/proposals", json={"model": SID, "topic": "Economics", "by": ME})
     assert r.status_code == 422 and "served elsewhere" in r.json()["detail"]
-    assert SID not in [m["id"] for m in chat.board_models()]
+    # 12d.3: the Playground chats with it, through its server, once
+    rows = [m for m in chat.board_models() if m["id"] == SID]
+    assert len(rows) == 1 and rows[0]["served"] and rows[0]["chat"]
 
 
 def test_the_compose_file_lets_the_container_reach_the_host():

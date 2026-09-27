@@ -2674,63 +2674,146 @@ table.jtresult tr.best td:first-child { font-weight:600; }
 .qbedit textarea { width:100%; box-sizing:border-box; }
 .qbaside { margin-top:10px; }
 @media (max-width: 640px) { .qbdup { grid-template-columns:1fr; } .qbopen { float:none; margin:0 0 8px; } }
-/* 12d.1: Playground */
-.pgwrap { display:grid; grid-template-columns:240px minmax(0, 1fr); gap:16px; align-items:start; }
-.pglist { position:sticky; top:72px; display:flex; flex-direction:column; gap:6px;
-  max-height:calc(100vh - 96px); overflow:auto; }
+/* 12d.1: Playground. 12d.3: laid out as a chat app — the chats down the left,
+   a conversation that fills the height, centred, the composer pinned at its foot */
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+  clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+body:has(.pgwrap) .wrap { padding-bottom:12px; }
+.pgwrap { display:grid; grid-template-columns:260px minmax(0, 1fr); gap:14px;
+  height:calc(100dvh - var(--bar-h) - 44px); min-height:460px; margin:var(--sp-4) 0 0; }
+.pgwrap > .card { margin:0; min-height:0; }
+.pglist { display:flex; flex-direction:column; gap:8px; padding:var(--sp-4) var(--sp-3); overflow:hidden; }
+.pgnew { width:100%; }
+.pgscroll { overflow-y:auto; min-height:0; flex:1; margin:0 -4px; padding:0 4px; }
 .pglist ul, .pgchatsmenu ul { list-style:none; margin:0; padding:0; }
-.pghead { margin:8px 0 2px; }
-.pgitem { display:flex; justify-content:space-between; align-items:center; gap:6px;
-  padding:4px 6px; border-radius:6px; }
+.pghead { margin:12px 6px 4px; }
+.pgitem { position:relative; display:flex; align-items:flex-start; gap:4px; padding:6px 8px;
+  border-radius:var(--r-1); }
+.pgitem:hover { background:var(--plane); }
 .pgitem.on { background:var(--accent-soft); }
-.pgitem a { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1;
+.pgitem a { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1;
   color:var(--text-primary); text-decoration:none; }
-.pgdel { font-size:var(--fs-1); opacity:.6; }
-.pgitem:hover .pgdel, .pgdel:focus-visible { opacity:1; }
-.pgmain { min-width:0; }
-.pgbar { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:flex-start; }
-.pgbar .pgsettings { margin-left:auto; min-width:0; }
-.pgsettings[open] { flex-basis:100%; margin-left:0; border:1px solid var(--border);
-  border-radius:8px; padding:8px 12px; }
-.pgsettings textarea { width:100%; box-sizing:border-box; }
-.pgconv { display:flex; flex-direction:column; gap:14px; margin:14px 0; }
-.pgempty { padding:24px 0; text-align:center; color:var(--text-secondary); }
-.pgmsg { display:grid; grid-template-columns:auto minmax(0, 1fr); gap:4px 10px; }
-.pgmsg > :not(.pgwho) { grid-column:2; }
-.pgwho { color:var(--text-secondary); font-size:var(--fs-2); white-space:nowrap; }
-.pgtext { white-space:pre-wrap; overflow-wrap:anywhere; }
-.pgmsg.you .pgtext { color:var(--text-primary); }
-.pgthink summary, .pgref summary { cursor:pointer; color:var(--text-secondary); font-size:var(--fs-1); }
-.pgthink summary, .pgref summary, .pgsettings summary { list-style:none; }
-.pgthink summary::-webkit-details-marker, .pgref summary::-webkit-details-marker,
-.pgsettings summary::-webkit-details-marker { display:none; }
-.pgsettings summary { cursor:pointer; color:var(--text-secondary); }
-.pgthinktext { white-space:pre-wrap; color:var(--text-secondary); max-height:18em; overflow:auto; }
-.pgstats { margin:2px 0 0; }
-.pgstats button { font-family:var(--font-sans); }
-.pgmark { font-size:var(--fs-2); }
-.pgmark.ok { color:var(--good-text, var(--text-primary)); }
-.pgmark.no { color:var(--warning-text); }
-.pginputwrap { border-top:1px solid var(--border); padding-top:10px; }
-/* 12d.2: two models side by side, stacked on a phone */
-.pgpair { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:12px 20px; }
-.pgpair > .pgmsg { border-left:2px solid var(--border); padding-left:10px; }
-.pgvs { display:inline-flex; gap:6px; align-items:center; }
-.pgpick { display:inline-flex; flex-wrap:wrap; gap:6px 10px; align-items:center; }
-.pgitem a { display:flex; flex-direction:column; }
-.pgtitle { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* a title wraps to two lines instead of being cut off; the model below it, small and grey */
+.pgtitle { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden;
+  line-height:1.35; overflow-wrap:anywhere; }
 .pgnames { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-@media (max-width: 720px) { .pgpair { grid-template-columns:minmax(0, 1fr); } }
-.pginput { width:100%; box-sizing:border-box; resize:vertical; }
-.pginputwrap .frm { display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
-.pgamber { margin:0 0 6px; }
+.pgdel { flex:none; min-height:0; padding:0 6px; line-height:22px; opacity:0; }
+.pgitem:hover .pgdel, .pgitem:focus-within .pgdel, .pgdel:focus-visible { opacity:1; }
+@media (hover:none) { .pgdel { opacity:1; } }
+.pgconfirm { display:flex; flex-direction:column; align-items:flex-end; gap:2px; flex:none; }
+.pgmain { position:relative; display:flex; flex-direction:column; min-width:0; padding:0; overflow:hidden; }
+.pgbar { display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; padding:10px 14px;
+  border-bottom:1px solid var(--border); }
+.pgpick { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; min-width:0; flex:1; }
+.pgbarlabel { font-weight:600; }
+.pggear { margin-left:auto; font-size:18px; min-height:34px; min-width:34px; padding:0; }
+/* the picker: a button that reads like the model, and a searchable list */
+.pgcombo { display:inline-flex; align-items:center; gap:6px; max-width:100%; min-height:36px;
+  padding:4px 10px; border:1px solid var(--border); border-radius:var(--r-2); background:var(--surface-1);
+  font-weight:600; }
+.pgcombo:not([disabled]):hover { border-color:var(--accent); }
+.pgcombo[disabled] { opacity:1; cursor:default; }
+.pgcname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.pgcombo .badge { font-weight:400; }
+.pgcaret { color:var(--text-secondary); font-weight:400; }
+.pgcombomenu.pop { width:min(92vw, 440px); padding:10px; gap:6px; }
+.pgopts { display:flex; flex-direction:column; gap:1px; max-height:min(55vh, 420px); overflow-y:auto; }
+.pgopts > * { flex-shrink:0; }
+.pgopt { display:grid; grid-template-columns:minmax(0, 1fr) auto; grid-template-areas:"n s" "t t";
+  gap:2px 10px; align-items:center; text-align:left; padding:6px 8px; border:0; border-radius:var(--r-1);
+  background:transparent; min-height:0; }
+.pgopt:hover, .pgopt:focus-visible { background:var(--plane); }
+.pgopt.on { background:var(--accent-soft); }
+.pgoname { grid-area:n; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pgopt .pgscore { grid-area:s; }
+.pgotags { grid-area:t; display:flex; gap:4px; }
+.pgotags:empty { display:none; }
+.pgleftout { margin:6px 2px 0; }
+/* the conversation: centred, about 760px, scrolling above the composer */
+.pgconv { flex:1; min-height:0; overflow-y:auto; padding:20px 16px 12px; }
+.pgcol { max-width:760px; margin:0 auto; display:flex; flex-direction:column; gap:18px; }
+.pgcol.two { max-width:1180px; }
+.pgempty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:18px; min-height:min(46vh, 380px); text-align:center; }
+.pgask { font-size:var(--fs-5); font-weight:600; margin:0; }
+.pgchips { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; width:100%; }
+.pgchip { display:flex; flex-direction:column; gap:4px; text-align:left; white-space:normal;
+  padding:10px 12px; border:1px solid var(--border); border-radius:var(--r-2); background:var(--surface-1);
+  min-height:0; line-height:1.35; }
+.pgchip:hover { border-color:var(--accent); background:var(--plane); }
+.pgchipq { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden;
+  overflow-wrap:anywhere; }
+.pgmsg { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.pgmsg.you { align-self:flex-end; max-width:min(85%, 620px);
+  background:color-mix(in srgb, var(--text-primary) 7%, var(--surface-1));
+  border-radius:14px 14px 4px 14px; padding:9px 14px; }
+.pgwho { color:var(--text-secondary); font-size:var(--fs-1); font-weight:600; }
+.pgtext { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.55; }
+.pgthink summary, .pgref summary { cursor:pointer; color:var(--text-secondary); font-size:var(--fs-1);
+  list-style:none; }
+.pgthink summary::-webkit-details-marker, .pgref summary::-webkit-details-marker { display:none; }
+.pgthinktext { white-space:pre-wrap; color:var(--text-secondary); max-height:18em; overflow:auto;
+  border-left:2px solid var(--border); padding-left:10px; margin-top:4px; }
+.pgstats { margin:0; overflow-wrap:anywhere; }
+.pgstats button { font-family:var(--font-sans); min-height:0; padding:0 2px; }
+.pgmark { font-size:var(--fs-2); }
+.pgmark.ok { color:var(--success-text, var(--text-primary)); }
+.pgmark.no { color:var(--warning-text); }
+/* 12d.2: two models side by side, stacked on a phone; 12d.3: each column's head */
+.pgpair { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:12px 24px; }
+.pgpair > .pgmsg { border-left:2px solid var(--border); padding-left:12px; }
+.pgheads { position:sticky; top:-20px; z-index:2; background:var(--surface-1); padding:6px 0 8px;
+  border-bottom:1px solid var(--border); }
+.pgcolhead { display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-width:0; }
+.pgcolhead > div:empty { display:none; }
+.pgmeta { overflow-wrap:anywhere; }
+/* the composer, pinned at the foot: it grows with the text, Send inside it */
+.pgcomposer { border-top:1px solid var(--border); padding:10px 16px 12px; background:var(--surface-1); }
+.pgbox { display:flex; align-items:flex-end; gap:8px; border:1px solid var(--border);
+  border-radius:14px; padding:6px 6px 6px 12px; background:var(--surface-1); }
+.pgbox:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.pginput { flex:1; min-width:0; border:0; outline:0; resize:none; background:transparent; padding:6px 0;
+  font:inherit; line-height:1.45; color:var(--text-primary); max-height:calc(1.45em * 8 + 12px);
+  box-shadow:none; }
+.pginput:focus, .pginput:focus-visible { outline:none; box-shadow:none; }
+.pgbox .primary { flex:none; min-height:36px; border-radius:10px; }
+.pgunder { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; margin-top:6px;
+  font-size:var(--fs-1); }
+.pgunder > button { min-height:0; padding:2px 4px; font-size:var(--fs-1); }
+.pgbadge { display:inline-block; border-radius:999px; padding:1px 8px; white-space:nowrap; }
+.pgbadge.ok { color:var(--success-text, var(--text-secondary)); background:var(--plane); }
+.pgbadge.amber { color:var(--warning-text); background:color-mix(in srgb, var(--warning) 14%, transparent); }
+.pgbadge button { min-height:0; padding:0 2px; color:inherit; text-decoration:underline; }
+.pgcomposer .warn, .pgcomposer [data-pg-paused] { margin:0 0 6px; }
+/* settings: a side panel over the conversation's right */
+.pgpanel { position:absolute; top:0; right:0; bottom:0; z-index:5; width:min(340px, 100%);
+  box-sizing:border-box; overflow-y:auto; padding:14px 16px; background:var(--surface-1);
+  border-left:1px solid var(--border); box-shadow:-10px 0 28px rgba(0, 0, 0, .14);
+  display:flex; flex-direction:column; gap:10px; }
+.pgpanelhead { display:flex; align-items:center; justify-content:space-between; }
+.pgpanelhead h3 { margin:0; }
+.pgpanel textarea { width:100%; box-sizing:border-box; }
+.pgpanel .fld { display:flex; flex-direction:column; gap:4px; }
 .pgpmenu.pop { min-width:320px; max-width:min(92vw, 520px); padding:10px 12px; gap:6px; }
 .pgplist { display:flex; flex-direction:column; gap:2px; max-height:min(50vh, 360px); overflow:auto; }
 .pgplist > * { flex-shrink:0; }
 .pgpq { text-align:left; white-space:normal; line-height:1.35; }
+/* the model page's Chat tab: the same component, a fixed height in its card */
+.pgembed { height:min(72vh, 760px); min-height:420px; border:1px solid var(--border);
+  border-radius:var(--r-2); margin:var(--sp-4) 0; }
 @media (max-width: 720px) {
-  .pgwrap { grid-template-columns:minmax(0, 1fr); }
-  .pgbar .pgsettings { margin-left:0; }
+  .pgwrap { grid-template-columns:minmax(0, 1fr); height:calc(100dvh - var(--bar-h) - 28px);
+    margin-top:var(--sp-3); }
+  .pgpair { grid-template-columns:minmax(0, 1fr); }
+  .pgchips { grid-template-columns:minmax(0, 1fr); }
+  .pgbar { padding:8px 10px; }
+  .pgconv { padding:14px 10px 10px; }
+  .pgcomposer { padding:8px 10px 10px; }
+  .pgheads { top:-14px; }
+  .pgmsg.you { max-width:92%; }
+  /* the button says the model; its tags are in the list it opens */
+  .pgcombo .badge { display:none; }
+  .pgcombo { max-width:min(100%, 230px); }
 }
 .genopts { display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; margin-top:8px; }
 .genopts label.spread { display:inline-flex; align-items:center; gap:6px; }
@@ -6252,9 +6335,7 @@ function evdAnswersList(m) {
 }
 
 // ---- Chat (12d.2): the Playground's own component, the model fixed ----
-// 12f.1: the Playground loads its models here; a served one is asked by runs only
-const SERVED_NO_CHAT = 'This model is served elsewhere: the Playground chats only with models '
-  + 'loaded on this server.';
+// 12d.3: a model served elsewhere chats here too, through its server
 const BASE_NO_CHAT = 'This is a base model: it has no chat format, so there\u2019s nothing to chat with.';
 function modelChatTab(m) {
   const P = state.pg;
@@ -6263,8 +6344,7 @@ function modelChatTab(m) {
   const offered = pgModel(m.id);
   if (!offered) return [el('div', { class: 'card', 'data-model-chat': m.id, 'data-model-chat-none': '1' },
     el('h2', { text: 'Chat' }),
-    el('p', { class: 'small', 'data-model-chat-why': '1', text: m.served ? SERVED_NO_CHAT
-      : m.kind === 'instruct'
+    el('p', { class: 'small', 'data-model-chat-why': '1', text: m.kind === 'instruct'
       ? 'This model can\u2019t chat here: it runs its own code, which chat doesn\u2019t run.'
       : BASE_NO_CHAT }))];
   if (!whoName()) return [el('div', { class: 'card', 'data-model-chat': m.id },
@@ -16307,6 +16387,10 @@ addEventListener('keydown', e => {
 // server, streamed; the settings the Everyday run used unless changed; a
 // person's chats kept by the name in masein ▾. Never a score, never money.
 // ===========================================================================
+// 12d.3: the layout of a chat app — the chats down the left, a picker over a
+// conversation that fills the height, the composer pinned at the bottom — and
+// the models served elsewhere (the phone build and its setups, the original)
+// beside the ones loaded here.
 const PG_WHO = () => ({ 'X-Who': whoName() });
 async function pgGet(path) {
   const r = await fetch(path, { headers: PG_WHO() }).catch(() => null);
@@ -16334,6 +16418,7 @@ async function loadPgChat(id) {
   try { P.chat = await pgGet('api/playground/chats/' + encodeURIComponent(id)); P.msg = ''; }
   catch (e) { P.chat = null; P.msg = e.message; P.id = null; }
   P.chatAsked = null;
+  P.stick = true;
   if (pgActive()) render();
 }
 const pgModel = id => ((state.pg.page || {}).models || []).find(m => m.id === id) || null;
@@ -16345,14 +16430,15 @@ function pgCloseStreams() {
 function pgOpen(id) {
   const P = state.pg;
   pgCloseStreams();
-  Object.assign(P, { id, chat: null, input: P.input || '', ref: null });
+  Object.assign(P, { id, chat: null, input: P.input || '', ref: null, stick: true });
   if (P.fixed && state.model) { render(); return; }      // the Chat tab keeps its place
   navigate({ tab: 'playground', model: null, topic: null });
 }
 function pgNew() {
   const P = state.pg;
   pgCloseStreams();
-  Object.assign(P, { id: null, chat: null, pick2: null });
+  // a new chat draws new suggestions
+  Object.assign(P, { id: null, chat: null, pick2: null, chips: null });
   if (P.fixed && state.model) { render(); return; }
   navigate({ tab: 'playground', model: null, topic: null });
 }
@@ -16368,36 +16454,43 @@ function vPlayground() {
     empty('Your chats are kept under your name: say who you are first.', 'Who are you?',
       () => askName()))];
   const narrow = matchMedia('(max-width: 720px)').matches;
+  requestAnimationFrame(pgStick);
   return [el('div', { class: 'pgwrap', 'data-pg': '1' },
     narrow ? '' : pgChatList(), pgMain(narrow))];
 }
 
-// ---- the chat list ----------------------------------------------------------
+// ---- the chat list: Today, Yesterday, Earlier ---------------------------------
+const pgName = id => (pgModel(id) || {}).name || String(id || '').split('/').pop();
 function pgChatItems() {
-  const P = state.pg, day = 24 * 3600 * 1000;
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const P = state.pg;
+  const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+  const today = d0.getTime() / 1000, yesterday = today - 86400;
   const chats = P.chats || [];
   const item = c => el('li', { class: 'pgitem' + (c.id === P.id ? ' on' : ''), 'data-pg-chat': c.id },
-    el('a', { href: '#tab=playground&chat=' + c.id, title: c.names || c.model,
+    el('a', { href: '#tab=playground&chat=' + c.id, title: c.title,
         onclick: e => { e.preventDefault(); popClose(); pgOpen(c.id); } },
+      // two lines of its title, then the model, small and grey (12d.2: both)
       el('span', { class: 'pgtitle', text: c.title }),
-      // 12d.2: "Qwen3-0.6B vs SmolLM2-360M"
-      c.model2 ? el('span', { class: 'small se pgnames', 'data-pg-names': '1', text: c.names }) : ''),
+      el('span', { class: 'small se pgnames', 'data-pg-names': '1', text: c.names || pgName(c.model) })),
     P.confirm === c.id
-      ? el('span', { class: 'small' }, el('button', { class: 'quiet danger', 'data-pg-delete-yes': c.id,
-          text: 'Delete?', onclick: () => pgDelete(c.id) }), ' ',
-        el('button', { class: 'quiet', text: 'keep', onclick: () => { P.confirm = null; render(); } }))
-      : el('button', { class: 'quiet pgdel', 'data-pg-delete': c.id, 'aria-label': `delete ${c.title}`,
-          text: 'Delete', onclick: () => { P.confirm = c.id; render(); } }));
-  const t = chats.filter(c => c.updated_at * 1000 >= today.getTime());
-  const e = chats.filter(c => c.updated_at * 1000 < today.getTime());
-  return [t.length ? [el('p', { class: 'pghead small se', text: 'Today' }), el('ul', {}, t.map(item))] : '',
-    e.length ? [el('p', { class: 'pghead small se', text: 'Earlier' }), el('ul', {}, e.map(item))] : ''];
+      ? el('span', { class: 'pgconfirm small' },
+          el('button', { class: 'quiet danger', 'data-pg-delete-yes': c.id, text: 'Delete?',
+            onclick: () => pgDelete(c.id) }),
+          el('button', { class: 'quiet', text: 'keep', onclick: () => { P.confirm = null; render(); } }))
+      // shown on hover and focus (always on a touch screen), never in the way
+      : el('button', { class: 'quiet pgdel', 'data-pg-delete': c.id, 'aria-label': `delete “${c.title}”`,
+          title: 'Delete this chat', text: '⋯', onclick: () => { P.confirm = c.id; render(); } }));
+  const groups = [['Today', chats.filter(c => c.updated_at >= today)],
+    ['Yesterday', chats.filter(c => c.updated_at >= yesterday && c.updated_at < today)],
+    ['Earlier', chats.filter(c => c.updated_at < yesterday)]];
+  return groups.filter(([, xs]) => xs.length).map(([h, xs]) =>
+    el('div', { class: 'pggroup', 'data-pg-group': h },
+      el('p', { class: 'pghead small se', text: h }), el('ul', {}, xs.map(item))));
 }
 function pgChatList() {
-  return el('div', { class: 'card pglist', 'data-pg-list': '1' },
-    el('button', { class: 'secondary', 'data-pg-new': '1', text: '+ New chat', onclick: pgNew }),
-    ...pgChatItems());
+  return el('aside', { class: 'card pglist', 'data-pg-list': '1' },
+    el('button', { class: 'secondary pgnew', 'data-pg-new': '1', text: '+ New chat', onclick: pgNew }),
+    el('div', { class: 'pgscroll' }, ...pgChatItems()));
 }
 async function pgDelete(id) {
   const P = state.pg;
@@ -16410,57 +16503,138 @@ async function pgDelete(id) {
   render();
 }
 
-// ---- the chat ---------------------------------------------------------------
+// ---- the model picker: a searchable list, grouped as Models ▾ groups ------------
 // the Playground is open: its own page, or (12d.2) a model page's Chat tab
 const pgActive = () => state.tab === 'playground' || (!!state.model && state.mtab === 'chat');
-// 12d.2: a trained model sits right under its base (the server orders them),
-// in its base's group, labelled with the day it was trained
-function pgOptions(models, cur, skip) {
-  const byId = Object.fromEntries(models.map(m => [m.id, m]));
-  const groupOf = m => ((m.trained_from && byId[m.trained_from]) || m).source;
-  const groups = [['hub', 'On the Hub'], ['artifact', 'Uploaded here']];
-  return groups.map(([g, label]) => {
-    const ms = models.filter(m => groupOf(m) === g && m.id !== skip);
-    return ms.length ? el('optgroup', { label }, ms.map(m => el('option', { value: m.id,
-      selected: m.id === cur ? '' : null,
-      text: m.trained_from && byId[m.trained_from] ? `↳ ${m.name} · trained · ${m.trained_on}` : m.name })))
-      : '';
-  });
+const PG_GROUPS = [['phone builds', 'Phone builds'], ['served', 'Served elsewhere'],
+  ['instruct', 'Instruct'], ['checkpoints', 'Uploaded here']];
+// 12d.2: a trained model sits in its base's group, right under it
+function pgGroupOf(m, byId) {
+  const b = (m.trained_from && byId[m.trained_from]) || m;
+  if (b.served) return isPhoneRow({ id: b.id }) ? 'phone builds' : 'served';
+  return b.source === 'artifact' ? 'checkpoints' : 'instruct';
 }
-function pgPicker(P, c) {
-  const models = P.page.models;
-  if (P.fixed) {
-    // the model page's Chat tab: its model, fixed
-    if (!c) P.pick = P.fixed;
-  } else if (!c && !P.pick && models[0]) P.pick = models[0].id;
-  const cur = c ? c.model : P.pick;
+function pgTags(m) {
+  if (!m) return '';
+  const byId = Object.fromEntries(((state.pg.page || {}).models || []).map(x => [x.id, x]));
+  const g = pgGroupOf(m, byId);
+  return [m.served ? el('span', { class: 'badge served', 'data-pg-tag': 'served', text: 'served' }) : '',
+    g === 'phone builds' ? el('span', { class: 'badge served', 'data-pg-tag': 'phone',
+      title: 'a phone build, or a setup of its file', text: 'phone build' }) : '',
+    m.trained_from ? el('span', { class: 'badge', 'data-pg-tag': 'trained',
+      text: `trained · ${m.trained_on}` }) : ''];
+}
+// one score: Everyday, the passed of its hidden questions
+function pgScore(m) {
+  const e = m && evdOf(m.id);
+  return el('span', { class: 'small se mono pgscore', 'data-pg-score': m ? m.id : '',
+    title: e ? 'Everyday tasks: hidden questions passed' : 'no Everyday result yet',
+    text: e ? `Everyday ${evdCount(e)}` : 'Everyday —' });
+}
+// the models chatted with lately come first, each in its group
+function pgRecency() {
+  const at = {};
+  for (const c of state.pg.chats || []) for (const id of [c.model, c.model2]) if (id)
+    at[id] = Math.max(at[id] || 0, c.updated_at || 0);
+  return at;
+}
+function pgOptionsIn(q, skip) {
+  const models = state.pg.page.models, byId = Object.fromEntries(models.map(m => [m.id, m]));
+  const at = pgRecency();
+  const want = m => m.id !== skip && (!q || (m.name + ' ' + m.id).toLowerCase().includes(q));
+  // a base and what was trained from it move together
+  const units = models.filter(m => !(m.trained_from && byId[m.trained_from]))
+    .map(b => [b, ...models.filter(x => x.trained_from === b.id)]);
+  const recent = u => Math.max(...u.map(m => at[m.id] || 0));
+  return PG_GROUPS.map(([g, label]) => [label, units.filter(u => pgGroupOf(u[0], byId) === g)
+    .map((u, i) => [u, i]).sort((x, y) => recent(y[0]) - recent(x[0]) || x[1] - y[1])
+    .flatMap(([u]) => u.filter(want))]).filter(([, ms]) => ms.length);
+}
+function pgCombo(which, cur, { disabled = false, skip = null, onPick } = {}) {
   const m = pgModel(cur);
-  const base = m && m.trained_from ? pgModel(m.trained_from) : null;
-  const other = c ? (c.model2 || '') : (P.pick2 || '');
+  const btn = el('button', { type: 'button', class: 'pgcombo',
+      [which === 'b' ? 'data-pg-model2' : 'data-pg-model']: cur || '',
+      'aria-label': which === 'b' ? 'second model' : 'model', disabled: disabled ? '' : null,
+      title: disabled ? 'a chat keeps its model: start a new chat for another' : null },
+    el('span', { class: 'pgcname', text: m ? (m.trained_from ? `↳ ${m.name}` : m.name) : 'Choose a model' }),
+    ...pgTags(m), disabled ? '' : el('span', { class: 'pgcaret', 'aria-hidden': 'true', text: '▾' }));
+  if (disabled) return btn;
+  return popover(btn, () => {
+    const list = el('div', { class: 'pgopts', role: 'listbox', 'aria-label': 'models' });
+    const fill = q => {
+      const groups = pgOptionsIn((q || '').trim().toLowerCase(), skip);
+      list.replaceChildren(...groups.flatMap(([label, ms]) => [
+        el('p', { class: 'small se pghead', role: 'presentation', text: label }),
+        ...ms.map(x => el('button', { type: 'button', role: 'option', class: 'pgopt' + (x.id === cur ? ' on' : ''),
+          'data-pg-option': x.id, 'aria-selected': String(x.id === cur),
+          onclick: () => { popClose(true); onPick(x.id); } },
+          el('span', { class: 'pgoname', text: x.trained_from ? `↳ ${x.name}` : x.name }),
+          el('span', { class: 'pgotags' }, ...pgTags(x)), pgScore(x)))]),
+        groups.length ? '' : el('p', { class: 'small se', text: 'No model matches.' }));
+    };
+    fill('');
+    const opts = () => [...list.querySelectorAll('[role=option]')];
+    const panel = el('div', { class: 'moremenu pgcombomenu', id: 'pop-pg-model-' + which,
+        onkeydown: e => {
+          const xs = opts(), i = xs.indexOf(document.activeElement);
+          if (e.key === 'ArrowDown') { e.preventDefault(); (xs[i + 1] || xs[0] || { focus() {} }).focus(); }
+          else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (i <= 0) panel.querySelector('input').focus(); else xs[i - 1].focus();
+          } else if (e.key === 'Enter' && e.target.tagName === 'INPUT' && xs[0]) { e.preventDefault(); xs[0].click(); }
+        } },
+      el('input', { type: 'search', placeholder: 'search models…', 'aria-label': 'search models',
+        'data-pg-search': which, oninput: e => fill(e.target.value) }),
+      list,
+      // base models are left out, with the line that says so
+      ...(state.pg.page.left_out || []).map(t => el('p', { class: 'small se pgleftout',
+        'data-pg-left-out': '1', text: t })));
+    return panel;
+  }, { key: 'pg-model-' + which, menu: false, focus: '[data-pg-search]' });
+}
+// what a column's model is, in one line: its tags, where it runs, one score
+function pgMeta(m) {
+  if (!m) return '';
+  return el('span', { class: 'small se pgmeta', 'data-pg-meta': m.id },
+    m.served ? 'served elsewhere' : m.params ? `${P(m.params)} · on this server` : 'on this server',
+    ' · ', pgScore(m));
+}
+function pgPickerBar(P, c, cur) {
+  const models = P.page.models;
+  const m = pgModel(cur), base = m && m.trained_from ? pgModel(m.trained_from) : null;
+  const compare = c ? !!c.model2 : P.pick2 != null;
   return el('span', { class: 'pgpick' },
-    P.fixed && !c ? el('b', { 'data-pg-model': cur, text: (m || {}).name || cur })
-      : el('select', { 'aria-label': 'model', 'data-pg-model': cur || '', disabled: c ? '' : null,
-          title: c ? 'a chat keeps its model: start a new chat for another' : null,
-          onchange: e => { P.pick = e.target.value; if (P.pick2 === P.pick) P.pick2 = null; render(); } },
-        pgOptions(models, cur)),
+    compare ? el('b', { class: 'pgbarlabel', text: 'Compare' })
+      : P.fixed && !c ? el('b', { 'data-pg-model': cur, text: (m || {}).name || cur })
+      : pgCombo('a', cur, { disabled: !!c, onPick: id => { P.pick = id; if (P.pick2 === id) P.pick2 = null; render(); } }),
     // 12d.2: + Compare — one message to two models, side by side
-    c ? (c.model2 ? el('span', { class: 'pgvs', 'data-pg-vs': c.model2 }, ' vs ',
-        el('b', { text: c.name2 })) : '')
-      : P.pick2 != null ? el('span', { class: 'pgvs', 'data-pg-vs': P.pick2 }, ' vs ',
-          el('select', { 'aria-label': 'second model', 'data-pg-model2': P.pick2 || '',
-            onchange: e => { P.pick2 = e.target.value; render(); } },
-            pgOptions(models, P.pick2, cur)),
-          el('button', { class: 'quiet', 'data-pg-uncompare': '1', 'aria-label': 'compare with no model',
-            text: '✕', onclick: () => { P.pick2 = null; render(); } }))
-        : el('button', { class: 'quiet', 'data-pg-compare': '1', text: '+ Compare',
-            onclick: () => { P.pick2 = (base || models.find(x => x.id !== cur) || {}).id || null;
-              render(); } }),
+    c ? '' : compare
+      ? el('button', { class: 'quiet', 'data-pg-uncompare': '1', 'aria-label': 'compare with no model',
+          text: 'Compare ✕', onclick: () => { P.pick2 = null; render(); } })
+      : el('button', { class: 'quiet', 'data-pg-compare': '1', text: '+ Compare',
+          onclick: () => { P.pick2 = (base || models.find(x => x.id !== cur) || {}).id || null; render(); } }),
     // a trained model: what training changed, one click away
-    !c && base && other !== base.id ? el('button', { class: 'quiet', 'data-pg-suggest': base.id,
+    !c && base && P.pick2 !== base.id ? el('button', { class: 'quiet', 'data-pg-suggest': base.id,
       text: `Compare with ${base.name} (before training)`,
       onclick: () => { P.pick2 = base.id; render(); } }) : '');
 }
-function pgSettings(P, c, m) {
+// Compare: a head for each column — its own picker, and its meta line
+function pgColHeads(P, c, cur, cur2) {
+  const head = (which, id) => el('div', { class: 'pgcolhead', 'data-pg-colhead': which },
+    c || (P.fixed && which === 'a') ? el('b', { [which === 'b' ? 'data-pg-model2' : 'data-pg-model']: id,
+        text: pgName(id) })
+      // the other column's model, picked here, swaps the two (the Chat tab's
+      // own model stays in its column)
+      : pgCombo(which, id, { skip: P.fixed && which === 'b' ? cur : null, onPick: x => {
+          if (which === 'a') { if (x === P.pick2) P.pick2 = P.pick; P.pick = x; }
+          else { if (x === P.pick) P.pick = P.pick2; P.pick2 = x; }
+          render(); } }),
+    el('div', {}, ...pgTags(pgModel(id)).filter(Boolean)), pgMeta(pgModel(id)));
+  return el('div', { class: 'pgpair pgheads' }, head('a', cur), head('b', cur2));
+}
+
+// ---- settings: a side panel, and a badge beside the composer ------------------------
+function pgPanel(P, c, m) {
   const base = m.scored;
   const s = c ? { ...base, ...c.settings } : { ...base, ...(P.draftSettings || {}) };
   const changed = c ? !c.is_scored : Object.keys(P.draftSettings || {}).length > 0;
@@ -16471,17 +16645,20 @@ function pgSettings(P, c, m) {
     catch (e) { toast('Refused. ' + e.message, { key: 'pg' }); }
     render();
   };
+  const close = () => { P.panel = false; render(); refocus(document.querySelector('[data-pg-gear]')); };
   const thinkingNow = s.thinking == null ? base.thinking_on : !!s.thinking;
-  return el('details', { class: 'pgsettings', 'data-pg-settings': '1', open: P.settingsOpen ? '' : null,
-      ontoggle: e => { P.settingsOpen = e.target.open; } },
-    el('summary', { text: 'Settings ▸' }),
+  return el('aside', { class: 'pgpanel', 'data-pg-settings': '1', 'aria-label': 'settings',
+      onkeydown: e => { if (e.key === 'Escape') { e.preventDefault(); close(); } } },
+    el('div', { class: 'pgpanelhead' }, el('h3', { text: 'Settings' }),
+      el('button', { class: 'quiet', 'data-pg-panel-close': '1', 'aria-label': 'close settings', text: '✕',
+        onclick: close })),
     el('p', { class: 'small se', text: 'As the Everyday run generates, until you change one: its '
       + 'chat template, no system message, thinking as it was scored, the same longest reply and '
       + 'sampling.' }),
     el('label', { class: 'fld' }, el('span', { class: 'fld-label', text: 'System message' }),
-      el('textarea', { rows: '2', 'data-pg-system': '1', 'data-keep': 'pg-system', text: s.system || '',
+      el('textarea', { rows: '3', 'data-pg-system': '1', 'data-keep': 'pg-system', text: s.system || '',
         onchange: e => save({ system: e.target.value }) })),
-    base.can_think ? el('label', { class: 'small' }, el('input', { type: 'checkbox',
+    base.can_think ? el('label', { class: 'small pgcheck' }, el('input', { type: 'checkbox',
       'data-pg-thinking': '1', checked: thinkingNow ? '' : null,
       onchange: e => save({ thinking: e.target.checked }) }), ' thinking') : '',
     el('label', { class: 'fld' }, el('span', { class: 'fld-label', text: 'Temperature' }),
@@ -16491,7 +16668,9 @@ function pgSettings(P, c, m) {
     el('label', { class: 'fld' }, el('span', { class: 'fld-label', text: 'Longest reply (tokens)' }),
       el('input', { type: 'number', min: '16', step: '16', value: String(s.max_gen_toks),
         'data-pg-max': '1', style: 'width:7em',
-        onchange: e => save({ max_gen_toks: Number(e.target.value) }) })));
+        onchange: e => save({ max_gen_toks: Number(e.target.value) }) })),
+    changed ? el('button', { class: 'secondary', 'data-pg-panel-reset': '1',
+      text: 'Back to the scored settings', onclick: () => pgReset(c) }) : '');
 }
 function pgDiff(s, base) {
   const out = {};
@@ -16499,48 +16678,97 @@ function pgDiff(s, base) {
     if (k in s && s[k] !== base[k] && !(k === 'thinking' && !!s[k] === base.thinking_on)) out[k] = s[k];
   return out;
 }
+
+// ---- the chat -----------------------------------------------------------------------
 function pgMain(narrow) {
   const P = state.pg, c = P.id && P.chat && P.chat.id === P.id ? P.chat : null;
   if (P.id && !c) return el('div', { class: 'card pgmain' }, skeleton(4, { 'data-loading': 'pg-chat' }));
-  const m = pgModel(c ? c.model : (P.fixed || P.pick || ((P.page.models[0] || {}).id)));
-  const m2 = pgModel(c ? c.model2 : P.pick2);
+  if (!c && !P.fixed && (!P.pick || !pgModel(P.pick))) P.pick = (P.page.models[0] || {}).id;
+  const cur = c ? c.model : (P.fixed || P.pick);
+  const cur2 = c ? c.model2 : P.pick2;
+  const m = pgModel(cur), m2 = pgModel(cur2);
+  const compare = !!cur2 || (!c && P.pick2 != null);
   const changed = c ? !c.is_scored : Object.keys(P.draftSettings || {}).length > 0;
-  const head = el('div', { class: 'pgbar' },
+  const bar = el('div', { class: 'pgbar' },
     narrow && !P.fixed ? popover(el('button', { class: 'quiet', 'data-pg-chats': '1', text: 'Chats ▾' }),
       () => el('div', { class: 'moremenu pgchatsmenu', id: 'pop-pg-chats' },
         el('button', { role: 'menuitem', 'data-pg-new': '1', text: '+ New chat',
           onclick: () => { popClose(); pgNew(); } }), ...pgChatItems()),
       { key: 'pg-chats', menu: false }) : '',
-    P.page.models.length ? pgPicker(P, c) : '',
-    m ? pgSettings(P, c, m) : '');
-  const lines = (P.page.left_out || []).map(t => el('p', { class: 'small se', 'data-pg-left-out': '1', text: t }));
+    P.page.models.length ? pgPickerBar(P, c, cur) : '',
+    m ? el('button', { class: 'quiet pggear', 'data-pg-gear': '1', 'aria-label': 'settings',
+      'aria-expanded': String(!!P.panel), title: 'Settings', text: '⚙',
+      onclick: () => { P.panel = !P.panel; render();
+        if (P.panel) { const f = document.querySelector('[data-pg-settings] textarea'); if (f) f.focus(); } } }) : '');
   if (!P.page.models.length)
-    return el('div', { class: 'card pgmain' }, head, el('p', { class: 'note', 'data-pg-none': '1',
-      text: 'No model on this board can chat yet.' }), lines);
+    return el('div', { class: 'card pgmain' }, bar, el('p', { class: 'note', 'data-pg-none': '1',
+      text: 'No model on this board can chat yet.' }),
+      (P.page.left_out || []).map(t => el('p', { class: 'small se', 'data-pg-left-out': '1', text: t })));
   const msgs = c ? c.messages : [];
-  const conv = el('div', { class: 'pgconv', 'data-pg-conv': '1' },
-    !msgs.length && !P.live ? el('div', { class: 'pgempty', 'data-pg-empty': '1' },
-      el('p', { text: 'Ask anything, or try a practice question.' }), pgPracticeButton('empty'))
-      : msgs.map((x, i) => x.role === 'user' ? pgUser(x)
-        : x.b ? el('div', { class: 'pgpair', 'data-pg-pair': String(i) },
-            pgReply(c, m, x, i, 'a'), pgReply(c, m2, x.b, i, 'b'))
-        : pgReply(c, m, x, i, 'a')));
-  return el('div', { class: 'card pgmain', 'data-pg-main': c ? c.id : 'new' },
-    head, lines.length && !c && !P.fixed ? lines : '', conv, pgInput(P, c, m, changed));
+  const conv = el('div', { class: 'pgconv', 'data-pg-conv': '1',
+      onscroll: e => { const t = e.target; P.stick = t.scrollTop + t.clientHeight >= t.scrollHeight - 48; } },
+    el('div', { class: 'pgcol' + (compare ? ' two' : '') },
+      compare ? pgColHeads(P, c, cur, cur2) : '',
+      !msgs.length && !P.live ? pgEmpty(P)
+        : msgs.map((x, i) => x.role === 'user' ? pgUser(x)
+          : x.b ? el('div', { class: 'pgpair', 'data-pg-pair': String(i) },
+              pgReply(c, m, x, i, 'a'), pgReply(c, m2, x.b, i, 'b'))
+          : pgReply(c, m, x, i, 'a'))));
+  return el('div', { class: 'card pgmain' + (P.fixed ? ' pgembed' : ''), 'data-pg-main': c ? c.id : 'new' },
+    bar, conv, pgInput(P, c, m, changed), P.panel && m ? pgPanel(P, c, m) : '');
+}
+// the conversation follows a reply as it streams, unless it was scrolled up
+function pgStick() {
+  const P = state.pg, cv = document.querySelector('[data-pg-conv]');
+  if (cv && P.stick !== false) cv.scrollTop = cv.scrollHeight;
+}
+// an empty chat: one heading, and practice questions to start from — drawn
+// again for each new chat, never a hidden one (the server lists none)
+function pgEmpty(P) {
+  if (!P.chips) {
+    const pr = P.practice || { everyday: [], knowledge: [] };
+    const draw = (xs, n) => [...xs].sort(() => Math.random() - 0.5).slice(0, n);
+    const e = draw(pr.everyday || [], 2), k = draw(pr.knowledge || [], 2);
+    P.chips = [...e, ...k, ...draw((pr.everyday || []).filter(x => !e.includes(x)), 4 - e.length - k.length)]
+      .slice(0, 4);
+  }
+  return el('div', { class: 'pgempty', 'data-pg-empty': '1' },
+    el('h2', { class: 'pgask', text: 'Ask anything' }),
+    P.chips.length ? el('div', { class: 'pgchips' }, P.chips.map(x => el('button', { class: 'pgchip',
+      'data-pg-chip': `${x.kind}|${x.id}`, title: x.prompt, onclick: () => {
+        P.input = x.prompt; P.ref = { kind: x.kind, id: x.id }; render();
+        const b = document.querySelector('[data-pg-input]'); if (b) { pgGrow(b); b.focus(); } } },
+      el('span', { class: 'small se', text: x.kind === 'everyday' ? `Everyday · ${x.groupLabel}`
+        : `Knowledge · ${x.topic}` }),
+      el('span', { class: 'pgchipq', text: x.prompt })))) : '');
 }
 function pgUser(x) {
   return el('div', { class: 'pgmsg you', 'data-pg-you': '1' },
-    el('span', { class: 'pgwho', text: 'you ›' }), el('div', { class: 'pgtext', text: x.text }));
+    el('span', { class: 'sr-only', text: 'you:' }), el('div', { class: 'pgtext', text: x.text }));
+}
+// what a reply cost: a local one in words a second; a served one in the
+// server's own tokens, and MTP's drafts when it reports them — its speed is
+// its server's, not the phone's, so none is given
+function pgStats(r) {
+  if (r.device === 'served')
+    return [r.tokens != null ? `${r.tokens.toLocaleString('en')} token${r.tokens === 1 ? '' : 's'}`
+      : `${(r.words || 0).toLocaleString('en')} word${r.words === 1 ? '' : 's'}`, ` · ${r.secs} s`,
+    r.draft ? el('span', { 'data-pg-mtp': `${r.draft.accepted}|${r.draft.n}`,
+      title: `MTP: the drafted tokens the model kept (timings.draft_n_accepted of draft_n), `
+        + `${Math.round(100 * r.draft.accepted / Math.max(1, r.draft.n))}%`,
+      text: ` · MTP: ${r.draft.accepted.toLocaleString('en')} of ${r.draft.n.toLocaleString('en')} drafts kept` }) : ''];
+  return `${(r.words || 0).toLocaleString('en')} word${r.words === 1 ? '' : 's'} · ${r.secs}s · ${r.wps} w/s`
+    + (r.device === 'cpu' ? ' · CPU' : '');
 }
 // one model's answer to a message — its column, when two are compared (12d.2)
 function pgReply(c, m, x, i, col = 'a') {
   const P = state.pg, live = P.live && P.live.n === i ? (P.live.cols || {})[col] : null;
   const k = x.replies && x.replies.length ? Math.min(x.shown || 0, x.replies.length - 1) : -1;
   const r = live && !live.over ? null : (k >= 0 ? x.replies[k] : null);
-  const name = m ? m.name : String((col === 'a' ? c.model : c.model2) || '').split('/').pop();
+  const name = m ? m.name : pgName(col === 'a' ? c.model : c.model2);
   const wrap = el('div', { class: 'pgmsg it', 'data-pg-reply': col === 'a' ? String(i) : `${i}|b`,
       'data-pg-col': col },
-    el('span', { class: 'pgwho', text: name + ' ›' }));
+    el('span', { class: 'pgwho', text: name }));
   if (live && !r) {
     wrap.append(
       live.note ? el('p', { class: 'small se', 'data-pg-note': '1', text: live.note }) : '',
@@ -16552,8 +16780,7 @@ function pgReply(c, m, x, i, col = 'a') {
     return wrap;
   }
   if (!r) {
-    wrap.append(el('p', { class: 'small se', 'data-pg-noreply': '1',
-      text: x.refused || 'no reply' }));
+    wrap.append(el('p', { class: 'small se', 'data-pg-noreply': '1', text: x.refused || 'no reply' }));
     return wrap;
   }
   wrap.append(
@@ -16563,9 +16790,7 @@ function pgReply(c, m, x, i, col = 'a') {
     r.cut ? el('p', { class: 'small se', 'data-pg-cut': r.cut,
       text: r.cut === 'stopped' ? 'stopped' : `cut short: ${r.cut}` }) : '',
     pgMark(r.mark),
-    el('p', { class: 'small se mono pgstats', 'data-pg-stats': '1' },
-      `${(r.words || 0).toLocaleString('en')} word${r.words === 1 ? '' : 's'} · ${r.secs}s · ${r.wps} w/s`
-        + (r.device === 'cpu' ? ' · CPU' : ''), ' · ',
+    el('p', { class: 'small se mono pgstats', 'data-pg-stats': '1' }, ...[].concat(pgStats(r)), ' · ',
       el('button', { class: 'quiet', 'data-pg-copy': '1', text: 'copy', onclick: () => {
         try { navigator.clipboard.writeText(r.text); toast('Copied', { key: 'pg' }); }
         catch (e) { toast('Copy failed', { key: 'pg' }); } } }), ' · ',
@@ -16594,6 +16819,13 @@ function pgMark(mk) {
     mk.note ? el('span', { class: 'small se', text: ' · ' + mk.note }) : '',
     (mk.checks || []).length ? el('p', { class: 'small se', text: 'The check: ' + mk.checks.join(' · ') }) : '');
 }
+// the composer grows with what is typed, up to about eight lines
+function pgGrow(t) {
+  if (!t) return;
+  t.style.height = 'auto';
+  const line = parseFloat(getComputedStyle(t).lineHeight) || 20;
+  t.style.height = Math.min(t.scrollHeight + 2, Math.round(line * 8 + 18)) + 'px';
+}
 function pgInput(P, c, m, changed) {
   const live = pgLive();
   // the reply keeps at most half the context (chat.context_words, the server's rule)
@@ -16605,27 +16837,34 @@ function pgInput(P, c, m, changed) {
     + (c ? c.messages.reduce((a, x) => a + ((x.text || ((x.replies || [])[x.shown || 0] || {}).text || '')
       .split(/\s+/).filter(Boolean).length), 0) : 0);
   const long = m && words > fits;
-  const box = el('textarea', { rows: '3', class: 'pginput', 'aria-label': 'message', 'data-pg-input': '1',
-    'data-keep': 'pg-input', placeholder: 'message…', text: P.input || '',
-    oninput: e => { P.input = e.target.value; pgLongLine(m, fits); },
-    onkeydown: e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); pgSend(); } } });
+  const box = el('textarea', { rows: '1', class: 'pginput', 'aria-label': 'message', 'data-pg-input': '1',
+    'data-keep': 'pg-input', placeholder: 'Message…', text: P.input || '',
+    oninput: e => { P.input = e.target.value; pgGrow(e.target); pgLongLine(m, fits); },
+    // Enter sends; Shift+Enter is a new line (and a word being composed is not sent)
+    onkeydown: e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault(); if (!pgLive()) pgSend(); } } });
+  requestAnimationFrame(() => pgGrow(box));
   // a run took the GPU in the middle of the last reply: said once, above the input
   const lastM = c && c.messages.length ? c.messages[c.messages.length - 1] : {};
   const lastR = [lastM, lastM.b || {}].map(x => (x.replies || []).slice(-1)[0] || {})
     .find(r => r.cut === 'a run started') || {};
-  return el('div', { class: 'pginputwrap' },
-    lastR.cut === 'a run started' ? el('p', { class: 'small se', 'data-pg-paused': '1',
-      text: 'Paused: a run started. Your conversation is kept.' }) : '',
-    changed ? el('p', { class: 'warn pgamber', 'data-pg-not-scored': '1' }, 'Not the scored settings. ',
-      el('button', { class: 'quiet', 'data-pg-reset': '1', text: 'reset', onclick: () => pgReset(c) })) : '',
-    el('p', { class: 'warn', 'data-pg-long': '1', hidden: long ? null : '',
-      text: `Too long for this model: about ${fits.toLocaleString('en')} words fits.` }),
-    box,
-    el('div', { class: 'frm' },
-      live ? el('button', { class: 'primary', 'data-pg-stop': '1', text: 'Stop', onclick: pgStop })
-        : el('button', { class: 'primary', 'data-pg-send': '1', text: 'Send', disabled: long ? '' : null,
-          onclick: pgSend }),
-      pgPracticeButton('input')));
+  return el('div', { class: 'pgcomposer' },
+    el('div', { class: 'pgcol' },
+      lastR.cut === 'a run started' ? el('p', { class: 'small se', 'data-pg-paused': '1',
+        text: 'Paused: a run started. Your conversation is kept.' }) : '',
+      el('p', { class: 'warn', 'data-pg-long': '1', hidden: long ? null : '',
+        text: `Too long for this model: about ${fits.toLocaleString('en')} words fits.` }),
+      el('div', { class: 'pgbox' }, box,
+        live ? el('button', { class: 'primary', 'data-pg-stop': '1', text: 'Stop', onclick: pgStop })
+          : el('button', { class: 'primary', 'data-pg-send': '1', text: 'Send', disabled: long ? '' : null,
+            onclick: pgSend })),
+      el('div', { class: 'pgunder' }, pgPracticeButton('input'),
+        el('span', { class: 'se', 'aria-hidden': 'true', text: '·' }),
+        changed ? el('span', { class: 'pgbadge amber', 'data-pg-badge': 'custom', 'data-pg-not-scored': '1' },
+            'custom settings · ',
+            el('button', { class: 'quiet', 'data-pg-reset': '1', text: 'reset', onclick: () => pgReset(c) }))
+          : el('span', { class: 'pgbadge ok', 'data-pg-badge': 'scored',
+            title: 'the settings its Everyday answers were scored on', text: 'scored settings ✓' }))));
 }
 function pgLongLine(m, fits) {
   const P = state.pg, c = P.chat;
@@ -16655,18 +16894,16 @@ function pgPracticeButton(where) {
         q = (q || '').trim().toLowerCase();
         const pr = P.practice || { everyday: [], knowledge: [] };
         const pick = x => { popClose(); P.input = x.prompt; P.ref = { kind: x.kind, id: x.id };
-          render(); const b = document.querySelector('[data-pg-input]'); if (b) b.focus(); };
+          render(); const b = document.querySelector('[data-pg-input]'); if (b) { pgGrow(b); b.focus(); } };
         const groups = [];
-        const by = (xs, key, label) => {
+        const by = (xs, label) => {
           const m = new Map();
           for (const x of xs) if (!q || x.prompt.toLowerCase().includes(q)) {
             const g = label(x); if (!m.has(g)) m.set(g, []); m.get(g).push(x); }
           return [...m.entries()];
         };
-        for (const [g, xs] of by(pr.everyday, 'group', x => 'Everyday · ' + x.groupLabel))
-          groups.push([g, xs]);
-        for (const [g, xs] of by(pr.knowledge, 'topic', x => 'Knowledge · ' + x.topic))
-          groups.push([g, xs]);
+        for (const [g, xs] of by(pr.everyday, x => 'Everyday · ' + x.groupLabel)) groups.push([g, xs]);
+        for (const [g, xs] of by(pr.knowledge, x => 'Knowledge · ' + x.topic)) groups.push([g, xs]);
         list.replaceChildren(...groups.flatMap(([g, xs]) => [el('p', { class: 'small se pghead', text: g }),
           ...xs.slice(0, 40).map(x => el('button', { role: 'menuitem', class: 'pgpq',
             'data-pg-pq': `${x.kind}|${x.id}`, text: x.prompt.length > 110 ? x.prompt.slice(0, 110) + '…' : x.prompt,
@@ -16701,7 +16938,10 @@ async function pgSend() {
     }
     const r = await post(`api/playground/chats/${c.id}/messages`, { text, by: whoName(),
       practice: P.ref && text ? P.ref : null });
-    P.chat = r.chat; P.input = ''; P.ref = null;
+    P.chat = r.chat; P.input = ''; P.ref = null; P.stick = true;
+    // what was sent leaves the box, which keeps its value through a redraw
+    const box = document.querySelector('[data-pg-input]');
+    if (box) { box.value = ''; pgGrow(box); }
     // the list says what the chat is about from its first message
     P.chats = (P.chats || []).map(x => x.id === r.chat.id
       ? { ...x, title: r.chat.title, updated_at: Date.now() / 1000 } : x);
@@ -16733,6 +16973,7 @@ function pgFollow(streamId, n, col) {
     const k = document.querySelector(`[data-pg-think="${col}"]`);
     if (t) t.textContent = L.text;
     if (k) { k.hidden = !L.think; const d = k.querySelector('.pgthinktext'); if (d) d.textContent = L.think; }
+    pgStick();
   };
   // each column ends on its own; the chat is read again once all have
   const over = () => {
@@ -16759,17 +17000,21 @@ function pgFollow(streamId, n, col) {
   };
   es.onerror = () => { if (!L.over) { es.close(); over(); } };
 }
-// the GPU is a run's: ask again, on its own, once it is free
+// the model is busy — the GPU a run's, or (12d.3) a served model under test:
+// ask again, on its own, once it is free
 function pgRetryWhenFree(n, col) {
   const P = state.pg, chatId = P.id;
+  const mid = P.chat ? (col === 'b' ? P.chat.model2 : P.chat.model) : '';
+  const served = !!(pgModel(mid) || {}).served;
   clearTimeout(P.retry);
   P.retry = setTimeout(async function tick() {
     const L = P.live && P.live.cols[col];
     if (!pgActive() || P.id !== chatId || !L || !L.refused) return;
     try {
       const s = await api('api/playground/status');
-      if (!s.run) { const c = P.chat; P.live = null; pgAgain(c, n, col); return; }
-      L.refused = s.run; render();
+      const busy = served ? s.testing === mid : !!s.run;
+      if (!busy) { const c = P.chat; P.live = null; pgAgain(c, n, col); return; }
+      L.refused = served ? s.testing_line : s.run; render();
     } catch (e) { /* try again */ }
     P.retry = setTimeout(tick, 15000);
   }, 15000);

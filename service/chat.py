@@ -17,15 +17,25 @@ their replies to the page, inside the service.
   only in a sandboxed subprocess (runner._child_env, EVAL_USER), and chat runs
   in the service.
 
+12d.3: a model served elsewhere (12f.1) chats too, through its
+OpenAI-compatible address, streamed — never loaded here, so no GPU and no
+lock: only a run testing that same model makes it wait, and a run about to
+test it stops its replies first (`yield_served`), so no chat message is ever
+interleaved with a scored one.
+
 The engine never touches a score: what it writes is the chat's own record.
 """
 
 from __future__ import annotations
 
+import http.client
 import json
 import re
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +46,10 @@ CUT_RUN = "a run started"
 WAIT_WORDS = "answering another message, yours is next"
 WAIT_GPU = "waiting for the GPU"
 CPU_NOTE = "on the CPU while a run uses the GPU — slower"
+# 12d.3: a served model a run is testing, and one whose server is down
+TESTING_LINE = "Being tested right now (run #{sid}{left}). Chat starts when it's done."
+DOWN_LINE = "The server at {where} isn't answering."
+SERVED_READ_S = 120                # the longest wait for a served model's next piece
 SUITE_WORDS = {"full": "Standard tests", "quick": "quick tests", "control": "control tests",
                "judged": "Knowledge exam", "everyday": "Everyday tasks",
                "generative": "instruction and maths tests"}
@@ -134,6 +148,112 @@ class HFBackend:
         t.join()
 
 
+class ServedDown(Exception):
+    """a served model's server gave no answer at all: said in one line"""
+
+
+def where(base_url: str) -> str:
+    """"http://host.docker.internal:8094/v1" -> ":8094", as a person says it"""
+    u = urllib.parse.urlparse(base_url or "")
+    return f":{u.port}" if u.port else (u.hostname or base_url or "its address")
+
+
+class ServedBackend:
+    """12d.3: a model served elsewhere, asked over its OpenAI-compatible
+    address with `stream: true` — the messages and settings a local chat
+    sends, and its key. Thinking (llama-server's `reasoning_content`) is put
+    in its tags, so the reply splits as a local one does, into the fold; the
+    server's own counts are kept: tokens, and MTP's drafts from `timings`"""
+    name = "served"
+
+    def load(self, model_id: str, spec: dict, device: str):
+        from . import served
+        rec = served.get(model_id)
+        if not rec:
+            raise RuntimeError("this served model isn't registered any more")
+        return {"model": model_id, "rec": rec, "device": "served"}
+
+    def unload(self, handle) -> None:
+        pass
+
+    def body(self, rec: dict, messages: list[dict], settings: dict) -> dict:
+        b = {"model": rec["pin"].get("model") or rec["name"], "messages": messages,
+             "stream": True, "stream_options": {"include_usage": True},
+             "max_tokens": int(settings["max_gen_toks"]),
+             "temperature": float(settings.get("temperature") or 0.0)}
+        # as its runs ask it (served.settings_for): thinking as registered —
+        # "the model decides" asks nothing — unless the chat changed it
+        think = settings.get("thinking")
+        if think is None and rec.get("thinking") in ("on", "off"):
+            think = rec["thinking"] == "on"
+        if think is not None:
+            b["chat_template_kwargs"] = {"enable_thinking": bool(think)}
+        return b
+
+    def generate(self, handle, messages: list[dict], settings: dict, should_stop, emit) -> dict:
+        rec = handle["rec"]
+        if should_stop():                 # a run took it between the queue and here
+            return {"tokens": None, "draft": None}
+        h = {"content-type": "application/json", "accept": "text/event-stream"}
+        if rec.get("key"):
+            h["authorization"] = f"Bearer {rec['key']}"
+        req = urllib.request.Request(rec["base_url"].rstrip("/") + "/chat/completions",
+                                     data=json.dumps(self.body(rec, messages, settings)).encode(),
+                                     headers=h, method="POST")
+        try:
+            r = urllib.request.urlopen(req, timeout=SERVED_READ_S)
+        except urllib.error.HTTPError as e:
+            said = e.read()[:160].decode("utf-8", "replace")
+            raise RuntimeError(f"The server at {where(rec['base_url'])} said HTTP {e.code}: "
+                               f"{said}") from None
+        except (urllib.error.URLError, OSError):
+            raise ServedDown(DOWN_LINE.format(where=where(rec["base_url"]))) from None
+        meta = {"tokens": None, "draft": None}
+        thinking = False
+        with r:                           # closing it tells the server to stop
+            try:
+                for line in r:
+                    if should_stop():
+                        break
+                    line = line.strip()
+                    if not line.startswith(b"data:"):
+                        continue
+                    data = line[5:].strip()
+                    if data == b"[DONE]":
+                        break
+                    try:
+                        ch = json.loads(data)
+                    except ValueError:
+                        continue
+                    for c in ch.get("choices") or []:
+                        d = c.get("delta") or {}
+                        if d.get("reasoning_content"):
+                            if not thinking:
+                                emit("<think>\n")
+                                thinking = True
+                            emit(d["reasoning_content"])
+                        if d.get("content"):
+                            if thinking:
+                                emit("\n</think>\n\n")
+                                thinking = False
+                            emit(d["content"])
+                    used = (ch.get("usage") or {}).get("completion_tokens")
+                    if isinstance(used, (int, float)) and used >= 0:
+                        meta["tokens"] = int(used)
+                    t = ch.get("timings") or {}
+                    if meta["tokens"] is None and isinstance(t.get("predicted_n"), (int, float)):
+                        meta["tokens"] = int(t["predicted_n"])
+                    if isinstance(t.get("draft_n"), (int, float)) and t["draft_n"] > 0:
+                        meta["draft"] = {"n": int(t["draft_n"]),
+                                         "accepted": int(t.get("draft_n_accepted") or 0)}
+            except (OSError, http.client.HTTPException):
+                # it went away mid-reply: what it wrote is kept, and says so
+                meta["cut"] = "the server stopped answering"
+        if thinking:
+            emit("\n</think>\n\n")
+        return meta
+
+
 def backend():
     return FakeBackend() if config.CHAT_BACKEND == "fake" else HFBackend()
 
@@ -182,6 +302,13 @@ def board_models() -> list[dict]:
                     "params": m.get("params"), "archinfo": arch,
                     "source": "artifact" if mid.startswith("local/") else "hub",
                     "chat": not why, "why_not": why})
+    # 12d.3: a model served elsewhere chats through its server — its
+    # model_meta.json was skipped above, so it is listed once
+    from . import served
+    for rec in db.served_all():
+        out.append({"id": rec["id"], "name": rec["name"], "kind": "instruct", "params": None,
+                    "archinfo": served.archinfo(rec), "source": "served", "served": True,
+                    "phone": served.is_phone(rec), "chat": True, "why_not": ""})
     return out
 
 
@@ -272,7 +399,13 @@ class Engine:
 
     # -- where a model can answer ---------------------------------------------
     def place(self, row: dict) -> tuple[str | None, str]:
-        """("cuda" | "cpu", a note) — or (None, why not now), in one line"""
+        """("cuda" | "cpu" | "served", a note) — or (None, why not now), in one line"""
+        if row.get("served"):
+            # 12d.3: no GPU here; only a run testing this same model waits it
+            run = runner.run_holding()
+            if run and run.get("hf_id") == row["id"]:
+                return None, testing_line(run)
+            return "served", ""
         params = float(row.get("params") or 0)
         small = 0 < params < config.CHAT_CPU_MAX_PARAMS_B * 1e9
         run = runner.run_holding()
@@ -296,6 +429,17 @@ class Engine:
         return "cuda", ""
 
     def _load(self, row: dict, device: str) -> Loaded:
+        if device == "served":
+            # nothing loads: its registration, read again each reply (its
+            # address and key may have changed), and a turn at a time
+            handle = ServedBackend().load(row["id"], {}, device)
+            with self.lock:
+                held = self.loaded.get(row["id"])
+                if held:
+                    held.handle, held.last_used = handle, now()
+                    return held
+                ld = self.loaded[row["id"]] = Loaded(row["id"], device, handle, now())
+            return ld
         with self.lock:
             held = self.loaded.get(row["id"])
             if held and held.device == device:
@@ -359,11 +503,36 @@ class Engine:
                 gone.append(ld.model)
         return gone
 
+    def yield_served(self, model_id: str, wait_s: float | None = None, sleep=time.sleep) -> float:
+        """12d.3: a run holds the lock to test a served model: its chat replies
+        stop (kept, cut short) and the run waits for them to end — at most
+        CHAT_YIELD_WAIT_S — so no chat request is interleaved with a scored
+        one; a new message waits meanwhile (place). Never raises"""
+        t0 = now()
+        limit = config.CHAT_YIELD_WAIT_S if wait_s is None else wait_s
+        try:
+            mine = [st for st in list(self.streams.values())
+                    if not st.done and st.model == model_id]
+            for st in mine:
+                st.cut = CUT_RUN
+                st.stop.set()
+            # until each has ended: one about to send sees the stop first
+            while any(not st.done for st in mine) and now() - t0 < limit:
+                sleep(0.05)
+        except Exception:                                   # noqa: BLE001
+            pass
+        return now() - t0
+
     def status(self) -> dict:
+        run = runner.run_holding()
+        testing = (run or {}).get("hf_id") or ""
         return {"loaded": [{"model": ld.model, "name": ld.model.split("/")[-1],
                             "device": ld.device, "idle_s": round(now() - ld.last_used)}
-                           for ld in self.loaded.values()],
-                "run": gpu_busy_line(runner.run_holding()) if runner.run_holding() else ""}
+                           for ld in self.loaded.values() if ld.device != "served"],
+                "run": gpu_busy_line(run) if run else "",
+                # 12d.3: the served model a run is testing, which chat waits for
+                "testing": testing if testing.startswith("served/") else "",
+                "testing_line": testing_line(run) if testing.startswith("served/") else ""}
 
     # -- a reply -------------------------------------------------------------
     def start(self, chat: dict, messages: list[dict], settings: dict, row: dict,
@@ -382,6 +551,8 @@ class Engine:
         pa, pb = self.place(a)[0], self.place(b)[0]
         if not pa or not pb:
             return False
+        if "served" in (pa, pb):
+            return True                # 12d.3: a served model takes no memory here
         if pa == "cpu" or pb == "cpu":
             return pa == pb == "cpu"
         need = sum(float(r.get("params") or 0) * 2 + config.CHAT_GPU_MARGIN_GB * 1e9
@@ -455,7 +626,8 @@ class Engine:
                             st.emit({"t": "text", "d": text[sent["text"]:]})
                     sent.update(think=len(think), text=len(text))
 
-                self._backend().generate(ld.handle, messages, settings, should_stop, emit)
+                be = ServedBackend() if device == "served" else self._backend()
+                meta = be.generate(ld.handle, messages, settings, should_stop, emit) or {}
                 raw = "".join(acc)
                 think, text = final_split(raw)
                 secs = max(0.001, time.time() - t0)
@@ -463,7 +635,12 @@ class Engine:
                 reply.update(text=text, thinking=think, device=device,
                              secs=round(max(secs, 0.01), 2),
                              words=words, wps=round(words / secs, 1),
-                             cut=st.cut or ("stopped" if st.stop.is_set() else ""))
+                             cut=st.cut or ("stopped" if st.stop.is_set() else "")
+                             or meta.get("cut") or "")
+                if device == "served":
+                    # 12d.3: the server's own counts; its words a second are
+                    # its server's speed, not the phone's, so none is kept
+                    reply.update(wps=None, tokens=meta.get("tokens"), draft=meta.get("draft"))
             finally:
                 ld.last_used = now()
                 ld.busy.release()
@@ -476,6 +653,14 @@ class Engine:
             st.emit({"t": "error", "why": str(e)[:300]})
         finally:
             threading.Timer(600, lambda: self.streams.pop(st.id, None)).start()
+
+
+def testing_line(run: dict) -> str:
+    """"Being tested right now (run #88, about 20 min left). Chat starts when
+    it's done." — the time left is the run's own progress line's (12f.1)"""
+    sub = db.get(run["sid"]) if run.get("sid") else None
+    m = re.search(r"about [^·]*? left", (sub or {}).get("progress") or "")
+    return TESTING_LINE.format(sid=run.get("sid") or "?", left=", " + m.group(0) if m else "")
 
 
 def gpu_busy_line(run: dict | None) -> str:
@@ -571,9 +756,12 @@ def get_chat(chat_id: str, by: str) -> dict:
 
 
 def list_chats(by: str) -> list[dict]:
+    # 12d.3: a served model by the name it was registered with, not its id's
+    named = {m["id"]: m["name"] for m in board_models()}
+    name = lambda mid: named.get(mid) or mid.split("/")[-1]            # noqa: E731
     return [{"id": c["id"], "title": c["title"] or "New chat", "model": c["model"],
              "model2": c.get("model2") or "",
              # 12d.2: "Qwen3-0.6B vs SmolLM2-360M"
-             "names": " vs ".join(m.split("/")[-1] for m in (c["model"], c.get("model2")) if m),
+             "names": " vs ".join(name(m) for m in (c["model"], c.get("model2")) if m),
              "updated_at": c["updated_at"]}
             for c in db.chat_list(_who(by), config.CHAT_LIST_N)]
