@@ -53,7 +53,9 @@ jobs:
       - name: py_compile scripts/ service/ clients/
         run: python -m compileall -q scripts service clients
       - name: unit and API tests
-        run: pytest -q -n auto -m "not gpu and not network and not dashboard"
+        run: |
+          echo "cores: $(nproc)"
+          pytest -q -n auto --dist worksteal --durations=40 -m "not gpu and not network and not dashboard"
 
   browser:
     runs-on: ubuntu-latest
