@@ -106,7 +106,9 @@ def test_models_has_the_gguf_group_only_for_models_with_a_result(live, page, mea
     page.wait_for_selector("table[data-lb-table]")
     groups = page.locator("table[data-lb-table] tr.grp th").evaluate_all(
         "xs => xs.map(x => x.textContent)")
-    assert groups[-1] == "Measured on the GGUF · llama.cpp, 0-shot", groups
+    # after the others; only the phone's reported numbers come after it (12f.2b)
+    assert [g for g in groups if g != "On the phone · reported"][-1] == \
+        "Measured on the GGUF · llama.cpp, 0-shot", groups
     th = page.locator("th[data-col='gguf:mmlu']")
     assert "llama-perplexity" in th.get_attribute("data-tip") and TIP in th.get_attribute("data-tip")
     names = page.locator("th[data-col^='gguf:'] .hname").evaluate_all(
