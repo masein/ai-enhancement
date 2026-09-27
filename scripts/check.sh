@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The check before every merge: what .github/workflows/ci.yml ran, run here.
-# The Actions minutes ran out on 2026-09-24 and CI is manual-only since; this
-# is the gate now (HANDOFF.md § 5b).
+# What .github/workflows/ci.yml runs, run here, one step after another. The
+# gate before a merge is the CI run on the mirror (HANDOFF.md § 5b), which
+# splits the same tests across parallel jobs; this is the check before pushing.
 #
 #   scripts/check.sh
 #

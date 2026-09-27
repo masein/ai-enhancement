@@ -234,9 +234,28 @@ billing resets. `.github/workflows/ci.yml` runs only when started by hand
 (`workflow_dispatch`). **Since 2026-09-26 it runs on masein's personal repo,
 `origin` (masein/ai-enhancement), as a mirror, and that run is the gate.**
 - **The mirror is public.** masein chose that, knowing Teraformer's code is
-  public there, and hosted-runner minutes are free on it. A check is the
-  `test` job alone; the image build runs only with `-f build_image=true`
-  (#76). One check takes about 30–35 minutes.
+  public there, and hosted-runner minutes are free on it, up to 20 jobs at
+  once. The image build runs only with `-f build_image=true` (#76).
+- **A check is three jobs, and the `ci` job's result is the one to read**:
+  - `lint-unit`: ruff, the compile pass, and the unit and API tests on
+    every core (pytest-xdist, `-n auto`);
+  - `browser`: `-m dashboard` in five shards run at once (pytest-split);
+  - `ci`: green only when both are.
+
+  Every test still runs. The plugins are in `requirements-ci.txt`, not
+  `requirements-dev.txt`, so the local check's image doesn't rebuild. A
+  failing shard uploads its screenshots as `dashboard-screenshots-shard-N`.
+- **ci: regenerate `.test_durations` when browser tests are added or get
+  slower, and commit it.** The shards are split by those times.
+  - From any JUnit XML of the browser suite:
+    `python scripts/test_durations.py browser.xml`. That can be a local
+    `pytest -m dashboard --junitxml browser.xml`, or the five shards' files
+    together.
+  - Or with the plugin itself: `pytest -m dashboard --store-durations`.
+  - A test missing from the file is split by the average. A stale file makes
+    the shards uneven, but it never drops a test.
+- **A test that fails only split or in parallel depends on another test.**
+  Fix the test: don't take it out of the split.
 - **Per PR branch:** `git push origin <branch>`, then
   `gh workflow run ci.yml -R masein/ai-enhancement --ref <branch>`. Put the
   run's link, the commit and the result in the PR description under "Local
