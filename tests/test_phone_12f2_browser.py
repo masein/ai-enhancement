@@ -1,4 +1,6 @@
-"""12f.2 on the page: On phone is the fourth switch on Models, after Everyday
+"""12f.2 on the page — 12f.2b: not a view of its own, its old link choosing the
+phone builds on Models, and the card on the model page. Before: On phone was the
+fourth switch on Models, after Everyday
 tasks, only once a phone build is registered. Its card shows what was
 measured on the phone as reported — every number "reported by <name>", with
 the date and the source — beside what the board measured through the served
@@ -56,14 +58,17 @@ def views(page, live):
     return page.locator("[data-models-switch] [role=tab]").all_inner_texts()
 
 
-def test_on_phone_is_offered_only_once_a_phone_build_exists(live, page, fake):
+def test_on_phone_is_no_view_and_its_old_link_chooses_the_phone_builds(live, page, fake):
+    """12f.2b: phone builds are rows on Models; the old On phone link opens
+    Models with them chosen"""
     page.set_viewport_size({"width": 1400, "height": 900})
-    assert "On phone" not in views(page, live)
-    # served, but not a phone build
-    register(live, fake, phone=False)
-    assert "On phone" not in views(page, live)
     register(live, fake, phone=True)
-    assert views(page, live) == ["Standard", "Knowledge exam", "Everyday tasks", "On phone"]
+    assert views(page, live) == ["Standard", "Knowledge exam", "Everyday tasks"]
+    page.goto("about:blank")
+    page.goto(live["base"] + "/#tab=models&view=phone")
+    page.wait_for_function("location.hash.includes('models=')")
+    assert "models=" + SID.replace("/", "%2F") in page.evaluate("location.hash")
+    assert page.locator("[data-models-menu]").inner_text() == "Models: 1 ▾"
     assert page.errors == []
 
 
@@ -82,14 +87,16 @@ def test_the_card_shows_what_was_reported_beside_what_the_board_measured(live, p
     page.set_viewport_size({"width": 1400, "height": 900})
     page.goto(live["base"] + "/#tab=home")
     set_name(page, "masein")
-    page.goto(live["base"] + "/#tab=models")
-    page.locator("[data-models-view='phone']").click()
+    # 12f.2b: on the model page, its "On the phone · reported" block
+    page.goto(live["base"] + "/#model=" + SID.replace("/", "%2F"))
+    page.locator("[data-kind-tile='phone'] [data-kind-test='phone']").click()
     card = page.locator(f"[data-phone-card='{SID}']")
     card.wait_for()
     assert card.locator(f"[data-phone-none='{SID}']").inner_text() == \
         "Nothing reported from the phone yet."
-    # typed in: the README's numbers, then who measured them and when
-    page.locator(f"[data-phone-form='{SID}'] > summary").click()
+    # typed in: the README's numbers, then who measured them and when — Add
+    # opened the form
+    assert page.locator(f"[data-phone-form='{SID}']").get_attribute("open") == ""
     page.locator(f"[data-phone-readme='{SID}']").click()
     assert page.locator("[data-phone-in='device']").input_value() == "OnePlus 15"
     assert page.locator("[data-phone-in='by']").input_value() == ""
@@ -117,7 +124,7 @@ def test_the_card_shows_what_was_reported_beside_what_the_board_measured(live, p
     assert row[0] == "Everyday tasks" and " of 200" in row[1] and " of " in row[2]
     # the server's own speed is not the phone's, and isn't shown
     assert "tok/s" not in meas.inner_text()
-    shot(page.locator("[data-phone-view]"), "on-phone-1400.png")
+    shot(page.locator("[data-kind-block='phone']"), "on-phone-1400.png")
     page.set_viewport_size({"width": 400, "height": 900})
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
     shot(page, "on-phone-400.png", full_page=True)
@@ -135,13 +142,22 @@ def test_the_model_page_has_it_as_its_fourth_kind_and_nowhere_else(live, page, f
     assert "tok/s median on OnePlus 15 · reported by Sam" in tile.inner_text()
     tile.click()
     page.wait_for_selector(f"[data-kind-block='phone'] [data-phone-card='{SID}']")
-    # the reported MMLU is in the card, and in no column, tile or average
+    # the reported MMLU is in the card, and in no tile or average
     body = page.locator("body").inner_text()
     assert body.count("81.98%") == 1
     page.set_viewport_size({"width": 1400, "height": 1000})
     page.evaluate("scrollTo(0, 0)")
     shot(page, "model-page-phone.png")
+    # 12f.2b: on Models it is in the reported group alone — never in the MMLU
+    # column the board measured, which a served model can't have
     page.goto(live["base"] + "/#tab=models&chip=knowledge")
     page.wait_for_selector("table[data-lb-table]")
-    assert "81.98" not in page.locator("body").inner_text()
+    assert page.locator("[data-rep-cell]").count() == 0      # not a row here: nothing it can have
+    # on Everyday tasks, where it is a row, beside its score
+    page.goto(live["base"] + "/#tab=models")
+    page.locator("[data-models-view='everyday']").click()
+    row = page.locator(f"tr[data-lb-row='{SID}']")
+    row.wait_for()
+    assert row.locator("[data-rep-cell='rep:q:MMLU']").inner_text().startswith("81.98%")
+    assert row.locator("[data-rep-cell='rep:median']").inner_text() == "13.5\nreported by Sam"
     assert page.errors == []

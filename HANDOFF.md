@@ -3086,6 +3086,7 @@ that program. `service/served.py` holds it.
   build" ticked, or with "phone" in how it's served.
 - **The On phone kind appears only when one exists:** the fourth switch on
   Models, after Everyday tasks, and the fourth kind on its model page.
+  (12f.2b took the switch off Models: phone builds are rows there now.)
 - **Its card holds numbers someone measured on the phone, typed in:**
   - the device, the chip and RAM;
   - decode tokens per second, the median and the best, and how they were
@@ -3246,6 +3247,46 @@ that program. `service/served.py` holds it.
   - each served answer records `timings.draft_n` and `draft_n_accepted` when
     llama-server reports them (`draft` in the samples). `answer_length` sums
     them into the rate, and says "not reported" when a server gives none.
+
+### 12f.2b — phone builds are rows
+
+The addendum from masein; `scripts/report_lm_eval.py` only.
+- **No "On phone" view.** Phone builds and their setups are ordinary rows on
+  Models (Standard, Everyday tasks, Knowledge exam), tagged "phone build"
+  (in place of "served": a phone build is one).
+  - A phone build is a served model registered as one, and any served entry
+    whose server reports the same file (`fileKey`: name and size).
+  - A GGUF's setup is a row of its own, "k4-LDA · lookahead 1"
+    (`rowOf` the model, `ggufSetup` its id). It has that setup's GGUF
+    numbers only, no Avg, and opens its model's page. The model's own row
+    is "as built".
+  - `#tab=models&view=phone` is Models, Standard, with the phone builds
+    chosen.
+- **Models ▾** has "phone builds" and "served" before instruct, base and
+  checkpoints, each with "only these".
+- **"On the phone · reported"** is a column group after the others: the
+  newest report's decode median and best, and each quality number reported.
+  - Shown only while a row shown has a report, each cell marked "reported by
+    <name>".
+  - Never a leader, never in Avg or a custom table's Avg, never what makes a
+    model a row: the reports still reach the page only through `/api/phone`.
+  - The "Add numbers measured on the phone" form is on the model page, under
+    its "On the phone · reported" kind.
+- **A served or GGUF-only row has only the columns it can have** (`canHave`):
+  - a harness task, an MMLU area or topic needs the model loaded here, so
+    those cells are blank, with the reason as a tooltip, never dashes;
+  - a server answers the generative tasks and the exam;
+  - the GGUF group needs a registered file.
+
+  A chip with nothing the row can have leaves it out, from the rows and from
+  "Not tested on this" (Knowledge, Commonsense). A chip with a generative
+  task keeps a served model with no result there under "Not tested".
+- **Two 12f.3 slips fixed on the way:**
+  - A GGUF-only row counted in "chat template applied to some models but
+    not others". llama-perplexity scores raw text, so there is no template.
+  - Served and GGUF-only rows counted as "preliminary", in the warning, the
+    preliminary filter and the frontier chart's count. They can never run
+    the required tasks, so they have no average to earn.
 
 ## 11. Known gaps, risks, loose ends
 

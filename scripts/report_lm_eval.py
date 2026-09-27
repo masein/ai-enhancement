@@ -1860,9 +1860,11 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             f"columns are not comparable — re-run with the same --num_fewshot.")
     # 12b.3: "on some models, not others" and "different templates" were two
     # checks about one thing; they are one, saying whichever is true
+    # a GGUF measured by llama-perplexity is scored on raw text: no template to compare
+    templated = {m: r for m, r in by_model.items() if not (r.get("archinfo") or {}).get("gguf")}
     chat_says: list[str] = []
-    if len({r["chat_template"] for r in by_model.values()}) > 1:
-        applied = [display[m] for m, r in by_model.items() if r["chat_template"]]
+    if len({r["chat_template"] for r in templated.values()}) > 1:
+        applied = [display[m] for m, r in templated.items() if r["chat_template"]]
         chat_says.append("Chat template applied to some models but not others (applied to: "
             + ", ".join(applied) + "). Correct if and only if those are the instruct "
             "models — it moves scores by tens of points, so check the list.")
@@ -1873,7 +1875,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     # a template that EXISTS but differs between models applied the same way is
     # also a comparability break — the hash is what has to match, not the yes/no
     shas = {(r.get("archinfo") or {}).get("tmpl_sha")
-            for m, r in by_model.items() if r["chat_template"]}
+            for m, r in templated.items() if r["chat_template"]}
     shas.discard(None)
     if len(shas) > 1:
         chat_says.append(f"The models evaluated WITH a chat template used {len(shas)} different "
@@ -1933,10 +1935,14 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             + (", …" if len(near) > 3 else "")
             + ". Both are ranked, because identical is the test for a duplicate and these "
               "are not identical — but two runs this close are worth a look.")
-    n_prelim = sum(1 for m in model_rows if not m["official"])
+    # a model served elsewhere or a GGUF file can never run the required
+    # tasks here: it is not "preliminary", it has no average to earn
+    rankable = [m for m in model_rows
+                if not m.get("served") and not (m.get("archinfo") or {}).get("gguf")]
+    n_prelim = sum(1 for m in rankable if not m["official"])
     if n_prelim and required:
-        warn('preliminary', 'info', {'tab': 'models', 'prelim': True}, f"{n_prelim} of {len(model_rows)} models are preliminary",
-            f"{n_prelim} of {len(model_rows)} models are preliminary (they have not "
+        warn('preliminary', 'info', {'tab': 'models', 'prelim': True}, f"{n_prelim} of {len(rankable)} models are preliminary",
+            f"{n_prelim} of {len(rankable)} models are preliminary (they have not "
             f"finished all {len(required)} required tasks) and carry no overall "
             f"average or rank. Their per-task numbers are shown everywhere and are "
             f"valid on their own — resubmit with suite=full to make them official.")
@@ -2015,6 +2021,26 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             f"only with the same judge's, so they are in each model's History until they are "
             f"judged again (AI models ▸ Re-judge).")
 
+    # 12f.2b: a GGUF's setup other than as built is a row of its own,
+    # "k4-LDA · lookahead 1", holding only that setup's GGUF scores; its
+    # model page is its model's. Added after the board's counts and warnings,
+    # which it has no part in
+    for mid, sets in ((gguf or {}).get("setups") or {}).items():
+        parent = next((m for m in model_rows if m["id"] == mid), None)
+        if not parent:
+            continue
+        for x in sets:
+            if x["id"] == "as-built" or not x.get("current") or not x.get("benches"):
+                continue
+            rid = f"{mid} · {x['name']}"
+            model_rows.append({
+                **parent, "id": rid, "name": f"{parent['name']} · {x['name']}", "rowOf": mid,
+                "ggufSetup": x["id"], "judge": None, "judgedAvg": None, "judgedEarlier": None,
+                "judgeState": None, "gen": None, "avg": None, "avgRaw": None, "avgSe": None,
+                "avgRawSe": None, "partialAvg": None, "official": False, "nhave": 0,
+                "tainted": [], "taintCompare": None, "diag": None, "answerLength": None,
+                "duplicateOf": None, "nearDuplicateOf": None})
+            gguf["models"][rid] = x["benches"]
     dates = sorted(str(r["date"]) for r in by_model.values() if r["date"])
     return {
         "title": title,
@@ -2854,6 +2880,9 @@ table.lb .mcell { display:flex; align-items:center; gap:4px; max-width:260px; ov
   white-space:nowrap; }
 table.lb .mcell .mname { flex:0 3 auto; min-width:40px; max-width:none; overflow:hidden;
   text-overflow:ellipsis; }
+/* 12f.2b: a phone build's row carries a setup in its name, "k4-LDA · lookahead 1" */
+table.lb td.model:has([data-phone-tag]) { max-width:340px; }
+table.lb td.model:has([data-phone-tag]) .mcell { max-width:320px; }
 /* a long badge ("duplicate of <name>") gives way too, after the name: every
    child stays inside the cell. The short ones (base, prelim) keep their word */
 table.lb .mcell .badge { flex:none; white-space:nowrap; }
@@ -3102,6 +3131,10 @@ select { max-width:100%; }
 .qbbatch .rd-q-meta .chip { margin-right:6px; }
 .qbpast li { margin:2px 0; }
 pre.gg-cmd { white-space:pre-wrap; overflow-wrap:anywhere; }
+/* 12f.2b: a reported number, and under it who reported it; a column it can't have, blank */
+table.lb td.tcell div.rep-by, td div.rep-by { display:block; font-weight:400;
+  font-family:var(--font-sans); }
+td.na { background:transparent; }
 td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .srvsum::-webkit-details-marker { display:none; }
 /* 12f.2: On phone — reported beside measured, stacked on a phone */
@@ -5711,14 +5744,16 @@ function modelKinds(m) {
     (E.questions || []).length ? { kind: 'everyday', label: 'Everyday tasks', taken: !!e,
       at: e ? e.marked_at || 0 : 0 } : null,
     // 12f.2: a phone build's fourth — the numbers reported from the phone
-    (servedOf(m.id) || {}).phone ? { kind: 'phone', label: 'On phone',
-      taken: phoneReports(m.id).length > 0, at: (phoneReports(m.id)[0] || {}).at || 0 } : null,
+    (servedOf(m.id) || {}).phone ? { kind: 'phone', label: 'On the phone · reported',
+      taken: phoneReports(m.id).length > 0 || !!state.phone.open[m.id],
+      at: (phoneReports(m.id)[0] || {}).at || 0 } : null,
   ].filter(Boolean);
 }
 // a kind's one number, and the line under it
 function kindValue(m, kind) {
   if (kind === 'phone') {
     const r = phoneReports(m.id)[0];
+    if (!r) return ['—', 'nothing reported from the phone yet'];
     return [String(r.decode_median), `tok/s median on ${r.device} · reported by ${r.by}`];
   }
   if (kind === 'standard' && m.served) {
@@ -7972,14 +8007,14 @@ const LB_CHIPS = [
 // the four kinds of test, named the same and in the same order everywhere.
 // A kind with no data yet is not offered: On phone (12f.2) once a phone build
 // is registered
-const MODELS_VIEWS = { standard: 'Standard', exam: 'Knowledge exam', everyday: 'Everyday tasks',
-  phone: 'On phone' };
+// 12f.2b: On phone is no view of its own any more — phone builds are rows,
+// and #tab=models&view=phone is Models with them chosen
+const MODELS_VIEWS = { standard: 'Standard', exam: 'Knowledge exam', everyday: 'Everyday tasks' };
 function modelsViews() {
   const out = ['standard'];
   if (DATA.models.some(m => Object.keys((m.judge || {}).tasks || {}).some(t => t.startsWith('exam_'))))
     out.push('exam');
   if (Object.keys(evd().models || {}).length) out.push('everyday');
-  if (phoneBuilds().length) out.push('phone');
   return out;
 }
 // Models opens on Standard, and remembers the viewer's last choice
@@ -8076,6 +8111,8 @@ function lbFromHash(rest) {
   const L = lbS(), p = new URLSearchParams(rest || '');
   // an old link's "chip=judged" is the Knowledge exam view now (12b)
   const view = p.get('chip') === 'judged' ? 'exam' : p.get('view');
+  // 12f.2b: the old On phone view is Models with the phone builds chosen
+  L.phoneFilter = view === 'phone';
   L.view = Object.keys(MODELS_VIEWS).includes(view) ? view : 'standard';
   L.stdChip = LB_CHIPS.some(([v]) => v === p.get('chip')) ? p.get('chip') : 'all';
   L.chip = L.view === 'exam' ? 'judged' : L.stdChip;
@@ -8153,12 +8190,48 @@ const ggufOf = (id, b) => ((G().models || {})[id] || {})[b] || null;
 const ggufHas = id => !!Object.keys((G().models || {})[id] || {}).length;
 // a GGUF file with no server: its Standard is llama-perplexity's, never an average
 const ggufOnly = m => { const g = (G().registered || {})[m.id]; return !!g && !g.served; };
+// 12f.2b: a model served elsewhere, a GGUF with no server, a GGUF's setup:
+// never ranked, so never "preliminary" either — it has no average to earn
+const narrow = m => !!(m.rowOf || ggufOnly(m) || m.served);
 const ggufLabel = b => ((G().benchmarks || {})[b] || {}).label || b;
 function ggufCol(b) {
   return { key: 'gguf:' + b, gguf: b, label: ggufLabel(b), short: ggufLabel(b), num: true,
     group: G().group || 'Measured on the GGUF', unit: '0-shot · %' };
 }
 const ggufCols = () => (G().order || []).map(ggufCol);
+// 12f.2b: what was measured on the phone, as reported — its newest report
+const phoneRep = id => ((state.phone.byId || {})[id] || [])[0] || null;
+const REP_GROUP = 'On the phone · reported';
+function repCols(rows) {
+  const reps = rows.map(m => phoneRep(m.id)).filter(Boolean);
+  if (!reps.length) return [];
+  const names = [...new Set(reps.flatMap(r => (r.quality || []).map(q => q.name)))];
+  return [{ key: 'rep:median', rep: 'decode_median', label: 'tok/s', short: 'tok/s', num: true,
+            group: REP_GROUP, unit: 'decode, median' },
+          { key: 'rep:best', rep: 'decode_best', label: 'best tok/s', short: 'best', num: true,
+            group: REP_GROUP, unit: 'decode, best' },
+          ...names.map(q => ({ key: 'rep:q:' + q, rep: 'q', q, label: q, short: q, num: true,
+            group: REP_GROUP, unit: 'as reported' }))];
+}
+function repCell(m, c) {
+  const r = phoneRep(m.id), v = repVal(m, c);
+  if (v == null) return el('td', { class: 'num se', text: '' });
+  // a speed to a tenth, as the phone reported it; a quality number as typed
+  const shown = c.rep === 'q' ? (r.quality.find(x => x.name === c.q) || {}).value : v.toFixed(1);
+  return el('td', { class: 'num tcell', 'data-rep-cell': c.key,
+      title: `reported by ${r.by}, measured ${r.date} on ${r.device}`
+        + (r.source ? ` · from ${r.source}` : '') + ' · never in an average' },
+    String(shown), el('div', { class: 'small se rep-by', text: `reported by ${r.by}` }));
+}
+function repVal(m, c) {
+  const r = phoneRep(m.id);
+  if (!r) return null;
+  if (c.rep === 'q') {
+    const q = (r.quality || []).find(x => x.name === c.q);
+    return q ? parseFloat(String(q.value)) : null;
+  }
+  return r[c.rep] ?? null;
+}
 // "81.5% of all 14,042", or a subset, said as one
 function ggufWords(g) {
   return (g.full ? `all ${Number(g.n).toLocaleString('en')} questions` : `a subset of `
@@ -8372,7 +8445,8 @@ function lbColumns(ms) {
     // got another number and took this one for wrong
     lead[3] = { key: 'cavg', label: state.avgMode === 'raw' ? 'Avg, raw' : 'Avg above chance',
       num: true, group: '', unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' };
-    return [...lead, ...L.cols.map(t => isGgufKey(t) ? ggufCol(t.slice(5)) : task(t)), ...tail];
+    return [...lead, ...L.cols.map(t => isGgufKey(t) ? ggufCol(t.slice(5)) : task(t)),
+      ...repCols(lbFilter(ms)), ...tail];
   }
   let mid;
   if (L.chip === 'all') {
@@ -8408,7 +8482,9 @@ function lbColumns(ms) {
     if (L.chip === 'instruction')
       lead.splice(0, lead.length, ...lead.filter(c => c.key !== 'rank' && c.key !== 'avg'));
   }
-  return [...lead, ...mid, ...tail];
+  // 12f.2b: and, on All tasks, what was reported from the phone while a row
+  // shown has it
+  return [...lead, ...mid, ...(L.chip === 'all' ? repCols(lbFilter(ms)) : []), ...tail];
 }
 
 // 11f: one word per column name; the long ones are the tooltip's
@@ -8420,6 +8496,8 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
 // scale went (11f).
 function lbColTip(c) {
   const scale = state.avgMode === 'raw' ? 'raw accuracy' : 'above chance';
+  if (c.rep) return [`${c.label} — ${c.unit}, measured on the phone and reported by whoever `
+    + 'measured it', 'the board never measures a phone; never in any average'];
   if (c.gguf) {
     const b = (G().benchmarks || {})[c.gguf] || {};
     return [`${b.label} — measured on the GGUF`, G().tip,
@@ -8498,7 +8576,7 @@ function lbFilter(ms) {
     && sizeOk(m)
     && (L.status === 'all'
         || (L.status === 'ranked' && officialAvg(m) != null)
-        || (L.status === 'preliminary' && officialAvg(m) == null)
+        || (L.status === 'preliminary' && officialAvg(m) == null && !narrow(m))
         || (L.status === 'tainted' && (m.tainted || []).length))
     && (!L.models || L.models.includes(m.id)));
 }
@@ -8522,7 +8600,8 @@ function pillMenu(key, label, opts, cur, pick, attrs = {}) {
 function lbLeaders(cols, val) {
   const out = {};
   for (const c of cols) {
-    if (!c.num || c.key === 'params') continue;
+    // 12f.2b: a reported number is shown, never ranked against the others
+    if (!c.num || c.key === 'params' || c.rep) continue;
     // provisional scores are never tinted: a judged column is on the board
     // only once the judge is calibrated, and a model whose judge is not ok
     // has no judged cell to tint
@@ -8591,6 +8670,16 @@ function modelsHead(badge) {
 // ever in state.phone: never in DATA, a column or an average
 const phoneBuilds = () => Object.entries(DATA.served || {}).filter(([, s]) => s.phone)
   .map(([id, s]) => ({ id, ...s }));
+// 12f.2b: a phone build's row — the build, a served setup of its file, a
+// setup row of its GGUF
+const fileKey = s => `${((s || {}).pin || {}).file}|${((s || {}).pin || {}).size}`;
+function isPhoneRow(m) {
+  const s = (DATA.served || {})[m.rowOf || m.id] || m.served;
+  if (!s) return false;
+  return !!s.phone || phoneBuilds().some(b => b.pin && b.pin.file && fileKey(b) === fileKey(s));
+}
+const phoneTag = m => isPhoneRow(m) ? el('span', { class: 'badge served', 'data-phone-tag': m.id,
+  title: 'served: a phone build, or a setup of its file', text: 'phone build' }) : '';
 const phoneReports = id => state.phone.byId[id] || [];
 async function loadPhone() {
   const P = state.phone;
@@ -8603,23 +8692,11 @@ async function loadPhone() {
   P.loading = false; P.loaded = true;
   render();
 }
+// 12f.2b: the form is on the model page — Add opens it there
 function openPhone(id) {
+  const m = DATA.models.find(x => x.id === id);
   state.phone.open[id] = true;
-  navigate({ tab: 'models', model: null, topic: null });
-  setModelsView('phone');
-}
-function lbPhone() {
-  if (LIVE && !state.phone.loaded && !state.phone.loading && netReady()) loadPhone();
-  return [el('div', { class: 'card', 'data-lb-card': '1', 'data-phone-view': '1' },
-    ...modelsHead(),
-    el('p', { class: 'sub', text: 'Phone builds: what was measured on the phone, as reported '
-      + 'by whoever measured it, beside what this board measured through the served model. '
-      + 'The board never measures a phone itself, and no reported number is in a column or an '
-      + 'average.' }),
-    ...phoneBuilds().map(b => el('section', { class: 'kpart', 'data-phone-build': b.id },
-      el('h3', {}, el('a', { href: '#model=' + encodeURIComponent(b.id), text: b.name }), ' ',
-        servedTag(b.id)),
-      phoneBody(b, b.id))))];
+  if (m) { navigate({ model: id, topic: null }); showKind(m, 'phone'); }
 }
 function phoneBody(b, id) {
   const P = state.phone;
@@ -8781,13 +8858,21 @@ function lbEveryday(ms) {
   const have = rows.filter(m => evdOf(m.id)).sort((a, b) => natCmp(a.name, b.name));
   const none = rows.filter(m => !evdOf(m.id));
   const prov = have.some(m => evdOf(m.id).provisional);
-  const ncols = groups.length + 2;
+  // 12f.2b: what was reported from the phone, beside the score, while a row has it
+  const reps = repCols(have);
+  const ncols = groups.length + 2 + reps.length;
   const table = el('table', { class: 'lb norank', 'data-lb-table': '1', 'data-lb-everyday': '1' },
-    el('thead', {}, el('tr', { class: 'names' },
+    el('thead', {},
+      reps.length ? el('tr', { class: 'grp' }, el('th', { colspan: String(groups.length + 2),
+        class: 'grp nogrp', scope: 'colgroup' }), el('th', { colspan: String(reps.length),
+        class: 'grp', scope: 'colgroup', text: REP_GROUP })) : '',
+      el('tr', { class: 'names' },
       el('th', { class: 'model pin', scope: 'col', text: 'Model' }),
       groups.map(([g, label]) => el('th', { class: 'num', scope: 'col', 'data-evd-col': g,
         title: `${evdQs(g).length} questions`, text: label })),
-      el('th', { class: 'num', scope: 'col', text: 'Total' }))),
+      el('th', { class: 'num', scope: 'col', text: 'Total' }),
+      reps.map(c => el('th', { class: 'num', scope: 'col', 'data-col': c.key,
+        'data-tip': JSON.stringify(lbColTip(c)), text: c.short })))),
     el('tbody', {}, have.map(m => {
       const e = evdOf(m.id);
       return el('tr', { class: 'clickrow', 'data-lb-row': m.id,
@@ -8795,14 +8880,15 @@ function lbEveryday(ms) {
             navigate({ model: m.id, topic: null }); } },
         el('td', { class: 'model pin', 'data-model': m.id },
           el('a', { class: 'mname mlink', href: '#model=' + encodeURIComponent(m.id), text: m.name }),
-          servedTag(m.id)),
+          phoneTag(m) || servedTag(m.id)),
         groups.map(([g, label]) => {
           const n = evdGroupCount(e, g);
           return el('td', { class: 'num' + (n && !evdMissing(e) ? '' : ' se'), 'data-evd-g': g,
             title: n ? label : 'not asked', text: n || '—' });
         }),
         // 12i.4: the ran-out note on its own line under the total, never beside it
-        el('td', { class: 'num evdtotal' }, el('div', {}, evdTotal(e, m.id)), evdRanOut(e)));
+        el('td', { class: 'num evdtotal' }, el('div', {}, evdTotal(e, m.id)), evdRanOut(e)),
+        reps.map(c => repCell(m, c)));
     }), notTestedRows(none, ncols, 'everyday')));
   return [el('div', { class: 'card', 'data-lb-card': '1' },
     ...modelsHead(evdBadge(prov)),
@@ -8839,8 +8925,15 @@ function genCell(c, m, cc, one, pctn) {
 function vLeaderboard(ms) {
   const L = lbS();
   if (!modelsViews().includes(L.view)) { L.view = 'standard'; L.chip = L.stdChip || 'all'; }
+  // 12f.2b: the phone reports, for the "On the phone · reported" columns
+  const PH = state.phone;
+  if (LIVE && phoneBuilds().length && !PH.loaded && !PH.loading && netReady()) loadPhone();
+  if (L.phoneFilter && DATA) {
+    L.phoneFilter = false;
+    const ids = DATA.models.filter(isPhoneRow).map(m => m.id);
+    lbSet({ view: 'standard', models: ids.length ? ids : null });
+  }
   if (L.view === 'everyday') return lbEveryday(ms);
-  if (L.view === 'phone') return lbPhone();
   // the exam's scores are not ranked until a person has agreed with the judge:
   // one line says so, instead of an empty table
   if (L.view === 'exam' && !judgedCalibrated())
@@ -8883,6 +8976,7 @@ function vLeaderboard(ms) {
     : c.area ? (areaMmlu(m, c.area) || {}).v
     : c.cat ? ((mmluCats(m) || {})[c.cat] || {}).score_report
     : c.gguf ? (ggufOf(m.id, c.gguf) || {}).v
+    : c.rep ? repVal(m, c)
     : c.task ? (cell(c.task, m.id) || {}).v : null;
   const rowsIn = lbFilter(ms);
   const sortCol = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg')
@@ -8910,9 +9004,26 @@ function vLeaderboard(ms) {
   // 12h.2: with benchmarks chosen, a model is a row only with every one of
   // them — one missing any is not averaged, and says what it is missing
   const benchVal = (t, id) => ((isGgufKey(t) ? ggufOf(id, t.slice(5)) : cell(t, id)) || {}).v;
+  // 12f.2b: a model served elsewhere, a GGUF with no server, or a setup row
+  // can have only some columns: the rest are left blank, and a chip with
+  // none of them leaves it out. A harness task, an MMLU area or topic needs
+  // the model loaded here — a generative task a server answers, and the
+  // exam; the GGUF group needs the file
+  const measures = c => !!(c.task || c.area || c.cat || c.judged || c.jarea || c.gguf);
+  const hasFile = m => !!(G().registered || {})[m.rowOf || m.id];
+  const canHave = (m, c) => !narrow(m) || (c.gguf ? hasFile(m)
+    : !(m.rowOf || ggufOnly(m)) && (c.task ? isGen(c.task) : !(c.area || c.cat)));
+  // what the board measured decides the rows; a reported number never does
   const testedIn = m => custom ? L.cols.every(t => benchVal(t, m.id) != null)
-    : dataCols.some(c => val(m, c) != null) || (L.view === 'exam' && judgedAny(m));
-  const notTested = ordered.filter(m => !testedIn(m) && !(m.duplicateOf && dupsOf[m.duplicateOf]));
+    : dataCols.some(c => !c.rep && val(m, c) != null) || (L.view === 'exam' && judgedAny(m));
+  // a server can be asked this chip's generative tasks before any model has a
+  // column for one: then it is "not tested", not absent
+  const chipAsks = L.chip === 'all' || genTasks().some(t =>
+    ((CATS.find(([g]) => g === L.chip) || [])[1] || []).includes(t));
+  const couldHave = m => cols.some(c => measures(c) && canHave(m, c))
+    || (!!m.served && !custom && chipAsks);
+  const notTested = ordered.filter(m => !testedIn(m) && !(m.duplicateOf && dupsOf[m.duplicateOf])
+    && !(narrow(m) && !couldHave(m)) && !m.rowOf);
   const lbAll = ordered.filter(m => !(m.duplicateOf && dupsOf[m.duplicateOf]) && testedIn(m));
   const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
     state.src, state.avgMode, L.view, L.chip, L.kind, L.size, L.status, L.models, L.cols]));
@@ -8985,7 +9096,7 @@ function vLeaderboard(ms) {
       onclick: e => {
         // links, buttons, checkboxes and badges with a job of their own keep it
         if (e.target.closest('a, button, input, select, label, .badge[title]')) return;
-        navigate({ model: m.id, topic: null });
+        navigate({ model: m.rowOf || m.id, topic: null });
       } },
       visCols.map(c => {
         if (c.key === 'rank') {
@@ -9019,11 +9130,12 @@ function vLeaderboard(ms) {
             style: `--fam:${famColor(m)}`,
             title: modelSentence(m) + `\n\nfamily: ${famOf(m)}\n` + m.id },
           el('div', { class: 'mcell' },
-            el('a', { class: 'mname mlink', text: m.name, href: '#model=' + encodeURIComponent(m.id) }),
+            el('a', { class: 'mname mlink', text: m.name,
+              href: '#model=' + encodeURIComponent(m.rowOf || m.id) }),
             ckBadge(m) || (m.kind === 'instruct'
               ? el('span', { class: 'badge instruct', text: 'instruct' })
               : el('span', { class: 'badge', text: 'base' })),
-            servedTag(m.id),
+            phoneTag(m) || servedTag(m.id),
             // 12h.1: a thinking row, or a model that cannot stop thinking
             m.thinkingRow || ((m.gen || {}).thinking || {}).mode === 'always'
               ? el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
@@ -9057,6 +9169,11 @@ function vLeaderboard(ms) {
               + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0'),
             'data-cavg': m.id });
         }
+        if ((c.key === 'avg' || c.key === 'cavg') && narrow(m)
+            || measures(c) && !canHave(m, c))
+          return el('td', { class: 'num na', 'data-na': c.key, title: c.gguf
+            ? 'Measured on a GGUF file with llama-perplexity: none is registered for this model.'
+            : m.served && !m.rowOf ? SERVED_LINE : G().tip });
         if (c.key === 'avg') {
           const a = officialAvg(m);
           if (a == null) return el('td', { class: 'num se',
@@ -9101,6 +9218,7 @@ function vLeaderboard(ms) {
             text: pctn(g.score_report) });
           return one(c, m, g.score_report, null, pctn, { title: `${g.n_report} leaderboard-half items` });
         }
+        if (c.rep) return repCell(m, c);
         if (c.gguf) {
           const g = ggufOf(m.id, c.gguf);
           if (!g) return el('td', { class: 'num se', text: '—' });
@@ -9359,8 +9477,9 @@ function lbModelsPill(ms) {
     const say = () => { foot.textContent = pick.size === ms.length ? 'All models shown'
       : `${pick.size} of ${ms.length} shown`; };
     const apply = () => lbSet({ models: pick.size === ms.length ? null : [...pick] });
-    const groupOf = m => m.source === 'artifact' ? 'checkpoints'
-      : m.kind === 'instruct' ? 'instruct' : 'base';
+    // 12f.2b: phone builds and served models are groups of their own
+    const groupOf = m => isPhoneRow(m) ? 'phone builds' : m.served ? 'served'
+      : m.source === 'artifact' ? 'checkpoints' : m.kind === 'instruct' ? 'instruct' : 'base';
     const row = m => el('label', { class: 'small mrow' },
       el('input', { type: 'checkbox', 'data-model-pick': m.id, checked: pick.has(m.id) ? '' : null,
         onchange: e => { if (e.target.checked) pick.add(m.id); else pick.delete(m.id);
@@ -9370,11 +9489,15 @@ function lbModelsPill(ms) {
     const fill = q => {
       const hit = ms.filter(m => !q
         || (m.name + ' ' + m.id + ' ' + famOf(m)).toLowerCase().includes(q.toLowerCase()));
-      list.replaceChildren(...['instruct', 'base', 'checkpoints'].flatMap(g => {
-        const gs = hit.filter(m => groupOf(m) === g);
-        return gs.length ? [el('div', { class: 'small se mgroup', 'data-model-group': g, text: g }),
-          ...gs.map(row)] : [];
-      }));
+      list.replaceChildren(...['phone builds', 'served', 'instruct', 'base', 'checkpoints']
+        .flatMap(g => {
+          const gs = hit.filter(m => groupOf(m) === g);
+          // a group's name chooses it alone: "only phone builds"
+          return gs.length ? [el('div', { class: 'small se mgroup', 'data-model-group': g }, g,
+            el('button', { class: 'quiet', 'data-model-group-only': g, text: 'only these',
+              onclick: () => { pick.clear(); ms.filter(m => groupOf(m) === g)
+                .forEach(m => pick.add(m.id)); say(); apply(); } })), ...gs.map(row)] : [];
+        }));
     };
     fill(state.lbModelsQ || '');
     say();
@@ -9678,7 +9801,8 @@ function frontierOf(pts) {
 function frontierChart(ms) {
   const L = lbS();
   const ranked = DATA.models.filter(m => officialAvg(m) != null && m.params && !m.duplicateOf);
-  const prelim = DATA.models.filter(m => officialAvg(m) == null && !m.duplicateOf).length;
+  const prelim = DATA.models.filter(m => officialAvg(m) == null && !m.duplicateOf
+    && !narrow(m)).length;
   const pts = ranked.map(m => ({ m, x: m.params, y: officialAvg(m), se: officialSe(m) }));
   const head = el('div', { class: 'ihead' },
     el('div', { class: 'eyebrow', text: 'Score against size' }),
