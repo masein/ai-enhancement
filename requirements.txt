@@ -7,8 +7,10 @@
 
 # pinned on purpose: a benchmark whose code changed is a different benchmark.
 # 12h.1: with IFEval's checker (langdetect, nltk, immutabledict) and the maths
-# extras (sympy, math-verify) its three generative tasks need
-lm_eval[ifeval,math]==0.4.12
+# extras (sympy, math-verify) its three generative tasks need. 12f.4: and the
+# api extra — local-chat-completions, how a served model sits them, imports it
+# (tests/test_image_deps.py fails CI when it's missing)
+lm_eval[ifeval,math,api]==0.4.12
 # recorded per-run in the report's provenance, so drift is visible. 12h.1:
 # pinned to the one version that has all nine new models built in (qwen3_5,
 # gemma4, lfm2, granitemoehybrid, nemotron_h, youtu, llama) — and the first

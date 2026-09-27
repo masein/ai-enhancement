@@ -114,16 +114,47 @@ jobs:
           path: tests/_screens/phase12d3/
           if-no-files-found: ignore
 
+  image-deps:
+    # 12f.4: the image's Python, as far as a runner holds it — its pinned
+    # requirements over a CPU torch (the base image's version) — so an import a
+    # run needs and the image lacks (lm_eval's local-chat-completions and its
+    # api extra) fails here, not on the server
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: torch, the base image's version, for the CPU
+        run: pip install "torch==2.11.*" --index-url https://download.pytorch.org/whl/cpu
+      - name: the image's requirements
+        run: pip install -r requirements.txt pytest httpx
+      - name: what lm_eval's api extra brought
+        run: |
+          python - <<'PY'
+          import importlib.metadata as md, re
+          for r in md.requires("lm_eval") or []:
+              if re.search(r"extra\s*==\s*['\"]api['\"]", r):
+                  d = re.split(r"[\s;<>=!~\[]", r, maxsplit=1)[0]
+                  print(f"{d}=={md.version(d)}")
+          PY
+      - name: the imports a run needs
+        run: EVALBOARD_IMAGE_DEPS=1 pytest -q -p no:cacheprovider tests/test_image_deps.py
+
   ci:
-    needs: [lint-unit, browser]
+    needs: [lint-unit, browser, image-deps]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: both jobs green
         run: |
-          echo "lint-unit: ${{ needs.lint-unit.result }} · browser: ${{ needs.browser.result }}"
+          echo "lint-unit: ${{ needs.lint-unit.result }} · browser: ${{ needs.browser.result }} · image-deps: ${{ needs.image-deps.result }}"
           test "${{ needs.lint-unit.result }}" = success
           test "${{ needs.browser.result }}" = success
+          test "${{ needs.image-deps.result }}" = success
 
   docker-image:
     if: github.event_name == 'workflow_dispatch' && inputs.build_image
