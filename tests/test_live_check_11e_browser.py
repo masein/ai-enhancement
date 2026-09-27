@@ -511,11 +511,11 @@ def test_at_400px_the_leaderboard_shows_a_score(live, phone):
     shown = page.evaluate(f"""() => [...document.querySelectorAll('{LB} td.model .mcell > *')]
       .filter(e => e.offsetParent && !e.classList.contains('mname')).map(e => e.className)""")
     assert all("prelim" in c for c in shown), shown
-    # the right edge fades and says there is more
+    # the right edge fades and says there is more — a button above the table
     fade = page.locator("[data-hfade='lb']")
     assert fade.get_attribute("data-more") == "1"
-    assert page.locator("[data-hfade='lb'] .scrollhint").is_visible()
-    assert page.locator("[data-hfade='lb'] .scrollhint").text_content() == "scroll →"
+    assert page.locator("[data-hfade='lb'] [data-scroll='right']").is_visible()
+    assert page.locator("[data-hfade='lb'] [data-scroll='right']").text_content() == "scroll →"
     shot(page, "11e-10-leaderboard-400-light.png")
     # scrolled to the end, the hint goes; a poll keeps the scroll
     page.evaluate("const s = document.querySelector('[data-hkeep=\"lb\"]'); s.scrollLeft = s.scrollWidth")

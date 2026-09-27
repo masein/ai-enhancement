@@ -2866,6 +2866,9 @@ table.lb td.tcell { font-weight:400; }
 table.lb td .cellnote { display:block; font-family:var(--font-sans); font-size:10px;
   font-weight:400; line-height:1.2; color:var(--muted); white-space:nowrap; }
 table.lb td .cellnote.warn { color:var(--warning-text); }
+/* a sparse model's active parameters under its total, small: "2.3B" then
+   "908M act" — on one line they ran into the name beside them */
+table.lb td .act { display:block; font-size:10px; line-height:1.2; color:var(--muted); }
 table.lb td.tcell.lead b { font-weight:700; }
 table.lb td.tcell:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
 .lbcap { font-family:var(--font-sans); font-size:var(--fs-1); color:var(--muted); margin:8px 0 0; }
@@ -2890,15 +2893,24 @@ table.lb .mcell .badge[data-duplicate], table.lb .mcell .badge[data-near-duplica
   flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
 table.lb .mcell .duptoggle { flex:none; padding:0 2px; min-height:0; }
 .hfade { position:relative; min-width:0; }
-.hfade::after { content:""; position:absolute; top:0; right:0; bottom:0; width:32px; z-index:6;
+/* the edge's fade: a sliver, never a click, and never over a whole number —
+   a column cut by the edge is cut anyway; the one before it stays readable */
+.hfade::after { content:""; position:absolute; top:0; right:0; bottom:0; width:8px; z-index:6;
   pointer-events:none; opacity:0; transition:opacity .15s;
   background:linear-gradient(to right, transparent, var(--surface-1)); }
+.hfade[data-wide="1"]::after { top:26px; }
 .hfade[data-more="1"]::after { opacity:1; }
-.hfade .scrollhint { display:none; position:absolute; top:0; right:0; z-index:7;
-  pointer-events:none; font-family:var(--font-sans); font-size:var(--fs-1);
-  height:24px; line-height:24px; color:var(--text-secondary); background:var(--surface-1);
-  padding:0 2px 0 8px; box-shadow:-10px 0 8px var(--surface-1); }
-.hfade[data-more="1"] .scrollhint { display:block; }
+/* its buttons: a bar above the box, over no column. "scroll →" on the right
+   while there is more that way, "← scroll" on the left once scrolled, and no
+   bar at all when the box fits */
+.hfade > .hnav { display:none; }
+.hfade[data-wide="1"] > .hnav { display:flex; justify-content:space-between; align-items:center;
+  height:24px; margin-bottom:2px; }
+.hfade > .hnav > button { visibility:hidden; font-family:var(--font-sans); font-size:var(--fs-1);
+  color:var(--text-secondary); min-height:0; height:24px; padding:0 6px; }
+.hfade > .hnav > button:hover { color:var(--accent); }
+.hfade[data-less="1"] > .hnav > [data-scroll="left"],
+.hfade[data-more="1"] > .hnav > [data-scroll="right"] { visibility:visible; }
 /* a phone: the rank and the model together take at most 45% of the scroller,
    the name ellipsises, and of the badges only "prelim" stays — the scores
    are what the table is for */
@@ -3789,6 +3801,9 @@ table.lb tr.clickrow { cursor:pointer; }
 table.lb tr.clickrow:hover td { background:var(--accent-soft); }
 table.lb tr.nottested td { background:var(--plane); }
 table.lb tr.nottested-row td { font-size:var(--fs-2); padding-left:24px; }
+/* a row across every column: its words stay in view while the table scrolls */
+table.lb tr.nottested td > [data-not-tested-toggle],
+table.lb tr.nottested-row td > .ntpin { position:sticky; left:24px; display:inline-block; }
 table.lb td.evmark { font-weight:700; }
 /* a table with no rank column (Knowledge exam, Everyday tasks) pins its
    model column at the edge */
@@ -4485,10 +4500,14 @@ function fillTip(target) {
 // 11k: it flips to the other side when it would run off, and then stays 8px
 // inside the window whatever happens — a tooltip cut off at the right edge
 // is a tooltip nobody can read
-function placeTip(x, y) {
+function placeTip(x, y, edge) {
+  // measured where it has the whole window: a fixed box left near the right
+  // edge shrinks to fit there, measures narrow, "fits", then runs off
+  tip.style.left = '0px'; tip.style.top = '0px';
   const p = 14, m = 8, w = tip.offsetWidth, h = tip.offsetHeight;
   let left = x + p, top = y + p;
-  if (left + w > innerWidth - m) left = x - w - p;
+  // a column's tooltip opens to the left near its table's right edge
+  if (left + w > Math.min(innerWidth - m, edge ?? Infinity)) left = x - w - p;
   if (top + h > innerHeight - m) top = y - h - p;
   left = Math.min(Math.max(m, left), Math.max(m, innerWidth - w - m));
   top = Math.min(Math.max(m, top), Math.max(m, innerHeight - h - m));
@@ -4505,16 +4524,21 @@ function tipFor(t) {
   if (t) t.setAttribute('aria-describedby', 'tip');
 }
 function hideTip() { tip.style.opacity = 0; tipFor(null); }
+// a column header's tooltip stays inside its table's box, which may scroll
+const tipEdge = t => {
+  const box = t.closest('th') && t.closest('[data-hfade]');
+  return box ? box.getBoundingClientRect().right : undefined;
+};
 document.addEventListener('pointermove', e => {
   const t = e.target.closest('[data-tip]');
   if (!t || !fillTip(t)) { hideTip(); return; }
-  tip.style.opacity = 1; tipFor(t); placeTip(e.clientX, e.clientY);
+  tip.style.opacity = 1; tipFor(t); placeTip(e.clientX, e.clientY, tipEdge(t));
 });
 document.addEventListener('focusin', e => {
   const t = e.target.closest('[data-tip]');
   if (!t || !fillTip(t)) return;
   const r = t.getBoundingClientRect();
-  tip.style.opacity = 1; tipFor(t); placeTip(r.right, r.bottom);
+  tip.style.opacity = 1; tipFor(t); placeTip(r.right, r.bottom, tipEdge(t));
 });
 document.addEventListener('focusout', hideTip);
 
@@ -8842,13 +8866,13 @@ function notTestedRows(none, ncols, suite, whyNot = null) {
     const note = said ? why : why && why.text;
     const test = said ? null : why ? why.suite : suite;
     return el('tr', { class: 'nottested-row', 'data-not-tested-row': m.id },
-      el('td', { colspan: String(ncols) },
+      el('td', { colspan: String(ncols) }, el('span', { class: 'ntpin' },
         el('a', { href: '#model=' + encodeURIComponent(m.id), text: m.name }),
         note ? el('span', { class: 'se', [said ? 'data-instruct-only' : 'data-missing']: m.id,
           text: ' · ' + note }) : '',
         LIVE && test ? [el('span', { class: 'se', text: ' · ' }), el('a', { href: '#',
           'data-not-tested-test': m.id, text: 'Test', onclick: e => { e.preventDefault();
-            state.sub.suite = test; openTest(m.id); } })] : ''));
+            state.sub.suite = test; openTest(m.id); } })] : '')));
   })];
 }
 // Everyday tasks: each model's row — n of k per group, and the total (12a.2)
@@ -9150,7 +9174,7 @@ function vLeaderboard(ms) {
               ? `\n${P(a.active_params)} active · ${a.experts} experts, ${a.experts_per_tok} per token`
               : '') },
             P(m.params), a.active_params
-              ? el('span', { class: 'act', text: ` · ${P(a.active_params)} act` }) : '');
+              ? el('span', { class: 'act', text: `${P(a.active_params)} act` }) : '');
         }
         if (c.key === 'date') {
           const d = String(lastEval(m) || '');
@@ -9290,11 +9314,25 @@ function vLeaderboard(ms) {
     insightsCard(ms)];
 }
 
-// A box that scrolls sideways, with a fade on its right edge and a small
-// "scroll →" while there is more to the right (11e)
+// A box that scrolls sideways, with a fade on its right edge (11e) and, above
+// it, "scroll →" while there is more to the right and "← scroll" once
+// scrolled. They are buttons over no column: the hint once sat on the last
+// column's header, where a click sorted by a column nobody could see
 function hfade(key, scroller) {
-  return el('div', { class: 'hfade', 'data-hfade': key }, scroller,
-    el('span', { class: 'scrollhint', 'aria-hidden': 'true', text: 'scroll →' }));
+  const go = dir => {
+    // about a screen, less the pinned # and Model, which never move
+    const pin = scroller.querySelector('thead th.model');
+    const kept = pin ? pin.getBoundingClientRect().right - scroller.getBoundingClientRect().left : 0;
+    scroller.scrollBy({ left: dir * Math.max(80, scroller.clientWidth - kept - 40),
+      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  };
+  const btn = (dir, text, label) => el('button', { type: 'button', class: 'quiet',
+    'data-scroll': dir > 0 ? 'right' : 'left', 'aria-label': label, text,
+    onclick: () => go(dir) });
+  return el('div', { class: 'hfade', 'data-hfade': key },
+    el('div', { class: 'hnav', 'data-hnav': key },
+      btn(-1, '← scroll', 'Scroll the table left'), btn(1, 'scroll →', 'Scroll the table right')),
+    scroller);
 }
 function hfadeUpdate(root) {
   // 11k: the Queue's table painted across its card at 1,512px — .stick left
@@ -9309,15 +9347,17 @@ function hfadeUpdate(root) {
     if (sc.dataset.hkeep === 'lb') state.lbWide = wide;
   });
   (root || document).querySelectorAll('[data-hfade]').forEach(box => {
-    const sc = box.firstElementChild;
+    const sc = box.lastElementChild;
     if (!sc) return;
     // 11h: a table wider than its card scrolls in its own box at every
     // width — the Knowledge chip pushed the whole page sideways at 1,512px.
     // Only then does its header give up sticking to the page
     const upd = () => {
       const ov = getComputedStyle(sc).overflowX;
-      box.dataset.more = (ov === 'auto' || ov === 'scroll')
-        && sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 2 ? '1' : '0';
+      const wide = (ov === 'auto' || ov === 'scroll') && sc.scrollWidth > sc.clientWidth + 2;
+      box.dataset.wide = wide ? '1' : '0';
+      box.dataset.more = wide && sc.scrollLeft + sc.clientWidth < sc.scrollWidth - 2 ? '1' : '0';
+      box.dataset.less = wide && sc.scrollLeft > 2 ? '1' : '0';
     };
     if (!sc._hfade) { sc._hfade = true; sc.addEventListener('scroll', upd, { passive: true }); }
     upd();
