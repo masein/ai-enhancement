@@ -231,7 +231,13 @@ def acquire_lock(sid: int) -> bool:
             owner = (LOCK / "pid").read_text().strip()
         except OSError:
             pass
-        if owner and Path(f"/proc/{owner}").is_dir():
+        beat = LOCK / "heartbeat"
+        if beat.exists():
+            # 12f.3: the GGUF worker on the host holds it — its pid is not one
+            # this container can see; its heartbeat says whether it's alive
+            if time.time() - beat.stat().st_mtime < LOCK_BEAT_S:
+                return False
+        elif owner and Path(f"/proc/{owner}").is_dir():
             return False                      # a live run (CLI or us) holds it
         # stale — the holder died hard; take over
         subprocess.run(["rm", "-rf", str(LOCK)], check=False)
@@ -242,6 +248,10 @@ def acquire_lock(sid: int) -> bool:
     (LOCK / "pid").write_text(str(os.getpid()))
     (LOCK / "submission").write_text(str(sid))
     return True
+
+
+# 12f.3: a worker's lock whose heartbeat is older than this is a dead worker's
+LOCK_BEAT_S = 120
 
 
 def release_lock() -> None:

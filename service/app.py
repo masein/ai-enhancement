@@ -34,7 +34,7 @@ from pydantic import BaseModel
 from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
                startup, suggest, worker)
 from . import playground
-from . import phone, served
+from . import gguf, phone, served
 from . import proposals as prop
 from . import reader
 
@@ -235,11 +235,16 @@ def _tree_key() -> tuple:
     # 12i.1: and the judge version this server runs: a new judge moves every
     # judged score marked by another into History without touching a file
     judge_v = _judge_identity().get("version")
+    # 12f.3: and what the host's GGUF worker has written
+    gd = config.RESULTS_ROOT / "gguf_results"
+    gg = [f for f in gd.glob("*.json")] if gd.is_dir() else []
+    ggs = (len(gg), max((f.stat().st_mtime for f in gg), default=0.0),
+           _mtime(config.RESULTS_ROOT / "gguf_data" / "manifest.json"))
     if not config.OUT_DIR.is_dir():
-        return (0, 0.0, db.taint_stamp(), exam, judge_v)
+        return (0, 0.0, db.taint_stamp(), exam, judge_v, ggs)
     files = [f for pat in _WATCH for f in config.OUT_DIR.rglob(pat)]
     return (len(files), max((f.stat().st_mtime for f in files), default=0.0),
-            db.taint_stamp(), exam, judge_v)
+            db.taint_stamp(), exam, judge_v, ggs)
 
 
 def taint_for(model_ids) -> dict[str, list[str]]:
@@ -346,6 +351,7 @@ def results_payload() -> dict:
         trained = trained_from_for(list(by_model.keys()))
         parents = {**parents_for(by_model.keys()),
                    **{m: t["base"] for m, t in trained.items()}}
+        served_map = report.load_served(config.OUT_DIR)
         payload = report.build_payload(by_model, config.TITLE, source=str(config.OUT_DIR),
                                        taint=taint_for(by_model.keys()),
                                        parents=parents,
@@ -353,7 +359,9 @@ def results_payload() -> dict:
                                        judge_identity=_judge_identity(),
                                        fingerprints=current_fingerprints(),
                                        everyday=report.load_everyday(config.OUT_DIR),
-                                       served=report.load_served(config.OUT_DIR))
+                                       served=served_map,
+                                       gguf=report.load_gguf(config.RESULTS_ROOT, config.OUT_DIR,
+                                                             served_map))
         payload["live"] = True
         # 12g.2: the hidden questions an Everyday group needs before Improve takes it
         if payload.get("everyday"):
@@ -522,6 +530,7 @@ def submissions(limit: int = 100):
     """The queue. A judged row carries the judge batch with it: the answers
     are on disk long before the grades are, and 'done' on the GPU half is not
     done — the row should say which topics it sat and how far the judge is."""
+    gguf.sync()                           # 12f.3: the host worker's progress, into its rows
     rows = db.recent(min(limit, 500))
     # 12a: a pilot row waits on the judge for one question, and says so the
     # way a judged row does — by the batch it recorded, and nothing else
@@ -568,6 +577,9 @@ def cancel(sid: int):
     in flight, frees the GPU and marks it canceled; nothing it half-wrote is
     kept, and no judge batch is submitted."""
     st = db.cancel(sid)
+    row = db.get(sid) or {}
+    if row.get("suite") == "gguf":
+        gguf.cancel(sid)                  # 12f.3: the host's worker stops it
     if not st:
         raise HTTPException(409, "only a queued or running submission can be canceled — "
                                  "this one has already finished")
@@ -829,6 +841,8 @@ class ServedIn(BaseModel):
     how: str = ""
     thinking: str = "auto"
     phone: bool = False                # 12f.2: a phone build
+    gguf_path: str = ""                # 12f.3: its GGUF file on the server
+    gguf_flags: str = ""
     by: str = ""
 
 
@@ -894,6 +908,70 @@ def phone_report_add(f: PhoneIn, x_token: str = Header(default="")):
         return {"report": phone.add(f.model_dump(), f.entered_by)}
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
+
+
+# ---------------------------------------------------------------------------
+# 12f.3: GGUF files, measured by llama-perplexity on the host (gguf_worker.py)
+# ---------------------------------------------------------------------------
+
+class GgufIn(BaseModel):
+    name: str = ""
+    path: str = ""
+    based_on: str = ""
+    how: str = ""
+    flags: str = ""
+    by: str = ""
+
+
+class GgufRunIn(BaseModel):
+    model: str
+    benchmarks: list[str] = []
+    subset: int = 0
+    by: str = ""
+
+
+@app.get("/api/gguf")
+def gguf_page():
+    gguf.sync()
+    models = [{"id": r["id"], **gguf.view(r)} for r in db.gguf_all()]
+    models += [{"id": r["id"], "name": r["name"], "path": r["gguf_path"],
+                "based_on": r.get("based_on", ""), "how": r.get("how", ""),
+                "flags": gguf.flags_of(r.get("gguf_flags")), "pin": r.get("gguf_pin") or {},
+                "served": True} for r in db.served_all() if r.get("gguf_path")]
+    return {"worker": gguf.worker(), "benchmarks": gguf.gb.BENCHMARKS, "order": gguf.gb.ORDER,
+            "datasets": gguf.manifest(), "models": models,
+            "default_flags": " ".join(gguf.gb.DEFAULT_FLAGS)}
+
+
+@app.post("/api/gguf/models")
+def gguf_register(f: GgufIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    try:
+        rec = gguf.register(f.model_dump(), f.by.strip()[:80])
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"model": {"id": rec["id"], **gguf.view(rec)}}
+
+
+@app.post("/api/gguf/estimate")
+def gguf_estimate(a: GgufRunIn):
+    return gguf.estimate(a.model, a.benchmarks or gguf.gb.ORDER, a.subset)
+
+
+@app.post("/api/gguf/runs")
+def gguf_run(a: GgufRunIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    by = _name(a.by, "a GGUF measurement")
+    why = disk.blocks_run()
+    if why:
+        raise HTTPException(409, why)
+    try:
+        sid = gguf.queue(a.model, a.benchmarks, a.subset, by)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    w = gguf.worker()
+    return {"id": sid, "status": "queued", "worker": w}
 
 
 @app.get("/api/models/code")

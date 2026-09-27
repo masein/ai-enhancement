@@ -194,7 +194,12 @@ def register(f: dict, by: str) -> dict:
     rec = {"id": mid, "name": name, "base_url": base, "key": key,
            "based_on": (f.get("based_on") or "").strip(), "how": how, "thinking": thinking,
            "phone": bool(f.get("phone")),
+           # 12f.3: its GGUF file on the server, for llama-perplexity's benchmarks
+           "gguf_path": (f.get("gguf_path") or "").strip(),
+           "gguf_flags": (f.get("gguf_flags") or "").strip(),
            "pin": pin_of(p), "answered": p["answered"], "by": by, "at": time.time()}
+    if rec["gguf_path"] and old.get("gguf_path") == rec["gguf_path"] and old.get("gguf_pin"):
+        rec["gguf_pin"] = old["gguf_pin"]
     db.served_put(rec)
     write_meta(rec)
     return public(rec)
@@ -209,6 +214,7 @@ def view(rec: dict) -> dict:
     return {"name": rec["name"], "base_url": rec["base_url"], "how": rec["how"],
             "based_on": rec["based_on"], "thinking": rec["thinking"], "pin": rec["pin"],
             "phone": is_phone(rec),
+            "gguf_path": rec.get("gguf_path") or "",
             # 12i.4: measured by its last run — Test a model's time estimate
             "speed": rec.get("speed")}
 

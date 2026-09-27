@@ -728,6 +728,103 @@ def answer_lengths(mid: str, r: dict, bases: set[str], served: dict) -> dict | N
     return out or None
 
 
+def load_gguf(results_root: Path | None, out_dir: Path | None = None,
+              served: dict | None = None) -> dict | None:
+    """12f.3: what the host's GGUF worker measured (results/gguf_results/), by
+    model and benchmark — its own column group, never in an lm_eval average.
+
+    A benchmark's column shows the newest full run on the current dataset
+    (gguf_data/manifest.json); a subset only while there is no full one, and
+    labelled so. Runs on an earlier dataset, and every run, are the model's
+    History. Two GGUFs based on the same model are paired, benchmark by
+    benchmark, with the board's own significance test."""
+    import gguf_bench as gb
+    if not results_root or not Path(results_root).is_dir():
+        return None
+    rdir = Path(results_root) / "gguf_results"
+    runs = []
+    for f in sorted(rdir.glob("*.json")) if rdir.is_dir() else []:
+        try:
+            r = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(r, dict) and r.get("model"):
+            runs.append(r)
+    try:
+        man = json.loads((Path(results_root) / "gguf_data" / "manifest.json")
+                         .read_text(encoding="utf-8")).get("benchmarks") or {}
+    except (OSError, ValueError):
+        man = {}
+    registered = {}
+    for f in sorted(Path(out_dir).glob("gguf__*/model_meta.json")) if out_dir and \
+            Path(out_dir).is_dir() else []:
+        try:
+            m = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(m.get("gguf"), dict):
+            registered[m["model"]] = m["gguf"]
+    for sid, sv in (served or {}).items():
+        if sv.get("gguf_path"):
+            registered[sid] = {"name": sv["name"], "path": sv["gguf_path"],
+                               "based_on": sv.get("based_on", ""), "how": sv.get("how", ""),
+                               "served": True}
+    if not runs and not registered:
+        return None
+    runs.sort(key=lambda r: -(r.get("finished_at") or r.get("started_at") or 0))
+    models: dict[str, dict] = {}
+    history: dict[str, list] = {}
+    for r in runs:
+        mid = r["model"]
+        benches = {}
+        for b, v in (r.get("benchmarks") or {}).items():
+            ds = ((r.get("datasets") or {}).get(b) or {}).get("sha256") or ""
+            benches[b] = {k: v.get(k) for k in ("status", "acc", "se", "n", "done", "total",
+                                                "chance", "seconds", "why", "error")}
+            benches[b]["dataset"] = ds[:12]
+            now = man.get(b, {}).get("sha256")
+            if v.get("status") != "done" or v.get("acc") is None or (now and ds != now):
+                benches[b]["current"] = False
+                continue
+            benches[b]["current"] = True
+            full = not r.get("subset")
+            cell = {"v": v["acc"], "se": v.get("se"), "n": v.get("n"), "full": full,
+                    "subset": r.get("subset") or 0, "chance": v.get("chance"),
+                    "sid": r.get("sid"), "at": r.get("finished_at"), "dataset": ds[:12],
+                    "file": (r.get("file") or {}).get("name"), "build": r.get("build") or ""}
+            have = models.setdefault(mid, {}).get(b)
+            if have is None or (full and not have["full"]):
+                models[mid][b] = cell
+        history.setdefault(mid, []).append({
+            "sid": r.get("sid"), "status": r.get("status"), "line": r.get("line") or "",
+            "at": r.get("finished_at") or r.get("started_at"), "file": r.get("file"),
+            "build": r.get("build") or "", "flags": r.get("flags") or [],
+            "subset": r.get("subset") or 0, "benchmarks": benches})
+    # pairs: two GGUFs of one base model, per benchmark, full against full
+    base_of = {mid: str((registered.get(mid) or (served or {}).get(mid) or {}).get("based_on")
+                        or "").lower() for mid in models}
+    pairs = []
+    ids = sorted(models)
+    for i, a in enumerate(ids):
+        for b in ids[i + 1:]:
+            if not base_of[a] or base_of[a] != base_of[b]:
+                continue
+            by = {}
+            for k in gb.ORDER:
+                x, y = models[a].get(k), models[b].get(k)
+                if not x or not y or x["full"] != y["full"] or (not x["full"] and x["n"] != y["n"]):
+                    continue
+                ok, z = significant(x["v"], x["se"] or 0.0, y["v"], y["se"] or 0.0)
+                by[k] = {"diff": x["v"] - y["v"], "z": z if math.isfinite(z) else None,
+                         "clear": bool(ok)}
+            if by:
+                pairs.append({"a": a, "b": b, "based_on": base_of[a], "by": by})
+    return {"group": gb.GROUP, "tip": gb.TIP, "order": gb.ORDER,
+            "benchmarks": {k: {"label": v["label"], "n": (man.get(k) or {}).get("n") or v["n"],
+                               "note": v.get("note", "")} for k, v in gb.BENCHMARKS.items()},
+            "models": models, "history": history, "pairs": pairs, "registered": registered}
+
+
 def load_served(out_dir: Path | None) -> dict:
     """12f.1: the models served elsewhere, by id — the name they were
     registered with, how they are served, what model they are based on and
@@ -1322,7 +1419,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                   judge_identity: dict | None = None,
                   fingerprints: dict[str, str] | None = None,
                   everyday: dict | None = None,
-                  served: dict | None = None) -> dict:
+                  served: dict | None = None,
+                  gguf: dict | None = None) -> dict:
     """`everyday`: the pilot's questions and marks (load_everyday), carried
     beside the models and never inside them.
 
@@ -1344,6 +1442,12 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     served = served or {}
     by_model = {**by_model, **{sid: empty_run(sid, sv) for sid, sv in served.items()
                                if sid not in by_model}}
+    # 12f.3: and a GGUF file with no server, before and after its measurements
+    for gid, gv in ((gguf or {}).get("registered") or {}).items():
+        if gid not in by_model and not gv.get("served"):
+            run = empty_run(gid)
+            run["archinfo"] = {"gguf": gv}
+            by_model[gid] = run
     models = list(by_model)
     taint = taint or {}
     parents = parents or {}      # tainted model id -> the model its training run started from
@@ -1364,10 +1468,13 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         shorts.setdefault(m.split("/")[-1], []).append(m)
     display = {m: (m if len(shorts[m.split("/")[-1]]) > 1 else m.split("/")[-1])
                for m in models}
-    # 12f.1: a served model is called what it was registered as
+    # 12f.1: a served model is called what it was registered as — 12f.3: and
+    # a GGUF file with no server
     for m in models:
         if m in served:
             display[m] = served[m]["name"]
+        elif m in ((gguf or {}).get("registered") or {}):
+            display[m] = gguf["registered"][m]["name"]
 
     # headline metric per (task, model)
     cells: dict[str, dict[str, dict]] = {}
@@ -1901,6 +2008,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         "everyday": everyday,
         # 12f.1: the models served elsewhere, results or not yet
         "served": served,
+        # 12f.3: measured on the GGUF by llama-perplexity: its own columns,
+        # never in an average with lm_eval's
+        "gguf": gguf,
         "warnings": warnings,
         "checks": checks,
         "meta": {
@@ -3830,6 +3940,9 @@ const state = {
   rvName: '',                          // the name approvals are recorded under (remembered)
   sub: { hf_id: '', kind: 'auto', suite: 'full', submitter: '', note: '', tasks: null },  // Submit form
   // 12f.1: Test a model ▸ A model served elsewhere
+  // 12f.3: A GGUF file (Test a model), and Measure on the GGUF ▸ (a model page)
+  gg: { page: null, loading: false, open: false, f: { name: '', path: '', based_on: '', how: '',
+        flags: '' }, msg: '', busy: '', start: {} },
   // 12f.2: On phone — the reports, by model, and each build's form
   phone: { loaded: false, loading: false, byId: {}, readme: null, open: {}, f: {}, msg: {},
            busy: '' },
@@ -5549,7 +5662,8 @@ function modelKinds(m) {
   const ran = m.date ? Date.parse(String(m.date)) / 1000 : 0;
   return [
     { kind: 'standard', label: 'Standard',
-      taken: [...DATA.accTasks, ...DATA.pplTasks].some(t => cell(t, m.id)), at: ran || 0 },
+      taken: [...DATA.accTasks, ...DATA.pplTasks].some(t => cell(t, m.id)) || ggufHas(m.id),
+      at: ran || 0 },
     (J.exam || []).length ? { kind: 'exam', label: 'Knowledge exam',
       taken: jt.length > 0 || ((m.judge || {}).history || []).length > 0,
       at: Math.max(0, ...jt.map(([, v]) => v.judged_at || 0)) } : null,
@@ -5694,6 +5808,16 @@ function servedCompare(m) {
     el('a', { href: '#model=' + encodeURIComponent(base.id), text: base.name }),
     ` loaded here: ${bits.join(' · ')}`);
 }
+// 12f.3: a GGUF file with no server — what it is, and where
+function ggufHead(m) {
+  const g = (G().registered || {})[m.id];
+  if (!g || g.served) return '';
+  return el('div', { class: 'served-head', 'data-gguf-head': m.id },
+    el('p', { class: 'small' }, el('span', { class: 'badge served', title: g.how, text: 'GGUF' }),
+      ' ', g.how),
+    el('p', { class: 'small se', text: `${g.path}` + ((g.pin || {}).sha256
+      ? ` · sha256 ${g.pin.sha256.slice(0, 12)}` : ' · its hash is recorded by the first job') }));
+}
 function servedHead(m) {
   const s = servedOf(m.id);
   if (!s) return '';
@@ -5713,7 +5837,7 @@ function modelHead(m, kinds) {
         el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
           (m.served ? '' : warnBadge(m)) || '', dupBadge(m) || ''),
         el('p', { class: 'mfacts', 'data-model-facts': '1', text: facts }),
-        trainedFromLine(m), servedHead(m))),
+        trainedFromLine(m), servedHead(m), ggufHead(m))),
       // 12b.3: the page's one main action is the header's, which reads Test
       // this model here — two filled buttons side by side was one too many
     el('div', { class: 'ktiles', 'data-kind-tiles': '1' }, kinds.map(k => kindTile(m, k))));
@@ -5880,6 +6004,8 @@ function kindParts(m, kind) {
           return out.length ? ` · answers that ran out of room: ${out.join(', ')}` : '';
         })() + '.' }) : '',
       part(resultsPart(m), 'results'),
+      // 12f.3: measured on the GGUF — under its own heading
+      ggufPart(m),
       // item analysis of the benchmark, not the improvement loop (12b §7)
       diag ? el('details', { class: 'kfold', 'data-cant-show': '1' },
         el('summary', { text: 'What the score can’t show ▸' }), diag) : ''].filter(Boolean);
@@ -6058,8 +6184,65 @@ function modelImproveTab(m) {
 }
 // ---- History: the runs, what produced the numbers, how they were graded ----
 function modelHistoryTab(m) {
-  return [LIVE ? vModelRuns(m) : null, judgedEarlierCard(m), evdEarlierCard(m), provRecord(m),
-    gradedCard(m), vTaint(m)].filter(Boolean);
+  return [LIVE ? vModelRuns(m) : null, ggufHistoryCard(m), judgedEarlierCard(m),
+    evdEarlierCard(m), provRecord(m), gradedCard(m), vTaint(m)].filter(Boolean);
+}
+// 12f.3: the model page's GGUF section — each benchmark as llama-perplexity
+// measured it, the pairing with another GGUF of the same base, and (live)
+// Measure on the GGUF ▸
+const signed = (x, d = 1) => (x > 0 ? '+' : x < 0 ? '\u2212' : '') + Math.abs(x).toFixed(d);
+function ggufPairLines(m) {
+  return (G().pairs || []).filter(p => p.a === m.id || p.b === m.id).map(p => {
+    const other = p.a === m.id ? p.b : p.a, sign = p.a === m.id ? 1 : -1;
+    const name = id => (DATA.models.find(x => x.id === id) || {}).name || id;
+    const bits = (G().order || []).filter(b => p.by[b]).map(b => {
+      const d = p.by[b];
+      return `${ggufLabel(b)} ${signed(100 * sign * d.diff)}`
+        + (d.clear ? '' : ' (not a clear difference)');
+    });
+    return el('p', { class: 'small', 'data-gguf-pair': other },
+      `${name(m.id)} vs ${name(other)}: ${bits.join(', ')}`,
+      el('span', { class: 'se', text: ' · points; the board\u2019s z-test on the two '
+        + 'proportions, 95%' }));
+  });
+}
+function ggufPart(m) {
+  const reg = ((G().registered || {})[m.id]);
+  if (!ggufHas(m.id) && !reg) return '';
+  const rows = (G().order || []).map(b => [b, ggufOf(m.id, b)]).filter(([, g]) => g);
+  return el('div', { class: 'kpart', 'data-gguf-part': m.id },
+    el('h3', { text: G().group }),
+    el('p', { class: 'small se', text: G().tip + ' Never in any average.' }),
+    rows.length ? el('div', { class: 'lb-wrap' }, el('table', { class: 'lb mtbl' },
+      el('thead', {}, el('tr', {}, el('th', { text: 'Benchmark' }),
+        el('th', { class: 'num', text: 'Score' }), el('th', { class: 'num', text: 'Questions' }),
+        el('th', { class: 'num', text: 'Chance' }))),
+      el('tbody', {}, rows.map(([b, g]) => el('tr', { 'data-gguf-row': b },
+        el('td', { text: ggufLabel(b) }),
+        el('td', { class: 'num', text: pct(g.v) },
+          g.se != null ? el('span', { class: 'se', text: ` \u00b1${(100 * g.se).toFixed(1)}` }) : ''),
+        el('td', { class: 'num se', text: g.full ? `all ${Number(g.n).toLocaleString('en')}`
+          : `subset of ${Number(g.subset).toLocaleString('en')}` }),
+        el('td', { class: 'num se', text: g.chance != null ? pct(g.chance) : '—' }))))))
+      : el('p', { class: 'small', text: 'Not measured on its GGUF yet.' }),
+    ...ggufPairLines(m),
+    LIVE && reg ? ggufStartPanel(m.id) : '');
+}
+function ggufHistoryCard(m) {
+  const runs = (G().history || {})[m.id] || [];
+  if (!runs.length) return null;
+  return el('div', { class: 'card', 'data-gguf-history': m.id },
+    el('h2', { text: 'Measured on the GGUF' }),
+    el('ul', { class: 'small' }, runs.map(r => el('li', { 'data-gguf-run': String(r.sid) },
+      el('b', { text: `#${r.sid} ${r.status}` }),
+      ` · ${r.at ? new Date(r.at * 1000).toISOString().slice(0, 16).replace('T', ' ') : ''}`,
+      r.file ? ` · ${r.file.name} (${String(r.file.sha256 || '').slice(0, 12)})` : '',
+      r.build ? ` · ${r.build}` : '', (r.flags || []).length ? ` · ${r.flags.join(' ')}` : '',
+      r.subset ? ` · subset of ${r.subset}` : '',
+      el('div', { class: 'se' }, Object.entries(r.benchmarks || {}).map(([b, v]) =>
+        `${ggufLabel(b)} ${v.acc != null ? pct(v.acc) : v.status}`
+        + (v.acc != null && !v.current ? ' (an earlier dataset)' : '')).join(' · ')),
+      r.line ? el('div', { class: 'se', text: r.line }) : ''))));
 }
 // 12i.1: Knowledge exam scores an earlier judge marked — a score compares only
 // with the same judge's, so they are kept here, said once, and nowhere else
@@ -6173,10 +6356,16 @@ function sitCta(m) {
 // Every submission of this model, newest first: which suite, what came of it,
 // and the log. "Why is this preliminary?" is answered here rather than in
 // someone's memory of the queue.
-// 12f.1: how a served run was asked — what its server served then
+// 12f.1: how a served run was asked — what its server served then. 12f.3: and
+// a GGUF run, what file and build it measured
 function runServedLine(r) {
   let a = {};
   try { a = JSON.parse(r.arch || '{}') || {}; } catch (e) { /* older row */ }
+  const g = a.gguf;
+  if (g) return el('div', { 'data-run-gguf': String(r.id), text: 'GGUF: ' + [
+    g.file ? `${g.file.name} (${String(g.file.sha256 || '').slice(0, 12)})` : g.path,
+    g.build, (g.flags || []).join(' '), g.subset ? `subset of ${g.subset}` : 'full sets']
+    .filter(Boolean).join(' · ') });
   const s = a.served;
   if (!s) return '';
   return el('div', { 'data-run-served': String(r.id), text: `served: ${pinLine(s.pin)} · `
@@ -7827,6 +8016,9 @@ function lbBenchGroups() {
   }
   const other = DATA.accTasks.filter(t => ok(t) && !used.has(t));
   if (other.length) out.push(['other', 'Other tasks', other]);
+  // 12f.3: measured on the GGUF — chosen only with each other for an Avg
+  if (Object.keys(G().models || {}).length)
+    out.push(['gguf', G().group, (G().order || []).map(b => 'gguf:' + b)]);
   return out;
 }
 const lbBenchAll = () => lbBenchGroups().flatMap(([, , ts]) => ts);
@@ -7836,7 +8028,7 @@ const lbBenchAll = () => lbBenchGroups().flatMap(([, , ts]) => ts);
 function lbBenchPicker() {
   const have = new Set(lbBenchAll());
   return CATS.map(([g, ts]) => [g, LB_GROUP[g], ts.map(t => [t, have.has(t)])])
-    .concat(lbBenchGroups().filter(([g]) => g === 'other')
+    .concat(lbBenchGroups().filter(([g]) => g === 'other' || g === 'gguf')
       .map(([g, name, ts]) => [g, name, ts.map(t => [t, true])]));
 }
 // the chosen benchmarks in the checklist's order, the unknown ones dropped;
@@ -7854,13 +8046,47 @@ const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogr
   arc_challenge: 'ARC-Challenge', arc_easy: 'ARC-Easy', gsm8k: 'GSM8K',
   truthfulqa_mc2: 'TruthfulQA', ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro',
   hendrycks_math500: 'MATH-500' };
-const benchName = t => BENCH_NAMES[t] || LB_SHORT[t] || t;
+const benchName = t => isGgufKey(t) ? `${ggufLabel(t.slice(5))} (GGUF)`
+  : BENCH_NAMES[t] || LB_SHORT[t] || t;
 // the mean of the chosen benchmarks, on the Scale pill's scale; each error
 // scales as its score does, and the errors add as variances (separate item
 // sets), so the mean's is √Σse² / k. Null when a benchmark is missing; no ±
 // when any benchmark has none
+// ---- 12f.3: measured on the GGUF by llama-perplexity ----
+// Its own columns, its own data (DATA.gguf), never DATA.cells: nothing that
+// averages or ranks the lm_eval columns can reach them
+const G = () => DATA.gguf || {};
+const isGgufKey = t => String(t).startsWith('gguf:');
+const ggufOf = (id, b) => ((G().models || {})[id] || {})[b] || null;
+const ggufHas = id => !!Object.keys((G().models || {})[id] || {}).length;
+const ggufLabel = b => ((G().benchmarks || {})[b] || {}).label || b;
+function ggufCol(b) {
+  return { key: 'gguf:' + b, gguf: b, label: ggufLabel(b), short: ggufLabel(b), num: true,
+    group: G().group || 'Measured on the GGUF', unit: '0-shot · %' };
+}
+const ggufCols = () => (G().order || []).map(ggufCol);
+// "81.5% of all 14,042", or a subset, said as one
+function ggufWords(g) {
+  return (g.full ? `all ${Number(g.n).toLocaleString('en')} questions` : `a subset of `
+    + `${Number(g.subset).toLocaleString('en')} (llama-perplexity's own seed) — not comparable `
+    + 'with a full run') + ` · ${g.file || 'the GGUF'} · dataset ${g.dataset}`;
+}
 function customAvg(m, ts) {
   if (!ts || !ts.length) return null;
+  // 12f.3: GGUF columns average only with GGUF columns — the prompts differ
+  if (ts.some(isGgufKey) && !ts.every(isGgufKey)) return null;
+  if (ts.every(isGgufKey)) {
+    const raw0 = state.avgMode === 'raw';
+    let sum = 0, v2 = 0;
+    for (const t of ts) {
+      const g = ggufOf(m.id, t.slice(5));
+      if (!g || !g.full) return null;
+      const c = g.chance, sc = !raw0 && c != null && c > 0 && c < 1, k = sc ? 1 / (1 - c) : 1;
+      sum += sc ? Math.max(0, (g.v - c) * k) : g.v;
+      v2 += ((g.se || 0) * k) ** 2;
+    }
+    return { v: sum / ts.length, se: Math.sqrt(v2) / ts.length };
+  }
   const raw = state.avgMode === 'raw';
   let sum = 0, v2 = 0, noSe = false;
   for (const t of ts) {
@@ -8052,7 +8278,7 @@ function lbColumns(ms) {
     // got another number and took this one for wrong
     lead[3] = { key: 'cavg', label: state.avgMode === 'raw' ? 'Avg, raw' : 'Avg above chance',
       num: true, group: '', unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' };
-    return [...lead, ...L.cols.map(task), ...tail];
+    return [...lead, ...L.cols.map(t => isGgufKey(t) ? ggufCol(t.slice(5)) : task(t)), ...tail];
   }
   let mid;
   if (L.chip === 'all') {
@@ -8063,6 +8289,8 @@ function lbColumns(ms) {
       .sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
     // 12b: the judged columns are Knowledge exam's, on the switch
     mid.push(...cats);
+    // 12f.3: after the others, only while a model here has a GGUF result
+    if (ms.some(m => ggufHas(m.id))) mid.push(...ggufCols());
   } else if (L.chip === 'knowledge') {
     mid = [...(CATS.find(([g]) => g === 'knowledge')[1]).filter(t => DATA.accTasks.includes(t))
              .map(task),
@@ -8098,6 +8326,12 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
 // scale went (11f).
 function lbColTip(c) {
   const scale = state.avgMode === 'raw' ? 'raw accuracy' : 'above chance';
+  if (c.gguf) {
+    const b = (G().benchmarks || {})[c.gguf] || {};
+    return [`${b.label} — measured on the GGUF`, G().tip,
+      `${Number(b.n || 0).toLocaleString('en')} questions, the lm_eval column's own`
+        + (b.note ? ` · ${b.note}` : ''), 'never in any average with the lm_eval columns'];
+  }
   if (c.key === 'rank' && (lbS().cols || lbS().models)) return ['# — this table\u2019s rows, '
     + 'in the order they are sorted'];
   if (c.key === 'rank') return ['# — rank among the ranked models on this board'];
@@ -8326,7 +8560,15 @@ function phoneReported(r, id) {
         ? `, ${r.decode_best} best` : '') + (r.repeats ? ` (${r.repeats})` : ''), 'decode'),
       row('settings', r.settings, 'settings'),
       ...(r.quality || []).flatMap(q => row(q.name + ', as reported',
-        q.value + (q.note ? ` (${q.note})` : ''), 'q-' + q.name))));
+        q.value + (q.note ? ` (${q.note})` : ''), 'q-' + q.name))),
+    // 12f.3: what this board measured on the GGUF, beside it and never merged
+    (() => {
+      const g = ggufOf(id, 'mmlu');
+      return g ? el('p', { class: 'small', 'data-phone-gguf-mmlu': id },
+        el('b', { text: `MMLU ${pct(g.v)}` }), ` \u2014 measured here (llama.cpp, 0-shot, `
+          + (g.full ? `full ${Number(g.n).toLocaleString('en')})` : `a subset of `
+          + `${Number(g.subset).toLocaleString('en')})`)) : '';
+    })());
 }
 // what the board measured through the served model, its base beside it
 function phoneMeasured(b, id) {
@@ -8546,6 +8788,7 @@ function vLeaderboard(ms) {
     : c.jarea ? areaJudged(m, c.jarea).v
     : c.area ? (areaMmlu(m, c.area) || {}).v
     : c.cat ? ((mmluCats(m) || {})[c.cat] || {}).score_report
+    : c.gguf ? (ggufOf(m.id, c.gguf) || {}).v
     : c.task ? (cell(c.task, m.id) || {}).v : null;
   const rowsIn = lbFilter(ms);
   const sortCol = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg')
@@ -8572,7 +8815,8 @@ function vLeaderboard(ms) {
   const judgedAny = m => Object.keys((m.judge || {}).tasks || {}).some(t => t.startsWith('exam_'));
   // 12h.2: with benchmarks chosen, a model is a row only with every one of
   // them — one missing any is not averaged, and says what it is missing
-  const testedIn = m => custom ? L.cols.every(t => (cell(t, m.id) || {}).v != null)
+  const benchVal = (t, id) => ((isGgufKey(t) ? ggufOf(id, t.slice(5)) : cell(t, id)) || {}).v;
+  const testedIn = m => custom ? L.cols.every(t => benchVal(t, m.id) != null)
     : dataCols.some(c => val(m, c) != null) || (L.view === 'exam' && judgedAny(m));
   const notTested = ordered.filter(m => !testedIn(m) && !(m.duplicateOf && dupsOf[m.duplicateOf]));
   const lbAll = ordered.filter(m => !(m.duplicateOf && dupsOf[m.duplicateOf]) && testedIn(m));
@@ -8762,6 +9006,12 @@ function vLeaderboard(ms) {
             title: `${g.n_report} items — under ${CAT_MIN_N}, treat as noise`,
             text: pctn(g.score_report) });
           return one(c, m, g.score_report, null, pctn, { title: `${g.n_report} leaderboard-half items` });
+        }
+        if (c.gguf) {
+          const g = ggufOf(m.id, c.gguf);
+          if (!g) return el('td', { class: 'num se', text: '—' });
+          return one(c, m, g.v, g.se != null ? (100 * g.se).toFixed(1) : null, pctn,
+            { title: ggufWords(g), 'data-gguf-cell': c.gguf, 'data-gguf-full': String(g.full) });
         }
         const cc = cell(c.task, m.id);
         if (!cc) return el('td', { class: 'num se', text: '—',
@@ -9114,9 +9364,14 @@ function lbCustomLine(nRows, nTested = nRows) {
           const n = ((state.lbTable || {}).rows || []).length;
           copyText(lbCsv(), `${n} row${n === 1 ? '' : 's'} as CSV`); } })),
     { key: 'custom-more' });
+  // 12f.3: the GGUF columns and the lm_eval ones are asked differently
+  const mixed = L.cols && L.cols.some(isGgufKey) && !L.cols.every(isGgufKey);
   return el('div', { class: 'customline', 'data-custom-line': '1' },
     el('span', { class: 'cl-what', 'data-custom-what': '1' }, el('b', { text: 'Custom' }),
-      ` · ${what} · ${count}`),
+      ` · ${what} · ${count}`,
+      mixed ? el('span', { class: 'se', 'data-gguf-mix': '1', text: ' · no Avg: the GGUF '
+        + 'columns average only with other GGUF columns (different prompts, no examples)' })
+        : ''),
     el('span', { class: 'cl-acts' },
       LIVE ? el('button', { class: 'quiet', 'data-save-view': '1', text: 'Save view',
         'aria-expanded': String(state.lbForm === 'save'),
@@ -11826,6 +12081,7 @@ function vQueue(part = { form: true, list: true }) {
       state.qmsg ? el('p', { class: 'warn', 'data-qmsg': '1', style: 'margin-top:8px',
         text: state.qmsg }) : '') : null,
     part.form ? servedCard(sf) : null,
+    part.form ? ggufCard() : null,
     part.list ? el('div', { class: 'card', 'data-all-runs': '1' },
       el('h2', { text: 'All runs' }),
       qToolbar, qPager, qTableWrap, qEmpty) : null].filter(Boolean);
@@ -11837,6 +12093,120 @@ function vQueue(part = { form: true, list: true }) {
 // again and keeps it, pinned to that file. The key is sent once, kept on the
 // server, and never shown again
 // ---------------------------------------------------------------------------
+// ---- 12f.3: A GGUF file, and Measure on the GGUF ▸ ----
+async function loadGg() {
+  const Q = state.gg;
+  Q.loading = true;
+  try { Q.page = await api('api/gguf'); } catch (e) { Q.page = { models: [], worker: {} }; }
+  Q.loading = false;
+  render();
+}
+function ggWorkerLine(w) {
+  if (!w || w.alive) return '';
+  return el('div', { class: 'warn small', 'data-gguf-worker-down': '1' },
+    el('p', { text: `${w.line} It measures on the host, outside Docker: start it with` }),
+    el('pre', { class: 'mono small', text: w.command }));
+}
+function ggufCard() {
+  const Q = state.gg, F = Q.f;
+  if (Q.open && !Q.page && !Q.loading && netReady()) loadGg();
+  const inp = (key, attrs = {}) => el('input', { type: 'text', id: 'gg-' + key, 'data-gg': key,
+    'data-keep': 'gg-' + key, value: F[key] || '', autocomplete: 'off', spellcheck: 'false',
+    oninput: e => { F[key] = e.target.value; }, ...attrs });
+  const save = async () => {
+    if (!whoName()) { askName(); return; }
+    Q.busy = 'save'; Q.msg = ''; render();
+    try {
+      const m = (await post('api/gguf/models', { ...F, by: whoName() })).model;
+      Q.msg = `Saved: ${m.name}. The worker checks the file and records its hash when its first `
+        + 'job starts.';
+      Q.saved = m.id; Q.page = null;
+      await refreshResults();
+    } catch (e) { Q.msg = String((e && e.message) || e); Q.saved = null; }
+    Q.busy = ''; render();
+  };
+  return el('details', { class: 'card', 'data-gguf-card': '1', open: Q.open ? '' : null,
+      ontoggle: e => { Q.open = e.target.open;
+        if (Q.open && !Q.page && !Q.loading && netReady()) loadGg(); } },
+    el('summary', { class: 'srvsum', text: 'A GGUF file ▸' }),
+    el('p', { class: 'sub', text: 'A quantised model file on this server, measured by llama.cpp\u2019s '
+      + 'llama-perplexity on MMLU, HellaSwag, Winogrande, ARC and TruthfulQA — its own columns, '
+      + 'not comparable with the lm_eval ones.' }),
+    ggWorkerLine((Q.page || {}).worker),
+    el('div', { class: 'srvform' },
+      el('label', { for: 'gg-name', text: 'Name' }), inp('name', { placeholder: 'Qwen3.6-35B-A3B MTP UD-Q4_K_XL (original)' }),
+      el('label', { for: 'gg-path', text: 'Path' }), inp('path', { placeholder: '/home/masein/model.gguf' }),
+      el('label', { for: 'gg-based_on', text: 'Based on' }), inp('based_on', { placeholder: 'Qwen/Qwen3.6-35B-A3B', list: 'srv-bases' }),
+      el('label', { for: 'gg-how', text: 'How it\u2019s built' }),
+      el('textarea', { id: 'gg-how', 'data-gg': 'how', 'data-keep': 'gg-how', rows: '2',
+        placeholder: 'llama.cpp build, quantisation, what changed',
+        oninput: e => { F.how = e.target.value; } }, F.how || ''),
+      el('label', { for: 'gg-flags', text: 'Flags' }),
+      inp('flags', { placeholder: ((Q.page || {}).default_flags) || '-ngl 99 --cpu-moe' })),
+    el('div', { class: 'frm', style: 'margin-top:10px' },
+      el('button', { class: 'primary', 'data-gg-save': '1', disabled: Q.busy ? '' : null,
+        text: Q.busy === 'save' ? 'Saving…' : 'Save', onclick: save })),
+    Q.msg ? el('p', { class: Q.saved ? 'small' : 'warn small', 'data-gg-msg': '1', text: Q.msg })
+      : '',
+    ((Q.page || {}).models || []).length ? el('ul', { class: 'srvlist', 'data-gg-list': '1' },
+      Q.page.models.map(x => el('li', { 'data-gg-row': x.id },
+        el('b', { text: x.name }), el('span', { class: 'small se', text: x.path }),
+        el('a', { href: '#model=' + encodeURIComponent(x.id), 'data-gg-open': x.id,
+          text: 'Measure ▸', onclick: e => { e.preventDefault(); closeTest();
+            navigate({ model: x.id, topic: null }); } })))) : '');
+}
+async function ggEstimate(id) {
+  const S = state.gg.start[id];
+  try {
+    S.est = await post('api/gguf/estimate', { model: id, benchmarks: [...S.benches],
+      subset: S.subset ? S.n : 0 });
+  } catch (e) { S.est = null; }
+  render();
+}
+function ggufStartPanel(id) {
+  const Q = state.gg;
+  if (!Q.page && !Q.loading && netReady()) loadGg();
+  const S = Q.start[id] = Q.start[id] || { benches: new Set(G().order || []), subset: false,
+    n: 2000, open: false };
+  const order = G().order || [];
+  const bits = [el('p', { class: 'small', text: 'The full sets by default: the only runs that '
+    + 'compare with another GGUF\u2019s. A subset is llama-perplexity\u2019s own seeded choice, '
+    + 'labelled so, and never compared with a full run.' }),
+    el('div', { class: 'frm' }, order.map(b => el('label', { class: 'spread small' },
+      el('input', { type: 'checkbox', 'data-gg-bench': b, checked: S.benches.has(b) ? '' : null,
+        onchange: e => { if (e.target.checked) S.benches.add(b); else S.benches.delete(b);
+          ggEstimate(id); } }), ' ' + ggufLabel(b)))),
+    el('label', { class: 'spread small' }, el('input', { type: 'checkbox', 'data-gg-subset': '1',
+      checked: S.subset ? '' : null, onchange: e => { S.subset = e.target.checked; ggEstimate(id); } }),
+      ' A subset of ', el('input', { type: 'number', min: '100', step: '100', value: String(S.n),
+        style: 'width:6em', 'data-gg-n': '1', onchange: e => {
+          S.n = Math.max(1, parseInt(e.target.value, 10) || 2000); ggEstimate(id); } }),
+      ' a benchmark'),
+    S.est ? el('p', { class: 'small', 'data-gg-estimate': '1', text: 'It takes ' + S.est.line
+      + '.' }) : '',
+    ggWorkerLine((Q.page || {}).worker),
+    el('div', { class: 'frm' }, el('button', { class: 'primary', 'data-gg-start': id,
+      disabled: S.busy || !S.benches.size ? '' : null, text: S.busy ? 'Queueing…' : 'Start',
+      onclick: async () => {
+        if (!whoName()) { askName(); return; }
+        S.busy = true; S.msg = ''; render();
+        try {
+          const j = await post('api/gguf/runs', { model: id, benchmarks: order.filter(b =>
+            S.benches.has(b)), subset: S.subset ? S.n : 0, by: whoName() });
+          rememberQueued(j.id);
+          toast(`Run #${j.id} queued for the GGUF worker —`, { key: 'gguf',
+            go: () => followRun(j.id), link: 'follow it →' });
+          S.open = false;
+        } catch (e) { S.msg = String((e && e.message) || e); }
+        S.busy = false; await loadQueue(); render();
+      } })),
+    S.msg ? el('p', { class: 'warn small', 'data-gg-start-msg': '1', text: S.msg }) : ''];
+  if (S.open && !S.est) ggEstimate(id);
+  return el('details', { class: 'kfold', 'data-gg-measure': id, open: S.open ? '' : null,
+      ontoggle: e => { S.open = e.target.open; if (S.open && !S.est) ggEstimate(id); } },
+    el('summary', { text: 'Measure on the GGUF ▸' }), ...bits);
+}
+
 async function loadServed() {
   const S = state.srv;
   S.loading = true;
@@ -11897,6 +12267,9 @@ function servedCard(sf) {
       inp('key', { type: 'password', placeholder: 'optional · kept on the server, never shown again' }),
       el('label', { for: 'srv-based_on', text: 'Based on' }),
       inp('based_on', { placeholder: 'Qwen/Qwen3.6-35B-A3B', list: 'srv-bases' }),
+      // 12f.3: its GGUF file, for the benchmarks llama-perplexity measures
+      el('label', { for: 'srv-gguf_path', text: 'GGUF file on the server' }),
+      inp('gguf_path', { placeholder: 'optional · /home/masein/model.gguf' }),
       el('label', { for: 'srv-how', text: 'How it’s served' }),
       el('textarea', { id: 'srv-how', 'data-srv': 'how', 'data-keep': 'srv-how', rows: '2',
         placeholder: 'llama.cpp build, quantisation, offload flags, routing',
@@ -13949,6 +14322,9 @@ function suiteCell(r, key) {
   try { ts = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
   const J = DATA.judged || {};
   if (r.suite === 'everyday') return el('span', { 'data-suite-cell': key, text: 'everyday tasks' });
+  // 12f.3: measured on the GGUF by the host's worker
+  if (r.suite === 'gguf') return el('span', { 'data-suite-cell': key, text: 'on the GGUF · '
+    + (ts.length ? ts.map(ggufLabel).join(', ') : 'llama-perplexity') });
   if (r.suite !== 'judged') return el('span', { 'data-suite-cell': key, text: r.suite });
   if (!ts.length) return el('span', { 'data-suite-cell': key, text: 'judged · the whole exam' });
   const ex = ts.filter(t => t !== J.control), ctl = ts.includes(J.control);
@@ -17038,7 +17414,7 @@ def build_report(runs: list[dict], out_path: Path, title: str,
                  parents: dict | None = None, judge_identity: dict | None = None,
                  banner: str = "", banner_link: tuple[str, str] = ("", ""),
                  fingerprints: dict | None = None, everyday: dict | None = None,
-                 served: dict | None = None) -> Path:
+                 served: dict | None = None, gguf: dict | None = None) -> Path:
     if not runs:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(f"<h1>No lm-eval results found.</h1><p>{html.escape(banner)}</p>",
@@ -17046,7 +17422,8 @@ def build_report(runs: list[dict], out_path: Path, title: str,
         return out_path
     payload = build_payload(merge_runs(runs), title, source="", calibration=calibration,
                             taint=taint, parents=parents, judge_identity=judge_identity,
-                            fingerprints=fingerprints, everyday=everyday, served=served)
+                            fingerprints=fingerprints, everyday=everyday, served=served,
+                            gguf=gguf)
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     page = (TEMPLATE
             .replace("__TITLE__", html.escape(title))
@@ -17108,7 +17485,11 @@ def main() -> int:
               "set they were graded on")
     out = build_report(runs, args.out, args.title, calibration=cal, fingerprints=fps,
                        everyday=load_everyday(args.results if args.results.is_dir() else None),
-                       served=load_served(args.results if args.results.is_dir() else None))
+                       served=load_served(args.results if args.results.is_dir() else None),
+                       gguf=load_gguf(args.results.parent if args.results.is_dir() else None,
+                                      args.results if args.results.is_dir() else None,
+                                      load_served(args.results if args.results.is_dir()
+                                                  else None)))
     print(f"\nwrote {out}  ({out.stat().st_size / 1024:.1f} KB)")
 
     if args.csv:
