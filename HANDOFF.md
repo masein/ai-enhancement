@@ -2909,6 +2909,38 @@ items 9–12.
   its directory, as for a run. The repo has no adapters: a trained model is
   a full safetensors upload.
 
+### 12f.0 — the judge-test sample, and the disk
+
+`docs/prompts/phase-12f-served-models-on-phone.md`, §1–2.
+
+- **The judge-test sample** (`judge_test.answers`) is drawn by builder 2.
+  - It takes instruct and chat models' answers first (their
+    `model_meta.json`), then base models'.
+  - **Loops are at most a tenth** (`DEGENERATE_SHARE`). A loop is an answer
+    where one 8-word run covers over 60% of its words, or that has no word
+    beyond the question's (`judge_test.degenerate`).
+  - The Everyday share stays at one in seven. The sample comes out smaller
+    rather than take more loops.
+- **A new sample is a new judge-test version** (`version`: "v" + a hash of
+  its answer keys).
+  - The sample it replaces moves to `BENCH_ROOT/ai/judge_test_history.json`,
+    and nothing is deleted.
+  - Marks are kept per version: the first sample's under `person`, as before
+    (masein's 100, given as "claude"), a later one's under `person@<version>`.
+    The candidates' list is kept per version the same way.
+  - The page says "the sample changed; mark the new one" until the new
+    sample's first mark. History lists each earlier sample: how many were
+    marked, by whom, and each judge's κ on it.
+- **The disk** (`service/disk.py`):
+  - the free space of the results folder's filesystem and of `/`, the lower
+    of the two;
+  - amber under `DISK_AMBER_GB` (10), red under `DISK_RED_GB` (3), with one
+    line: "The server's disk has 2.1 GB free. Runs may fail to save.";
+  - asked on every `/api/results`, never cached with the scores;
+  - a red disk turns the status dot red, `POST /api/submissions` refuses with
+    that line (409), and `run_submission` fails a queued run with it before
+    anything starts.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

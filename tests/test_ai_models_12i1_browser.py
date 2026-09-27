@@ -210,7 +210,7 @@ def test_the_judge_test_marks_one_answer_at_a_time_and_saves_as_it_goes(live, pa
     page.keyboard.press("s")
     page.wait_for_function("state.ai.jt.progress.skipped === 1")
     from service import db, judge_test
-    got = db.jt_marks(judge_test.PERSON)
+    got = db.jt_marks(judge_test.person())            # 12f.0: this sample's version
     assert got[first] == (3 if scale == "0-4" else 4) and list(got.values()).count(None) == 1
     # a reload lands where he stopped: the third answer, one marked
     page.reload()

@@ -31,7 +31,8 @@ from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, PlainTe
                                StreamingResponse)
 from pydantic import BaseModel
 
-from . import ai_models, builder, chat, config, db, hfmeta, judge_test, llm, llm_poller, startup, suggest, worker
+from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
+               startup, suggest, worker)
 from . import playground
 from . import proposals as prop
 from . import reader
@@ -397,6 +398,9 @@ ACTIVE = ("queued", "preflight", "waiting_gpu", "waiting_lock", "running")
 def submit(s: SubmissionIn, x_token: str = Header(default="")):
     if config.SUBMIT_TOKEN and x_token != config.SUBMIT_TOKEN:
         raise HTTPException(401, "bad or missing X-Token header")
+    why = disk.blocks_run()                  # 12f.0: a run can't save to a full disk
+    if why:
+        raise HTTPException(409, why)
     hf_id = s.hf_id.strip()
     if not _HF_ID_RE.match(hf_id):
         raise HTTPException(422, "model id must look like org/name — a Hugging Face repo "
@@ -843,7 +847,13 @@ def artifact_delete(name: str, x_token: str = Header(default="")):
 
 @app.get("/api/results")
 def results():
-    return JSONResponse(results_payload())
+    payload = results_payload()
+    # 12f.0: the disk, asked on every request — never cached with the scores
+    d = disk.status_check()
+    if d:
+        payload = {**payload, "checks": [d, *(payload.get("checks") or [])],
+                   "warnings": [d["text"], *(payload.get("warnings") or [])]}
+    return JSONResponse(payload)
 
 
 # ---------------------------------------------------------------------------
@@ -1079,9 +1089,15 @@ def ai_rejudge(a: ByIn, x_token: str = Header(default="")):
 def judge_test_page():
     """the answers to mark, as masein sees them — never a judge's mark — his
     marks so far, and where he got to"""
-    return {"answers": [judge_test.shown(x) for x in judge_test.answers()],
-            "marks": db.jt_marks(judge_test.PERSON), "progress": judge_test.progress(),
-            "kappa_min": config.JUDGE_KAPPA_MIN, "n_min": config.JUDGE_TEST_MIN}
+    shown = [judge_test.shown(x) for x in judge_test.answers()]
+    hist = judge_test.history()
+    prog = judge_test.progress()
+    return {"answers": shown, "marks": db.jt_marks(judge_test.person()), "progress": prog,
+            "kappa_min": config.JUDGE_KAPPA_MIN, "n_min": config.JUDGE_TEST_MIN,
+            # 12f.0: a new sample is a new version; the earlier ones, marks and
+            # all, are History — and until the new one has a mark, it says so
+            "version": judge_test.version(), "history": hist,
+            "changed": bool(hist) and not (prog["marked"] + prog["skipped"])}
 
 
 class JtMarkIn(BaseModel):

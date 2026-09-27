@@ -23,6 +23,7 @@ from __future__ import annotations
 import collections
 import hashlib
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -31,6 +32,10 @@ from . import ai_models, config, db, llm
 
 PERSON = "person"
 SEED = 1234
+# 12f.0: how a sample is drawn. A sample drawn by an earlier builder is an
+# earlier judge-test version: kept, with its marks, under History
+BUILDER = 2
+DEGENERATE_SHARE = 0.10          # at most this share of a sample is a looping answer
 KINDS = {"exam": "Knowledge exam", "everyday": "Everyday tasks"}
 # a judge request's size, for the estimate before a run: the board's judge
 # prompts with a question, a reference and an answer, and a short reply
@@ -46,6 +51,39 @@ def _scripts() -> None:
 
 def _sample_path() -> Path:
     return config.BENCH_ROOT / "ai" / "judge_test.json"
+
+
+def _history_path() -> Path:
+    return config.BENCH_ROOT / "ai" / "judge_test_history.json"
+
+
+def _sample() -> dict:
+    """the sample on file, as drawn: {n, at, answers, builder, version}. One
+    drawn before versions (12i.1) is "v1" """
+    try:
+        got = json.loads(_sample_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    got.setdefault("builder", 1)
+    got.setdefault("version", "v1")
+    return got
+
+
+def version() -> str:
+    return _sample().get("version") or "v1"
+
+
+def person(ver: str | None = None) -> str:
+    """whose marks are a person's, for a sample version: the plain key for the
+    first one — masein's marks on it stay exactly where they were — and a
+    versioned key for each after"""
+    ver = ver or version()
+    return PERSON if ver == "v1" else f"{PERSON}@{ver}"
+
+
+def _cand_key(ver: str | None = None) -> str:
+    ver = ver or version()
+    return "judge_test:candidates" if ver == "v1" else f"judge_test:candidates@{ver}"
 
 
 # ---------------------------------------------------------------------------
@@ -101,25 +139,115 @@ def _spread(rows: list[dict], n: int) -> list[dict]:
     return out
 
 
+_WORD = re.compile(r"[\w']+")
+
+
+def degenerate(answer: str, question: str = "") -> bool:
+    """12f.0: an answer any judge marks 0 without reading — a base model
+    looping ("The following is the following: …"): over 60% of its words are
+    one 8-word run repeated, or it has no word the question hasn't"""
+    words = [w.lower() for w in _WORD.findall(answer or "")]
+    if not words:
+        return True
+    if not set(words) - {w.lower() for w in _WORD.findall(question or "")}:
+        return True
+    if len(words) < 16:
+        return False
+    grams = collections.Counter(tuple(words[i:i + 8]) for i in range(len(words) - 7))
+    top = grams.most_common(1)[0][1]
+    return top * 8 / len(words) > 0.6
+
+
+def _instruct() -> set[str]:
+    """the instruct and chat models on file (their model_meta.json)"""
+    out = set()
+    for f in config.OUT_DIR.glob("*/model_meta.json") if config.OUT_DIR.is_dir() else []:
+        try:
+            m = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if m.get("kind") == "instruct" or m.get("tmpl_sha"):
+            out.add(m.get("model") or f.parent.name.replace("__", "/", 1))
+    return out
+
+
+def _draw(rows: list[dict], n: int, instruct: set[str], room: list[int]) -> list[dict]:
+    """n rows: instruct and chat models' first, then base models'; a looping
+    answer only while `room` (the sample's share of them) lasts"""
+    ok = [r for r in rows if not degenerate(r["answer"], r["question"])]
+    loops = [r for r in rows if degenerate(r["answer"], r["question"])]
+    out = _spread([r for r in ok if r["model"] in instruct], n)
+    out += _spread([r for r in ok if r["model"] not in instruct], n - len(out))
+    take = min(room[0], n - len(out))
+    if take > 0:
+        extra = _spread(loops, take)
+        room[0] -= len(extra)
+        out += extra
+    return out
+
+
 def answers(n: int | None = None, rebuild: bool = False) -> list[dict]:
     """The answers masein marks: drawn once from what is on file and kept
     (BENCH_ROOT/ai/judge_test.json), so a mark always means the same answer.
-    About one in seven are Everyday ones, when there are that many"""
+    About one in seven are Everyday ones, when there are that many. 12f.0:
+    mostly instruct and chat models' answers, loops at most a tenth; a sample
+    an earlier builder drew goes to History, marks and all, and a new one is
+    drawn"""
     n = n or config.JUDGE_TEST_N
-    p = _sample_path()
-    if not rebuild:
-        try:
-            got = json.loads(p.read_text(encoding="utf-8"))
-            if got.get("n") == n:
-                return got["answers"]
-        except (OSError, ValueError, KeyError):
-            pass
+    got = _sample()
+    if not rebuild and got.get("n") == n and got.get("builder") == BUILDER:
+        return got["answers"]
+    if got.get("answers"):
+        _archive(got)
+    instruct, room = _instruct(), [int(n * DEGENERATE_SHARE)]
     evd = _everyday_rows()
     n_evd = min(len(evd), n // 7)
-    picked = _spread(evd, n_evd) + _spread(_exam_rows(), n - n_evd)
+    picked = _draw(evd, n_evd, instruct, room)
+    picked += _draw(_exam_rows(), n - len(picked), instruct, room)
+    ver = "v" + hashlib.sha256("|".join(a["key"] for a in picked).encode()).hexdigest()[:8]
+    p = _sample_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"n": n, "at": time.time(), "answers": picked}), encoding="utf-8")
+    p.write_text(json.dumps({"n": n, "at": time.time(), "answers": picked, "builder": BUILDER,
+                             "version": ver}), encoding="utf-8")
     return picked
+
+
+def _archive(sample: dict) -> None:
+    """an earlier sample, with what it was: kept for History, never deleted"""
+    hist = history_samples()
+    if any(h["version"] == sample.get("version") for h in hist):
+        return
+    hist.append({"version": sample.get("version") or "v1", "at": sample.get("at"),
+                 "n": sample.get("n"), "answers": sample.get("answers") or [],
+                 "builder": sample.get("builder") or 1, "archived_at": time.time()})
+    p = _history_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(hist), encoding="utf-8")
+
+
+def history_samples() -> list[dict]:
+    try:
+        return json.loads(_history_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+
+
+def history() -> list[dict]:
+    """each earlier sample as History shows it: how many were marked, by whom,
+    and each judge's agreement on it then"""
+    out = []
+    for h in history_samples():
+        keys = {a["key"] for a in h["answers"]}
+        mine = {k: v for k, v in db.jt_marks(person(h["version"])).items() if k in keys}
+        by = db.jt_marks_by(person(h["version"]))
+        runs = db.ai_get(_cand_key(h["version"]), {})
+        rows = [{"name": c["name"], **agreement(mine, {k: v for k, v in db.jt_marks(key).items()
+                                                        if k in keys})}
+                for key, c in runs.items()]
+        out.append({"version": h["version"], "at": h.get("at"), "n": len(h["answers"]),
+                    "marked": sum(1 for v in mine.values() if v is not None),
+                    "by": sorted(by), "rows": rows})
+    return out
 
 
 def criteria_of(a: dict) -> dict:
@@ -152,11 +280,11 @@ def mark(key: str, value, by: str) -> None:
         value = 4 if value == "P" else 0
     if value is not None and value not in range(5):
         raise ValueError("a mark is 0 to 4, P or F, or a skip")
-    db.jt_mark(PERSON, key, value, by)
+    db.jt_mark(person(), key, value, by)
 
 
 def progress() -> dict:
-    got = db.jt_marks(PERSON)
+    got = db.jt_marks(person())
     keys = [a["key"] for a in answers()]
     marked = sum(1 for k in keys if got.get(k) is not None)
     skipped = sum(1 for k in keys if k in got and got[k] is None)
@@ -340,10 +468,10 @@ def finish(batch_id: str, results: dict) -> int:
         if m is not None:
             db.jt_mark(c["key"], key, int(m), meta.get("by", ""))
             n += 1
-    runs = db.ai_get("judge_test:candidates", {})
+    runs = db.ai_get(_cand_key(), {})
     runs[c["key"]] = {**c, "batch_id": batch_id, "at": time.time(), "marked": n,
                       "answered": answered}
-    db.ai_set("judge_test:candidates", runs, meta.get("by", ""))
+    db.ai_set(_cand_key(), runs, meta.get("by", ""))
     calibrate()
     return n
 
@@ -386,17 +514,17 @@ def result() -> dict:
     within 1, weighted kappa, n, cost per 1,000 answers; the best marked"""
     _scripts()
     import judge
-    person = db.jt_marks(PERSON)
+    mine = db.jt_marks(person())
     rows = []
     # a page shows this: a local judge is named by its weights, asked once
     ai_models.local_name(ask=True)
     cur_key = judge.version()["key"]
-    runs = db.ai_get("judge_test:candidates", {})
+    runs = db.ai_get(_cand_key(), {})
     cur = current_marks()
     if cur:
         rows.append({"key": cur_key, "name": judge.version()["label"], "current": True,
                      "id": judge.identity().get("slug") or judge.identity()["id"],
-                     **agreement(person, cur), "per_1000": None})
+                     **agreement(mine, cur), "per_1000": None})
     for key, c in runs.items():
         if key == cur_key:
             if rows:
@@ -404,7 +532,7 @@ def result() -> dict:
             continue
         rows.append({"key": key, "name": c["name"], "current": False, "id": c["id"],
                      "provider": c.get("provider_name") or c.get("provider") or "",
-                     **agreement(person, db.jt_marks(key)), "per_1000": _per_1000(c)})
+                     **agreement(mine, db.jt_marks(key)), "per_1000": _per_1000(c)})
     scored = [r for r in rows if r["kappa"] is not None and r["n"]]
     if scored:
         best = max(scored, key=lambda r: (r["kappa"], r["exact"] or 0))
@@ -425,7 +553,7 @@ def calibrate() -> dict | None:
     weighted kappa of JUDGE_KAPPA_MIN or more on JUDGE_TEST_MIN answers"""
     _scripts()
     import judge
-    ag = agreement(db.jt_marks(PERSON), current_marks())
+    ag = agreement(db.jt_marks(person()), current_marks())
     if not ag["n"]:
         return None
     ident = judge.identity()
@@ -434,7 +562,7 @@ def calibrate() -> dict | None:
            "calibrated": bool(ag["kappa"] is not None and ag["kappa"] >= config.JUDGE_KAPPA_MIN
                               and ag["n"] >= config.JUDGE_TEST_MIN),
            "method": "judge test: weighted kappa (quadratic) against a person's marks",
-           "by": (db.ai_get_meta("judge_test:candidates") or {}).get("by") or "masein",
+           "by": (db.ai_get_meta(_cand_key()) or {}).get("by") or "masein",
            "judge": {"id": ident["id"], "version": judge.version(ident)["key"]}}
     p = config.OUT_DIR / CAL_FILE
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -444,7 +572,7 @@ def calibrate() -> dict | None:
 
 def use(key: str, by: str) -> dict:
     """make a candidate the judge — a new judge version"""
-    runs = db.ai_get("judge_test:candidates", {})
+    runs = db.ai_get(_cand_key(), {})
     c = runs.get(key)
     if not c:
         raise ValueError("no such candidate in the judge test")
