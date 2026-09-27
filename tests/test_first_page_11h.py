@@ -193,7 +193,10 @@ def test_on_a_phone_the_filters_are_one_button_and_the_table_starts_near_the_top
         page.wait_for_selector(f"{LB} tbody tr")
         gap = page.evaluate(f"""() => document.querySelector('{LB} tbody tr').getBoundingClientRect().top
           - document.querySelector('[data-lb-card]').getBoundingClientRect().top""")
-        assert gap <= 320, gap
+        # the table scrolls sideways on a phone, so its scroll buttons take one
+        # 26px line above it (the sideways-scroll fix); the fold of the
+        # filters, which this guards, saves far more than that
+        assert gap <= 346, gap
         assert page.locator("#pill-kind").count() == 0            # folded away
         chips = page.evaluate("""() => [...document.querySelectorAll('.lbbar .chip-btn')]
           .map(b => Math.round(b.getBoundingClientRect().top))""")
