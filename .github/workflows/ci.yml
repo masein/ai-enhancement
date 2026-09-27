@@ -8,8 +8,9 @@
 # locally, one after another.
 #
 # In parallel, and no test left out:
-#   lint-unit  ruff, a compile pass, and the unit and API tests on every core
-#              (pytest-xdist, -n auto)
+#   lint-unit  ruff and a compile pass, and the unit and API tests in three
+#              shards, each on every core (pytest-split by .test_durations,
+#              then pytest-xdist -n auto)
 #   browser    the dashboard suite in five shards, each its share of
 #              `-m dashboard` by the committed .test_durations (pytest-split;
 #              HANDOFF § 5b says how to regenerate it)
@@ -36,8 +37,15 @@ concurrency:
 jobs:
   lint-unit:
     runs-on: ubuntu-latest
-    # a guard against a hung run, not a budget: serial, these took 13–27 minutes
+    # a guard against a hung run, not a budget: serial, the unit tests took 13–27 minutes
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # a 4-core runner gives the workers about 2.3 times one core (they
+        # build the fixture tree, which is CPU work), so three machines, not
+        # more workers, bring this under the browser shards' time
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -49,13 +57,16 @@ jobs:
             requirements-ci.txt
       - run: pip install -r requirements-ci.txt
       - name: ruff
+        if: matrix.shard == 1
         run: ruff check .
       - name: py_compile scripts/ service/ clients/
+        if: matrix.shard == 1
         run: python -m compileall -q scripts service clients
-      - name: unit and API tests
-        run: |
-          echo "cores: $(nproc)"
-          pytest -q -n auto --dist worksteal --durations=40 -m "not gpu and not network and not dashboard"
+      - name: unit and API tests, shard ${{ matrix.shard }} of 3
+        run: >-
+          pytest -q -n auto --dist worksteal --durations=15
+          -m "not gpu and not network and not dashboard"
+          --splits 3 --group ${{ matrix.shard }}
 
   browser:
     runs-on: ubuntu-latest

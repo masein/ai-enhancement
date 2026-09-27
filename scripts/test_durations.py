@@ -1,14 +1,15 @@
-"""Write .test_durations, the per-test times CI's browser shards are split by
-(pytest-split), from JUnit XML of a browser run.
+"""Write .test_durations, the per-test times CI's shards are split by
+(pytest-split), from JUnit XML of the unit and browser runs.
 
-    python scripts/test_durations.py browser.xml [more.xml ...]
+    python scripts/test_durations.py unit.xml browser.xml [more.xml ...]
 
-Any JUnit XML of `pytest -m dashboard` works: a local run with
-`--junitxml`, or the five CI shards' files together. The time is JUnit's,
+Any JUnit XML of the suites works: a local serial run of each with
+`--junitxml`, or CI shards' files together. The time is JUnit's,
 setup + call + teardown, so a module's server start lands on its first test,
 as pytest-split's own `--store-durations` records it. A test missing from the
 file is split by the average, so a stale file makes shards uneven; it never
-drops a test.
+drops a test. The file is updated, not replaced: a test no longer there stays
+listed, and is ignored.
 """
 
 from __future__ import annotations
@@ -48,9 +49,14 @@ def main(argv: list[str]) -> int:
     if not argv:
         print(__doc__)
         return 2
-    d = durations([Path(a) for a in argv])
-    (ROOT / ".test_durations").write_text(json.dumps(d, indent=1) + "\n", encoding="utf-8")
-    print(f".test_durations: {len(d)} tests, {sum(d.values()) / 60:.1f} min in all")
+    # merged into what is there, as pytest-split's own --store-durations does:
+    # one suite's run updates its tests and leaves the other suite's
+    f = ROOT / ".test_durations"
+    d = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+    new = durations([Path(a) for a in argv])
+    d = dict(sorted({**d, **new}.items()))
+    f.write_text(json.dumps(d, indent=1) + "\n", encoding="utf-8")
+    print(f".test_durations: {len(new)} tests updated, {len(d)} in all")
     return 0
 
 
