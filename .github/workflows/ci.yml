@@ -14,7 +14,9 @@
 #   browser    the dashboard suite in five shards, each its share of
 #              `-m dashboard` by the committed .test_durations (pytest-split;
 #              HANDOFF § 5b says how to regenerate it)
-#   ci         green only when both are: the one result to read
+#   image-deps the image's requirements over a CPU torch, and the imports a
+#              run needs (12f.4: lm_eval's local-chat-completions)
+#   ci         green only when all three are: the one result to read
 #
 # The Docker image build is a separate job, and runs only when asked for
 # (build_image): the pytorch base image is multi-GB, and since 12a.5b the image

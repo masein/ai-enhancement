@@ -34,11 +34,13 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import signal
 import socket
 import subprocess
 import sys
 import time
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -162,9 +164,14 @@ class Worker:
         if key in cache:
             return cache[key]
         h = hashlib.sha256()
+        beat = now()
         with open(p, "rb") as fh:
             for chunk in iter(lambda: fh.read(1 << 22), b""):
                 h.update(chunk)
+                # 12f.4: minutes of hashing are not a worker gone quiet
+                if now() - beat > 10:
+                    beat = now()
+                    self.heartbeat()
         cache[key] = h.hexdigest()
         write_json(self.hashes, cache)
         return cache[key]
@@ -200,6 +207,15 @@ class Worker:
         try:
             self.state = f"running {req['id']}"
             self.run(req, res, res_path)
+        except Exception as e:                   # noqa: BLE001 — 12f.4: never left "running"
+            # a crash ends its job, with what happened, and the worker goes on
+            traceback.print_exc()
+            for v in res["benchmarks"].values():
+                if v.get("status") in ("queued", "running"):
+                    v["status"] = "failed"
+            res.update(status="failed", finished_at=now(),
+                       line=f"The worker failed on this job: {type(e).__name__}: {e}"[:300])
+            write_json(res_path, res)
         finally:
             self.release_lock()
             self.state = "idle"
@@ -320,22 +336,11 @@ class Worker:
             proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT,
                                     env=self.env(setup.get("env")), start_new_session=True)
             last = 0.0
-            while True:
-                try:
-                    code = proc.wait(timeout=min(self.poll, 2.0))
-                    break
-                except subprocess.TimeoutExpired:
-                    pass
-                why = self.stop_why(req, t0, limit)
-                if why:
-                    self._end(proc)
-                    cur.update(status="stopped", why=why)
-                    code = None
-                    break
-                if now() - last >= self.poll:
-                    last = now()
-                    self._progress(cur, res, res_path, b, log, mode)
-                    self.heartbeat()
+            try:
+                code = self._watch(proc, req, res, res_path, b, cur, log, mode, t0, limit, last)
+            except BaseException:
+                self._end(proc)          # a crash here must not leave llama-perplexity running
+                raise
         got = gb.parse(mode, log.read_text(encoding="utf-8", errors="replace"))
         cur.update(done=got["done"], total=got["total"] or n, finished_at=now(),
                    seconds=round(now() - cur["started_at"], 3))
@@ -349,6 +354,23 @@ class Worker:
                        "without a score — see its log")
         res["line"] = f"{info['label']}: {cur['status']}"
         write_json(res_path, res)
+
+    def _watch(self, proc, req, res, res_path, b, cur, log, mode, t0, limit, last) -> int | None:
+        """until llama-perplexity ends, or the job is stopped: its exit code, or None"""
+        while True:
+            try:
+                return proc.wait(timeout=min(self.poll, 2.0))
+            except subprocess.TimeoutExpired:
+                pass
+            why = self.stop_why(req, t0, limit)
+            if why:
+                self._end(proc)
+                cur.update(status="stopped", why=why)
+                return None
+            if now() - last >= self.poll:
+                last = now()
+                self._progress(cur, res, res_path, b, log, mode)
+                self.heartbeat()
 
     def _progress(self, cur, res, res_path, b, log, mode) -> None:
         got = gb.parse(mode, log.read_text(encoding="utf-8", errors="replace"))
@@ -376,10 +398,40 @@ class Worker:
 
     def loop(self) -> None:
         while not _stop["why"]:
-            ran = self.once()
+            try:
+                ran = self.once()
+            except Exception:                    # noqa: BLE001 — the next request still runs
+                traceback.print_exc()
+                ran = False
             if not ran:
                 time.sleep(self.poll)
         self.heartbeat()
+
+
+def check_binary(binary: str, ld_path: str = "") -> str:
+    """12f.4: '' when llama-perplexity is there and starts; else why not, in
+    one line — the worker refuses to run rather than take a job it can't do"""
+    b = os.path.expanduser(binary)
+    path = b if os.sep in b else (shutil.which(b) or "")
+    if not path or not os.path.isfile(path):
+        return (f"llama-perplexity isn't at {b}: build it (HANDOFF § 5d), or give its path "
+                "with --binary.")
+    if not os.access(path, os.X_OK):
+        return f"{b} can't be run: make it executable, or give llama-perplexity's path with --binary."
+    env = dict(os.environ)
+    ld = ":".join(os.path.expanduser(p) for p in ld_path.split(":") if p)
+    if ld:
+        env["LD_LIBRARY_PATH"] = ld + (":" + env["LD_LIBRARY_PATH"] if env.get("LD_LIBRARY_PATH")
+                                       else "")
+    try:
+        p = subprocess.run([path, "--version"], capture_output=True, text=True, timeout=60, env=env)
+    except (OSError, subprocess.SubprocessError) as e:
+        return f"{b} doesn't start: {e}"
+    out = p.stdout + p.stderr
+    if p.returncode != 0 and "version:" not in out:
+        first = next((x.strip() for x in out.splitlines() if x.strip()), f"it exited {p.returncode}")
+        return f"{b} doesn't start: {first[:200]}"
+    return ""
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -392,6 +444,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="a job stops after this, keeping the benchmarks it finished")
     ap.add_argument("--once", action="store_true", help="one request, then exit")
     a = ap.parse_args(argv)
+    why = check_binary(a.binary, a.ld_library_path)
+    if why:
+        print(f"gguf worker: not started. {why}", flush=True)
+        return 2
 
     def stop(sig, frame):          # noqa: ARG001 — Ctrl+C: the running one stops, finished kept
         _stop["why"] = "stopped by Ctrl+C" if sig == signal.SIGINT else "stopped"

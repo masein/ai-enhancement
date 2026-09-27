@@ -2674,6 +2674,12 @@ table.jtresult tr.best td:first-child { font-weight:600; }
 .qbedit textarea { width:100%; box-sizing:border-box; }
 .qbaside { margin-top:10px; }
 @media (max-width: 640px) { .qbdup { grid-template-columns:1fr; } .qbopen { float:none; margin:0 0 8px; } }
+/* 12f.4: Measure on the GGUF */
+.ggdlg { max-width:560px; max-height:calc(100dvh - 32px); overflow-y:auto; }
+.ggh { font-size:var(--fs-2); margin:14px 0 6px; }
+.ggpick { display:flex; flex-direction:column; gap:4px; }
+.ggrow { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.ggrow input[type=number] { margin:0 4px; }
 /* 12d.1: Playground. 12d.3: laid out as a chat app — the chats down the left,
    a conversation that fills the height, centred, the composer pinned at its foot */
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
@@ -6171,8 +6177,12 @@ function setModelTab(t) {
 // ---- Scores: one block per kind the model has taken, the newest open ----
 function modelScoresTab(m, kinds) {
   const taken = kinds.filter(k => k.taken);
+  // 12f.4: a GGUF not measured yet says so, with what measures it
+  const gg = (G().registered || {})[m.id];
   if (!taken.length) return [el('div', { class: 'card', 'data-scores-none': '1' },
-    el('p', { class: 'small', text: 'No scores yet: this model has not taken a test.' }))];
+    el('p', { class: 'small', text: gg ? 'Not measured on its GGUF yet.'
+      : 'No scores yet: this model has not taken a test.' }),
+    gg && LIVE ? ggufStartPanel(m.id) : '')];
   const newest = taken.reduce((a, b) => (b.at || 0) > (a.at || 0) ? b : a).kind;
   const mine = state.mblk[m.id] || {};
   return taken.map(k => {
@@ -12498,71 +12508,132 @@ function ggufCard() {
     ((Q.page || {}).models || []).length ? el('ul', { class: 'srvlist', 'data-gg-list': '1' },
       Q.page.models.map(x => el('li', { 'data-gg-row': x.id },
         el('b', { text: x.name }), el('span', { class: 'small se', text: x.path }),
-        el('a', { href: '#model=' + encodeURIComponent(x.id), 'data-gg-open': x.id,
-          text: 'Measure ▸', onclick: e => { e.preventDefault(); closeTest();
-            navigate({ model: x.id, topic: null }); } })))) : '');
+        el('a', { href: '#model=' + encodeURIComponent(x.id), 'data-gg-page': x.id, text: 'its page' }),
+        el('button', { class: 'quiet', 'data-gg-open': x.id, text: 'Measure ▸',
+          onclick: () => ggMeasureDialog(x.id, `[data-gg-open="${CSS.escape(x.id)}"]`) })))) : '');
 }
-async function ggEstimate(id) {
-  const S = state.gg.start[id];
-  try {
-    S.est = await post('api/gguf/estimate', { model: id, benchmarks: [...S.benches],
-      subset: S.subset ? S.n : 0, setups: [...(S.setups || [])] });
-  } catch (e) { S.est = null; }
-  render();
-}
-function ggufStartPanel(id) {
+// 12f.4: Measure on the GGUF — a dialog, from Test a model's list, the model
+// page's GGUF section and, on a GGUF-only model's page, the header's button:
+// which benchmarks (with how many questions each), which setups, the full sets
+// or a subset, what it takes, and whether the worker is there to do it
+async function ggMeasureDialog(id, returnTo) {
   const Q = state.gg;
-  if (!Q.page && !Q.loading && netReady()) loadGg();
-  const sets = (((G().registered || {})[id] || {}).setups) || [{ id: 'as-built', name: 'as built' }];
-  const S = Q.start[id] = Q.start[id] || { benches: new Set(G().order || []), subset: false,
-    n: 2000, open: false, setups: new Set(sets.map(x => x.id)) };
-  const order = G().order || [];
-  const bits = [el('p', { class: 'small', text: 'The full sets by default: the only runs that '
-    + 'compare with another GGUF\u2019s. A subset is llama-perplexity\u2019s own seeded choice, '
-    + 'labelled so, and never compared with a full run.' }),
-    el('div', { class: 'frm' }, order.map(b => el('label', { class: 'spread small' },
-      el('input', { type: 'checkbox', 'data-gg-bench': b, checked: S.benches.has(b) ? '' : null,
-        onchange: e => { if (e.target.checked) S.benches.add(b); else S.benches.delete(b);
-          ggEstimate(id); } }), ' ' + ggufLabel(b)))),
-    // 12f.3 addendum: each setup is a run of its own
-    el('div', { class: 'frm', 'data-gg-setups': id }, el('span', { class: 'small', text: 'Setups:' }),
-      sets.map(x => el('label', { class: 'spread small', title: setupWords(x) },
-        el('input', { type: 'checkbox', 'data-gg-setup': x.id, checked: S.setups.has(x.id) ? '' : null,
-          onchange: e => { if (e.target.checked) S.setups.add(x.id); else S.setups.delete(x.id);
-            ggEstimate(id); } }), ' ' + x.name))),
-    el('p', { class: 'small se', 'data-gg-mtp': '1', text: G().mtp_line || '' }),
-    el('label', { class: 'spread small' }, el('input', { type: 'checkbox', 'data-gg-subset': '1',
-      checked: S.subset ? '' : null, onchange: e => { S.subset = e.target.checked; ggEstimate(id); } }),
-      ' A subset of ', el('input', { type: 'number', min: '100', step: '100', value: String(S.n),
-        style: 'width:6em', 'data-gg-n': '1', onchange: e => {
-          S.n = Math.max(1, parseInt(e.target.value, 10) || 2000); ggEstimate(id); } }),
-      ' a benchmark'),
-    S.est ? el('p', { class: 'small', 'data-gg-estimate': '1', text: 'It takes ' + S.est.line
-      + '.' }) : '',
-    ggWorkerLine((Q.page || {}).worker),
-    el('div', { class: 'frm' }, el('button', { class: 'primary', 'data-gg-start': id,
-      disabled: S.busy || !S.benches.size || !S.setups.size ? '' : null,
-      text: S.busy ? 'Queueing…' : 'Start',
-      onclick: async () => {
-        if (!whoName()) { askName(); return; }
-        S.busy = true; S.msg = ''; render();
-        try {
-          const j = await post('api/gguf/runs', { model: id, benchmarks: order.filter(b =>
-            S.benches.has(b)), subset: S.subset ? S.n : 0, setups: sets.map(x => x.id)
-            .filter(x => S.setups.has(x)), by: whoName() });
-          (j.ids || [j.id]).forEach(rememberQueued);
-          toast((j.ids || []).length > 1 ? `Runs #${j.ids.join(', #')} queued for the GGUF worker —`
-            : `Run #${j.id} queued for the GGUF worker —`, { key: 'gguf',
-            go: () => followRun(j.id), link: 'follow it →' });
-          S.open = false;
-        } catch (e) { S.msg = String((e && e.message) || e); }
-        S.busy = false; await loadQueue(); render();
-      } })),
-    S.msg ? el('p', { class: 'warn small', 'data-gg-start-msg': '1', text: S.msg }) : ''];
-  if (S.open && !S.est) ggEstimate(id);
-  return el('details', { class: 'kfold', 'data-gg-measure': id, open: S.open ? '' : null,
-      ontoggle: e => { S.open = e.target.open; if (S.open && !S.est) ggEstimate(id); } },
-    el('summary', { text: 'Measure on the GGUF ▸' }), ...bits);
+  if (!Q.page) { try { Q.page = await api('api/gguf'); } catch (e) { Q.page = null; } }
+  const page = Q.page || { models: [], order: [], benchmarks: {}, datasets: {}, worker: {} };
+  const m = (page.models || []).find(x => x.id === id) || {};
+  const sets = m.setups || (((G().registered || {})[id] || {}).setups) || [{ id: 'as-built', name: 'as built' }];
+  const order = page.order || G().order || [];
+  const have = b => !!(page.datasets || {})[b];
+  const S = { benches: new Set(order.filter(have)), setups: new Set(sets.map(x => x.id)),
+    subset: false, n: 2000, est: null, busy: false };
+  const back = el('div', { class: 'dlg-back', 'data-dialog': 'gguf-measure' });
+  const count = b => S.subset ? Math.min(S.n, (page.datasets[b] || {}).n || S.n)
+    : ((page.datasets || {})[b] || {}).n || ((page.benchmarks || {})[b] || {}).n || 0;
+  const counts = {};
+  const benches = el('div', { class: 'ggpick' }, order.map(b => el('label', { class: 'ggrow',
+      'data-gg-bench-row': b, title: have(b) ? '' : 'no dataset yet: run the converter once (HANDOFF § 5d)' },
+    el('input', { type: 'checkbox', 'data-gg-bench': b, checked: S.benches.has(b) ? '' : null,
+      disabled: have(b) ? null : '', onchange: e => {
+        if (e.target.checked) S.benches.add(b); else S.benches.delete(b); sync(true); } }),
+    el('span', { text: ggufLabel(b) }),
+    counts[b] = el('span', { class: 'small se mono', 'data-gg-count': b }),
+    have(b) ? '' : el('span', { class: 'small se', text: 'no dataset yet' }))));
+  const setups = el('div', { class: 'ggpick', 'data-gg-setups': id }, sets.map(x => el('label',
+    { class: 'ggrow', title: setupWords(x) },
+    el('input', { type: 'checkbox', 'data-gg-setup': x.id, checked: S.setups.has(x.id) ? '' : null,
+      onchange: e => { if (e.target.checked) S.setups.add(x.id); else S.setups.delete(x.id); sync(true); } }),
+    el('span', { text: x.name }),
+    el('span', { class: 'small se', text: x.id === 'as-built' ? 'nothing added' : setupWords(x) }))));
+  const nBox = el('input', { type: 'number', min: '100', step: '100', value: String(S.n), style: 'width:6em',
+    'data-gg-n': '1', disabled: '', 'aria-label': 'questions a benchmark',
+    onchange: e => { S.n = Math.max(1, parseInt(e.target.value, 10) || 2000); sync(true); } });
+  const radio = (v, ...kids) => el('label', { class: 'ggrow' }, el('input', { type: 'radio',
+    name: 'gg-size', 'data-gg-size': v, checked: (v === 'subset') === S.subset ? '' : null,
+    onchange: () => { S.subset = v === 'subset'; nBox.disabled = !S.subset; sync(true); } }), ...kids);
+  const est = el('p', { class: 'small', 'data-gg-estimate': '1' });
+  const err = el('p', { class: 'warn small', 'data-gg-start-msg': '1', hidden: '' });
+  const go = el('button', { class: 'primary', 'data-gg-start': id });
+  const cancel = el('button', { 'data-dialog-cancel': '1', text: 'Cancel' });
+  const box = el('div', { class: 'dlg ggdlg', role: 'dialog', 'aria-modal': 'true',
+      'aria-labelledby': 'dlg-title', 'data-gg-measure-dialog': id },
+    el('h2', { id: 'dlg-title', text: 'Measure on the GGUF' }),
+    el('p', { class: 'sub', text: (m.name || evdName(id)) + (m.path ? ` · ${m.path}` : '') }),
+    el('p', { class: 'small', text: 'llama.cpp’s llama-perplexity, on the host, from lm_eval’s '
+      + 'own questions. Its own columns, never compared with the lm_eval ones.' }),
+    el('h3', { class: 'ggh', text: 'Benchmarks' }), benches,
+    el('h3', { class: 'ggh', text: 'Setups' }), setups,
+    // 12f.3 addendum: nothing for MTP to draft
+    el('p', { class: 'small se', 'data-gg-mtp': '1', text: page.mtp_line || G().mtp_line || '' }),
+    el('h3', { class: 'ggh', text: 'Questions' }),
+    el('div', { class: 'ggpick' },
+      radio('full', el('span', { text: 'The full sets' }),
+        el('span', { class: 'small se', text: 'the only runs that compare with another GGUF’s' })),
+      radio('subset', el('span', {}, 'A subset of ', nBox, ' a benchmark'),
+        el('span', { class: 'small se', text: 'llama-perplexity’s own seeded choice, labelled so' }))),
+    est, ggWorkerLine(page.worker), err, el('div', { class: 'dlg-actions' }, cancel, go));
+  back.append(box);
+  let ask = 0;
+  const sync = async again => {
+    for (const b of order) counts[b].textContent = have(b)
+      ? (S.subset ? `${count(b).toLocaleString('en')} of ` : '')
+        + (((page.datasets || {})[b] || {}).n || 0).toLocaleString('en') : '';
+    const runs = S.setups.size;
+    go.textContent = S.busy ? 'Queueing…' : runs > 1 ? `Start ${runs} runs` : 'Start';
+    go.disabled = S.busy || !S.benches.size || !runs;
+    if (!again) return;
+    if (!S.benches.size || !runs) { est.textContent = ''; return; }
+    const mine = ++ask;
+    est.textContent = 'Working out how long it takes…';
+    try {
+      const j = await post('api/gguf/estimate', { model: id, benchmarks: order.filter(b => S.benches.has(b)),
+        subset: S.subset ? S.n : 0, setups: sets.map(x => x.id).filter(x => S.setups.has(x)) });
+      if (mine === ask) est.textContent = `It takes ${j.line}` + (runs > 1 ? `, for the ${runs} setups.` : '.');
+    } catch (e) { if (mine === ask) est.textContent = ''; }
+  };
+  const close = () => {
+    back.remove();
+    document.removeEventListener('keydown', onKey, true);
+    const again = returnTo && document.querySelector(returnTo);
+    if (again) again.focus();
+  };
+  const onKey = e => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    const f = [...box.querySelectorAll('input:not([disabled]), button:not([disabled])')].filter(x => x.offsetParent);
+    if (!f.length) return;
+    const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && (i === f.length - 1 || i < 0)) { e.preventDefault(); f[0].focus(); }
+  };
+  cancel.onclick = close;
+  back.addEventListener('click', e => { if (e.target === back) close(); });
+  go.onclick = async () => {
+    if (!whoName()) { askName(); return; }
+    S.busy = true; err.hidden = true; sync();
+    try {
+      const j = await post('api/gguf/runs', { model: id, benchmarks: order.filter(b => S.benches.has(b)),
+        subset: S.subset ? S.n : 0, setups: sets.map(x => x.id).filter(x => S.setups.has(x)),
+        by: whoName() });
+      (j.ids || [j.id]).forEach(rememberQueued);
+      close();
+      toast((j.ids || []).length > 1 ? `Runs #${j.ids.join(', #')} queued for the GGUF worker —`
+        : `Run #${j.id} queued for the GGUF worker —`, { key: 'gguf',
+        go: () => followRun(j.id), link: 'follow it →' });
+      await loadQueue(); render();
+    } catch (e) {
+      S.busy = false; err.hidden = false; err.textContent = String((e && e.message) || e); sync();
+    }
+  };
+  document.addEventListener('keydown', onKey, true);
+  document.body.append(back);
+  sync(true);
+  go.focus();
+}
+// the model page's GGUF section: what opens it
+function ggufStartPanel(id) {
+  return el('div', { class: 'frm', style: 'margin-top:10px' },
+    el('button', { class: 'secondary', 'data-gg-measure': id, text: 'Measure on the GGUF…',
+      onclick: () => ggMeasureDialog(id, `[data-gg-measure="${CSS.escape(id)}"]`) }));
 }
 
 async function loadServed() {
@@ -12730,13 +12801,16 @@ document.addEventListener('keydown', e => {
 function renderTestAct() {
   const box = document.getElementById('testAct');
   if (!box || !LIVE) return;
+  // 12f.4: a GGUF-only model is measured, not tested: its page's button opens Measure
+  const gg = !!state.model && ggufOnly({ id: state.model });
   if (!box.firstChild)
     box.append(el('button', { class: 'primary', 'data-test-model': '1',
-      onclick: () => openTest() }, el('span', { class: 't-full' }),
+      onclick: () => (state.model && ggufOnly({ id: state.model })
+        ? ggMeasureDialog(state.model, '[data-test-model]') : openTest()) }, el('span', { class: 't-full' }),
       el('span', { class: 't-short', text: 'Test' })));
   // 12b.3: on a model page it is that model's — the dialog opens with it
   // filled in (openTest takes state.model) — and it says so
-  const words = state.model ? 'Test this model' : 'Test a model';
+  const words = gg ? 'Measure this model' : state.model ? 'Test this model' : 'Test a model';
   const btn = box.firstChild;
   btn.title = words;
   if (state.model) btn.dataset.testThis = state.model;
