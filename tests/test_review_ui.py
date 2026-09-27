@@ -561,7 +561,7 @@ def test_the_places_are_named_once_and_their_address_says_so(live, page):
     page.goto(base + "/")
     page.wait_for_selector("#tabs button[role=tab]")
     labels = page.locator("#tabs > button[role=tab]").all_text_contents()
-    assert labels == ["Home", "Models", "Improve", "Benchmarks"]
+    assert labels == ["Home", "Models", "Playground", "Improve", "Benchmarks"]     # 12d.1
     assert page.locator("#moreBtn").count() == 0
     # 12g.1: the Loop is Improve's pipeline, and its address names the model
     for label, want in (("Loop", "improve&sub=model&model="), ("Models", "models"),

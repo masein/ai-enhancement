@@ -2397,6 +2397,55 @@ table.jtresult tr.best td:first-child { font-weight:600; }
 .qbedit textarea { width:100%; box-sizing:border-box; }
 .qbaside { margin-top:10px; }
 @media (max-width: 640px) { .qbdup { grid-template-columns:1fr; } .qbopen { float:none; margin:0 0 8px; } }
+/* 12d.1: Playground */
+.pgwrap { display:grid; grid-template-columns:240px minmax(0, 1fr); gap:16px; align-items:start; }
+.pglist { position:sticky; top:72px; display:flex; flex-direction:column; gap:6px;
+  max-height:calc(100vh - 96px); overflow:auto; }
+.pglist ul, .pgchatsmenu ul { list-style:none; margin:0; padding:0; }
+.pghead { margin:8px 0 2px; }
+.pgitem { display:flex; justify-content:space-between; align-items:center; gap:6px;
+  padding:4px 6px; border-radius:6px; }
+.pgitem.on { background:var(--accent-soft); }
+.pgitem a { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1;
+  color:var(--text-primary); text-decoration:none; }
+.pgdel { font-size:var(--fs-1); opacity:.6; }
+.pgitem:hover .pgdel, .pgdel:focus-visible { opacity:1; }
+.pgmain { min-width:0; }
+.pgbar { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:flex-start; }
+.pgbar .pgsettings { margin-left:auto; min-width:0; }
+.pgsettings[open] { flex-basis:100%; margin-left:0; border:1px solid var(--border);
+  border-radius:8px; padding:8px 12px; }
+.pgsettings textarea { width:100%; box-sizing:border-box; }
+.pgconv { display:flex; flex-direction:column; gap:14px; margin:14px 0; }
+.pgempty { padding:24px 0; text-align:center; color:var(--text-secondary); }
+.pgmsg { display:grid; grid-template-columns:auto minmax(0, 1fr); gap:4px 10px; }
+.pgmsg > :not(.pgwho) { grid-column:2; }
+.pgwho { color:var(--text-secondary); font-size:var(--fs-2); white-space:nowrap; }
+.pgtext { white-space:pre-wrap; overflow-wrap:anywhere; }
+.pgmsg.you .pgtext { color:var(--text-primary); }
+.pgthink summary, .pgref summary { cursor:pointer; color:var(--text-secondary); font-size:var(--fs-1); }
+.pgthink summary, .pgref summary, .pgsettings summary { list-style:none; }
+.pgthink summary::-webkit-details-marker, .pgref summary::-webkit-details-marker,
+.pgsettings summary::-webkit-details-marker { display:none; }
+.pgsettings summary { cursor:pointer; color:var(--text-secondary); }
+.pgthinktext { white-space:pre-wrap; color:var(--text-secondary); max-height:18em; overflow:auto; }
+.pgstats { margin:2px 0 0; }
+.pgstats button { font-family:var(--font-sans); }
+.pgmark { font-size:var(--fs-2); }
+.pgmark.ok { color:var(--good-text, var(--text-primary)); }
+.pgmark.no { color:var(--warning-text); }
+.pginputwrap { border-top:1px solid var(--border); padding-top:10px; }
+.pginput { width:100%; box-sizing:border-box; resize:vertical; }
+.pginputwrap .frm { display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap; }
+.pgamber { margin:0 0 6px; }
+.pgpmenu.pop { min-width:320px; max-width:min(92vw, 520px); padding:10px 12px; gap:6px; }
+.pgplist { display:flex; flex-direction:column; gap:2px; max-height:min(50vh, 360px); overflow:auto; }
+.pgplist > * { flex-shrink:0; }
+.pgpq { text-align:left; white-space:normal; line-height:1.35; }
+@media (max-width: 720px) {
+  .pgwrap { grid-template-columns:minmax(0, 1fr); }
+  .pgbar .pgsettings { margin-left:0; }
+}
 .genopts { display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center; margin-top:8px; }
 .genopts label.spread { display:inline-flex; align-items:center; gap:6px; }
 /* ---- 11d: Overview ------------------------------------------------------- */
@@ -3612,6 +3661,7 @@ const state = {
   lbView: 'tasks',                     // leaderboard columns: 'tasks' | 'cats' (MMLU by category)
   ai: {},                        // 12i.1: the AI models page and the judge test
   qb: {},                        // 12i.2: the question builder
+  pg: {},                        // 12d.1: the Playground
   rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '',
         // 11j: which of the four views, and the small per-proposal choices
         view: '', focus: {}, watch: new Set(), answers: {}, answersOpen: 0,
@@ -6481,6 +6531,8 @@ function viewHash(v) {
   if (v === 'ai') return 'tab=ai' + (state.ai.mark ? '&sub=mark' : '');
   // 12i.2: the draft open, so a reload lands on it
   if (v === 'build') return 'tab=build' + (state.qb.id ? '&draft=' + state.qb.id : '');
+  // 12d.1: the chat open, so a reload lands on it
+  if (v === 'playground') return 'tab=playground' + (state.pg.id ? '&chat=' + state.pg.id : '');
   if (place === 'improve' || place === 'benchmarks')
     return `tab=${place}&sub=${SUB_SLUG[v]}`
       // 12g.1: which model Improve is on, so a link opens it
@@ -6501,8 +6553,13 @@ function viewOfHash(name, params) {
             leaderboard: 'leaderboard', perplexity: 'leaderboard', loop: 'pipeline',
             review: 'pipeline', training: 'training', runs: 'queue', queue: 'queue',
             submit: 'queue', data: 'provenance', provenance: 'provenance', help: 'help',
-            tasks: 'tasks', exam: 'exam', everyday: 'everyday', ai: 'ai', build: 'build' }[n];
+            tasks: 'tasks', exam: 'exam', everyday: 'everyday', ai: 'ai', build: 'build',
+            playground: 'playground' }[n];
   if (n === 'ai') state.ai.mark = p.get('sub') === 'mark';
+  if (n === 'playground') {
+    const id = p.get('chat') || null;
+    if (id !== state.pg.id) Object.assign(state.pg, { id, chat: null, live: null });
+  }
   if (n === 'build') {
     const id = p.get('draft') || null;
     if (id !== state.qb.id) Object.assign(state.qb, { id, draft: null, at: 0, editing: null });
@@ -6551,7 +6608,7 @@ function routeFromHash() {
   if (location.hash.slice(1) !== want) history.replaceState(history.state, '', '#' + want);
 }
 
-const PLACE_WORDS = ['home', 'models', 'improve', 'benchmarks', 'runs', 'data', 'help'];
+const PLACE_WORDS = ['home', 'models', 'playground', 'improve', 'benchmarks', 'runs', 'data', 'help'];
 
 // slug ↔ topic, from the same map the payload carries (exam_law ↔ law)
 function topicOfSlug(slug) {
@@ -11372,6 +11429,9 @@ function runsList(full = false) {
       : el('p', { class: 'small', 'data-nothing-running': '1', text: 'Nothing running.' }),
     done.length ? [el('p', { class: 'small se runhead', text: 'Finished' }),
       ...done.map(r => runLine(r, { 'data-run-done': '1' }))] : '',
+    // 12d.1: a model loaded for the Playground holds memory too — said quietly
+    ((state.pgStatus || {}).loaded || []).map(l => el('p', { class: 'small se', 'data-pg-loaded': l.model,
+      text: `Playground: ${l.name} loaded` + (l.device === 'cpu' ? ' (CPU)' : '') })),
     full ? '' : all);
 }
 let _runsSig = null;
@@ -11380,7 +11440,7 @@ function renderRuns() {
   if (!box || !LIVE) return;
   const { running } = runsNow();
   const n = running.length;
-  const sig = String(n);
+  const sig = String(n) + '|' + ((state.pgStatus || {}).loaded || []).map(l => l.model).join(',');
   if (_runsSig === sig && box.firstChild) return;
   _runsSig = sig;
   const btn = el('button', { class: 'barpill runpill' + (n ? ' on' : ''), 'data-runs': String(n),
@@ -14874,6 +14934,418 @@ addEventListener('keydown', e => {
   }
 });
 
+// ===========================================================================
+// 12d.1: Playground — what does this model actually say? The models on this
+// server, streamed; the settings the Everyday run used unless changed; a
+// person's chats kept by the name in masein ▾. Never a score, never money.
+// ===========================================================================
+const PG_WHO = () => ({ 'X-Who': whoName() });
+async function pgGet(path) {
+  const r = await fetch(path, { headers: PG_WHO() }).catch(() => null);
+  if (!r) throw new Error('the server is unreachable — it may be restarting');
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail : `HTTP ${r.status}`);
+  return j;
+}
+async function loadPg(force) {
+  const P = state.pg;
+  if (P.asked || (P.page && !force)) return;
+  P.asked = true;
+  try {
+    const [page, practice] = await Promise.all([api('api/playground'), api('api/playground/practice')]);
+    P.page = page; P.practice = practice; P.msg = '';
+    if (whoName()) P.chats = (await pgGet('api/playground/chats')).chats;
+  } catch (e) { P.msg = e.message; }
+  P.asked = false;
+  if (state.tab === 'playground') render();
+}
+async function loadPgChat(id) {
+  const P = state.pg;
+  if (P.chatAsked === id) return;
+  P.chatAsked = id;
+  try { P.chat = await pgGet('api/playground/chats/' + encodeURIComponent(id)); P.msg = ''; }
+  catch (e) { P.chat = null; P.msg = e.message; P.id = null; }
+  P.chatAsked = null;
+  if (state.tab === 'playground') render();
+}
+const pgModel = id => ((state.pg.page || {}).models || []).find(m => m.id === id) || null;
+function pgOpen(id) {
+  const P = state.pg;
+  if (P.es) { P.es.close(); P.es = null; }
+  Object.assign(P, { id, chat: null, live: null, input: P.input || '', ref: null });
+  navigate({ tab: 'playground', model: null, topic: null });
+}
+function pgNew() {
+  const P = state.pg;
+  if (P.es) { P.es.close(); P.es = null; }
+  Object.assign(P, { id: null, chat: null, live: null });
+  navigate({ tab: 'playground', model: null, topic: null });
+}
+
+function vPlayground() {
+  const P = state.pg;
+  if (!P.page && netReady()) loadPg();
+  if (P.id && (!P.chat || P.chat.id !== P.id) && netReady()) loadPgChat(P.id);
+  if (!P.page) return [el('div', { class: 'card' }, skeleton(5, { 'data-loading': 'playground' }))];
+  if (!whoName()) return [el('div', { class: 'card', 'data-pg': 'noname' },
+    el('h2', { text: 'Playground' }),
+    empty('Your chats are kept under your name: say who you are first.', 'Who are you?',
+      () => askName()))];
+  const narrow = matchMedia('(max-width: 720px)').matches;
+  return [el('div', { class: 'pgwrap', 'data-pg': '1' },
+    narrow ? '' : pgChatList(), pgMain(narrow))];
+}
+
+// ---- the chat list ----------------------------------------------------------
+function pgChatItems() {
+  const P = state.pg, day = 24 * 3600 * 1000;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const chats = P.chats || [];
+  const item = c => el('li', { class: 'pgitem' + (c.id === P.id ? ' on' : ''), 'data-pg-chat': c.id },
+    el('a', { href: '#tab=playground&chat=' + c.id, text: c.title,
+      title: (pgModel(c.model) || {}).name || c.model,
+      onclick: e => { e.preventDefault(); popClose(); pgOpen(c.id); } }),
+    P.confirm === c.id
+      ? el('span', { class: 'small' }, el('button', { class: 'quiet danger', 'data-pg-delete-yes': c.id,
+          text: 'Delete?', onclick: () => pgDelete(c.id) }), ' ',
+        el('button', { class: 'quiet', text: 'keep', onclick: () => { P.confirm = null; render(); } }))
+      : el('button', { class: 'quiet pgdel', 'data-pg-delete': c.id, 'aria-label': `delete ${c.title}`,
+          text: 'Delete', onclick: () => { P.confirm = c.id; render(); } }));
+  const t = chats.filter(c => c.updated_at * 1000 >= today.getTime());
+  const e = chats.filter(c => c.updated_at * 1000 < today.getTime());
+  return [t.length ? [el('p', { class: 'pghead small se', text: 'Today' }), el('ul', {}, t.map(item))] : '',
+    e.length ? [el('p', { class: 'pghead small se', text: 'Earlier' }), el('ul', {}, e.map(item))] : ''];
+}
+function pgChatList() {
+  return el('div', { class: 'card pglist', 'data-pg-list': '1' },
+    el('button', { class: 'secondary', 'data-pg-new': '1', text: '+ New chat', onclick: pgNew }),
+    ...pgChatItems());
+}
+async function pgDelete(id) {
+  const P = state.pg;
+  try {
+    await post(`api/playground/chats/${id}/delete`, { by: whoName() });
+    P.chats = (P.chats || []).filter(c => c.id !== id);
+    if (P.id === id) { P.id = null; P.chat = null; }
+    P.confirm = null;
+  } catch (e) { toast('Refused. ' + e.message, { key: 'pg' }); }
+  render();
+}
+
+// ---- the chat ---------------------------------------------------------------
+function pgPicker(P, c) {
+  const models = P.page.models;
+  const cur = c ? c.model : (P.pick || (models[0] || {}).id);
+  if (!c && !P.pick && models[0]) P.pick = models[0].id;
+  const groups = [['hub', 'On the Hub'], ['artifact', 'Trained or uploaded here']];
+  return el('span', { class: 'pgpick' },
+    el('select', { 'aria-label': 'model', 'data-pg-model': cur || '', disabled: c ? '' : null,
+        title: c ? 'a chat keeps its model: start a new chat for another' : null,
+        onchange: e => { P.pick = e.target.value; render(); } },
+      groups.map(([g, label]) => {
+        const ms = models.filter(m => m.source === g);
+        return ms.length ? el('optgroup', { label }, ms.map(m => el('option', { value: m.id,
+          selected: m.id === cur ? '' : null, text: m.name }))) : '';
+      })));
+}
+function pgSettings(P, c, m) {
+  const base = m.scored;
+  const s = c ? { ...base, ...c.settings } : { ...base, ...(P.draftSettings || {}) };
+  const changed = c ? !c.is_scored : Object.keys(P.draftSettings || {}).length > 0;
+  const save = async patch => {
+    if (!c) { P.draftSettings = pgDiff({ ...(P.draftSettings || {}), ...patch }, base); render(); return; }
+    try { P.chat = await post(`api/playground/chats/${c.id}/settings`,
+      { settings: { ...c.settings, ...patch }, by: whoName() }); }
+    catch (e) { toast('Refused. ' + e.message, { key: 'pg' }); }
+    render();
+  };
+  const thinkingNow = s.thinking == null ? base.thinking_on : !!s.thinking;
+  return el('details', { class: 'pgsettings', 'data-pg-settings': '1', open: P.settingsOpen ? '' : null,
+      ontoggle: e => { P.settingsOpen = e.target.open; } },
+    el('summary', { text: 'Settings ▸' }),
+    el('p', { class: 'small se', text: 'As the Everyday run generates, until you change one: its '
+      + 'chat template, no system message, thinking as it was scored, the same longest reply and '
+      + 'sampling.' }),
+    el('label', { class: 'fld' }, el('span', { class: 'fld-label', text: 'System message' }),
+      el('textarea', { rows: '2', 'data-pg-system': '1', 'data-keep': 'pg-system', text: s.system || '',
+        onchange: e => save({ system: e.target.value }) })),
+    base.can_think ? el('label', { class: 'small' }, el('input', { type: 'checkbox',
+      'data-pg-thinking': '1', checked: thinkingNow ? '' : null,
+      onchange: e => save({ thinking: e.target.checked }) }), ' thinking') : '',
+    el('label', { class: 'fld' }, el('span', { class: 'fld-label', text: 'Temperature' }),
+      el('input', { type: 'number', min: '0', max: '2', step: '0.1', value: String(s.temperature),
+        'data-pg-temperature': '1', style: 'width:6em',
+        onchange: e => save({ temperature: Number(e.target.value) }) })),
+    el('label', { class: 'fld' }, el('span', { class: 'fld-label', text: 'Longest reply (tokens)' }),
+      el('input', { type: 'number', min: '16', step: '16', value: String(s.max_gen_toks),
+        'data-pg-max': '1', style: 'width:7em',
+        onchange: e => save({ max_gen_toks: Number(e.target.value) }) })));
+}
+function pgDiff(s, base) {
+  const out = {};
+  for (const k of ['system', 'thinking', 'temperature', 'max_gen_toks'])
+    if (k in s && s[k] !== base[k] && !(k === 'thinking' && !!s[k] === base.thinking_on)) out[k] = s[k];
+  return out;
+}
+function pgMain(narrow) {
+  const P = state.pg, c = P.id && P.chat && P.chat.id === P.id ? P.chat : null;
+  if (P.id && !c) return el('div', { class: 'card pgmain' }, skeleton(4, { 'data-loading': 'pg-chat' }));
+  const m = pgModel(c ? c.model : (P.pick || ((P.page.models[0] || {}).id)));
+  const changed = c ? !c.is_scored : Object.keys(P.draftSettings || {}).length > 0;
+  const head = el('div', { class: 'pgbar' },
+    narrow ? popover(el('button', { class: 'quiet', 'data-pg-chats': '1', text: 'Chats ▾' }),
+      () => el('div', { class: 'moremenu pgchatsmenu', id: 'pop-pg-chats' },
+        el('button', { role: 'menuitem', 'data-pg-new': '1', text: '+ New chat',
+          onclick: () => { popClose(); pgNew(); } }), ...pgChatItems()),
+      { key: 'pg-chats', menu: false }) : '',
+    P.page.models.length ? pgPicker(P, c) : '',
+    m ? pgSettings(P, c, m) : '');
+  const lines = (P.page.left_out || []).map(t => el('p', { class: 'small se', 'data-pg-left-out': '1', text: t }));
+  if (!P.page.models.length)
+    return el('div', { class: 'card pgmain' }, head, el('p', { class: 'note', 'data-pg-none': '1',
+      text: 'No model on this board can chat yet.' }), lines);
+  const msgs = c ? c.messages : [];
+  const conv = el('div', { class: 'pgconv', 'data-pg-conv': '1' },
+    !msgs.length && !P.live ? el('div', { class: 'pgempty', 'data-pg-empty': '1' },
+      el('p', { text: 'Ask anything, or try a practice question.' }), pgPracticeButton('empty'))
+      : msgs.map((x, i) => x.role === 'user' ? pgUser(x) : pgReply(c, m, x, i)));
+  return el('div', { class: 'card pgmain', 'data-pg-main': c ? c.id : 'new' },
+    head, lines.length && !c ? lines : '', conv, pgInput(P, c, m, changed));
+}
+function pgUser(x) {
+  return el('div', { class: 'pgmsg you', 'data-pg-you': '1' },
+    el('span', { class: 'pgwho', text: 'you ›' }), el('div', { class: 'pgtext', text: x.text }));
+}
+function pgReply(c, m, x, i) {
+  const P = state.pg, live = P.live && P.live.n === i ? P.live : null;
+  const k = x.replies && x.replies.length ? Math.min(x.shown || 0, x.replies.length - 1) : -1;
+  const r = live ? null : (k >= 0 ? x.replies[k] : null);
+  const name = m ? m.name : c.model.split('/').pop();
+  const wrap = el('div', { class: 'pgmsg it', 'data-pg-reply': String(i) },
+    el('span', { class: 'pgwho', text: name + ' ›' }));
+  if (live) {
+    wrap.append(
+      live.note ? el('p', { class: 'small se', 'data-pg-note': '1', text: live.note }) : '',
+      live.wait ? el('p', { class: 'small se', 'data-pg-wait': '1', text: live.wait }) : '',
+      el('details', { class: 'pgthink', 'data-pg-think': '1', hidden: live.think ? null : '' },
+        el('summary', { text: 'Thinking ▸' }), el('div', { class: 'small pgthinktext', text: live.think })),
+      el('div', { class: 'pgtext', 'data-pg-live': '1', text: live.text }),
+      live.refused ? el('p', { class: 'warn', 'data-pg-refused': '1', text: live.refused }) : '');
+    return wrap;
+  }
+  if (!r) {
+    wrap.append(el('p', { class: 'small se', 'data-pg-noreply': '1',
+      text: x.refused || 'no reply' }));
+    return wrap;
+  }
+  wrap.append(
+    r.thinking ? el('details', { class: 'pgthink', 'data-pg-think': '1' },
+      el('summary', { text: 'Thinking ▸' }), el('div', { class: 'small pgthinktext', text: r.thinking })) : '',
+    el('div', { class: 'pgtext', 'data-pg-text': '1', text: r.text }),
+    r.cut ? el('p', { class: 'small se', 'data-pg-cut': r.cut,
+      text: r.cut === 'stopped' ? 'stopped' : `cut short: ${r.cut}` }) : '',
+    pgMark(r.mark),
+    el('p', { class: 'small se mono pgstats', 'data-pg-stats': '1' },
+      `${(r.words || 0).toLocaleString('en')} word${r.words === 1 ? '' : 's'} · ${r.secs}s · ${r.wps} w/s`
+        + (r.device === 'cpu' ? ' · CPU' : ''), ' · ',
+      el('button', { class: 'quiet', 'data-pg-copy': '1', text: 'copy', onclick: () => {
+        try { navigator.clipboard.writeText(r.text); toast('Copied', { key: 'pg' }); }
+        catch (e) { toast('Copy failed', { key: 'pg' }); } } }), ' · ',
+      el('button', { class: 'quiet', 'data-pg-again': String(i), text: 'again',
+        onclick: () => pgAgain(c, i) }),
+      x.replies.length > 1 ? [' · ', el('span', { class: 'pgalt', 'data-pg-alt': `${k + 1}|${x.replies.length}` },
+        el('button', { class: 'quiet', 'aria-label': 'previous reply', text: '‹', disabled: k ? null : '',
+          onclick: () => { x.shown = k - 1; render(); } }),
+        ` ${k + 1} of ${x.replies.length} `,
+        el('button', { class: 'quiet', 'aria-label': 'next reply', text: '›',
+          disabled: k + 1 < x.replies.length ? null : '',
+          onclick: () => { x.shown = k + 1; render(); } }))] : ''),
+    // 12e: saving a question from a chat will sit here
+    el('span', { class: 'pgslot', 'data-pg-slot': '1' }));
+  return wrap;
+}
+function pgMark(mk) {
+  if (!mk) return '';
+  if (mk.unmarked) return el('p', { class: 'small se', 'data-pg-unmarked': '1', text: mk.unmarked });
+  if (mk.kind === 'knowledge')
+    return el('details', { class: 'pgref', 'data-pg-reference': '1' },
+      el('summary', { text: 'Reference answer ▸' }),
+      el('p', { class: 'small', text: mk.reference }), el('p', { class: 'small se', text: mk.note }));
+  return el('div', { class: 'pgmark ' + (mk.pass === false ? 'no' : 'ok'), 'data-pg-mark': String(mk.pass) },
+    el('span', { text: mk.words }),
+    mk.note ? el('span', { class: 'small se', text: ' · ' + mk.note }) : '',
+    (mk.checks || []).length ? el('p', { class: 'small se', text: 'The check: ' + mk.checks.join(' · ') }) : '');
+}
+function pgInput(P, c, m, changed) {
+  const live = !!P.live && !P.live.over;
+  // the reply keeps at most half the context (chat.context_words, the server's rule)
+  const ctx = (m && m.ctx) || 4096;
+  const budget = (c ? { ...m.scored, ...c.settings } : { ...m.scored, ...(P.draftSettings || {}) })
+    .max_gen_toks;
+  const fits = m ? Math.max(0, Math.floor((ctx - Math.min(budget, Math.floor(ctx / 2))) * 0.75)) : 0;
+  const words = (P.input || '').trim().split(/\s+/).filter(Boolean).length
+    + (c ? c.messages.reduce((a, x) => a + ((x.text || ((x.replies || [])[x.shown || 0] || {}).text || '')
+      .split(/\s+/).filter(Boolean).length), 0) : 0);
+  const long = m && words > fits;
+  const box = el('textarea', { rows: '3', class: 'pginput', 'aria-label': 'message', 'data-pg-input': '1',
+    'data-keep': 'pg-input', placeholder: 'message…', text: P.input || '',
+    oninput: e => { P.input = e.target.value; pgLongLine(m, fits); },
+    onkeydown: e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); pgSend(); } } });
+  // a run took the GPU in the middle of the last reply: said once, above the input
+  const lastR = c && c.messages.length ? ((c.messages[c.messages.length - 1].replies || [])
+    .slice(-1)[0] || {}) : {};
+  return el('div', { class: 'pginputwrap' },
+    lastR.cut === 'a run started' ? el('p', { class: 'small se', 'data-pg-paused': '1',
+      text: 'Paused: a run started. Your conversation is kept.' }) : '',
+    changed ? el('p', { class: 'warn pgamber', 'data-pg-not-scored': '1' }, 'Not the scored settings. ',
+      el('button', { class: 'quiet', 'data-pg-reset': '1', text: 'reset', onclick: () => pgReset(c) })) : '',
+    el('p', { class: 'warn', 'data-pg-long': '1', hidden: long ? null : '',
+      text: `Too long for this model: about ${fits.toLocaleString('en')} words fits.` }),
+    box,
+    el('div', { class: 'frm' },
+      live ? el('button', { class: 'primary', 'data-pg-stop': '1', text: 'Stop', onclick: pgStop })
+        : el('button', { class: 'primary', 'data-pg-send': '1', text: 'Send', disabled: long ? '' : null,
+          onclick: pgSend }),
+      pgPracticeButton('input')));
+}
+function pgLongLine(m, fits) {
+  const P = state.pg, c = P.chat;
+  const words = (P.input || '').trim().split(/\s+/).filter(Boolean).length
+    + (c ? c.messages.reduce((a, x) => a + ((x.text || ((x.replies || [])[x.shown || 0] || {}).text || '')
+      .split(/\s+/).filter(Boolean).length), 0) : 0);
+  const long = m && words > fits;
+  const line = document.querySelector('[data-pg-long]'), send = document.querySelector('[data-pg-send]');
+  if (line) line.hidden = !long;
+  if (send) send.disabled = !!long;
+}
+async function pgReset(c) {
+  const P = state.pg;
+  if (!c) { P.draftSettings = {}; render(); return; }
+  try { P.chat = await post(`api/playground/chats/${c.id}/settings`, { settings: {}, by: whoName() }); }
+  catch (e) { toast('Refused. ' + e.message, { key: 'pg' }); }
+  render();
+}
+
+// ---- practice questions: the practice half only ----------------------------------
+function pgPracticeButton(where) {
+  const P = state.pg;
+  return popover(el('button', { class: 'quiet', 'data-pg-practice': where, text: 'Try a practice question ▾' }),
+    () => {
+      const list = el('div', { class: 'pgplist' });
+      const fill = q => {
+        q = (q || '').trim().toLowerCase();
+        const pr = P.practice || { everyday: [], knowledge: [] };
+        const pick = x => { popClose(); P.input = x.prompt; P.ref = { kind: x.kind, id: x.id };
+          render(); const b = document.querySelector('[data-pg-input]'); if (b) b.focus(); };
+        const groups = [];
+        const by = (xs, key, label) => {
+          const m = new Map();
+          for (const x of xs) if (!q || x.prompt.toLowerCase().includes(q)) {
+            const g = label(x); if (!m.has(g)) m.set(g, []); m.get(g).push(x); }
+          return [...m.entries()];
+        };
+        for (const [g, xs] of by(pr.everyday, 'group', x => 'Everyday · ' + x.groupLabel))
+          groups.push([g, xs]);
+        for (const [g, xs] of by(pr.knowledge, 'topic', x => 'Knowledge · ' + x.topic))
+          groups.push([g, xs]);
+        list.replaceChildren(...groups.flatMap(([g, xs]) => [el('p', { class: 'small se pghead', text: g }),
+          ...xs.slice(0, 40).map(x => el('button', { role: 'menuitem', class: 'pgpq',
+            'data-pg-pq': `${x.kind}|${x.id}`, text: x.prompt.length > 110 ? x.prompt.slice(0, 110) + '…' : x.prompt,
+            onclick: () => pick(x) }))]),
+          groups.length ? '' : el('p', { class: 'small se', text: 'No practice question matches.' }));
+      };
+      fill('');
+      return el('div', { class: 'moremenu pgpmenu', id: 'pop-pg-practice-' + where },
+        el('input', { type: 'search', placeholder: 'search practice questions…', 'aria-label': 'search practice questions',
+          oninput: e => fill(e.target.value) }), list);
+    }, { key: 'pg-practice-' + where, menu: false, inCard: true });
+}
+
+// ---- sending, streaming, stopping -------------------------------------------------
+async function pgSend() {
+  const P = state.pg;
+  if (!whoName()) { askName(); return; }
+  const text = (P.input || '').trim();
+  if (!text || P.live) return;
+  try {
+    let c = P.chat && P.chat.id === P.id ? P.chat : null;
+    if (!c) {
+      c = await post('api/playground/chats', { model: P.pick || P.page.models[0].id, by: whoName(),
+        settings: P.draftSettings || {} });
+      P.chats = [{ id: c.id, title: 'New chat', model: c.model, updated_at: Date.now() / 1000 },
+        ...(P.chats || [])];
+      P.id = c.id; P.chat = c; P.draftSettings = {};
+      history.replaceState(history.state, '', '#' + hashFor());
+    }
+    const r = await post(`api/playground/chats/${c.id}/messages`, { text, by: whoName(),
+      practice: P.ref && text ? P.ref : null });
+    P.chat = r.chat; P.input = ''; P.ref = null;
+    // the list says what the chat is about from its first message
+    P.chats = (P.chats || []).map(x => x.id === r.chat.id
+      ? { ...x, title: r.chat.title, updated_at: Date.now() / 1000 } : x);
+    pgFollow(r.stream, r.chat.messages.length - 1);
+  } catch (e) { toast('Refused. ' + e.message, { key: 'pg' }); render(); }
+}
+async function pgAgain(c, i) {
+  const P = state.pg;
+  if (P.live) return;
+  try {
+    const r = await post(`api/playground/chats/${c.id}/again`, { n: i, by: whoName() });
+    P.chat = r.chat;
+    pgFollow(r.stream, i);
+  } catch (e) { toast('Refused. ' + e.message, { key: 'pg' }); }
+}
+function pgFollow(streamId, n) {
+  const P = state.pg;
+  P.live = { id: streamId, n, text: '', think: '', note: '', wait: '' };
+  render();
+  const es = new EventSource('api/playground/streams/' + streamId);
+  P.es = es;
+  const paint = () => {
+    const t = document.querySelector('[data-pg-live]'), k = document.querySelector('[data-pg-think]');
+    if (t) t.textContent = P.live.text;
+    if (k) { k.hidden = !P.live.think; const d = k.querySelector('.pgthinktext'); if (d) d.textContent = P.live.think; }
+  };
+  es.onmessage = ev => {
+    const e = JSON.parse(ev.data), L = P.live;
+    if (!L || L.id !== streamId) return;
+    if (e.t === 'place') { L.note = e.note || ''; L.wait = ''; render(); }
+    else if (e.t === 'wait') { L.wait = e.why; render(); }
+    else if (e.t === 'think') { L.think += e.d; L.wait = ''; paint(); }
+    else if (e.t === 'text') { L.text += e.d; L.wait = ''; paint(); }
+    else if (e.t === 'reset') { L.think = e.think; L.text = e.text; paint(); }
+    else if (e.t === 'refused' || e.t === 'error') {
+      es.close(); P.es = null; L.refused = e.why; L.over = true;
+      if (e.t === 'refused') pgRetryWhenFree(n);
+      render();
+    } else if (e.t === 'done') {
+      es.close(); P.es = null; P.live = null;
+      pgGet('api/playground/chats/' + P.id).then(c => { P.chat = c; render(); })
+        .catch(() => render());
+    }
+  };
+  es.onerror = () => { if (P.es === es && P.live) { es.close(); P.es = null; P.live = null;
+    pgGet('api/playground/chats/' + P.id).then(c => { P.chat = c; render(); }).catch(() => render()); } };
+}
+// the GPU is a run's: ask again, on its own, once it is free
+function pgRetryWhenFree(n) {
+  const P = state.pg, chatId = P.id;
+  clearTimeout(P.retry);
+  P.retry = setTimeout(async function tick() {
+    if (state.tab !== 'playground' || P.id !== chatId || !P.live || !P.live.refused) return;
+    try {
+      const s = await api('api/playground/status');
+      if (!s.run) { const c = P.chat; P.live = null; pgAgain(c, n); return; }
+      P.live.refused = s.run; render();
+    } catch (e) { /* try again */ }
+    P.retry = setTimeout(tick, 15000);
+  }, 15000);
+}
+async function pgStop() {
+  const P = state.pg;
+  if (!P.live) return;
+  try { await post(`api/playground/streams/${P.live.id}/stop`, {}); } catch (e) { /* the stream ends anyway */ }
+}
 // ---------- shell ----------
 // 12b: five places, organised around what people come to do. A table, a
 // reader or a dialog keeps its code and changes container: the views below
@@ -14895,9 +15367,13 @@ const TABS = [
   ...(LIVE ? [['ai', 'AI models', vAiModels]] : []),
   // 12i.2: reached from the Knowledge exam's and the Everyday page's questions
   ...(LIVE ? [['build', 'Build questions', vBuild]] : []),
+  // 12d.1: a place of its own, between Models and Improve — live only: a
+  // frozen page has no model to talk to
+  ...(LIVE ? [['playground', 'Playground', vPlayground]] : []),
 ];
 // Playground joins in 12d, between Models and Improve
 const PLACES = [['home', 'Home', ['overview']], ['models', 'Models', ['leaderboard']],
+  ['playground', 'Playground', ['playground']],
   ['improve', 'Improve', ['pipeline', 'training']],
   ['benchmarks', 'Benchmarks', ['tasks', 'exam', 'everyday']]]
   .map(([id, label, views]) => [id, label, views.filter(v => TABS.some(t => t[0] === v))])
@@ -14908,7 +15384,8 @@ const viewLabel = v => (TABS.find(t => t[0] === v) || [, v])[1];
 const SUB_SLUG = { pipeline: 'model', training: 'training',
                    tasks: 'standard', exam: 'exam', everyday: 'everyday' };
 const PAGE_SLUG = { overview: 'home', leaderboard: 'models', queue: 'runs',
-                    provenance: 'data', help: 'help', ai: 'ai', build: 'build' };
+                    provenance: 'data', help: 'help', ai: 'ai', build: 'build',
+                    playground: 'playground' };
 
 // Old hashes keep working (§8): a link someone pasted into a message last
 // month still lands, and the address bar then shows where it lives now.
@@ -15644,6 +16121,13 @@ async function loadQueue() {
         || JSON.stringify(p.judge || null) !== JSON.stringify(r.judge || null);
     });
     state.queue = rows;
+    // 12d.1: what the Playground has loaded, for the runs popover
+    try {
+      const ps = await api('api/playground/status');
+      if (JSON.stringify(ps.loaded) !== JSON.stringify((state.pgStatus || {}).loaded)) {
+        state.pgStatus = ps; renderRuns(); if (POP.key === 'runs') popReanchor();
+      }
+    } catch (e) { /* the popover stands as it was */ }
     // 12b: the run counter is on every page, and says so as runs move
     if (changed) { renderRuns(); if (POP.key === 'runs') popReanchor(); }
     if (justFinished) await refreshResults();       // new scores -> re-render everything

@@ -2801,6 +2801,82 @@ items 9–12.
 - **"Agreement (0–1)"** heads the judge test's κ column, with weighted kappa
   explained in its tooltip.
 
+### 12d.1 — the Playground: the engine, the page, practice questions
+
+`docs/prompts/phase-12d-playground.md`, §1–6.
+
+- **Playground** (`#tab=playground`, between Models and Improve; in Menu ▾
+  below 720 px) chats with the instruct models on this server, streamed. It
+  offers no OpenRouter model and never spends money.
+- **The engine** (`service/chat.py`) lives inside the service.
+  - **The loader is the runs' own:** `runner.load_spec()` gives the path
+    (`local/<name>` resolved), bfloat16 and the approved commit, and the model
+    loads through lm_eval's `HFLM`, the class `--model hf` uses. The runner
+    builds its `--model_args` from the same `load_spec` (`model_args`).
+  - Replies stream as server-sent events (`GET
+    /api/playground/streams/{id}`, uncompressed: Starlette leaves
+    `text/event-stream` alone), through a `TextIteratorStreamer`.
+  - One reply per loaded model at a time; a second says "answering another
+    message, yours is next".
+  - **Stop**, or a closed tab (the stream's generator is cancelled), ends a
+    reply at once.
+  - A model unloads after `CHAT_IDLE_UNLOAD_S` (600) idle, checked every 30 s.
+  - The runs popover lists a loaded model: "Playground: Qwen3-1.7B loaded".
+  - **A model that runs its own code is not offered.** Runs execute such code
+    only in the sandboxed subprocess (`_child_env`, `EVAL_USER`); chat runs
+    in the service.
+  - `CHAT_BACKEND=fake` streams canned text: the tests' model.
+- **Runs come first.**
+  - While `runner.LOCK` is held, nothing loads on the GPU. The page says "The
+    GPU is running Qwen3.5-2B's Standard tests. Chat starts when it's done."
+    (`runner.run_holding()`; main has no time-left estimate, so it says "when
+    it's done"), and asks again on its own every 15 s.
+  - A model under `CHAT_CPU_MAX_PARAMS_B` (1.0) answers on the CPU
+    meanwhile, with the grey line.
+  - `run_submission` calls `chat.ENGINE.yield_gpu()` before `acquire_lock`.
+    GPU replies stop, keeping what they wrote marked "cut short: a run
+    started", and GPU models unload. It waits `CHAT_YIELD_WAIT_S` (60) at
+    most and never raises.
+  - A lock taken from the command line is seen between tokens.
+  - Chat never takes the lock.
+  - Before a GPU load, `torch.cuda.mem_get_info` must show the weights (two
+    bytes a parameter) plus `CHAT_GPU_MARGIN_GB`, or the page says so in one
+    line.
+- **Both settings are measured on the server after deploy:**
+  - `CHAT_CPU_MAX_PARAMS_B`: a 0.6B model's words a second on the CPU; below
+    about 3, lower it;
+  - `CHAT_GPU_MARGIN_GB` (2.0 until then).
+- **The settings are the Everyday run's, from one function:
+  `everyday.run_settings(archinfo)`.**
+  - It returns: the chat template, no system message, thinking as the
+    template does by default (the run passes no `enable_thinking`), 512
+    tokens or `EVERYDAY_REASONING_MAX_GEN_TOKS` for a reasoning template,
+    greedy, and the stop string.
+  - `everyday.build_task` fills the task yaml's `generation_kwargs` from it,
+    and the runner reads the reasoning budget from it
+    (`runner._everyday_settings`).
+  - The Playground can change the system message, thinking (reasoning models
+    only), temperature and the longest reply. Anything changed shows "Not the
+    scored settings." with reset. A chat keeps its own settings.
+- **Chats are per person**, by the name in masein ▾, folded to lower case.
+  - Table `chats`, the whole chat as JSON.
+  - The list shows the last 50, and Delete asks once.
+  - Another person's chat is "not found" by any id.
+  - A GET says whose with `X-Who`; a stream is reached by its unguessable id.
+- **Try a practice question ▾** lists Everyday's practice half by group and
+  the exam's practice half by topic. A hidden question is never listed, sent
+  or reachable (`playground.practice_item` knows only the practice half).
+  Sent unedited, on the scored settings, as the chat's first message:
+  - an Everyday question is marked by its script checks, in their plain
+    words ("✓ passes", or "✗ " and each failed check's why);
+  - a Knowledge question shows its reference, folded: "not marked here; the
+    exam's judge marks it in runs".
+
+  Otherwise the reply says why it isn't marked. A mark is the chat's own
+  record, never a score.
+- **Not in 12d.1:** the kernels from 12a.5b (#75, not merged); comparing two
+  models, the model page's Chat tab and trained models (12d.2).
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

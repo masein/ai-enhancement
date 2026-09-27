@@ -15,16 +15,18 @@ test_split: test
 output_type: generate_until
 doc_to_text: "{{prompt}}"
 doc_to_target: ""
+# 12d.1: filled by everyday.build_task from everyday.run_settings() — the one
+# function the Playground's defaults also read, so the two cannot drift
 generation_kwargs:
   # a stop no chat answer writes, so the end of the model's turn is what ends
   # it (the harness always adds the tokenizer's end of text). Left out, the
   # harness can fall back to its few-shot delimiter, a blank line, which
   # would cut the JSON, the email, and Qwen3's "<think>\n\n</think>"
-  until: ["\n\n\n\n"]
+  until: __UNTIL__
   # a reasoning model gets EVERYDAY_REASONING_MAX_GEN_TOKS, 4,096 (--gen_kwargs)
-  max_gen_toks: 512
-  do_sample: false
-  temperature: 0.0
+  max_gen_toks: __MAX_GEN_TOKS__
+  do_sample: __DO_SAMPLE__
+  temperature: __TEMPERATURE__
 # no metric: scripts/everyday.py marks the answers and writes everyday.json
 # beside the model's results; the harness only records what the model wrote
 metric_list:

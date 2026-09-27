@@ -11,6 +11,7 @@ face the open internet.
 
 from __future__ import annotations
 
+import asyncio
 import difflib
 import hashlib
 import html
@@ -26,10 +27,12 @@ from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse, PlainTextResponse,
+                               StreamingResponse)
 from pydantic import BaseModel
 
-from . import ai_models, builder, config, db, hfmeta, judge_test, llm, llm_poller, startup, suggest, worker
+from . import ai_models, builder, chat, config, db, hfmeta, judge_test, llm, llm_poller, startup, suggest, worker
+from . import playground
 from . import proposals as prop
 from . import reader
 
@@ -62,6 +65,7 @@ async def lifespan(_app: FastAPI):
     llm.startup_check()          # a set-but-broken LLM config fails here, not at a click
     worker.start()
     llm_poller.start()
+    chat.start_janitor()         # 12d.1: an idle chat model unloads
     yield
     llm_poller.stop()
     worker.stop()
@@ -1157,6 +1161,164 @@ def judge_test_use(a: JtUseIn, x_token: str = Header(default="")):
 # 12i.2: the question builder — Knowledge exam or Everyday questions, written,
 # checked and reviewed in three steps, published as a new bank version
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 12d.1: the Playground — the models on this server, chatting, streamed.
+# Chats are a person's own: every request says whose (by, or X-Who), and an
+# id that isn't theirs is not found. OpenRouter models are not offered here
+# ---------------------------------------------------------------------------
+
+def _who_of(by: str, x_who: str) -> str:
+    return _name(by or x_who, "a chat")
+
+
+@app.get("/api/playground")
+def playground_page():
+    return {**playground.models(), "status": chat.ENGINE.status(),
+            "idle_unload_s": config.CHAT_IDLE_UNLOAD_S}
+
+
+@app.get("/api/playground/status")
+def playground_status():
+    return chat.ENGINE.status()
+
+
+@app.get("/api/playground/practice")
+def playground_practice():
+    """practice questions only — a hidden one is never listed"""
+    return playground.practice()
+
+
+@app.get("/api/playground/chats")
+def playground_chats(x_who: str = Header(default="")):
+    return {"chats": chat.list_chats(_who_of("", x_who))}
+
+
+class ChatIn(BaseModel):
+    model: str
+    by: str = ""
+    settings: dict = {}
+
+
+@app.post("/api/playground/chats")
+def playground_new(a: ChatIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    by = _who_of(a.by, "")
+    try:
+        c = chat.new_chat(a.model, by, a.settings)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return playground.view(c)
+
+
+def _chat_or_404(chat_id: str, by: str) -> dict:
+    try:
+        return chat.get_chat(chat_id, by)
+    except KeyError:
+        raise HTTPException(404, "no such chat of yours") from None
+
+
+@app.get("/api/playground/chats/{chat_id}")
+def playground_chat(chat_id: str, x_who: str = Header(default="")):
+    return playground.view(_chat_or_404(chat_id, _who_of("", x_who)))
+
+
+class ChatByIn(BaseModel):
+    by: str = ""
+
+
+@app.post("/api/playground/chats/{chat_id}/delete")
+def playground_delete(chat_id: str, a: ChatByIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    by = _who_of(a.by, "")
+    _chat_or_404(chat_id, by)
+    playground.delete(chat_id, by)
+    return {"deleted": chat_id}
+
+
+class ChatSettingsIn(BaseModel):
+    settings: dict
+    by: str = ""
+
+
+@app.post("/api/playground/chats/{chat_id}/settings")
+def playground_settings(chat_id: str, a: ChatSettingsIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    by = _who_of(a.by, "")
+    _chat_or_404(chat_id, by)
+    try:
+        return playground.set_settings(chat_id, a.settings, by)
+    except (ValueError, TypeError) as e:
+        raise HTTPException(422, str(e)) from None
+
+
+class MessageIn(BaseModel):
+    text: str
+    by: str = ""
+    practice: dict | None = None
+
+
+@app.post("/api/playground/chats/{chat_id}/messages")
+def playground_send(chat_id: str, a: MessageIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    by = _who_of(a.by, "")
+    _chat_or_404(chat_id, by)
+    try:
+        return playground.send(chat_id, a.text, by, a.practice)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+
+
+class AgainIn(BaseModel):
+    n: int
+    by: str = ""
+
+
+@app.post("/api/playground/chats/{chat_id}/again")
+def playground_again(chat_id: str, a: AgainIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    by = _who_of(a.by, "")
+    _chat_or_404(chat_id, by)
+    try:
+        return playground.again(chat_id, a.n, by)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+
+
+@app.post("/api/playground/streams/{stream_id}/stop")
+def playground_stop(stream_id: str):
+    return {"stopped": chat.ENGINE.stop(stream_id)}
+
+
+@app.get("/api/playground/streams/{stream_id}")
+async def playground_stream(stream_id: str, request: Request):
+    """a reply as server-sent events — the id is the key. A closed tab ends
+    the reply: it frees the model for the next message"""
+    st = chat.ENGINE.streams.get(stream_id)
+    if st is None:
+        raise HTTPException(404, "no such reply")
+
+    async def events():
+        i = 0
+        try:
+            while True:
+                evs = st.events[i:]
+                for ev in evs:
+                    yield f"data: {json.dumps(ev)}\n\n"
+                i += len(evs)
+                if st.done and i >= len(st.events):
+                    return
+                if await request.is_disconnected():
+                    return
+                await asyncio.sleep(0.05)
+        finally:
+            # the tab went away before the reply ended (a disconnect, or the
+            # server cancelling this generator): stop it, and free the model
+            if not st.done:
+                st.stop.set()
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
 
 @app.get("/api/builder")
 def builder_page():
