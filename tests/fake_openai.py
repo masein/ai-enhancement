@@ -31,6 +31,8 @@ class FakeServer:
         # 12i.4: its usage, as llama-server reports it: the words it wrote,
         # thinking included, unless a test says otherwise
         self.tokens = None
+        # 12f.3 addendum: llama-server's timings, MTP's drafts among them
+        self.timings = None
         self.stop_after: int | None = None      # answers, then it stops answering
         self.delay_s = 0.0
         self.requests: list[dict] = []           # every chat body, as sent
@@ -91,9 +93,12 @@ class FakeServer:
                         else len(content.split()) + len((think or "").split()))
                 with self._lock:
                     self.answered += 1
-                return {"id": "chatcmpl-1", "object": "chat.completion",
-                        "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}],
-                        "usage": {"prompt_tokens": 10, "completion_tokens": used}}
+                out = {"id": "chatcmpl-1", "object": "chat.completion",
+                       "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}],
+                       "usage": {"prompt_tokens": 10, "completion_tokens": used}}
+                if callable(self.timings):
+                    out["timings"] = self.timings(body)
+                return out
             finally:
                 with self._lock:
                     self.in_flight -= 1

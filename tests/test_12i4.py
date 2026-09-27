@@ -111,7 +111,9 @@ def test_the_median_length_and_the_ran_out_count_come_from_the_stored_answers(tm
     m1 = tmp_path / "a"
     plant(m1, exam_rows(texts, tokens=[50, 4096, 3, 7]), kind="exam")
     s = al.stats(m1, "exam", ["org/a"])
-    assert s == {"median": 28, "ran_out": 2, "n": 4, "how": "server", "tokenizer": ""}
+    # 12f.3: and MTP's drafts, which none of these recorded
+    assert s == {"median": 28, "ran_out": 2, "n": 4, "how": "server", "tokenizer": "",
+                 "draft": None}
     # 2. else the model's tokenizer, when its files are here
     m2 = tmp_path / "b"
     plant(m2, exam_rows(texts), kind="exam")

@@ -81,7 +81,9 @@ def test_the_estimate_uses_the_measured_seconds_an_answer(live, page, served_run
     for mid, rough in ((SID, False), (IDLE, True)):
         page.goto("about:blank")
         page.goto(live["base"] + "/#model=" + mid.replace("/", "%2F"))
-        page.wait_for_selector("[data-test-model]")
+        # its page first: the header's Test button is there before the page
+        # knows the model, and a click then opens the dialog with none filled in
+        page.wait_for_selector(f"[data-served-head='{mid}']")
         page.locator("[data-test-model]").click()
         suite = page.locator("[data-dialog='test'] [data-select='suite']")
         suite.wait_for()

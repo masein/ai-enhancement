@@ -252,6 +252,14 @@ CREATE TABLE IF NOT EXISTS phone_reports (
   data        TEXT NOT NULL,
   created_at  REAL NOT NULL
 );
+-- 12f.3: GGUF files measured with llama-perplexity by the host's worker —
+-- a file with no server (a served model's is on its row); what the first job
+-- hashed is pinned in it
+CREATE TABLE IF NOT EXISTS gguf_models (
+  id          TEXT PRIMARY KEY,
+  data        TEXT NOT NULL,
+  updated_at  REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS qb_drafts (
   id          TEXT PRIMARY KEY,
   kind        TEXT NOT NULL,                      -- 'knowledge' | 'everyday'
@@ -364,7 +372,8 @@ def add(hf_id: str, kind: str, suite: str, submitter: str, note: str,
 def claim_next() -> dict | None:
     """Atomically move the oldest queued row to 'preflight' and return it."""
     with closing(_conn()) as c:
-        row = c.execute("SELECT id FROM submissions WHERE status='queued' "
+        # 12f.3: a GGUF job is the host's worker's, never this queue's
+        row = c.execute("SELECT id FROM submissions WHERE status='queued' AND suite!='gguf' "
                         "ORDER BY id LIMIT 1").fetchone()
         if not row:
             return None
@@ -1133,6 +1142,26 @@ def phone_list(model: str) -> list[dict]:
         rows = c.execute("SELECT id, data FROM phone_reports WHERE model=? ORDER BY id DESC",
                          (model,)).fetchall()
     return [{**json.loads(d), "id": i} for i, d in rows]
+
+
+def gguf_put(rec: dict) -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO gguf_models (id, data, updated_at) VALUES (?,?,?) "
+                  "ON CONFLICT(id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at",
+                  (rec["id"], json.dumps(rec), time.time()))
+        c.commit()
+
+
+def gguf_get(model_id: str) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute("SELECT data FROM gguf_models WHERE id=?", (model_id,)).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def gguf_all() -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT data FROM gguf_models ORDER BY updated_at DESC").fetchall()
+    return [json.loads(r[0]) for r in rows]
 
 
 def served_all() -> list[dict]:

@@ -174,6 +174,11 @@ def check(f: dict) -> dict:
     return probe(f.get("base_url") or "", key)
 
 
+def _gguf_setups(text) -> list[dict]:
+    from . import gguf
+    return gguf.parse_setups(text)
+
+
 def register(f: dict, by: str) -> dict:
     """check the server, pin what it reports, and keep it — or say why not"""
     name = (f.get("name") or "").strip()
@@ -194,7 +199,14 @@ def register(f: dict, by: str) -> dict:
     rec = {"id": mid, "name": name, "base_url": base, "key": key,
            "based_on": (f.get("based_on") or "").strip(), "how": how, "thinking": thinking,
            "phone": bool(f.get("phone")),
+           # 12f.3: its GGUF file on the server, for llama-perplexity's benchmarks
+           "gguf_path": (f.get("gguf_path") or "").strip(),
+           "gguf_flags": (f.get("gguf_flags") or "").strip(),
+           # 12f.3 addendum: the setups its GGUF is measured in
+           "gguf_setups": _gguf_setups(f.get("gguf_setups")),
            "pin": pin_of(p), "answered": p["answered"], "by": by, "at": time.time()}
+    if rec["gguf_path"] and old.get("gguf_path") == rec["gguf_path"] and old.get("gguf_pin"):
+        rec["gguf_pin"] = old["gguf_pin"]
     db.served_put(rec)
     write_meta(rec)
     return public(rec)
@@ -209,6 +221,8 @@ def view(rec: dict) -> dict:
     return {"name": rec["name"], "base_url": rec["base_url"], "how": rec["how"],
             "based_on": rec["based_on"], "thinking": rec["thinking"], "pin": rec["pin"],
             "phone": is_phone(rec),
+            "gguf_path": rec.get("gguf_path") or "",
+            "gguf_setups": rec.get("gguf_setups") or [],
             # 12i.4: measured by its last run — Test a model's time estimate
             "speed": rec.get("speed")}
 
@@ -306,6 +320,8 @@ class Answer(str):
     """a reply's text, with how many tokens the server says it generated
     (12i.4: an answer's length, thinking included, as the server counts it)"""
     tokens: int | None = None
+    # 12f.3 addendum: MTP's drafts, as llama-server's timings report them
+    draft: dict | None = None
 
 
 def ask(rec: dict, text: str, s: dict) -> str:
@@ -331,6 +347,9 @@ def ask(rec: dict, text: str, s: dict) -> str:
     out = Answer(f"<think>\n{think}\n</think>\n\n{text}" if think else text)
     used = (reply.get("usage") or {}).get("completion_tokens")
     out.tokens = int(used) if isinstance(used, (int, float)) and used >= 0 else None
+    t = reply.get("timings") or {}
+    if isinstance(t.get("draft_n"), (int, float)) and t["draft_n"] > 0:
+        out.draft = {"n": int(t["draft_n"]), "accepted": int(t.get("draft_n_accepted") or 0)}
     return out
 
 
@@ -417,6 +436,8 @@ def _write(rec: dict, task: str, docs: list[dict], answers: dict[int, str], task
                 "resps": [[raw]], "filtered_resps": [raw], "filter": "none",
                 # 12i.4: its length as the server counted it, thinking included
                 "tokens": getattr(raw, "tokens", None),
+                # 12f.3 addendum: MTP's drafted and accepted tokens, when reported
+                "draft": getattr(raw, "draft", None),
                 "metrics": ["bypass"], "bypass": 999, "doc_hash": _doc_hash(doc),
                 "prompt_hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
                 "target_hash": hashlib.sha256(str(doc.get("reference", "")).encode("utf-8"))

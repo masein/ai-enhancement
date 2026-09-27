@@ -452,6 +452,53 @@ Then, on the board: Test a model ▸ A model served elsewhere, with the address
 `http://host.docker.internal:8090/v1` and `$LDA_KEY`'s value as the key.
 Check shows what the server serves; Save pins it.
 
+## 5d. The GGUF worker — llama-perplexity on the host (12f.3)
+
+The fork's `llama-perplexity` measures MMLU, HellaSwag, Winogrande, ARC and
+TruthfulQA straight from a GGUF file. It's built on the host
+(`~/llama.cpp-teraformer/build-lda`) against `~/lda-env`'s CUDA runtime,
+which the board's container can't run. So `scripts/gguf_worker.py` (the
+standard library only) runs on the host and picks up the jobs the board queues
+in the results folder. The folder is bind-mounted at the same path on both
+sides: **`/home/masein/benchmarks/results`**.
+
+Once, to fill `results/gguf_data/` with lm_eval's own questions in
+llama-perplexity's formats (it runs in the container, which has lm_eval and the
+Hub's dataset cache):
+
+```
+sudo docker compose exec -T bench python scripts/gguf_data.py --out /home/masein/benchmarks/results/gguf_data
+```
+
+It prints each benchmark's count, and how many questions its format can't hold
+exactly (they are left out and counted). A later run writes a new dataset
+version; results record the sha256 they were measured on.
+
+Start the worker (it waits while any other run holds the run lock):
+
+```
+cd ~/benchmarks/aienh && nohup python3 scripts/gguf_worker.py --results /home/masein/benchmarks/results \
+  --binary ~/llama.cpp-teraformer/build-lda/bin/llama-perplexity \
+  --ld-library-path ~/lda-env/lib:~/llama.cpp-teraformer/build-lda/bin > ~/gguf-worker.log 2>&1 &
+```
+
+Stop it (Ctrl+C in a terminal does the same): the benchmark running stops,
+the finished ones are kept, the lock is released.
+
+```
+pkill -INT -f scripts/gguf_worker.py
+```
+
+`--time-limit-h` (24) stops a job the same way. The board says "The GGUF
+worker isn't running" while `results/gguf_worker.json` is older than a minute.
+
+**Setups:** a GGUF is measured "as built", and in each setup registered with
+it, one line each: `lookahead 1: LLAMA_MOE_ROUTE_MODE=lookahead
+LLAMA_MOE_ROUTE_LOOKAHEAD=1`. The worker passes a setup's variables in
+llama-perplexity's environment and its flags after the model's. There are no
+MTP setups: llama-perplexity only scores the choices, so there is nothing to
+draft.
+
 ---
 
 ## 6. How we got here — the decisions and their reasons
@@ -3117,6 +3164,88 @@ that program. `service/served.py` holds it.
   the total.
 - **The two chat settings (§3)** are unchanged: `CHAT_CPU_MAX_PARAMS_B` 1.0 and
   `CHAT_GPU_MARGIN_GB` 2.0 until masein's measured values come.
+
+### 12f.3 — measured on the GGUF
+
+`docs/prompts/phase-12f3-gguf-benchmarks.md` §4–9; § 5d for running it.
+- **The benchmarks are one table** (`scripts/gguf_bench.py`): each row has the
+  key, the label, llama-perplexity's mode, its dataset file under `gguf_data/`,
+  the lm_eval task and split whose questions it holds, and the count.
+  - A later benchmark is a row and its converter.
+  - The flags and the output are read from the fork's `perplexity.cpp`, not
+    guessed:
+    - `--hellaswag` defaults to 400 tasks, so a full run says how many;
+    - the multiple-choice file goes in with `-bf`;
+    - a subset is llama-perplexity's own fixed-seed choice.
+  - TruthfulQA is MC1: llama-perplexity scores no MC2.
+- **The worker** (`scripts/gguf_worker.py`), for each request in
+  `results/gguf_requests/`:
+  1. takes the run lock (`results/.run.lock`, mkdir, the pid file) with a
+     `heartbeat` file in it. The board's `acquire_lock` treats a fresh
+     heartbeat as a live holder, because it can't see a host pid; one over
+     two minutes old is a dead worker's;
+  2. checks the model file exists and hashes it (sha256, cached by size and
+     mtime). Against the pin from the first job, a different file stops the
+     job in one line; so does a dataset whose sha256 isn't the one queued;
+  3. runs each benchmark, writing progress and scores to
+     `results/gguf_results/<id>.json` with the command, the binary's
+     `--version`, the file's name, size and sha256, and each dataset's sha256;
+  4. releases the lock. Ctrl+C, a cancel and `--time-limit-h` keep the
+     finished benchmarks.
+- **The converter** (`scripts/gguf_data.py`) writes lm_eval's own documents,
+  after its `process_docs`:
+  - HellaSwag as six lines a task;
+  - Winogrande as the CSV its reader parses, ending with a blank line (`-f`
+    drops one newline, and the reader drops a last line without one);
+  - MMLU, ARC and TruthfulQA in the multiple-choice binary.
+
+  It records the sha256 and counts in `manifest.json`.
+- **The board** (`service/gguf.py`):
+  - a served model can have a "GGUF file on the server", and Test a model
+    has **A GGUF file** for a file with no server (`gguf_models`);
+  - **Measure on the GGUF ▸** on the model page queues a job: a run row with
+    suite `gguf` that the service's own queue never takes, plus a request
+    file. The full sets are the default, with a time estimate, measured once
+    a run of that file exists;
+  - `/api/submissions` reads the worker's results into the rows.
+- **On the page:**
+  - Models ▸ Standard ▸ All tasks has a last group, **"Measured on the GGUF ·
+    llama.cpp, 0-shot"** (MMLU, HellaSwag, Winogrande, ARC-C, ARC-E,
+    TruthfulQA), shown only while a model has a result, with the brief's
+    tooltip;
+  - the scores live in `DATA.gguf`, never in `DATA.cells`, so no Avg, rank
+    or significance of the lm_eval columns can reach them. A custom table
+    can pick them (the Benchmarks picker's own group), but averages them only
+    with each other and says so;
+  - the model page's Standard block has them under their own heading, paired
+    with any other GGUF of the same base model, with the board's z-test:
+    "LDA phone build vs Qwen3.6 original: MMLU −0.4 (not a clear difference)";
+  - History lists each run's file, build and flags;
+  - the On phone card shows "MMLU 81.5% — measured here (llama.cpp, 0-shot,
+    full 14042)" beside the reported line, never merged.
+- **Setups (the addendum from the model's author):**
+  - A GGUF, or a served model's GGUF, has setups besides "as built": a name,
+    environment variables and extra flags, one a line (`gguf.parse_setups`).
+  - **MTP is refused**, with the line "No MTP setups: llama-perplexity only
+    scores the choices, so there is nothing for MTP to draft." It is shown
+    where setups are entered and where they are chosen.
+  - **A setup's id is its settings' hash** (`gguf_bench.setup_id`), so
+    changing them makes another setup; results measured under the old
+    settings stay, marked "(earlier)".
+  - **Measure on the GGUF ▸** queues a run a setup (the row's note: "setup:
+    lookahead 1"). The worker passes the variables and appends the flags, and
+    the result pins the setup with what it measured.
+  - **The model page** has a column a setup, side by side. The pairing
+    compares each setup against "as built", and two GGUFs of one base setup
+    by setup. History shows each run's setup and its settings. Models shows
+    "as built" (or the first registered setup with results).
+- **Served setups of one file:**
+  - served entries whose servers report the same file (name and size) are
+    grouped on the model page, "Setups of this file", side by side: Everyday,
+    Knowledge exam, median tokens, ran out, and MTP drafts accepted;
+  - each served answer records `timings.draft_n` and `draft_n_accepted` when
+    llama-server reports them (`draft` in the samples). `answer_length` sums
+    them into the rate, and says "not reported" when a server gives none.
 
 ## 11. Known gaps, risks, loose ends
 

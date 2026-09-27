@@ -116,15 +116,19 @@ def test_an_empty_state_offers_what_fills_it(live, page):
 
 
 def test_loading_is_a_skeleton_not_a_word(live, page):
-    import time
-    # 12g.1: Improve's pipeline, while its proposals and datasets are on the way
-    page.route("**/api/proposals*", lambda route: (time.sleep(1.5), route.continue_())[1])
+    # 12g.1: Improve's pipeline, while its proposals and datasets are on the way.
+    # The proposals are held until the test lets them go: a handler that slept
+    # and then answered raced the checks below (it failed 1 run in 8)
+    held = []
+    page.route("**/api/proposals*", lambda route: held.append(route))
     page.goto(live["base"] + "/#tab=improve")
     page.wait_for_selector("[data-loading='pipeline'][aria-busy='true']", timeout=10000)
     assert "Loading…" not in page.locator("#view").text_content()
     assert page.locator("[data-stage-none]").count() == 0      # no "No proposals" meanwhile
+    for route in held:
+        route.continue_()
+    page.unroute("**/api/proposals*")      # and any asked for since, let go with it
     page.wait_for_selector("[data-stages]", timeout=20000)
-    page.unroute("**/api/proposals*")
 
 
 def test_every_action_is_reachable_from_the_keyboard(live, page):
