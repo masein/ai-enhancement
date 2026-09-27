@@ -292,6 +292,15 @@ def bar_reveal(page, sel: str) -> bool:
     return False
 
 
+def pg_choose(page, model_id: str, second: bool = False) -> None:
+    """12d.3: the Playground's model picker is a searchable list, not a
+    native select: open it, click the model, see it chosen"""
+    which = "model2" if second else "model"
+    page.locator(f"[data-pg-{which}]").click()
+    page.locator(f"#pop-pg-model-{'b' if second else 'a'} [data-pg-option='{model_id}']").click()
+    page.wait_for_selector(f"[data-pg-{which}='{model_id}']")
+
+
 def set_name(page, name: str) -> None:
     """The one name, in the header, that every action records (phase 9b).
     With a name already set the box is a popover on the body (11a), not an

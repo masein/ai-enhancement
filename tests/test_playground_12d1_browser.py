@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 import everyday as ev
-from conftest import set_name
+from conftest import pg_choose, set_name
 from service import chat, config
 
 pytestmark = pytest.mark.dashboard
@@ -73,9 +73,10 @@ def test_the_header_reads_home_models_playground_improve_benchmarks(live, page):
 def test_a_chat_streams_with_its_stats_copy_and_again(live, page):
     pg(page, live["base"])
     empty = page.locator("[data-pg-empty]")
-    assert empty.locator("p").inner_text() == "Ask anything, or try a practice question."
-    assert empty.locator("[data-pg-practice]").count() == 1
-    page.locator("[data-pg-model]").select_option(SMALL)
+    assert empty.locator("h2").inner_text() == "Ask anything"
+    # 12d.3: practice questions are offered once, beside the composer
+    assert page.locator("[data-pg-practice]").count() == 1
+    pg_choose(page, SMALL)
     page.locator("[data-pg-input]").fill("can u make this shorter pls")
     page.locator("[data-pg-send]").click()
     stats = page.locator("[data-pg-reply='1'] [data-pg-stats]")
@@ -86,7 +87,7 @@ def test_a_chat_streams_with_its_stats_copy_and_again(live, page):
     assert re.match(r"\d+ words · [\d.]+s · [\d.]+ w/s · copy · again", stats.inner_text())
     did = page.evaluate("state.pg.id")
     assert page.evaluate("location.hash") == f"#tab=playground&chat={did}"
-    assert page.locator(f"[data-pg-chat='{did}'] a").inner_text() == "can u make this shorter pls"
+    assert page.locator(f"[data-pg-chat='{did}'] .pgtitle").inner_text() == "can u make this shorter pls"
     shot(page, "12d1-chat-1400-light.png")
     # the runs popover says what the Playground holds, quietly
     page.wait_for_function("(state.pgStatus || {loaded: []}).loaded.length === 1", timeout=20000)
@@ -104,14 +105,17 @@ def test_a_chat_streams_with_its_stats_copy_and_again(live, page):
 
 def test_settings_changed_show_the_amber_line_and_reset_puts_them_back(live, page):
     pg(page, live["base"])
-    page.locator("[data-pg-model]").select_option(SMALL)
-    page.locator("[data-pg-settings] summary").click()
+    pg_choose(page, SMALL)
+    # 12d.3: the settings are a side panel; a badge beside the composer says which
+    assert page.locator("[data-pg-badge]").inner_text() == "scored settings ✓"
+    page.locator("[data-pg-gear]").click()
+    page.wait_for_selector("[data-pg-settings]")
     assert page.locator("[data-pg-not-scored]").count() == 0
     page.locator("[data-pg-temperature]").fill("0.7")
     page.locator("[data-pg-temperature]").dispatch_event("change")
     line = page.locator("[data-pg-not-scored]")
     line.wait_for()
-    assert line.inner_text() == "Not the scored settings. reset"
+    assert line.inner_text() == "custom settings · reset"
     shot(page.locator("[data-pg-main]"), "12d1-settings-1400-light.png")
     line.locator("[data-pg-reset]").click()
     page.wait_for_selector("[data-pg-not-scored]", state="detached")
@@ -124,8 +128,8 @@ def test_a_practice_question_sent_unedited_is_marked_as_the_run_marks(live, page
     monkeypatch.setattr(chat.FakeBackend, "responder",
                         staticmethod(lambda m, msgs, s: q["reference"]))
     pg(page, live["base"])
-    page.locator("[data-pg-model]").select_option(SMALL)
-    page.locator("[data-pg-empty] [data-pg-practice]").click()
+    pg_choose(page, SMALL)
+    page.locator("[data-pg-practice]").click()
     page.locator(f"[data-pg-pq='everyday|{q['id']}']").click()
     assert page.locator("[data-pg-input]").input_value() == q["prompt"]     # unsent
     assert page.locator("[data-pg-reply]").count() == 0
@@ -139,7 +143,7 @@ def test_a_practice_question_sent_unedited_is_marked_as_the_run_marks(live, page
 
 def test_thinking_is_folded_above_the_reply(live, page):
     pg(page, live["base"])
-    page.locator("[data-pg-model]").select_option(THINKER)
+    pg_choose(page, THINKER)
     page.locator("[data-pg-input]").fill("what is 2+2")
     page.locator("[data-pg-send]").click()
     page.locator("[data-pg-reply='1'] [data-pg-stats]").wait_for()
@@ -152,9 +156,11 @@ def test_thinking_is_folded_above_the_reply(live, page):
 
 def test_base_models_are_left_out_with_the_line(live, page):
     pg(page, live["base"])
-    opts = page.locator("[data-pg-model] option").evaluate_all("os => os.map(o => o.value)")
+    page.locator("[data-pg-model]").click()
+    opts = page.locator("#pop-pg-model-a [data-pg-option]").evaluate_all(
+        "os => os.map(o => o.dataset.pgOption)")
     assert SMALL in opts and "fx/good-750m" not in opts
-    assert page.locator("[data-pg-left-out]").first.inner_text() == \
+    assert page.locator("#pop-pg-model-a [data-pg-left-out]").first.inner_text() == \
         "Base models aren't listed: they have no chat format."
     assert page.errors == []
 

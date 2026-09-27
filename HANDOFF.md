@@ -3079,7 +3079,7 @@ that program. `service/served.py` holds it.
     benchmarks need the model loaded here; this one is served elsewhere."
     The model page says it once, in its header; no dashes.
   - **Not Improve**: no tab, not in Improve's models, and `POST
-    /api/proposals` refuses it. Not in the Playground either.
+    /api/proposals` refuses it. (It chats in the Playground since 12d.3.)
 - **Runs:** the same run lock; no wait for free VRAM. Questions go
   `SERVED_CONCURRENCY` at a time (1). The row's progress says "140 of 200 ·
   4.1 s an answer · about 4 min left", from the seconds each answer took (for
@@ -3331,6 +3331,65 @@ it never scrolled, and it hid that column's numbers.
   line it ran into the name beside it.
 - The "Not tested on this" line and its rows stay in view while the table
   scrolls.
+
+### 12d.3 — the Playground as a chat app, and served models in it
+
+`docs/prompts/phase-12d3-playground-redesign-served-chat.md`.
+- **Served models chat.** The phone build, its setups and the original sit
+  in the picker with their `served` / `phone build` tags (`chat.board_models`
+  lists `served_models` once).
+  - **`chat.ServedBackend`:** each message goes to the model's address with
+    `stream: true` and its key.
+    - The settings come from the same function as local chat
+      (`chat.effective`). Thinking is as registered, or as the chat changed it
+      (`chat_template_kwargs.enable_thinking`).
+    - `reasoning_content` is put in `<think>` tags, so it streams into the
+      same Thinking ▸ fold.
+    - The last chunk's `usage` and `timings` give the reply's tokens and, when
+      reported, MTP's drafts: "MTP: 135 of 165 drafts kept".
+    - No words a second: that's the server's speed, not the phone's.
+  - **A run testing that same model:** a message waits with "Being tested
+    right now (run #88, about 20 min left). Chat starts when it's done." and
+    nothing is sent to it (`Engine.place`). The page asks again on its own
+    (`/api/playground/status` → `testing`).
+    - Once the run holds the lock, `runner.run_submission` calls
+      `Engine.yield_served`, which stops that model's replies (kept, "cut
+      short: a run started") and waits for them to end. No chat request is
+      interleaved with a scored one.
+    - Other served models stay chattable.
+  - **A server that doesn't answer** is one line, "The server at :8094 isn't
+    answering." One that goes away mid-reply keeps what it wrote, "cut short:
+    the server stopped answering".
+  - The model page's Chat tab, Compare (any two, local or served: a served
+    model takes no memory here, so both answer at once) and practice
+    questions work for served models as for local ones.
+- **The layout:**
+  - **Chat list:** down the left, Today / Yesterday / Earlier. Titles run to
+    two lines, with the model small and grey below. Delete (⋯) shows on hover
+    or focus, and always on a touch screen. On a phone it's under Chats ▾.
+  - **Model picker:** a searchable list (`pgCombo`), grouped as Models ▾ is:
+    phone builds, served elsewhere, instruct, uploaded here. Trained models sit
+    under their base. Each row has its tags and its Everyday score, the most
+    recently chatted-with first. The base-models line is at its foot. Picking
+    the other column's model swaps the two.
+  - **Conversation:** centred, at most 760 px, filling the height. The
+    composer is pinned at the foot and grows to about eight lines. **Enter
+    sends, Shift+Enter is a new line, and Send is Stop** while a reply
+    streams.
+  - **Empty chat:** "Ask anything" and four practice questions, drawn again
+    for each new chat. A click fills the composer, so a question sent
+    unedited is marked. "Try a practice question ▾" appears once, by the
+    composer.
+  - **Settings:** ⚙ opens a side panel. A badge by the composer reads "scored
+    settings ✓", or amber "custom settings · reset".
+  - **Compare:** two columns, each with its own picker and a meta line (where
+    it runs, its Everyday score), and one composer. The columns stack on a
+    phone.
+  - Dark theme and 400 px work, with no sideways scroll.
+- **Tests:** the fake OpenAI server streams as llama-server does
+  (`tests/fake_openai.py`). CI uploads the Playground's screenshots (1280 and
+  400 px, light and dark) as `playground-screenshots-shard-N`, whatever the
+  result. `tests/conftest.py`'s `pg_choose` picks a model in the new picker.
 
 ## 11. Known gaps, risks, loose ends
 

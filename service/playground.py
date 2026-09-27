@@ -49,7 +49,9 @@ def models() -> dict:
                 "params": m["params"], "ctx": (m["archinfo"] or {}).get("ctx"),
                 "scored": chat.scored_settings(m),
                 "trained_from": (trained.get(m["id"]) or {}).get("base") or "",
-                "trained_on": (trained.get(m["id"]) or {}).get("date") or ""}
+                "trained_on": (trained.get(m["id"]) or {}).get("date") or "",
+                # 12d.3: served elsewhere, and a phone build (12f.2): the picker's tags
+                "served": bool(m.get("served")), "phone": bool(m.get("phone"))}
                for m in rows if m["chat"]]
     ids = {m["id"] for m in offered}
     bases = [m for m in offered if not (m["trained_from"] and m["trained_from"] in ids)]
@@ -150,8 +152,10 @@ def mark(ref: dict | None, text_sent: str, first: bool, scored: bool, reply: str
 def view(c: dict) -> dict:
     row = chat.model_row(c["model"]) or {"id": c["model"], "name": c["model"].split("/")[-1],
                                            "archinfo": {}, "params": None}
+    row2 = chat.model_row(c["model2"]) if c.get("model2") else None
     return {**{k: v for k, v in c.items() if k != "who"},
-            "name": row["name"], "name2": (c.get("model2") or "").split("/")[-1],
+            "name": row["name"],
+            "name2": (row2 or {}).get("name") or (c.get("model2") or "").split("/")[-1],
             "scored": chat.scored_settings(row),
             "is_scored": chat.is_scored(c["settings"], row)}
 
