@@ -672,6 +672,62 @@ def _evd_label(q: dict) -> str:
     return s[:1].upper() + s[1:]
 
 
+def empty_run(model_id: str, served_view: dict | None = None) -> dict:
+    """a model with no result yet, as parse_run gives one: a row, its page,
+    and a place under "Not tested on this" (12i.4: a registered served model
+    before its first run)"""
+    arch = None
+    if served_view:
+        arch = {"served": served_view, "tmpl_sha": "served",
+                "reasoning_template": served_view.get("thinking") != "off",
+                "thinking": "never" if served_view.get("thinking") == "off" else "always"}
+    return {"higher_is_better": {}, "subtasks": set(), "source": "", "model": model_id,
+            "model_args": "", "backend": None, "dtype": None, "batch_size": None,
+            "device": None, "limit": None, "seed": None, "fewshot_seed": None,
+            "chat_template": True, "num_params": None, "n_shot": {}, "n_samples": {},
+            "git_hash": None, "date": None, "transformers_version": None,
+            "eval_seconds": None, "archinfo": arch, "diag": None, "judge": None,
+            "judge_mtime": None, "generative": None, "served": served_view, "tasks": {}}
+
+
+def model_dir_of(source: str) -> Path | None:
+    """a results file's model directory: OUT_DIR/<model>, above <task>_<n>shot"""
+    if not source:
+        return None
+    p = Path(source).parent
+    while p.name and not re.fullmatch(r".+_\d+shot", p.name):
+        p = p.parent
+    return p.parent if p.name else None
+
+
+def answer_lengths(mid: str, r: dict, bases: set[str], served: dict) -> dict | None:
+    """12i.4: the median answer length and how many ran out while thinking, for
+    a model that thinks — and for the base a served one is compared with"""
+    a = r.get("archinfo") or {}
+    thinks = (bool(a.get("reasoning_template")) or a.get("thinking") in ("always", "switch")
+              or mid in served)
+    if not (thinks or mid.lower() in bases):
+        return None
+    mdir = model_dir_of(r.get("source") or "")
+    if not mdir:
+        return None
+    try:
+        import answer_length as al
+        try:
+            from service import config as _cfg
+            arts = _cfg.ARTIFACTS_DIR
+        except ImportError:
+            arts = None
+        own = mid.replace(" · thinking", "")
+        repos = [own] + ([served[mid]["based_on"]] if mid in served and
+                         served[mid].get("based_on") else [])
+        out = {k: al.stats(mdir, k, repos, arts) for k in ("everyday", "exam")}
+    except Exception:                    # noqa: BLE001 — a number the page can go without
+        return None
+    out = {k: {**v, "words": al.how_words(v)} for k, v in out.items() if v}
+    return out or None
+
+
 def load_served(out_dir: Path | None) -> dict:
     """12f.1: the models served elsewhere, by id — the name they were
     registered with, how they are served, what model they are based on and
@@ -1284,6 +1340,10 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     here and handed to the model page as `judge.history`. None when the exam
     directory is not known (a frozen report built from a results tree
     alone): then nothing is filtered."""
+    # 12i.4: a registered served model is a row before its first result
+    served = served or {}
+    by_model = {**by_model, **{sid: empty_run(sid, sv) for sid, sv in served.items()
+                               if sid not in by_model}}
     models = list(by_model)
     taint = taint or {}
     parents = parents or {}      # tainted model id -> the model its training run started from
@@ -1305,7 +1365,6 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     display = {m: (m if len(shorts[m.split("/")[-1]]) > 1 else m.split("/")[-1])
                for m in models}
     # 12f.1: a served model is called what it was registered as
-    served = served or {}
     for m in models:
         if m in served:
             display[m] = served[m]["name"]
@@ -1354,6 +1413,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     # not exist. A model missing any required task gets no overall number.
     required, req_absent = required_tasks(acc_tasks)
     model_rows = []
+    # 12i.4: the base models served ones are compared with
+    bases = {str(v.get("based_on") or "").lower() for v in served.values()}
     for mid, r in by_model.items():
         # every task whose diagnostics this model's training data came from —
         # a multiple-choice benchmark, an exam topic, or both. The two are
@@ -1455,6 +1516,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             # 12f.1: served elsewhere — how, and what its server reported. Its
             # own row: never averaged with the model it is based on
             "served": served.get(mid) or r.get("served") or None,
+            # 12i.4: how long its answers are, and how many ran out thinking
+            "answerLength": answer_lengths(mid, r, bases, served),
             "id": mid, "name": display[mid],
             "family": re.split(r"[^a-z0-9]", mid.split("/")[-1].lower())[0],
             # uploaded checkpoints are experiment points, not reference models —
@@ -2883,6 +2946,12 @@ select { max-width:100%; }
   border-top:1px solid var(--border); }
 .srvlist li .se { overflow-wrap:anywhere; }
 .srvsum { font-weight:600; cursor:pointer; list-style:none; }
+/* 12i.4: a published batch's questions, and the past batches */
+.qbbatch { margin-top:var(--sp-4); }
+.qbbatch h3 { margin:0 0 4px; }
+.qbbatch .rd-q-meta .chip { margin-right:6px; }
+.qbpast li { margin:2px 0; }
+td.evdtotal .evd-ranout { display:block; white-space:normal; text-align:right; }
 .srvsum::-webkit-details-marker { display:none; }
 /* 12f.2: On phone — reported beside measured, stacked on a phone */
 .phone-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }
@@ -5576,16 +5645,46 @@ function pinLine(p) {
 }
 // its own row, never averaged with its base: the two side by side, when the
 // base is on the board — "Compared with Qwen3.6-35B-A3B loaded here: Everyday 171 vs 176"
+// 12i.4: how long a model's answers are, thinking included, and how many ran
+// out while thinking — two small numbers under an Everyday or exam score
+const alOf = (m, kind) => ((m || {}).answerLength || {})[kind] || null;
+function answerLengthLine(m, kind) {
+  const a = alOf(m, kind);
+  if (!a) return '';
+  return el('p', { class: 'mono small se', 'data-answer-length': kind,
+      title: `the median over all ${a.n} answers, practice and hidden, thinking included; `
+        + `${a.words}. Ran out: the answer budget ended while it was still thinking, with no `
+        + 'answer written' },
+    `median ${a.median.toLocaleString('en')} tokens · ran out ${a.ran_out} of ${a.n}`);
+}
+// 12i.4: how long an Everyday run takes. A served model's own measured
+// seconds an answer, once a run has measured it; before that a rough guess.
+// The phone build measured 5.2 s an answer: 388 questions, about 34 min
+const SERVED_GUESS_S = 5;
+function evdSuiteLabel(id) {
+  const e = evdOf(id), n = e && e.unasked ? e.unasked : evdAll() || 111;
+  const s = isServedId(id) ? servedOf(id) : null;
+  if (!s) return `Everyday tasks — ${n} questions, a few minutes`;
+  const each = (s.speed || {}).secs_each, measured = each != null && each > 0;
+  const min = Math.max(1, Math.round(n * (measured ? each : SERVED_GUESS_S) / 60));
+  return `Everyday tasks — ${n} questions, about ${min} min` + (measured ? '' : ', a rough guess');
+}
 function servedCompare(m) {
   const s = servedOf(m.id), want = String((s || {}).based_on || '').toLowerCase();
   const base = want && DATA.models.find(x => x.id.toLowerCase() === want && !x.served);
   if (!base) return null;
   const bits = [];
   const e1 = evdOf(m.id), e2 = evdOf(base.id);
+  // 12i.4: each with its answers' median length and how many ran out
+  const lens = kind => {
+    const a = alOf(m, kind), b = alOf(base, kind);
+    return a && b ? ` · median ${a.median.toLocaleString('en')} vs ${b.median.toLocaleString('en')}`
+      + ` tokens · ran out ${a.ran_out} vs ${b.ran_out}` : '';
+  };
   if (e1 && e2) bits.push('Everyday ' + (e1.total === e2.total ? `${e1.passed} vs ${e2.passed}`
-    : `${e1.passed} of ${e1.total} vs ${e2.passed} of ${e2.total}`));
+    : `${e1.passed} of ${e1.total} vs ${e2.passed} of ${e2.total}`) + lens('everyday'));
   if (m.judgedAvg != null && base.judgedAvg != null)
-    bits.push(`Knowledge exam ${num(m.judgedAvg, 2)} vs ${num(base.judgedAvg, 2)}`);
+    bits.push(`Knowledge exam ${num(m.judgedAvg, 2)} vs ${num(base.judgedAvg, 2)}` + lens('exam'));
   for (const t of genTasks()) {
     const a = cell(t, m.id), b = cell(t, base.id);
     if (a && b) bits.push(`${LB_SHORT[t] || t} ${pct(a.v)} vs ${pct(b.v)}`);
@@ -5795,9 +5894,10 @@ function kindParts(m, kind) {
       judged.append(el('details', { class: 'kfold', 'data-more-detail': 'judged' },
         el('summary', { text: 'More detail ▸' }), earlier));
     }
-    return [LIVE ? el('div', { class: 'kacts' }, sitCta(m)) : '', judged].filter(Boolean);
+    return [answerLengthLine(m, 'exam'), LIVE ? el('div', { class: 'kacts' }, sitCta(m)) : '',
+      judged].filter(Boolean);
   }
-  return [part(vEverydayBlock(m), 'everyday')].filter(Boolean);
+  return [answerLengthLine(m, 'everyday'), part(vEverydayBlock(m), 'everyday')].filter(Boolean);
 }
 // Results: every task this model has, grouped by domain
 function resultsPart(m) {
@@ -8365,7 +8465,8 @@ function lbEveryday(ms) {
           return el('td', { class: 'num' + (n && !evdMissing(e) ? '' : ' se'), 'data-evd-g': g,
             title: n ? label : 'not asked', text: n || '—' });
         }),
-        el('td', { class: 'num' }, evdTotal(e, m.id), evdRanOut(e)));
+        // 12i.4: the ran-out note on its own line under the total, never beside it
+        el('td', { class: 'num evdtotal' }, el('div', {}, evdTotal(e, m.id)), evdRanOut(e)));
     }), notTestedRows(none, ncols, 'everyday')));
   return [el('div', { class: 'card', 'data-lb-card': '1' },
     ...modelsHead(evdBadge(prov)),
@@ -11030,6 +11131,9 @@ function readBank(wrap, r, d) {
     const q = (f.q || '').trim().toLowerCase();
     const rows = d.questions.filter(x => (!f.difficulty || String(x.difficulty) === f.difficulty)
       && (!f.domain || String(x.domain) === f.domain) && (!f.style || String(x.style) === f.style)
+      // 12i.4: who wrote it, and the batch that published it
+      && (!f.written_by || String(x.written_by) === f.written_by)
+      && (!f.batch || String(x.batch) === f.batch)
       && (!q || String(x.prompt).toLowerCase().includes(q)));
     count.textContent = `${rows.length} of ${d.questions.length} practice questions`;
     list.replaceChildren(...rows.slice(0, shown).map(x => el('div', { class: 'rd-q', 'data-bank-q': x.qid },
@@ -11037,7 +11141,9 @@ function readBank(wrap, r, d) {
         x.difficulty != null ? el('span', { class: 'chip', text: `difficulty ${x.difficulty}` }) : '',
         x.domain ? el('span', { class: 'chip', text: x.domain }) : '',
         x.style ? el('span', { class: 'chip', text: x.style }) : '',
-        x.written_by ? el('span', { text: `written by ${x.written_by}` }) : ''),
+        x.written_by ? el('span', { text: `written by ${x.written_by}` }) : '',
+        x.batch ? el('span', { class: 'chip', 'data-bank-batch': x.batch, text: `batch ${x.batch}` })
+          : ''),
       el('div', { class: 'rd-prose' }, ...paras(x.prompt, f.q)),
       x.reference ? el('details', { class: 'small' }, el('summary', { text: 'Reference answer ▸' }),
         el('div', { class: 'rd-prose' }, ...paras(x.reference))) : '')),
@@ -11049,7 +11155,8 @@ function readBank(wrap, r, d) {
       `${d.report_count} hidden questions — never shown, by design. `,
       el('span', { class: 'se', text: 'They score the model; nothing is ever trained on them.' })),
     el('div', { class: 'frm rd-filters' }, search, pick('difficulty', 'difficulty'),
-      pick('domain', 'domain'), pick('style', 'style')),
+      pick('domain', 'domain'), pick('style', 'style'), pick('written by', 'written_by'),
+      uniq('batch').length ? pick('batch', 'batch') : ''),
     count, list);
   draw();
 }
@@ -11477,7 +11584,7 @@ function vQueue(part = { form: true, list: true }) {
           sub: 'The exam topics, answered in writing and graded by the judge: the model\'s '
             + 'judged score per topic.' }],
       // 12a: the pilot. 12c replaces this drop-down with cards
-      ['everyday', `Everyday tasks — ${evdAll() || 111} questions, a few minutes`],
+      ['everyday', evdSuiteLabel(sf.hf_id.trim())],
       // 12h.1: instruct models only; MMLU-Pro alone is hours
       ['generative', 'Instruction & maths — IFEval, MMLU-Pro, MATH-500, hours',
         { sub: 'Asked through the chat template and scored on what the model writes. '
@@ -11792,8 +11899,8 @@ function servedCard(sf) {
       inp('based_on', { placeholder: 'Qwen/Qwen3.6-35B-A3B', list: 'srv-bases' }),
       el('label', { for: 'srv-how', text: 'How it’s served' }),
       el('textarea', { id: 'srv-how', 'data-srv': 'how', 'data-keep': 'srv-how', rows: '2',
-        placeholder: 'llama.cpp fork teraformer/lda-2026-09-22 @ 91428471f, --cpu-moe, '
-          + 'lookahead 1, fusion off', oninput: e => { F.how = e.target.value; } }, F.how || ''),
+        placeholder: 'llama.cpp build, quantisation, offload flags, routing',
+        oninput: e => { F.how = e.target.value; } }, F.how || ''),
       el('label', { text: 'Thinking' }),
       el('div', {}, Select('thinking', [['on', 'on'], ['off', 'off'],
         ['auto', 'the model decides']], F.thinking || 'auto', v => { F.thinking = v; },
@@ -15109,8 +15216,79 @@ function vBuild() {
     steps, Q.msg ? el('p', { class: 'warn', text: Q.msg }) : '');
   if (!Q.page) return [head, el('div', { class: 'card' }, skeleton(4, { 'data-loading': 'qb' }))];
   if (Q.id && !d) return [head, el('div', { class: 'card' }, skeleton(4, { 'data-loading': 'qb-draft' }))];
-  if (!d) return [head, qbStepOne(), qbDrafts()];
+  if (!d) return [head, qbPast(), qbStepOne(), qbDrafts()];
   return [head, qbDraftCard(d)];
+}
+
+// 12i.4: the batches published so far, newest first — ten, then Show all
+const qbDay = t => { if (!t) return '';
+  const d = new Date(t * 1000);
+  return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct',
+    'Nov', 'Dec'][d.getMonth()]}`; };
+function qbPast() {
+  const Q = state.qb;
+  const past = (Q.page.drafts || []).filter(x => x.published);
+  if (!past.length) return '';
+  const shown = Q.pastAll ? past : past.slice(0, 10);
+  return el('div', { class: 'card', 'data-qb-past': String(past.length) },
+    el('h2', { text: 'Past batches' }),
+    el('ul', { class: 'qbdrafts qbpast' }, shown.map(x => el('li', { 'data-qb-past-row': x.id },
+      el('a', { href: '#tab=build&draft=' + x.id, text: qbWhat(x),
+        onclick: e => { e.preventDefault(); qbOpen(x.id); } }),
+      el('span', { class: 'small se', text: ` · ${qbDay(x.created_at)}`
+        + (x.writer ? ` · written by ${x.writer}` : '') }),
+      el('span', { class: 'small', 'data-qb-past-line': x.id, text: ` · ${x.progress.line}` }),
+      x.by ? el('span', { class: 'small se', text: ` · run by ${x.by}` }) : ''))),
+    past.length > 10 && !Q.pastAll ? el('button', { class: 'ghost', 'data-qb-past-all': '1',
+      text: `Show all ${past.length}`, onclick: () => { Q.pastAll = true; render(); } }) : '');
+}
+// 12i.4: every question a published batch wrote — its author's view, the
+// hidden half included; the one place a hidden question is shown
+const QB_VERDICT = { accept: 'A · accepted', edit: 'E · edited', reject: 'R · rejected' };
+function qbBatchQuestions(d) {
+  const Q = state.qb, kn = d.kind === 'knowledge';
+  const n = to => d.items.filter(it => (it.went || {}).to === to).length;
+  const f = Q.wentF || '';
+  const rows = d.items.filter(it => !f || (it.went || {}).to === f);
+  const slug = kn ? slugOfTopic(d.spec.topic) : '';
+  return el('div', { class: 'qbbatch', 'data-qb-batch-qs': String(d.items.length) },
+    el('h3', { text: `Every question this batch wrote (${d.items.length})` }),
+    el('p', { class: 'small se', 'data-qb-author-view': '1',
+      text: 'Includes the hidden half \u2014 this batch\u2019s author view.' }),
+    el('div', { class: 'frm rd-filters' },
+      Select('where it went', [['', `all ${d.items.length}`], ['practice', `practice ${n('practice')}`],
+        ['hidden', `hidden ${n('hidden')}`], ['not published', `not published ${n('not published')}`]],
+        f, v => { Q.wentF = v; render(); }, { key: 'qb-went' }),
+      kn && slug ? el('a', { href: '#' + splitRead(location.hash)[0] + '&read='
+          + encRead({ kind: 'bank', id: slug }), 'data-qb-bank-link': d.id,
+        text: 'Its practice questions in the bank ▸', onclick: e => { e.preventDefault();
+          // the reader opens on this batch's practice questions
+          state.readBankF = { batch: d.id };
+          openReader({ kind: 'bank', id: slug }, `[data-qb-bank-link="${d.id}"]`); } }) : ''),
+    el('div', { class: 'rd-bank' }, rows.map(it => qbBatchQ(d, it))));
+}
+function qbBatchQ(d, it) {
+  const kn = d.kind === 'knowledge', q = it.q, w = it.went || {};
+  const ok = it.checker_ok;
+  return el('div', { class: 'rd-q', 'data-qb-batch-q': String(it.n), 'data-went': w.to || '' },
+    el('div', { class: 'rd-q-meta small se' },
+      el('span', { class: 'mono', text: `#${it.n}` }),
+      el('span', { class: 'chip', 'data-went-to': w.to || '', title: w.why || null,
+        text: w.to === 'not published' && w.why ? `not published: ${w.why}` : w.to || '' }),
+      el('span', { class: 'chip', 'data-qb-review': it.verdict || 'none', text: it.verdict
+        ? QB_VERDICT[it.verdict] + (it.reason ? ` (${it.reason})` : '') + (it.by ? ` by ${it.by}` : '')
+        : 'not reviewed' }),
+      el('span', { class: 'chip', 'data-qb-checker-ok': String(ok), text: ok == null
+        ? 'checker: not marked' : ok ? 'checker matched' : 'checker didn\u2019t match' })),
+    el('div', { class: 'rd-prose' }, ...paras(kn ? q.question : q.prompt)),
+    el('details', { class: 'small' }, el('summary', { text: 'Reference ▸' }),
+      el('div', { class: 'rd-prose' }, ...paras(q.reference))),
+    el('details', { class: 'small' }, el('summary', { text: kn ? 'Rubric ▸' : 'Checks ▸' }),
+      el('ul', {}, (kn ? q.criteria || [] : it.checks_words || []).map(c => el('li', { text: c })))),
+    it.answer != null ? el('details', { class: 'small', 'data-qb-checker-answer': String(it.n) },
+      el('summary', { text: 'The checker\u2019s blind answer' + (kn && it.mark != null
+        ? ` · ${it.mark}/4` : '') + ' ▸' }),
+      el('div', { class: 'rd-prose' }, ...paras(it.answer || '(no answer)'))) : '');
 }
 
 function qbDrafts() {
@@ -15291,6 +15469,7 @@ function qbDraftCard(d) {
       el('div', { class: 'frm' }, el('button', { class: 'secondary', 'data-qb-see': '1',
         text: 'See the bank', onclick: () => navigate({ tab: p.kind === 'knowledge' ? 'exam' : 'everyday',
           model: null, topic: null }) })));
+    bits.push(qbBatchQuestions(d));
     return el('div', { class: 'card', 'data-qb-draft-open': d.id }, bits);
   }
   const aside = d.items.filter(it => it.auto);

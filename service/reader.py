@@ -191,7 +191,12 @@ def bank_practice(topic: str) -> dict:
         practice.append({"qid": r["qid"], "prompt": r.get("prompt") or "",
                          "reference": r.get("reference") or "",
                          "difficulty": meta.get("difficulty"), "domain": meta.get("domain"),
-                         "style": meta.get("style"), "written_by": r.get("accepted_by") or "",
+                         "style": meta.get("style"),
+                         # 12i.4: the writer, and the batch that published it
+                         "written_by": r.get("written_by") or r.get("drafted_by")
+                         or r.get("accepted_by") or "",
+                         "approved_by": r.get("approved_by") or r.get("accepted_by") or "",
+                         "batch": r.get("batch_id") or "",
                          "source": r.get("source") or ""})
     return {"topic": topic, "half": "diagnose", "questions": practice, "report_count": hidden}
 

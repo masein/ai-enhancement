@@ -3065,6 +3065,59 @@ that program. `service/served.py` holds it.
   masein confirms them with the colleague first.
 - A later report is the card's; the earlier ones are listed under it.
 
+### 12i.4 — small fixes found live on 2026-09-27
+
+`docs/prompts/phase-12f3-gguf-benchmarks.md` §1–3b.
+- **Build questions: past batches.**
+  - Under the three steps: every published batch, newest first, ten then
+    **Show all**. Each row has its topic or group, date, writer, "20 of 20
+    written · 0 flagged · 18 published", and who ran it, and opens the batch
+    (`#tab=build&draft=<id>`).
+- **A published batch shows every question it wrote**, in the bank reader's
+  style: the prompt, the reference, the checks or rubric, the A/E/R review, the
+  checker's blind answer and whether it matched, and where it went (practice,
+  hidden, or not published and why).
+  - Where it went is found in the bank by the `batch_id` publishing stamps on
+    every question, and split by the bank's own function (`builder.went`).
+  - **This is the one place a hidden question is shown:** the batch's author
+    view, reached from the Build page only, with the grey line "Includes the
+    hidden half — this batch's author view." The bank reader, the public bank
+    and the page's data are unchanged; a test holds that.
+  - A knowledge batch links to its practice questions in the bank reader,
+    filtered to that batch.
+- **The bank reader** (`read=bank:<topic>`) filters by **written by** and by
+  **batch**. "Written by" is now the writer, not the approver (`approved_by`
+  is its own field).
+- **Answer length and running out** (`scripts/answer_length.py`), for every
+  model that thinks, served ones, and the bases served ones are compared with:
+  - the median answer length in tokens, thinking included, over all its
+    answers, and how many ran out while thinking (the budget ended with no
+    answer written: `judge.answer_parts`' `no_answer`);
+  - tokens are the server's own count where a served answer recorded it (from
+    12i.4 on, `tokens` in each served sample), else the model's tokenizer when
+    its `tokenizer.json` is on the server (its upload, the Hub cache, or the
+    base's for a served model), else an estimate of a token every four
+    characters. The tooltip says which;
+  - cached in each model's `answer_length.json`, by the answer files' names,
+    sizes and mtimes;
+  - shown under the Everyday and Knowledge scores on the model page ("median
+    990 tokens · ran out 43 of 388"), and in the Compare line: "Everyday 171
+    vs 176 · median 990 vs 400 tokens · ran out 0 vs 3".
+- **Served models (§3b):**
+  - a registered served model with no result is a row (`report.empty_run`):
+    it's under Models ▸ "Not tested on this" with Test, and
+    `#model=served/<id>` opens its page;
+  - each served run records its seconds an answer on the model
+    (`served.record_speed`), and Test a model's Everyday line uses it: "about
+    34 min". Before a run it says "about N min, a rough guess" (5 s an
+    answer);
+  - "How it's served" suggests "llama.cpp build, quantisation, offload flags,
+    routing".
+- **The Everyday table's** "N answers ran out of room" is on its own line under
+  the total.
+- **The two chat settings (§3)** are unchanged: `CHAT_CPU_MAX_PARAMS_B` 1.0 and
+  `CHAT_GPU_MARGIN_GB` 2.0 until masein's measured values come.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

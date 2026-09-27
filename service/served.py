@@ -208,7 +208,20 @@ def view(rec: dict) -> dict:
     """what History and the page show: how it was served and what was pinned"""
     return {"name": rec["name"], "base_url": rec["base_url"], "how": rec["how"],
             "based_on": rec["based_on"], "thinking": rec["thinking"], "pin": rec["pin"],
-            "phone": is_phone(rec)}
+            "phone": is_phone(rec),
+            # 12i.4: measured by its last run — Test a model's time estimate
+            "speed": rec.get("speed")}
+
+
+def record_speed(model_id: str, secs_each: float, n: int) -> None:
+    """a run's measured seconds per answer, kept with the model (a speed
+    over fewer than ten answers says too little to keep)"""
+    rec = get(model_id)
+    if not rec or n < 10 or secs_each <= 0:
+        return
+    rec["speed"] = {"secs_each": round(secs_each, 3), "n": n, "at": time.time()}
+    db.served_put(rec)
+    write_meta(rec)
 
 
 def archinfo(rec: dict) -> dict:
@@ -289,6 +302,12 @@ def _doc_hash(doc: dict) -> str:
                           .encode("utf-8")).hexdigest()
 
 
+class Answer(str):
+    """a reply's text, with how many tokens the server says it generated
+    (12i.4: an answer's length, thinking included, as the server counts it)"""
+    tokens: int | None = None
+
+
 def ask(rec: dict, text: str, s: dict) -> str:
     """one chat message, one reply — thinking the server split off put back in
     its tags, as a local run's text has it, so the board reads it the same"""
@@ -305,10 +324,14 @@ def ask(rec: dict, text: str, s: dict) -> str:
         raise _Retry(f"HTTP {st}")
     if st != 200:
         raise ValueError(f"HTTP {st}: {raw[:160].decode('utf-8', 'replace')}")
-    msg = (json.loads(raw).get("choices") or [{}])[0].get("message") or {}
+    reply = json.loads(raw)
+    msg = (reply.get("choices") or [{}])[0].get("message") or {}
     text = msg.get("content") or ""
     think = msg.get("reasoning_content") or ""
-    return f"<think>\n{think}\n</think>\n\n{text}" if think else text
+    out = Answer(f"<think>\n{think}\n</think>\n\n{text}" if think else text)
+    used = (reply.get("usage") or {}).get("completion_tokens")
+    out.tokens = int(used) if isinstance(used, (int, float)) and used >= 0 else None
+    return out
 
 
 def _ask_patiently(rec: dict, text: str, s: dict) -> str:
@@ -356,6 +379,8 @@ def answer_task(rec: dict, task: str, docs: list[dict], task_out: Path, s: dict,
 
     with ThreadPoolExecutor(max_workers=max(1, config.SERVED_CONCURRENCY)) as pool:
         list(pool.map(one, range(total)))
+    if answers:
+        record_speed(rec["id"], (time.time() - t0) / len(answers), len(answers))
     # what is finished is kept, in order: a stop keeps the answers before the first gap
     gap = next((i for i in range(total) if i not in answers), total)
     kept = {i: answers[i] for i in sorted(answers) if i < gap}
@@ -390,6 +415,8 @@ def _write(rec: dict, task: str, docs: list[dict], answers: dict[int, str], task
                 "doc_id": i, "doc": doc, "target": doc.get("reference", ""),
                 "arguments": {"gen_args_0": {"arg_0": text, "arg_1": gen}},
                 "resps": [[raw]], "filtered_resps": [raw], "filter": "none",
+                # 12i.4: its length as the server counted it, thinking included
+                "tokens": getattr(raw, "tokens", None),
                 "metrics": ["bypass"], "bypass": 999, "doc_hash": _doc_hash(doc),
                 "prompt_hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
                 "target_hash": hashlib.sha256(str(doc.get("reference", "")).encode("utf-8"))
