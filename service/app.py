@@ -1448,10 +1448,14 @@ def builder_page():
             "checker_blocked": builder.blocked("checker"),
             "has_key": ai_models.has_key(),
             "dedup_how": "13-gram and embeddings" if ai_models.has_key() else "13-gram",
-            "drafts": [{"id": d["id"], "kind": d["kind"], "spec": d["spec"],
-                        "stage": d["stage"], "status": d["status"], "by": d.get("by", ""),
-                        "updated_at": d.get("updated_at"), "published": d.get("published"),
-                        "progress": builder.progress(d)} for d in db.qb_list()]}
+            # 12i.4: newest first, with who wrote them, for the past batches
+            "drafts": sorted([{"id": d["id"], "kind": d["kind"], "spec": d["spec"],
+                               "stage": d["stage"], "status": d["status"], "by": d.get("by", ""),
+                               "created_at": d.get("created_at"),
+                               "writer": (d.get("writer") or {}).get("label", ""),
+                               "updated_at": d.get("updated_at"), "published": d.get("published"),
+                               "progress": builder.progress(d)} for d in db.qb_list()],
+                             key=lambda x: -(x["created_at"] or 0))}
 
 
 class BuildEstimateIn(BaseModel):

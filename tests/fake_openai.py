@@ -28,6 +28,9 @@ class FakeServer:
         self.key = ""
         self.reply = lambda body: "A plain answer, from the served model."
         self.reasoning = ""
+        # 12i.4: its usage, as llama-server reports it: the words it wrote,
+        # thinking included, unless a test says otherwise
+        self.tokens = None
         self.stop_after: int | None = None      # answers, then it stops answering
         self.delay_s = 0.0
         self.requests: list[dict] = []           # every chat body, as sent
@@ -79,14 +82,18 @@ class FakeServer:
             try:
                 if self.delay_s:
                     time.sleep(self.delay_s)
-                msg = {"role": "assistant", "content": self.reply(body)}
-                if self.reasoning:
-                    msg["reasoning_content"] = self.reasoning
+                content = self.reply(body)
+                think = self.reasoning(body) if callable(self.reasoning) else self.reasoning
+                msg = {"role": "assistant", "content": content}
+                if think:
+                    msg["reasoning_content"] = think
+                used = (self.tokens(body) if callable(self.tokens)
+                        else len(content.split()) + len((think or "").split()))
                 with self._lock:
                     self.answered += 1
                 return {"id": "chatcmpl-1", "object": "chat.completion",
                         "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}],
-                        "usage": {"prompt_tokens": 10, "completion_tokens": 5}}
+                        "usage": {"prompt_tokens": 10, "completion_tokens": used}}
             finally:
                 with self._lock:
                     self.in_flight -= 1

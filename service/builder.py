@@ -982,6 +982,9 @@ def progress(d: dict) -> dict:
     flagged = sum(1 for it in items if not it["auto"] and it["flags"])
     line = (f"{len(items)} of {d['spec']['count']} written · {flagged} flagged"
             if d["stage"] == "rest" else f"{len(items)} of {min(TRY_N, d['spec']['count'])} written")
+    pub = (d.get("published") or {}).get("added")
+    if d["stage"] == "rest" and pub is not None:
+        line += f" · {pub} published"
     return {"written": len(items), "count": d["spec"]["count"], "flagged": flagged,
             "set_aside": sum(1 for it in items if it["auto"]),
             "checked": sum(1 for it in items if it["answer"] is not None),
@@ -989,8 +992,48 @@ def progress(d: dict) -> dict:
             "publishable": len(publishable(d)), "line": line}
 
 
+def checker_ok(it: dict) -> bool | None:
+    """12i.4: did the checker's blind answer match? None until it is marked"""
+    if it.get("answer") is None or it.get("judge_pending"):
+        return None
+    return not any(f.get("kind") == "checker" for f in it.get("flags") or [])
+
+
+def went(d: dict) -> dict[int, dict]:
+    """12i.4: where each question went — {"to": practice | hidden | not
+    published, "why"} — found in the bank by the batch stamped on every
+    question it published, and split by the bank's own function"""
+    _scripts()
+    rows: dict[str, dict] = {}
+    if d.get("published"):
+        if d["kind"] == "knowledge":
+            import exam_build as eb
+            for r in eb.load_bank(config.EXAM_DIR).get(d["spec"]["topic"]) or []:
+                if r.get("batch_id") == d["id"]:
+                    rows[r.get("prompt") or ""] = {"half": eb.half_of(r["qid"])}
+        else:
+            import everyday as ev
+            for q in ev.load_bank():
+                if q.get("batch_id") == d["id"]:
+                    rows[q.get("prompt") or ""] = {"half": ev.half(q)}
+    out = {}
+    for it in d["items"]:
+        row = rows.get(it["q"].get("question") if d["kind"] == "knowledge" else it["q"].get("prompt"))
+        if row:
+            out[it["n"]] = {"to": "practice" if row["half"] == "diagnose" else "hidden", "why": ""}
+            continue
+        why = ("rejected" if it.get("verdict") == "reject" else
+               f"set aside: {it['auto']}" if it.get("auto") else
+               "not checked" if it.get("answer") is None else
+               "already in the bank" if d.get("published") else
+               "the batch isn't published")
+        out[it["n"]] = {"to": "not published", "why": why}
+    return out
+
+
 def view(d: dict) -> dict:
-    """the draft as the page reads it"""
+    """the draft as the page reads it. It holds every question the batch
+    wrote, the hidden half's too: the Build page is its author's view"""
     out = {k: v for k, v in d.items() if k not in ("prompts", "writer_o", "checker_o")}
     if d["kind"] == "everyday":
         # each check in plain words, as the Everyday page shows them
@@ -998,6 +1041,9 @@ def view(d: dict) -> dict:
         import everyday as ev
         out["items"] = [{**it, "checks_words": [_describe(ev, c) for c in it["q"]["checks"]]}
                         for it in d["items"]]
+    wh = went(d)
+    out["items"] = [{**it, "checker_ok": checker_ok(it), "went": wh.get(it["n"])}
+                    for it in out.get("items", d["items"])]
     out["progress"] = progress(d)
     out["can_rest"] = can_rest(d)
     out["can_publish"] = can_publish(d)
