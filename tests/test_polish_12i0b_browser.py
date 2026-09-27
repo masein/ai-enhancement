@@ -32,7 +32,7 @@ def served(page, edit):
 
 
 def partial(body):
-    """one model answered only 169 of the hidden 200: its 31 are new"""
+    """one model answered only 169 of the hidden 179 (12a.6): its 10 are new"""
     e = body["everyday"]["models"][PARTIAL]
     e.update(passed=84, total=169, unasked=55)
 
@@ -70,13 +70,13 @@ def test_a_partial_everyday_total_is_greyed_with_what_is_not_asked_and_its_run(l
     assert " ".join(part.locator(".evmissing").inner_text().split()) == "55 not asked yet · Run"
     assert "se" in count.get_attribute("class")
     assert count.get_attribute("title") == ("over the 169 hidden questions it has answered, not "
-                                            "all 200 — not comparable with a full count")
+                                            "all 179 — not comparable with a full count")
     # its group cells are greyed with it
     assert page.locator("[data-evd-g='understanding'] td.evpart").count() == 1
     # the full one beside it is as it was
     full = page.locator("[data-evd-count='fx/good-750m']")
     assert full.locator("[data-evd-partial]").count() == 0
-    assert full.inner_text().endswith(" of 200")
+    assert full.inner_text().endswith(" of 179")
     shot(page.locator("[data-everyday-results]"), "12i0b-everyday-partial-1400-light.png")
     # Run ticks that model alone
     part.locator("[data-evd-run]").click()
@@ -119,7 +119,7 @@ def test_the_everyday_page_says_when_its_questions_were_updated(live, page):
     page.goto(live["base"] + "/#tab=benchmarks&sub=everyday")
     line = page.locator("[data-everyday-head] [data-evd-version]")
     line.wait_for()
-    assert line.inner_text() == "Questions updated 25 Sep"
+    assert line.inner_text() == "Questions updated 27 Sep"                  # 12a.6
     tip = line.get_attribute("title")
     assert tip.startswith(f"version {line.get_attribute('data-evd-version')}: the wording and "
                           "the split.")

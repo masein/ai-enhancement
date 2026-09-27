@@ -82,7 +82,8 @@ def test_step_one_offers_topics_groups_and_the_instructions_with_their_output_lo
     page = client.get("/api/builder").json()
     econ = next(t for t in page["topics"] if t["name"] == "Economics")
     assert econ["subtopics"][:2] == ["micro and macro fundamentals", "incentives"]
-    assert [g["id"] for g in page["groups"]][:3] == ["understanding", "writing", "shorten"]
+    # 12a.6: "Shorten a message" is Summarise's again
+    assert [g["id"] for g in page["groups"]][:3] == ["understanding", "writing", "summarising"]
     for kind in ("knowledge", "everyday"):
         p = page["prompts"][kind]
         assert p["locked"].startswith("## Output") and "## Output" not in p["editable"]
@@ -131,7 +132,7 @@ def test_an_everyday_question_whose_reference_fails_its_own_checks_is_set_aside(
            "prompt": "dinner was $80 and we tip 10% how much in all",
            "reference": "$90 in all.", "checks": [{"type": "number", "value": 88, "tolerance": 0}],
            "notes": ""}
-    paste = {"group": "shorten", "skill": "tldr", "difficulty": 1,
+    paste = {"group": "summarising", "skill": "tldr", "difficulty": 1,
              "prompt": "tldr pls: the bins go out on thursday not friday this week",
              "reference": "Bins on Thursday.", "checks": [{"type": "contains_any",
                                                           "values": ["thursday"]}], "notes": ""}
@@ -145,9 +146,17 @@ def test_an_everyday_question_whose_reference_fails_its_own_checks_is_set_aside(
     auto = [it["auto"] for it in d["items"]]
     assert auto[0] == ""
     assert auto[1] == "its reference fails its own checks: didn't say 88"
-    # the paste-back rule is the Shorten group's: here it is read as quick maths
-    d2 = create(client, kind="everyday", group="shorten", count=10)
-    assert d2["items"][2]["auto"] == "pasting the message back passes its checks"
+    # 12a.6: written for Summarise, no script sets it aside — its checks become
+    # the gate and the judge's rubric, which scores a copy of the text 0
+    d2 = create(client, kind="everyday", group="summarising", count=10)
+    it = d2["items"][2]
+    assert it["auto"] == ""
+    gate, rubric = it["q"]["checks"]
+    assert gate == {"type": "numbers_from_source"}
+    assert (rubric["type"], rubric["scale"], rubric["pass_at"]) == ("judge", 4, 3)
+    assert "- thursday" in rubric["rubric"] and '"Bins on Thursday."' in rubric["rubric"]
+    assert "The text itself, or most of it copied, is not a summary: score it 0." in rubric["rubric"]
+    assert "The request asks for it shorter" in rubric["rubric"]            # "tldr"
     # set aside before review: it cannot be reviewed, and is never published
     r = client.post(f"/api/builder/{d['id']}/review", json={"n": 2, "verdict": "accept", "by": BY})
     assert r.status_code == 422 and "set aside before review" in r.json()["detail"]

@@ -411,20 +411,26 @@ def _question(d: dict, raw: dict) -> tuple[dict, str]:
     bad = next((why for why in map(ev._bad_check, q["checks"]) if why), "")
     if bad:
         return q, f"a check can't be read: {bad}"
+    # 12a.6: a Summarise question is marked by the judge on its rubric, built
+    # from the facts the writer listed and a length only if the request asks one
+    q["group"] = ev.MERGED.get(q["group"], q["group"])
+    if q["group"] == "summarising":
+        q["checks"] = ev.summarise_checks(q)
     return q, _self_check(q)
 
 
 def _self_check(q: dict) -> str:
     """'' when an Everyday question can stand: its reference passes its own
-    checks, and pasting the message back fails a Shorten or Summarise one"""
+    checks. 12a.6: that pasting the message back fails a Summarise question is
+    its rubric's to say (a copy scores 0), not a script's"""
     _scripts()
     import everyday as ev
     for c in q["checks"]:
         ok, why = ev.run_check(c, q["reference"], q["prompt"])
         if ok is False:
             return f"its reference fails its own checks: {why}"
-    if q["group"] in ("shorten", "summarising") and not ev.failures(q, q["prompt"]):
-        return "pasting the message back passes its checks"
+    if q["group"] == "summarising" and not ev.judge_check(q):
+        return "a Summarise question needs the judge's rubric"
     return ""
 
 
@@ -654,7 +660,7 @@ def _read_marks(d: dict, texts: dict[int, str]) -> None:
         it.pop("judge_pending", None)
         if d["kind"] == "everyday":
             import everyday as ev
-            v = ev.parse_verdict(text) if text else None
+            v = ev.parse_verdict(text, ev.judge_check(it["q"])) if text else None
             if v is None:
                 _flag(it, "checker", "the judge gave no verdict on the checker's answer")
             elif not v["pass"]:

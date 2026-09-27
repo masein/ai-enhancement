@@ -396,8 +396,8 @@ def default_responder(req: Request) -> str:
     of fresh items for a generation request. The wording deliberately shares
     no vocabulary with the fixture's questions, so nothing here can trip the
     contamination gate by accident — a test that wants a trip plants one."""
-    if req.custom_id.startswith("everyday:"):
-        # 12a: the judged Everyday questions, answered as the stub would
+    if req.custom_id.startswith(("everyday:", "everyday-remark:")):
+        # 12a: the judged Everyday questions, answered as the stub would (12a.6: a re-mark's too)
         from everyday import stub_reply                # scripts/, on sys.path in the service
         return stub_reply(req.user)
     if req.custom_id.startswith(("judge:", "canary:")):
@@ -570,7 +570,7 @@ def _fake_qb_questions(meta: dict) -> list[dict]:
         t, who = _QB_THINGS[i % len(_QB_THINGS)], _QB_NAMES[(i * 4) % len(_QB_NAMES)]
         x, y, place = 3 + i % 17, 2 + (i * 7) % 13, _QB_PLACES[(i * 5) % len(_QB_PLACES)]
         g = meta.get("group", "")
-        if g in ("shorten", "summarising"):
+        if g == "summarising":
             words = " ".join(f"{_QB_THINGS[(i + k) % len(_QB_THINGS)]} at "
                              f"{_QB_PLACES[(i + k) % len(_QB_PLACES)]}" for k in range(12))
             out.append({"group": g, "skill": "shorten a note", "difficulty": 2,

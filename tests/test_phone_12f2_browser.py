@@ -121,7 +121,7 @@ def test_the_card_shows_what_was_reported_beside_what_the_board_measured(live, p
     head = meas.locator("thead th").evaluate_all("xs => xs.map(x => x.textContent)")
     assert head == ["", "served", "good-750m, loaded here"]
     row = meas.locator("[data-phone-row='Everyday tasks'] td").all_inner_texts()
-    assert row[0] == "Everyday tasks" and " of 200" in row[1] and " of " in row[2]
+    assert row[0] == "Everyday tasks" and " of 179" in row[1] and " of " in row[2]   # 12a.6
     # the server's own speed is not the phone's, and isn't shown
     assert "tok/s" not in meas.inner_text()
     shot(page.locator("[data-kind-block='phone']"), "on-phone-1400.png")

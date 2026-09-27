@@ -322,6 +322,12 @@ def _mark_failed(r: dict, why: str) -> None:
             out = _everyday.read(d)
             if out:
                 db.update(sub["id"], progress=_everyday.summary(out))
+    elif r["kind"] == "everyday_remark":
+        # 12a.6: each model this re-mark sent says so, instead of waiting
+        for d in (p for p in config.OUT_DIR.iterdir() if p.is_dir()) if config.OUT_DIR.is_dir() else []:
+            out = _everyday.read(d)
+            if out and (out.get("judge") or {}).get("batch_id") == r["batch_id"] and out.get("waiting"):
+                _everyday.judge_failed(d, why)
 
 
 def tick() -> int:
@@ -338,7 +344,8 @@ def tick() -> int:
             # 12i.2: a question builder batch to the job, as that draft chose it
             backend = (judge_test.batch_backend(r["batch_id"]) if r["kind"] == "judge_test"
                        else builder.batch_backend(r["batch_id"]) if r["kind"] == "qb"
-                       else llm.client("judge" if r["kind"] in ("judge", "everyday") else "llm"))
+                       else llm.client("judge" if r["kind"] in ("judge", "everyday", "everyday_remark")
+                                       else "llm"))
         except llm.LocalUnreachable as e:
             # vLLM restarting (or still loading after a reboot) is not a reason
             # to throw away batches whose finished results are on disk
@@ -376,6 +383,9 @@ def tick() -> int:
                 _finish_judge(r, results)
             elif r["kind"] == "everyday":
                 _finish_everyday(r, results)
+            elif r["kind"] == "everyday_remark":
+                # 12a.6: a re-mark's verdicts, for every model it sent
+                _everyday.finish_remark(config.OUT_DIR, results)
             elif r["kind"] == "judge_test":
                 judge_test.finish(r["batch_id"], results)
             elif r["kind"] == "qb":

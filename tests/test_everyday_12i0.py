@@ -20,6 +20,8 @@ import everyday as ev
 REPO = Path(__file__).resolve().parents[1]
 BRIEF = REPO / "docs" / "prompts" / "phase-12i"
 NUMBERS = {"type": "numbers_from_source"}
+# every check of every question still in the bank (12a.6), and the 12i.0 probes
+N_12I0 = 2014 + 3
 
 
 def _jsonl(path: Path) -> list[dict]:
@@ -45,17 +47,19 @@ def test_the_port_decides_as_12i_checks_py_does():
     and the same reason"""
     ref = reference_checker()
     n = 0
-    for p in PROBES_12A5 + [{"id": q["id"], "answer": q["reference"]} for q in BANK.values()]:
+    # 12a.6: the questions still in the bank, with the checks they have now
+    for p in [p for p in PROBES_12A5 if p["id"] in BANK] + [
+            {"id": q["id"], "answer": q["reference"]} for q in BANK.values()]:
         item = BANK[p["id"]]
         for c in item["checks"]:
             assert ev.run_check(c, p["answer"], item["prompt"]) == \
                 ref.run(c, p["answer"], item["prompt"]), (p["id"], c, p["answer"])
             n += 1
-    for p in PROBES_12I0:
+    for p in [p for p in PROBES_12I0 if p["id"] in BANK]:
         prompt = BANK[p["id"]]["prompt"]
         assert ev.run_check(NUMBERS, p["answer"], prompt) == ref.run(NUMBERS, p["answer"], prompt)
         n += 1
-    assert n == 3044 + 3
+    assert n == N_12I0
 
 
 @pytest.mark.parametrize("i", range(len(PROBES_12I0)),
@@ -100,5 +104,6 @@ def test_end_of_a_month_gives_its_last_day():
 
 
 def test_the_banks_version_does_not_change():
-    """a checker change re-marks the answers on file; the words are the same"""
-    assert ev.version()["hash"] == "32432393"
+    """a checker change re-marks the answers on file; the words are the same.
+    12a.6 changed the words: 48 short summaries retired"""
+    assert ev.version()["hash"] == "7489950e"

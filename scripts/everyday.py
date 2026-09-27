@@ -22,6 +22,8 @@ model has no such answer to — after a bank change, the new ones.
 
     python scripts/everyday.py results/full            re-mark every model (no GPU)
     python scripts/everyday.py results/full -m org/x   one model
+    python scripts/everyday.py results/full --judge    12a.6: and send the judge what waits on it
+    python scripts/everyday.py results/full --compare  12a.6: before and after, model by model
 
 It reads the generations the harness logged, marks each one on the text
 after the reasoning block (judge.answer_parts, #59's split — never the raw
@@ -61,20 +63,25 @@ BANK_DIR = REPO / "eval_tasks" / "everyday"
 BANK_PATH = BANK_DIR / "bank.jsonl"
 TEMPLATE_PATH = BANK_DIR / "_everyday_template_yaml"
 OUT_NAME = "everyday.json"
-# the eight groups, in this order everywhere, as the page shows them. 12a.5:
-# the short ones that were "Summarising" are "Shorten a message" (same ids),
-# and "Summarise" is the long texts — 425 to 850 words — a summary is for
+# the groups, in this order everywhere, as the page shows them. 12a.5: the
+# short ones that were "Summarising" were "Shorten a message" (same ids), and
+# "Summarise" the long texts — 425 to 850 words — a summary is for. 12a.6:
+# one group again, "Summarise": the best fifteen short ones kept, the rest
+# retired (retired.jsonl), and every one marked by the judge on a rubric
 GROUPS = {"understanding": "Understanding", "writing": "Writing",
-          "shorten": "Shorten a message", "summarising": "Summarise",
+          "summarising": "Summarise",
           "transform": "Transform", "quick_maths": "Quick maths",
           "instructions": "Instructions", "honesty": "Honesty"}
+# 12a.6: a question written for the old group, anywhere, reads as Summarise
+MERGED = {"shorten": "summarising"}
+RETIRED_PATH = BANK_DIR / "retired.jsonl"
 # 12a.4: the bank's version is the date its wording last changed and a short
 # hash of the question texts. A run's version is the hash of the questions it
 # was asked — the harness logs each one — so answers to an earlier wording are
 # never marked by today's checks, counted in today's score or compared with
 # today's runs. Reword a question, and this date changes with it
 # (tests/test_everyday_12a4.py pins the hash beside it).
-WORDING_DATE = "2026-09-25"
+WORDING_DATE = "2026-09-27"
 NEVER_FINISHED = "never finished answering"
 # 12g.2: the halves, by the exam's names — "report" is the hidden half that
 # scores the model, "diagnose" the practice half the loop may read. The split
@@ -105,6 +112,10 @@ def _bad_shape(c: dict) -> str:
         for k in ("right", "wrong"):
             if not _words(c[k]):
                 return f"first_mention needs {k}: a list of names"
+    if c["type"] == "judge" and "scale" in c:
+        sc, at = c.get("scale"), c.get("pass_at")
+        if not (isinstance(sc, int) and isinstance(at, int) and 1 <= at <= sc <= 10):
+            return "a judge that scores needs scale and pass_at: whole numbers, pass_at at most scale"
     return ""
 
 
@@ -179,6 +190,9 @@ def _read_bank(path: Path) -> list[dict]:
         if q["id"] in seen:
             raise ValueError(f"{path.name} line {n}: {q['id']} is there twice")
         seen.add(q["id"])
+        q["group"] = MERGED.get(q["group"], q["group"])
+        if q["group"] == "summarising" and not _rubric_check(q):
+            q["checks"] = summarise_checks(q)          # 12a.6: marked by the judge's rubric
         if q["group"] not in known:
             raise ValueError(f"{path.name} line {n}: unknown group {q['group']!r}")
         if not isinstance(q["checks"], list):
@@ -295,6 +309,13 @@ _MONTHS = ('january|february|march|april|may|june|july|august|september|october|
            'december')
 
 
+# 12a.6: a time written as four digits — "1100", "0930", "1430 hrs". In the
+# text it gives that time; in an answer it is the text's time when the text
+# gives it (as "11:00", "11 am" or "1100"), and a number like any other when not
+HHMM = re.compile(r'(?<![\d:.,$\u20ac\u00a3])([01]\d|2[0-3])([0-5]\d)(?:\s*(?:hrs?|h)\b)?'
+                  r'(?!\d|[:.,]\d|\s*%)', re.I)
+
+
 def clock_times(text: str) -> set[tuple[int, int]]:
     """every time of day the text gives, as (hour, minute): "3 pm", "15:00",
     "at three" and "noon" are all times. A time with no am/pm may be either"""
@@ -312,6 +333,8 @@ def clock_times(text: str) -> set[tuple[int, int]]:
         out.add((h, mi))
         if not ap and h <= 12:
             out.add(((h + 12) % 24, mi))
+    for m in HHMM.finditer(t):
+        out.add((int(m.group(1)), int(m.group(2))))
     return out
 
 
@@ -560,6 +583,9 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
             return ' '
         body = re.sub(r'\b(noon|midday)\b', '12:00 pm', body, flags=re.I)
         body = re.sub(r'\bmidnight\b', '12:00 am', body, flags=re.I)
+        # 12a.6: "1100" for the text's 11:00 is that time, not an invented 1100
+        body = HHMM.sub(lambda m: ' ' if (int(m.group(1)), int(m.group(2))) in given
+                        else m.group(0), body)
         body = TIME.sub(keep, body)
         if bad:
             return False, 'invented the time ' + bad[0]
@@ -670,6 +696,11 @@ def describe(check: dict) -> str:
     if t == 'any':
         return ', or '.join(describe(c) for c in check['checks'])
     if t == 'judge':
+        if check.get('scale'):
+            # 12a.6: the rubric is the judge's to read; the page says what it asks
+            return (f"the judge, on a rubric (0 to {check['scale']}, passing at "
+                    f"{check['pass_at']}): one summary, the key facts, nothing invented, "
+                    "and the length only if the request asks one")
         return 'the judge: ' + check['rubric']
     raise ValueError(f"unknown check type: {t}")
 
@@ -722,10 +753,123 @@ THE ANSWER
 {answer}"""
 
 
+# 12a.6: a rubric that scores — Summarise's, 0 to 4, passing at 3
+SCORED_PROMPT = """You are marking ONE answer from an assistant against a rubric that gives it a score. Read the question, the rubric and the answer, work out the score the rubric gives, and reply with one JSON object and nothing else: {{"score": <a whole number from 0 to {scale}>, "reason": <one short sentence for a person, about the answer: what cost it points, or that it lost none>}}.
+
+QUESTION
+{question}
+
+RUBRIC
+{rubric}
+
+THE ANSWER
+{answer}"""
+
+
+def judge_check(item: dict) -> dict | None:
+    return next((c for c in item.get("checks") or [] if c.get("type") == "judge"), None)
+
+
+def _rubric_check(item: dict | None) -> dict | None:
+    """a judge check that scores (12a.6), or None"""
+    c = judge_check(item or {})
+    return c if c and c.get("scale") else None
+
+
+def rubric_key(item: dict) -> str:
+    """which rubric a verdict was given on: a verdict is kept only while the
+    rubric is the one it read"""
+    c = judge_check(item) or {}
+    return hashlib.sha256(str(c.get("rubric", "")).encode("utf-8")).hexdigest()[:12]
+
+
 def judge_prompt(item: dict, answer: str) -> str:
-    rubric = next(c["rubric"] for c in item["checks"] if c["type"] == "judge")
-    return JUDGE_PROMPT.format(question=item["prompt"], rubric=rubric,
+    c = judge_check(item)
+    if c.get("scale"):
+        return SCORED_PROMPT.format(scale=c["scale"], question=item["prompt"], rubric=c["rubric"],
+                                    answer=answer.strip() or "(empty)")
+    return JUDGE_PROMPT.format(question=item["prompt"], rubric=c["rubric"],
                                answer=answer.strip() or "(empty)")
+
+
+# ---------------------------------------------------------------------------
+# 12a.6: Summarise is marked by the judge on a rubric. A word limit the request
+# never states was failing good summaries, and so was a lead-in counted into
+# it, a fact written another way, a time written as "1100". The script keeps
+# one gate — no number the text doesn't give — and the judge marks the rest
+# ---------------------------------------------------------------------------
+
+RUBRIC_SCALE, RUBRIC_PASS = 4, 3
+_N = (r'(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|forty|fifty|'
+      r'a hundred)')
+STATED_LENGTH = re.compile(
+    r'\b(?:(?:in|under|within|below|at most|no more than|max(?:imum)?|less than|fewer than|'
+    r'about|around|to)\s+)?' + _N + r'\s+(?:words?|sentences?|lines?|bullet(?:\s*points?)?|'
+    r'points?|paragraphs?)\b|\b(?:one|a|single)[\s-]+(?:line|liner|sentence|paragraph)\b', re.I)
+SHORTER = re.compile(r'\b(?:shorten|shorter|short|tl;?\s?dr|condense|brief(?:ly)?)\b', re.I)
+RUBRIC = """Score the answer from 0 to {scale} as a summary of the text in the question. Start at {scale} and take points off as below, never going under 0. It passes at {pass_at} or more.
+1. One summary. The text itself, or most of it copied, is not a summary: score it 0. Take off 1 if it is not one summary: versions or options to choose from, or the summary wrapped in a lead-in ("Here's a summary:"), a heading, notes about it or a closing offer. Plain formatting of the one summary, such as short lines or bullets, is fine.
+2. The key facts, judged by meaning and not by exact words (a date, time or amount written another way is the same fact). It should keep {need}:
+{facts}
+Take off 1 for each fact it is short of that, and 1 for each fact it gets wrong.
+3. It invents nothing. Take off 2 if it says anything the text doesn't: a name, number, date, time, place or detail that isn't there.
+4. Length. {length}{reference}"""
+
+
+def request_of(prompt: str) -> str:
+    """what the person asked for: the words before the text they pasted"""
+    return re.split(r'["\u201c]', prompt, maxsplit=1)[0]
+
+
+def stated_length(prompt: str) -> str:
+    """the length the request states, in its own words; "shorter" when it
+    only asks for it shorter; "" when it states none"""
+    req = request_of(prompt)
+    m = STATED_LENGTH.search(req)
+    if m:
+        return m.group(0).strip()
+    return "shorter" if SHORTER.search(req) else ""
+
+
+def _facts_of(q: dict) -> tuple[list[list[str]], int]:
+    """the question's key facts, each a list of ways to say it, and how many
+    it must keep — from its facts check, or its contains checks"""
+    for c in q.get("checks") or []:
+        if c.get("type") == "facts":
+            return c["values"], int(c["n"])
+    fs = [list(c["values"]) for c in q.get("checks") or [] if c.get("type") == "contains_any"]
+    fs += [[v] for c in q.get("checks") or [] if c.get("type") == "contains_all"
+           for v in c["values"]]
+    return fs, len(fs)
+
+
+def summarise_rubric(q: dict) -> str:
+    facts, need = _facts_of(q)
+    show = lambda vs: " / ".join(list(dict.fromkeys(v.strip() for v in vs))[:2])   # noqa: E731
+    length = stated_length(q["prompt"])
+    if length == "shorter":
+        says = ("The request asks for it shorter: take off 1 if the summary itself is not clearly "
+                "shorter than the text it was given.")
+    elif length:
+        says = (f'The request asks for "{length}". Measure the summary itself, not a lead-in: take '
+                "off 1 if it doesn't keep to that.")
+    else:
+        says = "The request states no length: take nothing off for length."
+    return RUBRIC.format(
+        scale=RUBRIC_SCALE, pass_at=RUBRIC_PASS,
+        need=(f"all {len(facts)} of these" if need >= len(facts) else
+              f"at least {need} of these {len(facts)}"),
+        facts="\n".join(f"- {show(f)}" for f in facts) or "- (none listed: what the text is about)",
+        length=says,
+        reference=f'\nA good summary, for reference: "{q["reference"]}"' if q.get("reference") else "")
+
+
+def summarise_checks(q: dict) -> list[dict]:
+    """12a.6: a Summarise question's checks — one script gate, no number the
+    text doesn't give, then the judge's rubric, 0 to 4, passing at 3"""
+    return [{"type": "numbers_from_source"},
+            {"type": "judge", "scale": RUBRIC_SCALE, "pass_at": RUBRIC_PASS,
+             "rubric": summarise_rubric(q)}]
 
 
 def _sentences(text: str) -> int:
@@ -762,15 +906,40 @@ def stub_reply(prompt: str) -> str:
     return json.dumps(stub_verdict(answer, question), ensure_ascii=False)
 
 
-def parse_verdict(text: str) -> dict | None:
+def parse_verdict(text: str, check: dict | None = None) -> dict | None:
+    """the judge's reply: {pass, reason} — and, on a rubric that scores
+    (12a.6), its score, the pass being the score at or over the line"""
     from service import llm
     obj = llm.extract_json(text or "")
-    if not isinstance(obj, dict) or not isinstance(obj.get("pass"), bool):
+    if not isinstance(obj, dict):
         return None
     reason = " ".join(str(obj.get("reason") or "").split())[:200]
+    scale = int((check or {}).get("scale") or 0)
+    if scale:
+        sc = obj.get("score")
+        if isinstance(sc, str) and sc.strip().isdigit():
+            sc = int(sc.strip())
+        if isinstance(sc, bool) or not isinstance(sc, (int, float)) or not 0 <= sc <= scale:
+            # a pass or fail with no score (the stand-in judge) reads as the top or 1
+            if not isinstance(obj.get("pass"), bool):
+                return None
+            sc = scale if obj["pass"] else 1
+        sc = int(round(sc))
+        ok = sc >= int(check.get("pass_at") or scale)
+        return {"pass": ok, "score": sc, "scale": scale,
+                "reason": f"{sc} of {scale}: " + (reason or ("nothing taken off" if sc == scale
+                                                             else "the judge took points off"))}
+    if not isinstance(obj.get("pass"), bool):
+        return None
     return {"pass": obj["pass"],
             "reason": reason or ("the judge says it is right" if obj["pass"]
                                  else "the judge says it is wrong")}
+
+
+def stub_for(q: dict, answer: str) -> dict:
+    """the stand-in judge's verdict on a question, scored when its rubric scores"""
+    v = stub_verdict(answer, q["prompt"])
+    return parse_verdict(json.dumps(v), judge_check(q)) or v
 
 
 # ---------------------------------------------------------------------------
@@ -960,14 +1129,19 @@ def _item(q: dict, rec: dict, verdicts: dict, before: dict) -> dict:
             # the script checks passed; the judge decides the rest
             v = verdicts.get(q["id"])
             old = before.get(q["id"]) or {}
-            if v is None and old.get("pass") is not None and old.get("answer_text") == ans:
-                v = {"pass": old["pass"], "reason": old["reason"]}
+            # 12a.6: an earlier verdict is kept only if the judge gave it, on this
+            # rubric, to this answer — never a script check's mark from before
+            if v is None and old.get("pass") is not None and old.get("answer_text") == ans \
+                    and old.get("rubric") == rubric_key(q):
+                v = {"pass": old["pass"], "reason": old["reason"],
+                     **({"score": old["score"]} if "score" in old else {})}
             if v is None:
                 it.update({"pass": None, "reason": old.get("reason") if (
                     old.get("answer_text") == ans and old.get("pass") is None
                     and old.get("reason")) else WAITING})
             else:
-                it.update({"pass": bool(v["pass"]), "reason": v["reason"]})
+                it.update({"pass": bool(v["pass"]), "reason": v["reason"], "rubric": rubric_key(q),
+                           **({"score": v["score"]} if v.get("score") is not None else {})})
         else:
             it.update({"pass": ok, "reason": why})
             if ok is False:
@@ -1169,7 +1343,7 @@ def start(model_dir: Path, submission: int | None = None,
     answers = {it["id"]: it["answer_text"] for it in out["items"]}
     ident = _judge.identity()
     if _judge.is_stub():
-        out = mark(model_dir, {q["id"]: stub_verdict(answers[q["id"]], q["prompt"]) for q in todo},
+        out = mark(model_dir, {q["id"]: stub_for(q, answers[q["id"]]) for q in todo},
                    judge={"id": ident["id"], "version": _judge.version(ident)["key"],
                           "provisional": False}, asked=asked)
         write(model_dir, out)
@@ -1212,11 +1386,13 @@ def start(model_dir: Path, submission: int | None = None,
 def finish(model_dir: Path, results: dict) -> dict | None:
     """The poller's half: the judge's replies in, everyday.json out."""
     verdicts = {}
+    qs = {q["id"]: q for q in load_bank()}
     for cid, res in results.items():
         if not str(cid).startswith("everyday:"):
             continue
         qid = str(cid).rsplit(":", 1)[-1]
-        v = None if getattr(res, "error", None) else parse_verdict(getattr(res, "text", ""))
+        v = None if getattr(res, "error", None) else parse_verdict(
+            getattr(res, "text", ""), judge_check(qs.get(qid) or {}))
         verdicts[qid] = v or {"pass": None, "reason": "not marked: the judge's reply could "
                                                       "not be read"}
     prev = read(model_dir) or {}
@@ -1271,28 +1447,153 @@ def judge_failed(model_dir: Path, why: str) -> None:
     write(model_dir, out)
 
 
+# ---------------------------------------------------------------------------
+# 12a.6: re-marking with the judge — no model runs. Before the first one, each
+# model's marks are kept (BEFORE_NAME), so the change reads model by model
+# ---------------------------------------------------------------------------
+
+BEFORE_NAME = "everyday_before_12a6.json"
+REMARK = "everyday-remark"
+
+
+def _counts(out: dict | None) -> dict:
+    if not out:
+        return {}
+    return {"passed": out.get("passed"), "total": out.get("total"),
+            "waiting": out.get("waiting") or 0, "groups": out.get("groups") or {}}
+
+
+def remark(results: Path, want: set[str] | None = None, judge: bool = False) -> dict:
+    """Mark every model again; with `judge`, send each answer waiting on the
+    judge — one batch for all of them, which the poller finishes. Returns
+    {"models": {id: summary}, "batch_id", "sent"}. The marks before the first
+    of these are kept in BEFORE_NAME, and never written over"""
+    before_f = results / BEFORE_NAME
+    before = json.loads(before_f.read_text(encoding="utf-8")) if before_f.exists() else None
+    snap, lines, todo, dirs = {}, {}, [], {}
+    for d in sorted(p for p in results.iterdir() if p.is_dir()):
+        if want and d.name not in want:
+            continue
+        prev = read(d)
+        out = mark(d)
+        if out is None:
+            continue
+        if prev:
+            snap[prev.get("model") or out["model"]] = _counts(prev)
+        write(d, out)
+        dirs[d.name] = d
+        lines[out["model"]] = summary(out) + (
+            " · earlier wording, kept as marked" if out.get("earlier") else "")
+        if judge and not out.get("earlier"):
+            answers = {it["id"]: it["answer_text"] for it in out["items"]}
+            todo += [(d.name, q, answers[q["id"]]) for q in _pending(out)]
+    if before is None and snap:
+        before_f.write_text(json.dumps({"at": time.time(), "version": version(), "models": snap},
+                                       indent=1), encoding="utf-8")
+    res = {"models": lines, "batch_id": None, "sent": 0}
+    if not todo:
+        return res
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))        # run as a script: the service's judge and database
+    from service import db, llm
+    ident = _judge.identity()
+    if _judge.is_stub():
+        by = {}
+        for name, q, ans in todo:
+            by.setdefault(name, {})[q["id"]] = stub_for(q, ans)
+        for name, vs in by.items():
+            out = mark(dirs[name], vs, judge={"id": ident["id"], "version": _judge.version(ident)["key"],
+                                              "provisional": False})
+            write(dirs[name], out)
+            lines[out["model"]] = summary(out)
+        res["sent"] = len(todo)
+        return res
+    why = _judge.blocked()
+    if why:
+        raise RuntimeError(f"the judge isn't set up on this server: {why}")
+    backend = llm.client("judge")
+    stamp = llm.provisional(backend, "marked")
+    reqs = [llm.Request(custom_id=f"{REMARK}:{name}:{q['id']}", system="", json=True,
+                        max_tokens=200, user=judge_prompt(q, ans),
+                        meta={"kind": "everyday", "id": q["id"]}) for name, q, ans in todo]
+    bid = backend.submit(reqs)
+    for name in {n for n, _, _ in todo}:
+        out = read(dirs[name])
+        out["judge"] = {"id": ident["id"], "version": _judge.version(ident)["key"],
+                        "provisional": bool(stamp), "batch_id": bid}
+        write(dirs[name], out)
+    db.batch_add(bid, "everyday_remark", 0, len(reqs), backend.name, backend.model)
+    db.batch_progress(bid, f"0/{len(reqs)} done")
+    res.update(batch_id=bid, sent=len(reqs))
+    return res
+
+
+def finish_remark(results_dir: Path, results: dict) -> list[str]:
+    """the poller's half of a re-mark: each model's verdicts into its marks"""
+    by: dict[str, dict] = {}
+    for cid, r in results.items():
+        parts = str(cid).split(":")
+        if len(parts) == 3 and parts[0] == REMARK:
+            by.setdefault(parts[1], {})[f"everyday:0:{parts[2]}"] = r
+    done = []
+    for name, rs in by.items():
+        d = results_dir / name
+        if d.is_dir() and finish(d, rs) is not None:
+            done.append(name)
+    return done
+
+
+def compare(results: Path) -> str:
+    """before and after, model by model — a table for a PR"""
+    f = results / BEFORE_NAME
+    if not f.exists():
+        return "no marks from before the re-mark: run with --judge first"
+    was = json.loads(f.read_text(encoding="utf-8"))["models"]
+    rows = ["| model | before | after | Summarise before | Summarise after | waiting |",
+            "|---|---|---|---|---|---|"]
+    for d in sorted(p for p in results.iterdir() if p.is_dir()):
+        now = read(d)
+        if not now or now.get("earlier"):
+            continue
+        b = was.get(now["model"]) or {}
+        bg = b.get("groups") or {}
+        old_sum = [bg[g] for g in ("shorten", "summarising") if g in bg]
+        sb = (f"{sum(x['passed'] for x in old_sum)} of {sum(x['total'] for x in old_sum)}"
+              if old_sum else "—")
+        ng = (now.get("groups") or {}).get("summarising")
+        rows.append(f"| {now['model']} | "
+                    + (f"{b['passed']} of {b['total']}" if b else "—") + " | "
+                    + f"{now['passed']} of {now['total']} | {sb} | "
+                    + (f"{ng['passed']} of {ng['total']}" if ng else "—")
+                    + f" | {now.get('waiting') or 0} |")
+    return "\n".join(rows)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("results", type=Path)
     ap.add_argument("-m", "--model", action="append", default=[])
+    ap.add_argument("--judge", action="store_true",
+                    help="12a.6: also send the answers waiting on the judge (no model runs)")
+    ap.add_argument("--compare", action="store_true",
+                    help="12a.6: before and after the re-mark, model by model")
     a = ap.parse_args()
     if not a.results.is_dir():
         print(f"no such directory: {a.results}", file=sys.stderr)
         return 2
+    if a.compare:
+        print(compare(a.results))
+        return 0
     want = {m.replace("/", "__") for m in a.model}
-    n = 0
-    for d in sorted(p for p in a.results.iterdir() if p.is_dir()):
-        if want and d.name not in want:
-            continue
-        out = mark(d)
-        if out is None:
-            continue
-        write(d, out)
-        n += 1
-        print(f"{out['model']}: {summary(out)}"
-              + (" · earlier wording, kept as marked" if out.get("earlier") else ""))
-    print(f"marked {n} model(s)")
+    res = remark(a.results, want, judge=a.judge)
+    for model, line in res["models"].items():
+        print(f"{model}: {line}")
+    print(f"marked {len(res['models'])} model(s)")
+    if a.judge:
+        print(f"sent the judge {res['sent']} answer(s)" + (
+            f" · batch {res['batch_id']}: the service marks them as it lands; then "
+            "--compare" if res["batch_id"] else ""))
     return 0
 
 
