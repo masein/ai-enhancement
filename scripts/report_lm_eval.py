@@ -2884,6 +2884,13 @@ select { max-width:100%; }
 .srvlist li .se { overflow-wrap:anywhere; }
 .srvsum { font-weight:600; cursor:pointer; list-style:none; }
 .srvsum::-webkit-details-marker { display:none; }
+/* 12f.2: On phone — reported beside measured, stacked on a phone */
+.phone-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }
+@media (max-width:720px) { .phone-grid { grid-template-columns:minmax(0, 1fr); } }
+.phone-grid h3 { margin:0 0 6px; font-size:var(--fs-3, 1rem); }
+.phone-grid dd, .phone-grid td { overflow-wrap:anywhere; }
+.phone-grid td.num { white-space:nowrap; }
+.rep-by { color:var(--text-secondary); font-size:var(--fs-1); white-space:nowrap; }
 .badge.prelim { color:var(--warning-text); border-color:var(--warning); }
 .tiebest { font-weight:650; }
 .tiebest::after { content:"\2009\2248"; color:var(--muted); font-size:9px; vertical-align:1px; }
@@ -3754,7 +3761,11 @@ const state = {
   rvName: '',                          // the name approvals are recorded under (remembered)
   sub: { hf_id: '', kind: 'auto', suite: 'full', submitter: '', note: '', tasks: null },  // Submit form
   // 12f.1: Test a model ▸ A model served elsewhere
-  srv: { open: false, f: { name: '', base_url: '', key: '', based_on: '', how: '', thinking: 'auto' },
+  // 12f.2: On phone — the reports, by model, and each build's form
+  phone: { loaded: false, loading: false, byId: {}, readme: null, open: {}, f: {}, msg: {},
+           busy: '' },
+  srv: { open: false, f: { name: '', base_url: '', key: '', based_on: '', how: '', thinking: 'auto',
+         phone: false },
          msg: '', reported: null, saved: false, busy: '', list: null, loading: false },
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
@@ -5463,6 +5474,8 @@ function vModel() {
 // not taken is a tile that says so, with the button that fills it
 function modelKinds(m) {
   const J = DATA.judged || {}, E = evd(), e = evdOf(m.id);
+  const P = state.phone;
+  if ((servedOf(m.id) || {}).phone && LIVE && !P.loaded && !P.loading && netReady()) loadPhone();
   const jt = Object.entries((m.judge || {}).tasks || {}).filter(([t]) => t.startsWith('exam_'));
   const ran = m.date ? Date.parse(String(m.date)) / 1000 : 0;
   return [
@@ -5473,10 +5486,17 @@ function modelKinds(m) {
       at: Math.max(0, ...jt.map(([, v]) => v.judged_at || 0)) } : null,
     (E.questions || []).length ? { kind: 'everyday', label: 'Everyday tasks', taken: !!e,
       at: e ? e.marked_at || 0 : 0 } : null,
+    // 12f.2: a phone build's fourth — the numbers reported from the phone
+    (servedOf(m.id) || {}).phone ? { kind: 'phone', label: 'On phone',
+      taken: phoneReports(m.id).length > 0, at: (phoneReports(m.id)[0] || {}).at || 0 } : null,
   ].filter(Boolean);
 }
 // a kind's one number, and the line under it
 function kindValue(m, kind) {
+  if (kind === 'phone') {
+    const r = phoneReports(m.id)[0];
+    return [String(r.decode_median), `tok/s median on ${r.device} · reported by ${r.by}`];
+  }
   if (kind === 'standard' && m.served) {
     const n = genTasks().filter(t => cell(t, m.id)).length;
     return ['—', `served · IFEval, MMLU-Pro, MATH-500: ${n} of ${genTasks().length}`];
@@ -5676,6 +5696,8 @@ function kindTest(m, kind) {
     'aria-expanded': String(state.msit.open && state.msit.model === m.id), text: 'Test',
     onclick: () => openSit(m.id) });
   if (kind === 'everyday') return evdTestBtn(m, 'quiet ktest');
+  if (kind === 'phone') return el('button', { class: 'quiet ktest', 'data-kind-test': 'phone',
+    text: 'Add', onclick: () => openPhone(m.id) });
   return el('button', { class: 'quiet ktest', 'data-kind-test': 'standard', text: 'Test',
     onclick: () => { state.sub.suite = m.served ? 'generative' : 'full'; openTest(m.id); } });
 }
@@ -5763,6 +5785,7 @@ function kindParts(m, kind) {
       diag ? el('details', { class: 'kfold', 'data-cant-show': '1' },
         el('summary', { text: 'What the score can’t show ▸' }), diag) : ''].filter(Boolean);
   }
+  if (kind === 'phone') return [phoneBody(servedOf(m.id), m.id)];
   if (kind === 'exam') {
     const earlier = vEarlier(m), judged = part(vJudged(m, [earlier]), 'judged');
     // a card that stopped early (not judged on the current exam) still keeps
@@ -7566,13 +7589,16 @@ const LB_CHIPS = [
   ['reasoning', 'Reasoning'], ['math', 'Math'], ['truthfulness', 'Truthfulness'],
   ['instruction', 'Instruction & maths'], ['lm', 'Language modelling']];
 // the four kinds of test, named the same and in the same order everywhere.
-// A kind with no data yet is not offered (On phone arrives in 12f)
-const MODELS_VIEWS = { standard: 'Standard', exam: 'Knowledge exam', everyday: 'Everyday tasks' };
+// A kind with no data yet is not offered: On phone (12f.2) once a phone build
+// is registered
+const MODELS_VIEWS = { standard: 'Standard', exam: 'Knowledge exam', everyday: 'Everyday tasks',
+  phone: 'On phone' };
 function modelsViews() {
   const out = ['standard'];
   if (DATA.models.some(m => Object.keys((m.judge || {}).tasks || {}).some(t => t.startsWith('exam_'))))
     out.push('exam');
   if (Object.keys(evd().models || {}).length) out.push('everyday');
+  if (phoneBuilds().length) out.push('phone');
   return out;
 }
 // Models opens on Standard, and remembers the viewer's last choice
@@ -8129,6 +8155,163 @@ function modelsHead(badge) {
         'data-models-view': v, 'aria-selected': String(L.view === v), text: MODELS_VIEWS[v],
         onclick: () => setModelsView(v) }))) : ''];
 }
+// ---- 12f.2: On phone ----
+// A phone build's card: what someone measured on the phone, typed in and
+// shown as reported, beside what the board measured through the served
+// model — each with its base beside it. The board never computes a phone's
+// speed, and never shows its server's own here. Reported numbers are only
+// ever in state.phone: never in DATA, a column or an average
+const phoneBuilds = () => Object.entries(DATA.served || {}).filter(([, s]) => s.phone)
+  .map(([id, s]) => ({ id, ...s }));
+const phoneReports = id => state.phone.byId[id] || [];
+async function loadPhone() {
+  const P = state.phone;
+  P.loading = true;
+  try {
+    const j = await api('api/phone');
+    P.byId = Object.fromEntries((j.builds || []).map(b => [b.id, b.reports || []]));
+    P.readme = j.readme || null;
+  } catch (e) { /* the card says nothing is reported yet */ }
+  P.loading = false; P.loaded = true;
+  render();
+}
+function openPhone(id) {
+  state.phone.open[id] = true;
+  navigate({ tab: 'models', model: null, topic: null });
+  setModelsView('phone');
+}
+function lbPhone() {
+  if (LIVE && !state.phone.loaded && !state.phone.loading && netReady()) loadPhone();
+  return [el('div', { class: 'card', 'data-lb-card': '1', 'data-phone-view': '1' },
+    ...modelsHead(),
+    el('p', { class: 'sub', text: 'Phone builds: what was measured on the phone, as reported '
+      + 'by whoever measured it, beside what this board measured through the served model. '
+      + 'The board never measures a phone itself, and no reported number is in a column or an '
+      + 'average.' }),
+    ...phoneBuilds().map(b => el('section', { class: 'kpart', 'data-phone-build': b.id },
+      el('h3', {}, el('a', { href: '#model=' + encodeURIComponent(b.id), text: b.name }), ' ',
+        servedTag(b.id)),
+      phoneBody(b, b.id))))];
+}
+function phoneBody(b, id) {
+  const P = state.phone;
+  if (LIVE && !P.loaded && !P.loading && netReady()) loadPhone();
+  const r = phoneReports(id)[0];
+  return el('div', { 'data-phone-card': id },
+    el('div', { class: 'phone-grid' }, phoneReported(r, id), phoneMeasured(b, id)),
+    phoneReports(id).length > 1 ? el('p', { class: 'small se', 'data-phone-earlier': id,
+      text: 'Earlier reports: ' + phoneReports(id).slice(1).map(x =>
+        `${x.decode_median} tok/s on ${x.device}, reported by ${x.by} (${x.date})`).join(' · ') })
+      : '',
+    LIVE ? phoneForm(id) : '');
+}
+function phoneReported(r, id) {
+  if (!r) return el('div', { 'data-phone-reported': id },
+    el('h3', { text: 'Measured on the phone' }),
+    el('p', { class: 'small', 'data-phone-none': id, text: LIVE || state.phone.loaded
+      ? 'Nothing reported from the phone yet.' : 'Reported numbers are on the live board.' }));
+  const by = el('span', { class: 'rep-by', 'data-reported-by': r.by, text: ` · reported by ${r.by}` });
+  const row = (k, v, key) => v ? [el('dt', { text: k }),
+    el('dd', { 'data-phone-field': key }, v, by.cloneNode(true))] : [];
+  return el('div', { 'data-phone-reported': id },
+    el('h3', { text: 'Measured on the phone' }),
+    el('p', { class: 'small se', 'data-phone-source': id, text: `Reported by ${r.by}, measured `
+      + `${r.date}` + (r.source ? ` · from ${r.source}` : '')
+      + (r.entered_by && r.entered_by !== r.by ? ` · entered by ${r.entered_by}` : '') }),
+    el('dl', { class: 'provlist' },
+      row('device', r.device, 'device'),
+      row('chip and RAM', [r.chip, r.ram_gb ? `${r.ram_gb} GB RAM` : ''].filter(Boolean)
+        .join(' · '), 'chip'),
+      row('decode', `${r.decode_median} tok/s median` + (r.decode_best != null
+        ? `, ${r.decode_best} best` : '') + (r.repeats ? ` (${r.repeats})` : ''), 'decode'),
+      row('settings', r.settings, 'settings'),
+      ...(r.quality || []).flatMap(q => row(q.name + ', as reported',
+        q.value + (q.note ? ` (${q.note})` : ''), 'q-' + q.name))));
+}
+// what the board measured through the served model, its base beside it
+function phoneMeasured(b, id) {
+  const want = String(b.based_on || '').toLowerCase();
+  const base = want && DATA.models.find(x => x.id.toLowerCase() === want && !x.served);
+  const m = DATA.models.find(x => x.id === id);
+  const e1 = evdOf(id), e2 = base ? evdOf(base.id) : null;
+  const rows = [
+    ['Everyday tasks', e1 ? `${e1.passed} of ${e1.total}` : null,
+      e2 ? `${e2.passed} of ${e2.total}` : null],
+    ['Knowledge exam', m && m.judgedAvg != null ? `${num(m.judgedAvg, 2)} / 4` : null,
+      base && base.judgedAvg != null ? `${num(base.judgedAvg, 2)} / 4` : null],
+    ...genTasks().map(t => [LB_SHORT[t] || t, cell(t, id) ? pct(cell(t, id).v) : null,
+      base && cell(t, base.id) ? pct(cell(t, base.id).v) : null])]
+    .filter(([, a]) => a != null);
+  return el('div', { 'data-phone-measured': id },
+    el('h3', { text: 'Measured by this board, through the served model' }),
+    rows.length ? el('div', { class: 'lb-wrap' }, el('table', { class: 'jd' },
+      el('thead', {}, el('tr', {}, el('th', { text: '' }), el('th', { class: 'num', text: 'served' }),
+        el('th', { class: 'num', text: base ? `${base.name}, loaded here` : 'its base' }))),
+      el('tbody', {}, rows.map(([k, a, c]) => el('tr', { 'data-phone-row': k },
+        el('td', { text: k }), el('td', { class: 'num', text: a }),
+        el('td', { class: 'num se', text: c || '—' }))))))
+      : el('p', { class: 'small', text: 'Not tested here yet: Test it on Everyday tasks, the '
+        + 'Knowledge exam or IFEval, MMLU-Pro and MATH-500.' }),
+    el('p', { class: 'small se', text: 'The server’s own speed isn’t shown: it doesn’t '
+      + 'represent the phone.' }));
+}
+const PHONE_FIELDS = [['device', 'Device', 'OnePlus 15'],
+  ['chip', 'Chip', 'Snapdragon 8 Elite Gen 5'], ['ram_gb', 'RAM (GB)', '16'],
+  ['decode_median', 'Decode tok/s, median', '13.5'], ['decode_best', 'Decode tok/s, best', '16.0'],
+  ['repeats', 'How it was repeated', '3 cold repeats, ≤65 °C'],
+  ['settings', 'Settings', 'experts streamed from flash, lookahead 1, MTP n_max 3'],
+  ['date', 'Measured on', ''], ['by', 'Measured by', 'who measured it'],
+  ['q_name', 'Reported score', 'MMLU'], ['q_value', 'Its value', '81.98%'],
+  ['q_note', 'How it was measured', 'all 14,042, measured on Metal'],
+  ['source', 'Source', 'the fork’s README']];
+function phoneForm(id) {
+  const P = state.phone, F = P.f[id] = P.f[id] || {};
+  const fields = el('div', { class: 'srvform' }, PHONE_FIELDS.flatMap(([k, label, ph]) => [
+    el('label', { for: `ph-${k}`, text: label }),
+    el('input', { type: k === 'date' ? 'date' : 'text', id: `ph-${k}`, 'data-phone-in': k,
+      'data-keep': `ph-${id}-${k}`, value: F[k] ?? '', placeholder: ph, autocomplete: 'off',
+      inputmode: /^(ram_gb|decode_)/.test(k) ? 'decimal' : null,
+      oninput: e => { F[k] = e.target.value; } })]));
+  const save = async () => {
+    if (!whoName()) { askName(); return; }
+    P.busy = id; P.msg[id] = ''; render();
+    try {
+      await post('api/phone/reports', { model: id, entered_by: whoName(),
+        ...Object.fromEntries(['device', 'chip', 'repeats', 'settings', 'date', 'by', 'source']
+          .map(k => [k, F[k] || ''])),
+        ...Object.fromEntries(['ram_gb', 'decode_median', 'decode_best']
+          .map(k => [k, F[k] ? Number(F[k]) : null])),
+        quality: [{ name: F.q_name || '', value: F.q_value || '', note: F.q_note || '' }] });
+      P.f[id] = {}; P.open[id] = false;
+      toast('Saved, as reported', { key: 'phone' });
+      P.busy = '';
+      await loadPhone();
+      return;
+    } catch (e) { P.msg[id] = String((e && e.message) || e); }
+    P.busy = '';
+    render();
+  };
+  return el('details', { class: 'kfold', 'data-phone-form': id, open: P.open[id] ? '' : null,
+      ontoggle: e => { P.open[id] = e.target.open; } },
+    el('summary', { text: 'Add numbers measured on the phone ▸' }),
+    el('p', { class: 'small', text: 'Typed in as measured; the page shows each number as '
+      + 'reported by whoever measured it. Nothing here enters a score.' }),
+    P.readme ? el('button', { class: 'quiet', 'data-phone-readme': id,
+      text: 'Fill in the fork’s README numbers', onclick: () => {
+        const R = P.readme, q = (R.quality || [])[0] || {};
+        Object.assign(F, { device: R.device, chip: R.chip, ram_gb: String(R.ram_gb ?? ''),
+          decode_median: String(R.decode_median ?? ''), decode_best: String(R.decode_best ?? ''),
+          repeats: R.repeats, settings: R.settings, source: R.source,
+          q_name: q.name || '', q_value: q.value || '', q_note: q.note || '' });
+        render();
+      } }) : '',
+    fields,
+    el('div', { class: 'frm', style: 'margin-top:10px' },
+      el('button', { class: 'primary', 'data-phone-save': id, disabled: P.busy ? '' : null,
+        text: P.busy === id ? 'Saving…' : 'Save', onclick: save })),
+    P.msg[id] ? el('p', { class: 'warn small', 'data-phone-msg': id, text: P.msg[id] }) : '');
+}
+
 // "Not tested on this (12) ▸": one collapsed line, each model with its Test
 function notTestedRows(none, ncols, suite, whyNot = null) {
   if (!none.length) return [];
@@ -8220,6 +8403,7 @@ function vLeaderboard(ms) {
   const L = lbS();
   if (!modelsViews().includes(L.view)) { L.view = 'standard'; L.chip = L.stdChip || 'all'; }
   if (L.view === 'everyday') return lbEveryday(ms);
+  if (L.view === 'phone') return lbPhone();
   // the exam's scores are not ranked until a person has agreed with the judge:
   // one line says so, instead of an empty table
   if (L.view === 'exam' && !judgedCalibrated())
@@ -11613,7 +11797,14 @@ function servedCard(sf) {
       el('label', { text: 'Thinking' }),
       el('div', {}, Select('thinking', [['on', 'on'], ['off', 'off'],
         ['auto', 'the model decides']], F.thinking || 'auto', v => { F.thinking = v; },
-        { key: 'srv-thinking' }))),
+        { key: 'srv-thinking' })),
+      // 12f.2: a phone build gets the On phone card
+      el('span', {}),
+      el('label', { class: 'spread small', style: 'padding-top:0' },
+        el('input', { type: 'checkbox', 'data-srv': 'phone', checked: F.phone ? '' : null,
+          onchange: e => { F.phone = e.target.checked; } }),
+        ' It’s a phone build', el('span', { class: 'se',
+          text: ' — its card holds numbers measured on the phone' }))),
     bases,
     el('div', { class: 'frm', style: 'margin-top:10px' },
       el('button', { class: 'quiet', 'data-srv-check': '1', disabled: busy ? '' : null,

@@ -244,6 +244,14 @@ CREATE TABLE IF NOT EXISTS served_models (
   data        TEXT NOT NULL,
   updated_at  REAL NOT NULL
 );
+-- 12f.2: numbers measured on the phone and typed in, as reported — never a
+-- results file, a board column or an average
+CREATE TABLE IF NOT EXISTS phone_reports (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  model       TEXT NOT NULL,
+  data        TEXT NOT NULL,
+  created_at  REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS qb_drafts (
   id          TEXT PRIMARY KEY,
   kind        TEXT NOT NULL,                      -- 'knowledge' | 'everyday'
@@ -1109,6 +1117,22 @@ def served_get(model_id: str) -> dict | None:
     with closing(_conn()) as c:
         row = c.execute("SELECT data FROM served_models WHERE id=?", (model_id,)).fetchone()
     return json.loads(row[0]) if row else None
+
+
+def phone_add(model: str, data: dict) -> int:
+    with closing(_conn()) as c:
+        cur = c.execute("INSERT INTO phone_reports (model, data, created_at) VALUES (?,?,?)",
+                        (model, json.dumps(data), time.time()))
+        c.commit()
+        return int(cur.lastrowid)
+
+
+def phone_list(model: str) -> list[dict]:
+    """a phone build's reports, the newest first"""
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT id, data FROM phone_reports WHERE model=? ORDER BY id DESC",
+                         (model,)).fetchall()
+    return [{**json.loads(d), "id": i} for i, d in rows]
 
 
 def served_all() -> list[dict]:
