@@ -172,6 +172,8 @@ def board_models() -> list[dict]:
         m = _meta(d / "model_meta.json")
         if not m or m.get("base_model") or not m.get("model"):
             continue                     # a "· thinking" row is its model's, not another
+        if m.get("served"):
+            continue                     # 12f.1: served elsewhere, never loaded here
         mid = m["model"]
         arch = {k: v for k, v in m.items() if k not in ("model", "kind", "params", "kind_reason")}
         templ = bool(arch.get("tmpl_sha")) or m.get("kind") == "instruct"

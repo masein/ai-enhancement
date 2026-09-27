@@ -34,6 +34,7 @@ from pydantic import BaseModel
 from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
                startup, suggest, worker)
 from . import playground
+from . import served
 from . import proposals as prop
 from . import reader
 
@@ -351,7 +352,8 @@ def results_payload() -> dict:
                                        calibration=_calibration(),
                                        judge_identity=_judge_identity(),
                                        fingerprints=current_fingerprints(),
-                                       everyday=report.load_everyday(config.OUT_DIR))
+                                       everyday=report.load_everyday(config.OUT_DIR),
+                                       served=report.load_served(config.OUT_DIR))
         payload["live"] = True
         # 12g.2: the hidden questions an Everyday group needs before Improve takes it
         if payload.get("everyday"):
@@ -440,11 +442,23 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     elif s.tasks:
         raise HTTPException(422, "tasks narrows a judged run only; the other suites are "
                                  "fixed lists")
+    # 12f.1: a model served elsewhere — registered, and asked only what a chat
+    # endpoint can answer. Its server is asked at the start of the run
+    srv = served.is_served(hf_id)
+    if srv:
+        if not served.get(hf_id):
+            raise HTTPException(422, f"{hf_id} is not registered: add it under Test a model ▸ "
+                                     f"A model served elsewhere. Nothing was queued.")
+        if s.suite not in served.SUITES:
+            raise HTTPException(422, served.LOGLIK_LINE + " Nothing was queued.")
+        if s.thinking:
+            raise HTTPException(422, "A served model thinks as it was registered: register it "
+                                     "again to change that. Nothing was queued.")
     # 11i: a checkpoint that ships its own model code is answered HERE, before
     # anything is queued, in the words the page shows beside its disabled
     # button. #56 learned it at start, after the wait — and its Resubmit had
     # no way to ask
-    code = hfmeta.remote_code_check(hf_id)
+    code = {"own_code": False} if srv else hfmeta.remote_code_check(hf_id)
     if code["own_code"]:
         if code["why"]:
             raise HTTPException(422, code["why"] + " Nothing was queued.")
@@ -789,7 +803,8 @@ def models_suggest(q: str = ""):
     if config.ARTIFACTS_DIR.is_dir():
         arts = sorted(d.name for d in config.ARTIFACTS_DIR.iterdir()
                       if d.is_dir() and not d.name.startswith("."))
-    local = suggest.local_candidates(results_payload(), db.recent(500), arts)
+    local = suggest.local_candidates(results_payload(), db.recent(500), arts,
+                                     served.all_public())
     out = suggest.suggest(q[:100], local)
     # 11i: an upload that ships its own model code says so in the list,
     # before it is picked — and whether this server will run it
@@ -798,6 +813,50 @@ def models_suggest(q: str = ""):
             code = hfmeta.remote_code_check(it["id"])
             if code["own_code"]:
                 it["own_code"] = {"runs": not code["why"]}
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 12f.1: models served elsewhere. Registered with what their server reports,
+# which is pinned; the key is kept here and never returned
+# ---------------------------------------------------------------------------
+
+class ServedIn(BaseModel):
+    name: str = ""
+    base_url: str = ""
+    key: str = ""
+    based_on: str = ""
+    how: str = ""
+    thinking: str = "auto"
+    by: str = ""
+
+
+@app.get("/api/served")
+def served_list():
+    return {"models": served.all_public(), "suites": list(served.SUITES),
+            "line": served.LOGLIK_LINE, "thinking": served.THINKING}
+
+
+@app.post("/api/served/check")
+def served_check(f: ServedIn):
+    """Check before saving: what the server at this address reports. Nothing
+    is kept"""
+    try:
+        return {"reported": served.check(f.model_dump())}
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+
+
+@app.post("/api/served")
+def served_add(f: ServedIn, x_token: str = Header(default="")):
+    """Check the server, pin what it reports, and keep it. A server that
+    doesn't answer is said in one line, and nothing is kept"""
+    _check_token(x_token)
+    try:
+        out = {"model": served.register(f.model_dump(), f.by.strip()[:80])}
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)       # on Models at the next look
     return out
 
 
@@ -2367,6 +2426,10 @@ def propose_gate(row: dict | None, topic: str, evidence: bool = True) -> dict:
             "provisional": bool(g.get("provisional"))}
 
 
+IMPROVE_SERVED = ("Improve trains the model's weights, and this one is served elsewhere: there "
+                  "are none here to train.")
+
+
 @app.post("/api/proposals")
 def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
     """Ask the LLM what skill is missing, from the judge's written assessments
@@ -2375,6 +2438,8 @@ def proposal_create(p: ProposalIn, x_token: str = Header(default="")):
     or a model that wrote nothing is refused with the same words the page
     shows."""
     _check_token(x_token)
+    if served.is_served(p.model):
+        raise HTTPException(422, IMPROVE_SERVED)
     backend = _require_llm()
     payload = results_payload()
     row = next((m for m in payload["models"] if m["id"] == p.model), None)

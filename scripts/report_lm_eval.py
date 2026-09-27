@@ -651,7 +651,10 @@ def load_results(path: Path) -> list[dict]:
             continue
         if "results" not in blob:
             continue
-        if blob["results"] and all(str(t).startswith(NOT_A_BENCHMARK) for t in blob["results"]):
+        # 12f.1: …except a served model's: it was asked as an instruct model
+        # is, and its Everyday answers are what puts its row on Models
+        if blob["results"] and all(str(t).startswith(NOT_A_BENCHMARK) for t in blob["results"]) \
+                and not blob.get("served"):
             continue
         runs.append(parse_run(blob, f))
     return runs
@@ -667,6 +670,23 @@ def _evd_label(q: dict) -> str:
     heading ("heavy typos" → "Heavy typos")"""
     s = str(q.get("label") or q.get("skill") or q["id"])
     return s[:1].upper() + s[1:]
+
+
+def load_served(out_dir: Path | None) -> dict:
+    """12f.1: the models served elsewhere, by id — the name they were
+    registered with, how they are served, what model they are based on and
+    what their server reported — from the model_meta.json registering one
+    writes. Carried beside the models: nothing averages it"""
+    out = {}
+    for f in sorted(Path(out_dir).glob("served__*/model_meta.json")) if out_dir and \
+            Path(out_dir).is_dir() else []:
+        try:
+            m = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(m, dict) and isinstance(m.get("served"), dict) and m.get("model"):
+            out[m["model"]] = m["served"]
+    return out
 
 
 def load_everyday(out_dir: Path | None) -> dict | None:
@@ -875,6 +895,8 @@ def parse_run(blob: dict, source: Path) -> dict:
         "judge": _beside(source, "judge.json"),
         "judge_mtime": _beside_mtime(source, "judge.json"),
         "generative": gen,
+        # 12f.1: a model served elsewhere — how, and what its server reported
+        "served": blob.get("served"),
         "tasks": tasks,
     }
 
@@ -1233,6 +1255,7 @@ def merge_runs(runs: list[dict]) -> dict[str, dict]:
         m["judge"] = m.get("judge") or r.get("judge")
         m["judge_mtime"] = m.get("judge_mtime") or r.get("judge_mtime")
         m["generative"] = m.get("generative") or r.get("generative")
+        m["served"] = r.get("served") or m.get("served")        # the newest run's
     return by_model
 
 
@@ -1242,9 +1265,13 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                   parents: dict[str, str] | None = None,
                   judge_identity: dict | None = None,
                   fingerprints: dict[str, str] | None = None,
-                  everyday: dict | None = None) -> dict:
+                  everyday: dict | None = None,
+                  served: dict | None = None) -> dict:
     """`everyday`: the pilot's questions and marks (load_everyday), carried
     beside the models and never inside them.
+
+    `served` (12f.1): the models served elsewhere (load_served) — the name a
+    person gave each is its name here, and each row says how it was served.
 
     `taint`: model id -> tasks whose diagnostics its training data was
     derived from (the service computes it from the run/dataset join). A
@@ -1277,6 +1304,11 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         shorts.setdefault(m.split("/")[-1], []).append(m)
     display = {m: (m if len(shorts[m.split("/")[-1]]) > 1 else m.split("/")[-1])
                for m in models}
+    # 12f.1: a served model is called what it was registered as
+    served = served or {}
+    for m in models:
+        if m in served:
+            display[m] = served[m]["name"]
 
     # headline metric per (task, model)
     cells: dict[str, dict[str, dict]] = {}
@@ -1336,7 +1368,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         got_req = [t for t in required if mid in cells.get(t, {}) and t not in tainted_acc]
         missing = [t for t in required if mid not in cells.get(t, {})]
         official = bool(required) and not missing and not (set(tainted_acc) & set(required))
-        params = r["num_params"] or params_from_name(mid)
+        # 12f.1: a served model's name is a person's words: no size read from it
+        params = r["num_params"] or (None if mid in served else params_from_name(mid))
         judge = _judged_now(r, fingerprints)
         # 12i.1: only the current judge version's scores are in today's views;
         # an earlier one's go to the model's History, "judged by <model>"
@@ -1419,6 +1452,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                                                 .get("v")))}}
                     if gen or any(mid in cells.get(t, {}) for t in GEN_TASKS) else None),
             "thinkingRow": mid.endswith(" · thinking"),
+            # 12f.1: served elsewhere — how, and what its server reported. Its
+            # own row: never averaged with the model it is based on
+            "served": served.get(mid) or r.get("served") or None,
             "id": mid, "name": display[mid],
             "family": re.split(r"[^a-z0-9]", mid.split("/")[-1].lower())[0],
             # uploaded checkpoints are experiment points, not reference models —
@@ -1800,6 +1836,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         "extra": extra,
         # 12a: the Everyday pilot — its own key, read by its own two views
         "everyday": everyday,
+        # 12f.1: the models served elsewhere, results or not yet
+        "served": served,
         "warnings": warnings,
         "checks": checks,
         "meta": {
@@ -2824,6 +2862,28 @@ select { max-width:100%; }
    the accent tint it wore was 3.9:1 in the dark theme */
 .badge.instruct { color:var(--text-primary); font-weight:600; }
 .badge.ckpt { border-style:dashed; color:var(--text-secondary); }
+/* 12f.1: served elsewhere — grey, its tooltip how */
+.badge.served { color:var(--text-secondary); cursor:help;
+  background:color-mix(in srgb, var(--text-secondary) 12%, transparent); }
+.served-head p { margin:4px 0 0; }
+.srvform { display:grid; grid-template-columns:minmax(120px, max-content) minmax(0, 1fr);
+  gap:8px 12px; align-items:start; margin-top:8px; }
+.srvform label { padding-top:6px; }
+.srvform input, .srvform textarea { font:inherit; font-size:var(--fs-2); color:var(--text-primary);
+  background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-1);
+  padding:6px 11px; width:100%; box-sizing:border-box; }
+.srvform input:focus, .srvform textarea:focus { outline:2px solid var(--accent-soft);
+  border-color:var(--accent); }
+.srvform input[type=checkbox] { width:auto; }
+.srvform textarea { min-height:3.2em; resize:vertical; }
+@media (max-width:560px) { .srvform { grid-template-columns:minmax(0, 1fr); }
+  .srvform label { padding-top:0; } }
+.srvlist { list-style:none; padding:0; margin:8px 0 0; }
+.srvlist li { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; padding:4px 0;
+  border-top:1px solid var(--border); }
+.srvlist li .se { overflow-wrap:anywhere; }
+.srvsum { font-weight:600; cursor:pointer; list-style:none; }
+.srvsum::-webkit-details-marker { display:none; }
 .badge.prelim { color:var(--warning-text); border-color:var(--warning); }
 .tiebest { font-weight:650; }
 .tiebest::after { content:"\2009\2248"; color:var(--muted); font-size:9px; vertical-align:1px; }
@@ -3693,6 +3753,9 @@ const state = {
          taintedOnly: false, prelimOnly: false, sort: { key: 'avg', dir: -1 } },  // Models tab
   rvName: '',                          // the name approvals are recorded under (remembered)
   sub: { hf_id: '', kind: 'auto', suite: 'full', submitter: '', note: '', tasks: null },  // Submit form
+  // 12f.1: Test a model ▸ A model served elsewhere
+  srv: { open: false, f: { name: '', base_url: '', key: '', based_on: '', how: '', thinking: 'auto' },
+         msg: '', reported: null, saved: false, busy: '', list: null, loading: false },
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
   // focus from filter inputs and kill slider drags
@@ -5414,6 +5477,10 @@ function modelKinds(m) {
 }
 // a kind's one number, and the line under it
 function kindValue(m, kind) {
+  if (kind === 'standard' && m.served) {
+    const n = genTasks().filter(t => cell(t, m.id)).length;
+    return ['—', `served · IFEval, MMLU-Pro, MATH-500: ${n} of ${genTasks().length}`];
+  }
   if (kind === 'standard') {
     const avg = officialAvg(m), r = rankOf(m);
     return avg != null
@@ -5468,6 +5535,56 @@ function avgVerdictOf(m) {
     : Math.abs(d) / Math.sqrt(sa * sa + sb * sb || 1e-12) > 1.96 ? 'a real gap.' : 'within noise.');
 }
 
+// ---- 12f.1: a model served elsewhere ----
+const SERVED_LINE = 'Multiple-choice benchmarks need the model loaded here; this one is served '
+  + 'elsewhere.';
+const SERVED_SUITES = ['everyday', 'judged', 'generative'];
+const servedOf = id => (DATA.served || {})[id]
+  || (DATA.models.find(x => x.id === id) || {}).served || null;
+const isServedId = id => /^served\//.test(String(id || ''));
+function servedTag(id) {
+  const s = servedOf(id);
+  return s ? el('span', { class: 'badge served', 'data-served-tag': id, title: s.how,
+    text: 'served' }) : '';
+}
+// what its server reported: "…UD-Q4_K_XL.gguf · 22.9 GB · context 16,384 · build b6500"
+function pinLine(p) {
+  p = p || {};
+  return [p.file, p.size ? (p.size / 1e9).toFixed(1) + ' GB' : null,
+    p.ctx ? 'context ' + Number(p.ctx).toLocaleString('en') : null,
+    p.build ? 'build ' + p.build : null].filter(Boolean).join(' · ');
+}
+// its own row, never averaged with its base: the two side by side, when the
+// base is on the board — "Compared with Qwen3.6-35B-A3B loaded here: Everyday 171 vs 176"
+function servedCompare(m) {
+  const s = servedOf(m.id), want = String((s || {}).based_on || '').toLowerCase();
+  const base = want && DATA.models.find(x => x.id.toLowerCase() === want && !x.served);
+  if (!base) return null;
+  const bits = [];
+  const e1 = evdOf(m.id), e2 = evdOf(base.id);
+  if (e1 && e2) bits.push('Everyday ' + (e1.total === e2.total ? `${e1.passed} vs ${e2.passed}`
+    : `${e1.passed} of ${e1.total} vs ${e2.passed} of ${e2.total}`));
+  if (m.judgedAvg != null && base.judgedAvg != null)
+    bits.push(`Knowledge exam ${num(m.judgedAvg, 2)} vs ${num(base.judgedAvg, 2)}`);
+  for (const t of genTasks()) {
+    const a = cell(t, m.id), b = cell(t, base.id);
+    if (a && b) bits.push(`${LB_SHORT[t] || t} ${pct(a.v)} vs ${pct(b.v)}`);
+  }
+  if (!bits.length) return null;
+  return el('p', { class: 'small', 'data-served-compare': m.id }, 'Compared with ',
+    el('a', { href: '#model=' + encodeURIComponent(base.id), text: base.name }),
+    ` loaded here: ${bits.join(' · ')}`);
+}
+function servedHead(m) {
+  const s = servedOf(m.id);
+  if (!s) return '';
+  return el('div', { class: 'served-head', 'data-served-head': m.id },
+    el('p', { class: 'small', 'data-served-how': m.id }, servedTag(m.id), ' ', s.how),
+    el('p', { class: 'small se', 'data-served-pin': m.id, text: 'Its server reported '
+      + pinLine(s.pin) + '. Every run checks it still does.' }),
+    el('p', { class: 'small', 'data-served-loglik': m.id, text: SERVED_LINE }),
+    servedCompare(m));
+}
 function modelHead(m, kinds) {
   const facts = [m.params ? P(m.params) : null, m.source === 'artifact' ? 'checkpoint' : m.kind,
     famOf(m)].filter(Boolean).join(' · ');
@@ -5475,9 +5592,9 @@ function modelHead(m, kinds) {
     el('div', { class: 'mtop' },
       el('div', { class: 'mtop-l' },
         el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
-          warnBadge(m) || '', dupBadge(m) || ''),
+          (m.served ? '' : warnBadge(m)) || '', dupBadge(m) || ''),
         el('p', { class: 'mfacts', 'data-model-facts': '1', text: facts }),
-        trainedFromLine(m))),
+        trainedFromLine(m), servedHead(m))),
       // 12b.3: the page's one main action is the header's, which reads Test
       // this model here — two filled buttons side by side was one too many
     el('div', { class: 'ktiles', 'data-kind-tiles': '1' }, kinds.map(k => kindTile(m, k))));
@@ -5542,7 +5659,7 @@ function kindTile(m, k) {
       msg ? el('span', { class: 'warn small', 'data-everyday-refused': m.id, text: msg }) : '');
   }
   const [v, sub] = kindValue(m, k.kind);
-  return el('button', { ...attrs, title: k.kind === 'standard' ? avgVerdictOf(m) : null,
+  return el('button', { ...attrs, title: k.kind === 'standard' && !m.served ? avgVerdictOf(m) : null,
       onclick: () => showKind(m, k.kind) },
     el('span', { class: 'eyebrow ktile-k', text: k.label }),
     el('span', { class: 'ktile-v', 'data-kind-value': k.kind, text: v }),
@@ -5560,7 +5677,7 @@ function kindTest(m, kind) {
     onclick: () => openSit(m.id) });
   if (kind === 'everyday') return evdTestBtn(m, 'quiet ktest');
   return el('button', { class: 'quiet ktest', 'data-kind-test': 'standard', text: 'Test',
-    onclick: () => { state.sub.suite = 'full'; openTest(m.id); } });
+    onclick: () => { state.sub.suite = m.served ? 'generative' : 'full'; openTest(m.id); } });
 }
 // a tile opens its block, on Scores
 function showKind(m, kind) {
@@ -5572,9 +5689,10 @@ function showKind(m, kind) {
 const MODEL_TABS = { scores: 'Scores', answers: 'Answers', chat: 'Chat', improve: 'Improve',
                      history: 'History' };
 function modelTabs(m) {
-  // 12d.2: Chat on every model page (live) — a base model's says why it can't
+  // 12d.2: Chat on every model page (live) — a base model's says why it can't.
+  // 12f.1: Improve trains the weights — a served model has none here
   return ['scores', 'answers', ...(LIVE ? ['chat'] : []),
-    ...(modelImproveRows(m).n ? ['improve'] : []), 'history']
+    ...(modelImproveRows(m).n && !m.served ? ['improve'] : []), 'history']
     .map(id => [id, MODEL_TABS[id]]);
 }
 // remembered per viewer; a tab this model has not got (Improve) falls back
@@ -5628,7 +5746,9 @@ function kindParts(m, kind) {
   if (kind === 'standard') {
     const diag = part(vDiagnose(m), 'diagnose');
     return [el('p', { class: 'mprose', text: modelSentence(m) }),
-      el('p', { class: 'small', 'data-avg-verdict': '1', text: avgVerdictOf(m)
+      // 12f.1: a served model sits the generative three only, and its page
+      // says why once, in its header — not a list of what it can't sit
+      m.served ? '' : el('p', { class: 'small', 'data-avg-verdict': '1', text: avgVerdictOf(m)
         + ((m.missing || []).length ? ` Missing ${m.missing.join(', ')}.` : '') }),
       // 12h.1: the mode is part of the result
       m.gen ? el('p', { class: 'small', 'data-gen-mode': m.id,
@@ -5751,6 +5871,9 @@ function evdAnswersList(m) {
 }
 
 // ---- Chat (12d.2): the Playground's own component, the model fixed ----
+// 12f.1: the Playground loads its models here; a served one is asked by runs only
+const SERVED_NO_CHAT = 'This model is served elsewhere: the Playground chats only with models '
+  + 'loaded on this server.';
 const BASE_NO_CHAT = 'This is a base model: it has no chat format, so there\u2019s nothing to chat with.';
 function modelChatTab(m) {
   const P = state.pg;
@@ -5759,7 +5882,8 @@ function modelChatTab(m) {
   const offered = pgModel(m.id);
   if (!offered) return [el('div', { class: 'card', 'data-model-chat': m.id, 'data-model-chat-none': '1' },
     el('h2', { text: 'Chat' }),
-    el('p', { class: 'small', 'data-model-chat-why': '1', text: m.kind === 'instruct'
+    el('p', { class: 'small', 'data-model-chat-why': '1', text: m.served ? SERVED_NO_CHAT
+      : m.kind === 'instruct'
       ? 'This model can\u2019t chat here: it runs its own code, which chat doesn\u2019t run.'
       : BASE_NO_CHAT }))];
   if (!whoName()) return [el('div', { class: 'card', 'data-model-chat': m.id },
@@ -5860,8 +5984,13 @@ function provRecord(m) {
       + `${a.experts_per_tok} per token (${a.active_src})` : '')
     + (m.paramsSrc ? ` · from the ${m.paramsSrc === 'config' ? 'harness config' : 'model name'}`
       : '') : null;
+  const sv = servedOf(m.id);
   const prov = [
-    ['hub id', m.id], ['parameters', params],
+    ['hub id', sv ? null : m.id], ['parameters', params],
+    // 12f.1: where and how it is served, and what its server reported
+    ...(sv ? [['served at', sv.base_url], ['how it’s served', sv.how],
+      ['its server reported', pinLine(sv.pin)], ['based on', sv.based_on || null],
+      ['thinking', sv.thinking === 'auto' ? 'the model decides' : sv.thinking]] : []),
     ['training compute', comp ? `${flop(comp.c)} FLOP (6ND, run ${comp.run.name})` : null],
     ['architecture', a.arch], ['shape', a.hidden ? `hidden ${a.hidden} · layers ${a.layers}`
       + ` · heads ${a.heads} · ctx ${a.ctx}` : null],
@@ -5921,6 +6050,15 @@ function sitCta(m) {
 // Every submission of this model, newest first: which suite, what came of it,
 // and the log. "Why is this preliminary?" is answered here rather than in
 // someone's memory of the queue.
+// 12f.1: how a served run was asked — what its server served then
+function runServedLine(r) {
+  let a = {};
+  try { a = JSON.parse(r.arch || '{}') || {}; } catch (e) { /* older row */ }
+  const s = a.served;
+  if (!s) return '';
+  return el('div', { 'data-run-served': String(r.id), text: `served: ${pinLine(s.pin)} · `
+    + `thinking ${s.thinking === 'auto' ? 'as the model decides' : s.thinking} · ${s.how}` });
+}
 function vModelRuns(m) {
   const rows = (state.queue || []).filter(r => r.hf_id === m.id);
   if (!state.queue.length && netReady()) loadQueue();
@@ -5944,7 +6082,7 @@ function vModelRuns(m) {
         return el('span', { class: stClass(st.cls), 'data-stage': st.key, text: st.text }); })()),
       el('td', { class: 'small se' }, r.error || r.progress || '',
         evdEarlierRun(r) ? el('span', { class: 'badge', 'data-earlier-run': String(r.id),
-          text: 'earlier wording' }) : ''),
+          text: 'earlier wording' }) : '', runServedLine(r)),
       el('td', {}, el('a', { href: `api/runs/${r.id}/log`, target: '_blank', rel: 'noopener',
         class: 'small', text: 'log' }))))))));
   return card;
@@ -6051,7 +6189,7 @@ function bestByKind(ms) {
     el('div', { class: 'hcard-v', 'data-best-value': 'exam', text: `${num(weak.v, 2)} / 4` }),
     el('div', { class: 'hcard-name', 'data-best-name': 'exam', title: weak.m.id,
       text: `${weak.m.name} · weakest: ${frName(weak.task)} ${num(weak.v, 2)} / 4` }),
-    LIVE ? hlLink('Improve it →', () => openImprove(weak.m.id)) : go('exam')));
+    LIVE && !weak.m.served ? hlLink('Improve it →', () => openImprove(weak.m.id)) : go('exam')));
   const E = evd();
   // 12i.0: counts over the whole set first — a partial one is never ranked beside them
   const ev = Object.entries(E.models || {}).filter(([id]) => ms.some(m => m.id === id))
@@ -8037,7 +8175,8 @@ function lbEveryday(ms) {
           onclick: ev => { if (ev.target.closest('a, button')) return;
             navigate({ model: m.id, topic: null }); } },
         el('td', { class: 'model pin', 'data-model': m.id },
-          el('a', { class: 'mname mlink', href: '#model=' + encodeURIComponent(m.id), text: m.name })),
+          el('a', { class: 'mname mlink', href: '#model=' + encodeURIComponent(m.id), text: m.name }),
+          servedTag(m.id)),
         groups.map(([g, label]) => {
           const n = evdGroupCount(e, g);
           return el('td', { class: 'num' + (n && !evdMissing(e) ? '' : ' se'), 'data-evd-g': g,
@@ -8261,12 +8400,13 @@ function vLeaderboard(ms) {
             ckBadge(m) || (m.kind === 'instruct'
               ? el('span', { class: 'badge instruct', text: 'instruct' })
               : el('span', { class: 'badge', text: 'base' })),
+            servedTag(m.id),
             // 12h.1: a thinking row, or a model that cannot stop thinking
             m.thinkingRow || ((m.gen || {}).thinking || {}).mode === 'always'
               ? el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
                   title: genMode(m), text: 'thinking' }) : '',
             // a thinking row has only these three: Standard's "preliminary" is not its
-            m.thinkingRow ? '' : warnBadge(m) || '', dupBadge(m) || '',
+            m.thinkingRow || m.served ? '' : warnBadge(m) || '', dupBadge(m) || '',
             dupsOf[m.id] ? dupToggle(m, dupsOf[m.id]) : ''));
         if (c.key === 'params') {
           const a = m.archinfo || {};
@@ -11121,6 +11261,12 @@ function vQueue(part = { form: true, list: true }) {
   // the form's values live in state: picking a model re-renders (to set its
   // kind), and a re-render must not wipe the suite and note already chosen
   const sf = state.sub;
+  // 12f.1: a model served elsewhere sits what a chat endpoint can answer
+  const srvId = isServedId(sf.hf_id.trim());
+  if (srvId) {
+    sf.kind = 'instruct';
+    if (!SERVED_SUITES.includes(sf.suite)) sf.suite = 'everyday';
+  }
   const f = {
     hf_id: modelBox('submit', sf.hf_id, v => { sf.hf_id = v; },
       it => { sf.hf_id = it.id; if (it.kind) sf.kind = it.kind; sf.allow = false;
@@ -11151,7 +11297,9 @@ function vQueue(part = { form: true, list: true }) {
       // 12h.1: instruct models only; MMLU-Pro alone is hours
       ['generative', 'Instruction & maths — IFEval, MMLU-Pro, MATH-500, hours',
         { sub: 'Asked through the chat template and scored on what the model writes. '
-          + 'Instruct models only; never in the average.' }]],
+          + 'Instruct models only; never in the average.' }]]
+      .map(o => srvId && !SERVED_SUITES.includes(o[0])
+        ? [o[0], o[1], { ...(o[2] || {}), disabled: true, title: SERVED_LINE }] : o),
       sf.suite || 'full', v => { sf.suite = v; render(); }, { key: 'submit-suite' }),
     note: el('input', { type: 'text', placeholder: 'note (optional)', style: 'flex:1;min-width:140px',
       'aria-label': 'note', 'data-keep': 'submit-note', value: sf.note,
@@ -11372,7 +11520,10 @@ function vQueue(part = { form: true, list: true }) {
       // 12i.0: one line, no system words
       el('p', { class: 'sub', 'data-suite-help': '1', text: 'Pick a model and what to test. '
         + 'One test runs at a time; results appear on Models.' }),
-      el('div', { class: 'frm' }, f.hf_id, f.kind, f.suite, f.note, btn,
+      el('div', { class: 'frm' }, f.hf_id, srvId ? '' : f.kind, f.suite, f.note, btn,
+        srvId ? el('span', { class: 'propwhy', 'data-why': 'served' },
+          el('span', { class: 'badge served', title: (servedOf(sf.hf_id.trim()) || {}).how || '',
+            text: 'served' }), ' ', SERVED_LINE) :
         cannotRun(sf.hf_id)
           ? el('span', { class: 'propwhy', 'data-why': 'weights',
                          text: noWeightsWhy(sf.hf_id.trim()) })
@@ -11383,9 +11534,109 @@ function vQueue(part = { form: true, list: true }) {
       topicBoxes, genOpts,
       state.qmsg ? el('p', { class: 'warn', 'data-qmsg': '1', style: 'margin-top:8px',
         text: state.qmsg }) : '') : null,
+    part.form ? servedCard(sf) : null,
     part.list ? el('div', { class: 'card', 'data-all-runs': '1' },
       el('h2', { text: 'All runs' }),
       qToolbar, qPager, qTableWrap, qEmpty) : null].filter(Boolean);
+}
+
+// ---------------------------------------------------------------------------
+// 12f.1: Test a model's fourth way — a model another program serves over an
+// OpenAI-compatible address. Check asks the server what it serves; Save asks
+// again and keeps it, pinned to that file. The key is sent once, kept on the
+// server, and never shown again
+// ---------------------------------------------------------------------------
+async function loadServed() {
+  const S = state.srv;
+  S.loading = true;
+  try { S.list = (await api('api/served')).models || []; } catch (e) { S.list = []; }
+  S.loading = false;
+  if (state.testOpen) render();
+}
+async function srvDo(what) {
+  const S = state.srv;
+  if (what === 'save' && !whoName()) { askName(); return; }
+  S.busy = what; S.msg = ''; S.saved = false;
+  render();
+  try {
+    if (what === 'check') {
+      S.reported = (await post('api/served/check', { ...S.f })).reported;
+    } else {
+      const m = (await post('api/served', { ...S.f, by: whoName() })).model;
+      S.reported = m.pin; S.saved = true;
+      S.f.key = '';                                      // sent once, never shown again
+      S.list = null;
+      Object.assign(state.sub, { hf_id: m.id, kind: 'instruct', note: '' });
+      if (!SERVED_SUITES.includes(state.sub.suite)) state.sub.suite = 'everyday';
+      await refreshResults();
+    }
+  } catch (e) {
+    S.msg = String((e && e.message) || e);
+    S.reported = null;
+  }
+  S.busy = '';
+  render();
+}
+function servedCard(sf) {
+  const S = state.srv, F = S.f;
+  // the list loads when the card is opened, never with the dialog: its answer
+  // redraws the dialog, and a redraw under someone picking a model moves it
+  if (S.open && S.list == null && !S.loading && netReady()) loadServed();
+  const inp = (key, attrs = {}) => el('input', { type: 'text', id: 'srv-' + key, 'data-srv': key,
+    'data-keep': 'srv-' + key, value: F[key] || '', autocomplete: 'off', spellcheck: 'false',
+    oninput: e => { F[key] = e.target.value; }, ...attrs });
+  const bases = el('datalist', { id: 'srv-bases' }, DATA.models.filter(m => !m.served)
+    .map(m => el('option', { value: m.id })));
+  const busy = !!S.busy;
+  return el('details', { class: 'card', 'data-served-card': '1', open: S.open ? '' : null,
+      ontoggle: e => {
+        S.open = e.target.open;
+        if (S.open && S.list == null && !S.loading && netReady()) loadServed();
+      } },
+    el('summary', { class: 'srvsum', text: 'A model served elsewhere ▸' }),
+    el('p', { class: 'sub', text: 'A model another program serves over an OpenAI-compatible '
+      + 'address, such as llama-server. The board asks it questions; it never starts or stops '
+      + 'that server.' }),
+    el('div', { class: 'srvform' },
+      el('label', { for: 'srv-name', text: 'Name' }),
+      inp('name', { placeholder: 'Qwen3.6-35B-A3B k4-LDA (phone build)' }),
+      el('label', { for: 'srv-base_url', text: 'Address' }),
+      inp('base_url', { placeholder: 'http://host.docker.internal:8090/v1' }),
+      el('label', { for: 'srv-key', text: 'Key' }),
+      inp('key', { type: 'password', placeholder: 'optional · kept on the server, never shown again' }),
+      el('label', { for: 'srv-based_on', text: 'Based on' }),
+      inp('based_on', { placeholder: 'Qwen/Qwen3.6-35B-A3B', list: 'srv-bases' }),
+      el('label', { for: 'srv-how', text: 'How it’s served' }),
+      el('textarea', { id: 'srv-how', 'data-srv': 'how', 'data-keep': 'srv-how', rows: '2',
+        placeholder: 'llama.cpp fork teraformer/lda-2026-09-22 @ 91428471f, --cpu-moe, '
+          + 'lookahead 1, fusion off', oninput: e => { F.how = e.target.value; } }, F.how || ''),
+      el('label', { text: 'Thinking' }),
+      el('div', {}, Select('thinking', [['on', 'on'], ['off', 'off'],
+        ['auto', 'the model decides']], F.thinking || 'auto', v => { F.thinking = v; },
+        { key: 'srv-thinking' }))),
+    bases,
+    el('div', { class: 'frm', style: 'margin-top:10px' },
+      el('button', { class: 'quiet', 'data-srv-check': '1', disabled: busy ? '' : null,
+        text: S.busy === 'check' ? 'Checking…' : 'Check', onclick: () => srvDo('check') }),
+      el('button', { class: 'primary', 'data-srv-save': '1', disabled: busy ? '' : null,
+        text: S.busy === 'save' ? 'Checking and saving…' : 'Save', onclick: () => srvDo('save') })),
+    S.reported ? el('p', { class: 'small', 'data-srv-reported': '1',
+      text: (S.saved ? 'Saved, pinned to what the server reports: ' : 'The server reports: ')
+        + pinLine(S.reported) + (S.saved ? '. Pick what to test it on above, then Start test.'
+          : '') }) : '',
+    S.msg ? el('p', { class: 'warn small', 'data-srv-msg': '1', text: S.msg }) : '',
+    (S.list || []).length ? el('ul', { class: 'srvlist', 'data-srv-list': '1' },
+      S.list.map(r => el('li', { 'data-srv-row': r.id },
+        el('b', { text: r.name }), servedTag(r.id) || el('span', { class: 'badge served',
+          title: r.how, text: 'served' }),
+        el('span', { class: 'small se', text: pinLine(r.pin) }),
+        el('button', { class: 'quiet', 'data-srv-test': r.id, text: 'Test it',
+          onclick: () => {
+            Object.assign(sf, { hf_id: r.id, kind: 'instruct' });
+            if (!SERVED_SUITES.includes(sf.suite)) sf.suite = 'everyday';
+            state.qmsg = '';
+            render();
+          } })))) : '');
 }
 
 // ---------------------------------------------------------------------------
@@ -11423,14 +11674,15 @@ function closeTest() {
 }
 function testDialog() {
   if (!state.testOpen || !LIVE) return [];
-  const [form] = vQueue({ form: true });
+  // the form, and (12f.1) A model served elsewhere under it
+  const form = vQueue({ form: true });
   // the backdrop closes it on a click, and is not itself a control
   const back = el('div', { class: 'dlg-back', 'data-dialog': 'test' },
     el('div', { class: 'dlg testdlg', role: 'dialog', 'aria-modal': 'true',
         'aria-labelledby': 'test-title' },
       el('button', { class: 'ghost dlg-x', 'data-dialog-close': '1', 'aria-label': 'close',
         text: '✕ Close', onclick: closeTest }),
-      form));
+      ...form));
   back.addEventListener('click', e => { if (e.target === back) closeTest(); });
   return [back];
 }
@@ -12335,7 +12587,8 @@ const judgedTopics = m => ((DATA.judged || {}).exam || []).filter(t => {
 function impModels() {
   const own = new Set([...(state.rv.proposals || []), ...(state.rv.datasets || [])]
     .map(x => x.model));
-  return DATA.models.filter(m => !m.duplicateOf && (judgedTopics(m).length || own.has(m.id)))
+  return DATA.models.filter(m => !m.duplicateOf && !m.served
+      && (judgedTopics(m).length || own.has(m.id)))
     .sort((a, b) => judgedTopics(b).length - judgedTopics(a).length || natCmp(a.name, b.name));
 }
 // the model shown: the address's, else the viewer's last, else the one with
@@ -16414,7 +16667,8 @@ def build_report(runs: list[dict], out_path: Path, title: str,
                  calibration: dict | None = None, taint: dict | None = None,
                  parents: dict | None = None, judge_identity: dict | None = None,
                  banner: str = "", banner_link: tuple[str, str] = ("", ""),
-                 fingerprints: dict | None = None, everyday: dict | None = None) -> Path:
+                 fingerprints: dict | None = None, everyday: dict | None = None,
+                 served: dict | None = None) -> Path:
     if not runs:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(f"<h1>No lm-eval results found.</h1><p>{html.escape(banner)}</p>",
@@ -16422,7 +16676,7 @@ def build_report(runs: list[dict], out_path: Path, title: str,
         return out_path
     payload = build_payload(merge_runs(runs), title, source="", calibration=calibration,
                             taint=taint, parents=parents, judge_identity=judge_identity,
-                            fingerprints=fingerprints, everyday=everyday)
+                            fingerprints=fingerprints, everyday=everyday, served=served)
     blob = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     page = (TEMPLATE
             .replace("__TITLE__", html.escape(title))
@@ -16483,7 +16737,8 @@ def main() -> int:
         print("no built exam found (--exam-tasks): judged results are shown whatever question "
               "set they were graded on")
     out = build_report(runs, args.out, args.title, calibration=cal, fingerprints=fps,
-                       everyday=load_everyday(args.results if args.results.is_dir() else None))
+                       everyday=load_everyday(args.results if args.results.is_dir() else None),
+                       served=load_served(args.results if args.results.is_dir() else None))
     print(f"\nwrote {out}  ({out.stat().st_size / 1024:.1f} KB)")
 
     if args.csv:
