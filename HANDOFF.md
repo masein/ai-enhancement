@@ -3310,6 +3310,28 @@ The addendum from masein; `scripts/report_lm_eval.py` only.
     preliminary filter and the frontier chart's count. They can never run
     the required tasks, so they have no average to earn.
 
+### Fix — Models tables that scroll sideways (masein, 2026-09-27)
+
+Seen on Standard ▸ Knowledge: the "scroll →" hint sat on the last column's
+header. A click sorted by that hidden column, a hover showed its tooltip,
+it never scrolled, and it hid that column's numbers.
+- **`hfade` has two buttons above the box, over no column:**
+  - "scroll →" scrolls about a screen, less the pinned # and Model;
+  - "← scroll" appears once scrolled;
+  - each hides when there's nothing more that way (`data-more`, `data-less`),
+    and the bar isn't there when the box fits (`data-wide`).
+- **The fade** is 8px, takes no clicks, and stays off the bar, so the last
+  column wholly in view is readable.
+- **Tooltips:**
+  - `placeTip` measures the tooltip at 0,0 first. A fixed box left near the
+    right edge had measured narrow, "fitted", then grown off the screen.
+  - A column header's tooltip is bounded by its table's box, so near the
+    right edge it opens to the left.
+- **Params:** a sparse model's "908M act" is a small line under "2.3B". On one
+  line it ran into the name beside it.
+- The "Not tested on this" line and its rows stay in view while the table
+  scrolls.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,
