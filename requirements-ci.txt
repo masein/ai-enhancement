@@ -1,0 +1,7 @@
+# CI on the mirror: the dev tooling, plus what runs it in parallel. Kept apart
+# from requirements-dev.txt so scripts/check.sh's image (built from that file,
+# about an hour on the office link) does not rebuild for plugins it never uses:
+# the local check stays serial.
+-r requirements-dev.txt
+pytest-xdist>=3.6        # lint-unit: the unit and API tests, -n auto
+pytest-split>=0.10       # browser: five shards, by .test_durations

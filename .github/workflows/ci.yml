@@ -1,16 +1,25 @@
-# Lint, compile, test, and drive the dashboard in Chromium, on a plain runner:
+# Lint, compile, test, and drive the dashboard in Chromium, on plain runners:
 # no GPU, no Hub, no torch. Tests that need either are marked `gpu` / `network`
 # and deselected here.
 #
-# Manual only since 2026-09-24: the account used its 2,000 Actions minutes, and
-# a push or PR now shows a job that never started. scripts/check.sh runs the
-# same steps locally and is the gate before a merge (HANDOFF.md § Checks). Run
-# this by hand (Actions ▸ ci ▸ Run workflow) when there are minutes to spend.
+# Started by hand (Actions ▸ ci ▸ Run workflow, or `gh workflow run`), on the
+# public mirror masein/ai-enhancement, where hosted runners are free and run
+# up to 20 jobs at once (HANDOFF.md § 5b). scripts/check.sh runs the same tests
+# locally, one after another.
+#
+# In parallel, and no test left out:
+#   lint-unit  ruff and a compile pass, and the unit and API tests in three
+#              shards, each on every core (pytest-split by .test_durations,
+#              then pytest-xdist -n auto)
+#   browser    the dashboard suite in five shards, each its share of
+#              `-m dashboard` by the committed .test_durations (pytest-split;
+#              HANDOFF § 5b says how to regenerate it)
+#   ci         green only when both are: the one result to read
 #
 # The Docker image build is a separate job, and runs only when asked for
 # (build_image): the pytorch base image is multi-GB, and since 12a.5b the image
 # also pulls the ~14 GB devel image and compiles two CUDA kernels — more than
-# an hour, and more disk than a hosted runner has. A check is the test job.
+# an hour, and more disk than a hosted runner has. A check is the jobs above.
 name: ci
 
 on:
@@ -26,37 +35,86 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  lint-unit:
     runs-on: ubuntu-latest
-    # the browser suite passed 20 minutes with the Reader's tests (11g), and the
-    # whole job took 18–25 minutes by 12a; 12a.5a's 776 probes and the new
-    # browser tests add about a quarter. The limit is a guard against a hung
-    # run, not a budget
-    timeout-minutes: 60
+    # a guard against a hung run, not a budget: serial, the unit tests took 13–27 minutes
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # a 4-core runner gives the workers about 2.3 times one core (they
+        # build the fixture tree, which is CPU work), so three machines, not
+        # more workers, bring this under the browser shards' time
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: requirements-dev.txt
-      - run: pip install -r requirements-dev.txt
+          cache-dependency-path: |
+            requirements-dev.txt
+            requirements-ci.txt
+      - run: pip install -r requirements-ci.txt
       - name: ruff
+        if: matrix.shard == 1
         run: ruff check .
       - name: py_compile scripts/ service/ clients/
+        if: matrix.shard == 1
         run: python -m compileall -q scripts service clients
-      - name: unit and API tests
-        run: pytest -q -m "not gpu and not network and not dashboard"
+      - name: unit and API tests, shard ${{ matrix.shard }} of 3
+        run: >-
+          pytest -q -n auto --dist worksteal --durations=15
+          -m "not gpu and not network and not dashboard"
+          --splits 3 --group ${{ matrix.shard }}
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false            # every shard reports, so one run shows every failure
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            requirements-ci.txt
+      - run: pip install -r requirements-ci.txt
+      - name: playwright version
+        id: pw
+        run: echo "version=$(python -c 'import importlib.metadata as m; print(m.version("playwright"))')" >> "$GITHUB_OUTPUT"
+      # the browser download is the slow part; the system libraries it needs
+      # are installed every time (apt, not cacheable here)
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - name: playwright chromium
         run: playwright install --with-deps chromium
-      - name: dashboard smoke
-        run: pytest -q -m dashboard
+      - name: dashboard, shard ${{ matrix.shard }} of 5
+        run: pytest -q -m dashboard --splits 5 --group ${{ matrix.shard }}
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: failure()
         with:
-          name: dashboard-screenshots
+          name: dashboard-screenshots-shard-${{ matrix.shard }}
           path: tests/_screens/
           if-no-files-found: ignore
+
+  ci:
+    needs: [lint-unit, browser]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: both jobs green
+        run: |
+          echo "lint-unit: ${{ needs.lint-unit.result }} · browser: ${{ needs.browser.result }}"
+          test "${{ needs.lint-unit.result }}" = success
+          test "${{ needs.browser.result }}" = success
 
   docker-image:
     if: github.event_name == 'workflow_dispatch' && inputs.build_image
