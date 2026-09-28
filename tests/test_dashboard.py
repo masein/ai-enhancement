@@ -670,13 +670,16 @@ def test_the_models_table_lists_every_model_and_filters_it(surface):
 def test_the_radars_model_chips_are_the_only_comparison(surface):
     """11c: the radar's chips replaced the compare column. Up to five models,
     added from a search and removed with ×; a sixth waits for a free slot,
-    and says so. The Models tab has no tick at all."""
+    and says so. The Models tab has no compare column (12m.1: its rows' ticks
+    open Compare, a view of its own)."""
     pg = surface.open("#tab=models")
     assert pg.locator("table.jd[data-models-table] input[type=checkbox][aria-label^='compare']"
                       ).count() == 0
     surface.tab("Leaderboard")
     assert pg.locator("table.lb thead th.cmp").count() == 0
-    assert pg.locator("table.lb tbody input[type=checkbox]").count() == 0
+    # 12m.1: a row's one tick is Compare's (a view of its own, Compare N ▸)
+    ticks = pg.locator("table.lb tbody input[type=checkbox]")
+    assert ticks.count() == pg.locator("table.lb tbody input[data-cmp-tick]").count() > 0
     radar = pg.locator("[data-radar]")
     assert "Add up to 5 models" in radar.locator("[data-radar-prompt]").text_content()
     ids = [m["id"] for m in DATA_MODELS(pg)][:6]

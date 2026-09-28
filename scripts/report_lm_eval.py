@@ -737,8 +737,11 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
     Each setup (as built, lookahead routing, …) is a column of its own on the
     model page. A benchmark's cell is the newest full run on the current
     dataset (gguf_data/manifest.json); a subset only while there is no full
-    one, and labelled so. Models shows the "as built" setup, or the first
-    registered one with results. Runs on an earlier dataset, and every run,
+    one, and labelled so. A GGUF's own row on Models shows its "as built"
+    setup and nothing else (12m.1: it fell back to the first setup with
+    results, so the phone build's plain row showed its lookahead numbers as
+    if built so); each other setup is a row of its own ("· lookahead 1").
+    Runs on an earlier dataset, and every run,
     are the model's History — 12f.5: and MMLU measured on the cloze file
     (each option's text scored, before it was lettered), "cloze, not
     comparable", whatever the manifest says. Pairs, benchmark by benchmark,
@@ -829,9 +832,9 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
         rows += [{**seen_setup[mid][su], "current": False, "benches": cells}
                  for su, cells in (per.get(mid) or {}).items() if su not in now_ids]
         setups_out[mid] = rows
-        show = next((x for x in rows if x["current"] and x["benches"]), None)
-        if show:
-            models[mid] = show["benches"]
+        built = next((x for x in rows if x["id"] == gb.AS_BUILT["id"] and x["benches"]), None)
+        if built:
+            models[mid] = built["benches"]
     base_of = {mid: str((registered.get(mid) or (served or {}).get(mid) or {}).get("based_on")
                         or "").lower() for mid in per}
 
@@ -3065,8 +3068,9 @@ table.lb .mcell { display:flex; align-items:center; gap:4px; max-width:260px; ov
 table.lb .mcell .mname { flex:0 3 auto; min-width:40px; max-width:none; overflow:hidden;
   text-overflow:ellipsis; }
 /* 12f.2b: a phone build's row carries a setup in its name, "k4-LDA · lookahead 1" */
-table.lb td.model:has([data-phone-tag]) { max-width:340px; }
-table.lb td.model:has([data-phone-tag]) .mcell { max-width:320px; }
+/* 12m.1: 22px more for the Compare tick before the name */
+table.lb td.model:has([data-phone-tag]) { max-width:362px; }
+table.lb td.model:has([data-phone-tag]) .mcell { max-width:342px; }
 /* a long badge ("duplicate of <name>") gives way too, after the name: every
    child stays inside the cell. The short ones (base, prelim) keep their word */
 table.lb .mcell .badge { flex:none; white-space:nowrap; }
@@ -3102,6 +3106,8 @@ table.lb .mcell .duptoggle { flex:none; padding:0 2px; min-height:0; }
   table.lb td.model { padding-left:6px; padding-right:4px; }
   table.lb .mcell { max-width:calc(45cqi - 42px); }
   table.lb .mcell .badge:not(.prelim), table.lb .mcell .duptoggle { display:none; }
+  /* 12m.1: and no Compare tick — on a phone, Models ▾ ▸ Compare these */
+  table.lb .mcell input.cmptick { display:none; }
   /* the active parameters stay in the tooltip: Params is one short number */
   table.lb td .act { display:none; }
   table.lb .mcell .badge.prelim { flex:0 1 auto; min-width:0; overflow:hidden;
@@ -3246,6 +3252,22 @@ svg .wbar:focus rect { stroke:var(--accent); stroke-width:2; }
 .mchip { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-sans);
   font-size:var(--fs-1); border:1px solid var(--border); border-radius:999px; padding:2px 4px 2px 10px; }
 details.astable > summary { cursor:pointer; font-size:var(--fs-1); color:var(--accent); }
+/* 12m.1: Compare — benchmarks down the side, the models across, grouped by method */
+table.cmp tbody th { text-transform:none; letter-spacing:normal; font-family:var(--font-sans);
+  color:var(--text-primary); font-size:var(--fs-2, 13px); }
+table.cmp th.cmp-name { text-align:left; font-weight:400; white-space:normal; min-width:150px; }
+@media (max-width:520px) { table.cmp th.cmp-name { min-width:110px; max-width:130px; } }
+table.lb.cmp .cmp-tag, table.lb.cmp td.num .cmp-tag { display:block; font-size:10px;
+  line-height:1.3; white-space:normal; font-family:var(--font-sans); }
+table.cmp td.cmp-off { color:var(--muted); }
+table.cmp tr.cmp-group th { text-align:left; background:var(--surface-2, var(--surface-1)); }
+table.cmp tr.cmp-group .cmp-fold { font-weight:600; color:var(--text-primary); padding:2px 0; }
+table.cmp thead th .key, ul.cmp-models .key { display:inline-block; width:9px; height:9px;
+  border-radius:50%; vertical-align:middle; margin-right:4px; }
+ul.cmp-models { list-style:none; margin:6px 0 10px; padding:0; font-size:var(--fs-1); }
+ul.cmp-models li { margin:2px 0; overflow-wrap:anywhere; }
+.mcell input.cmptick { margin:0 6px 0 0; flex:none; cursor:pointer; }
+.benchpick .pickers { display:flex; gap:8px; flex-wrap:wrap; }
 @media (max-width:720px) { .igrid { grid-template-columns:1fr; } .lbbar .pills { margin-left:0; } }
 @media (max-width:520px) { .igrid { grid-template-columns:minmax(0, 1fr); } }
 /* a table that scrolls sideways can pin its first column (11c uses it) */
@@ -4177,7 +4199,7 @@ const state = {
   trQ: '', trStatus: 'all', trOrder: 'updated',            // runs-list filter/sort
   trMetricQ: '', trSecClosed: {}, trSecSig: '',            // metric panels filter / sections
   trXAxis: 'step',                     // benchmark-join chart: step | tokens | compute
-  cmpSel: [], cmpColors: {},                               // radar: compared models (≤CMP_MAX)
+  cmpSel: [], cmpColors: {}, cmpOpen: {},                               // radar: compared models (≤CMP_MAX)
   accScale: 'raw',                     // task panels: 'raw' | 'chance' (diverging)
   cmpEvicted: '',                      // last model the compare FIFO dropped
   radarNorm: 'chance', radarAxes: 'tasks',                 // radar scaling / axis mode
@@ -4482,7 +4504,7 @@ const taskLabel = t => {
 // The chip row under a task heading: what it measures, how many options, how
 // many of our models have run it, whether it separates them, and where the
 // ceiling is. Each chip carries the long version in its title.
-function taskChips(t) {
+function taskChips(t, o = {}) {
   const i = DATA.tasks[t] || {};
   const out = [];
   if (i.domain) out.push(el('span', { class: 'tchip dom', text: i.domain,
@@ -4490,7 +4512,8 @@ function taskChips(t) {
   if (i.options) out.push(el('span', { class: 'tchip', text: i.options + '-choice',
     title: `multiple choice with ${i.options} options — chance is `
          + `${Math.round(100 / i.options)}%` }));
-  if (i.nmodels) out.push(el('span', { class: 'tchip', text: i.nmodels + ' models',
+  // 12m.1: a panel says how many of the chosen models it holds, in its own line
+  if (i.nmodels && !o.panel) out.push(el('span', { class: 'tchip', text: i.nmodels + ' models',
     title: 'models on this board with a score for this task' }));
   // a task where no pair of models differs by more than their combined error is
   // measuring nothing here, and today it looks identical to one that works
@@ -4745,9 +4768,13 @@ function niceTicks(hi, want = 4) {
 // eleven models cannot share eight distinguishable hues), whiskers = ±1 stderr,
 // chance line where the task has one.
 function barPanel(task, models, opts) {
-  const info = DATA.tasks[task] || {};
+  // 12m.1: a panel of another method (the GGUF's) brings its own cells,
+  // chance and header; opts.hl are the models drawn in colour, the rest grey
+  const get = opts.get || (m => cell(task, m.id));
+  const info = opts.info || DATA.tasks[task] || {};
   const lower = !!opts.lower;
-  const rows = models.map(m => ({ m, c: cell(task, m.id) })).filter(r => r.c)
+  const hl = opts.hl || [];
+  const rows = models.map(m => ({ m, c: get(m) })).filter(r => r.c)
                      .sort((a, b) => lower ? a.c.v - b.c.v : b.c.v - a.c.v);
   const shots = [...new Set(rows.map(r => r.c.shots).filter(s => s != null))];
   const ns    = [...new Set(rows.map(r => r.c.n).filter(n => n != null))];
@@ -4757,7 +4784,7 @@ function barPanel(task, models, opts) {
   const noisy = c => hasChance && (c.v - 1.96 * (c.se || 0)) <= info.chance;
   const above = hasChance ? rows.filter(r => !noisy(r.c)).length : 0;
   // missing models: name them, and say WHY when the answer is "quick suite"
-  const missing = models.filter(m => !cell(task, m.id));
+  const missing = models.filter(m => !get(m));
   const missTip = missing.length
     ? 'missing: ' + missing.slice(0, 12).map(m => m.name).join(', ')
       + (missing.length > 12 ? ` +${missing.length - 12} more` : '')
@@ -4765,12 +4792,16 @@ function barPanel(task, models, opts) {
          ? ' — checkpoints ran the quick suite; resubmit with suite=full to fill this panel'
          : '')
     : null;
-  const panel = el('div', { class: 'panel' },
-    el('h3', { text: taskLabel(task) }),
-    taskChips(task),
-    el('div', { class: 'pmeta', title: missTip, text:
-      (lower ? 'lower is better' : 'higher is better')
-      + (shots.length ? ` · ${shots.length > 1 ? 'MIXED n-shot!' : shots[0] + '-shot'}` : '')
+  const panel = el('div', { class: 'panel', 'data-panel': opts.key || task,
+      'data-panel-models': String(rows.length) },
+    el('h3', { text: opts.label || taskLabel(task) }),
+    opts.info ? '' : taskChips(task, { panel: true }),
+    // 12m.1: the method first, and how many of the chosen models the panel holds
+    el('div', { class: 'pmeta', 'data-panel-method': opts.key || task, title: missTip, text:
+      (opts.method || ('lm_eval' + (shots.length === 1 ? ` · ${shots[0]}-shot` : '')))
+      + ` · ${rows.length} model${rows.length === 1 ? '' : 's'}`
+      + ' · ' + (lower ? 'lower is better' : 'higher is better')
+      + (shots.length > 1 ? ' · MIXED n-shot!' : '')
       + (ns.length === 1 ? ` · ${ns[0]} items` : '')
       + (hasChance && rows.length > 1
          ? ` · ${above ? above + ' of ' + rows.length + ' clearly above chance'
@@ -4782,8 +4813,11 @@ function barPanel(task, models, opts) {
   // long lists collapse to the best 12 — a wall of forty chance-level bars is
   // scrolling, not reading; the button below the axis brings the rest back
   const CAPN = 12;
-  const capped = !state.panelOpen[task] && rows.length > CAPN + 2;
-  const shown = capped ? rows.slice(0, CAPN) : rows;
+  const pkey = opts.key || task;
+  // a highlighted model is never cut off by the cap
+  const capped = !state.panelOpen[pkey] && rows.length > CAPN + 2;
+  const shown = capped ? rows.slice(0, CAPN).concat(rows.slice(CAPN).filter(r => hl.includes(r.m.id)))
+    : rows;
 
   // "vs chance" is a DIVERGING bar centred on the chance line instead of on
   // zero — the form for "above/below a baseline". It is the honest fix for
@@ -4871,7 +4905,8 @@ function barPanel(task, models, opts) {
     // curiosity: an instruct template applied to a base model puts real models
     // under the line, so the chart has to be able to say so
     const below = div && dv(c) < 0;
-    const hue = below ? 'var(--s8)' : 'var(--s1)';
+    const hs = hl.indexOf(m.id);
+    const hue = hl.length ? (hs >= 0 ? trColor(hs) : 'var(--axis)') : below ? 'var(--s8)' : 'var(--s1)';
     // 18, not 22: at 11.5px a 22-character id runs past the panel's left edge and
     // the first letters are simply cut off. The full id is on hover and in the
     // row tooltip, so the gutter is the constraint, not the information.
@@ -4883,8 +4918,9 @@ function barPanel(task, models, opts) {
       'data-model': m.id, 'data-full-name': m.name, text: name },
       el('svg:title', { text: m.name === m.id ? m.id : `${m.name}\n${m.id}` })));
     svg.append(el('svg:path', { class: 'bar', 'data-model': m.id,
+      'data-hl': hs >= 0 ? String(hs) : null,
       d: barPath(base, vx, y, BH),
-      opacity: dim ? 0.45 : null,
+      opacity: dim ? 0.45 : hl.length && hs < 0 ? 0.35 : null,
       'fill-opacity': isCk ? 0.28 : null,
       stroke: isCk ? hue : null,
       'stroke-width': isCk ? 1.2 : null,
@@ -4929,7 +4965,7 @@ function barPanel(task, models, opts) {
   if (rows.length > CAPN + 2)
     panel.append(el('button', { style: 'margin:2px 0 8px;padding:3px 10px;font-size:12px',
       text: capped ? `show all ${rows.length}` : `show best ${CAPN}`,
-      onclick: () => { state.panelOpen[task] = !state.panelOpen[task]; render(); } }));
+      onclick: () => { state.panelOpen[pkey] = !state.panelOpen[pkey]; render(); } }));
   return panel;
 }
 
@@ -5941,7 +5977,7 @@ function modelKinds(m) {
   const ran = m.date ? Date.parse(String(m.date)) / 1000 : 0;
   return [
     { kind: 'standard', label: 'Standard',
-      taken: [...DATA.accTasks, ...DATA.pplTasks].some(t => cell(t, m.id)) || ggufHas(m.id),
+      taken: [...DATA.accTasks, ...DATA.pplTasks].some(t => cell(t, m.id)) || ggufAny(m.id),
       at: ran || 0 },
     (J.exam || []).length ? { kind: 'exam', label: 'Knowledge exam',
       taken: jt.length > 0 || ((m.judge || {}).history || []).length > 0,
@@ -6150,6 +6186,9 @@ function modelHead(m, kinds) {
         el('div', { class: 'mhead' }, el('h1', { class: 'mtitle', text: m.name }),
           (m.served || ggufOnly(m) ? '' : warnBadge(m)) || '', dupBadge(m) || ''),
         el('p', { class: 'mfacts', 'data-model-facts': '1', text: facts }),
+        // 12m.1: this model beside others, on Models ▸ Compare
+        el('p', { class: 'small' }, el('button', { class: 'quiet', 'data-compare-with': m.id,
+          text: 'Compare with…', onclick: () => openCompare([m.rowOf || m.id]) })),
         trainedFromLine(m), servedHead(m), ggufHead(m))),
       // 12b.3: the page's one main action is the header's, which reads Test
       // this model here — two filled buttons side by side was one too many
@@ -6558,7 +6597,7 @@ const setupWords = x => [...Object.entries(x.env || {}).map(([k, v]) => `${k}=${
   ...(x.flags || [])].join(' ') || 'nothing added';
 function ggufPart(m) {
   const reg = ((G().registered || {})[m.id]);
-  if (!ggufHas(m.id) && !reg) return '';
+  if (!ggufAny(m.id) && !reg) return '';
   // a column a setup: as built, then each setup, side by side
   const sets = ((G().setups || {})[m.id] || []).filter(x => x.current || Object.keys(x.benches
     || {}).length);
@@ -7444,8 +7483,15 @@ function viewHash(v) {
     return `tab=${place}&sub=${SUB_SLUG[v]}`
       // 12g.1: which model Improve is on, so a link opens it
       + (v === 'pipeline' && state.imp.model ? '&model=' + encodeURIComponent(state.imp.model)
-        : '');
+        : '')
+      // 12m.1: the models chosen (Models' own choice) and the highlighted ones
+      + (v === 'tasks' ? benchHash() : '');
   return 'tab=' + (PAGE_SLUG[v] || v);
+}
+function benchHash() {
+  const L = lbS(), ids = xs => xs.map(encodeURIComponent).join(',');
+  return (L.models ? '&models=' + ids(L.models) : '')
+    + ((L.hl || []).length ? '&hl=' + ids(L.hl) : '');
 }
 // where an address lands: its view, and the state it carries. Old names and
 // new ones both, so a bookmark from before 12b opens its new home (§8)
@@ -7473,6 +7519,15 @@ function viewOfHash(name, params) {
   }
   if (n === 'improve') v = sub || 'pipeline';
   if (n === 'benchmarks') v = ['tasks', 'exam', 'everyday'].includes(sub) ? sub : benchSub();
+  if (v === 'tasks') {
+    // 12m.1: the chosen models and the highlighted ones, from the address
+    const L = lbS(), ids = new Set(((DATA || {}).models || []).map(m => m.id));
+    const list = k => [...new Set((p.get(k) || '').split(',').map(x => x.trim())
+      .filter(id => id && (!DATA || ids.has(id))))];
+    const chosen = list('models'), hl = list('hl').slice(0, 3);
+    L.models = chosen.length ? chosen : null;
+    L.hl = hl.length ? hl : null;
+  }
   if (!v || !has(v)) return null;
   if (v === 'leaderboard') {
     lbFromHash(params || '');
@@ -8366,7 +8421,10 @@ function lbS() {
       state.lbSe = localStorage.getItem('bench-lb-se') === 'on';
     } catch (e) { /* private mode: the defaults */ }
     state.lb = { ...LB_DEFAULTS, open: [], models: null, cols: null, tint, howto, shown: {},
-                 focus: null, weak: null, radarSrc: 'tasks', view: 'standard', stdChip: 'all' };
+                 focus: null, weak: null, radarSrc: 'tasks', view: 'standard', stdChip: 'all',
+                 // 12m.1: the compared models, the shape's source, the ticked rows,
+                 // and Benchmarks' highlighted models (at most three)
+                 cmp: null, shapeSrc: 'tasks', ticks: [], hl: null };
   }
   return state.lb;
 }
@@ -8375,6 +8433,9 @@ function lbS() {
 // defaults, so a plain link stays plain
 function lbHash() {
   const L = lbS(), out = [];
+  // 12m.1: "view=compare&m=Qwen%2FQwen3-1.7B,served%2F…" — the models and nothing else
+  if (L.view === 'compare')
+    return 'view=compare' + ((L.cmp || []).length ? '&m=' + L.cmp.map(encodeURIComponent).join(',') : '');
   if (L.view && L.view !== 'standard') out.push('view=' + L.view);
   for (const k of Object.keys(LB_DEFAULTS)) {
     if (k === 'chip' && L.view !== 'standard') continue;
@@ -8395,7 +8456,7 @@ function lbFromHash(rest) {
   if (p.get('chip') === 'truthfulness') p.set('chip', 'trust');
   // 12f.2b: the old On phone view is Models with the phone builds chosen
   L.phoneFilter = view === 'phone';
-  L.view = Object.keys(MODELS_VIEWS).includes(view) ? view : 'standard';
+  L.view = Object.keys(MODELS_VIEWS).includes(view) || view === 'compare' ? view : 'standard';
   L.stdChip = LB_CHIPS.some(([v]) => v === p.get('chip')) ? p.get('chip') : 'all';
   L.chip = L.view === 'exam' ? 'judged' : L.stdChip;
   L.kind = LB_KINDS.some(([v]) => v === p.get('kind')) ? p.get('kind') : 'all';
@@ -8409,6 +8470,9 @@ function lbFromHash(rest) {
   const ids = new Set(((DATA || {}).models || []).map(m => m.id));
   const ms = list('models').filter(id => !DATA || ids.has(id));
   L.models = ms.length ? [...new Set(ms)] : null;
+  // 12m.1: the compared models, as the address names them, at most eight
+  if (L.view === 'compare')
+    L.cmp = [...new Set(list('m').filter(id => !DATA || ids.has(id)))].slice(0, CMP_TOP);
 }
 // ---- 12h.2: a table you build ----------------------------------------------
 // Benchmarks ▾ offers every Standard benchmark, in its chip groups: the
@@ -8471,6 +8535,8 @@ const G = () => DATA.gguf || {};
 const isGgufKey = t => String(t).startsWith('gguf:');
 const ggufOf = (id, b) => ((G().models || {})[id] || {})[b] || null;
 const ggufHas = id => !!Object.keys((G().models || {})[id] || {}).length;
+// 12m.1: measured in any setup — its row holds "as built" alone, its page every setup
+const ggufAny = id => ((G().setups || {})[id] || []).some(x => Object.keys(x.benches || {}).length);
 // a GGUF file with no server: its Standard is llama-perplexity's, never an average
 const ggufOnly = m => { const g = (G().registered || {})[m.id]; return !!g && !g.served; };
 // 12f.2b: a model served elsewhere, a GGUF with no server, a GGUF's setup:
@@ -9232,8 +9298,330 @@ function genCell(c, m, cc, one, pctn) {
   return td;
 }
 
+// ===========================================================================
+// 12m.1: Compare — the chosen models side by side, benchmarks down the side,
+// grouped by how each number was measured. Numbers measured different ways
+// are never ranked, averaged or coloured against each other: a row compares
+// only the cells that share its method tag ("lm_eval · 5-shot"); a cell with
+// another tag is grey, says its tag, and isn't ranked.
+// ===========================================================================
+const CMP_TOP = 8;                     // the most models one table holds
+function openCompare(ids) {
+  Object.assign(lbS(), { view: 'compare', cmp: [...new Set(ids)].slice(0, CMP_TOP), ticks: [] });
+  navigate({ tab: 'leaderboard', model: null, topic: null });
+}
+// what a chosen model is, in a word: the line above the table
+function cmpKind(m) {
+  if (isPhoneRow(m)) return 'phone build';
+  if (m.rowOf || ggufOnly(m)) return 'GGUF';
+  if (m.served) return 'served';
+  if (m.source === 'artifact') return 'checkpoint';
+  return m.kind === 'instruct' ? 'instruct' : 'base';
+}
+// and its setup, when it has one: a GGUF setup's settings, how a served model is served
+function cmpSetup(m) {
+  if (m.rowOf) {
+    const x = ((G().setups || {})[m.rowOf] || []).find(s => s.id === m.ggufSetup);
+    return x ? `${x.name}: ${setupWords(x)}` : '';
+  }
+  return (servedOf(m.id) || {}).how || '';
+}
+// a proportion's standard error, for a count with no error of its own
+const cmpSe = (p, n) => n > 0 ? Math.sqrt(p * (1 - p) / n) : null;
+// an Everyday count: the hidden half's, a group's or all of it
+function cmpEvd(id, g) {
+  const e = evdOf(id);
+  const x = e && (g ? (e.groups || {})[g] : e);
+  if (!x || !x.total) return null;
+  const v = x.passed / x.total, miss = evdMissing(e);
+  return { v, se: cmpSe(v, x.total), tip: `${x.passed} of ${x.total} passed`,
+    // 12m.1: the bank's own count (340 since 12a.6), and a partial run is its own method
+    tag: (miss ? `${e.total} of ${evdHidden()} scored` : `${evdAll()} questions`)
+      + ', our checks' + (e.provisional ? ' · provisional judge' : '') };
+}
+// the groups, each by its method, and its rows: get(m) is a cell or null —
+// {v, se, tag, tip?, txt?}; fmt says how v reads (a percentage unless said)
+function cmpGroups(ms) {
+  const prov = m => judgedOkM(m) ? '' : ' · provisional';
+  const lmTasks = DATA.accTasks.filter(t => !isGen(t) && t !== 'do_not_answer' && t !== 'xstest'
+    && !(DATA.tasks[t] || {}).control);
+  const safe = (key, label, pick, lower) => ({ key, label, lower, noBest: !!lower,
+    get: m => {
+      const t = m.trust || {}, x = pick(t);
+      return x ? { v: x.v, se: cmpSe(x.v, x.of), tip: `${x.n} of ${x.of}`,
+        tag: 'judged 0–2' + (t.provisional ? ' · provisional' : '') } : null;
+    } });
+  const reps = ms.map(m => phoneRep(m.id)).filter(Boolean);
+  const said = r => `reported by ${r.by}` + (r.device ? ` · ${r.device}` : '');
+  return [
+    { key: 'standard', name: 'Standard · lm_eval', rows: lmTasks.map(t => ({ key: t,
+      label: benchName(t), get: m => {
+        const c = cell(t, m.id);
+        return c ? { v: c.v, se: c.se || null,
+          tag: 'lm_eval · ' + (c.shots != null ? `${c.shots}-shot` : 'n-shot unknown') } : null;
+      } })) },
+    { key: 'gguf', name: 'Measured on the GGUF', rows: (G().order || []).map(b => ({
+      key: 'gguf:' + b, label: ggufLabel(b), get: m => {
+        const g = ggufOf(m.id, b);
+        return g ? { v: g.v, se: g.se ?? null, tip: ggufWords(g), tag: 'llama.cpp · 0-shot'
+          + (g.full ? '' : ` · subset of ${Number(g.subset).toLocaleString('en')}`) } : null;
+      } })) },
+    { key: 'gen', name: 'Instruction & maths', rows: genTasks().map(t => ({ key: t,
+      label: benchName(t), get: m => {
+        const c = cell(t, m.id);
+        if (!c) return null;
+        const sub = t === 'mmlu_pro' && (m.gen || {}).subset;
+        return { v: c.v, se: c.se || null, tag: 'written answer, checked'
+          + (sub ? ` · subset of ${Number(sub.n).toLocaleString('en')}` : '')
+          + (m.thinkingRow ? ' · thinking' : '') };
+      } })) },
+    { key: 'everyday', name: 'Everyday tasks', rows: [
+      { key: 'evd', label: 'All groups', get: m => cmpEvd(m.id, null) },
+      ...evdGroups().map(([g, label]) => ({ key: 'evd:' + g, label, get: m => cmpEvd(m.id, g) }))] },
+    { key: 'exam', name: 'Knowledge exam', rows: [
+      { key: 'javg', label: 'Judged average', fmt: 'j', get: m => m.judgedAvg == null ? null
+        : { v: m.judgedAvg, se: null, tag: 'judged 0–4' + prov(m) } },
+      ...Object.keys(DATA.meta.areas || {}).map(a => ({ key: 'jarea:' + a, label: a, fmt: 'j',
+        get: m => { const r = areaJudged(m, a);
+          return r.v == null ? null : { v: r.v, se: null, tip: `${r.k} of ${r.n} topics judged`,
+            tag: 'judged 0–4' + prov(m) }; } }))] },
+    // 12k.2: its own group, judged 0–2; over-refusal lower is better, never "best"
+    { key: 'trust', name: 'Trust & safety', rows: [
+      safe('trust:dna', 'Do-Not-Answer', t => t.refuses),
+      safe('trust:xstest', 'XSTest', t => t.xstest),
+      safe('trust:over', 'Over-refusal', t => t.over, true)] },
+    // 12f.2: what someone measured on the phone, as they reported it
+    { key: 'phone', name: REP_GROUP, rows: reps.length ? [
+      { key: 'rep:median', label: 'Decode, tok/s median', fmt: 'n1', get: m => {
+        const r = phoneRep(m.id);
+        return r && r.decode_median != null ? { v: r.decode_median, se: null, tag: said(r) } : null;
+      } },
+      ...[...new Set(reps.flatMap(r => (r.quality || []).map(q => q.name)))].map(q => ({
+        key: 'rep:q:' + q, label: `${q}, as reported`, fmt: 'txt', get: m => {
+          const r = phoneRep(m.id), x = r && (r.quality || []).find(y => y.name === q);
+          const v = x ? parseFloat(String(x.value)) : NaN;
+          return x && !isNaN(v) ? { v, se: null, txt: String(x.value),
+            tag: said(r) + (x.note ? ` · ${x.note}` : '') } : null;
+        } }))] : [] },
+  ];
+}
+// one row, read: its cells, the tag most of them share (a tie: the leftmost's),
+// and the best value among those alone — none for a row that never has a best
+function cmpRead(row, ms) {
+  const cells = ms.map(m => row.get(m));
+  const n = {};
+  cells.forEach(c => { if (c) n[c.tag] = (n[c.tag] || 0) + 1; });
+  let main = null;
+  for (const c of cells) if (c && (main == null || n[c.tag] > n[main])) main = c.tag;
+  const same = cells.filter(c => c && c.tag === main);
+  const best = row.noBest || same.length < 2 ? null
+    : (row.lower ? Math.min : Math.max)(...same.map(c => c.v));
+  return { cells, main, best, have: cells.filter(Boolean).length };
+}
+const cmpShow = (row, c) => row.fmt === 'j' ? num(c.v, 2) : row.fmt === 'n1' ? c.v.toFixed(1)
+  : row.fmt === 'txt' ? c.txt : (100 * c.v).toFixed(1);
+// two models: the difference, where both were measured the same way — and
+// whether it is one, by the board's z-test (|z| > 1.96)
+function cmpDelta(row, r) {
+  const [a, b] = r.cells;
+  if (!a || !b || a.tag !== b.tag) return null;
+  const k = row.fmt === 'j' || row.fmt === 'n1' || row.fmt === 'txt' ? 1 : 100;
+  const d = (a.v - b.v) * k;
+  const txt = (d > 0 ? '+' : d < 0 ? '−' : '') + Math.abs(d).toFixed(row.fmt === 'j' ? 2 : 1);
+  if (a.se == null || b.se == null) return { txt, clear: null, words: 'no error to test' };
+  const se = Math.sqrt(a.se * a.se + b.se * b.se);
+  const clear = se > 0 ? Math.abs(a.v - b.v) / se > 1.96 : a.v !== b.v;
+  return { txt, clear, words: clear ? 'clear' : 'not a clear difference' };
+}
+// the chosen models: a chip each, × to take it out, and Add a model
+function cmpChips(ids) {
+  const L = lbS();
+  const set = next => lbSet({ cmp: next });
+  const add = popover(el('button', { class: 'pill', id: 'pill-cmp-add', 'data-cmp-add': '1',
+      disabled: ids.length >= CMP_TOP ? '' : null,
+      title: ids.length >= CMP_TOP ? `a comparison holds ${CMP_TOP} — take one out first` : null,
+      text: 'Add a model… ▾' }), () => {
+    const list = el('div', { class: 'mlist' });
+    const fill = q => list.replaceChildren(...DATA.models.filter(m => !ids.includes(m.id)
+        && (!q || (m.name + ' ' + m.id).toLowerCase().includes(q.toLowerCase())))
+      .map(m => el('button', { role: 'menuitem', 'data-cmp-pick': m.id,
+        onclick: () => { popClose(true); set([...(L.cmp || []), m.id]); } },
+        m.name, el('span', { class: 'se', text: ' ' + cmpKind(m) }))));
+    fill('');
+    return el('div', { class: 'moremenu modelsmenu', id: 'pop-cmp-add', 'aria-label': 'add a model' },
+      el('input', { type: 'search', placeholder: 'models…', 'aria-label': 'search models',
+        'data-keep': 'cmpadd', oninput: e => fill(e.target.value) }), list);
+  }, { key: 'cmp-add', menu: false });
+  return el('div', { class: 'rchips', 'data-cmp-chips': '1' }, ids.map((id, i) => {
+    const m = DATA.models.find(x => x.id === id);
+    return el('span', { class: 'mchip', 'data-cmp-chip': id },
+      el('span', { class: 'key', style: `background:${trColor(i)}` }), m.name,
+      el('button', { class: 'xbtn', 'aria-label': 'take out ' + m.name, text: '×',
+        onclick: () => set(ids.filter(x => x !== id)) }));
+  }), add);
+}
+function vCompare() {
+  const L = lbS();
+  const ids = (L.cmp || []).filter(id => DATA.models.some(m => m.id === id)).slice(0, CMP_TOP);
+  const ms = ids.map(id => DATA.models.find(m => m.id === id));
+  const PH = state.phone;
+  if (LIVE && ms.some(m => servedOf(m.rowOf || m.id)) && !PH.loaded && !PH.loading && netReady())
+    loadPhone();
+  const back = el('a', { href: '#tab=models', class: 'small', 'data-cmp-back': '1',
+    text: '← Models', onclick: e => { e.preventDefault(); lbS().view = 'standard';
+      navigate({ tab: 'leaderboard', model: null, topic: null }); } });
+  const lines = el('ul', { class: 'cmp-models', 'data-cmp-models': '1' }, ms.map((m, i) => {
+    const setup = cmpSetup(m);
+    return el('li', { 'data-cmp-model': m.id },
+      el('span', { class: 'key', style: `background:${trColor(i)}` }),
+      el('a', { href: '#model=' + encodeURIComponent(m.rowOf || m.id), text: m.name }),
+      el('span', { class: 'se', 'data-cmp-kind': m.id, text: ' · ' + [cmpKind(m),
+        m.params ? P(m.params) : null, setup || null].filter(Boolean).join(' · ') }));
+  }));
+  const save = LIVE && ms.length >= 2 ? el('button', { class: 'quiet', 'data-save-view': '1',
+    text: 'Save view', 'aria-expanded': String(state.lbForm === 'save'),
+    onclick: () => { state.lbForm = state.lbForm === 'save' ? null : 'save';
+      state.lbViewName = ''; state.after = { focus: '[data-view-name]' }; render(); } }) : '';
+  const card = el('div', { class: 'card', 'data-lb-card': '1', 'data-compare': String(ms.length) },
+    el('h2', {}, 'Compare'), el('div', { class: 'frm' }, back, save),
+    lbViewForm(), cmpChips(ids), lines);
+  if (ms.length < 2) {
+    card.append(el('p', { class: 'small', 'data-cmp-few': '1', text: ms.length
+      ? 'Add at least one more model to compare: Add a model ▾.'
+      : 'Choose 2 to 8 models: tick them on Models, or Add a model ▾.' }));
+    // one model: its own shape, on its own axes
+    return ms.length ? [card, shapeCard(ms, 'cmp')] : [card];
+  }
+  const two = ms.length === 2;
+  const head = el('tr', {}, el('th', { scope: 'col', class: 'pin', text: 'Benchmark' }),
+    ms.map((m, i) => el('th', { class: 'num', scope: 'col', 'data-cmp-col': m.id, title: m.id },
+      el('span', { class: 'key', style: `background:${trColor(i)}` }), ' ' + midTrunc(m.name, 22))),
+    two ? el('th', { class: 'num', scope: 'col', 'data-cmp-delta-head': '1',
+      title: `${ms[0].name} minus ${ms[1].name}, where both were measured the same way`,
+      text: 'Δ' }) : '');
+  const bodies = [];
+  for (const g of cmpGroups(ms)) {
+    const rows = g.rows.map(row => ({ row, r: cmpRead(row, ms) })).filter(x => x.r.have);
+    if (!rows.length) continue;
+    // a group fewer than two of these models have is folded: nothing to set beside
+    const withAny = ms.filter((m, i) => rows.some(x => x.r.cells[i])).length;
+    const open = state.cmpOpen[g.key] ?? withAny >= 2;
+    const ncol = ms.length + 1 + (two ? 1 : 0);
+    const gh = el('tr', { class: 'cmp-group', 'data-cmp-group': g.key },
+      el('th', { colspan: String(ncol), scope: 'colgroup' },
+        el('button', { class: 'quiet cmp-fold', 'aria-expanded': String(open),
+          'data-cmp-fold': g.key, onclick: () => { state.cmpOpen[g.key] = !open; render(); } },
+          (open ? '▾ ' : '▸ ') + g.name),
+        withAny < 2 ? el('span', { class: 'small se', text: ` · ${withAny} of ${ms.length} `
+          + 'models measured' }) : ''));
+    const body = el('tbody', { 'data-cmp-body': g.key }, gh);
+    if (open) for (const { row, r } of rows) {
+      const mixed = new Set(r.cells.filter(Boolean).map(c => c.tag)).size > 1;
+      const d = two ? cmpDelta(row, r) : null;
+      body.append(el('tr', { 'data-cmp-row': row.key },
+        el('th', { scope: 'row', class: 'cmp-name pin' }, row.label,
+          row.lower ? el('span', { class: 'small se', 'data-cmp-lower': row.key,
+            text: ' · lower is better' }) : '',
+          el('div', { class: 'small se cmp-tag', 'data-cmp-main': row.key, text: r.main })),
+        r.cells.map((c, i) => {
+          if (!c) return el('td', { class: 'num se', 'data-cmp-cell': ms[i].id,
+            text: 'not measured' });
+          const own = c.tag === r.main, best = own && r.best != null && c.v === r.best;
+          const txt = cmpShow(row, c);
+          return el('td', { class: 'num' + (own ? '' : ' se cmp-off'),
+              'data-cmp-cell': ms[i].id, 'data-tag': c.tag, 'data-best': best ? '1' : null,
+              'data-tip': JSON.stringify([`${ms[i].name} · ${row.label}`,
+                txt + (c.se != null ? ` ± ${cmpShow(row, { v: c.se })}` : ''), c.tag,
+                ...(c.tip ? [c.tip] : []), ...(own ? [] : ['measured another way: not ranked '
+                  + 'against this row'])]) },
+            best ? el('b', { text: txt }) : txt,
+            own && !mixed ? '' : el('div', { class: 'small se cmp-tag', text: c.tag }));
+        }),
+        two ? el('td', { class: 'num small' + (d && d.clear ? '' : ' se'),
+          'data-cmp-delta': row.key, text: d ? `${d.txt} · ${d.words}` : '' }) : ''));
+    }
+    bodies.push(body);
+  }
+  card.append(bodies.length ? hfade('cmp', el('div', { class: 'lb-wrap', 'data-hkeep': 'cmp' },
+      el('table', { class: 'lb cmp', 'data-cmp-table': '1' }, el('thead', {}, head), ...bodies)))
+    : el('p', { class: 'small', text: 'Nothing is measured for these models yet.' }),
+    el('p', { class: 'lbcap', text: 'Bold is the best of the cells measured the way the row '
+      + 'says; a grey cell was measured another way, says how, and isn’t ranked. '
+      + (two ? 'Δ is the first minus the second, only where both were measured the same way; '
+        + '"clear" means |z| > 1.96 on their errors. ' : '')
+      + 'Nothing here is averaged.' }));
+  return [card, shapeCard(ms, 'cmp')];
+}
+// ---- 12m.1: shapes, one method at a time ----
+// The radar takes one kind of measurement, draws only the axes at least two
+// of its models have (one model: its own), and names each axis as the
+// tables do. A group nothing measured the same way for these models is a
+// line, never an empty web
+const SHAPE_SRC = [['tasks', 'Standard'], ['gguf', 'GGUF'], ['everyday', 'Everyday groups'],
+  ['gen', 'Instruction & maths']];
+function shapeAxes(src) {
+  const areas = Object.keys(DATA.meta.areas || {});
+  if (src === 'areas') return areas.map(a => ({ key: a, label: a,
+    get: m => { const r = areaMmlu(m, a); return r ? { n: areaScaled(r.v),
+      rows: [`${(100 * areaScaled(r.v)).toFixed(1)}% ${scaleWords()} · ${r.n} questions`] } : null; } }));
+  if (src === 'judged') return judgedCalibrated() ? areas.map(a => ({ key: a, label: a,
+    get: m => { const r = areaJudged(m, a); return r.v == null ? null
+      : { n: r.v / 4, rows: [`${num(r.v, 2)} / 4 · ${r.k} of ${r.n} topics`] }; } })) : [];
+  if (src === 'gguf') return (G().order || []).map(b => ({ key: 'gguf:' + b, label: ggufLabel(b),
+    get: m => {
+      const g = ggufOf(m.id, b);
+      if (!g) return null;
+      const c = g.chance, sc = state.avgMode !== 'raw' && c > 0 && c < 1;
+      return { n: sc ? Math.max(0, Math.min(1, (g.v - c) / (1 - c))) : g.v,
+        rows: [`${(100 * g.v).toFixed(1)}% raw · llama.cpp, 0-shot` + (g.full ? '' : ' · a subset')] };
+    } }));
+  if (src === 'everyday') return evdGroups().map(([g, label]) => ({ key: 'evd:' + g, label,
+    get: m => { const x = ((evdOf(m.id) || {}).groups || {})[g];
+      return x && x.total ? { n: x.passed / x.total, rows: [`${x.passed} of ${x.total} passed`] }
+        : null; } }));
+  if (src === 'gen') return genTasks().map(t => ({ key: t, label: benchName(t),
+    get: m => { const c = cell(t, m.id);
+      return c ? { n: c.v, rows: [`${(100 * c.v).toFixed(1)}%`] } : null; } }));
+  return (DATA.required || DATA.accTasks).filter(t => DATA.accTasks.includes(t)).map(t => ({
+    key: t, label: benchName(t), get: m => { const c = cell(t, m.id);
+      return c ? { n: normScore(t, c.v), rows: [`${(100 * c.v).toFixed(1)}% raw`
+        + (c.se ? ` ± ${(100 * c.se).toFixed(1)}` : '')] } : null; } }));
+}
+// the axes these models share: at least two of them measured it (one model: its own)
+function sharedAxes(axes, ms) {
+  const need = Math.min(2, ms.length);
+  return axes.filter(ax => ms.filter(m => ax.get(m)).length >= need && need > 0);
+}
+// the source drawn: the one asked for while it has a shape (three shared
+// axes), else the first that does — the phone build has no Standard, and
+// opens on GGUF or Everyday
+function shapeFor(ms, want, srcs) {
+  const ok = s => sharedAxes(shapeAxes(s), ms).length >= 3;
+  return ok(want) ? want : (srcs.map(([v]) => v).find(ok) || want);
+}
+function shapeCard(ms, where) {
+  const L = lbS();
+  const srcs = SHAPE_SRC;
+  const src = shapeFor(ms, L.shapeSrc || 'tasks', srcs);
+  const axes = sharedAxes(shapeAxes(src), ms);
+  const any = srcs.some(([v]) => sharedAxes(shapeAxes(v), ms).length);
+  const seg = el('div', { class: 'seg', role: 'group', 'aria-label': 'what the shape is of' },
+    srcs.map(([v, t]) => el('button', { 'aria-pressed': String(src === v), 'data-shape-src': v,
+      text: t, onclick: () => lbSet({ shapeSrc: v }) })));
+  const body = axes.length >= 3 ? radarSvg(axes, ms.map((m, i) => ({ m, color: trColor(i) })))
+    : el('p', { class: 'small', 'data-shape-none': '1', text: any && axes.length
+      ? `Only ${axes.length} benchmark${axes.length === 1 ? ' is' : 's are'} measured this way `
+        + 'for these models: a shape needs three.'
+      : 'Nothing measured the same way for these models yet' });
+  return el('div', { class: 'card', 'data-shape-card': where },
+    el('h2', { text: 'Shapes' }), seg, body,
+    el('p', { class: 'small se', text: 'One kind of measurement at a time, and only the axes at '
+      + 'least two of these models have.' }));
+}
 function vLeaderboard(ms) {
   const L = lbS();
+  // 12m.1: Compare is a view of Models, reached by choosing models, not a switch
+  if (L.view === 'compare') return vCompare();
   if (!modelsViews().includes(L.view)) { L.view = 'standard'; L.chip = L.stdChip || 'all'; }
   // 12f.2b: the phone reports, for the "On the phone · reported" columns
   const PH = state.phone;
@@ -9324,8 +9712,13 @@ function vLeaderboard(ms) {
   const canHave = (m, c) => !narrow(m) || (c.gguf ? hasFile(m)
     : !(m.rowOf || ggufOnly(m)) && (c.task ? isGen(c.task) : !(c.area || c.cat)));
   // what the board measured decides the rows; a reported number never does
-  const testedIn = m => custom ? L.cols.every(t => benchVal(t, m.id) != null)
-    : dataCols.some(c => !c.rep && val(m, c) != null) || (L.view === 'exam' && judgedAny(m));
+  // 12m.1: a GGUF measured only in a setup is still a row where GGUF columns
+  // are shown — beside its setup's row, its own cells "not measured yet"
+  const ggufRow = m => !m.rowOf && ggufAny(m.id) && !ggufHas(m.id)
+    && (custom ? L.cols.every(isGgufKey) : dataCols.some(c => c.gguf));
+  const testedIn = m => (custom ? L.cols.every(t => benchVal(t, m.id) != null)
+    : dataCols.some(c => !c.rep && val(m, c) != null) || (L.view === 'exam' && judgedAny(m)))
+    || ggufRow(m);
   // a server can be asked this chip's generative tasks before any model has a
   // column for one: then it is "not tested", not absent
   const chipAsks = L.chip === 'all' || genTasks().some(t =>
@@ -9440,6 +9833,13 @@ function vLeaderboard(ms) {
             style: `--fam:${famColor(m)}`,
             title: modelSentence(m) + `\n\nfamily: ${famOf(m)}\n` + m.id },
           el('div', { class: 'mcell' },
+            // 12m.1: tick two to eight rows, then Compare ▸
+            L.view === 'standard' ? el('input', { type: 'checkbox', class: 'cmptick',
+              'data-cmp-tick': m.id, 'aria-label': 'compare ' + m.name,
+              checked: (L.ticks || []).includes(m.id) ? '' : null,
+              onchange: e => { const t = new Set(L.ticks || []);
+                if (e.target.checked) t.add(m.id); else t.delete(m.id);
+                L.ticks = [...t]; render(); } }) : '',
             el('a', { class: 'mname mlink', text: m.name,
               href: '#model=' + encodeURIComponent(m.rowOf || m.id) }),
             ckBadge(m) || (m.kind === 'instruct'
@@ -9474,6 +9874,8 @@ function vLeaderboard(ms) {
         }
         if (c.key === 'cavg') {
           const a = customAvg(m, L.cols);
+          // 12m.1: a GGUF's own row, measured only in a setup, has no average here
+          if (!a) return el('td', { class: 'num se', 'data-cavg': m.id, text: '—' });
           return one(c, m, a.v, a.se != null ? (100 * a.se).toFixed(1) : null, pctn, {
             title: `mean over ${L.cols.map(benchName).join(', ')}, `
               + (state.avgMode === 'raw' ? 'raw accuracy' : 'scaled so chance = 0'),
@@ -9531,7 +9933,10 @@ function vLeaderboard(ms) {
         if (c.rep) return repCell(m, c);
         if (c.gguf) {
           const g = ggufOf(m.id, c.gguf);
-          if (!g) return el('td', { class: 'num se', text: '—' });
+          // 12m.1: a GGUF's own row holds its "as built" results alone; a
+          // setup's are that setup's row
+          if (!g) return el('td', { class: 'num se', 'data-gguf-cell': c.gguf,
+            text: (G().registered || {})[m.id] && !m.rowOf ? 'not measured yet' : '—' });
           return one(c, m, g.v, g.se != null ? (100 * g.se).toFixed(1) : null, pctn,
             { title: ggufWords(g), 'data-gguf-cell': c.gguf, 'data-gguf-full': String(g.full) });
         }
@@ -9724,7 +10129,7 @@ function lbToolbar(ms, cols, shown, nHidden) {
   return el('div', { class: 'lbbar narrow' },
     el('div', { class: 'chiprow' }, std ? chips : '',
       el('div', { class: 'pickers', 'data-pickers': '1' },
-        std ? lbBenchPill() : '', std ? lbModelsPill(ms) : '', toggle)),
+        std ? cmpGo() : '', std ? lbBenchPill() : '', std ? lbModelsPill(ms) : '', toggle)),
     note, std ? lbViewForm() : '',
     open ? el('div', { class: 'fsheet', id: 'filter-sheet', role: 'dialog', 'aria-label': 'filters',
         'data-filter-sheet': '1',
@@ -9733,6 +10138,15 @@ function lbToolbar(ms, cols, shown, nHidden) {
         el('button', { class: 'ghost', text: 'Done', 'data-filters-done': '1',
           onclick: () => { state.lbFilters = false; render(); } })),
       pills) : '');
+}
+// 12m.1: "Compare 3 ▸" while two to eight rows are ticked
+function cmpGo() {
+  const n = (lbS().ticks || []).length;
+  if (n < 2) return '';
+  return el('button', { class: 'pill on', 'data-cmp-go': String(n), disabled: n > CMP_TOP ? '' : null,
+    title: n > CMP_TOP ? `a comparison holds ${CMP_TOP}: untick ${n - CMP_TOP}` : null,
+    text: n > CMP_TOP ? `Compare: ${CMP_TOP} at most` : `Compare ${n} ▸`,
+    onclick: () => openCompare(lbS().ticks) });
 }
 // crossing 720px turns the panel into a sheet: close it
 matchMedia('(max-width:720px)').addEventListener('change', () => {
@@ -9809,7 +10223,9 @@ function lbModelsPill(ms) {
       : `${pick.size} of ${ms.length} shown`; };
     const apply = () => lbSet({ models: pick.size === ms.length ? null : [...pick] });
     // 12f.2b: phone builds and served models are groups of their own
+    // 12m.1: and a GGUF file, or a setup of one, is a group of its own
     const groupOf = m => isPhoneRow(m) ? 'phone builds' : m.served ? 'served'
+      : m.rowOf || ggufOnly(m) ? 'GGUF'
       : m.source === 'artifact' ? 'checkpoints' : m.kind === 'instruct' ? 'instruct' : 'base';
     const row = m => el('label', { class: 'small mrow' },
       el('input', { type: 'checkbox', 'data-model-pick': m.id, checked: pick.has(m.id) ? '' : null,
@@ -9820,7 +10236,7 @@ function lbModelsPill(ms) {
     const fill = q => {
       const hit = ms.filter(m => !q
         || (m.name + ' ' + m.id + ' ' + famOf(m)).toLowerCase().includes(q.toLowerCase()));
-      list.replaceChildren(...['phone builds', 'served', 'instruct', 'base', 'checkpoints']
+      list.replaceChildren(...['phone builds', 'served', 'GGUF', 'instruct', 'base', 'checkpoints']
         .flatMap(g => {
           const gs = hit.filter(m => groupOf(m) === g);
           // a group's name chooses it alone: "only phone builds"
@@ -9838,7 +10254,13 @@ function lbModelsPill(ms) {
           title: 'every model, the ranked ones first — the default', onclick: () => {
             popClose(true); lbSet({ models: null }); } }),
         el('button', { class: 'quiet', text: 'Clear', 'data-models-clear': '1', onclick: () => {
-          pick.clear(); say(); apply(); } })),
+          pick.clear(); say(); apply(); } }),
+        // 12m.1: two to eight chosen, side by side
+        el('button', { class: 'quiet', text: 'Compare these ▸', 'data-models-compare': '1',
+          title: 'two to eight models, side by side', onclick: () => {
+            if (pick.size < 2 || pick.size === ms.length) {
+              toast('Choose two to eight models to compare', { key: 'cmp' }); return; }
+            popClose(true); openCompare([...pick]); } })),
       el('input', { type: 'search', placeholder: 'search models…', 'aria-label': 'search models',
         'data-keep': 'lbmodels', value: state.lbModelsQ || '',
         oninput: e => { state.lbModelsQ = e.target.value; fill(e.target.value); } }),
@@ -9935,6 +10357,8 @@ const sameList = (a, b) => (!a && !b) || (!!a && !!b && a.length === b.length
   && [...a].sort().join('\n') === [...b].sort().join('\n'));
 function lbIsView(v) {
   const L = lbS(), sp = v.spec || {};
+  // 12m.1: a saved comparison is its models
+  if (sp.view === 'compare') return L.view === 'compare' && sameList(L.cmp, sp.models || null);
   return L.view === 'standard' && sameList(L.cols, lbKnownCols(sp.cols || []))
     && sameList(L.models, sp.models || null) && (!!L.cols || L.chip === (sp.chip || 'all'));
 }
@@ -9945,6 +10369,7 @@ function viewChip(v) {
   const chip = el('button', { class: 'chip-btn saved' + (on ? ' on' : ''),
     'data-saved-view': String(v.id), 'aria-pressed': String(on), title: `saved by ${v.saved_by}`,
     text: v.name, onclick: () => { const sp = v.spec || {};
+      if (sp.view === 'compare') { openCompare(sp.models || []); return; }
       lbSet({ chip: sp.chip || 'all', cols: lbKnownCols(sp.cols || []),
               models: sp.models && sp.models.length ? sp.models : null }); } });
   if (!ownView(v)) return chip;
@@ -9975,13 +10400,15 @@ function lbViewForm() {
       onkeydown: e => { if (e.key === 'Enter') { e.preventDefault();
         const b = e.target.closest('.viewform').querySelector('[data-action]'); if (b) b.click(); } } })];
   if (f === 'save') {
-    if (!L.cols && !L.models) { state.lbForm = null; return ''; }
+    const cmp = L.view === 'compare';
+    if (cmp ? (L.cmp || []).length < 2 : !L.cols && !L.models) { state.lbForm = null; return ''; }
     return el('div', { class: 'viewform', 'data-view-form': 'save' },
       ...nameBox('Name this view', 'viewname'),
       actButton('view-save', 'Save for the team', async () => {
         const name = state.lbViewName || '';
         const v = await sendView('api/views', 'POST', { name, by: by(),
-          spec: { chip: L.chip, cols: L.cols, models: L.models } });
+          spec: cmp ? { view: 'compare', models: L.cmp }
+            : { chip: L.chip, cols: L.cols, models: L.models } });
         state.lbForm = null;
         await loadViews();
         return { toast: `Saved “${v.name}” for the team — it is a chip after the groups` };
@@ -10297,27 +10724,20 @@ function weakestChart() {
         el('td', { class: 'num', text: num(x.v, 2) + ' / 4' })))))));
 }
 
-// The radar: up to five models as chips, and three sources. Judged by area is
-// an average, so it waits for a calibrated judge.
-function radarSource() {
-  const L = lbS();
-  const areas = Object.keys(DATA.meta.areas || {});
-  if (L.radarSrc === 'areas') return areas.map(a => ({ key: a, label: a,
-    get: m => { const r = areaMmlu(m, a); return r ? { n: areaScaled(r.v),
-      rows: [`${(100 * areaScaled(r.v)).toFixed(1)}% ${scaleWords()} · ${r.n} questions`] } : null; } }));
-  if (L.radarSrc === 'judged' && judgedCalibrated()) return areas.map(a => ({ key: a, label: a,
-    get: m => { const r = areaJudged(m, a); return r.v == null ? null
-      : { n: r.v / 4, rows: [`${num(r.v, 2)} / 4 · ${r.k} of ${r.n} topics`] }; } }));
-  return (DATA.required || DATA.accTasks).filter(t => DATA.accTasks.includes(t)).map(t => ({
-    key: t, label: t, get: m => { const c = cell(t, m.id);
-      return c ? { n: normScore(t, c.v), rows: [`${(100 * c.v).toFixed(1)}% raw`
-        + (c.se ? ` ± ${(100 * c.se).toFixed(1)}` : '')] } : null; } }));
+// The radar: up to five models as chips. 12m.1: its sources are the kinds of
+// measurement, one at a time — Standard, GGUF, Everyday groups, Instruction &
+// maths — and MMLU and the exam by area; each axis is named as the tables name
+// it, and only axes the chosen models share are drawn (shapeAxes, sharedAxes).
+// Judged by area is an average, so it waits for a calibrated judge.
+const RADAR_SRC = [...SHAPE_SRC, ['areas', 'MMLU by area'], ['judged', 'Judged by area']];
+function radarSource(ms) {
+  return sharedAxes(shapeAxes(lbS().radarSrc || 'tasks'), ms || []);
 }
 
 function radarBlock(ms) {
   const L = lbS();
   const ids = state.cmpSel.filter(id => DATA.models.some(m => m.id === id));
-  const axes = radarSource();
+  const axes = radarSource(ids.map(id => DATA.models.find(m => m.id === id)));
   const calOk = judgedCalibrated();
   const add = el('button', { class: 'pill', id: 'pill-radar-add', 'data-radar-add': '1',
     disabled: ids.length >= CMP_MAX ? '' : null,
@@ -10344,7 +10764,7 @@ function radarBlock(ms) {
           onclick: () => cmpToggle(id, DATA.models) }));
     }), addPop);
   const src = el('div', { class: 'seg', role: 'group', 'aria-label': 'radar source' },
-    [['tasks', 'Tasks'], ['areas', 'MMLU by area'], ['judged', 'Judged by area']].map(([v, t]) => {
+    RADAR_SRC.map(([v, t]) => {
       const off = v === 'judged' && !calOk;
       return el('button', { 'aria-pressed': String(L.radarSrc === v), 'data-radar-src': v, text: t,
         disabled: off ? '' : null, title: off ? judgedOffWhy() : null,
@@ -10352,10 +10772,12 @@ function radarBlock(ms) {
     }));
   const head = el('div', { class: 'ihead' }, el('div', { class: 'eyebrow', text: 'Compare shapes' }));
   const body = !ids.length || axes.length < 3
-    ? el('p', { class: 'small', 'data-radar-prompt': '1', text: axes.length < 3
-        ? 'Too few axes to draw a shape for this source.'
-        : `Add up to ${CMP_MAX} models to draw their shapes — one axis per `
-          + (L.radarSrc === 'tasks' ? 'task' : 'area') + ', one shape per model.' })
+    ? el('p', { class: 'small', 'data-radar-prompt': '1', text: !ids.length
+        ? `Add up to ${CMP_MAX} models to draw their shapes — one axis per benchmark, `
+          + 'one shape per model.'
+        : axes.length ? `Only ${axes.length} of these axes ${axes.length === 1 ? 'is' : 'are'} `
+          + 'measured the same way for these models: a shape needs three.'
+        : 'Nothing measured the same way for these models yet' })
     : radarSvg(axes, ids.map(id => ({ m: DATA.models.find(x => x.id === id),
         color: trColor(state.cmpColors[id] ?? ids.indexOf(id)) })));
   return el('div', { class: 'ibox', 'data-radar': '1' }, head, chips, src, body,
@@ -10460,7 +10882,56 @@ function domainGroups(tasks) {
     (a[0] === 'other') - (b[0] === 'other'));
 }
 
-function vTasks(ms) {
+// 12m.1: the lm_eval task a GGUF benchmark asks the questions of — its panel
+// sits beside that one's, never merged into it
+const GGUF_OF = { mmlu: 'mmlu', hellaswag: 'hellaswag', winogrande: 'winogrande',
+  arc_challenge: 'arc_challenge', arc_easy: 'arc_easy', truthfulqa_mc2: 'truthfulqa' };
+function ggufPanel(t, ms, hl) {
+  const b = GGUF_OF[t];
+  const cells = b ? ms.map(m => ggufOf(m.id, b)).filter(Boolean) : [];
+  if (!cells.length) return [];
+  return [barPanel('gguf:' + b, ms, { lower: false, hl, key: 'gguf:' + b,
+    label: `${ggufLabel(b)} · measured on the GGUF`,
+    method: 'llama.cpp · 0-shot' + (cells.some(g => !g.full) ? ' · some a subset' : ''),
+    info: { chance: cells.find(g => g.chance != null)?.chance ?? null },
+    get: m => { const g = ggufOf(m.id, b);
+      return g ? { v: g.v, se: g.se || 0, shots: null, n: g.n } : null; } })];
+}
+// Benchmarks ▸ Standard's models: Models ▾ (the choice Models has too, in the
+// address) and Highlight — up to three, in colour in every panel
+function hlPill(ms, hl) {
+  const btn = el('button', { class: 'pill' + (hl.length ? ' on' : ''), id: 'pill-highlight',
+    'data-hl-menu': String(hl.length), text: `Highlight${hl.length ? ': ' + hl.length : ''} ▾` });
+  return popover(btn, () => {
+    const now = new Set(hl);
+    const list = el('div', { class: 'mlist' });
+    const fill = q => list.replaceChildren(...ms.filter(m => !q
+        || (m.name + ' ' + m.id).toLowerCase().includes(q.toLowerCase()))
+      .map(m => el('label', { class: 'small mrow' },
+        el('input', { type: 'checkbox', 'data-hl-pick': m.id, checked: now.has(m.id) ? '' : null,
+          disabled: !now.has(m.id) && now.size >= 3 ? '' : null,
+          onchange: e => { if (e.target.checked) now.add(m.id); else now.delete(m.id);
+            lbSet({ hl: now.size ? [...now] : null }); } }),
+        now.has(m.id) ? el('span', { class: 'famdot',
+          style: `background:${trColor([...now].indexOf(m.id))}` }) : '', ' ' + m.name)));
+    fill('');
+    return el('div', { class: 'moremenu modelsmenu', id: 'pop-highlight', 'aria-label': 'highlight' },
+      el('p', { class: 'small se', text: 'Up to three, in colour in every panel; the rest grey.' }),
+      el('input', { type: 'search', placeholder: 'search models…', 'aria-label': 'search models',
+        'data-keep': 'hlmodels', oninput: e => fill(e.target.value) }), list,
+      el('div', { class: 'frm' }, el('button', { class: 'quiet', text: 'Clear', 'data-hl-clear': '1',
+        onclick: () => { popClose(true); lbSet({ hl: null }); } })));
+  }, { key: 'highlight', menu: false, rebuild: true });
+}
+function benchPick(ms, pick, hl) {
+  const L = lbS();
+  return el('div', { class: 'card benchpick', 'data-bench-pick': String(pick.length) },
+    el('div', { class: 'pickers', 'data-pickers': '1' }, lbModelsPill(ms), hlPill(pick, hl)),
+    el('p', { class: 'small se', 'data-bench-pick-line': '1', text: (L.models
+      ? `${pick.length} of ${ms.length} models, chosen here or on Models — the same choice`
+      : `All ${ms.length} models`) + (hl.length ? ` · ${hl.length} highlighted` : '') }));
+}
+function vTasks(ms, hl = []) {
   if (!DATA.accTasks.length) return [note('No accuracy tasks found.')];
   const scaleBtn = (v, label, tip) => el('button', {
     class: 'tgl' + (state.accScale === v ? ' on' : ''), title: tip, text: label,
@@ -10489,7 +10960,8 @@ function vTasks(ms) {
     ...domainGroups(DATA.accTasks).map(([dom, ts]) => el('div', {},
       el('h3', { class: 'domhead' }, dom,
         el('span', { class: 'se', text: ` · ${ts.length} task${ts.length > 1 ? 's' : ''}` })),
-      el('div', { class: 'panels' }, ts.map(t => barPanel(t, ms, { lower: false }))))),
+      el('div', { class: 'panels' }, ts.flatMap(t => [barPanel(t, ms, { lower: false, hl }),
+        ...ggufPanel(t, ms, hl)])))),
     tableTwin('tasks-table', ms, DATA.accTasks, false)];
 }
 
@@ -12511,7 +12983,7 @@ function vQueue(part = { form: true, list: true }) {
     el('td', { title: (r.note || '') + (r.arch && r.arch.length > 2 ? (() => {
         try { const a = JSON.parse(r.arch);
               return `\n${a.arch || ''} · hidden ${a.hidden ?? '—'} · layers ${a.layers ?? '—'} · vocab ${a.vocab ?? '—'}`; }
-        catch { return ''; } })() : '') }, r.hf_id,
+        catch { return ''; } })() : '') }, r.suite === 'gguf' ? runName(r) : r.hf_id,
       el('span', { class: 'badge' + (r.kind === 'instruct' ? ' instruct' : ''), text: r.kind })),
     // a judged row says what it sat, in one line: the list is behind ▸ (11i)
     el('td', { class: 'small' }, suiteCell(r, 'q')),
@@ -13062,7 +13534,7 @@ function runsNow() {
 function runLine(r, attrs = {}) {
   const st = runStage(r);
   const onBoard = DATA.models.some(m => m.id === r.hf_id);
-  const name = (DATA.models.find(m => m.id === r.hf_id) || {}).name || r.hf_id.split('/').pop();
+  const name = runName(r);
   return el('div', { class: 'runline', 'data-run-line': String(r.id), ...attrs },
     el('span', { class: stClass(st.cls), text: st.text }),
     onBoard ? el('a', { href: '#model=' + encodeURIComponent(r.hf_id), class: 'runname', text: name,
@@ -13134,7 +13606,12 @@ function vHelp() {
 // Benchmarks ▸ Standard: today's Tasks page, with About these benchmarks
 // under it (from the Leaderboard's How to read this table)
 function vStandardBench(ms) {
-  return [...vTasks(ms), aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
+  // 12m.1: only the chosen models (Models ▾, shared with Models), up to three highlighted
+  const L = lbS();
+  const pick = L.models ? ms.filter(m => L.models.includes(m.id)) : ms;
+  const hl = (L.hl || []).filter(id => pick.some(m => m.id === id)).slice(0, 3);
+  return [benchPick(ms, pick, hl), ...vTasks(pick, hl),
+    aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
 }
 
 // ---------- Review: the human in the loop ----------
@@ -14984,23 +15461,37 @@ function modelSitPanel(m) {
 // the Suite cell: one line whatever the run sat, and the list behind ▸,
 // grouped by area. #56's row listed 37 names and stood 650px tall.
 state.suiteOpen = new Set();
-// a run's suite in words: "everyday tasks", "trust & safety", "full · all of BBQ"
+// 12m.1: a run's suite by the board's own names, never its id
+const SUITE_NAMES = { full: 'Standard', quick: 'Standard · quick', control: 'MMLU control',
+  judged: 'Knowledge exam', everyday: 'Everyday tasks', generative: 'Instruction & maths',
+  safety: 'Trust & safety', gguf: 'Measured on the GGUF' };
 function suiteWords(r) {
-  return r.suite === 'everyday' ? 'everyday tasks' : r.suite === 'safety' ? 'trust & safety'
-    : r.suite === 'full' && r.bbq_all ? 'full · all of BBQ' : r.suite;
+  const w = SUITE_NAMES[r.suite] || r.suite;
+  return r.suite === 'full' && r.bbq_all ? w + ' · all of BBQ' : w;
+}
+// 12m.1: a run's model, and a GGUF run's setup with it:
+// "Qwen3.6-35B-A3B original k=8 · GGUF · lookahead 1"
+function runName(r) {
+  const name = (DATA.models.find(m => m.id === r.hf_id) || {}).name
+    || ((G().registered || {})[r.hf_id] || {}).name || r.hf_id.split('/').pop();
+  if (r.suite !== 'gguf') return name;
+  let su = '';
+  try { su = ((JSON.parse(r.arch || '{}').gguf || {}).setup || {}).name || ''; }
+  catch (e) { /* an older row */ }
+  if (!su) su = ((/^setup: ([^·]+)/.exec(r.note || '') || [])[1] || '').trim();
+  return `${name} · GGUF · ${su || 'as built'}`;
 }
 function suiteCell(r, key) {
   let ts = [];
   try { ts = JSON.parse(r.tasks || '[]'); } catch (e) { /* older row */ }
   const J = DATA.judged || {};
-  if (r.suite === 'everyday') return el('span', { 'data-suite-cell': key, text: 'everyday tasks' });
   // 12f.3: measured on the GGUF by the host's worker
-  if (r.suite === 'gguf') return el('span', { 'data-suite-cell': key, text: 'on the GGUF · '
+  if (r.suite === 'gguf') return el('span', { 'data-suite-cell': key, text: suiteWords(r) + ' · '
     + (ts.length ? ts.map(ggufLabel).join(', ') : 'llama-perplexity') });
   if (r.suite !== 'judged') return el('span', { 'data-suite-cell': key, text: suiteWords(r) });
-  if (!ts.length) return el('span', { 'data-suite-cell': key, text: 'judged · the whole exam' });
+  if (!ts.length) return el('span', { 'data-suite-cell': key, text: 'Knowledge exam · the whole exam' });
   const ex = ts.filter(t => t !== J.control), ctl = ts.includes(J.control);
-  const label = 'judged · ' + (ex.length === 1 ? frName(ex[0]) : ex.length
+  const label = 'Knowledge exam · ' + (ex.length === 1 ? frName(ex[0]) : ex.length
     ? `${ex.length} topics` : '') + (ctl ? (ex.length ? ' + ' : '') + 'MMLU control' : '');
   if (ex.length <= 1) return el('span', { 'data-suite-cell': key, text: label });
   const byName = Object.fromEntries(Object.entries(J.topics || {}).map(([t, n]) => [n, t]));

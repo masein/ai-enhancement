@@ -169,8 +169,8 @@ def test_test_a_model_offers_the_safety_suite_and_all_of_bbq(live, page):
     [row] = [r for r in _api(live, "/api/submissions") if r["id"] not in before]
     assert (row["hf_id"], row["suite"], row["bbq_all"]) == (GOOD, "full", 1)
     # the queue says what each run asks
-    assert page.evaluate(f"suiteWords({json.dumps(row)})") == "full · all of BBQ"
-    assert page.evaluate("suiteWords({suite: 'safety'})") == "trust & safety"
+    assert page.evaluate(f"suiteWords({json.dumps(row)})") == "Standard · all of BBQ"   # 12m.1
+    assert page.evaluate("suiteWords({suite: 'safety'})") == "Trust & safety"
     assert page.evaluate("stillGrading({suite: 'safety', judge: {status: 'submitted'}})")
     assert page.errors == []
 

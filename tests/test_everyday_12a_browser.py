@@ -284,7 +284,7 @@ def test_run_everyday_tasks_queues_one_run_per_ticked_model(live, page):
         toast.locator("[data-toast-link]").click()
         page.wait_for_selector("[data-queue-row]")
         assert page.locator(f"tr[data-queue-row='{rows[0]['id']}'] [data-suite-cell]") \
-            .first.text_content() == "everyday tasks"
+            .first.text_content() == "Everyday tasks"              # 12m.1: the board's name
     finally:
         cancel_pilot_rows(live["base"])
     assert page.errors == []

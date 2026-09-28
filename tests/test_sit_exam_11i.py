@@ -577,13 +577,13 @@ def test_a_37_topic_row_is_one_line_and_its_list_opens_by_area(live, page):
         cell = page.locator(f"tr[data-queue-row='{sid}'] [data-suite-cell='q']")
         cell.wait_for()
         assert cell.locator("summary").text_content() == \
-            f"judged · {len(exam)} topics + MMLU control ▸"
+            f"Knowledge exam · {len(exam)} topics + MMLU control ▸"          # 12m.1
         # as tall as the row that sat one topic: #56's stood 650px
         row_h = page.locator(f"tr[data-queue-row='{sid}']").bounding_box()["height"]
         one_h = page.locator(f"tr[data-queue-row='{one}']").bounding_box()["height"]
         assert abs(row_h - one_h) <= 1 and row_h < 80, (row_h, one_h)
         assert page.locator(f"tr[data-queue-row='{one}'] [data-suite-cell='q']") \
-            .text_content() == "judged · Law"
+            .text_content() == "Knowledge exam · Law"
         cell.locator("summary").click()
         lines = cell.locator(".suitelist > div")
         assert lines.count() >= 7                           # grouped by area
@@ -594,7 +594,7 @@ def test_a_37_topic_row_is_one_line_and_its_list_opens_by_area(live, page):
         model_tab(page, "history")
         page.wait_for_selector(f"tr[data-run='{sid}'] [data-suite-cell='m']")
         assert page.locator(f"tr[data-run='{sid}'] [data-suite-cell='m'] summary") \
-            .text_content().startswith(f"judged · {len(exam)} topics")
+            .text_content().startswith(f"Knowledge exam · {len(exam)} topics")
         assert page.errors == []
     finally:
         for s in (sid, one):

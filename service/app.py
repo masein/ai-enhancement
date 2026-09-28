@@ -3083,6 +3083,7 @@ _VIEW_KEY = re.compile(r"^[A-Za-z0-9_.\-]{1,64}$")
 
 
 class ViewSpec(BaseModel):
+    view: str = "standard"             # 12m.1: or "compare", its models side by side
     chip: str = "all"
     cols: list[str] | None = None      # the chosen benchmarks, or the chip's own
     models: list[str] | None = None    # the chosen models, or every one
@@ -3113,6 +3114,13 @@ def _view_name(s: str) -> str:
 def _view_spec(v: ViewSpec) -> dict:
     cols = v.cols if v.cols else None
     models = v.models if v.models else None
+    if v.view not in ("standard", "compare"):
+        raise HTTPException(422, "a view is standard or compare")
+    if v.view == "compare":
+        # 12m.1: a comparison is its models, two to eight of them
+        if not models or not 2 <= len(models) <= 8 or not all(0 < len(m) <= 200 for m in models):
+            raise HTTPException(422, "a comparison is two to eight model ids")
+        return {"view": "compare", "models": models}
     if cols is None and models is None:
         raise HTTPException(422, "nothing to save: choose benchmarks or models first")
     if cols and (len(cols) > 40 or not all(_VIEW_KEY.match(c) for c in cols)):
