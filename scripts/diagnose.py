@@ -520,6 +520,10 @@ def diagnose_model(model_dir: Path) -> dict:
         if not files:
             continue
         task = re.sub(r"_\d+shot$", "", task_dir.name)
+        # 12n.2: GPQA's questions never leave the server — no examples of them
+        # are written where a page can read them
+        if task.startswith("gpqa"):
+            continue
         d = diagnose_task(files)
         if d:
             tasks[task] = d

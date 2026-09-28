@@ -69,6 +69,12 @@ REQUIRED_REPO_FILES = [
     "eval_tasks/trust_safety/xstest.jsonl",
     "eval_tasks/trust_safety/bbq_ambig_3000.jsonl",
     "eval_tasks/trust_safety/bbq_ambig.jsonl.gz",
+    # 12n.2: simpleqa.build_tasks() writes SimpleQA Verified's task from these,
+    # and the judge grades with its template
+    "eval_tasks/simpleqa/manifest.json",
+    "eval_tasks/simpleqa/_simpleqa_template_yaml",
+    "eval_tasks/simpleqa/simpleqa_verified.csv",
+    "eval_tasks/simpleqa/grader_template.txt",
     "FRIENDS.md",                           # served at /guide
     "clients/bench_client.py",              # served at /client
     *DELIVERED_TOPIC_FILES,

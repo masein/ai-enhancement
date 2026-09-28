@@ -56,8 +56,13 @@ def docs_of(n_hs=12):
                 "answerKey": "A"})
     tqa = [{"question": "Is the earth flat?", "mc1_targets": {"choices": ["No.", "Yes."],
                                                              "labels": [1, 0]}}]
+    # 12n.2: GPQA's shape, as lm_eval's process_docs leaves it — invented
+    # questions, never GPQA's (tests/fixtures/gpqa)
+    gpqa = [{"Question": f"An invented lamp draws {i} A at 12 V: its power?",
+             "choice1": f"{12 * i} W", "choice2": f"{i} W", "choice3": "7 W", "choice4": "0 W",
+             "answer": "(A)"} for i in range(1, 4)]
     by = {"mmlu": mmlu, "hellaswag": hs, "winogrande": wg, "arc_challenge": arc,
-          "arc_easy": arc, "truthfulqa_mc1": tqa}
+          "arc_easy": arc, "truthfulqa_mc1": tqa, "gpqa_diamond_zeroshot": gpqa}
     return lambda name: by[name]
 
 
@@ -110,7 +115,8 @@ def test_the_worker_takes_the_run_lock_measures_and_releases_it(box, monkeypatch
     request(box)
     assert w.once() is True
     r = result(box)
-    assert r["status"] == "done" and r["line"] == "6 benchmarks measured"
+    # 12n.2: seven with GPQA Diamond
+    assert r["status"] == "done" and r["line"] == "7 benchmarks measured"
     assert r["build"] == "version: 9999 (91428471f)"
     assert r["file"]["name"] == "model.gguf" and len(r["file"]["sha256"]) == 64
     # it held the lock while it ran, and gave it back

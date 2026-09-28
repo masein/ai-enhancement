@@ -133,7 +133,8 @@ def test_the_tasks_are_built_from_the_pinned_files_under_our_own_names(tmp_path)
 
 
 def test_the_suites_and_where_the_harness_finds_them():
-    assert config.tasks_for_suite("full")[-1 - len(config.discovered_ppl_tasks())] == "bbq_3000"
+    # 12n.2: GPQA Diamond's four options scored come after BBQ
+    assert config.tasks_for_suite("full")[-2 - len(config.discovered_ppl_tasks())] == "bbq_3000"
     assert "bbq_all" not in config.tasks_for_suite("full")
     full_all = config.tasks_for_suite("full", bbq_all=True)
     assert "bbq_all" in full_all and "bbq_3000" not in full_all

@@ -357,6 +357,10 @@ def _queue_one(model_id: str, benchmarks: list[str], subset: int, by: str,
     if unknown or not want:
         raise ValueError("benchmarks are " + ", ".join(gb.ORDER))
     man = manifest()
+    # 12n.2: "all" is every benchmark with a dataset built — GPQA's is built
+    # apart (gguf_data.py --only gpqa), and until then a run of all asks the rest
+    if not benchmarks:
+        want = [b for b in want if b in man] or want
     missing = [gb.BENCHMARKS[b]["label"] for b in want if b not in man]
     if missing:
         raise ValueError(f"No dataset yet for {', '.join(missing)}: run the converter once "

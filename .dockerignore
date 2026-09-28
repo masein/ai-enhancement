@@ -20,6 +20,7 @@ eval_tasks/*
 # 12k.2: Trust & safety's pinned data and task templates — every full run
 # (BBQ) and the safety suite build their tasks from them
 !eval_tasks/trust_safety
+!eval_tasks/simpleqa
 logs/
 artifacts/
 service.sqlite3*

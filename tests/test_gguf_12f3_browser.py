@@ -113,7 +113,9 @@ def test_models_has_the_gguf_group_only_for_models_with_a_result(live, page, mea
     assert "llama-perplexity" in th.get_attribute("data-tip") and TIP in th.get_attribute("data-tip")
     names = page.locator("th[data-col^='gguf:'] .hname").evaluate_all(
         "xs => xs.map(x => x.textContent)")
-    assert names == ["MMLU", "HellaSwag", "Winogrande", "ARC-C", "ARC-E", "TruthfulQA"]
+    # 12n.2: and GPQA Diamond
+    assert names == ["MMLU", "HellaSwag", "Winogrande", "ARC-C", "ARC-E", "TruthfulQA",
+                     "GPQA Diamond"]
     cell = page.locator(f"tr[data-lb-row='{measured['gid']}'] td[data-gguf-cell='mmlu']")
     assert cell.inner_text().startswith("66.7")
     # a model with no GGUF result: a dash, not a number
@@ -147,7 +149,7 @@ def test_the_model_page_shows_its_gguf_scores_the_pairing_and_the_phone_card(liv
     part = page.locator(f"[data-gguf-part='{PHONE}']")
     part.wait_for()
     assert part.locator("h3").inner_text() == "Measured on the GGUF · llama.cpp, 0-shot"
-    assert part.locator("[data-gguf-row]").count() == 6
+    assert part.locator("[data-gguf-row]").count() == 7                # 12n.2: GPQA Diamond too
     pairs = part.locator(f"[data-gguf-pair='{measured['gid']}']").all_inner_texts()
     assert any(p.startswith("LDA phone build vs Qwen3.6 original, as built: MMLU +16.7")
                and "(not a clear difference)" in p for p in pairs), pairs

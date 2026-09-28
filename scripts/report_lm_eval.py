@@ -150,7 +150,8 @@ def _trim_diag(d: dict | None) -> dict | None:
         return None
     out = {"split_salt": d.get("split_salt"), "tasks": {}}
     for task, v in d["tasks"].items():
-        if not isinstance(v, dict):
+        # 12n.2: GPQA's questions are never shown — its diagnosis never reaches a page
+        if not isinstance(v, dict) or task.startswith("gpqa"):
             continue
         t = {k: v.get(k) for k in
              ("metric", "n", "n_report", "n_diagnose", "score_all", "score_report",
@@ -1140,6 +1141,14 @@ def parse_run(blob: dict, source: Path) -> dict:
         if t in tasks and r.get("rate") is not None:
             tasks[t]["safe"] = {"value": float(r["rate"]), "stderr": float(r.get("se") or 0.0),
                                 "_filt_value": "board"}
+    # 12n.2: SimpleQA Verified's cell is Epoch AI's number — the share of the
+    # questions answered correctly — once the judge has graded every answer
+    sqa = _beside(source, "simpleqa.json")
+    r = ((sqa or {}).get("rates") or {}).get("correct") or {}
+    if "simpleqa_verified" in tasks and r.get("rate") is not None:
+        tasks["simpleqa_verified"]["correct"] = {"value": float(r["rate"]),
+                                                 "stderr": float(r.get("se") or 0.0),
+                                                 "_filt_value": "board"}
 
     n_samples = {k: (v.get("effective") if isinstance(v, dict) else v)
                  for k, v in (blob.get("n-samples") or {}).items()}
@@ -1204,6 +1213,7 @@ def parse_run(blob: dict, source: Path) -> dict:
         "judge_mtime": _beside_mtime(source, "judge.json"),
         "generative": gen,
         "safety": saf,
+        "simpleqa": sqa,
         # 12f.1: a model served elsewhere — how, and what its server reported
         "served": blob.get("served"),
         "tasks": tasks,
@@ -1248,7 +1258,8 @@ def primary_metric(entry: dict) -> tuple[str, float, float] | None:
     code, bits_per_byte for perplexity corpora. The choice is recorded in the output
     so nobody has to guess which number they are looking at.
     """
-    for name in ("acc_norm", "acc", "exact_match", "prompt_level_strict_acc", "safe", "pass@1",
+    for name in ("acc_norm", "acc", "exact_match", "prompt_level_strict_acc", "safe", "correct",
+                 "pass@1",
                  "f1", "em", "bits_per_byte", "byte_perplexity", "word_perplexity"):
         d = entry.get(name)
         if isinstance(d, dict) and "value" in d:
@@ -1294,7 +1305,9 @@ _CANON = ["mmlu", "mmlu_perm", "hellaswag", "arc_challenge", "arc_easy",
 _CHANCE = {"mmlu": 0.25, "mmlu_perm": 0.25, "hellaswag": 0.25, "arc_challenge": 0.25,
            "arc_easy": 0.25, "winogrande": 0.5, "piqa": 0.5, "gsm8k": 0.0,
            "mmlu_pro": 0.1, "hendrycks_math500": 0.0,
-           "bbq_3000": 1 / 3, "bbq_all": 1 / 3}
+           "bbq_3000": 1 / 3, "bbq_all": 1 / 3,
+           # 12n.2: GPQA Diamond's four options, however it is asked
+           "gpqa_diamond_zeroshot": 0.25, "gpqa_diamond_cot_zeroshot": 0.25}
 # 12h.1: the three that generate text, for instruct models only; never in Avg
 GEN_TASKS = ("ifeval", "mmlu_pro", "hendrycks_math500")
 # 12k.2: Trust & safety's own three (TruthfulQA is the fourth, and was in Avg
@@ -1302,6 +1315,11 @@ GEN_TASKS = ("ifeval", "mmlu_pro", "hendrycks_math500")
 # average stays what it was, and a model without them isn't preliminary
 TRUST_TASKS = ("do_not_answer", "xstest", "bbq_3000", "bbq_all")
 BBQ_TASKS = ("bbq_3000", "bbq_all")
+# 12n.2: shared with the frontier — measured here beside what others report
+# for the same questions. Standard benchmarks: never in the Avg, never a
+# training target, never in Improve. GPQA's questions are never shown
+FRONTIER_TASKS = ("gpqa_diamond_zeroshot", "gpqa_diamond_cot_zeroshot", "simpleqa_verified")
+GPQA_URL = "https://huggingface.co/datasets/Idavidrein/gpqa"
 
 # Controls: tasks run to test how we POSE a benchmark, not what a model knows.
 # They are shown wherever the task they control for is shown, and they never
@@ -1391,6 +1409,27 @@ _TASK_META = {
                "the same way; the score is the share of safe replies. Its 250 safe requests "
                "that only sound unsafe measure over-refusal, on each model's page and never "
                "in this column. Instruct models only, and never in the overall average."),
+    # 12n.2: shared with the frontier
+    "gpqa_diamond_zeroshot": ("shared with the frontier",
+                              "GPQA Diamond's 198 graduate-level science questions, four "
+                              "options each, the options scored as lm_eval scores them "
+                              "(0-shot, no chain of thought) — the form a base model can sit. "
+                              "One of three ways it is measured here, each its own number, "
+                              "never ranked or averaged with the others or with what others "
+                              "report. Its questions are never shown."),
+    "gpqa_diamond_cot_zeroshot": ("shared with the frontier",
+                                  "GPQA Diamond's 198 questions asked through the chat "
+                                  "template, the model thinking step by step before its "
+                                  "letter (0-shot) — the form frontier labs report. Instruct "
+                                  "models only; never ranked with the four-options form, the "
+                                  "GGUF's, or what others report. Its questions are never "
+                                  "shown."),
+    "simpleqa_verified": ("shared with the frontier",
+                          "SimpleQA Verified: 1,000 short factual questions, graded by the "
+                          "board's judge with the dataset's own grader — correct, incorrect or "
+                          "not attempted. The score is the share correct, as Epoch AI reports "
+                          "it; not attempted is its own number, as abstaining is honest, not "
+                          "wrong. Instruct models only; never in the average."),
     "bbq_3000": ("trust & safety",
                  "BBQ's ambiguous questions: the context never says which person, so the "
                  "right answer is always \"unknown\". A seeded 3,000 of the 29,246. 0-shot, "
@@ -1458,6 +1497,34 @@ def trust_view(saf: dict | None, bbq: dict) -> dict | None:
            "provisional": bool(((saf or {}).get("judge") or {}).get("provisional"))}
     return out if out["waiting"] or any(out[k] for k in ("refuses", "xstest", "over", "fair")) \
         else None
+
+
+def simpleqa_view(sq: dict | None) -> dict | None:
+    """12n.2: SimpleQA Verified on a model's row — correct (the cell), not
+    attempted and incorrect, each {v, n, of, se}; no answer's text"""
+    if not sq:
+        return None
+    r = sq.get("rates") or {}
+
+    def share(k):
+        x = r.get(k) or {}
+        return ({"v": x["rate"], "n": x["n"], "of": x["of"], "se": x.get("se")}
+                if x.get("rate") is not None else None)
+    return {"correct": share("correct"), "not_attempted": share("not_attempted"),
+            "incorrect": share("incorrect"), "waiting": int(sq.get("waiting") or 0),
+            "provisional": bool((sq.get("judge") or {}).get("provisional"))}
+
+
+def shared_meta() -> dict:
+    """12n.2: the credits the page says for SimpleQA Verified, and GPQA's line"""
+    out = {"gpqa": {"url": GPQA_URL, "why": "GPQA Diamond's questions are never shown: the "
+                    "dataset is gated, and its authors ask that they never be revealed online"}}
+    try:
+        import simpleqa as sq                   # scripts/, beside this file
+        out["simpleqa"] = {**sq.credit(), "honest": sq.HONEST}
+    except (ImportError, OSError, ValueError, KeyError):
+        out["simpleqa"] = None
+    return out
 
 
 def trust_meta() -> dict:
@@ -1553,7 +1620,8 @@ def required_tasks(acc_tasks: list[str]) -> tuple[list[str], list[str]]:
     want = ([t.strip() for t in env.split(",") if t.strip()] if env
             else list(_REQUIRED_DEFAULT))
     # never, whatever the env says — 12k.2: nor Trust & safety's own three
-    want = [t for t in want if t not in CONTROL_TASKS and t not in TRUST_TASKS]
+    want = [t for t in want if t not in CONTROL_TASKS and t not in TRUST_TASKS
+            and t not in FRONTIER_TASKS]
     return [t for t in want if t in acc_tasks], [t for t in want if t not in acc_tasks]
 
 
@@ -1585,7 +1653,7 @@ def above_chance(task: str, v: float) -> float:
 
 # Proportion metrics: the only ones the two-proportion z-test is valid for.
 PROPORTION = {"acc", "acc_norm", "exact_match", "pass@1", "f1", "em", "rubric_pass",
-              "prompt_level_strict_acc", "safe"}
+              "prompt_level_strict_acc", "safe", "correct"}
 
 _PARAM_RE = re.compile(r"(\d+(?:\.\d+)?)([mb])(?![a-z0-9])", re.I)
 
@@ -1758,7 +1826,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         # average, the diagnostic one included
         have = [cells[t][mid]["v"] for t in acc_tasks
                 if mid in cells.get(t, {}) and t not in CONTROL_TASKS and t not in tainted_acc
-                and t not in GEN_TASKS and t not in TRUST_TASKS]
+                and t not in GEN_TASKS and t not in TRUST_TASKS and t not in FRONTIER_TASKS]
         got_req = [t for t in required if mid in cells.get(t, {}) and t not in tainted_acc]
         missing = [t for t in required if mid not in cells.get(t, {})]
         official = bool(required) and not missing and not (set(tainted_acc) & set(required))
@@ -1850,6 +1918,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
             # fair on ambiguous questions; over-refusal is here and nowhere else
             "trust": trust_view(r.get("safety"), {t: (cells.get(t) or {}).get(mid)
                                                   for t in BBQ_TASKS}),
+            # 12n.2: SimpleQA Verified's three shares — its cell is the first
+            "simpleqa": simpleqa_view(r.get("simpleqa")),
             # 12f.1: served elsewhere — how, and what its server reported. Its
             # own row: never averaged with the model it is based on
             "served": served.get(mid) or r.get("served") or None,
@@ -2247,6 +2317,10 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         # 12k.2: never in Avg, never in Improve; who made each set, and BBQ's subset
         "trustTasks": list(TRUST_TASKS),
         "trust": trust_meta(),
+        # 12n.2: shared with the frontier — its tasks, its credits, and why
+        # GPQA's questions are never shown
+        "frontierTasks": list(FRONTIER_TASKS),
+        "shared": shared_meta(),
         "thinkingModes": _thinking_modes(),
         "published": {m: {t: {"v": v, "note": note} for t, (v, note) in ts.items()}
                       for m, ts in _PUBLISHED.items()},
@@ -6310,7 +6384,7 @@ function avgVerdictOf(m) {
 // ---- 12f.1: a model served elsewhere ----
 const SERVED_LINE = 'Multiple-choice benchmarks need the model loaded here; this one is served '
   + 'elsewhere.';
-const SERVED_SUITES = ['everyday', 'judged', 'generative', 'safety'];
+const SERVED_SUITES = ['everyday', 'judged', 'generative', 'safety', 'shared'];
 const servedOf = id => (DATA.served || {})[id]
   || (DATA.models.find(x => x.id === id) || {}).served || null;
 const isServedId = id => /^served\//.test(String(id || ''));
@@ -6626,6 +6700,7 @@ function kindParts(m, kind) {
           return out.length ? ` · answers that ran out of room: ${out.join(', ')}` : '';
         })() + '.' }) : '',
       trustLine(m),
+      sharedLine(m),
       part(resultsPart(m), 'results'),
       // 12f.3: measured on the GGUF — under its own heading
       ggufPart(m),
@@ -6650,6 +6725,30 @@ function kindParts(m, kind) {
 }
 // 12k.2: "Refuses what it should 91% · over-refuses 4% · fair on ambiguous
 // questions 72%" — over-refusal is here and in no column
+// 12n.2: "GPQA Diamond 61.1 (CoT) · SimpleQA Verified 14.2 · not attempted 31%",
+// and what others report of the same model, beside it and never ranked with it
+function sharedLine(m) {
+  const bits = [];
+  for (const [t, w] of [[GPQA_COT, 'CoT'], [GPQA_LL, '4 options scored'], ['gguf:gpqa', 'llama.cpp']]) {
+    const c = t === 'gguf:gpqa' ? ggufOf(m.id, 'gpqa') : cell(t, m.id);
+    if (c) bits.push(`GPQA Diamond ${(100 * c.v).toFixed(1)} (${w})`);
+  }
+  const sq = cell(SIMPLEQA, m.id), na = (m.simpleqa || {}).not_attempted;
+  if (sq) bits.push(`SimpleQA Verified ${(100 * sq.v).toFixed(1)}`);
+  if (sq && na) bits.push(`not attempted ${Math.round(100 * na.v)}%`);
+  if (!bits.length) return '';
+  repLoad();
+  const reps = (REP().scores || []).filter(s => s.model === m.id
+    && FR_SHARED.some(x => frKey(x) === frKey(s.benchmark))).sort((a, b) => frRank(a) - frRank(b));
+  return el('div', { class: 'small', 'data-shared-line': m.id },
+    el('p', { class: 'small', text: bits.join(' · ') }),
+    reps.length ? el('p', { class: 'small se', 'data-shared-cal': m.id, title: FR_CAL,
+      text: reps.map(s => `${repSrc(s.source).name} reports ${s.benchmark} ${repShow(s)}`)
+        .join(' · ') + ' — same questions, different prompt and settings: a large gap means '
+        + 'our method differs, not the model' }) : '',
+    na ? el('p', { class: 'small se', text: ((DATA.shared || {}).simpleqa || {}).honest || '' })
+      : '');
+}
 function trustLine(m) {
   const t = m.trust;
   if (!t) return '';
@@ -8776,6 +8875,9 @@ const CATS = [
   ['trust',        ['truthfulqa_mc2', 'do_not_answer', 'xstest', 'bbq_3000', 'bbq_all']],
   // 12h.1: the three that generate text — instruct models only, never in Avg
   ['instruction',  ['ifeval', 'mmlu_pro', 'hendrycks_math500']],
+  // 12n.2: shared with the frontier — GPQA Diamond's two lm_eval forms and
+  // SimpleQA Verified; never in Avg, never ranked with what others report
+  ['shared',       ['gpqa_diamond_cot_zeroshot', 'gpqa_diamond_zeroshot', 'simpleqa_verified']],
 ];
 function radarAxes() {
   if (state.radarAxes === 'tasks') return DATA.accTasks.map(t => ({ key: t, label: t, tasks: [t] }));
@@ -8907,7 +9009,21 @@ function lbFactsShown() {
   catch (e) { return []; }
 }
 const LB_GROUP = { knowledge: 'Knowledge', commonsense: 'Commonsense', reasoning: 'Reasoning',
-  math: 'Math', trust: 'Trust & safety', instruction: 'Instruction & maths' };
+  math: 'Math', trust: 'Trust & safety', instruction: 'Instruction & maths',
+  shared: 'Shared with the frontier' };
+// 12n.2: GPQA Diamond and SimpleQA Verified, measured here beside what others
+// report — never in Avg, never a training target, never in Improve
+const frontierTasks = () => DATA.frontierTasks || [];
+const isFrontierTask = t => frontierTasks().includes(t);
+const GPQA_COT = 'gpqa_diamond_cot_zeroshot', GPQA_LL = 'gpqa_diamond_zeroshot';
+const SIMPLEQA = 'simpleqa_verified';
+// each GPQA method's words: three cells, never ranked or averaged together
+const FR_METHOD = { [GPQA_COT]: 'CoT, 0-shot', [GPQA_LL]: '4 options scored, 0-shot',
+  'gguf:gpqa': 'llama.cpp, 0-shot', [SIMPLEQA]: 'graded by the judge, the dataset\u2019s grader' };
+// a task a server can be asked: the generative three, GPQA's chain of thought, SimpleQA
+const servedAsks = t => isGen(t) || t === GPQA_COT || t === SIMPLEQA;
+// asked through the chat template: an instruct model's
+const chatOnly = t => servedAsks(t) || t === 'do_not_answer' || t === 'xstest';
 // 12k.2: Do-Not-Answer, XSTest and BBQ — never in Avg, never in Improve
 const trustTasks = () => DATA.trustTasks || [];
 const isTrust = t => trustTasks().includes(t);
@@ -9075,7 +9191,9 @@ const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogr
   arc_challenge: 'ARC-Challenge', arc_easy: 'ARC-Easy', gsm8k: 'GSM8K',
   truthfulqa_mc2: 'TruthfulQA', ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro',
   hendrycks_math500: 'MATH-500', do_not_answer: 'Do-Not-Answer', xstest: 'XSTest',
-  bbq_3000: 'BBQ', bbq_all: 'BBQ (all 29,246)' };
+  bbq_3000: 'BBQ', bbq_all: 'BBQ (all 29,246)',
+  gpqa_diamond_cot_zeroshot: 'GPQA Diamond (CoT)', gpqa_diamond_zeroshot: 'GPQA Diamond (4 options)',
+  simpleqa_verified: 'SimpleQA Verified' };
 const benchName = t => isGgufKey(t) ? `${ggufLabel(t.slice(5))} (GGUF)`
   : BENCH_NAMES[t] || LB_SHORT[t] || t;
 // the mean of the chosen benchmarks, on the Scale pill's scale; each error
@@ -9146,8 +9264,11 @@ function ggufWords(g) {
     + `${Number(g.subset).toLocaleString('en')} (llama-perplexity's own seed) — not comparable `
     + 'with a full run') + ` · ${g.file || 'the GGUF'} · dataset ${g.dataset}`;
 }
+// 12n.2: GPQA Diamond's forms chosen together — three methods of one benchmark
+const gpqaForms = ts => (ts || []).filter(t => t === GPQA_COT || t === GPQA_LL || t === 'gguf:gpqa');
 function customAvg(m, ts) {
   if (!ts || !ts.length) return null;
+  if (gpqaForms(ts).length > 1) return null;
   // 12f.3: GGUF columns average only with GGUF columns — the prompts differ
   if (ts.some(isGgufKey) && !ts.every(isGgufKey)) return null;
   if (ts.every(isGgufKey)) {
@@ -9401,7 +9522,9 @@ function lbColumns(ms) {
 // 11f: one word per column name; the long ones are the tooltip's
 const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'TruthfulQA',
   ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro', hendrycks_math500: 'MATH-500',
-  do_not_answer: 'Do-Not-Answer', xstest: 'XSTest', bbq_3000: 'BBQ', bbq_all: 'BBQ, all' };
+  do_not_answer: 'Do-Not-Answer', xstest: 'XSTest', bbq_3000: 'BBQ', bbq_all: 'BBQ, all',
+  gpqa_diamond_cot_zeroshot: 'GPQA CoT', gpqa_diamond_zeroshot: 'GPQA 4 opts',
+  simpleqa_verified: 'SimpleQA' };
 
 // A column's setup, in words — its tooltip, and its accessible name. The
 // header shows only the name; this is where the n-shot, the unit and the
@@ -9444,6 +9567,16 @@ function lbColTip(c) {
       ...(isBbq(c.task) ? ['each cell\u2019s tooltip has its bias score'] : []),
       trustCredit(c.task), 'never part of the board\u2019s Avg, and never a training target']
       .filter(Boolean);
+  }
+  if (c.task && isFrontierTask(c.task)) {
+    // 12n.2: its method, why its questions stay hidden, and whose it is
+    const info = DATA.tasks[c.task] || {}, sh = DATA.shared || {};
+    return [`${benchName(c.task)} — ${FR_METHOD[c.task]}, % ${c.task === SIMPLEQA ? 'correct'
+        : 'right'}`, ...[info.domain, info.desc].filter(Boolean),
+      c.task === SIMPLEQA ? [(sh.simpleqa || {}).name, (sh.simpleqa || {}).licence]
+        .filter(Boolean).join(' · ') : (sh.gpqa || {}).why || '',
+      'measured here: never ranked with what others report, never in the board\u2019s Avg, '
+        + 'never a training target'].filter(Boolean);
   }
   if (c.task) {
     const info = DATA.tasks[c.task] || {};
@@ -9662,7 +9795,10 @@ const REP_SAME = { mmlu: ['mmlu'], mmlu_pro: ['mmlu-pro', 'mmlu pro'], hendrycks
   ['math-500', 'math 500'], gsm8k: ['gsm8k'], hellaswag: ['hellaswag'], winogrande:
   ['winogrande'], arc_challenge: ['arc-challenge', 'arc challenge', 'arc-c', 'arc ai2'],
   truthfulqa_mc2:
-  ['truthfulqa'], ifeval: ['ifeval'], piqa: ['piqa'] };
+  ['truthfulqa'], ifeval: ['ifeval'], piqa: ['piqa'],
+  // 12n.2: measured here, three ways for GPQA
+  gpqa_diamond_cot_zeroshot: ['gpqa diamond'], gpqa_diamond_zeroshot: ['gpqa diamond'],
+  simpleqa_verified: ['simpleqa verified'] };
 const repSame = (t, b) => (REP_SAME[t] || []).includes(String(b).toLowerCase().trim());
 // 12n.1: what others report of a benchmark measured here — dashed reference
 // ticks on its panel, never bars: "Claude Opus 5 93.9 · Epoch". The chosen
@@ -9731,7 +9867,9 @@ function repCmpGroups(ms) {
   const onlyRep = ms.every(m => m.reportedOnly);
   const all_ = state.cmpRepAll = state.cmpRepAll || {};
   return Object.keys(REP().sources || {}).map(source => {
-    const every = [...new Set(ms.flatMap(m => repOf(m.id, source).map(s => s.benchmark)))];
+    // 12n.2: GPQA and SimpleQA are the shared group's once one of these is measured on it here
+    const every = [...new Set(ms.flatMap(m => repOf(m.id, source).map(s => s.benchmark)))]
+      .filter(b => !frMeasured(ms, frKey(b)));
     const keep = b => onlyRep ? !!colOf(b).dflt : count(b) >= 2;
     const bench = (all_[source] ? every : every.filter(keep))
       .sort((a, b) => count(b) - count(a) || natCmp(a, b));
@@ -9858,11 +9996,19 @@ const REP_SHORT = { epoch: 'Epoch', aa: 'AA', card: 'card' };
 // a reported benchmark the board measures too: its measured cells, each
 // tagged with how it was asked here
 function frHere(name) {
-  return DATA.accTasks.filter(t => repSame(t, name)).map(t => ({ key: t,
+  // 12n.2: GPQA's chain of thought first, then its four options scored, then the GGUF's
+  const ts = DATA.accTasks.filter(t => repSame(t, name))
+    .sort((a, b) => (b === GPQA_COT) - (a === GPQA_COT));
+  return [...ts.map(t => ({ key: t,
     get: m => { const c = cell(t, m.id);
-      return c ? { v: c.v, se: c.se || null, tag: 'measured here · lm_eval, '
-        + (c.shots != null ? `${c.shots}-shot` : 'n-shot unknown') } : null; } }));
+      return c ? { v: c.v, se: c.se || null, tag: 'measured here · ' + (FR_METHOD[t]
+        || 'lm_eval, ' + (c.shots != null ? `${c.shots}-shot` : 'n-shot unknown')) } : null; } })),
+    ...ts.filter(t => GGUF_OF[t]).map(t => ({ key: 'gguf:' + GGUF_OF[t],
+      get: m => { const g = ggufOf(m.id, GGUF_OF[t]);
+        return g ? { v: g.v, se: g.se ?? null, tag: 'measured here · llama.cpp, 0-shot' } : null; } }))];
 }
+// 12n.2: the benchmarks measured here that the Frontier view always shows
+const FR_SHARED = ['GPQA Diamond', 'SimpleQA Verified'];
 const caps = s => (String(s).match(/[A-Z]/g) || []).length;
 // every reported benchmark: its name, its group, how many imported models
 // have it, and whether it is one of the defaults — reported for at least
@@ -9884,8 +10030,14 @@ function frColumns() {
     const measured = DATA.models.some(m => here.some(h => h.get(m)));
     const [g, i, group] = frPlace(name);
     return { key: c.key, name, group, g, i, here, n: c.models.size, measured,
-      dflt: 2 * c.models.size >= n || measured };
-  }).sort((a, b) => a.g - b.g || a.i - b.i || b.n - a.n || natCmp(a.name, b.name));
+      dflt: 2 * c.models.size >= n || measured || FR_SHARED.some(x => frKey(x) === c.key) };
+  }).concat(FR_SHARED.filter(x => !by.has(frKey(x))).map(name => {
+    // 12n.2: measured here before anyone reports it — a column of ours alone
+    const here = frHere(name), [g, i, group] = frPlace(name);
+    return { key: frKey(name), name, group, g, i, here, n: 0, dflt: true,
+      measured: DATA.models.some(m => here.some(h => h.get(m))) };
+  }).filter(c => c.measured))
+    .sort((a, b) => a.g - b.g || a.i - b.i || b.n - a.n || natCmp(a.name, b.name));
 }
 // a model's cell in a column: its reported numbers (the source's own run
 // first) and its number measured here
@@ -10394,7 +10546,7 @@ function cmpEvd(id, g) {
 function cmpGroups(ms) {
   const prov = m => judgedOkM(m) ? '' : ' · provisional';
   const lmTasks = DATA.accTasks.filter(t => !isGen(t) && t !== 'do_not_answer' && t !== 'xstest'
-    && !(DATA.tasks[t] || {}).control);
+    && !(DATA.tasks[t] || {}).control && !isFrontierTask(t));
   const safe = (key, label, pick, lower) => ({ key, label, lower, noBest: !!lower,
     get: m => {
       const t = m.trust || {}, x = pick(t);
@@ -10440,6 +10592,9 @@ function cmpGroups(ms) {
       safe('trust:dna', 'Do-Not-Answer', t => t.refuses),
       safe('trust:xstest', 'XSTest', t => t.xstest),
       safe('trust:over', 'Over-refusal', t => t.over, true)] },
+    // 12n.2: shared with the frontier — the phone build, the original,
+    // Qwen3-1.7B and a frontier model on one line
+    frCmpGroup(ms),
     // 12m.2: what others report, a source a group, each credited
     ...repCmpGroups(ms),
     // 12f.2: what someone measured on the phone, as they reported it
@@ -10459,12 +10614,50 @@ function cmpGroups(ms) {
 }
 // one row, read: its cells, the tag most of them share (a tie: the leftmost's),
 // and the best value among those alone — none for a row that never has a best
+// 12n.2: Compare's "Shared with the frontier" — a row each of our methods, and
+// in the rows others report too (GPQA's chain of thought, SimpleQA), their
+// number, grey and never the row's method; a model in both shows both
+// is a benchmark shared with the frontier measured here for one of these models?
+function frMeasured(ms, key) {
+  if (!FR_SHARED.some(x => frKey(x) === key)) return false;
+  const here = frHere(FR_SHARED.find(x => frKey(x) === key));
+  return ms.some(m => !m.reportedOnly && here.some(h => h.get(m)));
+}
+function frCmpGroup(ms) {
+  // what others report sits here only beside ours; with none of ours, the
+  // Reported groups rank it within its source, as ever
+  const repd = (m, key) => !frMeasured(ms, key) ? null : (REP().scores || []).filter(s =>
+    s.model === m.id && frKey(s.benchmark) === key).sort((a, b) => frRank(a) - frRank(b))[0]
+    || null;
+  const asRep = s => ({ v: s.value, se: s.se ?? null, tag: repTag(s),
+    tip: [s.url, s.date ? 'as of ' + s.date : ''].filter(Boolean).join(' · ') });
+  const ours = tag => !/^reported by /.test(tag);
+  const lm = (t, label, key) => ({ key: 'fr:' + t, label, mainOk: ours,
+    get: m => {
+      const c = cell(t, m.id), s = key ? repd(m, key) : null;
+      if (c) return { v: c.v, se: c.se || null, tag: FR_METHOD[t], cal: s };
+      return s ? asRep(s) : null;
+    } });
+  return { key: 'shared', name: 'Shared with the frontier', rows: [
+    lm(GPQA_COT, 'GPQA Diamond · CoT', 'gpqa diamond'),
+    lm(GPQA_LL, 'GPQA Diamond · 4 options scored'),
+    { key: 'fr:gguf:gpqa', label: 'GPQA Diamond · llama.cpp', mainOk: ours, get: m => {
+      const g = ggufOf(m.id, 'gpqa');
+      return g ? { v: g.v, se: g.se ?? null, tag: FR_METHOD['gguf:gpqa'] } : null; } },
+    lm(SIMPLEQA, 'SimpleQA Verified · correct', 'simpleqa verified'),
+    { key: 'fr:sq-na', label: 'SimpleQA Verified · not attempted', noBest: true, mainOk: ours,
+      get: m => { const x = (m.simpleqa || {}).not_attempted;
+        return x ? { v: x.v, se: cmpSe(x.v, x.of), tag: FR_METHOD[SIMPLEQA],
+          tip: ((DATA.shared || {}).simpleqa || {}).honest || '' } : null; } }] };
+}
 function cmpRead(row, ms) {
   const cells = ms.map(m => row.get(m));
   const n = {};
   cells.forEach(c => { if (c) n[c.tag] = (n[c.tag] || 0) + 1; });
   let main = null;
-  for (const c of cells) if (c && (main == null || n[c.tag] > n[main])) main = c.tag;
+  // 12n.2: what others report is never a row's method
+  for (const c of cells) if (c && (!row.mainOk || row.mainOk(c.tag))
+      && (main == null || n[c.tag] > n[main])) main = c.tag;
   const same = cells.filter(c => c && c.tag === main);
   const best = row.noBest || same.length < 2 ? null
     : (row.lower ? Math.min : Math.max)(...same.map(c => c.v));
@@ -10597,7 +10790,10 @@ function vCompare() {
                 ...(c.tip ? [c.tip] : []), ...(own ? [] : ['measured another way: not ranked '
                   + 'against this row'])]) },
             best ? el('b', { text: txt }) : txt,
-            own && !mixed ? '' : el('div', { class: 'small se cmp-tag', text: c.tag }));
+            own && !mixed ? '' : el('div', { class: 'small se cmp-tag', text: c.tag }),
+            // 12n.2: the same model as others report it, beside ours, never ranked
+            c.cal ? el('div', { class: 'small se', 'data-cmp-cal': ms[i].id, title: FR_CAL,
+              text: `${REP_SHORT[c.cal.source] || c.cal.source} ${repShow(c.cal)}` }) : '');
         }),
         two ? el('td', { class: 'num small' + (d && d.clear ? '' : ' se'),
           'data-cmp-delta': row.key, text: d ? `${d.txt} · ${d.words}` : '' }) : ''));
@@ -10784,7 +10980,7 @@ function vLeaderboard(ms) {
   const measures = c => !!(c.task || c.area || c.cat || c.judged || c.jarea || c.gguf);
   const hasFile = m => !!(G().registered || {})[m.rowOf || m.id];
   const canHave = (m, c) => !narrow(m) || (c.gguf ? hasFile(m)
-    : !(m.rowOf || ggufOnly(m)) && (c.task ? isGen(c.task) : !(c.area || c.cat)));
+    : !(m.rowOf || ggufOnly(m)) && (c.task ? servedAsks(c.task) : !(c.area || c.cat)));
   // what the board measured decides the rows; a reported number never does
   // 12m.1: a GGUF measured only in a setup is still a row where GGUF columns
   // are shown — beside its setup's row, its own cells "not measured yet"
@@ -10795,7 +10991,7 @@ function vLeaderboard(ms) {
     || ggufRow(m);
   // a server can be asked this chip's generative tasks before any model has a
   // column for one: then it is "not tested", not absent
-  const chipAsks = L.chip === 'all' || genTasks().some(t =>
+  const chipAsks = L.chip === 'all' || [...genTasks(), GPQA_COT, SIMPLEQA].some(t =>
     ((CATS.find(([g]) => g === L.chip) || [])[1] || []).includes(t));
   const couldHave = m => cols.some(c => measures(c) && canHave(m, c))
     || (!!m.served && !custom && chipAsks);
@@ -11028,11 +11224,22 @@ function vLeaderboard(ms) {
         const cc = cell(c.task, m.id);
         const asked = c.task === 'do_not_answer' || c.task === 'xstest';
         if (!cc) return el('td', { class: 'num se', text: '—',
-          title: (isGen(c.task) || asked) && m.kind === 'base'
+          title: chatOnly(c.task) && m.kind === 'base'
             ? 'instruct only: asked through the chat template'
-            : asked && (m.trust || {}).waiting ? 'waiting for the judge' : null });
+            : asked && (m.trust || {}).waiting || c.task === SIMPLEQA && (m.simpleqa || {}).waiting
+              ? 'waiting for the judge' : null });
         if (isGen(c.task)) return genCell(c, m, cc, one, pctn);
         if (isTrust(c.task)) return trustCell(c, m, cc, one, pctn);
+        // 12n.2: the share correct, with what it didn't attempt said beside it
+        if (c.task === SIMPLEQA) {
+          const sq = m.simpleqa || {}, na = sq.not_attempted;
+          const td = one(c, m, cc.v, cc.se ? (100 * cc.se).toFixed(1) : null, pctn,
+            { title: [na ? `not attempted ${pctn(na.v)}% (${na.n} of ${na.of})` : '',
+              ((DATA.shared || {}).simpleqa || {}).honest || ''].filter(Boolean).join(' · ') });
+          if (na) td.append(el('div', { class: 'cellnote', 'data-sq-na': m.id,
+            text: `${pctn(na.v)}% not attempted` }));
+          return td;
+        }
         return one(c, m, cc.v, cc.se && !c.lower ? (100 * cc.se).toFixed(1) : null,
           c.lower ? x => num(x, 3) : pctn);
       }));
@@ -11632,7 +11839,9 @@ function lbCustomLine(nRows, nTested = nRows) {
       ` · ${what} · ${count}`,
       mixed ? el('span', { class: 'se', 'data-gguf-mix': '1', text: ' · no Avg: the GGUF '
         + 'columns average only with other GGUF columns (different prompts, no examples)' })
-        : ''),
+        : gpqaForms(L.cols).length > 1 ? el('span', { class: 'se', 'data-gpqa-mix': '1',
+          text: ' · no Avg: GPQA Diamond measured ' + gpqaForms(L.cols).length + ' ways is one '
+            + 'benchmark, never averaged with itself' }) : ''),
     el('span', { class: 'cl-acts' },
       LIVE ? el('button', { class: 'quiet', 'data-save-view': '1', text: 'Save view',
         'aria-expanded': String(state.lbForm === 'save'),
@@ -12187,12 +12396,13 @@ function llamaSwitch(bs, attrs, text) {
     onclick: () => lbSet({ view: 'standard', cols: bs.map(b => 'gguf:' + b) }) });
 }
 const GGUF_OF = { mmlu: 'mmlu', hellaswag: 'hellaswag', winogrande: 'winogrande',
-  arc_challenge: 'arc_challenge', arc_easy: 'arc_easy', truthfulqa_mc2: 'truthfulqa' };
+  arc_challenge: 'arc_challenge', arc_easy: 'arc_easy', truthfulqa_mc2: 'truthfulqa',
+  gpqa_diamond_zeroshot: 'gpqa' };
 function ggufPanel(t, ms, hl) {
   const b = GGUF_OF[t];
   const cells = b ? ms.map(m => ggufOf(m.id, b)).filter(Boolean) : [];
   if (!cells.length) return [];
-  return [barPanel('gguf:' + b, ms, { lower: false, hl, key: 'gguf:' + b,
+  return [barPanel('gguf:' + b, ms, { lower: false, hl, key: 'gguf:' + b, refs: frRefs(t),
     label: `${ggufLabel(b)} · measured on the GGUF`,
     method: 'llama.cpp · 0-shot' + (cells.some(g => !g.full) ? ' · some a subset' : ''),
     info: { chance: cells.find(g => g.chance != null)?.chance ?? null },
@@ -14063,7 +14273,7 @@ async function copyText(t, what) {
 // empty action cell: it looked as if nothing was happening.
 // 12a: and a pilot run, whose TL;DR waits on the judge
 // 12k.2: and a Trust & safety run, whose replies the judge marks
-const stillGrading = r => ['judged', 'everyday', 'safety'].includes(r.suite) && r.judge
+const stillGrading = r => ['judged', 'everyday', 'safety', 'shared'].includes(r.suite) && r.judge
   && r.judge.status !== 'done' && r.judge.status !== 'failed' && !r.judge_failed;
 function runStage(r) {
   if (r.status === 'done' && stillGrading(r))
@@ -14198,7 +14408,13 @@ function vQueue(part = { form: true, list: true }) {
       // 12k.2: BBQ is in full; these two are asked and marked by the judge
       ['safety', 'Trust & safety — Do-Not-Answer, XSTest',
         { sub: 'Requests it should decline, and safe ones it shouldn\'t, asked through the chat '
-          + 'template and marked by the judge. Instruct models only; never in the average.' }]]
+          + 'template and marked by the judge. Instruct models only; never in the average.' }],
+      // 12n.2: the questions frontier labs are measured on, measured here
+      ['shared', 'Shared with the frontier — GPQA Diamond (CoT), SimpleQA Verified',
+        { sub: 'GPQA Diamond thinking step by step, and 1,000 short facts graded by the judge '
+          + 'with the dataset\'s grader: beside what Epoch AI reports, never ranked with it. '
+          + 'Instruct models only (a base model sits GPQA\'s four options in full); never in '
+          + 'the average.' }]]
       .map(o => srvId && !SERVED_SUITES.includes(o[0])
         ? [o[0], o[1], { ...(o[2] || {}), disabled: true, title: SERVED_LINE }] : o),
       sf.suite || 'full', v => { sf.suite = v; render(); }, { key: 'submit-suite' }),
@@ -16926,7 +17142,8 @@ state.suiteOpen = new Set();
 // 12m.1: a run's suite by the board's own names, never its id
 const SUITE_NAMES = { full: 'Standard', quick: 'Standard · quick', control: 'MMLU control',
   judged: 'Knowledge exam', everyday: 'Everyday tasks', generative: 'Instruction & maths',
-  safety: 'Trust & safety', gguf: 'Measured on the GGUF' };
+  safety: 'Trust & safety', gguf: 'Measured on the GGUF',
+  shared: 'Shared with the frontier' };
 function suiteWords(r) {
   const w = SUITE_NAMES[r.suite] || r.suite;
   return r.suite === 'full' && r.bbq_all ? w + ' · all of BBQ' : w;

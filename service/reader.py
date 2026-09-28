@@ -272,7 +272,20 @@ def _hidden_marks() -> tuple[set, list]:
     return _HIDDEN["qids"], _HIDDEN["texts"]
 
 
+# 12n.2: GPQA Diamond's questions are never shown — its authors ask that they
+# never be revealed online. A line in its prompt's shape is withheld: the
+# prompt's opening, its "Choices:" and each "(A) …" option
+_GPQA = re.compile(r"what is the correct answer to this question|^\s*choices:\s*$|"
+                   r"^\s*\([abcd]\)\s+\S", re.I)
+
+
+def gpqa_line(line: str) -> bool:
+    return bool(_GPQA.search(line))
+
+
 def _withheld(line: str, qids: set, texts: list) -> bool:
+    if gpqa_line(line):
+        return True
     flat = " ".join(line.split()).lower()
     if any(t in flat for t in texts):
         return True
@@ -300,7 +313,8 @@ def log_lines(sid: int, tail: int = 200) -> dict:
     for line in keep:
         if _withheld(line, qids, texts):
             withheld += 1
-            out.append("[line withheld — it quotes a hidden question]")
+            out.append("[line withheld — it quotes a hidden question]" if not gpqa_line(line)
+                       else "[line withheld — it quotes a GPQA question, never shown]")
         else:
             out.append(line)
     return {**base, "total": len(lines), "first": len(lines) - len(keep) + 1, "lines": out,

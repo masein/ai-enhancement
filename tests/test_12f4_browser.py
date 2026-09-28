@@ -60,7 +60,7 @@ def test_measure_from_test_a_model_is_a_dialog_that_queues(live, page, gid):
     assert page.locator("[data-dialog='test']").count() == 1          # it opens over Test a model
     assert dlg.locator("h2").inner_text() == "Measure on the GGUF"
     rows = dlg.locator("[data-gg-bench-row]")
-    assert rows.count() == 6
+    assert rows.count() == 7                                          # 12n.2: GPQA Diamond
     n = gd.manifest_of(config.RESULTS_ROOT / "gguf_data") if hasattr(gd, "manifest_of") else json.loads(
         (config.RESULTS_ROOT / "gguf_data" / "manifest.json").read_text())["benchmarks"]
     assert dlg.locator("[data-gg-count='mmlu']").inner_text() == f"{n['mmlu']['n']:,}"

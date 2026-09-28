@@ -68,6 +68,12 @@ BENCHMARKS = {
                    "data": "truthfulqa-mc1-validation.bin", "lm_eval": "truthfulqa_mc1",
                    "split": "validation", "n": 817,
                    "note": "MC1, one right answer: llama-perplexity scores no MC2"},
+    # 12n.2: shared with the frontier — as lm_eval's gpqa_diamond_zeroshot asks it,
+    # its four options scored. Gated: gguf_data.py builds it on the server with
+    # its HF token, and its questions are never committed or shown
+    "gpqa": {"label": "GPQA Diamond", "mode": "multiple-choice", "data": "gpqa-diamond.bin",
+             "lm_eval": "gpqa_diamond_zeroshot", "split": "train", "n": 198,
+             "note": "gated on Hugging Face: accept its terms with this server's HF account"},
 }
 ORDER = list(BENCHMARKS)
 MODES = {

@@ -404,6 +404,10 @@ def default_responder(req: Request) -> str:
         # 12k.2: Do-Not-Answer and XSTest, marked on the rubric as the stand-in marks them
         from trust_safety import stub_reply as safety_reply  # scripts/, on sys.path in the service
         return safety_reply(req.user)
+    if req.custom_id.startswith("simpleqa:"):
+        # 12n.2: SimpleQA Verified, graded as the stand-in grades it
+        from simpleqa import stub_reply as simpleqa_reply  # scripts/, on sys.path in the service
+        return simpleqa_reply(req.user)
     if req.custom_id.startswith(("judge:", "canary:")):
         try:
             from judge import StubGrader              # scripts/, on sys.path in the service

@@ -79,6 +79,9 @@ COPY eval_tasks/everyday/ eval_tasks/everyday/
 # bbq_utils.py: trust_safety.build_tasks() writes the tasks from them for
 # every full run and every Trust & safety run (tests/test_image_contents.py)
 COPY eval_tasks/trust_safety/ eval_tasks/trust_safety/
+# 12n.2: SimpleQA Verified (MIT), pinned — simpleqa.build_tasks() writes its task
+# from it, and its grader template is the judge's
+COPY eval_tasks/simpleqa/ eval_tasks/simpleqa/
 COPY FRIENDS.md ./
 
 # the same check the service runs at startup, at BUILD time: an image missing

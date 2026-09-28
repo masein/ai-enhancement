@@ -1,0 +1,26 @@
+{
+ "built": "2026-09-28",
+ "sources": {
+  "simpleqa_verified": {
+   "name": "SimpleQA Verified",
+   "licence": "MIT",
+   "url": "https://huggingface.co/datasets/google/simpleqa-verified",
+   "revision": "0dc97e0d28d8233463e005cdc4475cc2a13ba2dc",
+   "cite": "Google DeepMind, SimpleQA Verified (2025): 1,000 short factual questions, a cleaned-up SimpleQA",
+   "files": {
+    "simpleqa_verified.csv": "b5db21155444763543fe31b67e7cf28ce2bb225742a5b889421c5f182e2f92f5"
+   },
+   "rows": 1000
+  },
+  "grader": {
+   "name": "SimpleQA Verified grader template",
+   "licence": "MIT, Copyright (c) 2024 UK AI Security Institute",
+   "url": "https://github.com/UKGovernmentBEIS/inspect_evals/blob/541e9994bf9f757fa7069f5157e286672b594aeb/src/inspect_evals/simpleqa/grader_templates.py",
+   "revision": "541e9994bf9f757fa7069f5157e286672b594aeb",
+   "cite": "SIMPLEQA_VERIFIED_GRADER_TEMPLATE and SIMPLEQA_GRADING_INSTRUCTIONS, as Inspect Evals carries the dataset's grader",
+   "files": {
+    "grader_template.txt": "83b9bb62f89d96292171b61b9e997d5f12c0a3bf5aeba9e8786798a9edbf3f0e"
+   }
+  }
+ }
+}

@@ -3927,6 +3927,71 @@ for and hold the run lock and take its turn in the one queue. Now:
     - a builder batch's view still shows its own published questions,
       hidden ones included (12i.2's design).
 
+### 12n.2 — GPQA Diamond and SimpleQA Verified, measured here
+
+- **GPQA Diamond** (Rein et al., CC BY 4.0) is **gated** on Hugging Face
+  (`Idavidrein/gpqa`). Its authors ask that its questions never be revealed
+  online, and the mirror is public, so:
+  - **Never commit a question of it.** lm_eval, and `gguf_data.py --only gpqa`,
+    load it on the server with the server's HF token.
+    `tests/test_12n2_gpqa_data.py` scans the repo for the dataset's canary.
+  - **Never show one.** No endpoint, page or reader carries a GPQA question
+    or answer:
+    - `diagnose.py` skips GPQA, and the report drops any GPQA diagnosis;
+    - both run-log views withhold a line in GPQA's prompt shape (the raw
+      `/api/runs/{sid}/log` now withholds hidden exam questions too);
+    - the Playground's practice lists were never fed from lm_eval datasets.
+  - **Accept its terms once**, with the Hugging Face account whose token is
+    on the server: https://huggingface.co/datasets/Idavidrein/gpqa. Until
+    then a GPQA run fails in one line, "GPQA is gated: accept its terms at
+    … with this server's HF account", and so does `gguf_data.py`. Deploy step
+    4 (`check_tasks.py`) asks Hugging Face and prints the same line, or that
+    the account can read it.
+  - **Three forms, three cells**, never ranked or averaged together, or with
+    what others report:
+    - `gpqa_diamond_cot_zeroshot`: chain of thought through the chat template,
+      with the generative suite's thinking settings. Instruct, served and
+      OpenRouter models, in the new `shared` suite. Tag "CoT, 0-shot".
+    - `gpqa_diamond_zeroshot`: the four options scored. It's in the full suite,
+      so a base model sits it too. Tag "4 options scored, 0-shot".
+    - The GGUF's: `gguf_bench` `gpqa`, as lm_eval's four-options form asks it,
+      built by `gguf_data.py --only gpqa`. Tag "llama.cpp, 0-shot". A GGUF run
+      of "all" asks only the benchmarks with a dataset built, so nothing fails
+      before it is.
+- **SimpleQA Verified** (Google DeepMind, 2025; MIT) is pinned and committed
+  in `eval_tasks/simpleqa` with its manifest (revision `0dc97e0d…`, sha256)
+  and the dataset's grader template, as Inspect Evals carries it (MIT).
+  - `scripts/simpleqa.py` asks it as Trust & safety is asked: through the chat
+    template, with the Everyday settings, and over a server for a served
+    model.
+  - The board's judge grades every answer with that template: correct,
+    incorrect or not attempted (`simpleqa.json`; batch kind `simpleqa`).
+  - The cell is **Epoch AI's number**, the share of all questions answered
+    correctly. Not attempted is its own number (an answer never finished
+    counts as one), because abstaining is honest, not wrong.
+- **The `shared` suite** ("Shared with the frontier") is GPQA's chain of
+  thought and SimpleQA Verified. OpenRouter models sit it with the estimate
+  first and the monthly limit enforced.
+- **Standard benchmarks:** never in the Avg, never a training target, never in
+  Improve.
+- **On the page:**
+  - the Frontier view's columns always include both (ours alone until
+    someone reports them);
+  - Compare's "Shared with the frontier": a row per method, Epoch's number in
+    the CoT and SimpleQA rows, grey;
+  - Benchmarks' panels with Epoch's reference ticks, the GGUF's included;
+  - the model page's line, "GPQA Diamond 61.1 (CoT) · SimpleQA Verified 14.2 ·
+    not attempted 31%", with what Epoch reports of the same model;
+  - Test a model's new suite.
+- **Not measured here, and why:**
+  - **HLE (Humanity's Last Exam):** small models score at the floor, and its
+    2,500 questions would buy nothing but a column of zeros.
+  - **FrontierMath and SimpleBench:** private, so there are no questions to
+    ask.
+  - **ARC-AGI:** small models score about zero.
+  - **SWE-bench Verified, Terminal Bench and OSWorld:** agentic. They need
+    sandboxes, tools and long multi-turn runs that this board doesn't have.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,
