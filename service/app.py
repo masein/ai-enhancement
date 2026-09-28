@@ -3082,6 +3082,73 @@ def evd_audits():
     return {"owner": config.BOARD_OWNER, "audits": db.hidden_audits()}
 
 
+# ---------------------------------------------------------------------------
+# 12o.2: every benchmark's questions, with each chosen model's result on each
+# — the halves that may be listed today, and the owner's audit of the others
+# ---------------------------------------------------------------------------
+
+def _qtask(task: str) -> None:
+    from . import questions
+    if questions.GPQA.match(task):
+        raise HTTPException(403, questions.NOT_LISTED)
+    if task not in questions.tasks():
+        raise HTTPException(404, f"No questions on file for {task}: no model has answered it yet")
+
+
+def _qmodels(models: str | list[str] | None) -> list[str] | None:
+    if isinstance(models, list):
+        return [m for m in models if m] or None
+    return [m for m in (models or "").split(",") if m.strip()] or None
+
+
+@app.get("/api/questions")
+def questions_list():
+    from . import questions
+    return {"tasks": [{"task": t, "kind": questions.kind_of(t)} for t in questions.tasks()]}
+
+
+@app.get("/api/questions/{task}")
+def questions_page(task: str, offset: int = 0, limit: int = 50, q: str = "", subject: str = "",
+                   models: str = "", f: str = ""):
+    """a page of a benchmark's listable half, 50 a page, with each chosen
+    model's result on each question"""
+    from . import questions
+    _qtask(task)
+    return questions.page(task, offset=offset, limit=limit, q=q, subject=subject,
+                          models=_qmodels(models), f=f)
+
+
+class QuestionsAuditIn(BaseModel):
+    by: str = ""
+    confirm: bool = False
+    models: list[str] | None = None
+    offset: int = 0
+    limit: int = 50
+    q: str = ""
+    subject: str = ""
+    f: str = ""
+
+
+@app.post("/api/questions/{task}/audit")
+def questions_audit(task: str, a: QuestionsAuditIn, x_token: str = Header(default="")):
+    """the half that is never listed — MMLU's and every lm_eval benchmark's
+    report half, the exam's, Everyday's hidden one — for the board's owner,
+    after the warning, logged before anything is shown. Never GPQA"""
+    from . import questions
+    _check_token(x_token)
+    if not _is_owner(a.by):
+        raise HTTPException(403, "Only the board's owner opens the half that is never listed")
+    if a.confirm is not True:
+        raise HTTPException(428, AUDIT_WARNING)
+    _qtask(task)
+    got = questions.page(task, offset=a.offset, limit=a.limit, q=a.q, subject=a.subject,
+                         models=_qmodels(a.models), f=a.f, half="report")
+    what = ("hidden half" if task == "everyday" else "the exam's report half"
+            if questions.kind_of(task) == "exam" else "report half")
+    db.hidden_audit_add(a.by.strip()[:80], f"{task} · {what}", got["total"])
+    return {**got, "warning": AUDIT_WARNING, "audit": what}
+
+
 def _name(s: str, what: str) -> str:
     s = s.strip()[:80]
     if not s:
