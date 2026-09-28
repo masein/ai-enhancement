@@ -3643,6 +3643,26 @@ select { max-width:100%; }
   border-top:1px solid var(--border); }
 .srvlist li .se { overflow-wrap:anywhere; }
 .sameas { margin-right:10px; }
+/* 12o.2: a benchmark's questions */
+.qx-open { font-size:var(--fs-1); font-weight:400; margin-left:6px; white-space:nowrap; }
+h3 .qx-open { text-transform:none; letter-spacing:0; }
+.qx-q { border-top:1px solid var(--border); padding:12px 0; }
+.qx-subj { text-transform:none; margin-bottom:2px; }
+.qx-text { white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--fs-3); line-height:1.5; }
+.qx-opts { margin:6px 0 6px 0; padding-left:0; list-style:none; }
+.qx-opts li { padding:1px 0; overflow-wrap:anywhere; }
+.qx-opts li.qx-right { font-weight:600; }
+.qx-results { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:6px; font-size:var(--fs-1); }
+.qx-results-gen { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); }
+.qx-res { white-space:nowrap; }
+.qx-gen { white-space:normal; border:1px solid var(--border); border-radius:8px; padding:6px 8px; }
+.qx-gen .qx-ans { white-space:pre-wrap; max-height:220px; overflow:auto; margin-top:4px;
+  overflow-wrap:anywhere; }
+.qx-m { font-weight:600; }
+.qx-ok { color:var(--good, #1a7f37); font-weight:700; }
+.qx-no { color:var(--critical-text, #b42318); font-weight:700; }
+.qx-pager { align-items:center; gap:10px; margin:8px 0; }
+@media (max-width:600px) { .qx-res { white-space:normal; } }
 .mrow .mhas { margin-left:6px; font-size:var(--fs-0, 11px); }
 .srvsum { font-weight:600; cursor:pointer; list-style:none; }
 /* 12m.3: OpenRouter's models, under their makers */
@@ -4551,6 +4571,7 @@ const state = {
   lbView: 'tasks',                     // leaderboard columns: 'tasks' | 'cats' (MMLU by category)
   ai: {},                        // 12i.1: the AI models page and the judge test
   qb: {},                        // 12i.2: the question builder
+  qx: {},                        // 12o.2: a benchmark's questions
   pg: {},                        // 12d.1: the Playground
   rv: { llm: null, proposals: [], datasets: [], loaded: false, msg: '',
         // 11j: which of the four views, and the small per-proposal choices
@@ -5192,7 +5213,9 @@ function barPanel(task, models, opts) {
     : null;
   const panel = el('div', { class: 'panel', 'data-panel': opts.key || task,
       'data-panel-models': String(rows.length) },
-    el('h3', { text: opts.label || taskLabel(task) }),
+    el('h3', {}, opts.label || taskLabel(task),
+      // 12o.2: its questions, and each chosen model's answer to each
+      !opts.key && canBrowse(task) ? [' ', qxLink(task)] : ''),
     opts.info ? '' : taskChips(task, { panel: true }),
     // 12m.1: the method first, and how many of the chosen models the panel holds
     el('div', { class: 'pmeta', 'data-panel-method': opts.key || task, title: missTip, text:
@@ -8111,8 +8134,10 @@ function auditsCard() {
   const names = Object.fromEntries(evdGroups());
   return el('div', { class: 'card', 'data-audits': A.loaded ? String((A.list || []).length) : 'loading' },
     el('h2', { text: 'The hidden half, opened' }),
-    el('p', { class: 'sub', text: 'Every time an Everyday group’s hidden half was opened for an '
-      + 'audit: the board’s owner only, after a warning. Those questions are the test.' }),
+    // 12o.2: and a benchmark's report half, from its questions
+    el('p', { class: 'sub', text: 'Every time a half that is never listed was opened for an '
+      + 'audit — an Everyday group’s hidden half, or a benchmark’s report half from its '
+      + 'questions: the board’s owner only, after a warning. Those questions are the test.' }),
     !A.loaded ? skeleton(2) : !(A.list || []).length
       ? el('p', { class: 'small', text: 'Nobody has opened a hidden half.' })
       : el('ul', { class: 'small' }, A.list.map(a => el('li', { 'data-audit-row': String(a.id) },
@@ -8231,6 +8256,9 @@ function viewHash(v) {
   if (v === 'build') return 'tab=build' + (state.qb.id ? '&draft=' + state.qb.id : '');
   // 12d.1: the chat open, so a reload lands on it
   if (v === 'playground') return 'tab=playground' + (state.pg.id ? '&chat=' + state.pg.id : '');
+  // 12o.2: a benchmark's questions, and the models chosen
+  if (place === 'benchmarks' && state.qx.task)
+    return 'tab=benchmarks&q=' + encodeURIComponent(state.qx.task) + benchHash();
   if (place === 'improve' || place === 'benchmarks')
     return `tab=${place}&sub=${SUB_SLUG[v]}`
       // 12g.1: which model Improve is on, so a link opens it
@@ -8271,6 +8299,13 @@ function viewOfHash(name, params) {
   }
   if (n === 'improve') v = sub || 'pipeline';
   if (n === 'benchmarks') v = ['tasks', 'exam', 'everyday'].includes(sub) ? sub : benchSub();
+  // 12o.2: a benchmark's questions
+  if (n === 'benchmarks' && p.get('q')) {
+    if (state.qx.task !== p.get('q'))
+      Object.assign(state.qx, { task: p.get('q'), offset: 0, q: '', subject: '', f: '',
+        data: null, key: '', audit: false });
+    v = 'tasks';
+  } else if (n === 'benchmarks') state.qx.task = null;
   // 12n.1: Everyday tasks and the Knowledge exam follow the same choice
   if (['tasks', 'everyday', 'exam'].includes(v)) {
     // 12m.1: the chosen models and the highlighted ones, from the address
@@ -8343,6 +8378,9 @@ function navigate(patch) {
   if (patch.tab === 'queue' && (state.tab !== 'queue' || state.model || state.topic)
       && state.pg.queue) state.pg.queue.page = 1;
   const from = location.hash;
+  // 12o.2: a place or a page left leaves a benchmark's questions
+  if (('tab' in patch || 'model' in patch && patch.model) && !patch.qxOpen) state.qx.task = null;
+  delete patch.qxOpen;
   Object.assign(state, patch);
   const want = hashFor();
   // push history, then paint. Painting here rather than leaving it to the
@@ -10916,6 +10954,9 @@ function vCompare() {
         el('th', { scope: 'row', class: 'cmp-name pin' }, row.label,
           row.lower ? el('span', { class: 'small se', 'data-cmp-lower': row.key,
             text: ' · lower is better' }) : '',
+          // 12o.2: the benchmark's questions, these models' answers on each
+          canBrowse(row.key) && ((DATA.tasks || {})[row.key] || isGen(row.key))
+            ? [' ', qxLink(row.key, { class: 'qx-open small' })] : '',
           el('div', { class: 'small se cmp-tag', 'data-cmp-main': row.key, text: r.main })),
         r.cells.map((c, i) => {
           if (!c) return el('td', { class: 'num se', 'data-cmp-cell': ms[i].id,
@@ -11195,7 +11236,8 @@ function vLeaderboard(ms) {
         el('span', { class: 'hname', text: c.short || c.label }),
         sortedBy(c) ? el('span', { class: 'dir', text: state.sort.dir > 0 ? ' ▲' : ' ▼' }) : '',
         // 12o.1: its ⋯ and its width
-        ...layoutBits(LK, c.key, c.label, { movable: !fixed }));
+        ...layoutBits(LK, c.key, c.label, { movable: !fixed,
+          task: c.task && canBrowse(c.task) ? c.task : null }));
     })));
 
   // ---- a cell (11f): the number only. A leader — the column's best, or
@@ -11830,7 +11872,7 @@ function layoutGrip(key, col, label) {
   return grip;
 }
 // a header's ⋯: Move left · Move right · Move to start, and Reset layout
-function layoutMore(key, col, label, movable, onOrder) {
+function layoutMore(key, col, label, movable, onOrder, task = null) {
   // its glyph drawn by the stylesheet: a header's text is its name alone
   const btn = el('button', { type: 'button', 'data-col-more': col,
     'aria-label': `${label} column: move it, or reset the table's layout` });
@@ -11841,6 +11883,9 @@ function layoutMore(key, col, label, movable, onOrder) {
       const item = (what, text) => el('button', { role: 'menuitem', 'data-col-move': what,
         text, onclick: () => { popClose(true); layoutMove(key, table, col, what, onOrder); } });
       return el('div', { class: 'moremenu', id: 'pop-col-' + col, 'aria-label': label },
+        // 12o.2: a benchmark's column opens its questions
+        ...(task ? [el('button', { role: 'menuitem', 'data-q-open': task, text: 'Questions ▸',
+          onclick: () => { popClose(true); openQuestions(task); } })] : []),
         ...(movable ? [item('left', 'Move left'), item('right', 'Move right'),
           item('start', 'Move to start')] : []),
         el('button', { role: 'menuitem', 'data-layout-reset': key,
@@ -11850,8 +11895,8 @@ function layoutMore(key, col, label, movable, onOrder) {
 // what a header holds besides its name — its ⋯ and its handle — and, when
 // it moves, what makes it draggable. `onOrder`: a table whose order is kept
 // elsewhere (Compare's is its models, in the address)
-function layoutBits(key, col, label, { movable = true, onOrder = null } = {}) {
-  return [layoutMore(key, col, label, movable, onOrder), layoutGrip(key, col, label)];
+function layoutBits(key, col, label, { movable = true, onOrder = null, task = null } = {}) {
+  return [layoutMore(key, col, label, movable, onOrder, task), layoutGrip(key, col, label)];
 }
 function layoutDrag(key, col, group, { onOrder = null } = {}) {
   const same = t => t && t.dataset.lkey && (t.dataset.lgroup || '') === (group || '')
@@ -15838,6 +15883,206 @@ function vStandardBench(ms) {
   const hl = (L.hl || []).filter(id => [...pick, ...reps].some(m => m.id === id)).slice(0, 3);
   return [benchPick(ms, pick, hl, reps), ...vTasks(pick, hl),
     aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
+}
+
+// ===========================================================================
+// 12o.2: every benchmark's questions — Benchmarks ▸ <a benchmark> ▸ Questions.
+// The listable half (a benchmark's diagnose half; the exam's; Everyday's
+// practice half), 50 a page from the server, each with each chosen model's
+// result: the option it picked, ✓/✗ and how sure it was, or what it wrote,
+// its thinking folded, and the check's or the judge's verdict. "not run" for
+// a model with no run of it. The other half is a count and a line — and the
+// owner's audit, logged. GPQA is never listed
+// ===========================================================================
+const canBrowse = t => !!LIVE && !!t && !/^gpqa/i.test(t) && !(DATA.pplTasks || []).includes(t);
+function openQuestions(task, from) {
+  Object.assign(state.qx, { task, offset: 0, q: '', subject: '', f: '', data: null, key: '',
+    audit: false });
+  state.readFrom = from || null;
+  navigate({ qxOpen: true, tab: 'tasks', model: null, topic: null });
+}
+function qxLink(task, attrs = {}) {
+  return el('a', { class: 'qx-open', href: '#tab=benchmarks&q=' + encodeURIComponent(task)
+      + benchHash(), 'data-q-open': task, text: 'Questions ▸', ...attrs,
+    onclick: e => { if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+      e.preventDefault(); e.stopPropagation(); openQuestions(task); } });
+}
+// a refusal (GPQA, a benchmark no model has answered) says why, in the
+// server's words; it is not the network failing
+async function qxGet(path) {
+  const r = await fetch(path);
+  if (!r.ok) {
+    let why = '';
+    try { why = (await r.json()).detail; } catch (e) { /* not JSON */ }
+    throw new Error(why || 'HTTP ' + r.status);
+  }
+  return r.json();
+}
+const qxKey = () => { const X = state.qx, L = lbS();
+  return JSON.stringify([X.task, X.offset, X.q, X.subject, X.f, L.models || [], X.audit]); };
+async function qxLoad() {
+  const X = state.qx, L = lbS(), key = qxKey();
+  X.key = key; X.loading = true; X.error = '';
+  // GPQA is never listed: not asked for at all
+  if (/^gpqa/i.test(X.task || '')) {
+    Object.assign(X, { data: null, loading: false,
+      error: 'GPQA Diamond’s questions are never shown, as its authors ask' });
+    setTimeout(render, 0);                     // not inside the render that asked
+    return;
+  }
+  try {
+    const qs = new URLSearchParams({ offset: X.offset, limit: 50, q: X.q, subject: X.subject,
+      f: X.f, models: (L.models || []).join(',') });
+    const data = X.audit
+      ? await post(`api/questions/${encodeURIComponent(X.task)}/audit`, { by: whoName(),
+          confirm: true, models: L.models || [], offset: X.offset, limit: 50, q: X.q,
+          subject: X.subject, f: X.f })
+      : await qxGet(`api/questions/${encodeURIComponent(X.task)}?${qs}`);
+    if (X.key !== key) return;                  // a later choice asked again
+    X.data = data;
+  } catch (e) {
+    if (X.key !== key) return;
+    X.data = null; X.error = String((e && e.message) || e);
+    if (X.audit) X.audit = false;
+  }
+  X.loading = false;
+  render();
+}
+function qxAuditAsk(task) {
+  const back = el('div', { class: 'dlg-back', 'data-dialog': 'audit' });
+  const close = () => back.remove();
+  const go = el('button', { class: 'primary', 'data-audit-go': '1', text: 'Open it', onclick: () => {
+    close(); Object.assign(state.qx, { audit: true, offset: 0, data: null, key: '' }); render(); } });
+  back.append(el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true',
+      'aria-labelledby': 'audit-title', 'data-audit-dialog': task },
+    el('h2', { id: 'audit-title', text: `Open ${benchName(task)}’s ${task === 'everyday'
+      ? 'hidden half' : 'report half'}?` }),
+    el('p', { 'data-audit-warning': '1', text: AUDIT_WARNING }),
+    el('div', { class: 'dlg-actions' },
+      el('button', { 'data-dialog-cancel': '1', text: 'Cancel', onclick: close }), go)));
+  document.body.append(back);
+  go.focus();
+}
+// one model's result on one question
+function qxResult(mid, r, row, kind) {
+  const name = evdName(mid);
+  if (!r) return el('div', { class: 'qx-res qx-none', 'data-qx-res': mid, 'data-qx-state': 'none' },
+    el('span', { class: 'qx-m', text: name }), el('span', { class: 'se', text: ' not run' }));
+  const mark = r.ok == null ? el('span', { class: 'se', text: '·' })
+    : el('span', { class: r.ok ? 'qx-ok' : 'qx-no', text: r.ok ? '✓' : '✗',
+        'aria-label': r.ok ? 'right' : 'wrong' });
+  const state_ = r.ok == null ? 'open' : r.ok ? 'right' : 'wrong';
+  if (kind === 'lm') {
+    const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    return el('div', { class: 'qx-res', 'data-qx-res': mid, 'data-qx-state': state_ },
+      mark, ' ', el('span', { class: 'qx-m', text: name }),
+      r.pick != null ? el('span', { class: 'qx-pick', 'data-qx-pick': String(r.pick),
+        title: (row.options || [])[r.pick] || '', text: ` picked ${L[r.pick] || r.pick + 1}` }) : '',
+      r.mass != null ? el('span', { class: 'se', text: ` · ${(100 * r.mass).toFixed(0)}% on true` })
+        : '',
+      r.margin != null ? el('span', { class: 'se', 'data-qx-margin': String(r.margin),
+        title: 'how sure it was: its likeliest option’s probability minus the next one’s',
+        text: ` · margin ${r.margin.toFixed(2)}` }) : '');
+  }
+  return el('div', { class: 'qx-res qx-gen', 'data-qx-res': mid, 'data-qx-state': state_ },
+    el('div', {}, mark, ' ', el('span', { class: 'qx-m', text: name }),
+      el('span', { class: 'se qx-verdict', text: ' · ' + (r.verdict || '') })),
+    r.thinking ? el('details', { class: 'evthink', 'data-qx-thinking': mid },
+      el('summary', { text: `thinking ▸ ${r.thinking.split(/\s+/).length.toLocaleString('en')} words` }),
+      el('div', { class: 'evthink-t', text: r.thinking })) : '',
+    el('div', { class: 'qx-ans', text: r.answer || (r.no_answer ? 'no answer' : '—') }));
+}
+function qxRow(row, d) {
+  const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const right = new Set(Array.isArray(row.answer_idx) ? row.answer_idx
+    : row.answer_idx != null ? [row.answer_idx] : []);
+  const models = d.shown || [];
+  return el('section', { class: 'qx-q', 'data-qx-q': row.id },
+    row.subject ? el('div', { class: 'small se qx-subj', text: row.subject }) : '',
+    el('div', { class: 'qx-text', text: row.q }),
+    (row.options || []).length ? el('ol', { class: 'qx-opts' }, row.options.map((o, i) =>
+      el('li', { class: right.has(i) ? 'qx-right' : '', 'data-qx-opt': String(i) },
+        el('b', { text: (L[i] || i + 1) + '. ' }), o,
+        right.has(i) ? el('span', { class: 'qx-ok', text: ' ✓', 'aria-label': 'the right answer' })
+          : ''))) : '',
+    row.reference ? el('p', { class: 'small se', text: 'Reference: ' + row.reference }) : '',
+    el('div', { class: 'qx-results' + (d.kind === 'lm' ? '' : ' qx-results-gen') },
+      models.map(m => qxResult(m, (row.results || {})[m], row, d.kind))),
+    // 12o.2: the GGUF's, where llama.cpp's log says which question it was
+    row.gguf ? el('div', { class: 'qx-results qx-gguf', 'data-qx-gguf-row': row.id },
+      el('span', { class: 'small se', text: 'On the GGUF (llama.cpp):' }),
+      Object.entries(row.gguf).map(([m, r]) => qxResult(m, r, row, 'lm'))) : '');
+}
+function vQuestions(ms) {
+  const X = state.qx, L = lbS(), task = X.task;
+  if (qxKey() !== X.key && !X.loading) qxLoad();
+  const d = X.data, info = (DATA.tasks || {})[task] || {};
+  const board = ms || visible();
+  const picker = benchPick(board, L.models ? board.filter(m => L.models.includes(m.id)) : board,
+    []);
+  const back = el('a', { href: '#tab=benchmarks&sub=standard' + benchHash(), 'data-qx-back': '1',
+    text: '← Benchmarks', onclick: e => { e.preventDefault(); X.task = null;
+      navigate({ tab: 'tasks' }); } });
+  const meta = d && d.meta || {};
+  const head = el('div', { class: 'card', 'data-qx-head': task },
+    el('p', { class: 'small' }, back),
+    el('h2', {}, benchName(task) + ' · questions',
+      X.audit ? el('span', { class: 'badge danger', 'data-qx-audit': '1',
+        text: task === 'everyday' ? 'hidden half · audit' : 'report half · audit' }) : ''),
+    info.desc ? el('p', { class: 'sub', 'data-qx-what': '1', text: info.desc }) : '',
+    el('p', { class: 'small se', 'data-qx-source': '1', text: [meta.source ? 'Source: '
+      + meta.source : 'Source: as lm_eval loads it', meta.licence ? 'licence ' + meta.licence
+      : meta.url ? 'licence: the dataset’s card' : '', meta.revision ? 'revision '
+      + String(meta.revision).slice(0, 12) : ''].filter(Boolean).join(' · ') },
+      meta.url ? [' · ', el('a', { href: meta.url, target: '_blank', rel: 'noopener',
+        text: 'its card' })] : ''),
+    d ? el('p', { class: 'small', 'data-qx-counts': `${d.listed}|${d.other}` },
+      X.audit ? `${d.listed.toLocaleString('en')} questions in this half, never listed — `
+        + 'this opening is logged under Data & sources.'
+      : `${d.listed.toLocaleString('en')} questions listed`
+        + (d.other ? ` · ${d.other.toLocaleString('en')} more are ${d.hidden_why}` : ''),
+      !X.audit && d.other && evdOwner() ? [' ', el('button', { class: 'quiet',
+        'data-qx-audit-open': task, text: task === 'everyday' ? 'Open the hidden half (audit)'
+          : 'Open the report half (audit)', onclick: () => qxAuditAsk(task) })] : '',
+      X.audit ? [' ', el('button', { class: 'quiet', 'data-qx-audit-close': '1',
+        text: 'Close the audit', onclick: () => { Object.assign(X, { audit: false, offset: 0,
+          data: null, key: '' }); render(); } })] : '') : '',
+    X.audit ? el('p', { class: 'warn', 'data-qx-audit-banner': '1', text: AUDIT_WARNING }) : '');
+  if (X.error && !d) return [head, el('div', { class: 'card' }, el('p', { class: 'warn',
+    'data-qx-error': '1', text: X.error }))];
+  if (!d) return [head, picker, el('div', { class: 'card' },
+    skeleton(5, { 'data-loading': 'questions' }))];
+  const set = patch => { Object.assign(X, patch, { offset: 0 }); render(); };
+  const who = d.shown || [];
+  const filters = el('div', { class: 'toolbar qx-bar', 'data-qx-filters': '1' },
+    el('input', { type: 'search', placeholder: 'search the questions', 'aria-label': 'search',
+      'data-keep': 'qx-q', value: X.q, style: 'flex:1;min-width:180px', 'data-qx-search': '1',
+      oninput: e => { clearTimeout(X._t); const v = e.target.value;
+        X._t = setTimeout(() => set({ q: v }), 250); } }),
+    d.subjects.length ? Select('subject', [['', 'every subject'],
+      ...d.subjects.map(s => [s, s])], X.subject, v => set({ subject: v }),
+      { key: 'qx-subject' }) : '',
+    Select('which', [['', 'every question'], ['disagree', 'the chosen models disagree'],
+      ['allwrong', 'all the chosen got it wrong'],
+      ...who.flatMap(m => [[`onlyright:${m}`, `only ${evdName(m)} got it right`],
+        [`onlywrong:${m}`, `only ${evdName(m)} got it wrong`]])], X.f, v => set({ f: v }),
+      { key: 'qx-filter' }));
+  const from = d.total ? d.offset + 1 : 0, to = Math.min(d.offset + d.limit, d.total);
+  const pager = el('div', { class: 'frm qx-pager', 'data-qx-pager': `${from}|${to}|${d.total}` },
+    el('span', { class: 'small', text: d.total ? `${from}–${to} of ${d.total.toLocaleString('en')}`
+      : 'No question matches' }),
+    el('button', { class: 'quiet', 'data-qx-prev': '1', text: '← Previous',
+      disabled: d.offset ? null : '', onclick: () => { X.offset = Math.max(0, d.offset - 50);
+        render(); } }),
+    el('button', { class: 'quiet', 'data-qx-next': '1', text: 'Next →',
+      disabled: to < d.total ? null : '', onclick: () => { X.offset = d.offset + 50; render(); } }));
+  const gg = d.gguf ? el('p', { class: 'small se', 'data-qx-gguf': d.gguf.benchmark },
+    'Measured on the GGUF: ', d.gguf.line || 'question by question under each, from '
+      + 'llama.cpp’s log of a full run') : '';
+  return [head, picker, el('div', { class: 'card', 'data-qx-list': task,
+      'aria-busy': X.loading ? 'true' : null },
+    filters, gg, pager, ...d.rows.map(r => qxRow(r, d)), d.rows.length > 5 ? pager.cloneNode(true)
+      : '')];
 }
 
 // ---------- Review: the human in the loop ----------
@@ -20189,7 +20434,9 @@ function render() {
     const place = placeOf(state.tab);
     view.replaceChildren(
       ...(place === 'improve' || place === 'benchmarks' ? [subSwitch(place)] : []),
-      ...TABS.find(([id]) => id === state.tab)[2](ms), ...dlg);
+      // 12o.2: a benchmark's questions, in Benchmarks
+      ...(place === 'benchmarks' && state.qx.task ? vQuestions(ms)
+        : TABS.find(([id]) => id === state.tab)[2](ms)), ...dlg);
   }
   if (keep) {
     const again = view.querySelector(`[data-keep="${keep.key}"]`);

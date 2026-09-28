@@ -4116,6 +4116,47 @@ answers failed, some two thirds of them wrongly.
   "chat ✓" (measured through its server) and "llama.cpp ✓" (on its GGUF).
   One tick a setup takes every row of it. Other models keep their groups.
 
+### 12o.2 — every benchmark's questions, browsed
+
+- **Where:** Questions ▸ on a Benchmarks panel's heading, in a Models
+  column's ⋯, and on a Compare row. The address is `#tab=benchmarks&q=<task>`
+  with the Models ▾ choice.
+- **What:** `service/questions.py`, `GET /api/questions` and
+  `/api/questions/{task}` (50 a page; `q`, `subject`, `models`, and `f`:
+  `disagree`, `allwrong`, `onlyright:<id>`, `onlywrong:<id>`). Each question
+  with each chosen model's result, from what is on file:
+  - log-likelihood tasks: the option it picked, ✓/✗, and the margin between
+    its two likeliest options (acc_norm's length-normalised, as diagnose.py
+    reads it); TruthfulQA MC2 marks every true answer and shows the mass on
+    them;
+  - written answers (IFEval, MMLU-Pro, MATH-500): the answer, its thinking
+    folded, and generative.py's reading; Do-Not-Answer and XSTest, the
+    judge's mark (safety.json); SimpleQA, its grade; the Knowledge exam, the
+    judge's score; Everyday, its checks;
+  - "not run" for a chosen model with no run of it.
+  - The header: what it tests, the source and revision its newest run
+    names (a licence where the repo records one; else the dataset's card).
+- **What is listed is what was listed before:** each lm_eval benchmark's
+  diagnose half (the half diagnose.py takes its examples from — for every
+  benchmark, not MMLU alone), the exam's diagnose half, Everyday's practice
+  half. The other half is a count and a line. GPQA is never listed, and the
+  page never asks for it.
+- **The owner's audit** (`POST /api/questions/{task}/audit`): the other half,
+  after the warning, logged before it is shown ("mmlu · report half"),
+  listed under Data & sources. Everyone else sees the count.
+- **The GGUF:** upstream llama.cpp's tools/perplexity prints a running
+  accuracy after every task. On a full run the tasks are in the file's order
+  (gguf_data.py writes lm_eval's documents in lm_eval's order), so:
+  - multiple choice (MMLU, ARC): right or wrong, question by question;
+  - Winogrande: right or wrong, its pick and the margin from its two scores;
+  - a subset is a random draw and HellaSwag is always shuffled: "llama.cpp
+    records only the total". So is a log whose lines aren't exactly one a
+    task — the fork on the server is trusted only when it prints as upstream
+    does.
+- **Nothing browsed feeds anything:** the browser reads the results tree and
+  keeps its tables in memory; no writer, Improve, the Playground or chat
+  imports it (a test checks both).
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,
