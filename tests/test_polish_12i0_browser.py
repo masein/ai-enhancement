@@ -21,7 +21,10 @@ SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12i0"
 NAMES = {"mmlu": "MMLU", "hellaswag": "HellaSwag", "piqa": "PIQA", "winogrande": "WinoGrande",
          "arc_challenge": "ARC-Challenge", "arc_easy": "ARC-Easy", "gsm8k": "GSM8K",
          "truthfulqa_mc2": "TruthfulQA", "ifeval": "IFEval", "mmlu_pro": "MMLU-Pro",
-         "hendrycks_math500": "MATH-500"}
+         "hendrycks_math500": "MATH-500",
+         # 12k.2: Trust & safety's three, listed before anything has run them
+         "do_not_answer": "Do-Not-Answer", "xstest": "XSTest", "bbq_3000": "BBQ",
+         "bbq_all": "BBQ (all 29,246)"}
 
 
 def shot(page_or_part, name, **kw):
