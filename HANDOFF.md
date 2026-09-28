@@ -4071,14 +4071,26 @@ answers failed, some two thirds of them wrongly.
   - `QB_EMBED_MODEL=openrouter` still sends them to `OPENROUTER_EMBED_MODEL`;
     Build questions then says "every question is sent to it to be embedded,
     the hidden half included".
-  - **Its cosine is checked on this bank, on the server**, once after
-    deploying: `python -m service.dup_threshold` (see Deploy). It reads the
-    vectors OpenRouter's model left in the builder's cache, flags the pairs
-    it put at `QB_DUP_COSINE` (0.9) or above, embeds the same texts locally,
-    and keeps the cosine whose flags agree best with those —
-    `BENCH_ROOT/builder/dup_threshold.json`, which the builder reads. It
-    prints counts, never a question. Until it has run: 0.94.
+  - **Its cosine is chosen on the server**, once after deploying:
+    `python -m service.dup_threshold` (see Deploy). Since 12o.5 it uses a
+    labelled set, `eval_tasks/everyday/dup_pairs.jsonl`, from the PRACTICE
+    half only: 60 questions each reworded by hand (no 13 words in a row in
+    common, so only the embeddings can catch them) and 60 pairs of different
+    questions from one group, the most alike by shared words. It keeps the
+    highest cosine that flags at least 95% of the rewordings, rounded down to
+    two places, and prints both rates — rewordings caught, different
+    questions flagged — into `BENCH_ROOT/builder/dup_threshold.json`, which
+    the builder reads. (12o.1 compared it with the pairs OpenRouter's model
+    had flagged; there were none, so it had nothing to go on.) Counts and
+    rates only, never a question. Until it has run: 0.94.
     `QB_DUP_COSINE_LOCAL` overrides both.
+  - **A duplicate names the closest question** (12o.5): the same 13 words
+    win over any cosine, and of the cosines over the cut the highest is
+    named, not the first in the list.
+  - **Deploy step 3 runs the check with the real model** — the model is in
+    the image, not in CI: the set's threshold reaches 95%, and the builder
+    flags a rewording from the set at it (`test_12o5_dup_threshold.py`,
+    skipped in CI with the reason).
 - **Deploy step 3's GPQA check** walks the tree when it isn't a git checkout
   (the `git archive` copy has no .git), leaving out .git, results/ and
   `__pycache__`.

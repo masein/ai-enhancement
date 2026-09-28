@@ -362,8 +362,8 @@ QB_DUP_COSINE = float(os.environ.get("QB_DUP_COSINE", "0.9"))
 # (service/embed_local.py), so no question, the hidden half included, leaves
 # it. "openrouter" sends every question to OPENROUTER_EMBED_MODEL instead, and
 # the builder says so. Its cosine: what `python -m service.dup_threshold`
-# found on this bank (BENCH_ROOT/builder/dup_threshold.json), else this —
-# QB_DUP_COSINE_LOCAL, when set, over both
+# chose on the labelled practice pairs (12o.5; BENCH_ROOT/builder/
+# dup_threshold.json), else this — QB_DUP_COSINE_LOCAL, when set, over both
 QB_EMBED_MODEL = os.environ.get("QB_EMBED_MODEL", "local").strip().lower()
 QB_EMBED_DIR = Path(os.environ.get("QB_EMBED_DIR", "/opt/models/bge-small-en-v1.5"))
 QB_DUP_COSINE_LOCAL_DEFAULT = 0.94

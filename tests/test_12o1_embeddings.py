@@ -1,8 +1,8 @@
 """12o.1: the question builder's duplicate check embeds on this server — a
 small model on the CPU, in the image and pinned — so the hidden half never
 leaves it; OpenRouter's embeddings stay a setting, which says it sends every
-question out. The cosine for the local model is checked on this bank, on the
-server, against the pairs OpenRouter's model flagged, and the builder uses it.
+question out. The cosine for the local model is chosen on the server and the
+builder uses it (12o.5 chooses it on a labelled set: test_12o5_dup_threshold).
 
 The local model never runs here: a word-count stand-in takes its place, as
 the fake OpenRouter's does for OpenRouter's."""
@@ -13,10 +13,9 @@ import json
 import re
 from pathlib import Path
 
-import pytest
 
 from fake_openrouter import embedding
-from service import builder, config, db, dup_threshold, embed_local, llm
+from service import builder, config, embed_local, llm
 from test_builder_12i2 import _near_copy_writer, create, rest, review_all, svc  # noqa: F401
 
 REPO = Path(__file__).resolve().parents[1]
@@ -110,44 +109,6 @@ def test_the_local_cosine_is_the_one_checked_on_this_bank(svc, monkeypatch):  # 
     assert builder.dup_cosine() == config.QB_DUP_COSINE_LOCAL_DEFAULT
     monkeypatch.setattr(config, "QB_DUP_COSINE_LOCAL", "0.91")
     assert builder.dup_cosine() == 0.91
-
-
-@pytest.mark.parametrize("pairs, want", [
-    # the remote model's two flags sit at 0.93 and 0.95 locally; the others below 0.9
-    ([(0.95, 0.95), (0.91, 0.93), (0.6, 0.89), (0.5, 0.7)],
-     {"cosine": 0.93, "flagged": 2, "caught": 2, "extra": 0}),
-    # one flagged pair the local model scores low: missing it beats flagging four more
-    ([(0.95, 0.96), (0.92, 0.80)] + [(0.7, 0.85)] * 4,
-     {"cosine": 0.96, "flagged": 2, "caught": 1, "extra": 0}),
-    # nothing flagged: nothing to check against
-    ([(0.5, 0.9), (0.6, 0.95)], {"cosine": None, "flagged": 0, "caught": 0, "extra": 0}),
-])
-def test_the_cosine_chosen_agrees_best_with_the_pairs_it_flagged(pairs, want):
-    assert dup_threshold.choose(pairs, 0.9) == want
-
-
-def test_the_check_on_the_server_reads_the_cache_and_prints_no_question(
-        svc, monkeypatch, capsys):  # noqa: F811
-    client, _, _ = svc
-    # a batch embedded through OpenRouter before 12o.1: its vectors are cached
-    monkeypatch.setattr(config, "QB_EMBED_MODEL", "openrouter")
-    from fake_openrouter import FakeOpenRouter
-    FakeOpenRouter.install(monkeypatch)
-    _near_copy_writer(monkeypatch, reworded())
-    rest(client, review_all(client, create(client, kind="everyday", group="quick_maths",
-                                           count=20)))
-    monkeypatch.setattr(config, "QB_EMBED_MODEL", "local")
-    Local(monkeypatch)
-    dup_threshold.main()
-    out = capsys.readouterr().out
-    assert "catches" in out, out
-    got = json.loads((config.BENCH_ROOT / "builder" / "dup_threshold.json").read_text())
-    assert got["model"] == embed_local.IDENT and got["flagged"] >= 1
-    assert got["caught"] == got["flagged"] and builder.dup_cosine() == got["cosine"]
-    assert f"catches {got['caught']} of them" in out
-    import everyday as ev
-    assert not [q for q in ev.load_bank() if q["prompt"][:40] in out]
-    assert db.qb_list()
 
 
 def test_the_image_holds_the_model_pinned_as_the_service_expects():
