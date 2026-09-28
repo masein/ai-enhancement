@@ -365,7 +365,8 @@ def test_models_is_one_table_and_a_row_opens_the_model_page(live, page):
         ["Standard", "Knowledge exam", "Everyday tasks"]
     assert [b.text_content() for b in page.locator("[data-chip]").all()] == \
         ["All tasks", "Knowledge", "Commonsense", "Reasoning", "Math", "Trust & safety",
-         "Instruction & maths", "Language modelling",          # 12h.1: IFEval, MMLU-Pro, MATH-500
+         "Instruction & maths", "Mobile tasks",                # 12h.1, 12o.3: MobileAIBench's two
+         "Language modelling",
          "Frontier · reported"]                                # 12n.1: reported scores' home
     # Kind, Size, Status, Columns and Scale are in Filters ▾; 12h.2: Benchmarks
     # and Models sit beside it
