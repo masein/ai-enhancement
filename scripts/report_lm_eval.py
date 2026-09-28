@@ -3388,6 +3388,7 @@ th.ldrop-after { box-shadow:inset -3px 0 0 var(--accent); }
 .col-more { display:inline-block; margin-left:2px; opacity:.45; }
 th:hover .col-more, th:focus-within .col-more { opacity:1; }
 .mname .mn-short { display:none; }
+.col-more > button::before { content:"⋯"; }
 .col-more > button { min-height:0; padding:0 3px; border:0; background:none; cursor:pointer;
   color:var(--text-secondary); font-size:var(--fs-1); }
 @media (min-width:601px) {
@@ -11814,7 +11815,8 @@ function layoutGrip(key, col, label) {
 }
 // a header's ⋯: Move left · Move right · Move to start, and Reset layout
 function layoutMore(key, col, label, movable, onOrder) {
-  const btn = el('button', { type: 'button', 'data-col-more': col, text: '⋯',
+  // its glyph drawn by the stylesheet: a header's text is its name alone
+  const btn = el('button', { type: 'button', 'data-col-more': col,
     'aria-label': `${label} column: move it, or reset the table's layout` });
   return el('span', { class: 'col-more', onclick: e => e.stopPropagation(),
       draggable: 'false', ondragstart: e => { e.preventDefault(); e.stopPropagation(); } },
