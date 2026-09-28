@@ -74,8 +74,14 @@ def test_the_brief_s_copies_are_the_prompts_the_builder_uses():
     docs = REPO / "docs" / "prompts" / "phase-12i"
     assert (docs / "knowledge-question-prompt.md").read_text(encoding="utf-8") == \
         builder.PROMPTS["knowledge"].read_text(encoding="utf-8")
-    assert (docs / "everyday-question-prompt.md").read_text(encoding="utf-8") == \
-        builder.PROMPTS["everyday"].read_text(encoding="utf-8")
+    # 12n.1: but for one example — the brief's quoted a question of the hidden
+    # half, word for word, and the writer was sent it with every batch
+    brief = (docs / "everyday-question-prompt.md").read_text(encoding="utf-8").splitlines()
+    ours = builder.PROMPTS["everyday"].read_text(encoding="utf-8").splitlines()
+    assert len(brief) == len(ours)
+    [(was, now)] = [(a, b) for a, b in zip(brief, ours) if a != b]
+    assert "cn u put thse in abc ordr pls: mango, banana, apple, kiwi" in was
+    assert json.loads(now)["skill"] == json.loads(was)["skill"] == "abbreviated sort"
 
 
 def test_the_builder_loads_with_the_servers_data_shape(server):

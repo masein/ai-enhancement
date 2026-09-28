@@ -328,6 +328,10 @@ REPORTED_MAKERS = [m.strip() for m in os.environ.get("REPORTED_MAKERS",
                    if m.strip()]
 REPORTED_PER_MAKER = int(os.environ.get("REPORTED_PER_MAKER", "10"))
 REPORTED_DAILY = os.environ.get("REPORTED_DAILY", "1") == "1"
+# 12n.1: the board's owner — the one name that may open an Everyday group's
+# hidden half (every opening logged) and edit a hidden question. Names are
+# typed, as everywhere on this board: the tailnet is the boundary
+BOARD_OWNER = os.environ.get("BOARD_OWNER", "masein").strip()
 # the monthly AI spend limit, in dollars; the page changes it. At the limit AI
 # jobs wait, with a plain message — they never fall back to another model
 AI_MONTHLY_LIMIT_USD = float(os.environ.get("AI_MONTHLY_LIMIT_USD", "20"))

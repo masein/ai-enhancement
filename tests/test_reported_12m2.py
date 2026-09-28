@@ -249,8 +249,10 @@ def test_epoch_imports_with_its_hash_and_date(qwen_here):
     g55 = [s for s in view["scores"] if s["model"] == ms["GPT-5.5 (xhigh)"]["id"]]
     assert [(s["benchmark"], round(s["value"], 4), s["setting"]) for s in g55] == [
         ("GPQA diamond", 0.94, "Epoch AI's own run")]
-    # Google DeepMind's two and Anthropic's two; the open model on the board is itself
-    assert sum(1 for m in view["models"] if m["maker"] == "Google DeepMind") == 2
+    # Google's two and Anthropic's two; the open model on the board is itself. 12n.1:
+    # Epoch's "Google DeepMind" is Google, its own name kept for the tooltip
+    assert [m["maker_as"] for m in view["models"] if m["maker"] == "Google"] == \
+        ["Google DeepMind"] * 2
     assert sum(1 for m in view["models"] if m["maker"] == "Anthropic") == 2
     qwen = next(m for m in view["models"] if m["key"] == "alibaba/qwen3-1.7b")
     assert qwen["id"] == qwen["measured"] == "Qwen/Qwen3-1.7B"

@@ -160,16 +160,22 @@ def load_bank(path: Path | None = None) -> list[dict]:
     never later, on a model's answer. 12i.2: with no path, the repo's bank
     and then what the question builder published (built_path)"""
     if path is None:
-        rows = _read_bank(BANK_PATH)
-        built = built_path()
-        if built.exists():
-            ids = {q["id"] for q in rows}
-            for q in _read_bank(built):
-                if q["id"] in ids:
-                    raise ValueError(f"{built.name}: {q['id']} is in the repo's bank too")
-                rows.append(q)
-        return rows
+        # 12n.1: and as the questions read after every edit made where they are read
+        return _edited(_base_bank())
     return _read_bank(path)
+
+
+def _base_bank() -> list[dict]:
+    """the repo's bank and what the question builder published, before any edit"""
+    rows = _read_bank(BANK_PATH)
+    built = built_path()
+    if built.exists():
+        ids = {q["id"] for q in rows}
+        for q in _read_bank(built):
+            if q["id"] in ids:
+                raise ValueError(f"{built.name}: {q['id']} is in the repo's bank too")
+            rows.append(q)
+    return rows
 
 
 def _read_bank(path: Path) -> list[dict]:
@@ -190,19 +196,25 @@ def _read_bank(path: Path) -> list[dict]:
         if q["id"] in seen:
             raise ValueError(f"{path.name} line {n}: {q['id']} is there twice")
         seen.add(q["id"])
-        q["group"] = MERGED.get(q["group"], q["group"])
-        if q["group"] == "summarising" and not _rubric_check(q):
-            q["checks"] = summarise_checks(q)          # 12a.6: marked by the judge's rubric
-        if q["group"] not in known:
-            raise ValueError(f"{path.name} line {n}: unknown group {q['group']!r}")
-        if not isinstance(q["checks"], list):
-            raise ValueError(f"{path.name} line {n}: checks is not a list")
-        for c in q["checks"]:
-            why = _bad_check(c)
-            if why:
-                raise ValueError(f"{path.name} line {n}: {why}")
-        out.append(q)
+        out.append(_valid(q, f"{path.name} line {n}", known))
     return out
+
+
+def _valid(q: dict, where: str, known: dict | None = None) -> dict:
+    """one question, checked as the bank is read — or ValueError, naming where"""
+    known = groups() if known is None else known
+    q["group"] = MERGED.get(q["group"], q["group"])
+    if q["group"] == "summarising" and not _rubric_check(q):
+        q["checks"] = summarise_checks(q)          # 12a.6: marked by the judge's rubric
+    if q["group"] not in known:
+        raise ValueError(f"{where}: unknown group {q['group']!r}")
+    if not isinstance(q["checks"], list):
+        raise ValueError(f"{where}: checks is not a list")
+    for c in q["checks"]:
+        why = _bad_check(c)
+        if why:
+            raise ValueError(f"{where}: {why}")
+    return q
 
 
 # ---------------------------------------------------------------------------
@@ -961,8 +973,13 @@ def bank_hash(questions) -> str:
 
 
 def version() -> dict:
-    """the bank's version: {"date": …, "hash": …, "split": …}"""
-    return {"date": WORDING_DATE, "hash": bank_hash(load_bank()), "split": SPLIT}
+    """the bank's version: {"date": …, "hash": …, "split": …}. 12n.1: every
+    edit that leaves the bank different is a new one, dated the day of the
+    last edit; an edit undone is the version before it again"""
+    h, d, log = bank_hash(load_bank()), _edit_digest(), edit_log()
+    return {"date": max(WORDING_DATE, _day(log[-1]["at"])) if log else WORDING_DATE,
+            "hash": hashlib.sha256(f"{h}|{d}".encode("utf-8")).hexdigest()[:8] if d else h,
+            "split": SPLIT}
 
 
 # ---------------------------------------------------------------------------
@@ -974,8 +991,10 @@ def qid(q: dict) -> str:
 
 
 def half(q: dict) -> str:
-    """HIDDEN ("report") or PRACTICE ("diagnose")"""
-    return _dx.split_of(qid(q))
+    """HIDDEN ("report") or PRACTICE ("diagnose"). 12n.1: an edited question
+    keeps the half it was in, whatever its words hash to now"""
+    h = q.get("half")
+    return h if h in (HIDDEN, PRACTICE) else _dx.split_of(qid(q))
 
 
 def split_counts(questions=None) -> dict[str, dict]:
@@ -985,6 +1004,289 @@ def split_counts(questions=None) -> dict[str, dict]:
     for q in qs:
         out[q["group"]]["hidden" if half(q) == HIDDEN else "practice"] += 1
     return {g: c for g, c in out.items() if c["hidden"] or c["practice"]}
+
+
+# ---------------------------------------------------------------------------
+# 12n.1: a question edited where it is read. Every save is one line of
+# BENCH_ROOT/everyday/edits.jsonl — beside what the question builder
+# published, never the repo's bank, so a later image keeps it — and the bank
+# is read through them: an edited question as it reads now, a retired one
+# gone (and in BENCH_ROOT/everyday/retired.jsonl with its reason). Each
+# keeps the half it was in: a practice question has been seen and is never
+# made hidden; a hidden one made practice is revealed on purpose. Every save
+# is a new version of the bank, and can be undone
+# ---------------------------------------------------------------------------
+
+EDITS_NAME = "edits.jsonl"
+EDITED = ("prompt", "reference", "checks", "group", "half")
+PRACTICE_STAYS = ("A practice question has been seen, so it can't be made hidden. Retire it, "
+                  "and write a new one")
+
+
+def edits_path() -> Path:
+    return built_dir() / EDITS_NAME
+
+
+def retired_here_path() -> Path:
+    return built_dir() / "retired.jsonl"
+
+
+def _day(t: float) -> str:
+    return time.strftime("%Y-%m-%d", time.localtime(t))
+
+
+def edit_log() -> list[dict]:
+    """every save, oldest first: {n, id, action, at, by, why, what, before, after, undoes?}"""
+    try:
+        text = edits_path().read_text(encoding="utf-8")
+    except OSError:
+        return []
+    return [json.loads(line) for line in text.splitlines() if line.strip()]
+
+
+def _now_rows(log: list[dict] | None = None) -> dict[str, dict | None]:
+    """each edited question as it reads now; None when it is retired"""
+    return {r["id"]: r["after"] for r in (edit_log() if log is None else log)}
+
+
+def _edited(rows: list[dict]) -> list[dict]:
+    now = _now_rows()
+    if not now:
+        return rows
+    out = []
+    for q in rows:
+        if q["id"] not in now:
+            out.append(q)
+        elif now[q["id"]] is not None:
+            out.append(_valid(dict(now[q["id"]]), f"{EDITS_NAME}: {q['id']}"))
+    return out
+
+
+def _edit_digest() -> str:
+    """what the edits leave different from the bank as it was published —
+    none once every edit is undone"""
+    now = _now_rows()
+    if not now:
+        return ""
+    base = {q["id"]: q for q in _base_bank()}
+    diff = {}
+    for i, a in now.items():
+        b = base.get(i)
+        if b is None:
+            continue
+        if a is None:
+            diff[i] = None
+            continue
+        d = {k: a.get(k) for k in EDITED if k != "half" and a.get(k) != b.get(k)}
+        if a.get("half") and a["half"] != half(b):
+            d["half"] = a["half"]
+        if d:
+            diff[i] = d
+    return hashlib.sha256(json.dumps(diff, sort_keys=True).encode("utf-8")).hexdigest()[:8] \
+        if diff else ""
+
+
+def question(qid_: str) -> dict | None:
+    """one question of the bank as it reads now, by its id"""
+    return next((q for q in load_bank() if q["id"] == qid_), None)
+
+
+def apply_changes(q: dict, changes: dict) -> dict:
+    """the question with these changes, checked as the bank is read — or
+    ValueError in one line. `rubric` is its judge check's rubric; `half` may
+    go from hidden to practice, never back"""
+    new = {k: v for k, v in q.items() if k != "edited"}
+    was = new["half"] = half(q)
+    for k, v in (changes or {}).items():
+        if k == "prompt":
+            if not str(v or "").strip():
+                raise ValueError("The question can't be empty")
+            new["prompt"] = str(v).strip()
+        elif k == "reference":
+            new["reference"] = str(v or "").strip()
+        elif k == "checks":
+            if isinstance(v, str):
+                try:
+                    v = json.loads(v)
+                except ValueError as e:
+                    raise ValueError(f"The checks aren't valid JSON: {e}") from None
+            if not isinstance(v, list) or not v:
+                raise ValueError("The checks are a list of at least one check")
+            for c in v:
+                why = _bad_check(c)
+                if why:
+                    raise ValueError(f"A check: {why}")
+            new["checks"] = v
+        elif k == "rubric":
+            c = judge_check(new)
+            if not c:
+                raise ValueError("This question has no judge: edit its checks instead")
+            if not str(v or "").strip():
+                raise ValueError("A rubric can't be empty")
+            new["checks"] = [{**x, "rubric": str(v).strip()} if x is c else x
+                             for x in new["checks"]]
+        elif k == "group":
+            if v not in groups():
+                raise ValueError(f"There is no group {v!r}")
+            new["group"] = v
+        elif k == "half":
+            if v not in (HIDDEN, PRACTICE):
+                raise ValueError("A question is hidden or practice")
+            if v == HIDDEN and was == PRACTICE:
+                raise ValueError(PRACTICE_STAYS)
+            new["half"] = v
+        else:
+            raise ValueError(f"{k} isn't something an edit changes")
+    return _valid(new, "the edit")
+
+
+def _changed(a: dict, b: dict) -> list[str]:
+    return [k for k in EDITED if a.get(k) != b.get(k)]
+
+
+def _write_retired(log: list[dict]) -> None:
+    """the questions retired here, each with its reason — as 12a.6's retired.jsonl"""
+    last = {r["id"]: r for r in log}
+    rows = [{"retired": _day(r["at"]), "why": r["why"], "by": r["by"], **r["before"]}
+            for r in last.values() if r["after"] is None]
+    p = retired_here_path()
+    if rows or p.exists():
+        p.write_text("".join(json.dumps(x, ensure_ascii=False, sort_keys=True) + "\n"
+                             for x in rows), encoding="utf-8")
+
+
+def _save(qid_: str, action: str, before: dict, after: dict | None, why: str, by: str,
+          what: list[str], undoes: int | None = None) -> dict:
+    log = edit_log()
+    n = (log[-1]["n"] + 1) if log else 1
+    at = time.time()
+    b = {k: v for k, v in before.items() if k != "edited"}
+    b["half"] = half(before)
+    if after is not None:
+        after = {**{k: v for k, v in after.items() if k != "edited"},
+                 "edited": {"n": n, "action": action, "by": by, "at": at, "why": why}}
+    rec = {"n": n, "id": qid_, "action": action, "at": at, "by": by, "why": why, "what": what,
+           "before": b, "after": after, **({"undoes": undoes} if undoes else {})}
+    built_dir().mkdir(parents=True, exist_ok=True)
+    with open(edits_path(), "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec, ensure_ascii=False, sort_keys=True) + "\n")
+    _write_retired(log + [rec])
+    return rec
+
+
+def _who_why(why: str, by: str) -> tuple[str, str]:
+    why, by = str(why or "").strip()[:300], str(by or "").strip()[:80]
+    if not by:
+        raise ValueError("Who: every edit keeps a name")
+    if not why:
+        raise ValueError("Why: every edit keeps its reason")
+    return why, by
+
+
+def edit(qid_: str, changes: dict, why: str, by: str) -> dict:
+    """save an edit: the record of it — or KeyError (no such question),
+    ValueError (why not, in one line)"""
+    q = question(qid_)
+    if q is None:
+        raise KeyError(qid_)
+    why, by = _who_why(why, by)
+    new = apply_changes(q, changes)
+    what = _changed(new, {**q, "half": half(q)})
+    if not what:
+        raise ValueError("Nothing changed")
+    return _save(qid_, "edit", q, new, why, by, what)
+
+
+def retire(qid_: str, why: str, by: str) -> dict:
+    q = question(qid_)
+    if q is None:
+        raise KeyError(qid_)
+    why, by = _who_why(why, by)
+    return _save(qid_, "retire", q, None, why, by, ["retired"])
+
+
+def undo(qid_: str, by: str) -> dict:
+    """the question as it read before its last edit not undone yet"""
+    by = str(by or "").strip()[:80]
+    if not by:
+        raise ValueError("Who: every edit keeps a name")
+    log = [r for r in edit_log() if r["id"] == qid_]
+    if not log:
+        raise KeyError(qid_)
+    undone = {r["undoes"] for r in log if r.get("undoes")}
+    last = next((r for r in reversed(log) if r["action"] != "undo" and r["n"] not in undone), None)
+    if last is None:
+        raise ValueError("Nothing left to undo")
+    now = log[-1]["after"]
+    return _save(qid_, "undo", now if now is not None else last["before"], last["before"],
+                 f"undo #{last['n']}: {last['why']}", by, last["what"], undoes=last["n"])
+
+
+def history(qid_: str) -> list[dict]:
+    """one question's saves, newest first: who, when, why, what — no text"""
+    log = [r for r in edit_log() if r["id"] == qid_]
+    undone = {r["undoes"] for r in log if r.get("undoes")}
+    return [{k: r.get(k) for k in ("n", "action", "at", "by", "why", "what", "undoes")}
+            | {"undone": r["n"] in undone} for r in reversed(log)]
+
+
+def impact(qid_: str, changes: dict, results: Path) -> dict:
+    """What saving these changes would do to the answers kept, before it is
+    saved: how many are marked against the question, which marks would
+    flip, which go to the judge, and — the words changed — which answers no
+    longer count until the question is asked again. No model runs"""
+    q = question(qid_)
+    if q is None:
+        raise KeyError(qid_)
+    new = apply_changes(q, changes)
+    reworded = new["prompt"] != q["prompt"]
+    out = {"answers": 0, "same": 0, "flips": [], "judge": [], "unasked": []}
+    for d in sorted(p for p in results.iterdir() if p.is_dir()) if results.is_dir() else []:
+        prev = read(d)
+        if not prev or prev.get("earlier"):
+            continue
+        a = answers(d).get(answer_key(q))
+        if not a:
+            continue
+        name = prev.get("model") or _model_id(d)
+        out["answers"] += 1
+        if reworded:
+            out["unasked"].append(name)
+            continue
+        it = next((x for x in prev.get("items") or [] if x["id"] == qid_), None)
+        now = _item(new, {"filtered_resps": [a["raw"]], "resps": [[a["raw"]]]}, {},
+                    {qid_: it} if it else {}, verdict_memory(d))
+        was = (it or {}).get("pass")
+        if now["pass"] is None:
+            out["judge"].append(name)
+        elif now["pass"] != was:
+            out["flips"].append({"model": name, "from": was, "to": now["pass"]})
+        else:
+            out["same"] += 1
+    out["line"] = impact_line(out)
+    return out
+
+
+def impact_line(i: dict) -> str:
+    """"3 would flip: Qwen3-1.7B ✗→✓, … · 2 go to the judge" """
+    mark = {True: "✓", False: "✗", None: "…"}
+    if not i["answers"]:
+        return "No model has answered it yet: nothing is marked again"
+    if i["unasked"]:
+        n = len(i["unasked"])
+        return (f"The words change: {n} answer{'s' if n > 1 else ''} to the old words stop "
+                "counting — each model reads it as changed, not re-asked yet, until it is asked "
+                "again")
+    parts = []
+    if i["flips"]:
+        parts.append(f"{len(i['flips'])} would flip: " + ", ".join(
+            f"{f['model'].split('/')[-1]} {mark[f['from']]}→{mark[f['to']]}" for f in i["flips"]))
+    if i["judge"]:
+        parts.append(f"{len(i['judge'])} go{'es' if len(i['judge']) == 1 else ''} to the judge")
+    if i["same"]:
+        parts.append(f"{i['same']} keep{'s' if i['same'] == 1 else ''} its mark"
+                     if i["same"] == 1 else f"{i['same']} keep their marks")
+    return " · ".join(parts) or "Nothing changes"
 
 
 # ---------------------------------------------------------------------------
@@ -1109,8 +1411,9 @@ def _model_id(model_dir: Path) -> str:
         return model_dir.name.replace("__", "/", 1)
 
 
-def _item(q: dict, rec: dict, verdicts: dict, before: dict) -> dict:
-    """one question's answer, marked"""
+def _item(q: dict, rec: dict, verdicts: dict, before: dict, memory: dict | None = None) -> dict:
+    """one question's answer, marked. 12n.1: `memory`, the judge's verdicts
+    kept by question, rubric and answer — an edit undone gets its marks back"""
     it = {"id": q["id"], "group": q["group"], "half": half(q),
           "judged": any(c["type"] == "judge" for c in q["checks"])}
     parts = _judge.answer_parts(rec)
@@ -1135,6 +1438,8 @@ def _item(q: dict, rec: dict, verdicts: dict, before: dict) -> dict:
                     and old.get("rubric") == rubric_key(q):
                 v = {"pass": old["pass"], "reason": old["reason"],
                      **({"score": old["score"]} if "score" in old else {})}
+            if v is None and memory:
+                v = memory.get(_memory_key(q["id"], rubric_key(q), ans))
             if v is None:
                 it.update({"pass": None, "reason": old.get("reason") if (
                     old.get("answer_text") == ans and old.get("pass") is None
@@ -1169,16 +1474,21 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
     prev = read(model_dir) or {}
     before = {it["id"]: it for it in prev.get("items") or []}
     verdicts = verdicts or {}
+    memory = verdict_memory(model_dir)
     current = [(q, got[answer_key(q)]) for q in bank if answer_key(q) in got]
     if current:
         items = [_item(q, {"filtered_resps": [a["raw"]], "resps": [[a["raw"]]]},
-                       verdicts, before) for q, a in current]
+                       verdicts, before, memory) for q, a in current]
         new = len({q["id"] for q, _ in current} & set(asked or ()))
+        # 12n.1: a question reworded since this model answered it — its answer
+        # was to other words: not counted until it is asked again
+        was = {a.get("id") for a in got.values()}
         stamp = {"version": dict(now), "earlier": False,
                  # what this marking was: answers the run just gave, answers
                  # from before marked again, and what the model was never asked
                  "marking": {"new": new, "remarked": len(items) - new},
-                 "unasked": len(bank) - len(items)}
+                 "unasked": len(bank) - len(items),
+                 "changed": [q["id"] for q in bank if answer_key(q) not in got and q["id"] in was]}
     else:
         recs = records(model_dir)
         if not recs:
@@ -1194,7 +1504,7 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
         if stamp["earlier"] and prev.get("items"):
             return {**prev, **stamp, "ran_out": _ran_out(prev["items"])}
         # not asked: a model that sat the pilot only is marked on its five
-        items = [_item(q, recs[q["id"]], verdicts, before) for q in bank if q["id"] in recs]
+        items = [_item(q, recs[q["id"]], verdicts, before, memory) for q in bank if q["id"] in recs]
     gen = _judge._generation(model_dir, TASK) or {}
     scored = items if stamp["earlier"] else [it for it in items if it["half"] == HIDDEN]
     out = {
@@ -1238,7 +1548,38 @@ def _ran_out(items: list[dict]) -> int:
 def write(model_dir: Path, out: dict) -> Path:
     p = model_dir / OUT_NAME
     p.write_text(json.dumps(out, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+    remember_verdicts(model_dir, out)
     return p
+
+
+# 12n.1: the judge's verdicts, kept by question, rubric and answer — so a
+# rubric changed and changed back, or a question edited and the edit undone,
+# has its marks back without asking the judge again. A new judge (12i.1)
+# forgets them all
+VERDICTS_NAME = "everyday_verdicts.json"
+
+
+def _memory_key(qid_: str, rubric: str, answer: str) -> str:
+    return f"{qid_}|{rubric}|{prompt_hash(answer)}"
+
+
+def verdict_memory(model_dir: Path) -> dict:
+    try:
+        return json.loads((model_dir / VERDICTS_NAME).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def remember_verdicts(model_dir: Path, out: dict) -> None:
+    mem = verdict_memory(model_dir)
+    more = {_memory_key(it["id"], it["rubric"], it.get("answer_text") or ""):
+            {"pass": it["pass"], "reason": it.get("reason") or "",
+             **({"score": it["score"]} if it.get("score") is not None else {})}
+            for it in (out or {}).get("items") or []
+            if it.get("rubric") and it.get("pass") is not None}
+    if more and any(mem.get(k) != v for k, v in more.items()):
+        mem.update(more)
+        (model_dir / VERDICTS_NAME).write_text(json.dumps(mem, sort_keys=True), encoding="utf-8")
 
 
 def marking_line(out: dict) -> str:
@@ -1429,6 +1770,8 @@ def clear_verdicts(model_dir: Path) -> int:
     for it in (out or {}).get("items") or []:
         if it["id"] in todo:
             it.update({"pass": None, "reason": WAITING})
+    # 12n.1: and the verdicts kept for an undo are the last judge's too
+    (model_dir / VERDICTS_NAME).unlink(missing_ok=True)
     if todo:
         write(model_dir, out)
     return len(todo)
@@ -1463,11 +1806,14 @@ def _counts(out: dict | None) -> dict:
             "waiting": out.get("waiting") or 0, "groups": out.get("groups") or {}}
 
 
-def remark(results: Path, want: set[str] | None = None, judge: bool = False) -> dict:
+def remark(results: Path, want: set[str] | None = None, judge: bool = False,
+           only: set[str] | None = None, snapshot: bool = True) -> dict:
     """Mark every model again; with `judge`, send each answer waiting on the
     judge — one batch for all of them, which the poller finishes. Returns
     {"models": {id: summary}, "batch_id", "sent"}. The marks before the first
-    of these are kept in BEFORE_NAME, and never written over"""
+    of these are kept in BEFORE_NAME, and never written over. 12n.1: `only`,
+    the questions an edit changed — the only ones sent to the judge — and no
+    snapshot for an edit's re-mark"""
     before_f = results / BEFORE_NAME
     before = json.loads(before_f.read_text(encoding="utf-8")) if before_f.exists() else None
     snap, lines, todo, dirs = {}, {}, [], {}
@@ -1486,8 +1832,9 @@ def remark(results: Path, want: set[str] | None = None, judge: bool = False) -> 
             " · earlier wording, kept as marked" if out.get("earlier") else "")
         if judge and not out.get("earlier"):
             answers = {it["id"]: it["answer_text"] for it in out["items"]}
-            todo += [(d.name, q, answers[q["id"]]) for q in _pending(out)]
-    if before is None and snap:
+            todo += [(d.name, q, answers[q["id"]]) for q in _pending(out)
+                     if only is None or q["id"] in only]
+    if before is None and snap and snapshot:
         before_f.write_text(json.dumps({"at": time.time(), "version": version(), "models": snap},
                                        indent=1), encoding="utf-8")
     res = {"models": lines, "batch_id": None, "sent": 0}
