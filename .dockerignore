@@ -17,6 +17,9 @@ eval_tasks/*
 !eval_tasks/fr
 # the Everyday bank and its task template (12a, 12a.2)
 !eval_tasks/everyday
+# 12k.2: Trust & safety's pinned data and task templates — every full run
+# (BBQ) and the safety suite build their tasks from them
+!eval_tasks/trust_safety
 logs/
 artifacts/
 service.sqlite3*

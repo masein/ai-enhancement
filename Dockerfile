@@ -75,6 +75,10 @@ COPY eval_tasks/fr/ eval_tasks/fr/
 # 12a.3: the Everyday bank (333 questions) and its task template; the page
 # shows the questions and everyday.build_task() writes the task from them
 COPY eval_tasks/everyday/ eval_tasks/everyday/
+# 12k.2: BBQ, Do-Not-Answer and XSTest, pinned, with the task templates and
+# bbq_utils.py: trust_safety.build_tasks() writes the tasks from them for
+# every full run and every Trust & safety run (tests/test_image_contents.py)
+COPY eval_tasks/trust_safety/ eval_tasks/trust_safety/
 COPY FRIENDS.md ./
 
 # the same check the service runs at startup, at BUILD time: an image missing
