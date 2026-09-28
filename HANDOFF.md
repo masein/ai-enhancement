@@ -3811,6 +3811,28 @@ OpenRouter: the fake OpenAI-compatible server answers at its address.
   its page says "Pinned to <version> · on <provider>, with no fallbacks.
   Every run checks it still is."
 
+### 12m.3, a follow-up — remote runs in a lane of their own
+
+A run of a model from OpenRouter never touches the GPU, and it used to wait
+for and hold the run lock and take its turn in the one queue. Now:
+- **Its own lane:** `worker.loop_remote`, a second thread, claims only the
+  runs of models from OpenRouter (`db.claim_next(remote=True)`: a served
+  model whose record says `via: openrouter`), one at a time among
+  themselves. The GPU lane (`worker.loop`) never claims one.
+- **No run lock and no GPU wait:** the runner neither yields the
+  Playground's GPU nor takes the lock for one, and releases only a lock it
+  took — so one running beside a GPU run never lets go of that run's lock.
+- **Nobody waits behind one:** the one queue's turn-taking (12f.5:
+  `gguf_ahead`, `board_ahead`) doesn't count them, so a board run or a GGUF
+  job is never held for one.
+- **Its tasks in folders of its own** (`BENCH_ROOT/remote/everyday-tasks`,
+  `…/trust-tasks`): Everyday writes its task with the questions a model has
+  no answer to, and a GPU run beside it reads its own, never rewritten
+  under it.
+- The judge it calls is any run's. A model served elsewhere that isn't
+  OpenRouter's keeps the lock and the queue: its server can be on this
+  host's GPU.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

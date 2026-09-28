@@ -714,7 +714,8 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
 
 def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, label: str,
                 log_path: Path, everyday: bool, asked: list[str] | None, safety: bool = False,
-                meter: _served.Meter | None = None):
+                meter: _served.Meter | None = None, evd_dir: Path | None = None,
+                trust_dir: Path | None = None):
     """one Everyday, exam or Trust & safety task, asked over the model's
     server. (status, stopped): 0 or CANCELED, and a ServerStopped when it
     stopped answering — what it answered before that is written and kept.
@@ -722,10 +723,10 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
     12m.3: a model from OpenRouter's questions go through its run's meter,
     and its progress says the running total"""
     if safety:
-        items = config.TRUST_TASKS_DIR / f"{task}.jsonl"                      # build_tasks'
+        items = (trust_dir or config.TRUST_TASKS_DIR) / f"{task}.jsonl"      # build_tasks'
         everyday = True
     elif everyday:
-        items = config.EVERYDAY_TASKS_DIR / f"{config.EVERYDAY_TASK}.jsonl"   # build_task's
+        items = (evd_dir or config.EVERYDAY_TASKS_DIR) / f"{config.EVERYDAY_TASK}.jsonl"
     else:
         items = config.JUDGED_TASKS_DIR / f"{task}.jsonl"                     # exam_build's
     docs = [json.loads(line) for line in items.read_text(encoding="utf-8").splitlines()
@@ -846,6 +847,12 @@ def run_submission(sub: dict) -> None:
     # against the month's AI limit
     est = meta.get("estimate") or {}
     meter = _served.Meter(rec, sid, est.get("usd", 0.0)) if _served.is_openrouter(rec) else None
+    # 12m.3: and a lane of its own — it never touches the GPU, so it neither
+    # waits for nor holds the run lock, and writes its tasks in a folder of its
+    # own: a GPU run beside it reads its own, never rewritten under it
+    remote = meter is not None
+    evd_dir = config.BENCH_ROOT / "remote" / "everyday-tasks" if remote else config.EVERYDAY_TASKS_DIR
+    trust_dir = config.BENCH_ROOT / "remote" / "trust-tasks" if remote else config.TRUST_TASKS_DIR
     db.update(sid, kind=kind, params=meta["params"], vocab=meta["vocab"],
               batch=meta["batch"], need_gb=meta["need_gb"],
               arch=json.dumps(meta.get("archinfo") or {}),
@@ -897,12 +904,12 @@ def run_submission(sub: dict) -> None:
     if everyday:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import everyday as _everyday
-        _everyday.build_task(config.EVERYDAY_TASKS_DIR)
+        _everyday.build_task(evd_dir)
     if set(tasks) & set(config.TRUST_TASKS):
         # 12k.2: BBQ, Do-Not-Answer and XSTest, from the pinned files
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import trust_safety as _trust
-        _trust.build_tasks(config.TRUST_TASKS_DIR)
+        _trust.build_tasks(trust_dir)
     if remote_code:      # the code that produced the scores is part of the record
         db.update(sid, progress=f"preflight ok · custom model code · batch={meta['batch']}")
     # 12h.1: a Hub model on the approved list runs its own code offline, as
@@ -921,13 +928,16 @@ def run_submission(sub: dict) -> None:
     # -- one run at a time: wait for the shared lock ------------------------------
     # 12d.1: the Playground lets go of the GPU first — its replies there stop,
     # its models unload — within CHAT_YIELD_WAIT_S; chat never takes the lock
-    try:
-        from . import chat as _chat
-        _chat.ENGINE.yield_gpu()
-    except Exception:                                  # noqa: BLE001 — a run never waits on chat
-        pass
-    if not wait_for_lock(sid):
-        return
+    held = False
+    if not remote:
+        try:
+            from . import chat as _chat
+            _chat.ENGINE.yield_gpu()
+        except Exception:                              # noqa: BLE001 — a run never waits on chat
+            pass
+        if not wait_for_lock(sid):
+            return
+        held = True
     relay = None          # 12m.3: a model from OpenRouter's generative three go through it
 
     # 12d.3: the lock is this run's, so a new chat message to the model it
@@ -1016,7 +1026,7 @@ def run_submission(sub: dict) -> None:
                     db.update(sid, status="running",
                               progress=f"{label} — no new questions, marking again")
                     continue
-                _everyday.build_task(config.EVERYDAY_TASKS_DIR, only=asked)
+                _everyday.build_task(evd_dir, only=asked)
                 with open(log_path, "a") as lf:
                     lf.write(f"\n[service] {task}: asking the {len(todo)} question(s) it has "
                              f"no answer to on today's words\n")
@@ -1045,7 +1055,8 @@ def run_submission(sub: dict) -> None:
                 # settings a local run uses, into the files lm_eval writes
                 t_task = time.time()
                 status, stopped = _ask_served(sid, rec, meta, task, task_out, label, log_path,
-                                              everyday, asked, safety=safety, meter=meter)
+                                              everyday, asked, safety=safety, meter=meter,
+                                              evd_dir=evd_dir, trust_dir=trust_dir)
                 gpu_seconds += time.time() - t_task
                 db.update(sid, gpu_seconds=gpu_seconds)
                 if status == CANCELED:
@@ -1345,7 +1356,8 @@ def run_submission(sub: dict) -> None:
     finally:
         if relay is not None:
             relay.__exit__(None, None, None)
-        release_lock()
+        if held:                   # 12m.3: never a GPU run's lock, taken while a remote one ran
+            release_lock()
         if remote_code:
             shutil.rmtree(config.BENCH_ROOT / ".jobscratch" / str(sid),
                           ignore_errors=True)
