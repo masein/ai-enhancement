@@ -3577,6 +3577,13 @@ answers are held back and its licence is non-commercial, no-derivatives.
   Improve; Improve's retest watch does look at them.
 - **Deploy step 4** (`scripts/check_tasks.py`) builds the four tasks and
   checks each, "full, all of BBQ" included.
+- **In the image** (after #96's deploy found it missing): `.dockerignore`
+  allows `eval_tasks/trust_safety`, the Dockerfile copies it, and its files
+  are on `service.startup.REQUIRED_REPO_FILES`, so the build's "image files
+  OK" check fails without them. `tests/test_image_contents.py` now reads the
+  code and the repo, not only that list: every `eval_tasks/<folder>` the
+  service or scripts name ships whole, and every folder under `eval_tasks/`
+  ships or says in `NOT_IN_IMAGE` why the service never reads it.
 
 ### 12f.5 — the GGUF runs: -np, lettered MMLU, one queue, a restarted worker
 

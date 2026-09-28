@@ -58,6 +58,17 @@ REQUIRED_REPO_FILES = [
     "eval_tasks/everyday/_everyday_template_yaml",  # …and the task everyday.build_task writes
     "eval_tasks/fr/question-builder-prompt.md",        # 12i.2: Build questions' defaults —
     "eval_tasks/everyday/question-builder-prompt.md",  # GET /api/builder reads both
+    # 12k.2: trust_safety.build_tasks() writes BBQ's, Do-Not-Answer's and XSTest's
+    # tasks from these for every full run and every Trust & safety run; the page
+    # reads the manifest for its credits
+    "eval_tasks/trust_safety/manifest.json",
+    "eval_tasks/trust_safety/_safety_template_yaml",
+    "eval_tasks/trust_safety/_bbq_template_yaml",
+    "eval_tasks/trust_safety/bbq_utils.py",
+    "eval_tasks/trust_safety/do_not_answer.jsonl",
+    "eval_tasks/trust_safety/xstest.jsonl",
+    "eval_tasks/trust_safety/bbq_ambig_3000.jsonl",
+    "eval_tasks/trust_safety/bbq_ambig.jsonl.gz",
     "FRIENDS.md",                           # served at /guide
     "clients/bench_client.py",              # served at /client
     *DELIVERED_TOPIC_FILES,

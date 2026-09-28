@@ -122,3 +122,61 @@ def test_the_service_refuses_to_start_without_one(tmp_path):
     assert "cannot serve requests" in said
     assert "eval_tasks/fr/_fr_template_yaml" in said and "categories.yaml" in said
     assert "Dockerfile" in said or "COPY" in said            # what to do about it
+
+
+# ---------------------------------------------------------------------------
+# 12k.2's deploy: eval_tasks/trust_safety was read by every full run and was not
+# in the image — the list above did not name it, so nothing checked it. The
+# second time (after #81). These don't rest on the list: they read the code
+# and the repo, so a new eval_tasks folder is in the image or says why not.
+# ---------------------------------------------------------------------------
+
+# an eval_tasks folder in the repo that the running service never reads, and why
+# (none today: every one is read at run time)
+NOT_IN_IMAGE: dict[str, str] = {}
+_NAMED = re.compile(r"""eval_tasks["']?\s*/\s*["']?([A-Za-z0-9_\-]+)""")
+
+
+def eval_folders_the_code_names() -> set[str]:
+    """every eval_tasks/<folder> the service or its scripts name — as a path
+    ("eval_tasks/fr/…") or joined ("eval_tasks" / "trust_safety")"""
+    out = set()
+    for f in [*REPO.glob("service/*.py"), *REPO.glob("scripts/*.py")]:
+        out |= set(_NAMED.findall(f.read_text(encoding="utf-8")))
+    return out
+
+
+def repo_eval_folders() -> set[str]:
+    return {d.name for d in (REPO / "eval_tasks").iterdir() if d.is_dir()}
+
+
+def test_every_eval_tasks_folder_the_code_reads_is_in_the_image_whole():
+    named = eval_folders_the_code_names() & repo_eval_folders()
+    # the scan finds them all — 12k.2's among them
+    assert {"fr", "everyday", "mmlu_perm", "trust_safety"} <= named
+    for name in sorted(named):
+        folder = REPO / "eval_tasks" / name
+        files = [p.relative_to(REPO).as_posix() for p in folder.rglob("*") if p.is_file()
+                 and "__pycache__" not in p.parts and p.suffix != ".pyc"]
+        missing = [p for p in files if not in_image(p)]
+        assert missing == [], (
+            f"eval_tasks/{name} is read at run time and the image would ship without "
+            f"{missing[:5]}: add '!eval_tasks/{name}' to .dockerignore and "
+            f"'COPY eval_tasks/{name}/ eval_tasks/{name}/' to the Dockerfile")
+
+
+def test_every_eval_tasks_folder_in_the_repo_ships_or_says_why():
+    for name in sorted(repo_eval_folders()):
+        assert in_image(f"eval_tasks/{name}/x.jsonl") or name in NOT_IN_IMAGE, (
+            f"eval_tasks/{name} is not in the image: copy it, or say in NOT_IN_IMAGE why "
+            f"the running service never reads it")
+    assert set(NOT_IN_IMAGE) <= repo_eval_folders()
+
+
+def test_the_folder_that_broke_12k2s_deploy_would_now_ship():
+    """the file from the traceback, and the rest of what build_tasks reads"""
+    for f in ("_safety_template_yaml", "_bbq_template_yaml", "bbq_utils.py", "manifest.json",
+              "do_not_answer.jsonl", "xstest.jsonl", "bbq_ambig_3000.jsonl",
+              "bbq_ambig.jsonl.gz"):
+        assert f"eval_tasks/trust_safety/{f}" in startup.REQUIRED_REPO_FILES
+        assert in_image(f"eval_tasks/trust_safety/{f}"), f
