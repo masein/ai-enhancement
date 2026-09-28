@@ -10,7 +10,7 @@ import pytest
 
 from conftest import fresh, make_service
 from fake_openrouter import FakeOpenRouter
-from service import builder, config, db, llm, llm_poller
+from service import builder, config, db, embed_local, llm, llm_poller
 
 BY = "masein"
 
@@ -249,7 +249,10 @@ def test_a_near_duplicate_of_a_bank_question_is_flagged_and_keep_old_drops_it(sv
     it = next(it for it in d["items"] if it["n"] == 11)
     dup = next(f for f in it["flags"] if f["kind"] == "dup")
     assert dup["text"] == f"looks like {bank['id']}" and dup["how"] == "13 words in a row"
-    assert dup["other"]["text"] == bank["prompt"] and d["dedup_how"] == "13-gram"
+    assert dup["other"]["text"] == bank["prompt"]
+    # 12o.5: and the embeddings beside it, where the model is in the image (deploy step 3)
+    assert d["dedup_how"] == ("13-gram and embeddings on this server" if embed_local.available()
+                              else "13-gram")
     # "keep new" can't retire a bank question
     r = client.post(f"/api/builder/{d['id']}/duplicate", json={"n": 11, "keep": "new", "by": BY})
     assert r.status_code == 422

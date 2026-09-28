@@ -809,18 +809,18 @@ def _dedup(d: dict) -> None:
         cands += [({"src": "batch", "id": str(o["n"]), "label": f"#{o['n']}",
                     "text": new_texts[j]}, grams_n[j], vecs[j] if vecs else None)
                   for j, o in enumerate(live[:i])]
+        # 12o.5: the same words win over a cosine wherever they are, and of
+        # the cosines over the cut, the closest question is the one named
+        top = None
         for o, g, v in cands:
-            how = ""
             if grams_n[i] & g:
-                how = "13 words in a row" if len(contamination.normalize(o["text"])) \
-                    >= contamination.NGRAM else "the same words"
-            elif vecs is not None:
-                cos = ai_models.cosine(vecs[i], v)
-                if cos >= cut:
-                    how = f"cosine {cos:.2f}"
-            if how:
-                best = (o, how)
+                best = (o, "13 words in a row" if len(contamination.normalize(o["text"]))
+                        >= contamination.NGRAM else "the same words")
                 break
+            if vecs is not None:
+                cos = ai_models.cosine(vecs[i], v)
+                if cos >= cut and (top is None or cos > top):
+                    top, best = cos, (o, f"cosine {cos:.2f}")
         if best:
             o, how = best
             _flag(it, "dup", f"looks like {o['label']}", other=o, how=how)
