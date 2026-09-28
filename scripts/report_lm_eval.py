@@ -9103,7 +9103,9 @@ function repLoad() {
     .catch(e => { R.msg = String((e && e.message) || e); })
     .finally(() => { R.loading = false; R.loaded = true; render(); });
 }
-const repSrc = s => (REP().sources || {})[s] || { name: s, credit: '' };
+// a source by its name, before the view has come (Outside data draws at once)
+const REP_NAMES = { epoch: 'Epoch AI', aa: 'Artificial Analysis', card: 'model card' };
+const repSrc = s => (REP().sources || {})[s] || { name: REP_NAMES[s] || s, credit: '' };
 // a model known only by what others report, as a row: never ranked, no average
 function repOnly() {
   return (REP().models || []).filter(m => !m.measured).map(m => ({ id: m.id, name: m.name,
@@ -9202,9 +9204,12 @@ function outsideCard() {
       + 'it shows. Never measured here, so never a column the board measured, an average or a '
       + 'rank. Artificial Analysis’s free data is for internal use: this board is on the '
       + 'tailnet, and its numbers are never in the single-file report.' }),
-    el('ul', { class: 'small', 'data-rep-lines': '1' }, ['epoch', 'aa'].map(s => el('li',
-      { 'data-rep-line': s }, (R.sources[s] || {}).line || `${repSrc(s).name}: not imported yet`,
-      el('span', { class: 'se', text: ' · ' + ((R.sources[s] || {}).credit || '') })))),
+    el('ul', { class: 'small', 'data-rep-lines': state.rep.loaded ? '1' : 'loading' },
+      ['epoch', 'aa'].map(s => el('li', { 'data-rep-line': s },
+        !state.rep.loaded ? `${repSrc(s).name}: loading…`
+          : (R.sources[s] || {}).line || `${repSrc(s).name}: not imported yet`,
+        (R.sources[s] || {}).credit ? el('span', { class: 'se', text: ' · ' + R.sources[s].credit })
+          : ''))),
     el('p', { class: 'small se', text: `The default import: each of ${((R.settings || {}).makers
       || []).join(', ') || 'OpenAI, Google, Anthropic'}’s ${(R.settings || {}).per_maker || 10} `
       + 'most recent models, and the open models already on the board (REPORTED_MAKERS, '
