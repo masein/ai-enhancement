@@ -534,3 +534,29 @@ def test_it_sits_what_a_served_model_sits_and_not_the_playground(svc, fake):
             "That is OpenRouter: add its models under Test a model ▸ A model from OpenRouter, "
             "where what they cost is counted")
     assert len(fake.auth) == n and served.get("served/GPT-by-hand") is None
+
+
+
+def test_a_model_measured_here_is_its_reported_self_without_an_alias(svc, monkeypatch):
+    """12m.2 meets 12m.3: Artificial Analysis's "Frontier Test 5.5" (OpenAI) and
+    the OpenRouter model openai/frontier-test-5.5 measured here are one model"""
+    import json as _json
+    from pathlib import Path as _Path
+
+    from service import config as _config, db as _db, reported, served as _served
+    rec = {"id": "served/openrouter-openai-frontier-test-5.5", "name": "Frontier Test 5.5",
+           "via": "openrouter", "base_url": _config.OPENROUTER_BASE_URL, "key": "",
+           "based_on": "", "maker": "OpenAI", "how": "OpenRouter", "thinking": "auto",
+           "phone": False, "gguf_path": "", "gguf_flags": "", "gguf_setups": [],
+           "pin": {"model": "openai/frontier-test-5.5", "version": "openai/frontier-test-5.5-0920",
+                   "provider": "openai", "provider_name": "OpenAI", "precision": "unknown",
+                   "price_in": 1e-6, "price_out": 4e-6, "ctx": 128000},
+           "answered": [], "by": "masein", "at": 0}
+    _db.served_put(rec)
+    _served.write_meta(rec)
+    monkeypatch.setattr(_config, "AA_API_KEY", "aa-test")
+    raw = (_Path(__file__).resolve().parent / "fixtures" / "artificial_analysis_models.json").read_bytes()
+    reported.import_aa(fetch=lambda url, headers=None, timeout=60: raw)
+    m = next(x for x in reported.view()["models"] if x["key"] == "openai/frontier-test-5.5")
+    assert m["id"] == m["measured"] == rec["id"]
+    assert _json.dumps(reported.view()).count("aa-test") == 0
