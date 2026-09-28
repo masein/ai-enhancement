@@ -69,13 +69,36 @@ def slug(s: str) -> str:
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9.]+", "-", str(s).lower())).strip("-")
 
 
-def key(name: str, maker: str = "") -> str:
+# 12n.1: one maker, one name. Epoch AI files Gemini 3.1 Flash-Lite under
+# "Google" and the other Gemini models under "Google DeepMind", which split
+# one maker into two groups and kept one model from joining itself across
+# sources. The source's own name stays with the model, for its tooltip
+MAKERS = {"google deepmind": "Google", "deepmind": "Google", "google": "Google"}
+
+
+def maker(name: str) -> str:
+    """"Google DeepMind" -> "Google"; any other maker as the source names it"""
+    n = re.sub(r"\s+", " ", str(name or "").strip())
+    return MAKERS.get(n.lower(), n)
+
+
+_MAKER_SLUGS = {slug(k): slug(v) for k, v in MAKERS.items()}
+
+
+def canon(k: str) -> str:
+    """a key with its maker as one name: "google-deepmind/gemini-3-pro" is
+    "google/gemini-3-pro" — keys imported before 12n.1 join too"""
+    m, sep, n = str(k).partition("/")
+    return f"{_MAKER_SLUGS.get(m, m)}/{n}" if sep else str(k)
+
+
+def key(name: str, maker_: str = "") -> str:
     """one model's key: "openai/gpt-5.5". A name that already carries its
     maker ("openai/gpt-5.5", OpenRouter's) keeps it"""
     if "/" in str(name):
         m, n = str(name).split("/", 1)
-        return f"{slug(m)}/{slug(n)}"
-    return f"{slug(maker) or 'unknown'}/{slug(name)}"
+        return canon(f"{slug(m)}/{slug(n)}")
+    return canon(f"{slug(maker_) or 'unknown'}/{slug(name)}")
 
 
 def board_ids() -> list[str]:
@@ -99,7 +122,7 @@ def aliases() -> dict[str, str]:
     the page wins"""
     out = {key(r["pin"]["model"]): r["id"] for r in db.served_all()
            if r.get("via") == "openrouter" and (r.get("pin") or {}).get("model")}
-    out.update({a["alias"]: a["target"] for a in db.reported_aliases()})
+    out.update({canon(a["alias"]): canon(a["target"]) for a in db.reported_aliases()})
     return out
 
 
@@ -108,6 +131,7 @@ def resolve(k: str, board: list[str] | None = None, al: dict | None = None) -> s
     name (an open model already here: "qwen/qwen3-1.7b" and Qwen/Qwen3-1.7B),
     else itself"""
     al = aliases() if al is None else al
+    k = canon(k)
     k = al.get(k, k)
     for mid in board or []:
         if mid == k or slug(mid.split("/")[-1]) == k.split("/")[-1]:
@@ -152,7 +176,8 @@ def keep(rows: list[dict], makers: list[str] | None = None, per: int | None = No
     per = config.REPORTED_PER_MAKER if per is None else per
     first: dict[str, dict] = {}
     for i, r in enumerate(rows):
-        first.setdefault(r["key"], {"i": i, "maker": slug(r.get("maker") or r["key"].split("/")[0]),
+        first.setdefault(r["key"], {"i": i, "maker": slug(maker(r.get("maker"))
+                                                          or r["key"].split("/")[0]),
                                     "released": r.get("released") or ""})
     chosen = set()
     for mk in makers:
@@ -366,11 +391,14 @@ def view(board: list[str] | None = None) -> dict:
     al = aliases()
     scores, models = [], {}
     for r in db.reported_scores():
-        mid = resolve(r["key"], board, al)
+        k = canon(r["key"])
+        mid = resolve(k, board, al)
         here = mid in (board or [])
-        rid = mid if here else "reported/" + r["key"]
-        models.setdefault(rid, {"id": rid, "key": r["key"], "name": r["name"],
-                                "maker": r["maker"], "measured": mid if here else None})
+        rid = mid if here else "reported/" + k
+        # 12n.1: one Google; the source's own name, for the tooltip
+        models.setdefault(rid, {"id": rid, "key": k, "name": r["name"],
+                                "maker": maker(r["maker"]), "maker_as": r["maker"],
+                                "measured": mid if here else None})
         scores.append({"model": rid, "source": r["source"], "benchmark": r["benchmark"],
                        "value": r["value"], "se": r.get("se"), "unit": r["unit"],
                        "setting": r["setting"],
@@ -380,7 +408,10 @@ def view(board: list[str] | None = None) -> dict:
         last = db.reported_import_last(s) if s != "card" else None
         srcs[s] = {**meta, "line": NO_AA_KEY if s == "aa" and not config.AA_API_KEY and not last
                    else _line(s, last) if s != "card" else "",
-                   "has_key": bool(config.AA_API_KEY) if s == "aa" else None}
+                   "has_key": bool(config.AA_API_KEY) if s == "aa" else None,
+                   # 12n.1: the day its numbers were imported, for the credit line
+                   "imported": _dt.datetime.fromtimestamp(last["at"]).strftime("%Y-%m-%d")
+                   if last else ""}
     return {"sources": srcs, "models": list(models.values()), "scores": scores,
             "aliases": [{"alias": a, "target": t} for a, t in sorted(al.items())],
             "settings": {"makers": config.REPORTED_MAKERS, "per_maker": config.REPORTED_PER_MAKER}}

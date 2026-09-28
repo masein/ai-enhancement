@@ -112,8 +112,10 @@ def _everyday_rows() -> list[dict]:
             continue
         for it in e.get("items") or []:
             q = qs.get(it["id"])
+            # 12n.1: the practice half only — the judge test shows the question,
+            # and a hidden one is never shown
             if not q or not it.get("judged") or it.get("pass") is None \
-                    or not (it.get("answer_text") or "").strip():
+                    or not (it.get("answer_text") or "").strip() or ev.half(q) != ev.PRACTICE:
                 continue
             rubric = next(c["rubric"] for c in q["checks"] if c["type"] == "judge")
             out.append({"key": f"everyday:{f.parent.name}|{it['id']}", "kind": "everyday",

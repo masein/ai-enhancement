@@ -3833,6 +3833,100 @@ for and hold the run lock and take its turn in the one queue. Now:
   OpenRouter's keeps the lock and the queue: its server can be on this
   host's GPU.
 
+### 12n.1 — the Frontier view, reported scores as a reference, and Everyday edited where it's read
+
+- **Pickers:** every group of Models ▾, Benchmarks ▾ and Filters ▸ Columns
+  has a box that is ticked, mixed or empty, and **all · none** beside its
+  name. Reported (not run here) is folded under one line, by maker, with
+  **one Google**: `reported.maker()` makes "Google DeepMind" Google (the
+  source's own name stays as `maker_as`, in the tooltip), and
+  `reported.canon()` does the same to keys, those imported before too, so
+  one model from two sources joins itself.
+- **Frontier · reported** (Models' last chip, live only): the home of
+  reported scores.
+  - Rows: the reported models, by maker, and ours with a number in a column
+    shown.
+  - Columns: by default, the benchmarks reported for at least half the
+    imported models, and those measured here too; **All N** shows the rest.
+  - The credit is said once, in the header. A cell is a plain number, with
+    its source, setting and link in the tooltip; † marks a value the source
+    took from elsewhere.
+  - Bold and the tint compare only cells of one setting. Our cells read
+    "measured here · <method>" and rank only with ours. A model in both
+    shows both, e.g. "measured here 36.4 · Epoch 38.0".
+- **Everywhere else, reported scores are never rows or columns.** A chosen
+  reported model is one grey line on the other chips ("… Frontier ▸").
+  - Compare's Reported groups keep only the benchmarks another chosen model
+    has too, plus Show all.
+  - Benchmarks draws them as dashed **reference ticks** on the panel of the
+    same benchmark (`frRefs`), and adds a Frontier group of panels. The
+    "frontier" chip takes the best imported number when there is one
+    (`frontierRef`); the static `_FRONTIER` entry is the fallback.
+- **A served model and its GGUF are one model** (`join_served_gguf`, in
+  the report builder).
+  - When is it one file: by sha256 when both have one; else the same file
+    name, with sizes within 3%. The size has to be close, not equal:
+    llama-server reports its tensors' bytes, a little under the file's.
+  - A served entry named for one of the GGUF's setups ("… · lookahead 1")
+    takes that setup's results. MTP stays its own row.
+  - Two plain served entries of one file join neither.
+  - `DATA.sameAs` sends the GGUF's old id and links to the one model.
+  - Measure on the GGUF still measures the GGUF entry (`ggufIdOf`).
+- **The Model column is as wide as it is dragged.**
+  - How: a handle on the header's right edge, or ←/→ once it's focused; a
+    double-click fits the longest name.
+  - Where: Models, Compare, Everyday and Frontier, each table's width kept
+    in localStorage (`bench-mcol-<table>`). The header's ⋯ ▸ Reset forgets
+    it.
+  - Under 600 px there is no handle, and names wrap to two lines. Panel
+    names wrap to two lines too; one too long for two keeps its
+    distinguishing end (`shortNames`).
+- **Everyday, read side by side:**
+  - A group's name on Benchmarks ▸ Everyday tasks opens `read=group:<id>`:
+    every practice question once, each chosen model's answer beside it,
+    "models disagree first".
+  - A count's reader says "Scored: n of k hidden (not shown) · Practice
+    below: …".
+- **The hidden half, audited:** only `BOARD_OWNER` (in `.env`, default
+  masein) sees "Open the hidden half (audit)".
+  - A warning comes first, then `POST /api/everyday/audit`, which logs the
+    opening (`hidden_audits`: who, when, which group) before it shows
+    anything.
+  - Data & sources lists every opening.
+  - Nothing links to the view, and a hidden question is read or edited only
+    by the owner.
+- **Editing a question** (Edit, in either reader):
+  - Where edits live: each save is a line of
+    `BENCH_ROOT/everyday/edits.jsonl`, beside the builder's `built.jsonl`;
+    the repo's bank is never written. `load_bank` reads through the edits,
+    and a retired question also goes to `BENCH_ROOT/everyday/retired.jsonl`
+    with its reason.
+  - Halves: each edited question keeps the half it was in (a `half` field).
+    Practice → hidden is refused, and hidden → practice reveals it on
+    purpose.
+  - Versions: every save is a new bank version, and Undo gives back the one
+    before.
+  - Before saving, Show the impact reads the marks against it and which
+    would flip.
+  - On save, every stored answer is marked again with no model run; the
+    judge is asked only about that question.
+    - A reworded question: each model's answer was to other words, so it
+      leaves their scores ("changed, not re-asked yet") until **Re-ask
+      changed questions** queues runs that ask only those.
+    - Judge verdicts are kept by question, rubric and answer
+      (`everyday_verdicts.json`), so an undone rubric gets its marks back
+      unasked. A new judge (12i.1) forgets them.
+- **Leaks closed on the way:**
+  - The question builder's default instructions quoted a hidden question
+    (everyday-understanding-08) as an example; it's an invented one now.
+  - The judge test showed hidden Everyday answers; it shows the practice
+    half only.
+  - Not changed, and worth knowing:
+    - the builder's duplicate check still sends every bank question, hidden
+      too, to the embeddings model;
+    - a builder batch's view still shows its own published questions,
+      hidden ones included (12i.2's design).
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

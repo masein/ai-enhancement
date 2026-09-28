@@ -1,9 +1,9 @@
 """12m.2 on the page: models known only as reported are in Models ▾ under
-"Reported (not run here)", by maker; chosen, a row of their own with the
-"Reported · <source>" columns, never a leader, an average or a rank; Compare
-gives each source its own group, credited; Benchmarks puts a reported panel
-beside the lm_eval one of the same benchmark; and AI models ▸ Outside data
-says what each source holds."""
+"Reported (not run here)", by maker — 12n.1: folded, and chosen, a row of
+the Frontier view's, never of Standard's; Compare gives each source its own
+group, credited; Benchmarks draws a reported number as a tick on the panel
+of the same benchmark; and AI models ▸ Outside data says what each source
+holds."""
 
 from __future__ import annotations
 
@@ -53,36 +53,31 @@ def test_models_menu_has_the_reported_models_by_maker_and_a_chosen_one_is_a_row(
     page.goto(live["base"] + "/#tab=models")
     page.wait_for_selector("[data-lb-table]")
     page.locator("#pill-models").click()
+    # 12n.1: Reported (not run here) is folded until opened, a maker a group
+    page.locator("#pop-models [data-rep-fold]").click()
     page.wait_for_selector("#pop-models [data-model-group='reported · OpenAI']")
     head = page.locator("#pop-models [data-model-group='reported · OpenAI']").inner_text()
-    assert head.startswith("Reported (not run here) · OpenAI")
+    assert head.strip().startswith("OpenAI all · none · only these")
     # not among "all", which is the board's
     assert page.locator(f"#pop-models [data-model-pick='{F55}']").is_checked() is False
     page.locator("[data-models-clear]").click()
     for mid in (GOOD, F55):
         page.locator(f"#pop-models [data-model-pick='{mid}']").check()
     page.keyboard.press("Escape")
-    row = page.locator(f"tr[data-lb-row='{F55}']")
-    row.wait_for()
-    # its numbers in their own group, credited, never a leader, no rank, no average
-    cell = row.locator("[data-rep2-cell='rep2:aa:MMLU-Pro']")
-    assert cell.inner_text().split("\n")[0] == "87.3"
+    # 12n.1: never a row of Standard's; its row is Frontier's, credited in its header
+    page.wait_for_selector("[data-rep-hidden='1']")
+    assert page.locator(f"tr[data-lb-row='{F55}']").count() == 0
+    page.locator("[data-rep-hidden-go]").click()
+    page.locator("[data-frontier-all]").click()
+    cell = page.locator(f"[data-fr-rep='{F55}'][data-fr-cell='mmlu-pro']")
+    cell.wait_for()
+    assert cell.inner_text() == "87.3"
     t = tip(cell)
-    assert "reported by Artificial Analysis · Artificial Analysis's own run" in t
-    assert "Data: Artificial Analysis" in t
-    assert page.locator("[data-rep2-cell]").evaluate_all(
-        "xs => xs.every(x => !x.dataset.lead)")
-    # a built table numbers its rows; the model has no average, so no rank
+    assert "reported by Artificial Analysis · Artificial Analysis's own run" in t[1]
+    assert "Data: Artificial Analysis" in page.locator("[data-frontier-credit]").inner_text()
+    # the model has no average, so no rank
     assert page.evaluate(f"officialAvg(anyModel({json.dumps(F55)}))") is None
-    # tagged "reported", with no Standard badge and no page of its own here
-    assert row.locator(f"[data-reported-tag='{F55}']").inner_text() == "reported"
-    assert row.locator(".badge.prelim, a.mname").count() == 0
-    groups = page.locator(f"{'[data-lb-table]'} thead tr.grp th").all_inner_texts()
-    assert any(g.upper().startswith("REPORTED · ARTIFICIAL ANALYSIS") for g in groups)
     shot(page.locator("[data-lb-card]"), "models-reported-row.png")
-    # a click on it opens Compare, it beside the rest chosen
-    row.locator("td.num").first.click()
-    page.wait_for_selector("[data-compare='2']")
     assert page.errors == []
 
 
@@ -109,19 +104,17 @@ def test_compare_gives_each_source_its_group_credited(live, page):
     assert page.errors == []
 
 
-def test_a_reported_panel_sits_beside_its_benchmark_credited(live, page):
+def test_a_reported_number_is_a_tick_on_its_benchmark_credited(live, page):
+    """12n.1: a reference tick on MMLU's panel, not a panel of bars beside it"""
     page.set_viewport_size({"width": 1400, "height": 1000})
     page.goto("about:blank")
-    page.goto(live["base"] + "/#tab=benchmarks&sub=standard")
-    page.wait_for_selector("[data-panel='rep:card:mmlu']")
-    keys = page.locator("[data-panel]").evaluate_all("xs => xs.map(x => x.dataset.panel)")
-    at = keys.index("mmlu")
-    assert "rep:card:mmlu" in keys[at + 1:at + 3]
-    panel = page.locator("[data-panel='rep:card:mmlu']")
-    assert panel.locator("h3").inner_text() == "MMLU · reported by model card"
-    assert "as the model card or paper reports it" in panel.locator("[data-panel-method]").inner_text()
-    hit = panel.locator(f"rect.hit[data-model='{F55}']")
-    assert "as the model card or paper reports it" in tip(hit)
+    page.goto(live["base"] + f"/#tab=benchmarks&sub=standard&models={quote(GOOD, safe='')},"
+              + quote(F55, safe=""))
+    page.wait_for_selector(f"[data-panel='mmlu'] g.reftick[data-ref='{F55}']")
+    assert page.locator("[data-panel='rep:card:mmlu']").count() == 0
+    t = page.locator(f"[data-panel='mmlu'] g.reftick[data-ref='{F55}']")
+    assert t.locator("text").text_content() == "Frontier Test 5.5 91.2 · card"
+    assert "as the model card or paper reports it" in tip(t.locator("rect.hit"))
     assert page.errors == []
 
 

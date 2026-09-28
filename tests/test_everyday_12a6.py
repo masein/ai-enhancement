@@ -168,6 +168,8 @@ def test_a_script_mark_from_before_is_never_taken_for_the_judges(tmp_path):
     before = ev.read(mdir)
     before["items"][0]["rubric"] = "an older rubric"
     ev.write(mdir, before)
+    # 12n.1: and nothing remembers a verdict on this rubric (an undo's memory)
+    (mdir / ev.VERDICTS_NAME).unlink()
     assert ev.mark(mdir)["items"][0]["pass"] is None
 
 

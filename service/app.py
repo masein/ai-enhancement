@@ -368,6 +368,8 @@ def results_payload() -> dict:
         # 12g.2: the hidden questions an Everyday group needs before Improve takes it
         if payload.get("everyday"):
             payload["everyday"]["minHidden"] = config.EVERYDAY_MIN_HIDDEN
+            # 12n.1: who may open a group's hidden half (and nobody else sees a way to)
+            payload["everyday"]["owner"] = config.BOARD_OWNER
         # the loop's audit trail, per tainted model: run, datasets, proposals
         trails = trail_for([m["id"] for m in payload["models"]])
         for m in payload["models"]:
@@ -2878,6 +2880,167 @@ def proposal_detail(pid: int):
     if not r:
         raise HTTPException(404, "no such proposal")
     return _proposal_view(r, db.dataset_list(500))
+
+
+# ---------------------------------------------------------------------------
+# 12n.1: Everyday questions read and edited where they are read. A hidden
+# question is the board's owner's alone, from the audit of its group; every
+# opening of a hidden half is logged. An edit is saved beside what the
+# question builder published, and every stored answer is marked again at
+# once — no model runs; the judge only for the question edited
+# ---------------------------------------------------------------------------
+
+HIDDEN_OWNER = ("A hidden question is read and edited only by the board's owner, from its "
+                "group's audit")
+AUDIT_WARNING = ("These questions are the test. Don’t train on them or write questions toward "
+                 "them. This opening is logged.")
+
+
+def _is_owner(by: str) -> bool:
+    return bool(config.BOARD_OWNER) and (by or "").strip().lower() == config.BOARD_OWNER.lower()
+
+
+def _evq(qid: str, by: str):
+    """a question to read or edit, as it reads now — or, retired, as it read
+    last; a hidden one only for the owner"""
+    import everyday as ev
+    q = ev.question(qid)
+    if q is None:
+        last = [r for r in ev.edit_log() if r["id"] == qid]
+        q = last[-1]["before"] if last else None
+    if q is None:
+        raise HTTPException(404, f"No question {qid}")
+    if ev.half(q) == ev.HIDDEN and not _is_owner(by):
+        raise HTTPException(403, HIDDEN_OWNER)
+    return ev, q
+
+
+def _evq_view(ev, q: dict) -> dict:
+    return {**{k: q.get(k) for k in ("id", "group", "prompt", "reference", "checks", "skill",
+                                      "edited")},
+            "half": ev.half(q), "rubric": (ev.judge_check(q) or {}).get("rubric"),
+            "retired": ev.question(q["id"]) is None}
+
+
+@app.get("/api/everyday/questions/{qid}")
+def evd_question(qid: str, by: str = ""):
+    ev, q = _evq(qid, by)
+    return {"question": _evq_view(ev, q), "history": ev.history(qid),
+            "groups": [[k, v] for k, v in ev.groups().items()]}
+
+
+class EvdEditIn(BaseModel):
+    changes: dict = {}
+    why: str = ""
+    by: str = ""
+
+
+@app.post("/api/everyday/questions/{qid}/impact")
+def evd_impact(qid: str, f: EvdEditIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    ev, _ = _evq(qid, f.by)
+    try:
+        return ev.impact(qid, f.changes, config.OUT_DIR)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+
+
+def _evd_saved(ev, rec: dict) -> dict:
+    """after a save: every model's answers marked again, the judge asked
+    only about this question, and the page's payload rebuilt"""
+    note = ""
+    try:
+        res = ev.remark(config.OUT_DIR, judge=True, only={rec["id"]}, snapshot=False) \
+            if config.OUT_DIR.is_dir() else {}
+    except RuntimeError as e:                       # the judge isn't set up: marked, waiting
+        res, note = {}, str(e)
+    _cache.update(key=None, payload=None, at=0.0)
+    return {"edit": {k: rec.get(k) for k in ("n", "id", "action", "at", "by", "why", "what")},
+            "remarked": len((res or {}).get("models") or {}), "sent": (res or {}).get("sent", 0),
+            "note": note, "version": ev.version()}
+
+
+@app.post("/api/everyday/questions/{qid}/edit")
+def evd_edit(qid: str, f: EvdEditIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    ev, _ = _evq(qid, f.by)
+    try:
+        rec = ev.edit(qid, f.changes, f.why, f.by)
+    except KeyError:
+        raise HTTPException(404, f"No question {qid}") from None
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return _evd_saved(ev, rec)
+
+
+@app.post("/api/everyday/questions/{qid}/retire")
+def evd_retire(qid: str, f: EvdEditIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    ev, _ = _evq(qid, f.by)
+    try:
+        rec = ev.retire(qid, f.why, f.by)
+    except KeyError:
+        raise HTTPException(404, f"No question {qid}") from None
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return _evd_saved(ev, rec)
+
+
+@app.post("/api/everyday/questions/{qid}/undo")
+def evd_undo(qid: str, f: EvdEditIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    ev, _ = _evq(qid, f.by)
+    try:
+        rec = ev.undo(qid, f.by)
+    except KeyError:
+        raise HTTPException(404, f"No edit of {qid}") from None
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return _evd_saved(ev, rec)
+
+
+class AuditIn(BaseModel):
+    group: str
+    by: str = ""
+    confirm: bool = False
+    models: list[str] = []
+
+
+@app.post("/api/everyday/audit")
+def evd_audit(a: AuditIn, x_token: str = Header(default="")):
+    """12n.1: a group's hidden half, for the board's owner, after the
+    warning — logged before anything is shown"""
+    _check_token(x_token)
+    import everyday as ev
+    if not _is_owner(a.by):
+        raise HTTPException(403, "Only the board's owner opens the hidden half")
+    if a.confirm is not True:
+        raise HTTPException(428, AUDIT_WARNING)
+    if a.group not in ev.groups():
+        raise HTTPException(404, f"No group {a.group}")
+    qs = [q for q in ev.load_bank() if q["group"] == a.group and ev.half(q) == ev.HIDDEN]
+    db.hidden_audit_add(a.by.strip()[:80], a.group, len(qs))
+    ids, now = {q["id"] for q in qs}, ev.version()["hash"]
+    answers, changed = {}, {}
+    for f in sorted(config.OUT_DIR.glob("*/everyday.json")) if config.OUT_DIR.is_dir() else []:
+        e = ev.read(f.parent) or {}
+        if (e.get("version") or {}).get("hash") != now or not e.get("model") \
+                or (a.models and e["model"] not in a.models):
+            continue
+        answers[e["model"]] = {it["id"]: {k: it.get(k) for k in (
+            "pass", "reason", "failed", "answer_text", "had_reasoning", "reasoning_text",
+            "no_answer")} for it in e.get("items") or [] if it["id"] in ids}
+        changed[e["model"]] = [i for i in e.get("changed") or [] if i in ids]
+    return {"group": a.group, "warning": AUDIT_WARNING,
+            "questions": [{**_evq_view(ev, q), "describe": [ev.describe(c) for c in q["checks"]]}
+                          for q in qs],
+            "answers": answers, "changed": changed}
+
+
+@app.get("/api/everyday/audits")
+def evd_audits():
+    """every opening of a hidden half: who, when, which group — Data & sources lists them"""
+    return {"owner": config.BOARD_OWNER, "audits": db.hidden_audits()}
 
 
 def _name(s: str, what: str) -> str:

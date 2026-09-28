@@ -148,9 +148,10 @@ def test_compare_groups_by_method_and_ranks_only_like_with_like(live, page, boar
     assert page.locator("[data-cmp-row='gguf:mmlu']").count() == 0
     g.locator("[data-cmp-fold]").click()
     page.wait_for_selector("[data-cmp-row='gguf:mmlu']")
-    # Everyday: its method is the bank's own count, 340 since 12a.6, and a
+    # Everyday: its method is the count its scores are over — 12n.1: the
+    # hidden half's (179), from the result, never the bank's 340 — and a
     # model not asked them all is another method
-    E = page.evaluate("evdAll()")
+    E = page.evaluate("evdHidden()")
     assert page.locator("[data-cmp-main='evd']").inner_text() == f"{E} questions, our checks"
     part = page.locator(f"[data-cmp-row='evd'] [data-cmp-cell='{SMALL}']")
     assert "cmp-off" in part.get_attribute("class") and " scored, our checks" in part.inner_text()

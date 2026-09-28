@@ -91,6 +91,9 @@ def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: b
     monkeypatch.setattr(llm.FakeBatches, "responder", staticmethod(llm.default_responder))
     llm.reset()
     appmod._cache.update(key=None, payload=None, at=0.0)
+    # 12n.1: and the judge's health as nobody has asked yet — a cached "down"
+    # from another test in the same worker refused judged runs for 30 s
+    appmod._JUDGE_HEALTH.update(at=0.0, value=None)
     client = TestClient(appmod.app)
     client.__enter__()
     return client, appmod, manifest

@@ -125,6 +125,15 @@ CREATE TABLE IF NOT EXISTS exam_curation (
   reason      TEXT DEFAULT '',
   decided_at  REAL NOT NULL
 );
+-- 12n.1: every opening of an Everyday group's hidden half — the board's
+-- owner only, after a warning: who, when, which group
+CREATE TABLE IF NOT EXISTS hidden_audits (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  by_whom     TEXT NOT NULL,
+  grp         TEXT NOT NULL,
+  n           INTEGER NOT NULL,                 -- how many hidden questions it showed
+  at          REAL NOT NULL
+);
 -- the one place the service writes to the repo's own tree: a rubric or a
 -- criteria file uploaded from the Exam tab. Who, when, what it replaced.
 CREATE TABLE IF NOT EXISTS rubric_changes (
@@ -958,6 +967,22 @@ def rubric_changes(limit: int = 100) -> list[dict]:
         rows = c.execute(f"SELECT {','.join(_RUB_COLS)} FROM rubric_changes "
                          "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
     return [dict(zip(_RUB_COLS, r)) for r in rows]
+
+
+def hidden_audit_add(by: str, group: str, n: int) -> int:
+    """12n.1: an opening of a group's hidden half, logged before it is shown"""
+    with closing(_conn()) as c:
+        cur = c.execute("INSERT INTO hidden_audits (by_whom, grp, n, at) VALUES (?,?,?,?)",
+                        (by, group, n, time.time()))
+        c.commit()
+        return int(cur.lastrowid)
+
+
+def hidden_audits(limit: int = 200) -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT id, by_whom, grp, n, at FROM hidden_audits ORDER BY id DESC "
+                         "LIMIT ?", (limit,)).fetchall()
+    return [dict(zip(("id", "by", "group", "n", "at"), r)) for r in rows]
 
 
 # ---------------------------------------------------------------------------

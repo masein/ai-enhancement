@@ -37,6 +37,7 @@ Deliberately dependency-free (stdlib only) so it runs anywhere your harness runs
 from __future__ import annotations
 
 import argparse
+import copy
 import datetime as _dt
 import html
 import json
@@ -893,6 +894,93 @@ def load_served(out_dir: Path | None) -> dict:
     return out
 
 
+# 12n.1: a served model and its GGUF file are one model. llama-server reports
+# its tensors' bytes, a little under the file's (the header and vocabulary
+# are the rest), so two sizes within 3% are one file of one name
+_SAME_SIZE = 0.03
+
+
+def _words(s) -> str:
+    return " " + re.sub(r"[^a-z0-9]+", " ", str(s or "").lower()).strip() + " "
+
+
+def same_file(served_pin: dict, g: dict, served_sha: str = "") -> bool:
+    """is the file a server reports (its pin) the file a GGUF entry points to?
+    By sha256 when both have one; else by name and size, both required"""
+    gp = g.get("pin") or {}
+    if served_sha and gp.get("sha256"):
+        return served_sha == gp["sha256"]
+    name = gp.get("name") or str(g.get("path") or "").rsplit("/", 1)[-1]
+    a, b = served_pin.get("size"), gp.get("size")
+    return bool(name and served_pin.get("file") == name and a and b
+                and abs(a - b) <= _SAME_SIZE * max(a, b))
+
+
+def join_served_gguf(served: dict, gguf: dict | None,
+                     measured: set | frozenset = frozenset()) -> tuple[dict | None, dict]:
+    """12n.1: a served entry whose pinned file is a GGUF entry's is one model
+    with it — one row, one Compare column, one page — its GGUF results the
+    served model's, each keeping its own provenance (the GGUF's file, build
+    and how, beside the server's). A served entry named for one of the GGUF's
+    setups ("k4-LDA · lookahead 1") takes that setup's results the same way.
+    MTP has no GGUF counterpart: an entry served with it stays its own row,
+    and so does any file two plain served entries share (which would it be?).
+    A GGUF entry with results of its own besides its GGUF's (`measured`)
+    keeps its row. Returns the GGUF data, rewritten, and {old id: the id it
+    is now}"""
+    if not gguf:
+        return gguf, {}
+    reg = gguf.get("registered") or {}
+    same: dict[str, str] = {}
+    for gid, g in list(reg.items()):
+        if g.get("served") or gid in measured:
+            continue
+        cands = [(sid, sv) for sid, sv in sorted((served or {}).items())
+                 if not sv.get("gguf_path") and same_file(sv.get("pin") or {}, g)]
+        setups = [x for x in (gguf.get("setups") or {}).get(gid, []) if x["id"] != "as-built"]
+        plain, by_setup = [], {}
+        for sid, sv in cands:
+            words = _words(sv.get("name"))
+            if " mtp " in words:
+                continue
+            hit = [x for x in setups if _words(x["name"]) in words]
+            if len(hit) == 1:
+                by_setup.setdefault(hit[0]["id"], []).append(sid)
+            elif not hit:
+                plain.append(sid)
+        if len(plain) != 1:
+            continue
+        sid = plain[0]
+        same[gid] = sid
+        joined = {**g, "served": True, "gguf_id": gid}
+        reg[sid] = joined
+        del reg[gid]
+        rows = (gguf.get("setups") or {}).pop(gid, [])
+        for x in rows:
+            if x["id"] == "as-built":
+                continue
+            to = by_setup.get(x["id"]) or []
+            if len(to) == 1 and x.get("benches"):
+                # the served setup's own row holds this setup's GGUF results
+                x["joined"] = to[0]
+                gguf["models"][to[0]] = x["benches"]
+                gguf["setups"][to[0]] = [{**x, "joined": to[0]}]
+                reg[to[0]] = {**joined, "setup": x["name"]}
+                same[f"{gid} · {x['name']}"] = to[0]
+            else:
+                same[f"{gid} · {x['name']}"] = f"{sid} · {x['name']}"
+        gguf.setdefault("setups", {})[sid] = rows
+        if gid in (gguf.get("models") or {}):
+            gguf["models"][sid] = gguf["models"].pop(gid)
+        hist = gguf.get("history") or {}
+        if gid in hist:
+            hist[sid] = hist.pop(gid) + hist.get(sid, [])
+        for pr in gguf.get("pairs") or []:
+            pr["a"] = sid if pr["a"] == gid else pr["a"]
+            pr["b"] = sid if pr["b"] == gid else pr["b"]
+    return gguf, same
+
+
 def load_everyday(out_dir: Path | None) -> dict | None:
     """12a.3: the Everyday bank — 12a.5: 388 questions in eight groups, split by
     12g.2 into a hidden half that scores and a practice half that is shown —
@@ -957,6 +1045,10 @@ def load_everyday(out_dir: Path | None) -> dict | None:
             # 12a.5: "55 new questions · 333 re-marked", and the questions it
             # has not been asked yet
             "marking": ev.marking_line(e), "unasked": int(e.get("unasked") or 0),
+            # 12n.1: questions reworded since it answered them — practice ones by
+            # id, hidden ones counted
+            "changed": [i for i in e.get("changed") or [] if half_of.get(i) == ev.PRACTICE],
+            "changedHidden": sum(1 for i in e.get("changed") or [] if half_of.get(i) == ev.HIDDEN),
             "groups": by_group(hidden),
             # the practice half: its counts, and its answers — the only ones shown
             "practice": by_group(practice), "items": practice,
@@ -970,7 +1062,10 @@ def load_everyday(out_dir: Path | None) -> dict | None:
                            "label": _evd_label(q), "skill": q.get("skill") or "",
                            "prompt": q["prompt"], "reference": q.get("reference") or "",
                            "checks": [ev.describe(c) for c in q["checks"]],
-                           "judged": any(c["type"] == "judge" for c in q["checks"])}
+                           "judged": any(c["type"] == "judge" for c in q["checks"]),
+                           # 12n.1: who changed it last, when and why
+                           **({"edited": {k: q["edited"].get(k) for k in (
+                               "n", "action", "by", "at", "why")}} if q.get("edited") else {})}
                           for i, q in enumerate(shown, 1)],
             "hidden": {g: c["hidden"] for g, c in counts.items()},
             "practice": {g: c["practice"] for g, c in counts.items()},
@@ -1565,6 +1660,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     alone): then nothing is filtered."""
     # 12i.4: a registered served model is a row before its first result
     served = served or {}
+    # 12n.1: and a served model and its GGUF file are one
+    gguf, same_as = join_served_gguf(served, copy.deepcopy(gguf) if gguf else gguf,
+                                     set(by_model))
     by_model = {**by_model, **{sid: empty_run(sid, sv) for sid, sv in served.items()
                                if sid not in by_model}}
     # 12f.3: and a GGUF file with no server, before and after its measurements
@@ -2122,7 +2220,9 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         if not parent:
             continue
         for x in sets:
-            if x["id"] == "as-built" or not x.get("current") or not x.get("benches"):
+            # 12n.1: a setup a served setup took is that served model's row
+            if x["id"] == "as-built" or not x.get("current") or not x.get("benches") \
+                    or x.get("joined"):
                 continue
             rid = f"{mid} · {x['name']}"
             model_rows.append({
@@ -2169,6 +2269,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         "everyday": everyday,
         # 12f.1: the models served elsewhere, results or not yet
         "served": served,
+        # 12n.1: an id that is another's now — a GGUF entry, a served model's file
+        "sameAs": same_as,
         # 12f.3: measured on the GGUF by llama-perplexity: its own columns,
         # never in an average with lm_eval's
         "gguf": gguf,
@@ -2360,6 +2462,8 @@ button:active:not(:disabled):not([aria-disabled="true"]) { transform:scale(.98);
    screen below 720px. It slides in and fades with the 11f tokens */
 body.reading { overflow:hidden; }
 .reader-wrap { position:fixed; inset:0; z-index:90; }
+/* 12n.1: a dialog opened from the reader (the audit's warning, Re-ask) sits above it */
+body.reading .dlg-back { z-index:95; }
 .reader-scrim { position:absolute; inset:0; background:rgba(10,16,30,.28); opacity:0;
   transition:opacity var(--dur-3) var(--ease); }
 .reader { position:absolute; top:0; right:0; bottom:0; width:min(760px, 92vw);
@@ -3123,6 +3227,41 @@ table.lb tbody td.model { box-shadow:inset 3px 0 0 var(--fam, var(--axis)); }
 table.lb td.model .mname { display:inline-block; max-width:190px; overflow:hidden;
   text-overflow:ellipsis; vertical-align:bottom; }
 table.lb th.model { position:sticky; left:32px; z-index:3; }
+/* 12n.1: the Model column as wide as someone dragged it — a handle on its
+   header's right edge, the width kept per table in this browser. Under 600px
+   there is no handle, and a name wraps to two lines instead */
+.colgrip { position:absolute; top:0; right:-4px; bottom:0; width:9px; cursor:col-resize; z-index:5;
+  touch-action:none; }
+.colgrip::after { content:""; position:absolute; top:20%; bottom:20%; left:4px; width:1px;
+  background:var(--border); }
+.colgrip:hover::after, .colgrip:focus-visible::after, .colgrip.drag::after { width:2px; left:3px;
+  background:var(--accent); }
+.colgrip:focus-visible { outline:none; }
+.mcol-more { display:inline-block; margin-left:4px; }
+.mname .mn-short { display:none; }
+.mcol-more > button { min-height:0; padding:0 4px; border:0; background:none; cursor:pointer;
+  color:var(--text-secondary); font-size:var(--fs-1); }
+@media (min-width:601px) {
+  table[data-mcol] th.model, table[data-mcol] td.model,
+  table[data-mcol] thead th.pin, table[data-mcol] th.cmp-name {
+    width:var(--mcol); min-width:var(--mcol); max-width:var(--mcol); }
+  table[data-mcol] td.model .mcell { max-width:calc(var(--mcol) - 16px); }
+  table[data-mcol] td.model .mname { max-width:none; }
+}
+table.mcol-measure td.model, table.mcol-measure th.model, table.mcol-measure .mcell,
+table.mcol-measure .mname, table.mcol-measure th.cmp-name, table.mcol-measure thead th.pin {
+  width:auto !important; min-width:0 !important; max-width:none !important;
+  white-space:nowrap !important; overflow:visible !important; }
+@media (max-width:600px) {
+  .colgrip, .mcol-more { display:none; }
+  table.lb td.model .mcell { white-space:normal; }
+  /* between words, never inside one: the column keeps room for a word */
+  table.lb td.model { min-width:104px; }
+  table.lb td.model .mname { white-space:normal; display:-webkit-box; -webkit-box-orient:vertical;
+    -webkit-line-clamp:2; overflow:hidden; text-overflow:clip; overflow-wrap:break-word; }
+  .mname .mn-full { display:none; }
+  .mname .mn-short { display:inline; }
+}
 /* the rank and the model stay put while the scores scroll sideways */
 table.lb .rank { white-space:nowrap; color:var(--muted); position:sticky; left:0; z-index:2;
   text-align:left;
@@ -3735,6 +3874,30 @@ button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; filter:
 /* 12i.0: a benchmark nothing has run yet, listed and greyed */
 .benchmenu .colgroup label.notrun { color:var(--text-secondary); }
 .modelsmenu .mgroup { margin:6px 0 2px; text-transform:none; }
+/* 12n.1: a picker group's own box, and Reported folded under its own line */
+input.gbox { margin:0 2px 0 0; vertical-align:-2px; }
+/* 12n.1: an Everyday group side by side — a question, then each model's answer */
+.evq-open { display:block; color:inherit; text-decoration:none; }
+.evq-open:hover .evq-short { color:var(--accent); text-decoration:underline; }
+.grpq { border-top:1px solid var(--border); padding:12px 0; }
+.grpq-head { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+.evside { display:flex; gap:10px; overflow-x:auto; padding:4px 0 8px; scroll-snap-type:x proximity; }
+.evside-card { flex:0 0 min(300px, 85%); border:1px solid var(--border); border-radius:8px;
+  padding:8px 10px; background:var(--surface-1); scroll-snap-align:start; min-width:0; }
+.evside-card[data-mark="no"] { border-color:color-mix(in srgb, var(--s8) 45%, var(--border)); }
+.evside-head { display:flex; gap:6px; align-items:center; }
+.evside-card .evans { max-height:260px; overflow:auto; white-space:pre-wrap; font-size:var(--fs-1); }
+.evside-why { margin:4px 0; }
+.audit-banner { margin-bottom:10px; }
+.grp-line { margin:0 0 6px; }
+.qeform { border:1px dashed var(--border); border-radius:8px; padding:10px; margin:8px 0; }
+.qeform textarea { width:100%; font-family:var(--font-mono); font-size:var(--fs-1); }
+/* 12n.1: the Frontier view — our cells' method on a line of its own */
+table.lb td.tcell .fr-tag { display:block; font-family:var(--font-sans); white-space:nowrap; }
+table.lb td.fr-cal { white-space:nowrap; }
+table.lb td.fr-here { box-shadow:inset 2px 0 0 var(--accent); }
+sup.fr-mark { color:var(--text-secondary); margin-left:1px; }
+.modelsmenu .mgroup.mrep { margin-top:10px; padding-top:6px; border-top:1px solid var(--border); }
 @media (max-width:720px) {
   .lbbar.narrow .chiprow { flex-wrap:wrap; row-gap:8px; }
   .lbbar.narrow .chips { flex-basis:100%; }
@@ -4286,6 +4449,57 @@ const pct  = (v, d = 1) => v == null ? '—' : (100 * v).toFixed(d) + '%';
 // "qwen35-d…-step945": the start and the end of a long name, never just the start
 const midTrunc = (s, n) => s.length <= n ? s
   : s.slice(0, Math.ceil((n - 1) * 0.45)) + '…' + s.slice(s.length - Math.floor((n - 1) * 0.55));
+// 12n.1: a label in at most two lines of n, broken between words; the end is
+// kept when it can't all fit
+function wrap2(text, n) {
+  text = String(text);
+  if (text.length <= n) return [text];
+  const w = text.match(/[^\s\-_·/]+[\s\-_·/]*|^[\s\-_·/]+/g) || [text];
+  let a = '';
+  while (w.length && (a + w[0]).trimEnd().length <= n) a += w.shift();
+  if (!a) return [text.slice(0, n), '…' + text.slice(Math.max(n, text.length - (n - 1)))];
+  let b = w.join('').trim();
+  if (b.length > n) b = '…' + b.slice(b.length - (n - 1));
+  return [a.trimEnd(), b];
+}
+// 12n.1: labels that keep what tells models apart. A name too long for its
+// place loses, first, the words it shares at the front with the others of
+// its kind ("Qwen3.6-35B-A3B k4-LDA · lookahead 1" is "k4-LDA · lookahead 1"
+// beside "… original · lookahead 1"), then whole words from the front —
+// never the end, where two setups of one file differ. Two the same keep
+// both ends. The full name is on hover. Returns name -> label
+function shortNames(names, max = 22) {
+  const words = n => String(n).match(/[^\s\-_·/]+[\s\-_·/]*|^[\s\-_·/]+/g) || [String(n)];
+  const uniq = [...new Set(names.map(String))], out = new Map(), kinds = new Map();
+  // a kind: the names that begin with the same word
+  for (const n of uniq) {
+    const w0 = words(n)[0];
+    if (!kinds.has(w0)) kinds.set(w0, []);
+    kinds.get(w0).push(n);
+  }
+  for (const ns of kinds.values()) {
+    const ws = ns.map(words);
+    // the words all of a kind share at the front, cut from each once one is too long
+    let k = 0;
+    if (ns.length > 1 && ns.some(n => n.length > max)) {
+      const least = Math.min(...ws.map(w => w.length));
+      while (k < least - 1 && ws.every(w => w[k] === ws[0][k])) k++;
+    }
+    ns.forEach((n, i) => {
+      let rest = ws[i].slice(k);
+      const txt = () => rest.join('').replace(/^[\s\-_·/]+/, '').trim();
+      if (txt().length <= max) { out.set(n, txt()); return; }
+      // then whole words from the front, never the end
+      while (rest.length > 1 && txt().length > max - 1) rest = rest.slice(1);
+      const t = txt();
+      out.set(n, '…' + (t.length > max - 1 ? t.slice(t.length - (max - 1)) : t));
+    });
+  }
+  const by = {};
+  for (const [n, l] of out) (by[l] = by[l] || []).push(n);
+  for (const ns of Object.values(by)) if (ns.length > 1) ns.forEach(n => out.set(n, midTrunc(n, max)));
+  return out;
+}
 const num  = (v, d = 3) => v == null ? '—'
   : (+v).toFixed(d).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
 const P    = v => v == null ? '—' : v >= 995e6 ? (v / 1e9).toFixed(v % 1e9 ? 1 : 0) + 'B'
@@ -4530,10 +4744,11 @@ function taskChips(t, o = {}) {
     title: 'no pair of models on this board differs by more than their combined '
          + 'standard error — this task is not distinguishing our models, whatever '
          + 'the ranking suggests' }));
-  if (i.frontier) out.push(el('span', { class: 'tchip front',
-    text: 'frontier ' + pct(i.frontier.v),
-    title: `best published score ${pct(i.frontier.v)} — ${i.frontier.src}, as of `
-         + `${i.frontier.asof}. A different protocol from ours (n-shot, harness), `
+  const fr = frontierRef(t);
+  if (fr) out.push(el('span', { class: 'tchip front', 'data-frontier-chip': t,
+    text: 'frontier ' + pct(fr.v),
+    title: `best published score ${pct(fr.v)} — ${fr.src}${fr.asof ? ', as of ' + fr.asof : ''}. `
+         + `A different protocol from ours (n-shot, harness), `
          + `so read it as where the ceiling is, not as a like-for-like gap.` }));
   return out.length ? el('div', { class: 'tchips' }, ...out) : '';
 }
@@ -4787,7 +5002,8 @@ function barPanel(task, models, opts) {
   const shots = [...new Set(rows.map(r => r.c.shots).filter(s => s != null))];
   const ns    = [...new Set(rows.map(r => r.c.n).filter(n => n != null))];
   const hasChance = info.chance != null && info.chance > 0 && !lower;
-  // "above chance" is a statistical claim, not a pixel one: the bar must clear
+  // 12n.1: what others report of this benchmark: dashed ticks, never bars
+  const refs = opts.refs || [];
   // the chance line by more than 1.96 standard errors to count
   const noisy = c => hasChance && (c.v - 1.96 * (c.se || 0)) <= info.chance;
   const above = hasChance ? rows.filter(r => !noisy(r.c)).length : 0;
@@ -4837,12 +5053,20 @@ function barPanel(task, models, opts) {
   const div = hasChance && state.accScale === 'chance';
   const dv  = c => (c.v - info.chance) / (1 - info.chance);
   const dse = c => (c.se || 0) / (1 - info.chance);
-  const front = info.frontier;
-
-  const W = 460, LBL = 150, PAD = 56, BH = 15, GAP = 7;
-  const TOP = (hasChance || (front && div)) ? 20 : 8;   // headroom for a rule label
+  // 12n.1: the frontier from what was imported, when it reports this benchmark
+  const front = opts.info ? null : frontierRef(task);
+  // 12n.1: a name wraps to two lines rather than being cut; one too long for
+  // two keeps what tells it from the others, never its end (shortNames)
+  const LINE = 24;
+  const labels = shortNames(shown.map(r => r.m.name), 2 * LINE);
+  const lines = new Map([...labels].map(([n, l]) => [n, wrap2(l, LINE)]));
+  const longest = Math.max(0, ...[...lines.values()].flat().map(x => x.length));
+  const W = 460, LBL = Math.max(150, Math.min(190, 12 + 6.6 * longest)), PAD = 56, BH = 15, GAP = 7;
+  const rowH = m => BH + GAP + ((lines.get(m.name) || []).length > 1 ? 11 : 0);
+  // headroom for a rule label, and a row for each reference tick's
+  const TOP = ((hasChance || (front && div)) ? 20 : 8) + 13 * refs.length;
   const plotW = W - LBL - PAD;
-  const H = shown.length * (BH + GAP) + TOP + 16;
+  const H = shown.reduce((a, r) => a + rowH(r.m), 0) + TOP + 16;
   let X, base, ticks, tickFmt;
   if (div) {
     // the axis runs from the worst model to perfect, so the frontier reference
@@ -4850,7 +5074,8 @@ function barPanel(task, models, opts) {
     // and only chipped in the raw one
     const fd = front ? dv({ v: front.v, se: 0 }) : 0;
     const dlo = Math.min(0, ...shown.map(r => dv(r.c) - dse(r.c))) * 1.08;
-    const dhi = Math.max(0.05, fd, ...shown.map(r => dv(r.c) + dse(r.c))) * 1.05;
+    const dhi = Math.max(0.05, fd, ...refs.map(r => dv(r)),
+      ...shown.map(r => dv(r.c) + dse(r.c))) * 1.05;
     X = v => LBL + plotW * (Math.max(dlo, Math.min(v, dhi)) - dlo) / (dhi - dlo);
     base = X(0);
     ticks = [];
@@ -4858,7 +5083,8 @@ function barPanel(task, models, opts) {
       ticks.push(+v.toFixed(4));
     tickFmt = v => (v > 0 ? '+' : '') + Math.round(100 * v) + '%';
   } else {
-    const maxv = Math.max(...shown.map(r => r.c.v + (r.c.se || 0)), info.chance || 0);
+    const maxv = Math.max(...shown.map(r => r.c.v + (r.c.se || 0)), ...refs.map(r => r.v),
+      info.chance || 0);
     // scale to the data, not to a fixed floor — gsm8k at 2% must not be squashed
     // into an axis drawn for 25%-chance tasks
     const hi = lower ? maxv * 1.15
@@ -4887,6 +5113,18 @@ function barPanel(task, models, opts) {
       fill: 'var(--muted)',
       text: 'chance ' + Math.round(100 * info.chance) + '%' }));
   }
+  // 12n.1: a reported number, a dashed tick across the panel and its label on
+  // a row of its own above: "Claude Opus 5 93.9 · Epoch"
+  refs.forEach((r, i) => {
+    const rx = div ? X(dv(r)) : X(r.v), ly = TOP - 13 * (refs.length - i - 1) - 5;
+    svg.append(el('svg:g', { class: 'reftick', 'data-ref': r.id, 'data-ref-v': String(r.v) },
+      el('svg:line', { x1: rx, y1: ly + 3, x2: rx, y2: H - 18, stroke: 'var(--axis)',
+        'stroke-width': 1.2, 'stroke-dasharray': '4 3' }),
+      el('svg:text', { x: rx + (rx > W / 2 ? -4 : 4), y: ly, 'font-size': 9.5,
+        fill: 'var(--text-secondary)', 'text-anchor': rx > W / 2 ? 'end' : 'start', text: r.label }),
+      el('svg:rect', { class: 'hit', x: rx - 5, y: ly - 9, width: 10, height: H - ly - 9,
+        fill: 'transparent', tabindex: 0, 'data-tip': JSON.stringify(r.tip) })));
+  });
   if (front && div) {
     const fx = X(dv({ v: front.v, se: 0 }));
     svg.append(el('svg:line', { x1: fx, y1: 14, x2: fx, y2: H - 18,
@@ -4904,8 +5142,10 @@ function barPanel(task, models, opts) {
       ? `M${x0},${yy} H${tip - r} q${r},0 ${r},${r} V${yy + h - r} q0,${r} -${r},${r} H${x0} Z`
       : `M${x0},${yy} H${tip + r} q${-r},0 ${-r},${r} V${yy + h - r} q0,${r} ${r},${r} H${x0} Z`;
   };
-  let y = TOP;
+  let y0 = TOP;
   for (const { m, c } of shown) {
+    // a two-line name: the bar sits in the middle of its two lines
+    const ex = rowH(m) - BH - GAP, y = y0 + ex / 2;
     const dim = noisy(c);                  // within noise of chance: still there, but quiet
     const isCk = m.source === 'artifact';  // hollow = uploaded checkpoint, same hue
     const vx = div ? X(dv(c)) : X(c.v);
@@ -4920,10 +5160,12 @@ function barPanel(task, models, opts) {
     // row tooltip, so the gutter is the constraint, not the information.
     // cut in the MIDDLE: "qwen35-delta-moe-…" named both checkpoints of one
     // run identically; their difference is at the end of the name
-    const name = midTrunc(m.name, 18);
-    svg.append(el('svg:text', { x: LBL - 8, y: y + BH * 0.75, 'font-size': 11.5,
-      fill: dim ? 'var(--muted)' : 'var(--text-secondary)', 'text-anchor': 'end', class: 'blab',
-      'data-model': m.id, 'data-full-name': m.name, text: name },
+    const ls = lines.get(m.name) || [midTrunc(m.name, 18)];
+    svg.append(el('svg:text', { x: LBL - 8, y: y0 + BH * 0.75 + (ls.length > 1 ? -1 : 0),
+      'font-size': 11.5, fill: dim ? 'var(--muted)' : 'var(--text-secondary)',
+      'text-anchor': 'end', class: 'blab', 'data-model': m.id, 'data-full-name': m.name,
+      'data-lines': String(ls.length) },
+      ...ls.map((t, i) => el('svg:tspan', { x: LBL - 8, dy: i ? 12.5 : 0, text: t })),
       el('svg:title', { text: m.name === m.id ? m.id : `${m.name}\n${m.id}` })));
     svg.append(el('svg:path', { class: 'bar', 'data-model': m.id,
       'data-hl': hs >= 0 ? String(hs) : null,
@@ -4965,10 +5207,10 @@ function barPanel(task, models, opts) {
     if (isCk) tipRows.push('uploaded checkpoint (local artifact)');
     if (lower && info.metric === 'bits_per_byte')
       tipRows.splice(1, 0, `cross-entropy ${num(c.v * Math.LN2, 3)} nats/byte`);
-    svg.append(el('svg:rect', { class: 'hit', x: 0, y: y - GAP / 2, width: W,
-      height: BH + GAP, tabindex: 0, 'data-model': m.id,
+    svg.append(el('svg:rect', { class: 'hit', x: 0, y: y0 - GAP / 2, width: W,
+      height: rowH(m), tabindex: 0, 'data-model': m.id,
       'data-tip': JSON.stringify(tipRows) }));
-    y += BH + GAP;
+    y0 += rowH(m);
   }
   panel.append(svg);
   if (rows.length > CAPN + 2)
@@ -4997,11 +5239,12 @@ function scoreBar(t, c) {
     svg.append(el('svg:line', { x1: X(i.chance), y1: 1, x2: X(i.chance), y2: H - 1,
       stroke: 'var(--muted)', 'stroke-width': 1, 'stroke-dasharray': '2 2' },
       el('svg:title', { text: `chance ${pct(i.chance)}` })));
-  if (!i.lower && i.frontier)
-    svg.append(el('svg:line', { x1: X(i.frontier.v), y1: 1, x2: X(i.frontier.v), y2: H - 1,
+  const fr = i.lower ? null : frontierRef(t);
+  if (fr)
+    svg.append(el('svg:line', { x1: X(fr.v), y1: 1, x2: X(fr.v), y2: H - 1,
       stroke: 'var(--axis)', 'stroke-width': 1.5 },
-      el('svg:title', { text: `frontier ${pct(i.frontier.v)} — ${i.frontier.src}, `
-        + `as of ${i.frontier.asof}; a different protocol from ours` })));
+      el('svg:title', { text: `frontier ${pct(fr.v)} — ${fr.src}`
+        + `${fr.asof ? ', as of ' + fr.asof : ''}; a different protocol from ours` })));
   return svg;
 }
 
@@ -6145,12 +6388,15 @@ function servedCompare(m) {
     ` loaded here: ${bits.join(' · ')}`);
 }
 // 12f.3: a GGUF file with no server — what it is, and where
+// 12n.1: and a served model's own file, registered as a GGUF too — one model,
+// each result with its own provenance
 function ggufHead(m) {
   const g = (G().registered || {})[m.id];
-  if (!g || g.served) return '';
+  if (!g || (g.served && !g.gguf_id)) return '';
   return el('div', { class: 'served-head', 'data-gguf-head': m.id },
     el('p', { class: 'small' }, el('span', { class: 'badge served', title: g.how, text: 'GGUF' }),
-      ' ', g.how),
+      ' ', g.gguf_id ? el('span', { 'data-gguf-joined': g.gguf_id, text: `Its file, measured `
+        + `by llama.cpp as ${g.name}${g.setup ? ` in ${g.setup}` : ''}: ${g.how}` }) : g.how),
     el('p', { class: 'small se', text: `${g.path}` + ((g.pin || {}).sha256
       ? ` · sha256 ${g.pin.sha256.slice(0, 12)}` : ' · its hash is recorded by the first job') }));
 }
@@ -7238,9 +7484,17 @@ function evdTestBtn(m, cls = 'ghost') {
 }
 
 // ---- #everyday: the models side by side ---------------------------------------
-function vEverydayPage() {
+function vEverydayPage(ms) {
   const E = evd(), qs = E.questions || [], groups = evdGroups();
-  const ids = Object.keys(E.models || {}).sort((a, b) => evdName(a).localeCompare(evdName(b)));
+  // 12n.1: the models chosen on Models or Benchmarks (the one choice, in the
+  // address), and up to three highlighted, as on Standard
+  const L = lbS();
+  const ids = Object.keys(E.models || {}).filter(id => !L.models || L.models.includes(id))
+    .sort((a, b) => evdName(a).localeCompare(evdName(b)));
+  const board = (ms || visible()), pick = L.models ? board.filter(m => L.models.includes(m.id))
+    : board;
+  const hl = (L.hl || []).filter(id => ids.includes(id)).slice(0, 3);
+  const picker = benchPick(board, pick.filter(m => ids.includes(m.id)), hl);
   const prov = ids.some(id => E.models[id].provisional);
   const run = LIVE ? el('button', { class: 'primary', 'data-everyday-run': '1',
     text: 'Run everyday tasks', onclick: () => evdDialog({ returnTo: '[data-everyday-run]' }) }) : '';
@@ -7260,6 +7514,9 @@ function vEverydayPage() {
             + 'are in each model\u2019s History, and in no score here.',
           text: `Questions updated ${evdDay(E.version.date)}` }) : ''),
       run));
+  if (!ids.length && L.models) return [head, picker, el('div', { class: 'card' },
+    empty('None of the chosen models has taken everyday tasks.', 'All models',
+      () => lbSet({ models: null }), { 'data-everyday-none-chosen': '1' })), evdBankCard()];
   if (!ids.length) {
     return [head, el('div', { class: 'card' }, empty('No model has taken everyday tasks yet.',
       LIVE ? 'Run everyday tasks' : '', () => evdDialog({ returnTo: '[data-empty-action]' }),
@@ -7280,7 +7537,9 @@ function vEverydayPage() {
   };
   const table = el('table', { class: 'evtable', 'data-everyday-table': '1' },
     el('thead', {}, el('tr', {}, el('th', { class: 'evq-th', text: 'Group' }),
-      ids.map(id => el('th', { class: 'evm-th', 'data-evd-model': id },
+      ids.map(id => el('th', { class: 'evm-th', 'data-evd-model': id,
+          'data-hl': hl.includes(id) ? String(hl.indexOf(id)) : null,
+          style: hl.includes(id) ? `box-shadow:inset 0 3px ${trColor(hl.indexOf(id))}` : null },
         DATA.models.some(x => x.id === id)
           ? el('a', { href: '#model=' + encodeURIComponent(id), text: evdName(id),
               onclick: ev => { ev.preventDefault(); navigate({ model: id, topic: null }); } })
@@ -7288,10 +7547,15 @@ function vEverydayPage() {
         el('span', { class: 'evm-count', 'data-evd-count': id }, evdTotal(E.models[id], id)),
         evdRanOut(E.models[id]))))),
     el('tbody', {}, groups.map(([g, label]) => el('tr', { 'data-evd-g': g },
+      // 12n.1: the group's name opens its practice questions side by side
       el('th', { scope: 'row', class: 'evq-cell' },
-        el('span', { class: 'evq-short', text: label }),
-        el('span', { class: 'evq-group', 'data-evd-group-split': g,
-          text: `${evdHidden(g)} hidden · ${evdPractice(g)} practice` })),
+        el('a', { class: 'evq-open', href: '#' + splitRead(location.hash)[0] + '&read=' + encRead(
+            { kind: 'group', id: g }), 'data-read-open': 'group:' + g,
+          onclick: ev => { if (ev.metaKey || ev.ctrlKey || ev.shiftKey) return;
+            ev.preventDefault(); openReader({ kind: 'group', id: g }, `[data-read-open="group:${g}"]`); } },
+          el('span', { class: 'evq-short', text: label }),
+          el('span', { class: 'evq-group', 'data-evd-group-split': g,
+            text: `${evdHidden(g)} hidden · ${evdPractice(g)} practice` }))),
       ids.map(id => cell(id, g))))));
   const panel = sel && (((E.models[sel.id] || {}).groups) || {})[sel.g]
     ? el('div', { class: 'evpanel', 'data-evd-panel': `${sel.id}|${sel.g}` },
@@ -7300,9 +7564,15 @@ function vEverydayPage() {
           el('span', { class: 'evgcount', text: evdGroupCount(E.models[sel.id], sel.g) }),
           el('button', { class: 'quiet', 'data-evd-panel-close': '1', text: '✕',
             'aria-label': 'close', onclick: () => { state.evdCell = null; render(); } })),
+        // 12n.1: what the number was, and what is below it
+        (() => { const e = E.models[sel.id], h = (e.groups || {})[sel.g] || {},
+          p = (e.practice || {})[sel.g] || { passed: 0, total: 0 };
+          return el('p', { class: 'small', 'data-evd-count-head': `${sel.id}|${sel.g}`,
+            text: `Scored: ${h.passed} of ${h.total} hidden (not shown) · Practice below: `
+              + `${p.passed} of ${p.total}` }); })(),
         evdGroupList(sel.id, sel.g))
     : '';
-  return [head, el('div', { class: 'card', 'data-everyday-results': '1' },
+  return [head, picker, el('div', { class: 'card', 'data-everyday-results': '1' },
     el('div', { class: 'lb-wrap', 'data-hkeep': 'everyday' }, table), panel), evdBankCard()];
 }
 
@@ -7396,6 +7666,255 @@ function readEveryday(wrap, r) {
   wrap._update = paint;             // a poll or a step repaints in place
 }
 
+// ===========================================================================
+// 12n.1: Benchmarks ▸ Everyday tasks, a group read side by side. Every
+// practice question of the group, each once, and beside it each chosen
+// model's answer: its mark, the check that decided it, and the whole answer
+// with the thinking folded. "Models disagree first" puts the questions they
+// split on at the top. The hidden half is its count and a line — for the
+// board's owner, an audit of it, after a warning, and logged. Each question
+// is edited where it is read: its impact first, then saved as a new version
+// of the bank, every answer marked again with no model run, and undoable
+// ===========================================================================
+const evdOwner = () => !!LIVE && !!evd().owner
+  && (whoName() || '').trim().toLowerCase() === String(evd().owner).toLowerCase();
+// the models a reader shows: the Models ▾ choice, or every one with answers
+function evdReaderModels() {
+  const L = lbS();
+  return Object.keys(evd().models || {}).filter(id => !L.models || L.models.includes(id))
+    .sort((a, b) => evdName(a).localeCompare(evdName(b)));
+}
+// what decided a mark, in a line: the check it failed, the judge's word, or every check
+function evdDecided(it, q) {
+  if (!it) return 'not asked';
+  if (it.no_answer || it.pass == null) return it.reason || 'not marked yet';
+  if (it.pass === false) return (it.failed || []).length ? `${it.failed[0].why} — the check: `
+    + `${it.failed[0].check}` + (it.failed.length > 1 ? ` (and ${it.failed.length - 1} more)` : '')
+    : it.reason;
+  return q.judged ? `the judge: ${it.reason}` : `every check passed: ${it.reason}`;
+}
+function evdSideCard(id, q, it, changed) {
+  const mk = evdMark(it);
+  return el('div', { class: 'evside-card', 'data-grp-answer': `${id}|${q.id}`,
+      'data-mark': changed ? 'changed' : mk.cls },
+    el('div', { class: 'evside-head' },
+      el('span', { class: 'evmark ' + (changed ? 'wait' : mk.cls), text: changed ? '↻' : mk.t,
+        'aria-label': changed ? 'changed' : mk.words }),
+      el('b', { title: id, text: evdName(id) })),
+    changed ? el('p', { class: 'small se', 'data-grp-changed': id,
+        text: 'changed, not re-asked yet: its answer was to the old words, and doesn’t count' })
+      : el('p', { class: 'small evside-why', 'data-grp-decided': id, text: evdDecided(it, q) }),
+    changed || !it || it.no_answer ? '' : el('div', { class: 'evans', 'data-grp-text': id,
+      text: it.answer_text || '(the model wrote nothing)' }),
+    !changed && it && it.had_reasoning ? el('details', { class: 'evthink' },
+      el('summary', { text: `thinking ▸ ${(it.reasoning_words || String(it.reasoning_text || '')
+        .split(/\s+/).filter(Boolean).length).toLocaleString('en')} words` }),
+      el('div', { class: 'evthink-t', text: it.reasoning_text || '' })) : '');
+}
+// the owner's audit: a warning, then the hidden half, logged by the server
+function evdAuditAsk(g, label) {
+  const back = el('div', { class: 'dlg-back', 'data-dialog': 'audit' });
+  const err = el('div', { class: 'warn', hidden: '', 'data-dialog-error': '1' });
+  const close = () => back.remove();
+  const go = el('button', { class: 'primary', 'data-audit-go': '1', text: 'Open it', onclick: async () => {
+    go.disabled = true;
+    try {
+      const L = lbS();
+      const data = await post('api/everyday/audit', { group: g, by: whoName(), confirm: true,
+        models: L.models || [] });
+      state.audit = { group: g, data };
+      close(); render();
+    } catch (e) { err.hidden = false; err.textContent = String(e.message || e); go.disabled = false; }
+  } });
+  back.append(el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true',
+      'aria-labelledby': 'audit-title', 'data-audit-dialog': g },
+    el('h2', { id: 'audit-title', text: `Open ${label}’s hidden half?` }),
+    el('p', { 'data-audit-warning': '1', text: AUDIT_WARNING }),
+    err, el('div', { class: 'dlg-actions' },
+      el('button', { 'data-dialog-cancel': '1', text: 'Cancel', onclick: close }), go)));
+  document.body.append(back);
+  go.focus();
+}
+const AUDIT_WARNING = 'These questions are the test. Don’t train on them or write questions '
+  + 'toward them. This opening is logged.';
+function readGroup(wrap, r) {
+  const paint = () => {
+    const E = evd(), g = r.id, label = (evdGroups().find(x => x[0] === g) || [, g])[1];
+    const ids = evdReaderModels();
+    const A = state.audit && state.audit.group === g ? state.audit.data : null;
+    if (state.audit && !A) state.audit = null;     // another group: the audit is over
+    const qs = A ? A.questions.map((q, i) => ({ ...q, n: i + 1, label: `hidden ${i + 1}`,
+      checks: q.describe, judged: !!q.rubric })) : evdQs(g);
+    const itemOf = (id, qid) => A ? (A.answers[id] || {})[qid] || null
+      : evdItem(E.models[id], qid);
+    const changedOf = (id, qid) => ((A ? A.changed[id] : (E.models[id] || {}).changed) || [])
+      .includes(qid);
+    const split = q => { const ps = ids.map(id => (itemOf(id, q.id) || {}).pass);
+      return ps.includes(true) && ps.includes(false); };
+    const dis = state.grpSort === 'disagree';
+    const order = dis ? [...qs.filter(split), ...qs.filter(q => !split(q))] : qs;
+    const nSplit = qs.filter(split).length;
+    wrap._title.textContent = A ? `${label} · the hidden half (audit)`
+      : `${label} · practice questions side by side`;
+    wrap._src.textContent = (A ? `${qs.length} hidden questions` : `${qs.length} practice · `
+      + `${evdHidden(g)} hidden, not shown`) + ` · ${ids.length} model${ids.length === 1 ? '' : 's'}`
+      + (lbS().models ? ', chosen on Models ▾' : '');
+    wrap._acts.replaceChildren(el('button', { class: 'ghost', 'data-grp-sort': dis ? 'disagree' : 'order',
+      'aria-pressed': String(dis), text: dis ? 'In the bank’s order' : `Models disagree first (${nSplit})`,
+      onclick: () => { state.grpSort = dis ? null : 'disagree'; paint(); } }));
+    const redo = ids.filter(id => qs.some(q => changedOf(id, q.id)));
+    wrap._body.replaceChildren(
+      A ? el('div', { class: 'warn audit-banner', 'data-audit-banner': g },
+        el('b', { text: 'The hidden half, opened for an audit. ' }), A.warning || AUDIT_WARNING,
+        ' ', el('button', { class: 'quiet', 'data-audit-close': '1', text: 'Close the audit',
+          onclick: () => { state.audit = null; paint(); } })) : '',
+      el('div', { class: 'frm grp-line' },
+        A ? '' : evdOwner() ? el('button', { class: 'secondary', 'data-audit-open': g,
+            text: 'Open the hidden half (audit)', onclick: () => evdAuditAsk(g, label) })
+          : el('span', { class: 'small se', 'data-grp-hidden-line': g,
+            text: `The ${evdHidden(g)} hidden ones score it and are not shown.` }),
+        LIVE && redo.length ? el('button', { class: 'quiet', 'data-grp-reask': String(redo.length),
+          text: `Re-ask changed questions (${redo.length} model${redo.length === 1 ? '' : 's'}) ▸`,
+          onclick: () => evdDialog({ models: redo, returnTo: '[data-grp-reask]' }) }) : ''),
+      ...order.map(q => el('section', { class: 'grpq', 'data-grp-q': q.id,
+          'data-grp-split': split(q) ? '1' : null },
+        el('div', { class: 'grpq-head' }, el('b', { text: q.label || q.id }),
+          q.edited ? el('span', { class: 'small se', 'data-grp-edited': q.id,
+            text: ` · edited ${evdDay(new Date(q.edited.at * 1000).toISOString().slice(0, 10))} `
+              + `by ${q.edited.by}: ${q.edited.why}` }) : '',
+          LIVE && (!A || evdOwner()) ? el('button', { class: 'quiet', 'data-qe-open': q.id,
+            text: (state.qedit || {}).id === q.id ? 'Editing ▾' : 'Edit',
+            onclick: () => qeOpen(q.id, paint) }) : ''),
+        el('blockquote', { class: 'evq', 'data-grp-prompt': q.id, text: q.prompt }),
+        q.reference ? el('p', { class: 'small' }, el('b', { text: 'Reference: ' }), q.reference) : '',
+        el('p', { class: 'small se', text: 'Checks: ' + (q.checks || []).join(' · ') }),
+        (state.qedit || {}).id === q.id ? qeForm(paint) : '',
+        el('div', { class: 'evside', 'data-grp-answers': q.id },
+          ids.map(id => evdSideCard(id, q, itemOf(id, q.id), changedOf(id, q.id)))))),
+      qs.length ? '' : el('p', { class: 'small', text: 'No questions here.' }));
+  };
+  paint();
+  wrap._update = () => { if (!document.activeElement || !document.activeElement.closest
+    || !document.activeElement.closest('[data-qe-form]')) paint(); };
+}
+// ---- 12n.1: edit a question where it is read ----
+async function qeOpen(id, paint) {
+  if ((state.qedit || {}).id === id) { state.qedit = null; paint(); return; }
+  if (!whoName()) { askName(); return; }
+  try {
+    const j = await api(`api/everyday/questions/${encodeURIComponent(id)}?by=`
+      + encodeURIComponent(whoName()));
+    const q = j.question;
+    state.qedit = { id, q, groups: j.groups, hist: j.history, msg: '', impact: null,
+      f: { prompt: q.prompt, reference: q.reference || '', checks: JSON.stringify(q.checks, null, 1),
+           rubric: q.rubric || '', group: q.group, half: q.half }, why: '' };
+  } catch (e) { toast(String(e.message || e), { key: 'qe' }); return; }
+  paint();
+}
+// what the form changes, in the order the server applies it (checks before rubric)
+function qeChanges() {
+  const Q = state.qedit, q = Q.q, f = Q.f, out = {};
+  if (f.prompt.trim() !== q.prompt) out.prompt = f.prompt;
+  if (f.reference.trim() !== (q.reference || '')) out.reference = f.reference;
+  let same = false;
+  try { same = JSON.stringify(JSON.parse(f.checks)) === JSON.stringify(q.checks); } catch (e) { /* its error is the server's to say */ }
+  if (!same) out.checks = f.checks;
+  if (q.rubric != null && f.rubric.trim() !== q.rubric) out.rubric = f.rubric;
+  if (f.group !== q.group) out.group = f.group;
+  if (f.half !== q.half) out.half = f.half;
+  return out;
+}
+async function qeDo(what, paint) {
+  const Q = state.qedit;
+  const url = `api/everyday/questions/${encodeURIComponent(Q.id)}/${what}`;
+  Q.msg = ''; Q.busy = what; paint();
+  try {
+    const j = await post(url, { changes: qeChanges(), why: Q.why, by: whoName() });
+    if (what === 'impact') { Q.impact = j; Q.busy = null; paint(); return; }
+    const saved = j.edit || {};
+    toast(`${what === 'retire' ? 'Retired' : what === 'undo' ? 'Undone' : 'Saved'} — edit #${saved.n}`
+      + ` · ${j.remarked} model${j.remarked === 1 ? '' : 's'} marked again, no model run`
+      + (j.sent ? ` · ${j.sent} answer${j.sent === 1 ? '' : 's'} to the judge` : '')
+      + (j.note ? ` · ${j.note}` : ''), { key: 'qe', ms: 9000 });
+    state.qedit = null;
+    if (state.audit) state.audit = null;         // its text is the old one: open it again
+    await refreshResults();
+  } catch (e) { Q.msg = String(e.message || e); Q.busy = null; }
+  paint();
+}
+function qeForm(paint) {
+  const Q = state.qedit, f = Q.f, q = Q.q;
+  const area = (k, label, rows) => [el('label', { for: 'qe-' + k, text: label }),
+    el('textarea', { id: 'qe-' + k, 'data-qe': k, rows: String(rows), 'data-keep': 'qe-' + k,
+      oninput: e => { f[k] = e.target.value; Q.impact = null; } }, f[k])];
+  const hidden = q.half === 'report';
+  const undo = (Q.hist || []).find(h => h.action !== 'undo' && !h.undone);
+  return el('div', { class: 'qeform', 'data-qe-form': Q.id },
+    el('div', { class: 'srvform' },
+      ...area('prompt', 'Question', 3), ...area('reference', 'Reference', 2),
+      ...(q.rubric != null ? area('rubric', 'The judge’s rubric', 4) : []),
+      ...area('checks', 'Checks (JSON)', 6),
+      el('label', { for: 'qe-group', text: 'Group' }),
+      el('select', { id: 'qe-group', 'data-qe': 'group', onchange: e => { f.group = e.target.value;
+          Q.impact = null; } },
+        (Q.groups || []).map(([k, v]) => el('option', { value: k, selected: k === f.group ? '' : null,
+          text: v }))),
+      el('label', { for: 'qe-half', text: 'Half' }),
+      hidden ? el('select', { id: 'qe-half', 'data-qe': 'half', onchange: e => { f.half = e.target.value;
+          Q.impact = null; } },
+        el('option', { value: 'report', selected: f.half === 'report' ? '' : null, text: 'hidden' }),
+        el('option', { value: 'diagnose', selected: f.half === 'diagnose' ? '' : null,
+          text: 'practice — this reveals it' }))
+        : el('span', { class: 'small se', 'data-qe-half': 'practice', text: 'practice — it has been '
+          + 'seen, so it can’t be made hidden' }),
+      el('label', { for: 'qe-why', text: 'Why' }),
+      el('input', { id: 'qe-why', 'data-qe': 'why', value: Q.why, 'data-keep': 'qe-why',
+        placeholder: 'the reason, kept with the edit', autocomplete: 'off',
+        oninput: e => { Q.why = e.target.value; } })),
+    Q.impact ? el('p', { class: 'small', 'data-qe-impact': JSON.stringify({ answers: Q.impact.answers,
+      flips: Q.impact.flips.length, judge: Q.impact.judge.length, unasked: Q.impact.unasked.length }),
+      text: Q.impact.line }) : '',
+    Q.msg ? el('p', { class: 'warn', 'data-qe-error': '1', text: Q.msg }) : '',
+    el('div', { class: 'frm' },
+      el('button', { class: 'secondary', 'data-qe-impact-btn': '1', disabled: Q.busy ? '' : null,
+        text: 'Show the impact', onclick: () => qeDo('impact', paint) }),
+      el('button', { class: 'primary', 'data-qe-save': '1', disabled: Q.busy ? '' : null,
+        text: 'Save', onclick: () => qeDo('edit', paint) }),
+      el('button', { class: 'quiet', 'data-qe-retire': '1', disabled: Q.busy ? '' : null,
+        text: 'Retire it', onclick: () => qeDo('retire', paint) }),
+      el('button', { class: 'quiet', 'data-qe-cancel': '1', text: 'Cancel',
+        onclick: () => { state.qedit = null; paint(); } })),
+    (Q.hist || []).length ? el('div', { class: 'small', 'data-qe-history': String(Q.hist.length) },
+      el('b', { text: 'Its edits' }),
+      el('ul', {}, Q.hist.map(h => el('li', { 'data-qe-hist': String(h.n) },
+        `#${h.n} ${h.action}${h.undone ? ' (undone)' : ''} · `
+          + `${new Date(h.at * 1000).toISOString().slice(0, 16).replace('T', ' ')} · ${h.by}: ${h.why}`
+          + ((h.what || []).length ? ` · ${h.what.join(', ')}` : ''),
+        undo && undo.n === h.n ? [' ', el('button', { class: 'quiet', 'data-qe-undo': String(h.n),
+          text: 'Undo', onclick: () => qeDo('undo', paint) })] : '')))) : '');
+}
+// Data & sources: every opening of a hidden half
+function auditsCard() {
+  if (!LIVE) return '';
+  const A = state.audits = state.audits || { loaded: false };
+  if (!A.loaded && !A.loading && netReady()) {
+    A.loading = true;
+    api('api/everyday/audits').then(j => { A.list = j.audits; })
+      .catch(() => { A.list = null; })
+      .finally(() => { A.loading = false; A.loaded = true; render(); });
+  }
+  const names = Object.fromEntries(evdGroups());
+  return el('div', { class: 'card', 'data-audits': A.loaded ? String((A.list || []).length) : 'loading' },
+    el('h2', { text: 'The hidden half, opened' }),
+    el('p', { class: 'sub', text: 'Every time an Everyday group’s hidden half was opened for an '
+      + 'audit: the board’s owner only, after a warning. Those questions are the test.' }),
+    !A.loaded ? skeleton(2) : !(A.list || []).length
+      ? el('p', { class: 'small', text: 'Nobody has opened a hidden half.' })
+      : el('ul', { class: 'small' }, A.list.map(a => el('li', { 'data-audit-row': String(a.id) },
+        `${a.by} · ${new Date(a.at * 1000).toISOString().slice(0, 16).replace('T', ' ')} · `
+          + `${names[a.group] || a.group} · ${a.n} question${a.n === 1 ? '' : 's'}`))));
+}
+
 // ---- Run everyday tasks ----------------------------------------------------------
 function evdDialog(pre = {}) {
   const board = DATA.models.filter(m => m.kind === 'instruct').map(m => m.id);
@@ -7403,8 +7922,11 @@ function evdDialog(pre = {}) {
     .sort((a, b) => evdName(a).localeCompare(evdName(b)))];
   // 12i.0: a model's own "Run" ticks that model alone
   if (pre.only && !ids.includes(pre.only)) ids.push(pre.only);
+  // 12n.1: Re-ask changed questions ticks the models with one
+  for (const id of pre.models || []) if (!ids.includes(id)) ids.push(id);
   // 12a.5: and the ones with questions not asked yet — a run asks them only those
   const pick = Object.fromEntries(ids.map(id => [id, pre.only ? id === pre.only
+    : pre.models ? pre.models.includes(id)
     : EVD_DEFAULTS.includes(id) && (!evdOf(id) || evdOf(id).unasked > 0)]));
   const back = el('div', { class: 'dlg-back', 'data-dialog': 'everyday' });
   const err = el('div', { class: 'warn', hidden: '', 'data-dialog-error': '1' });
@@ -7510,7 +8032,7 @@ function viewHash(v) {
       + (v === 'pipeline' && state.imp.model ? '&model=' + encodeURIComponent(state.imp.model)
         : '')
       // 12m.1: the models chosen (Models' own choice) and the highlighted ones
-      + (v === 'tasks' ? benchHash() : '');
+      + (['tasks', 'everyday', 'exam'].includes(v) ? benchHash() : '');
   return 'tab=' + (PAGE_SLUG[v] || v);
 }
 function benchHash() {
@@ -7544,11 +8066,12 @@ function viewOfHash(name, params) {
   }
   if (n === 'improve') v = sub || 'pipeline';
   if (n === 'benchmarks') v = ['tasks', 'exam', 'everyday'].includes(sub) ? sub : benchSub();
-  if (v === 'tasks') {
+  // 12n.1: Everyday tasks and the Knowledge exam follow the same choice
+  if (['tasks', 'everyday', 'exam'].includes(v)) {
     // 12m.1: the chosen models and the highlighted ones, from the address
     const L = lbS(), ids = new Set(((DATA || {}).models || []).map(m => m.id));
-    const list = k => [...new Set((p.get(k) || '').split(',').map(x => x.trim())
-      .filter(id => id && (!DATA || ids.has(id))))];
+    const list = k => [...new Set((p.get(k) || '').split(',').map(x => canonId(x.trim()))
+      .filter(id => id && (!DATA || ids.has(id) || id.startsWith('reported/'))))];
     const chosen = list('models'), hl = list('hl').slice(0, 3);
     L.models = chosen.length ? chosen : null;
     L.hl = hl.length ? hl : null;
@@ -7573,7 +8096,8 @@ function routeFromHash() {
   state.read = rd;
   const h = decodeURIComponent(rest);
   const m = /^model=(.+)$/.exec(h);
-  if (m && DATA.models.some(x => x.id === m[1])) { state.model = m[1]; state.topic = null; return; }
+  if (m && DATA.models.some(x => x.id === canonId(m[1]))) {
+    state.model = canonId(m[1]); state.topic = null; return; }
   state.model = null;
   // a topic page is the loop for one topic — deep-linkable, because it is the
   // page a person is sent to when someone says "look at law". 12b: it sits
@@ -8349,7 +8873,9 @@ function aboutBenchmarks(tasks, inline = false) {
 const LB_CHIPS = [
   ['all', 'All tasks'], ['knowledge', 'Knowledge'], ['commonsense', 'Commonsense'],
   ['reasoning', 'Reasoning'], ['math', 'Math'], ['trust', 'Trust & safety'],
-  ['instruction', 'Instruction & maths'], ['lm', 'Language modelling']];
+  ['instruction', 'Instruction & maths'], ['lm', 'Language modelling'],
+  // 12n.1: the home of reported scores (live: the frozen report carries none)
+  ['frontier', 'Frontier · reported']];
 // the four kinds of test, named the same and in the same order everywhere.
 // A kind with no data yet is not offered: On phone (12f.2) once a phone build
 // is registered
@@ -8493,11 +9019,13 @@ function lbFromHash(rest) {
   const unalias = Object.fromEntries(Object.entries(LB_ALIAS).map(([k, v]) => [v, k]));
   L.cols = L.view === 'standard' ? lbKnownCols(list('cols').map(t => unalias[t] || t)) : null;
   const ids = new Set(((DATA || {}).models || []).map(m => m.id));
-  const ms = list('models').filter(id => !DATA || ids.has(id) || id.startsWith('reported/'));
+  const ms = list('models').map(canonId).filter(id => !DATA || ids.has(id)
+    || id.startsWith('reported/'));
   L.models = ms.length ? [...new Set(ms)] : null;
   // 12m.1: the compared models, as the address names them, at most eight
   if (L.view === 'compare')
-    L.cmp = [...new Set(list('m').filter(id => !DATA || ids.has(id) || id.startsWith('reported/')))]
+    L.cmp = [...new Set(list('m').map(canonId).filter(id => !DATA || ids.has(id)
+      || id.startsWith('reported/')))]
       .slice(0, CMP_TOP);
 }
 // ---- 12h.2: a table you build ----------------------------------------------
@@ -8558,6 +9086,11 @@ const benchName = t => isGgufKey(t) ? `${ggufLabel(t.slice(5))} (GGUF)`
 // Its own columns, its own data (DATA.gguf), never DATA.cells: nothing that
 // averages or ranks the lm_eval columns can reach them
 const G = () => DATA.gguf || {};
+// 12n.1: an id that is another model's now — a GGUF entry joined to the
+// served model of the same file — so an old link or saved view opens the one
+const canonId = id => ((DATA || {}).sameAs || {})[id] || id;
+// the GGUF entry a model's GGUF is measured as: its own, or the one joined to it
+const ggufIdOf = id => ((G().registered || {})[id] || {}).gguf_id || id;
 const isGgufKey = t => String(t).startsWith('gguf:');
 const ggufOf = (id, b) => ((G().models || {})[id] || {})[b] || null;
 const ggufHas = id => !!Object.keys((G().models || {})[id] || {}).length;
@@ -8823,8 +9356,8 @@ function lbColumns(ms) {
     // got another number and took this one for wrong
     lead[3] = { key: 'cavg', label: state.avgMode === 'raw' ? 'Avg, raw' : 'Avg above chance',
       num: true, group: '', unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' };
-    return [...lead, ...L.cols.map(t => isGgufKey(t) ? ggufCol(t.slice(5)) : task(t)),
-      ...repCols(lbFilter(ms)), ...repCols2(lbFilter(ms)), ...tail];
+    // 12n.1: only what was chosen — never a column nobody chose
+    return [...lead, ...L.cols.map(t => isGgufKey(t) ? ggufCol(t.slice(5)) : task(t)), ...tail];
   }
   let mid;
   if (L.chip === 'all') {
@@ -8862,8 +9395,7 @@ function lbColumns(ms) {
   }
   // 12f.2b: and, on All tasks, what was reported from the phone while a row
   // shown has it
-  return [...lead, ...mid, ...(L.chip === 'all' ? [...repCols(lbFilter(ms)),
-    ...repCols2(lbFilter(ms))] : []), ...tail];
+  return [...lead, ...mid, ...(L.chip === 'all' ? repCols(lbFilter(ms)) : []), ...tail];
 }
 
 // 11f: one word per column name; the long ones are the tooltip's
@@ -8876,8 +9408,6 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
 // scale went (11f).
 function lbColTip(c) {
   const scale = state.avgMode === 'raw' ? 'raw accuracy' : 'above chance';
-  if (c.rep2) return [`${c.label} — reported by ${repSrc(c.rep2).name}`, repSrc(c.rep2).credit,
-    'never measured here: never in an average or a rank'];
   if (c.rep) return [`${c.label} — ${c.unit}, measured on the phone and reported by whoever `
     + 'measured it', 'the board never measures a phone; never in any average'];
   if (c.gguf) {
@@ -8998,7 +9528,7 @@ function lbLeaders(cols, val) {
   const out = {};
   for (const c of cols) {
     // 12f.2b: a reported number is shown, never ranked against the others
-    if (!c.num || c.key === 'params' || c.rep || c.rep2) continue;
+    if (!c.num || c.key === 'params' || c.rep) continue;
     // provisional scores are never tinted: a judged column is on the board
     // only once the judge is calibrated, and a model whose judge is not ok
     // has no judged cell to tint
@@ -9109,7 +9639,8 @@ const repSrc = s => (REP().sources || {})[s] || { name: REP_NAMES[s] || s, credi
 // a model known only by what others report, as a row: never ranked, no average
 function repOnly() {
   return (REP().models || []).filter(m => !m.measured).map(m => ({ id: m.id, name: m.name,
-    family: m.maker || 'reported', maker: m.maker || '', kind: 'reported', reportedOnly: true,
+    family: m.maker || 'reported', maker: m.maker || '', makerAs: m.maker_as || m.maker || '',
+    kind: 'reported', reportedOnly: true,
     source: 'reported', params: null, tainted: [], avg: null, avgRaw: null, official: false,
     missing: [], date: null }));
 }
@@ -9133,39 +9664,89 @@ const REP_SAME = { mmlu: ['mmlu'], mmlu_pro: ['mmlu-pro', 'mmlu pro'], hendrycks
   truthfulqa_mc2:
   ['truthfulqa'], ifeval: ['ifeval'], piqa: ['piqa'] };
 const repSame = (t, b) => (REP_SAME[t] || []).includes(String(b).toLowerCase().trim());
-function repPanels(t, ms, hl) {
-  const out = [];
-  for (const source of Object.keys(REP().sources || {})) {
-    const cells = new Map();
-    for (const m of ms) {
-      const s = repOf(m.id, source).find(x => repSame(t, x.benchmark));
-      if (s) cells.set(m.id, s);
-    }
-    if (!cells.size) continue;
-    const any = [...cells.values()][0];
-    const settings = [...new Set([...cells.values()].map(s => s.setting))];
-    out.push(barPanel('rep:' + source + ':' + t, ms, { lower: false, hl,
-      key: `rep:${source}:${t}`, label: `${any.benchmark} · reported by ${repSrc(source).name}`,
-      method: (settings.length === 1 ? repTag(any) : `reported by ${repSrc(source).name} · `
-        + 'MIXED settings!') + ` · ${repSrc(source).credit}`,
-      credit: repSrc(source).credit, info: { chance: null },
-      get: m => { const s = cells.get(m.id);
-        return s && s.unit !== 'points' ? { v: s.value, se: 0, shots: null, n: null } : null; } }));
-  }
-  return out;
+// 12n.1: what others report of a benchmark measured here — dashed reference
+// ticks on its panel, never bars: "Claude Opus 5 93.9 · Epoch". The chosen
+// models' (Models ▾), or the three best reported when none is chosen
+function frRefs(t) {
+  if (!LIVE) return [];
+  const L = lbS(), by = new Map();
+  const all = (REP().scores || []).filter(s => s.unit !== 'points' && repSame(t, s.benchmark)
+    && (!L.models || L.models.includes(s.model))).sort((a, b) => frRank(a) - frRank(b));
+  for (const s of all) if (!by.has(s.model)) by.set(s.model, s);
+  const refs = [...by.values()].sort((a, b) => b.value - a.value).slice(0, L.models ? 6 : 3);
+  return refs.map(s => { const name = (anyModel(s.model) || { name: s.model }).name;
+    return { v: s.value, id: s.model, label: `${name} ${repShow(s)} · ${REP_SHORT[s.source] || s.source}`,
+      tip: [`${name} ${repShow(s)}`, repTag(s), repSrc(s.source).credit, ...(s.url ? [s.url] : []),
+        'reported, not measured here: a reference, never ranked with the bars'] }; });
+}
+// 12n.1: the "frontier" chip of a benchmark measured here: the best number
+// imported for the same benchmark, instead of the one written into the build
+// (which stays where nothing is imported)
+function frontierRef(t) {
+  const s = LIVE ? (REP().scores || []).filter(x => x.unit !== 'points' && repSame(t, x.benchmark))
+    .sort((a, b) => b.value - a.value)[0] : null;
+  if (s) return { v: s.value, asof: s.date || repSrc(s.source).imported || '',
+    src: `${(anyModel(s.model) || { name: s.model }).name}, ${repTag(s)} · ${repSrc(s.source).credit}` };
+  return (DATA.tasks[t] || {}).frontier || null;
+}
+// 12n.1: Benchmarks ▸ Standard's Frontier group: a panel for each of the
+// Frontier view's default benchmarks, its bars the setting most of its
+// numbers share (a number measured another way is in the Frontier view)
+function frPanels(hl) {
+  if (!LIVE || !state.rep.loaded) return '';
+  const cols = frColumns().filter(c => c.dflt), rows = frRows(cols);
+  const panels = cols.flatMap(c => {
+    const cells = rows.map(r => [r.m, frCell(r.m, c).rep]).filter(([, x]) => x && x.unit !== 'points');
+    if (!cells.length) return [];
+    const n = {};
+    cells.forEach(([, x]) => { const k = x.source + '|' + x.setting; n[k] = (n[k] || 0) + 1; });
+    const main = Object.keys(n).sort((a, b) => n[b] - n[a])[0];
+    const mine = new Map(cells.filter(([, x]) => x.source + '|' + x.setting === main)
+      .map(([m, x]) => [m.id, x]));
+    const any = [...mine.values()][0], other = cells.length - mine.size;
+    return [barPanel('fr:' + c.key, rows.map(r => r.m).filter(m => mine.has(m.id)), { lower: false,
+      hl, key: 'fr:' + c.key, label: c.name, info: { chance: null }, credit: repSrc(any.source).credit,
+      method: repTag(any) + (other ? ` · ${other} more reported another way, in the Frontier view`
+        : ''),
+      get: m => { const x = mine.get(m.id);
+        return x ? { v: x.value, se: x.se || 0, shots: null, n: null } : null; } })];
+  });
+  if (!panels.length) return '';
+  return el('div', { 'data-frontier-panels': String(panels.length) },
+    el('h3', { class: 'domhead' }, 'Frontier · reported',
+      el('span', { class: 'se', text: ` · ${panels.length} benchmark${panels.length > 1 ? 's' : ''} · `
+        + frCredit() })),
+    el('div', { class: 'panels' }, panels));
 }
 // the Compare groups, one a source: "Reported · Epoch AI", its credit in the head
+// 12n.1: only the benchmarks another chosen model has too (reported, or
+// measured here), the most shared first; Show all N brings the rest. With
+// only reported models chosen, the Frontier view's default set
 function repCmpGroups(ms) {
+  const cols = frColumns(), colOf = b => cols.find(c => c.key === frKey(b)) || {};
+  const has = (m, b) => (REP().scores || []).some(s => s.model === m.id
+    && frKey(s.benchmark) === frKey(b)) || (!m.reportedOnly && (colOf(b).here || [])
+    .some(h => h.get(m)));
+  const count = b => ms.filter(m => has(m, b)).length;
+  const onlyRep = ms.every(m => m.reportedOnly);
+  const all_ = state.cmpRepAll = state.cmpRepAll || {};
   return Object.keys(REP().sources || {}).map(source => {
-    const bench = [...new Set(ms.flatMap(m => repOf(m.id, source).map(s => s.benchmark)))].sort(natCmp);
+    const every = [...new Set(ms.flatMap(m => repOf(m.id, source).map(s => s.benchmark)))];
+    const keep = b => onlyRep ? !!colOf(b).dflt : count(b) >= 2;
+    const bench = (all_[source] ? every : every.filter(keep))
+      .sort((a, b) => count(b) - count(a) || natCmp(a, b));
     return { key: 'rep:' + source, name: `Reported · ${repSrc(source).name}`,
-      credit: repSrc(source).credit, rows: bench.map(b => ({ key: `rep:${source}:${b}`, label: b,
+      credit: repSrc(source).credit,
+      more: every.length > bench.length || all_[source] ? { n: every.length, open: !!all_[source],
+        toggle: () => { all_[source] = !all_[source]; render(); } } : null,
+      rows: bench.map(b => ({ key: `rep:${source}:${b}`, label: b,
         fmt: (REP().scores || []).some(s => s.source === source && s.benchmark === b
           && s.unit === 'points') ? 'n1' : null,
         get: m => {
           const s = repOf(m.id, source).find(x => x.benchmark === b);
+          // the credit is the group's, once, in its head
           return s ? { v: s.value, se: s.se ?? null, tag: repTag(s),
-            tip: [repSrc(source).credit, s.url, s.date ? 'as of ' + s.date : '',
+            tip: [s.url, s.date ? 'as of ' + s.date : '',
               s.by ? 'entered by ' + s.by : ''].filter(Boolean).join(' · ') } : null;
         } })) };
   });
@@ -9244,28 +9825,282 @@ function outsideCard() {
             A.target = e.target.value; } })),
       el('div', { class: 'frm' }, alias, actNote('rep-alias'))));
 }
-// Models' own columns for them: "Reported · Epoch AI", a benchmark a column,
-// only while a row shown has one — never a leader, never deciding a row
-function repCols2(rows) {
-  if (!LIVE) return [];
-  return Object.keys(REP().sources || {}).flatMap(source => {
-    const bench = [...new Set(rows.flatMap(m => repOf(m.id, source).map(x => x.benchmark)))]
-      .sort(natCmp);
-    return bench.map(b => ({ key: `rep2:${source}:${b}`, rep2: source, bench: b, label: b,
-      short: midTrunc(b, 14), num: true, group: `Reported · ${repSrc(source).name}`,
-      unit: 'reported' }));
-  });
+// ===========================================================================
+// 12n.1: Models ▸ Frontier · reported — the home of reported scores. The
+// reported models by maker, and ours beside them where the board measures the
+// same benchmark. A column a benchmark, grouped by what it tests; a cell a
+// plain number, its source, setting and link in its tooltip. Bold and the
+// tint compare only the cells of one setting — Epoch AI's own runs with each
+// other, one outside source with itself, ours (measured here, tagged with
+// how) with ours — never across them. Nothing here is averaged.
+// ===========================================================================
+const FR_GROUPS = [
+  ['Knowledge & reasoning', [/^gpqa\b/, /humanity.s last exam|^hle\b/, /^simpleqa/]],
+  ['Maths', [/otis|mock aime/, /^frontiermath/]],
+  ['Coding & agents', [/^swe-?bench verified/, /^terminal.?bench/, /^deepswe/]],
+  ['Puzzles & games', [/^arc-?agi/, /^simplebench/, /^chess puzzles?/]]];
+// one benchmark by its name across sources: "GPQA diamond" is "GPQA Diamond"
+const frKey = b => String(b || '').toLowerCase().replace(/\s+/g, ' ').trim();
+function frPlace(name) {
+  const k = frKey(name);
+  for (let g = 0; g < FR_GROUPS.length; g++) {
+    const i = FR_GROUPS[g][1].findIndex(r => r.test(k));
+    if (i >= 0) return [g, i, FR_GROUPS[g][0]];
+  }
+  return [FR_GROUPS.length, 0, 'Other'];
 }
-const repVal2 = (m, c) => { const x = repOf(m.id, c.rep2).find(y => y.benchmark === c.bench);
-  return x ? x.value : null; };
-function rep2Cell(m, c) {
-  const x = repOf(m.id, c.rep2).find(y => y.benchmark === c.bench);
-  if (!x) return el('td', { class: 'num se', text: '' });
-  return el('td', { class: 'num tcell', 'data-rep2-cell': c.key,
-      'data-tip': JSON.stringify([`${repShow(x)} · ${m.name} · ${x.benchmark}`, repTag(x),
-        repSrc(x.source).credit, ...(x.url ? [x.url] : []), 'never measured here: never in an '
-        + 'average or a rank']) },
-    repShow(x), el('div', { class: 'small se rep-by', text: repSrc(x.source).name }));
+// a reported number's setting: its source's own run, or one it took from elsewhere
+const repOwn = s => /own run$/.test(s.setting || '');
+const repElse = s => /^from /.test(s.setting || '');
+const FR_SRC = ['epoch', 'aa', 'card'];
+const frRank = s => 2 * Math.max(0, FR_SRC.indexOf(s.source)) + (repOwn(s) ? 0 : 1);
+const REP_SHORT = { epoch: 'Epoch', aa: 'AA', card: 'card' };
+// a reported benchmark the board measures too: its measured cells, each
+// tagged with how it was asked here
+function frHere(name) {
+  return DATA.accTasks.filter(t => repSame(t, name)).map(t => ({ key: t,
+    get: m => { const c = cell(t, m.id);
+      return c ? { v: c.v, se: c.se || null, tag: 'measured here · lm_eval, '
+        + (c.shots != null ? `${c.shots}-shot` : 'n-shot unknown') } : null; } }));
+}
+const caps = s => (String(s).match(/[A-Z]/g) || []).length;
+// every reported benchmark: its name, its group, how many imported models
+// have it, and whether it is one of the defaults — reported for at least
+// half the imported models, or measured here too
+function frColumns() {
+  const R = REP(), by = new Map();
+  for (const s of R.scores || []) {
+    const k = frKey(s.benchmark);
+    if (!by.has(k)) by.set(k, { key: k, names: {}, models: new Set() });
+    const c = by.get(k);
+    c.names[s.benchmark] = (c.names[s.benchmark] || 0) + 1;
+    c.models.add(s.model);
+  }
+  const n = (R.models || []).length;
+  return [...by.values()].map(c => {
+    const name = Object.keys(c.names).sort((a, b) => caps(b) - caps(a)
+      || c.names[b] - c.names[a])[0];
+    const here = frHere(name);
+    const measured = DATA.models.some(m => here.some(h => h.get(m)));
+    const [g, i, group] = frPlace(name);
+    return { key: c.key, name, group, g, i, here, n: c.models.size, measured,
+      dflt: 2 * c.models.size >= n || measured };
+  }).sort((a, b) => a.g - b.g || a.i - b.i || b.n - a.n || natCmp(a.name, b.name));
+}
+// a model's cell in a column: its reported numbers (the source's own run
+// first) and its number measured here
+function frCell(m, c) {
+  const reps = (REP().scores || []).filter(s => s.model === m.id && frKey(s.benchmark) === c.key)
+    .sort((a, b) => frRank(a) - frRank(b));
+  const here = m.reportedOnly ? null : c.here.map(h => h.get(m)).find(Boolean) || null;
+  return { rep: reps[0] || null, reps, here };
+}
+// the rows: every reported model, by maker, and each model of ours with a
+// number in a column shown — only the chosen ones when Models ▾ chooses
+function frRows(cols) {
+  const L = lbS(), R = REP(), only = repOnly();
+  const rows = [];
+  for (const rm of R.models || []) {
+    const m = rm.measured ? DATA.models.find(x => x.id === rm.id) : only.find(x => x.id === rm.id);
+    // a model of ours reported elsewhere too is ours, under its maker when one is named
+    if (m) rows.push({ m, maker: rm.maker || (rm.measured ? null : 'other'),
+      makerAs: rm.maker_as || rm.maker || '' });
+  }
+  const seen = new Set(rows.map(r => r.m.id));
+  for (const m of DATA.models)
+    if (!seen.has(m.id) && !m.rowOf && cols.some(c => c.here.some(h => h.get(m))))
+      rows.push({ m, maker: null, makerAs: '' });
+  return L.models ? rows.filter(r => L.models.includes(r.m.id)) : rows;
+}
+// the leaders of a column: within one setting only, the best and those within
+// its noise (their errors, where both have one) — "id|rep" or "id|here"
+function frLeaders(rows, c) {
+  const pools = {};
+  const add = (k, x) => { (pools[k] = pools[k] || []).push(x); };
+  for (const r of rows) {
+    const x = frCell(r.m, c);
+    if (x.rep) add('rep|' + x.rep.source + '|' + x.rep.setting,
+      { k: r.m.id + '|rep', v: x.rep.value, se: x.rep.se ?? null });
+    if (x.here) add('here|' + x.here.tag, { k: r.m.id + '|here', v: x.here.v, se: x.here.se });
+  }
+  const lead = new Set();
+  for (const pool of Object.values(pools)) {
+    if (pool.length < 2) continue;
+    pool.sort((a, b) => b.v - a.v);
+    const best = pool[0];
+    for (const x of pool)
+      if (x === best || (x.se != null && best.se != null && x.se + best.se > 0
+          && Math.abs(best.v - x.v) / Math.sqrt(x.se * x.se + best.se * best.se) <= 1.96))
+        lead.add(x.k);
+  }
+  return lead;
+}
+// the credit, once: "Data: Epoch AI, CC BY 4.0 · imported 28 Sep"
+function frCredit() {
+  const R = REP(), used = new Set((R.scores || []).map(s => s.source));
+  return ['epoch', 'aa', 'card'].filter(s => used.has(s)).map(s => {
+    const x = repSrc(s);
+    return s === 'card' ? 'Model cards and papers, as typed in on AI models'
+      : x.credit + (x.imported ? ` · imported ${evdDay(x.imported)}` : '');
+  }).join(' · ');
+}
+const FR_CAL = 'Same questions, different prompt and settings. A large gap means our method '
+  + 'differs, not the model.';
+function lbFrontier(ms) {
+  const L = lbS(), F = state.fr = state.fr || { all: false, sort: null };
+  const card = el('div', { class: 'card', 'data-lb-card': '1', 'data-frontier': '1' },
+    ...modelsHead(), lbToolbar(ms, lbColumns(ms), new Set(), 0));
+  if (!state.rep.loaded) {
+    card.append(el('p', { class: 'small se', 'data-frontier-loading': '1',
+      text: 'Loading what others report…' }));
+    return [card];
+  }
+  const every = frColumns();
+  if (!every.length) {
+    card.append(empty('Nothing reported yet: AI models ▸ Outside data ▸ Import now reads Epoch '
+      + 'AI’s file.', 'AI models', () => navigate({ tab: 'ai', model: null, topic: null }),
+      { 'data-frontier-none': '1' }));
+    return [card];
+  }
+  const ndef = every.filter(c => c.dflt).length;
+  const cols = F.all || !ndef ? every : every.filter(c => c.dflt);
+  const rows = frRows(cols);
+  const leads = Object.fromEntries(cols.map(c => [c.key, frLeaders(rows, c)]));
+  // sorted by a column: a flat list, one with no number in it at the bottom;
+  // else by maker, the imported makers first and ours last
+  const sortC = F.sort && cols.find(c => c.key === F.sort.key);
+  const sv = (r, c) => { const x = frCell(r.m, c);
+    return x.rep ? x.rep.value : x.here ? x.here.v : null; };
+  const makers = [...new Set([...((REP().settings || {}).makers || []),
+    ...rows.map(r => r.maker).filter(Boolean).sort(natCmp)])];
+  const mk = r => r.maker == null ? makers.length : makers.indexOf(r.maker);
+  const ordered = [...rows].sort((a, b) => {
+    if (sortC) {
+      const va = sv(a, sortC), vb = sv(b, sortC);
+      if (va == null || vb == null) return (va == null) - (vb == null);
+      return F.sort.dir * (va - vb);
+    }
+    return mk(a) - mk(b) || natCmp(a.m.name, b.m.name);
+  });
+  const groups = [];
+  for (const c of cols) {
+    if (groups.length && groups[groups.length - 1].g === c.group) groups[groups.length - 1].n++;
+    else groups.push({ g: c.group, n: 1 });
+  }
+  const pct1 = v => (100 * v).toFixed(1);
+  const td = (r, c) => {
+    const x = frCell(r.m, c), lead = leads[c.key];
+    if (!x.rep && !x.here) return el('td', { class: 'num', 'data-fr-cell': c.key });
+    const rl = x.rep && lead.has(r.m.id + '|rep'), hl = x.here && lead.has(r.m.id + '|here');
+    const tint = (rl || hl) && L.tint ? 'background:var(--heat-3)' : null;
+    const b = (on, t) => on ? el('b', { text: t }) : t;
+    // a value its source took from another: a small mark, the source in the tooltip
+    const mark = x.rep && repElse(x.rep) ? el('sup', { class: 'fr-mark', text: '†',
+      title: x.rep.setting }) : '';
+    const repTip = x.rep ? [`${repShow(x.rep)} · ${repTag(x.rep)}`, ...(x.rep.url ? [x.rep.url] : []),
+      ...(x.rep.date ? ['as of ' + x.rep.date] : []),
+      ...x.reps.slice(1).map(s => `also ${repShow(s)} · ${repTag(s)}`)] : [];
+    // each part says its setting and value: what it is ranked with, and how
+    const hereAt = { 'data-fr-set': 'here|' + (x.here || {}).tag, 'data-fr-v': x.here
+      ? String(x.here.v) : null, 'data-fr-lead': hl ? '1' : null };
+    const repAt = { 'data-fr-set': x.rep ? `${x.rep.source}|${x.rep.setting}` : null,
+      'data-fr-v': x.rep ? String(x.rep.value) : null, 'data-fr-lead': rl ? '1' : null };
+    if (x.rep && x.here)
+      return el('td', { class: 'num tcell fr-cal', 'data-fr-cell': c.key, 'data-fr-cal': r.m.id,
+          style: tint, tabindex: '0', 'data-tip': JSON.stringify([FR_CAL]) },
+        el('span', { class: 'fr-here', ...hereAt }, 'measured here ', b(hl, pct1(x.here.v))),
+        el('span', { class: 'se', text: ' · ' }),
+        el('span', { class: 'fr-rep', ...repAt }, `${REP_SHORT[x.rep.source] || x.rep.source} `,
+          b(rl, repShow(x.rep)), mark));
+    if (x.here)
+      return el('td', { class: 'num tcell fr-here', 'data-fr-cell': c.key, 'data-fr-here': r.m.id,
+          'data-lead': hl ? '1' : null, style: tint, tabindex: '0', ...hereAt,
+          'data-tip': JSON.stringify([`${pct1(x.here.v)}`
+            + (x.here.se ? ` ± ${pct1(x.here.se)}` : ''), `${r.m.name} · ${c.name}`, x.here.tag,
+            'ranked only with the cells measured the same way here'])},
+        b(hl, pct1(x.here.v)), el('div', { class: 'small se fr-tag', text: x.here.tag }));
+    return el('td', { class: 'num tcell', 'data-fr-cell': c.key, 'data-fr-rep': r.m.id,
+        'data-fr-setting': x.rep.setting, 'data-lead': rl ? '1' : null, style: tint, tabindex: '0',
+        ...repAt,
+        'data-tip': JSON.stringify([`${r.m.name} · ${c.name}`, ...repTip]) },
+      b(rl, repShow(x.rep)), mark);
+  };
+  const frShort = shortNames(rows.map(r => r.m.name), 26);
+  const nameCell = r => el('td', { class: 'model pin', 'data-model': r.m.id,
+      title: r.m.reportedOnly ? 'not run here: only what others report' : r.m.id },
+    el('div', { class: 'mcell' },
+      r.m.reportedOnly ? el('span', { class: 'mname', text: r.m.name })
+        : mnameLink(r.m, frShort, { href: '#model=' + encodeURIComponent(r.m.id) }),
+      !r.m.reportedOnly ? el('span', { class: 'badge', 'data-fr-ours': r.m.id,
+        title: 'measured on this board', text: 'ours' }) : '',
+      sortC ? el('span', { class: 'se small', text: ' ' + (r.maker || 'measured here') }) : ''));
+  const ncol = cols.length + 1;
+  const tbody = el('tbody', {});
+  let last;
+  for (const r of ordered) {
+    const g = r.maker == null ? 'Measured here' : r.maker;
+    if (!sortC && g !== last) {
+      const as = [...new Set(rows.filter(x => x.maker === r.maker).map(x => x.makerAs)
+        .filter(a => a && a !== r.maker))];
+      tbody.append(el('tr', { class: 'cmp-group', 'data-fr-maker': g },
+        el('th', { colspan: String(ncol), scope: 'colgroup', title: as.length
+          ? `${g}: the source files some of these under ${as.map(a => `“${a}”`).join(', ')}` : null,
+          text: g })));
+      last = g;
+    }
+    tbody.append(el('tr', { 'data-fr-row': r.m.id, class: r.m.reportedOnly ? '' : 'clickrow',
+      onclick: e => { if (e.target.closest('a, button') || r.m.reportedOnly) return;
+        navigate({ model: r.m.id, topic: null }); } }, nameCell(r), cols.map(c => td(r, c))));
+  }
+  const thead = el('thead', {},
+    el('tr', { class: 'grp' }, el('th', { class: 'grp nogrp', scope: 'colgroup' }),
+      groups.map(({ g, n }) => el('th', { colspan: String(n), class: 'grp', scope: 'colgroup',
+        'data-fr-group': g, text: g }))),
+    el('tr', { class: 'names' }, el('th', { class: 'model pin', scope: 'col' }, 'Model',
+        ...mcolBits('frontier')),
+      cols.map(c => {
+        const on = sortC === c;
+        return el('th', { class: 'num sortable', scope: 'col', 'data-fr-col': c.key,
+            'aria-sort': on ? (F.sort.dir > 0 ? 'ascending' : 'descending') : 'none',
+            'data-tip': JSON.stringify([c.name, `reported for ${c.n} of `
+              + `${(REP().models || []).length} imported models`
+              + (c.measured ? ' · measured here too' : '')]),
+            onclick: () => { F.sort = { key: c.key, dir: on ? -F.sort.dir : -1 }; render(); } },
+          el('span', { class: 'hname', text: midTrunc(c.name, 18) }),
+          on ? el('span', { class: 'dir', text: F.sort.dir > 0 ? ' ▲' : ' ▼' }) : '');
+      })));
+  card.append(
+    el('p', { class: 'small', 'data-frontier-credit': '1', text: frCredit() }),
+    el('p', { class: 'small se', 'data-frontier-cols': `${cols.length}|${every.length}` },
+      F.all ? `All ${every.length} benchmarks reported. ` : `The ${ndef} benchmarks reported for at `
+        + `least half of the ${(REP().models || []).length} imported models, and those measured `
+        + 'here too. ',
+      ndef < every.length ? el('button', { class: 'quiet', 'data-frontier-all': '1',
+        'aria-pressed': String(!!F.all), text: F.all ? `Only the ${ndef} ▸`
+          : `All ${every.length} benchmarks ▸`, onclick: () => { F.all = !F.all; render(); } }) : '',
+      sortC ? [' · ', el('button', { class: 'quiet', 'data-frontier-bymaker': '1',
+        text: 'by maker', onclick: () => { F.sort = null; render(); } })] : ''),
+    rows.length ? hfade('fr', el('div', { class: 'lb-wrap stick', 'data-hkeep': 'fr' },
+      el('table', { class: 'lb norank frtable' + (L.tint ? ' tinted' : ''),
+        'data-frontier-table': '1', ...mcolAttrs('frontier') }, thead, tbody)))
+      : el('p', { class: 'note', 'data-frontier-empty': '1', text: 'None of the chosen models '
+        + 'has a number in these columns: Models ▾ chooses them.' }),
+    el('p', { class: 'lbcap', text: 'Bold is the best of the cells with one setting — Epoch AI’s '
+      + 'own runs with each other, one outside source with itself, ours measured here with '
+      + 'ours; the rest aren’t ranked against them. † a value the source took from elsewhere, '
+      + 'named in its tooltip. Nothing here is averaged.' }));
+  return [card];
+}
+// 12n.1: on every other chip, a line when chosen models are known only as reported
+function repHiddenLine() {
+  const L = lbS();
+  const n = L.models ? repOnly().filter(m => L.models.includes(m.id)).length : 0;
+  if (!n || L.view !== 'standard' || !LIVE) return '';
+  return el('p', { class: 'small se', 'data-rep-hidden': String(n) },
+    `${n} reported model${n === 1 ? ' isn’t' : 's aren’t'} shown here: nothing is measured this `
+    + `way for ${n === 1 ? 'it' : 'them'} · `,
+    el('a', { href: '#', 'data-rep-hidden-go': '1', text: 'Frontier ▸',
+      onclick: e => { e.preventDefault(); lbSet({ chip: 'frontier', cols: null }); } }));
 }
 // 12f.2b: the form is on the model page — Add opens it there
 function openPhone(id) {
@@ -9401,9 +10236,10 @@ function phoneForm(id) {
 }
 
 // "Not tested on this (12) ▸": one collapsed line, each model with its Test
-function notTestedRows(none, ncols, suite, whyNot = null) {
+// 12n.1: open to begin with when the table has no rows: the reasons are the table
+function notTestedRows(none, ncols, suite, whyNot = null, openFirst = false) {
   if (!none.length) return [];
-  const open = !!state.lbNotTested;
+  const open = state.lbNotTested ?? openFirst;
   const head = el('tr', { class: 'nottested', 'data-not-tested': String(none.length) },
     el('td', { colspan: String(ncols) }, el('button', { class: 'quiet', 'data-not-tested-toggle': '1',
       'aria-expanded': String(open), onclick: () => { state.lbNotTested = !open; render(); },
@@ -9418,9 +10254,10 @@ function notTestedRows(none, ncols, suite, whyNot = null) {
     const test = said ? null : why ? why.suite : suite;
     return el('tr', { class: 'nottested-row', 'data-not-tested-row': m.id },
       el('td', { colspan: String(ncols) }, el('span', { class: 'ntpin' },
-        el('a', { href: '#model=' + encodeURIComponent(m.id), text: m.name }),
-        note ? el('span', { class: 'se', [said ? 'data-instruct-only' : 'data-missing']: m.id,
-          text: ' · ' + note }) : '',
+        el('a', { href: '#model=' + encodeURIComponent(m.rowOf || m.id), text: m.name }),
+        note ? el('span', { class: 'se', [said ? 'data-instruct-only' : why.kind
+          ? 'data-not-here' : 'data-missing']: m.id, text: ' · ' + note }) : '',
+        why && why.extra ? [el('span', { class: 'se', text: ' · ' }), why.extra] : '',
         LIVE && test ? [el('span', { class: 'se', text: ' · ' }), el('a', { href: '#',
           'data-not-tested-test': m.id, text: 'Test', onclick: e => { e.preventDefault();
             state.sub.suite = test; openTest(m.id); } })] : '')));
@@ -9436,25 +10273,26 @@ function lbEveryday(ms) {
   // 12f.2b: what was reported from the phone, beside the score, while a row has it
   const reps = repCols(have);
   const ncols = groups.length + 2 + reps.length;
-  const table = el('table', { class: 'lb norank', 'data-lb-table': '1', 'data-lb-everyday': '1' },
+  const table = el('table', { class: 'lb norank', 'data-lb-table': '1', 'data-lb-everyday': '1',
+      ...mcolAttrs('everyday') },
     el('thead', {},
       reps.length ? el('tr', { class: 'grp' }, el('th', { colspan: String(groups.length + 2),
         class: 'grp nogrp', scope: 'colgroup' }), el('th', { colspan: String(reps.length),
         class: 'grp', scope: 'colgroup', text: REP_GROUP })) : '',
       el('tr', { class: 'names' },
-      el('th', { class: 'model pin', scope: 'col', text: 'Model' }),
+      el('th', { class: 'model pin', scope: 'col' }, 'Model', ...mcolBits('everyday')),
       groups.map(([g, label]) => el('th', { class: 'num', scope: 'col', 'data-evd-col': g,
         title: `${evdQs(g).length} questions`, text: label })),
       el('th', { class: 'num', scope: 'col', text: 'Total' }),
       reps.map(c => el('th', { class: 'num', scope: 'col', 'data-col': c.key,
         'data-tip': JSON.stringify(lbColTip(c)), text: c.short })))),
     el('tbody', {}, have.map(m => {
-      const e = evdOf(m.id);
+      const e = evdOf(m.id), evShort = shortNames(have.map(x => x.name), 26);
       return el('tr', { class: 'clickrow', 'data-lb-row': m.id,
           onclick: ev => { if (ev.target.closest('a, button')) return;
             navigate({ model: m.id, topic: null }); } },
         el('td', { class: 'model pin', 'data-model': m.id },
-          el('a', { class: 'mname mlink', href: '#model=' + encodeURIComponent(m.id), text: m.name }),
+          mnameLink(m, evShort, { href: '#model=' + encodeURIComponent(m.id) }),
           phoneTag(m) || servedTag(m.id)),
         groups.map(([g, label]) => {
           const n = evdGroupCount(e, g);
@@ -9546,8 +10384,9 @@ function cmpEvd(id, g) {
   if (!x || !x.total) return null;
   const v = x.passed / x.total, miss = evdMissing(e);
   return { v, se: cmpSe(v, x.total), tip: `${x.passed} of ${x.total} passed`,
-    // 12m.1: the bank's own count (340 since 12a.6), and a partial run is its own method
-    tag: (miss ? `${e.total} of ${evdHidden()} scored` : `${evdAll()} questions`)
+    // 12n.1: the count the score is over — the hidden half's (179), from the
+    // result, never the bank's 340 — and a partial run is its own method
+    tag: (miss ? `${x.total} of ${evdHidden(g)} scored` : `${x.total} questions`)
       + ', our checks' + (e.provisional ? ' · provisional judge' : '') };
 }
 // the groups, each by its method, and its rows: get(m) is a cell or null —
@@ -9708,19 +10547,24 @@ function vCompare() {
     return ms.length ? [card, shapeCard(ms, 'cmp')] : [card];
   }
   const two = ms.length === 2;
-  const head = el('tr', {}, el('th', { scope: 'col', class: 'pin', text: 'Benchmark' }),
-    ms.map((m, i) => el('th', { class: 'num', scope: 'col', 'data-cmp-col': m.id, title: m.id },
-      el('span', { class: 'key', style: `background:${trColor(i)}` }), ' ' + midTrunc(m.name, 22))),
+  // 12n.1: each keeps what tells it from the others
+  const short = shortNames(ms.map(m => m.name), 22);
+  const head = el('tr', {}, el('th', { scope: 'col', class: 'pin' }, 'Benchmark',
+      ...mcolBits('compare', 'Benchmark')),
+    ms.map((m, i) => el('th', { class: 'num', scope: 'col', 'data-cmp-col': m.id,
+        title: `${m.name}\n${m.id}` },
+      el('span', { class: 'key', style: `background:${trColor(i)}` }), ' ' + short.get(m.name))),
     two ? el('th', { class: 'num', scope: 'col', 'data-cmp-delta-head': '1',
       title: `${ms[0].name} minus ${ms[1].name}, where both were measured the same way`,
       text: 'Δ' }) : '');
   const bodies = [];
   for (const g of cmpGroups(ms)) {
     const rows = g.rows.map(row => ({ row, r: cmpRead(row, ms) })).filter(x => x.r.have);
-    if (!rows.length) continue;
+    if (!rows.length && !g.more) continue;
     // a group fewer than two of these models have is folded: nothing to set beside
     const withAny = ms.filter((m, i) => rows.some(x => x.r.cells[i])).length;
-    const open = state.cmpOpen[g.key] ?? withAny >= 2;
+    // 12n.1: open too when only its Show all has something to show
+    const open = state.cmpOpen[g.key] ?? (withAny >= 2 || (!!g.more && (g.more.open || !rows.length)));
     const ncol = ms.length + 1 + (two ? 1 : 0);
     const gh = el('tr', { class: 'cmp-group', 'data-cmp-group': g.key },
       el('th', { colspan: String(ncol), scope: 'colgroup' },
@@ -9729,7 +10573,8 @@ function vCompare() {
           (open ? '▾ ' : '▸ ') + g.name),
         g.credit ? el('span', { class: 'small se', 'data-cmp-credit': g.key, text: ' · ' + g.credit })
           : '',
-        withAny < 2 ? el('span', { class: 'small se', text: ` · ${withAny} of ${ms.length} `
+        !rows.length ? el('span', { class: 'small se', text: ' · none shared by two of these' })
+        : withAny < 2 ? el('span', { class: 'small se', text: ` · ${withAny} of ${ms.length} `
           + 'models measured' }) : ''));
     const body = el('tbody', { 'data-cmp-body': g.key }, gh);
     if (open) for (const { row, r } of rows) {
@@ -9757,10 +10602,18 @@ function vCompare() {
         two ? el('td', { class: 'num small' + (d && d.clear ? '' : ' se'),
           'data-cmp-delta': row.key, text: d ? `${d.txt} · ${d.words}` : '' }) : ''));
     }
+    // 12n.1: the rest of a source's benchmarks, one click away
+    if (open && g.more) body.append(el('tr', { 'data-cmp-more': g.key },
+      el('td', { colspan: String(ncol) }, el('button', { class: 'quiet', 'data-cmp-show-all': g.key,
+        'aria-expanded': String(g.more.open), onclick: g.more.toggle,
+        text: g.more.open ? 'Only the shared ones' : `Show all ${g.more.n} reported benchmarks` }),
+      g.more.open ? '' : el('span', { class: 'small se', text: ' · only the benchmarks another '
+        + 'of these models has too are shown' }))));
     bodies.push(body);
   }
   card.append(bodies.length ? hfade('cmp', el('div', { class: 'lb-wrap', 'data-hkeep': 'cmp' },
-      el('table', { class: 'lb cmp', 'data-cmp-table': '1' }, el('thead', {}, head), ...bodies)))
+      el('table', { class: 'lb cmp', 'data-cmp-table': '1', ...mcolAttrs('compare') },
+        el('thead', {}, head), ...bodies)))
     : el('p', { class: 'small', text: 'Nothing is measured for these models yet.' }),
     el('p', { class: 'lbcap', text: 'Bold is the best of the cells measured the way the row '
       + 'says; a grey cell was measured another way, says how, and isn’t ranked. '
@@ -9837,10 +10690,9 @@ function shapeCard(ms, where) {
 }
 function vLeaderboard(ms) {
   const L = lbS();
-  // 12m.2: a model known only as reported, when chosen, is a row of its own
+  // 12n.1: a model known only as reported is never a row here: its home is
+  // Frontier · reported, and a line says so when one is chosen
   repLoad();
-  if (L.models && L.view === 'standard')
-    ms = [...ms, ...repOnly().filter(m => L.models.includes(m.id))];
   // 12m.1: Compare is a view of Models, reached by choosing models, not a switch
   if (L.view === 'compare') return vCompare();
   if (!modelsViews().includes(L.view)) { L.view = 'standard'; L.chip = L.stdChip || 'all'; }
@@ -9853,6 +10705,7 @@ function vLeaderboard(ms) {
     lbSet({ view: 'standard', models: ids.length ? ids : null });
   }
   if (L.view === 'everyday') return lbEveryday(ms);
+  if (L.view === 'standard' && L.chip === 'frontier' && !L.cols) return lbFrontier(ms);
   // the exam's scores are not ranked until a person has agreed with the judge:
   // one line says so, instead of an empty table
   if (L.view === 'exam' && !judgedCalibrated())
@@ -9896,7 +10749,6 @@ function vLeaderboard(ms) {
     : c.cat ? ((mmluCats(m) || {})[c.cat] || {}).score_report
     : c.gguf ? (ggufOf(m.id, c.gguf) || {}).v
     : c.rep ? repVal(m, c)
-    : c.rep2 ? repVal2(m, c)
     : c.task ? (cell(c.task, m.id) || {}).v : null;
   const rowsIn = lbFilter(ms);
   const sortCol = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg')
@@ -9931,7 +10783,7 @@ function vLeaderboard(ms) {
   // exam; the GGUF group needs the file
   const measures = c => !!(c.task || c.area || c.cat || c.judged || c.jarea || c.gguf);
   const hasFile = m => !!(G().registered || {})[m.rowOf || m.id];
-  const canHave = (m, c) => m.reportedOnly ? !!c.rep2 : c.rep2 ? true : !narrow(m) || (c.gguf ? hasFile(m)
+  const canHave = (m, c) => !narrow(m) || (c.gguf ? hasFile(m)
     : !(m.rowOf || ggufOnly(m)) && (c.task ? isGen(c.task) : !(c.area || c.cat)));
   // what the board measured decides the rows; a reported number never does
   // 12m.1: a GGUF measured only in a setup is still a row where GGUF columns
@@ -9939,9 +10791,7 @@ function vLeaderboard(ms) {
   const ggufRow = m => !m.rowOf && ggufAny(m.id) && !ggufHas(m.id)
     && (custom ? L.cols.every(isGgufKey) : dataCols.some(c => c.gguf));
   const testedIn = m => (custom ? L.cols.every(t => benchVal(t, m.id) != null)
-    : dataCols.some(c => !c.rep && !c.rep2 && val(m, c) != null) || (L.view === 'exam' && judgedAny(m)))
-    // 12m.2: a model known only as reported is a row when it is chosen, and only then
-    || (m.reportedOnly && dataCols.some(c => c.rep2 && val(m, c) != null))
+    : dataCols.some(c => !c.rep && val(m, c) != null) || (L.view === 'exam' && judgedAny(m)))
     || ggufRow(m);
   // a server can be asked this chip's generative tasks before any model has a
   // column for one: then it is "not tested", not absent
@@ -9949,8 +10799,16 @@ function vLeaderboard(ms) {
     ((CATS.find(([g]) => g === L.chip) || [])[1] || []).includes(t));
   const couldHave = m => cols.some(c => measures(c) && canHave(m, c))
     || (!!m.served && !custom && chipAsks);
+  // 12n.1: every model chosen is a row, or under the line with why — a
+  // served model or a GGUF that can't be measured this way too
   const notTested = ordered.filter(m => !testedIn(m) && !(m.duplicateOf && dupsOf[m.duplicateOf])
-    && !(narrow(m) && !couldHave(m)) && !m.rowOf);
+    && (!!L.models || !(narrow(m) && !couldHave(m)) && !m.rowOf));
+  // the columns asked of a model here: the chosen ones, or this chip's
+  const asked = custom ? L.cols.map(t => isGgufKey(t) ? { gguf: t.slice(5) } : { task: t })
+    : dataCols.filter(measures);
+  // can't be measured this way at all: a server or a GGUF, and none of these
+  // (a server this chip can ask its written tasks is only not tested yet)
+  const cannot = m => narrow(m) && !couldHave(m);
   const lbAll = ordered.filter(m => !(m.duplicateOf && dupsOf[m.duplicateOf]) && testedIn(m));
   const lbPg = paged('leaderboard', lbAll, JSON.stringify([state.sort, state.q, state.kind,
     state.src, state.avgMode, L.view, L.chip, L.kind, L.size, L.status, L.models, L.cols]));
@@ -9987,7 +10845,9 @@ function vLeaderboard(ms) {
           dir: state.sort.key === c.key ? -state.sort.dir : (c.key === 'name' ? 1 : c.lower ? 1 : -1) };
           render(); } },
         el('span', { class: 'hname', text: c.short || c.label }),
-        sortedBy(c) ? el('span', { class: 'dir', text: state.sort.dir > 0 ? ' ▲' : ' ▼' }) : '');
+        sortedBy(c) ? el('span', { class: 'dir', text: state.sort.dir > 0 ? ' ▲' : ' ▼' }) : '',
+        // 12n.1: its width, dragged
+        ...(c.key === 'name' ? mcolBits('models') : []));
     })));
 
   // ---- a cell (11f): the number only. A leader — the column's best, or
@@ -10014,6 +10874,7 @@ function vLeaderboard(ms) {
   };
   const pctn = v => (100 * v).toFixed(1);
   const ncols = visCols.length;
+  const lbShort = shortNames(rows.map(m => m.name), 26);
   const tbody = el('tbody', {});
   rows.forEach(m => {
     // 12b: a row opens the model page — the detail lives there, not in a
@@ -10023,8 +10884,6 @@ function vLeaderboard(ms) {
       onclick: e => {
         // links, buttons, checkboxes and badges with a job of their own keep it
         if (e.target.closest('a, button, input, select, label, .badge[title]')) return;
-        // 12m.2: a model known only as reported opens beside the others, in Compare
-        if (m.reportedOnly) { openCompare([...(L.models || []).filter(id => id !== m.id), m.id]); return; }
         navigate({ model: m.rowOf || m.id, topic: null });
       } },
       visCols.map(c => {
@@ -10066,13 +10925,8 @@ function vLeaderboard(ms) {
               onchange: e => { const t = new Set(L.ticks || []);
                 if (e.target.checked) t.add(m.id); else t.delete(m.id);
                 L.ticks = [...t]; render(); } }) : '',
-            // 12m.2: a model known only as reported has no page of its own here
-            m.reportedOnly ? el('span', { class: 'mname', title: m.id, text: m.name })
-              : el('a', { class: 'mname mlink', text: m.name,
-                href: '#model=' + encodeURIComponent(m.rowOf || m.id) }),
-            m.reportedOnly ? el('span', { class: 'badge', 'data-reported-tag': m.id,
-                title: 'not run here: only what others report', text: 'reported' })
-              : ckBadge(m) || (m.kind === 'instruct'
+            mnameLink(m, lbShort, { href: '#model=' + encodeURIComponent(m.rowOf || m.id) }),
+            ckBadge(m) || (m.kind === 'instruct'
               ? el('span', { class: 'badge instruct', text: 'instruct' })
               : el('span', { class: 'badge', text: 'base' })),
             phoneTag(m) || servedTag(m.id),
@@ -10081,7 +10935,7 @@ function vLeaderboard(ms) {
               ? el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
                   title: genMode(m), text: 'thinking' }) : '',
             // a thinking row has only these three: Standard's "preliminary" is not its
-            m.thinkingRow || m.served || ggufOnly(m) || m.reportedOnly ? ''
+            m.thinkingRow || m.served || ggufOnly(m) ? ''
               : warnBadge(m) || '', dupBadge(m) || '',
             dupsOf[m.id] ? dupToggle(m, dupsOf[m.id]) : ''));
         if (c.key === 'params') {
@@ -10161,7 +11015,6 @@ function vLeaderboard(ms) {
             text: pctn(g.score_report) });
           return one(c, m, g.score_report, null, pctn, { title: `${g.n_report} leaderboard-half items` });
         }
-        if (c.rep2) return rep2Cell(m, c);
         if (c.rep) return repCell(m, c);
         if (c.gguf) {
           const g = ggufOf(m.id, c.gguf);
@@ -10198,25 +11051,50 @@ function vLeaderboard(ms) {
     if (m.thinkingRow && harness.length)
       return { text: text + ' · a thinking row has only IFEval, MMLU-Pro and MATH-500' };
     if (!harness.length && m.kind === 'base') return { text: text + ' · instruct only' };
+    // 12n.1: a server answers the written ones, never these
+    if (narrow(m) && harness.length) return { text: text + ' · served: a server can’t give the '
+      + 'log-likelihoods ' + harness.map(benchName).join(', ') + (harness.length > 1 ? ' use'
+        : ' uses'), suite: miss.some(isGen) ? 'generative' : null };
     return { text, suite: harness.length ? 'full' : miss.some(isGen) ? 'generative' : 'safety' };
+  };
+  // 12n.1: a served model or a GGUF these can't measure says why, and what
+  // llama.cpp measured of it instead: "HellaSwag 82.7 · Winogrande 74.4"
+  const llama = llamaCounterparts(asked);
+  const llamaVals = m => llama.map(b => [b, ggufOf(m.id, b)]).filter(([, g]) => g)
+    .map(([b, g]) => `${ggufLabel(b)} ${(100 * g.v).toFixed(1)}`);
+  const notHere = m => {
+    const srv = !!m.served && !m.rowOf && !ggufOnly(m);
+    const vals = hasFile(m) ? llamaVals(m) : [];
+    const bits = [srv ? 'served · a server can’t give the log-likelihoods these benchmarks use' : '',
+      vals.length ? 'measured by llama.cpp instead: ' + vals.join(' · ')
+        : srv ? '' : 'a GGUF · llama.cpp has measured none of these on it'].filter(Boolean);
+    return { text: bits.join(' · '), kind: srv ? 'served' : 'gguf',
+      extra: vals.length ? llamaSwitch(llama, { 'data-llama-switch': m.id },
+        'Show the llama.cpp columns') : null };
   };
   tbody.append(...notTestedRows(notTested, ncols,
     genView ? 'generative' : L.view === 'exam' ? 'judged' : 'full',
-    custom ? missing : genView ? m => (m.kind === 'base' ? 'instruct only' : null) : null));
+    m => cannot(m) ? notHere(m) : custom ? missing(m)
+      : genView ? (m.kind === 'base' ? 'instruct only' : null) : null,
+    !lbAll.length));
   // what Copy as CSV copies: these rows, these columns, as shown (12h.2)
   state.lbTable = { cols: visCols, rows: lbAll, val, custom };
 
   const table = el('table', { class: 'lb' + (L.tint ? ' tinted' : '')
-      + (visCols.some(c => c.key === 'rank') ? '' : ' norank'), 'data-lb-table': '1' },
+      + (visCols.some(c => c.key === 'rank') ? '' : ' norank'), 'data-lb-table': '1',
+      ...mcolAttrs('models') },
     thead, tbody);
   return [el('div', { class: 'card', 'data-lb-card': '1' },
       ...modelsHead(L.view === 'exam' ? judgeChecked() : ''),
       lbToolbar(ms, cols, shown, nHidden),
       L.chip === 'knowledge' && staleSentence(ms) && !custom
         ? el('p', { class: 'warn', 'data-stale-diag': '1', text: staleSentence(ms) }) : '',
+      repHiddenLine(),
       // 12i.0: a chosen model with no score in these columns is not "tested"
+      // 12n.1: a number measured on its GGUF counts too
       lbCustomLine(lbAll.length, lbAll.filter(m => (L.cols || DATA.accTasks)
-        .some(t => (cell(t, m.id) || {}).v != null)).length),
+        .some(t => benchVal(t, m.id) != null) || dataCols.some(c => c.gguf
+          && val(m, c) != null)).length),
       statusLine(lbPg, 'models', [
         L.chip === 'judged' || custom ? null
           : `${lbAll.filter(m => officialAvg(m) != null).length} ranked`,
@@ -10224,10 +11102,20 @@ function vLeaderboard(ms) {
         L.chip !== 'all' && !custom ? (LB_CHIPS.find(([v]) => v === L.chip) || [])[1] : null]),
       lbPg.pager,
       // the Models tab's empty state, kept: a sentence and the way back
-      custom && !lbAll.length && rowsIn.length ? empty(`No model here has all ${L.cols.length} `
-        + 'of these — each one is under the line with what it is missing.', 'Reset',
-        () => lbSet({ cols: null, models: null }))
-        : '',
+      // 12n.1: what the empty table holds, counted truthfully
+      custom && !lbAll.length && rowsIn.length ? (() => {
+        const nCan = notTested.filter(cannot).length, nMiss = notTested.length - nCan;
+        const text = `None of the ${rowsIn.length} has all ${L.cols.length}.`
+          + (nMiss ? ` ${nMiss} ${nMiss === 1 ? 'is' : 'are'} under the line with what `
+            + `${nMiss === 1 ? 'it’s' : 'they’re'} missing` : '')
+          + (nCan ? `${nMiss ? ';' : ''} ${nCan} can’t be measured this way (served or GGUF)` : '');
+        const sw = nCan && notTested.some(m => cannot(m) && hasFile(m) && llamaVals(m).length);
+        return el('div', { class: 'empty', 'data-empty': '1', 'data-none-has': `${nMiss}|${nCan}` },
+          el('p', {}, text, sw ? [' · ', llamaSwitch(llama, { 'data-llama-switch': 'all' },
+            'Show their llama.cpp columns')] : ''),
+          el('button', { class: 'secondary', 'data-empty-action': '1', text: 'Reset',
+            onclick: () => lbSet({ cols: null, models: null }) }));
+      })() : '',
       // 12i.0: Clear in Models ▾ applies at once, and leaves this
       L.models && !L.models.length ? empty('No model chosen: tick one under Models ▾.',
         'All ranked', () => lbSet({ models: null }), { 'data-no-models': '1' })
@@ -10313,7 +11201,7 @@ function lbToolbar(ms, cols, shown, nHidden) {
   const L = lbS();
   const calOk = judgedCalibrated();
   const chips = el('div', { class: 'chips', role: 'group', 'aria-label': 'task groups' },
-    LB_CHIPS.map(([v, t]) => {
+    LB_CHIPS.filter(([v]) => v !== 'frontier' || LIVE).map(([v, t]) => {
       const off = v === 'judged' && !calOk;
       // 11e: an unavailable chip still takes the click (aria-disabled, not
       // disabled) — the click says why, in one line under the chips; the
@@ -10384,6 +11272,122 @@ function cmpGo() {
 matchMedia('(max-width:720px)').addEventListener('change', () => {
   state.lbFilters = false; if (DATA) render(); });
 
+// ---- 12n.1: the Model column, as wide as someone dragged it ----
+// A handle on its header's right edge — a pointer, or ←/→ once focused —
+// and a double-click fits the longest name shown. The width is kept per
+// table in this browser (in memory where storage is off); Reset, in the
+// header's ⋯, forgets it. Under 600px there is no handle: names wrap instead
+const MCOL = { min: 110, max: 640, step: 16 };
+function mcolGet(key) {
+  try { const v = +localStorage.getItem('bench-mcol-' + key); return v > 0 ? v : null; }
+  catch (e) { return (state.mcol || {})[key] || null; }
+}
+function mcolSet(key, w) {
+  state.mcol = state.mcol || {};
+  state.mcol[key] = w;
+  try { if (w) localStorage.setItem('bench-mcol-' + key, String(w));
+        else localStorage.removeItem('bench-mcol-' + key); }
+  catch (e) { /* private: this page's memory only */ }
+}
+// a table's attributes for it: its key, and the width when one is kept
+function mcolAttrs(key) {
+  const w = mcolGet(key);
+  return { 'data-mcol-table': key, 'data-mcol': w ? String(w) : null,
+    style: w ? `--mcol:${w}px` : null };
+}
+// the width that shows every name in the column in full
+function mcolFit(table) {
+  table.classList.add('mcol-measure');
+  const th = table.querySelector('thead [data-mcol-grip]').closest('th');
+  const w = th.getBoundingClientRect().width;
+  table.classList.remove('mcol-measure');
+  return Math.ceil(w) + 2;
+}
+function mcolGrip(key, label) {
+  const grip = el('span', { class: 'colgrip', role: 'separator', tabindex: '0',
+    'aria-orientation': 'vertical', 'aria-valuemin': String(MCOL.min),
+    'aria-valuemax': String(MCOL.max), 'aria-valuenow': String(mcolGet(key) || ''),
+    'aria-label': `${label} column width: ← narrower, → wider`, 'data-mcol-grip': key,
+    title: 'drag to widen or narrow · double-click fits the longest name' });
+  const width = () => grip.closest('th').getBoundingClientRect().width;
+  const apply = (w, keep) => {
+    w = Math.round(Math.max(MCOL.min, Math.min(MCOL.max, w)));
+    const t = grip.closest('table');
+    t.style.setProperty('--mcol', w + 'px');
+    t.dataset.mcol = String(w);
+    grip.setAttribute('aria-valuenow', String(w));
+    if (keep) { mcolSet(key, w); hfadeUpdate(); }
+  };
+  grip.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const x0 = e.clientX, w0 = width();
+    grip.setPointerCapture(e.pointerId);
+    grip.classList.add('drag');
+    const move = ev => apply(w0 + ev.clientX - x0, false);
+    const up = ev => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', up);
+      grip.removeEventListener('pointercancel', up);
+      grip.classList.remove('drag');
+      apply(w0 + ev.clientX - x0, true);
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+    grip.addEventListener('pointercancel', up);
+  });
+  // never a sort: the header's own click is its column's
+  grip.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });
+  grip.addEventListener('dblclick', e => { e.preventDefault(); e.stopPropagation();
+    apply(mcolFit(grip.closest('table')), true); });
+  grip.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault(); e.stopPropagation();
+    apply(width() + (e.key === 'ArrowRight' ? 1 : -1) * MCOL.step * (e.shiftKey ? 3 : 1), true);
+  });
+  return grip;
+}
+// the header's ⋯: Reset puts the column back as it was drawn
+function mcolMore(key, label) {
+  const btn = el('button', { type: 'button', 'data-mcol-more': key, text: '⋯',
+    'aria-label': `${label} column: more` });
+  return el('span', { class: 'mcol-more', onclick: e => e.stopPropagation() },
+    popover(btn, () => el('div', { class: 'moremenu', id: 'pop-mcol-' + key, 'aria-label': label },
+      el('button', { role: 'menuitem', 'data-mcol-reset': key, disabled: mcolGet(key) ? null : '',
+        text: `Reset the ${label} column’s width`,
+        onclick: () => { popClose(true); mcolSet(key, null); render(); } })),
+      { key: 'mcol-' + key }));
+}
+// 12n.1: a name in a table's Model column. Under 600px a long one wraps to two
+// lines; the words it shares at the front with the table's others give way
+// first (shortNames), never its end — the full name stays its label
+function mnameLink(m, short, attrs = {}) {
+  const s = short && short.get(m.name);
+  return el('a', { class: 'mname mlink', 'aria-label': s && s !== m.name ? m.name : null,
+      title: m.name, ...attrs },
+    s && s !== m.name ? [el('span', { class: 'mn-full', text: m.name }),
+      el('span', { class: 'mn-short', 'aria-hidden': 'true', text: s })] : m.name);
+}
+// what a Model header holds besides its name: the ⋯ and the handle
+const mcolBits = (key, label = 'Model') => [mcolMore(key, label), mcolGrip(key, label)];
+// 12n.1: a picker group's own tick box — ticked, mixed or empty, as its
+// members are — and "all · none" beside its name. A click on the box ticks
+// all of them, or none when all were
+function groupBox(attrs, n, of, set) {
+  const state_ = n === 0 ? 'none' : n >= of ? 'all' : 'some';
+  const box = el('input', { type: 'checkbox', class: 'gbox', ...attrs, 'data-group-state': state_,
+    'aria-checked': state_ === 'some' ? 'mixed' : String(state_ === 'all'),
+    checked: state_ === 'all' ? '' : null, disabled: of ? null : '',
+    // what it shows now: a menu patched in place keeps this node, and its state
+    onchange: e => set(e.target.dataset.groupState !== 'all') });
+  box.indeterminate = state_ === 'some';
+  return box;
+}
+function allNone(attrs, set) {
+  return [el('button', { class: 'quiet', text: 'all', ...attrs('all'), onclick: () => set(true) }),
+    el('span', { class: 'se', text: ' · ' }),
+    el('button', { class: 'quiet', text: 'none', ...attrs('none'), onclick: () => set(false) })];
+}
 // Columns · 4 hidden ▾ — the current chip's columns, Show all, and the tint
 function lbColumnsPill(cols, shown, nHidden) {
   const L = lbS();
@@ -10402,12 +11406,14 @@ function lbColumnsPill(cols, shown, nHidden) {
         // what is shown NOW, read when a control is used: the panel outlives
         // the render that built it (11e)
         const now = () => lbShownFor(cols);
+        const setAll = on => lbSaveShown(on ? [...new Set([...now(), ...keys])]
+          : [...now()].filter(k => !keys.includes(k)));
         return el('div', { class: 'colgroup', 'data-column-group': tag },
-          el('div', { class: 'small se' }, heads[tag] + ' ',
-            el('button', { class: 'quiet', text: 'all', 'data-column-group-all': tag,
-              onclick: () => lbSaveShown([...new Set([...now(), ...keys])]) }),
-            el('button', { class: 'quiet', text: 'none', 'data-column-group-none': tag,
-              onclick: () => lbSaveShown([...now()].filter(k => !keys.includes(k))) })),
+          el('div', { class: 'small se' },
+            groupBox({ 'data-column-group-box': tag, 'aria-label': heads[tag] + ': all or none' },
+              keys.filter(k => shown.has(k)).length, keys.length, setAll),
+            ' ' + heads[tag] + ' ',
+            ...allNone(w => ({ ['data-column-group-' + w]: tag }), setAll)),
           cs.map(c => el('label', { class: 'small' },
             el('input', { type: 'checkbox', 'data-column': c.key, checked: shown.has(c.key) ? '' : null,
               onchange: e => lbSaveShown(e.target.checked ? [...now(), c.key]
@@ -10471,26 +11477,53 @@ function lbModelsPill(ms) {
     const row = m => el('label', { class: 'small mrow' },
       el('input', { type: 'checkbox', 'data-model-pick': m.id, checked: pick.has(m.id) ? '' : null,
         onchange: e => { if (e.target.checked) pick.add(m.id); else pick.delete(m.id);
-          say(); apply(); } }),
+          say(); apply(); fill(state.lbModelsQ || ''); } }),
       el('span', { class: 'famdot', style: `background:${famColor(m)}`, title: famOf(m) }),
       ' ' + m.name, orOf(m) ? el('span', { class: 'se', 'data-pick-via': m.id,
-        text: ' via OpenRouter' }) : el('span', { class: 'se', text: ' ' + famOf(m) }));
+        text: ' via OpenRouter' }) : m.reportedOnly ? el('span', { class: 'se',
+        'data-pick-maker': m.id, title: m.makerAs && m.makerAs !== m.maker
+          ? `${m.maker}: the source files it under "${m.makerAs}"` : null, text: ' ' + m.maker })
+        : el('span', { class: 'se', text: ' ' + famOf(m) }));
     // 12m.2: Reported (not run here), a maker a group: the makers imported first, as set
+    // 12n.1: one Google — and the whole of it folded until opened
     const repMakers = [...new Set([...((REP().settings || {}).makers || []),
       ...reps.map(m => m.maker || 'other')])].map(mk => 'reported · ' + mk);
-    const gname = g => g.startsWith('reported · ') ? 'Reported (not run here) · ' + g.slice(11) : g;
+    const gname = g => g.startsWith('reported · ') ? g.slice(11) : g;
+    // 12n.1: a group's box and its all · none; "only these" chooses it alone
+    const setGroup = (ids, on) => { ids.forEach(id => on ? pick.add(id) : pick.delete(id));
+      say(); apply(); fill(state.lbModelsQ || ''); };
+    const head = (g, ids, name, cls) => el('div', { class: 'small se mgroup' + (cls || ''),
+        'data-model-group': g },
+      groupBox({ 'data-model-group-box': g, 'aria-label': `${name}: all or none` },
+        ids.filter(id => pick.has(id)).length, ids.length, on => setGroup(ids, on)),
+      ' ' + name + ' ',
+      ...allNone(w => ({ ['data-model-group-' + w]: g }), on => setGroup(ids, on)),
+      el('span', { class: 'se', text: ' · ' }),
+      el('button', { class: 'quiet', 'data-model-group-only': g, text: 'only these',
+        onclick: () => { pick.clear(); ids.forEach(id => pick.add(id)); say(); apply();
+          fill(state.lbModelsQ || ''); } }));
     const fill = q => {
       const hit = all.filter(m => !q
         || (m.name + ' ' + m.id + ' ' + famOf(m)).toLowerCase().includes(q.toLowerCase()));
+      const block = g => {
+        const gs = hit.filter(m => groupOf(m) === g);
+        return gs.length ? [head(g, all.filter(m => groupOf(m) === g).map(m => m.id), gname(g)),
+          ...gs.map(row)] : [];
+      };
+      const repHit = hit.filter(m => m.reportedOnly);
+      const open = !!state.lbRepOpen || !!q;
+      const repIds = reps.map(m => m.id);
       list.replaceChildren(...['phone builds', 'served', ...makers, 'GGUF', 'instruct', 'base',
-        'checkpoints', ...repMakers].flatMap(g => {
-          const gs = hit.filter(m => groupOf(m) === g);
-          // a group's name chooses it alone: "only phone builds"
-          return gs.length ? [el('div', { class: 'small se mgroup', 'data-model-group': g }, gname(g),
-            el('button', { class: 'quiet', 'data-model-group-only': g, text: 'only these',
-              onclick: () => { pick.clear(); all.filter(m => groupOf(m) === g)
-                .forEach(m => pick.add(m.id)); say(); apply(); } })), ...gs.map(row)] : [];
-        }));
+        'checkpoints'].flatMap(block),
+        ...(repHit.length ? [el('div', { class: 'small mgroup mrep', 'data-model-group': 'reported' },
+          groupBox({ 'data-model-group-box': 'reported', 'aria-label': 'every reported model: '
+            + 'all or none' }, repIds.filter(id => pick.has(id)).length, repIds.length,
+            on => setGroup(repIds, on)), ' ',
+          el('button', { class: 'quiet', 'data-rep-fold': '1', 'aria-expanded': String(open),
+            text: `Reported (not run here) · ${reps.length} ${open ? '▾' : '▸'}`,
+            title: 'models known only by what others report, by maker',
+            onclick: () => { state.lbRepOpen = !state.lbRepOpen; fill(state.lbModelsQ || ''); } })),
+          ...(open ? repMakers.flatMap(block) : [])] : []));
     };
     fill(state.lbModelsQ || '');
     say();
@@ -10536,16 +11569,27 @@ function lbBenchPill() {
       const groups = lbBenchPicker().map(([g, name, ts]) => [g, name, ts.filter(hit)])
         .filter(([, , ts]) => ts.length);
       // 12i.0: each by its own name alone; one not run yet is greyed and says so
-      list.replaceChildren(...(groups.length ? groups.map(([g, name, ts]) =>
-        el('div', { class: 'colgroup', 'data-bench-group': g },
-          el('div', { class: 'small se', text: name }),
+      // 12n.1: a group's box and all · none, over the ones that have run
+      const setGroup = (ts, on) => {
+        const next = new Set(state.lbBenchNow || []);
+        ts.forEach(t => on ? next.add(t) : next.delete(t));
+        lbSet({ cols: lbBenchAll().filter(x => next.has(x)) });
+      };
+      list.replaceChildren(...(groups.length ? groups.map(([g, name, ts]) => {
+        const ran = lbBenchPicker().find(x => x[0] === g)[2].filter(([, r]) => r).map(([t]) => t);
+        return el('div', { class: 'colgroup', 'data-bench-group': g },
+          el('div', { class: 'small se' },
+            groupBox({ 'data-bench-group-box': g, 'aria-label': `${name}: all or none` },
+              ran.filter(t => now.has(t)).length, ran.length, on => setGroup(ran, on)),
+            ' ' + name + ' ', ...allNone(w => ({ ['data-bench-group-' + w]: g }),
+              on => setGroup(ran, on))),
           ts.map(([t, ran]) => el('label', { class: 'small' + (ran ? '' : ' notrun'),
               'data-bench-row': t },
             el('input', { type: 'checkbox', 'data-bench': t, checked: now.has(t) ? '' : null,
               disabled: ran ? null : '', onchange: e => set(t, e.target.checked) }),
             ' ' + benchName(t),
-            ran ? '' : el('span', { class: 'se', 'data-not-run': t, text: ' · not run yet' })))))
-        : [el('p', { class: 'small se', text: 'No benchmark matches.' })]));
+            ran ? '' : el('span', { class: 'se', 'data-not-run': t, text: ' · not run yet' }))));
+      }) : [el('p', { class: 'small se', text: 'No benchmark matches.' })]));
     };
     fill();
     return el('div', { class: 'moremenu benchmenu', id: 'pop-benchmarks', 'aria-label': 'benchmarks' },
@@ -10566,7 +11610,8 @@ function lbBenchPill() {
 function lbCustomLine(nRows, nTested = nRows) {
   const L = lbS();
   // 12i.0: models chosen that have no scores here say so: "3 chosen · 2 tested"
-  const chosen = L.models ? L.models.length : null;
+  // 12n.1: a reported model chosen is counted on Frontier, not here
+  const chosen = L.models ? L.models.filter(id => !id.startsWith('reported/')).length : null;
   const count = chosen != null && nTested < chosen ? `${chosen} chosen · ${nTested} tested`
     : `${nRows} model${nRows === 1 ? '' : 's'}`;
   if (L.view !== 'standard' || (!L.cols && !L.models)) return '';
@@ -11071,7 +12116,8 @@ function radarSvg(axes, series) {
   const table = el('details', { class: 'astable' }, el('summary', { text: 'Show as table' }),
     el('table', { class: 'mini' },
       el('thead', {}, el('tr', {}, el('th', { text: 'axis' }),
-        series.map(s => el('th', { class: 'num', title: s.m.id, text: midTrunc(s.m.name, 16) })))),
+        series.map(s => el('th', { class: 'num', title: `${s.m.name}\n${s.m.id}`,
+          text: shortNames(series.map(x => x.m.name), 16).get(s.m.name) })))),
       el('tbody', {}, axes.map(ax => el('tr', {}, el('td', { text: ax.label }),
         series.map(s => { const v = ax.get(s.m);
           return el('td', { class: 'num', text: v ? (100 * v.n).toFixed(0) : '—' }); }))))));
@@ -11130,6 +12176,16 @@ function domainGroups(tasks) {
 
 // 12m.1: the lm_eval task a GGUF benchmark asks the questions of — its panel
 // sits beside that one's, never merged into it
+// 12n.1: the llama.cpp benchmarks that ask these columns' questions (no
+// PIQA), and a button that switches the chosen set to them
+function llamaCounterparts(cols) {
+  const order = G().order || [];
+  return [...new Set(cols.map(c => c.gguf || GGUF_OF[c.task]).filter(b => b && order.includes(b)))];
+}
+function llamaSwitch(bs, attrs, text) {
+  return el('button', { class: 'quiet', ...attrs, text,
+    onclick: () => lbSet({ view: 'standard', cols: bs.map(b => 'gguf:' + b) }) });
+}
 const GGUF_OF = { mmlu: 'mmlu', hellaswag: 'hellaswag', winogrande: 'winogrande',
   arc_challenge: 'arc_challenge', arc_easy: 'arc_easy', truthfulqa_mc2: 'truthfulqa' };
 function ggufPanel(t, ms, hl) {
@@ -11169,15 +12225,16 @@ function hlPill(ms, hl) {
         onclick: () => { popClose(true); lbSet({ hl: null }); } })));
   }, { key: 'highlight', menu: false, rebuild: true });
 }
-function benchPick(ms, pick, hl) {
+function benchPick(ms, pick, hl, reps = []) {
   const L = lbS();
   return el('div', { class: 'card benchpick', 'data-bench-pick': String(pick.length) },
-    el('div', { class: 'pickers', 'data-pickers': '1' }, lbModelsPill(ms), hlPill(pick, hl)),
+    el('div', { class: 'pickers', 'data-pickers': '1' }, lbModelsPill(ms),
+      hlPill([...pick, ...reps], hl)),
     el('p', { class: 'small se', 'data-bench-pick-line': '1', text: (L.models
       ? `${pick.length} of ${ms.length} models, chosen here or on Models — the same choice`
       : `All ${ms.length} models`) + (hl.length ? ` · ${hl.length} highlighted` : '') }));
 }
-function vTasks(ms, hl = [], reps = []) {
+function vTasks(ms, hl = []) {
   if (!DATA.accTasks.length) return [note('No accuracy tasks found.')];
   const scaleBtn = (v, label, tip) => el('button', {
     class: 'tgl' + (state.accScale === v ? ' on' : ''), title: tip, text: label,
@@ -11203,11 +12260,22 @@ function vTasks(ms, hl = [], reps = []) {
           : 'tasks with no chance level are unchanged by this toggle' })),
     // grouped under their domain — the same vocabulary the radar folds on, so a
     // reader learns one taxonomy rather than two
-    ...domainGroups(DATA.accTasks).map(([dom, ts]) => el('div', {},
-      el('h3', { class: 'domhead' }, dom,
-        el('span', { class: 'se', text: ` · ${ts.length} task${ts.length > 1 ? 's' : ''}` })),
-      el('div', { class: 'panels' }, ts.flatMap(t => [barPanel(t, ms, { lower: false, hl }),
-        ...ggufPanel(t, ms, hl), ...repPanels(t, [...ms, ...reps], hl)])))),
+    ...domainGroups(DATA.accTasks).map(([dom, ts]) => {
+      // 12n.1: a benchmark none of these models has is a word in one line at
+      // the section's end, not a card of its own; it comes back with a number
+      const none = ts.filter(t => !ms.some(m => cell(t, m.id)));
+      return el('div', {},
+        el('h3', { class: 'domhead' }, dom,
+          el('span', { class: 'se', text: ` · ${ts.length} task${ts.length > 1 ? 's' : ''}` })),
+        el('div', { class: 'panels' }, ts.flatMap(t => [
+          ...(none.includes(t) ? [] : [barPanel(t, ms, { lower: false, hl, refs: frRefs(t) })]),
+          ...ggufPanel(t, ms, hl)])),
+        none.length ? el('p', { class: 'small se', 'data-empty-panels': none.join(',') },
+          `No numbers for ${lbS().models ? 'the chosen models' : 'any model'}: `
+          + `${none.join(', ')} (lm_eval)` + (ms.some(narrow) ? ' · served and GGUF models '
+            + 'can’t be measured this way' : '')) : '');
+    }),
+    frPanels(hl),
     tableTwin('tasks-table', ms, DATA.accTasks, false)];
 }
 
@@ -11612,6 +12680,8 @@ function vRuns(ms) {
     el('div', { style: 'display:flex;gap:8px;margin-top:8px' },
       el('button', { onclick: exportCsv, text: 'Download CSV' }),
       el('button', { onclick: exportJson, text: 'Download JSON' }))));
+  // 12n.1: every opening of an Everyday group's hidden half
+  if (LIVE) frag.push(auditsCard());
   return frag;
 }
 
@@ -12117,7 +13187,7 @@ function vTraining() {
 // reader's lines come with any line that quotes one withheld.
 // ===========================================================================
 const READ_KINDS = ['dataset', 'rubric', 'criteria', 'bank', 'log', 'provenance',
-                    'proposal', 'everyday'];
+                    'proposal', 'everyday', 'group'];
 
 function readStr(r) {
   return r ? [r.kind, r.id, r.n].filter(x => x != null && x !== '').join(':') : '';
@@ -12200,7 +13270,7 @@ async function readFetch(r, extra) {
     } else if (r.kind === 'proposal') {
       // 11j: a proposal opens in the same sheet, as one short card
       data = await api(`api/proposals/${r.id}`);
-    } else if (r.kind === 'everyday') {
+    } else if (r.kind === 'everyday' || r.kind === 'group') {
       // 12a: already on the page — the answers are in the payload
       data = { model: r.id };
     } else if (r.kind === 'provenance') {
@@ -12301,7 +13371,7 @@ function renderReader() {
   }
   const build = { dataset: readDataset, rubric: readRubric, criteria: readCriteria, bank: readBank,
                   log: readLog, provenance: readProvenance, proposal: readProposal,
-                  everyday: readEveryday }[r.kind];
+                  everyday: readEveryday, group: readGroup }[r.kind];
   wrap._aside.onkeydown = null;
   build(wrap, r, got.data, got);
   wrap.dataset.ready = '1';
@@ -13591,7 +14661,7 @@ async function ggMeasureDialog(id, returnTo) {
 function ggufStartPanel(id) {
   return el('div', { class: 'frm', style: 'margin-top:10px' },
     el('button', { class: 'secondary', 'data-gg-measure': id, text: 'Measure on the GGUF…',
-      onclick: () => ggMeasureDialog(id, `[data-gg-measure="${CSS.escape(id)}"]`) }));
+      onclick: () => ggMeasureDialog(ggufIdOf(id), `[data-gg-measure="${CSS.escape(id)}"]`) }));
 }
 
 async function loadServed() {
@@ -13998,10 +15068,11 @@ function vStandardBench(ms) {
   const L = lbS();
   repLoad();
   const pick = L.models ? ms.filter(m => L.models.includes(m.id)) : ms;
-  // 12m.2: and the models known only as reported, chosen or all — their own panels
+  // 12m.2: and the models known only as reported, chosen or all — 12n.1: in
+  // the Frontier group's panels, and as reference ticks on ours
   const reps = L.models ? repOnly().filter(m => L.models.includes(m.id)) : repOnly();
   const hl = (L.hl || []).filter(id => [...pick, ...reps].some(m => m.id === id)).slice(0, 3);
-  return [benchPick(ms, pick, hl), ...vTasks(pick, hl, reps),
+  return [benchPick(ms, pick, hl, reps), ...vTasks(pick, hl),
     aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
 }
 
@@ -18600,7 +19671,12 @@ function popReanchor() {
     if (sig(POP.panel) === sig(fresh)) {
       const now = [...fresh.querySelectorAll('input')];
       [...POP.panel.querySelectorAll('input')].forEach((e, i) => {
-        if (e.type === 'checkbox') e.checked = now[i].checked; });
+        if (e.type !== 'checkbox') return;
+        e.checked = now[i].checked;
+        // 12n.1: a group's box is ticked, mixed or empty as its members now are
+        e.indeterminate = now[i].indeterminate;
+        for (const a of ['data-group-state', 'aria-checked'])
+          if (now[i].hasAttribute(a)) e.setAttribute(a, now[i].getAttribute(a)); });
     } else {
       const f = document.activeElement;
       const key = f && POP.panel.contains(f) && (f.dataset.column || f.dataset.filter);
