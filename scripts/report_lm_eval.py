@@ -4199,7 +4199,8 @@ const state = {
   trQ: '', trStatus: 'all', trOrder: 'updated',            // runs-list filter/sort
   trMetricQ: '', trSecClosed: {}, trSecSig: '',            // metric panels filter / sections
   trXAxis: 'step',                     // benchmark-join chart: step | tokens | compute
-  cmpSel: [], cmpColors: {}, cmpOpen: {},                               // radar: compared models (≤CMP_MAX)
+  cmpSel: [], cmpColors: {}, cmpOpen: {},
+  rep: {},                                                 // 12m.2: api/reported, loaded once                               // radar: compared models (≤CMP_MAX)
   accScale: 'raw',                     // task panels: 'raw' | 'chance' (diverging)
   cmpEvicted: '',                      // last model the compare FIFO dropped
   radarNorm: 'chance', radarAxes: 'tasks',                 // radar scaling / axis mode
@@ -4953,6 +4954,7 @@ function barPanel(task, models, opts) {
       `${task} — ${c.shots != null ? c.shots + '-shot, ' : ''}${c.n != null ? c.n + ' items' : ''}`,
       m.id + (m.params ? ` · ${P(m.params)} params` : '')];
     if (dim) tipRows.splice(1, 0, '≈ chance — not statistically above it');
+    if (opts.credit) tipRows.push(opts.credit);
     if (isCk) tipRows.push('uploaded checkpoint (local artifact)');
     if (lower && info.metric === 'bits_per_byte')
       tipRows.splice(1, 0, `cross-entropy ${num(c.v * Math.LN2, 3)} nats/byte`);
@@ -8468,11 +8470,12 @@ function lbFromHash(rest) {
   const unalias = Object.fromEntries(Object.entries(LB_ALIAS).map(([k, v]) => [v, k]));
   L.cols = L.view === 'standard' ? lbKnownCols(list('cols').map(t => unalias[t] || t)) : null;
   const ids = new Set(((DATA || {}).models || []).map(m => m.id));
-  const ms = list('models').filter(id => !DATA || ids.has(id));
+  const ms = list('models').filter(id => !DATA || ids.has(id) || id.startsWith('reported/'));
   L.models = ms.length ? [...new Set(ms)] : null;
   // 12m.1: the compared models, as the address names them, at most eight
   if (L.view === 'compare')
-    L.cmp = [...new Set(list('m').filter(id => !DATA || ids.has(id)))].slice(0, CMP_TOP);
+    L.cmp = [...new Set(list('m').filter(id => !DATA || ids.has(id) || id.startsWith('reported/')))]
+      .slice(0, CMP_TOP);
 }
 // ---- 12h.2: a table you build ----------------------------------------------
 // Benchmarks ▾ offers every Standard benchmark, in its chip groups: the
@@ -8541,7 +8544,7 @@ const ggufAny = id => ((G().setups || {})[id] || []).some(x => Object.keys(x.ben
 const ggufOnly = m => { const g = (G().registered || {})[m.id]; return !!g && !g.served; };
 // 12f.2b: a model served elsewhere, a GGUF with no server, a GGUF's setup:
 // never ranked, so never "preliminary" either — it has no average to earn
-const narrow = m => !!(m.rowOf || ggufOnly(m) || m.served);
+const narrow = m => !!(m.rowOf || ggufOnly(m) || m.served || m.reportedOnly);
 const ggufLabel = b => ((G().benchmarks || {})[b] || {}).label || b;
 function ggufCol(b) {
   return { key: 'gguf:' + b, gguf: b, label: ggufLabel(b), short: ggufLabel(b), num: true,
@@ -8795,7 +8798,7 @@ function lbColumns(ms) {
     lead[3] = { key: 'cavg', label: state.avgMode === 'raw' ? 'Avg, raw' : 'Avg above chance',
       num: true, group: '', unit: state.avgMode === 'raw' ? 'raw · %' : 'above chance · %' };
     return [...lead, ...L.cols.map(t => isGgufKey(t) ? ggufCol(t.slice(5)) : task(t)),
-      ...repCols(lbFilter(ms)), ...tail];
+      ...repCols(lbFilter(ms)), ...repCols2(lbFilter(ms)), ...tail];
   }
   let mid;
   if (L.chip === 'all') {
@@ -8833,7 +8836,8 @@ function lbColumns(ms) {
   }
   // 12f.2b: and, on All tasks, what was reported from the phone while a row
   // shown has it
-  return [...lead, ...mid, ...(L.chip === 'all' ? repCols(lbFilter(ms)) : []), ...tail];
+  return [...lead, ...mid, ...(L.chip === 'all' ? [...repCols(lbFilter(ms)),
+    ...repCols2(lbFilter(ms))] : []), ...tail];
 }
 
 // 11f: one word per column name; the long ones are the tooltip's
@@ -8846,6 +8850,8 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
 // scale went (11f).
 function lbColTip(c) {
   const scale = state.avgMode === 'raw' ? 'raw accuracy' : 'above chance';
+  if (c.rep2) return [`${c.label} — reported by ${repSrc(c.rep2).name}`, repSrc(c.rep2).credit,
+    'never measured here: never in an average or a rank'];
   if (c.rep) return [`${c.label} — ${c.unit}, measured on the phone and reported by whoever `
     + 'measured it', 'the board never measures a phone; never in any average'];
   if (c.gguf) {
@@ -8966,7 +8972,7 @@ function lbLeaders(cols, val) {
   const out = {};
   for (const c of cols) {
     // 12f.2b: a reported number is shown, never ranked against the others
-    if (!c.num || c.key === 'params' || c.rep) continue;
+    if (!c.num || c.key === 'params' || c.rep || c.rep2) continue;
     // provisional scores are never tinted: a judged column is on the board
     // only once the judge is calibrated, and a model whose judge is not ok
     // has no judged cell to tint
@@ -9056,6 +9062,178 @@ async function loadPhone() {
   } catch (e) { /* the card says nothing is reported yet */ }
   P.loading = false; P.loaded = true;
   render();
+}
+// ---- 12m.2: reported scores, from outside the board ----
+// Epoch AI, Artificial Analysis and model cards. Their own endpoint
+// (api/reported), never DATA: never a column the board measured, an average
+// or a rank — and never in the frozen report, which is how Artificial
+// Analysis's numbers stay on the tailnet. Every one says whose it is
+const REP = () => state.reported || { sources: {}, models: [], scores: [], aliases: [] };
+function repLoad() {
+  const R = state.rep;
+  if (!LIVE || R.loaded || R.loading || !netReady()) return;
+  R.loading = true;
+  api('api/reported').then(j => { state.reported = j; })
+    .catch(e => { R.msg = String((e && e.message) || e); })
+    .finally(() => { R.loading = false; R.loaded = true; render(); });
+}
+const repSrc = s => (REP().sources || {})[s] || { name: s, credit: '' };
+// a model known only by what others report, as a row: never ranked, no average
+function repOnly() {
+  return (REP().models || []).filter(m => !m.measured).map(m => ({ id: m.id, name: m.name,
+    family: m.maker || 'reported', maker: m.maker || '', kind: 'reported', reportedOnly: true,
+    source: 'reported', params: null, tainted: [], avg: null, avgRaw: null, official: false,
+    missing: [], date: null }));
+}
+// a model by its id: the board's, or one known only as reported
+const anyModel = id => DATA.models.find(m => m.id === id) || repOnly().find(m => m.id === id) || null;
+// its scores from one source, the newest a benchmark and setting: [{benchmark, value, …}]
+function repOf(id, source) {
+  const out = new Map();
+  for (const s of REP().scores || [])
+    if (s.model === id && (!source || s.source === source)) out.set(s.benchmark + '|' + s.setting, s);
+  return [...out.values()];
+}
+const repShow = s => s.unit === 'points' ? s.value.toFixed(1) : (100 * s.value).toFixed(1);
+// "reported by Epoch AI · 5-shot, CoT" — a cell's method, so two settings are never one row
+const repTag = s => `reported by ${repSrc(s.source).name}` + (s.setting ? ` · ${s.setting}` : '');
+// the lm_eval task a reported benchmark is the same test as, by its names —
+// its panel sits beside that one's on Benchmarks, never merged into it
+const REP_SAME = { mmlu: ['mmlu'], mmlu_pro: ['mmlu-pro', 'mmlu pro'], hendrycks_math500:
+  ['math-500', 'math 500'], gsm8k: ['gsm8k'], hellaswag: ['hellaswag'], winogrande:
+  ['winogrande'], arc_challenge: ['arc-challenge', 'arc challenge', 'arc-c'], truthfulqa_mc2:
+  ['truthfulqa'], ifeval: ['ifeval'], piqa: ['piqa'] };
+const repSame = (t, b) => (REP_SAME[t] || []).includes(String(b).toLowerCase().trim());
+function repPanels(t, ms, hl) {
+  const out = [];
+  for (const source of Object.keys(REP().sources || {})) {
+    const cells = new Map();
+    for (const m of ms) {
+      const s = repOf(m.id, source).find(x => repSame(t, x.benchmark));
+      if (s) cells.set(m.id, s);
+    }
+    if (!cells.size) continue;
+    const any = [...cells.values()][0];
+    const settings = [...new Set([...cells.values()].map(s => s.setting))];
+    out.push(barPanel('rep:' + source + ':' + t, ms, { lower: false, hl,
+      key: `rep:${source}:${t}`, label: `${any.benchmark} · reported by ${repSrc(source).name}`,
+      method: (settings.length === 1 ? repTag(any) : `reported by ${repSrc(source).name} · `
+        + 'MIXED settings!') + ` · ${repSrc(source).credit}`,
+      credit: repSrc(source).credit, info: { chance: null },
+      get: m => { const s = cells.get(m.id);
+        return s && s.unit !== 'points' ? { v: s.value, se: 0, shots: null, n: null } : null; } }));
+  }
+  return out;
+}
+// the Compare groups, one a source: "Reported · Epoch AI", its credit in the head
+function repCmpGroups(ms) {
+  return Object.keys(REP().sources || {}).map(source => {
+    const bench = [...new Set(ms.flatMap(m => repOf(m.id, source).map(s => s.benchmark)))].sort(natCmp);
+    return { key: 'rep:' + source, name: `Reported · ${repSrc(source).name}`,
+      credit: repSrc(source).credit, rows: bench.map(b => ({ key: `rep:${source}:${b}`, label: b,
+        fmt: (REP().scores || []).some(s => s.source === source && s.benchmark === b
+          && s.unit === 'points') ? 'n1' : null,
+        get: m => {
+          const s = repOf(m.id, source).find(x => x.benchmark === b);
+          return s ? { v: s.unit === 'points' ? s.value : s.value, se: null, tag: repTag(s),
+            tip: [repSrc(source).credit, s.url, s.date ? 'as of ' + s.date : '',
+              s.by ? 'entered by ' + s.by : ''].filter(Boolean).join(' · ') } : null;
+        } })) };
+  });
+}
+// ---- AI models ▸ Outside data: each source's line, Import now, the aliases,
+// and a number typed in from a model card
+function outsideCard() {
+  if (!LIVE) return '';
+  repLoad();
+  const R = REP(), F = state.rep.f = state.rep.f || {};
+  const importNow = actButton('rep-import', 'Import now', async () => {
+    if (!whoName()) throw new Error(askName());
+    const j = await post('api/reported/import', { by: whoName() });
+    state.rep.loaded = false; repLoad();
+    return { toast: (j.results || []).map(r => r.line).join(' · ') };
+  });
+  const field = (k, label, ph) => [el('label', { for: 'rep-' + k, text: label }),
+    el('input', { id: 'rep-' + k, 'data-rep-in': k, value: F[k] ?? '', placeholder: ph,
+      autocomplete: 'off', oninput: e => { F[k] = e.target.value; } })];
+  const card = actButton('rep-card', 'Add it, as reported', async () => {
+    if (!whoName()) throw new Error(askName());
+    await post('api/reported/cards', { ...F, entered_by: whoName() });
+    state.rep.f = {}; state.rep.loaded = false; repLoad();
+    return { toast: 'Added, as the card reports it' };
+  });
+  const A = state.rep.a = state.rep.a || {};
+  const alias = actButton('rep-alias', 'Add the alias', async () => {
+    if (!whoName()) throw new Error(askName());
+    await post('api/reported/aliases', { alias: A.alias || '', target: A.target || '', by: whoName() });
+    state.rep.a = {}; state.rep.loaded = false; repLoad();
+    return { toast: 'Two names, one model' };
+  });
+  return el('div', { class: 'card', 'data-outside': '1' },
+    el('h2', { text: 'Outside data' }),
+    el('p', { class: 'sub', text: 'Scores reported elsewhere, imported daily, each credited where '
+      + 'it shows. Never measured here, so never a column the board measured, an average or a '
+      + 'rank. Artificial Analysis’s free data is for internal use: this board is on the '
+      + 'tailnet, and its numbers are never in the single-file report.' }),
+    el('ul', { class: 'small', 'data-rep-lines': '1' }, ['epoch', 'aa'].map(s => el('li',
+      { 'data-rep-line': s }, (R.sources[s] || {}).line || `${repSrc(s).name}: not imported yet`,
+      el('span', { class: 'se', text: ' · ' + ((R.sources[s] || {}).credit || '') })))),
+    el('p', { class: 'small se', text: `The default import: each of ${((R.settings || {}).makers
+      || []).join(', ') || 'OpenAI, Google, Anthropic'}’s ${(R.settings || {}).per_maker || 10} `
+      + 'most recent models, and the open models already on the board (REPORTED_MAKERS, '
+      + 'REPORTED_PER_MAKER in .env).' }),
+    el('div', { class: 'frm' }, importNow, actNote('rep-import')),
+    el('details', { class: 'kfold', 'data-rep-card-form': '1', open: state.rep.cardOpen ? '' : null,
+        ontoggle: e => { state.rep.cardOpen = e.target.open; } },
+      el('summary', { text: 'A number from a model card or paper ▸' }),
+      el('div', { class: 'srvform' }, ...field('model', 'Model', 'GPT-5.5'),
+        ...field('maker', 'Maker', 'OpenAI'), ...field('benchmark', 'Benchmark', 'MMLU-Pro'),
+        ...field('value', 'Value', '86.4%'), ...field('setting', 'Their setting', '5-shot, CoT'),
+        ...field('url', 'Source', 'https://…'), ...field('date', 'Date', '2026-09-28')),
+      el('div', { class: 'frm' }, card, actNote('rep-card'))),
+    el('details', { class: 'kfold', 'data-rep-aliases': String((R.aliases || []).length),
+        open: state.rep.aliasOpen ? '' : null, ontoggle: e => { state.rep.aliasOpen = e.target.open; } },
+      el('summary', { text: `Aliases: ${(R.aliases || []).length} ▸` }),
+      el('p', { class: 'small se', text: 'Two names of one model — "GPT-5.5" at Epoch AI and '
+        + '"openai/gpt-5.5" through OpenRouter — are one model with an alias: its measured and '
+        + 'reported numbers side by side, never mixed.' }),
+      el('ul', { class: 'small' }, (R.aliases || []).map(a => el('li', { 'data-rep-alias': a.alias },
+        `${a.alias} → ${a.target} `, el('button', { class: 'quiet', text: 'remove',
+          onclick: async () => { if (!whoName()) { askName(); return; }
+            await post('api/reported/aliases/delete', { alias: a.alias, by: whoName() });
+            state.rep.loaded = false; repLoad(); } })))),
+      el('div', { class: 'srvform' },
+        el('label', { for: 'rep-alias', text: 'The name' }),
+        el('input', { id: 'rep-alias', 'data-rep-alias-in': 'alias', value: A.alias ?? '',
+          placeholder: 'GPT-5.5 (OpenAI)', oninput: e => { A.alias = e.target.value; } }),
+        el('label', { for: 'rep-target', text: 'is the model' }),
+        el('input', { id: 'rep-target', 'data-rep-alias-in': 'target', value: A.target ?? '',
+          placeholder: 'openai/gpt-5.5, or a model on the board', oninput: e => {
+            A.target = e.target.value; } })),
+      el('div', { class: 'frm' }, alias, actNote('rep-alias'))));
+}
+// Models' own columns for them: "Reported · Epoch AI", a benchmark a column,
+// only while a row shown has one — never a leader, never deciding a row
+function repCols2(rows) {
+  if (!LIVE) return [];
+  return Object.keys(REP().sources || {}).flatMap(source => {
+    const bench = [...new Set(rows.flatMap(m => repOf(m.id, source).map(x => x.benchmark)))]
+      .sort(natCmp);
+    return bench.map(b => ({ key: `rep2:${source}:${b}`, rep2: source, bench: b, label: b,
+      short: midTrunc(b, 14), num: true, group: `Reported · ${repSrc(source).name}`,
+      unit: 'reported' }));
+  });
+}
+const repVal2 = (m, c) => { const x = repOf(m.id, c.rep2).find(y => y.benchmark === c.bench);
+  return x ? x.value : null; };
+function rep2Cell(m, c) {
+  const x = repOf(m.id, c.rep2).find(y => y.benchmark === c.bench);
+  if (!x) return el('td', { class: 'num se', text: '' });
+  return el('td', { class: 'num tcell', 'data-rep2-cell': c.key,
+      'data-tip': JSON.stringify([`${repShow(x)} · ${m.name} · ${x.benchmark}`, repTag(x),
+        repSrc(x.source).credit, ...(x.url ? [x.url] : []), 'never measured here: never in an '
+        + 'average or a rank']) },
+    repShow(x), el('div', { class: 'small se rep-by', text: repSrc(x.source).name }));
 }
 // 12f.2b: the form is on the model page — Add opens it there
 function openPhone(id) {
@@ -9312,6 +9490,7 @@ function openCompare(ids) {
 }
 // what a chosen model is, in a word: the line above the table
 function cmpKind(m) {
+  if (m.reportedOnly) return 'reported only' + (m.maker ? ` · ${m.maker}` : '');
   if (isPhoneRow(m)) return 'phone build';
   if (m.rowOf || ggufOnly(m)) return 'GGUF';
   if (m.served) return 'served';
@@ -9390,6 +9569,8 @@ function cmpGroups(ms) {
       safe('trust:dna', 'Do-Not-Answer', t => t.refuses),
       safe('trust:xstest', 'XSTest', t => t.xstest),
       safe('trust:over', 'Over-refusal', t => t.over, true)] },
+    // 12m.2: what others report, a source a group, each credited
+    ...repCmpGroups(ms),
     // 12f.2: what someone measured on the phone, as they reported it
     { key: 'phone', name: REP_GROUP, rows: reps.length ? [
       { key: 'rep:median', label: 'Decode, tok/s median', fmt: 'n1', get: m => {
@@ -9442,7 +9623,7 @@ function cmpChips(ids) {
       title: ids.length >= CMP_TOP ? `a comparison holds ${CMP_TOP} — take one out first` : null,
       text: 'Add a model… ▾' }), () => {
     const list = el('div', { class: 'mlist' });
-    const fill = q => list.replaceChildren(...DATA.models.filter(m => !ids.includes(m.id)
+    const fill = q => list.replaceChildren(...[...DATA.models, ...repOnly()].filter(m => !ids.includes(m.id)
         && (!q || (m.name + ' ' + m.id).toLowerCase().includes(q.toLowerCase())))
       .map(m => el('button', { role: 'menuitem', 'data-cmp-pick': m.id,
         onclick: () => { popClose(true); set([...(L.cmp || []), m.id]); } },
@@ -9453,7 +9634,7 @@ function cmpChips(ids) {
         'data-keep': 'cmpadd', oninput: e => fill(e.target.value) }), list);
   }, { key: 'cmp-add', menu: false });
   return el('div', { class: 'rchips', 'data-cmp-chips': '1' }, ids.map((id, i) => {
-    const m = DATA.models.find(x => x.id === id);
+    const m = anyModel(id);
     return el('span', { class: 'mchip', 'data-cmp-chip': id },
       el('span', { class: 'key', style: `background:${trColor(i)}` }), m.name,
       el('button', { class: 'xbtn', 'aria-label': 'take out ' + m.name, text: '×',
@@ -9462,8 +9643,9 @@ function cmpChips(ids) {
 }
 function vCompare() {
   const L = lbS();
-  const ids = (L.cmp || []).filter(id => DATA.models.some(m => m.id === id)).slice(0, CMP_TOP);
-  const ms = ids.map(id => DATA.models.find(m => m.id === id));
+  repLoad();
+  const ids = (L.cmp || []).filter(id => anyModel(id)).slice(0, CMP_TOP);
+  const ms = ids.map(anyModel);
   const PH = state.phone;
   if (LIVE && ms.some(m => servedOf(m.rowOf || m.id)) && !PH.loaded && !PH.loading && netReady())
     loadPhone();
@@ -9512,6 +9694,8 @@ function vCompare() {
         el('button', { class: 'quiet cmp-fold', 'aria-expanded': String(open),
           'data-cmp-fold': g.key, onclick: () => { state.cmpOpen[g.key] = !open; render(); } },
           (open ? '▾ ' : '▸ ') + g.name),
+        g.credit ? el('span', { class: 'small se', 'data-cmp-credit': g.key, text: ' · ' + g.credit })
+          : '',
         withAny < 2 ? el('span', { class: 'small se', text: ` · ${withAny} of ${ms.length} `
           + 'models measured' }) : ''));
     const body = el('tbody', { 'data-cmp-body': g.key }, gh);
@@ -9620,6 +9804,10 @@ function shapeCard(ms, where) {
 }
 function vLeaderboard(ms) {
   const L = lbS();
+  // 12m.2: a model known only as reported, when chosen, is a row of its own
+  repLoad();
+  if (L.models && L.view === 'standard')
+    ms = [...ms, ...repOnly().filter(m => L.models.includes(m.id))];
   // 12m.1: Compare is a view of Models, reached by choosing models, not a switch
   if (L.view === 'compare') return vCompare();
   if (!modelsViews().includes(L.view)) { L.view = 'standard'; L.chip = L.stdChip || 'all'; }
@@ -9675,6 +9863,7 @@ function vLeaderboard(ms) {
     : c.cat ? ((mmluCats(m) || {})[c.cat] || {}).score_report
     : c.gguf ? (ggufOf(m.id, c.gguf) || {}).v
     : c.rep ? repVal(m, c)
+    : c.rep2 ? repVal2(m, c)
     : c.task ? (cell(c.task, m.id) || {}).v : null;
   const rowsIn = lbFilter(ms);
   const sortCol = cols.find(c => c.key === state.sort.key) || cols.find(c => c.key === 'avg')
@@ -9709,7 +9898,7 @@ function vLeaderboard(ms) {
   // exam; the GGUF group needs the file
   const measures = c => !!(c.task || c.area || c.cat || c.judged || c.jarea || c.gguf);
   const hasFile = m => !!(G().registered || {})[m.rowOf || m.id];
-  const canHave = (m, c) => !narrow(m) || (c.gguf ? hasFile(m)
+  const canHave = (m, c) => m.reportedOnly ? !!c.rep2 : c.rep2 ? true : !narrow(m) || (c.gguf ? hasFile(m)
     : !(m.rowOf || ggufOnly(m)) && (c.task ? isGen(c.task) : !(c.area || c.cat)));
   // what the board measured decides the rows; a reported number never does
   // 12m.1: a GGUF measured only in a setup is still a row where GGUF columns
@@ -9717,7 +9906,9 @@ function vLeaderboard(ms) {
   const ggufRow = m => !m.rowOf && ggufAny(m.id) && !ggufHas(m.id)
     && (custom ? L.cols.every(isGgufKey) : dataCols.some(c => c.gguf));
   const testedIn = m => (custom ? L.cols.every(t => benchVal(t, m.id) != null)
-    : dataCols.some(c => !c.rep && val(m, c) != null) || (L.view === 'exam' && judgedAny(m)))
+    : dataCols.some(c => !c.rep && !c.rep2 && val(m, c) != null) || (L.view === 'exam' && judgedAny(m)))
+    // 12m.2: a model known only as reported is a row when it is chosen, and only then
+    || (m.reportedOnly && dataCols.some(c => c.rep2 && val(m, c) != null))
     || ggufRow(m);
   // a server can be asked this chip's generative tasks before any model has a
   // column for one: then it is "not tested", not absent
@@ -9930,6 +10121,7 @@ function vLeaderboard(ms) {
             text: pctn(g.score_report) });
           return one(c, m, g.score_report, null, pctn, { title: `${g.n_report} leaderboard-half items` });
         }
+        if (c.rep2) return rep2Cell(m, c);
         if (c.rep) return repCell(m, c);
         if (c.gguf) {
           const g = ggufOf(m.id, c.gguf);
@@ -10216,15 +10408,20 @@ function lbModelsPill(ms) {
   const btn = el('button', { class: 'pill' + (L.models ? ' on' : ''), id: 'pill-models',
     'data-models-menu': '1', text: `Models: ${L.models ? L.models.length : 'all'} ▾` });
   return popover(btn, () => {
-    const pick = new Set(L.models || ms.map(m => m.id));
+    // 12m.2: and the models known only as reported, by maker — never among
+    // "all", which is the board's
+    const reps = repOnly(), board = ms.filter(m => !m.reportedOnly), all = [...board, ...reps];
+    const pick = new Set(L.models || board.map(m => m.id));
     const list = el('div', { class: 'mlist' });
     const foot = el('p', { class: 'small se', 'data-models-foot': '1' });
-    const say = () => { foot.textContent = pick.size === ms.length ? 'All models shown'
-      : `${pick.size} of ${ms.length} shown`; };
-    const apply = () => lbSet({ models: pick.size === ms.length ? null : [...pick] });
+    const allOn = () => pick.size === board.length && board.every(m => pick.has(m.id));
+    const say = () => { foot.textContent = allOn() ? 'All models shown'
+      : `${pick.size} of ${board.length}${reps.length ? ` (and ${reps.length} reported)` : ''} shown`; };
+    const apply = () => lbSet({ models: allOn() ? null : [...pick] });
     // 12f.2b: phone builds and served models are groups of their own
     // 12m.1: and a GGUF file, or a setup of one, is a group of its own
-    const groupOf = m => isPhoneRow(m) ? 'phone builds' : m.served ? 'served'
+    const groupOf = m => m.reportedOnly ? 'reported · ' + (m.maker || 'other')
+      : isPhoneRow(m) ? 'phone builds' : m.served ? 'served'
       : m.rowOf || ggufOnly(m) ? 'GGUF'
       : m.source === 'artifact' ? 'checkpoints' : m.kind === 'instruct' ? 'instruct' : 'base';
     const row = m => el('label', { class: 'small mrow' },
@@ -10233,16 +10430,20 @@ function lbModelsPill(ms) {
           say(); apply(); } }),
       el('span', { class: 'famdot', style: `background:${famColor(m)}`, title: famOf(m) }),
       ' ' + m.name, el('span', { class: 'se', text: ' ' + famOf(m) }));
+    // Reported (not run here), a maker a group: the makers imported first, as set
+    const makers = [...new Set([...((REP().settings || {}).makers || []),
+      ...reps.map(m => m.maker || 'other')])].map(mk => 'reported · ' + mk);
+    const gname = g => g.startsWith('reported · ') ? 'Reported (not run here) · ' + g.slice(11) : g;
     const fill = q => {
-      const hit = ms.filter(m => !q
+      const hit = all.filter(m => !q
         || (m.name + ' ' + m.id + ' ' + famOf(m)).toLowerCase().includes(q.toLowerCase()));
-      list.replaceChildren(...['phone builds', 'served', 'GGUF', 'instruct', 'base', 'checkpoints']
-        .flatMap(g => {
+      list.replaceChildren(...['phone builds', 'served', 'GGUF', 'instruct', 'base', 'checkpoints',
+        ...makers].flatMap(g => {
           const gs = hit.filter(m => groupOf(m) === g);
           // a group's name chooses it alone: "only phone builds"
-          return gs.length ? [el('div', { class: 'small se mgroup', 'data-model-group': g }, g,
+          return gs.length ? [el('div', { class: 'small se mgroup', 'data-model-group': g }, gname(g),
             el('button', { class: 'quiet', 'data-model-group-only': g, text: 'only these',
-              onclick: () => { pick.clear(); ms.filter(m => groupOf(m) === g)
+              onclick: () => { pick.clear(); all.filter(m => groupOf(m) === g)
                 .forEach(m => pick.add(m.id)); say(); apply(); } })), ...gs.map(row)] : [];
         }));
     };
@@ -10258,7 +10459,7 @@ function lbModelsPill(ms) {
         // 12m.1: two to eight chosen, side by side
         el('button', { class: 'quiet', text: 'Compare these ▸', 'data-models-compare': '1',
           title: 'two to eight models, side by side', onclick: () => {
-            if (pick.size < 2 || pick.size === ms.length) {
+            if (pick.size < 2 || allOn()) {
               toast('Choose two to eight models to compare', { key: 'cmp' }); return; }
             popClose(true); openCompare([...pick]); } })),
       el('input', { type: 'search', placeholder: 'search models…', 'aria-label': 'search models',
@@ -10931,7 +11132,7 @@ function benchPick(ms, pick, hl) {
       ? `${pick.length} of ${ms.length} models, chosen here or on Models — the same choice`
       : `All ${ms.length} models`) + (hl.length ? ` · ${hl.length} highlighted` : '') }));
 }
-function vTasks(ms, hl = []) {
+function vTasks(ms, hl = [], reps = []) {
   if (!DATA.accTasks.length) return [note('No accuracy tasks found.')];
   const scaleBtn = (v, label, tip) => el('button', {
     class: 'tgl' + (state.accScale === v ? ' on' : ''), title: tip, text: label,
@@ -10961,7 +11162,7 @@ function vTasks(ms, hl = []) {
       el('h3', { class: 'domhead' }, dom,
         el('span', { class: 'se', text: ` · ${ts.length} task${ts.length > 1 ? 's' : ''}` })),
       el('div', { class: 'panels' }, ts.flatMap(t => [barPanel(t, ms, { lower: false, hl }),
-        ...ggufPanel(t, ms, hl)])))),
+        ...ggufPanel(t, ms, hl), ...repPanels(t, [...ms, ...reps], hl)])))),
     tableTwin('tasks-table', ms, DATA.accTasks, false)];
 }
 
@@ -13608,9 +13809,12 @@ function vHelp() {
 function vStandardBench(ms) {
   // 12m.1: only the chosen models (Models ▾, shared with Models), up to three highlighted
   const L = lbS();
+  repLoad();
   const pick = L.models ? ms.filter(m => L.models.includes(m.id)) : ms;
-  const hl = (L.hl || []).filter(id => pick.some(m => m.id === id)).slice(0, 3);
-  return [benchPick(ms, pick, hl), ...vTasks(pick, hl),
+  // 12m.2: and the models known only as reported, chosen or all — their own panels
+  const reps = L.models ? repOnly().filter(m => L.models.includes(m.id)) : repOnly();
+  const hl = (L.hl || []).filter(id => [...pick, ...reps].some(m => m.id === id)).slice(0, 3);
+  return [benchPick(ms, pick, hl), ...vTasks(pick, hl, reps),
     aboutBenchmarks([...DATA.accTasks, ...DATA.pplTasks])];
 }
 
@@ -16478,7 +16682,7 @@ function vAiModels() {
         text: w.text })),
       A.confirm ? aiRejudgeBox() : '',
       aiJobsTable(P)),
-    judgeTestCard()];
+    judgeTestCard(), outsideCard()];
 }
 
 // ---- the judge test ----------------------------------------------------------

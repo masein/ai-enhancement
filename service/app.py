@@ -34,7 +34,7 @@ from pydantic import BaseModel
 from . import (ai_models, builder, chat, config, db, disk, hfmeta, judge_test, llm, llm_poller,
                startup, suggest, worker)
 from . import playground
-from . import gguf, phone, served
+from . import gguf, phone, reported, served
 from . import proposals as prop
 from . import reader
 
@@ -918,6 +918,72 @@ class PhoneIn(BaseModel):
 @app.get("/api/phone")
 def phone_builds():
     return {"builds": phone.builds(), "readme": phone.README}
+
+
+# ---------------------------------------------------------------------------
+# 12m.2: reported scores from outside the board — their own endpoint, never
+# the results payload, so never a column, an average or the frozen report
+# ---------------------------------------------------------------------------
+
+@app.get("/api/reported")
+def reported_view():
+    return reported.view()
+
+
+class ReportedImportIn(BaseModel):
+    by: str = ""
+
+
+@app.post("/api/reported/import")
+def reported_import(a: ReportedImportIn, x_token: str = Header(default="")):
+    """Import now: every source, once, each saying what it did in one line"""
+    _check_token(x_token)
+    _name(a.by, "importing reported scores")
+    return {"results": reported.run_all()}
+
+
+class ReportedCardIn(BaseModel):
+    model: str
+    maker: str = ""
+    benchmark: str
+    value: str
+    setting: str = ""
+    url: str = ""
+    date: str = ""
+    entered_by: str = ""
+
+
+@app.post("/api/reported/cards")
+def reported_card(f: ReportedCardIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    try:
+        return {"score": reported.card_add(f.model_dump(), f.entered_by)}
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+
+
+class ReportedAliasIn(BaseModel):
+    alias: str
+    target: str = ""
+    by: str = ""
+
+
+@app.post("/api/reported/aliases")
+def reported_alias(a: ReportedAliasIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    try:
+        return reported.alias_set(a.alias, a.target, a.by)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+
+
+@app.post("/api/reported/aliases/delete")
+def reported_alias_delete(a: ReportedAliasIn, x_token: str = Header(default="")):
+    _check_token(x_token)
+    _name(a.by, "removing an alias")
+    if not db.reported_alias_delete(reported.key(a.alias)):
+        raise HTTPException(404, "no such alias")
+    return {"deleted": reported.key(a.alias)}
 
 
 @app.post("/api/phone/reports")
