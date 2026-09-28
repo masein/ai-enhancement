@@ -9657,7 +9657,8 @@ function vCompare() {
     const setup = cmpSetup(m);
     return el('li', { 'data-cmp-model': m.id },
       el('span', { class: 'key', style: `background:${trColor(i)}` }),
-      el('a', { href: '#model=' + encodeURIComponent(m.rowOf || m.id), text: m.name }),
+      m.reportedOnly ? el('span', { text: m.name })
+        : el('a', { href: '#model=' + encodeURIComponent(m.rowOf || m.id), text: m.name }),
       el('span', { class: 'se', 'data-cmp-kind': m.id, text: ' · ' + [cmpKind(m),
         m.params ? P(m.params) : null, setup || null].filter(Boolean).join(' · ') }));
   }));
@@ -9991,6 +9992,8 @@ function vLeaderboard(ms) {
       onclick: e => {
         // links, buttons, checkboxes and badges with a job of their own keep it
         if (e.target.closest('a, button, input, select, label, .badge[title]')) return;
+        // 12m.2: a model known only as reported opens beside the others, in Compare
+        if (m.reportedOnly) { openCompare([...(L.models || []).filter(id => id !== m.id), m.id]); return; }
         navigate({ model: m.rowOf || m.id, topic: null });
       } },
       visCols.map(c => {
@@ -10032,9 +10035,13 @@ function vLeaderboard(ms) {
               onchange: e => { const t = new Set(L.ticks || []);
                 if (e.target.checked) t.add(m.id); else t.delete(m.id);
                 L.ticks = [...t]; render(); } }) : '',
-            el('a', { class: 'mname mlink', text: m.name,
-              href: '#model=' + encodeURIComponent(m.rowOf || m.id) }),
-            ckBadge(m) || (m.kind === 'instruct'
+            // 12m.2: a model known only as reported has no page of its own here
+            m.reportedOnly ? el('span', { class: 'mname', title: m.id, text: m.name })
+              : el('a', { class: 'mname mlink', text: m.name,
+                href: '#model=' + encodeURIComponent(m.rowOf || m.id) }),
+            m.reportedOnly ? el('span', { class: 'badge', 'data-reported-tag': m.id,
+                title: 'not run here: only what others report', text: 'reported' })
+              : ckBadge(m) || (m.kind === 'instruct'
               ? el('span', { class: 'badge instruct', text: 'instruct' })
               : el('span', { class: 'badge', text: 'base' })),
             phoneTag(m) || servedTag(m.id),
@@ -10043,7 +10050,8 @@ function vLeaderboard(ms) {
               ? el('span', { class: 'badge instruct', 'data-thinking-badge': m.id,
                   title: genMode(m), text: 'thinking' }) : '',
             // a thinking row has only these three: Standard's "preliminary" is not its
-            m.thinkingRow || m.served || ggufOnly(m) ? '' : warnBadge(m) || '', dupBadge(m) || '',
+            m.thinkingRow || m.served || ggufOnly(m) || m.reportedOnly ? ''
+              : warnBadge(m) || '', dupBadge(m) || '',
             dupsOf[m.id] ? dupToggle(m, dupsOf[m.id]) : ''));
         if (c.key === 'params') {
           const a = m.archinfo || {};

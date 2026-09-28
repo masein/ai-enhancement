@@ -74,9 +74,15 @@ def test_models_menu_has_the_reported_models_by_maker_and_a_chosen_one_is_a_row(
         "xs => xs.every(x => !x.dataset.lead)")
     # a built table numbers its rows; the model has no average, so no rank
     assert page.evaluate(f"officialAvg(anyModel({json.dumps(F55)}))") is None
+    # tagged "reported", with no Standard badge and no page of its own here
+    assert row.locator(f"[data-reported-tag='{F55}']").inner_text() == "reported"
+    assert row.locator(".badge.prelim, a.mname").count() == 0
     groups = page.locator(f"{'[data-lb-table]'} thead tr.grp th").all_inner_texts()
     assert any(g.upper().startswith("REPORTED · ARTIFICIAL ANALYSIS") for g in groups)
     shot(page.locator("[data-lb-card]"), "models-reported-row.png")
+    # a click on it opens Compare, it beside the rest chosen
+    row.locator("td.num").first.click()
+    page.wait_for_selector("[data-compare='2']")
     assert page.errors == []
 
 
