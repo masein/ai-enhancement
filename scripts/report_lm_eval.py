@@ -1217,6 +1217,15 @@ def parse_run(blob: dict, source: Path) -> dict:
         tasks["simpleqa_verified"]["correct"] = {"value": float(r["rate"]),
                                                  "stderr": float(r.get("se") or 0.0),
                                                  "_filt_value": "board"}
+    # 12o.3: MobileAIBench's HotpotQA and SQL, scored by its own metrics —
+    # HotpotQA's F1 and SQL's SQLParser F1 are the cells
+    mab = _beside(source, "mobileaibench.json")
+    for t, key, metric in (("mab_hotpotqa", "f1", "mab_f1"),
+                           ("mab_sql", "sqlparser_f1", "sqlparser_f1")):
+        got = ((mab or {}).get("tasks") or {}).get(t) or {}
+        if t in tasks and got.get(key) is not None:
+            tasks[t][metric] = {"value": float(got[key]), "stderr": float(got.get("se") or 0.0),
+                                "_filt_value": "board"}
 
     n_samples = {k: (v.get("effective") if isinstance(v, dict) else v)
                  for k, v in (blob.get("n-samples") or {}).items()}
@@ -1282,6 +1291,7 @@ def parse_run(blob: dict, source: Path) -> dict:
         "generative": gen,
         "safety": saf,
         "simpleqa": sqa,
+    "mab": mab,
         # 12f.1: a model served elsewhere — how, and what its server reported
         "served": blob.get("served"),
         "tasks": tasks,
@@ -1327,7 +1337,7 @@ def primary_metric(entry: dict) -> tuple[str, float, float] | None:
     so nobody has to guess which number they are looking at.
     """
     for name in ("acc_norm", "acc", "exact_match", "prompt_level_strict_acc", "safe", "correct",
-                 "pass@1",
+                 "mab_f1", "sqlparser_f1", "pass@1",
                  "f1", "em", "bits_per_byte", "byte_perplexity", "word_perplexity"):
         d = entry.get(name)
         if isinstance(d, dict) and "value" in d:
@@ -1387,6 +1397,9 @@ BBQ_TASKS = ("bbq_3000", "bbq_all")
 # for the same questions. Standard benchmarks: never in the Avg, never a
 # training target, never in Improve. GPQA's questions are never shown
 FRONTIER_TASKS = ("gpqa_diamond_zeroshot", "gpqa_diamond_cot_zeroshot", "simpleqa_verified")
+# 12o.3: MobileAIBench's HotpotQA and SQL — never in the Avg, never a training
+# target, never in Improve
+MAB_TASKS = ("mab_hotpotqa", "mab_sql")
 GPQA_URL = "https://huggingface.co/datasets/Idavidrein/gpqa"
 
 # Controls: tasks run to test how we POSE a benchmark, not what a model knows.
@@ -1498,6 +1511,20 @@ _TASK_META = {
                           "not attempted. The score is the share correct, as Epoch AI reports "
                           "it; not attempted is its own number, as abstaining is honest, not "
                           "wrong. Instruct models only; never in the average."),
+    # 12o.3: MobileAIBench's own 1,000-row samples, scored by its own metrics
+    "mab_hotpotqa": ("mobile tasks",
+                     "HotpotQA, from MobileAIBench: answer a question from about ten given "
+                     "passages — on-phone search and documents. Their 1,000 questions and "
+                     "prompt; F1 over the answer's words, as MobileAIBench scores it (exact "
+                     "match and BLEU beside it). Short answers score best: the reference is a "
+                     "few words. Instruct models only; never in the average."),
+    "mab_sql": ("mobile tasks",
+                "SQL from a question, from MobileAIBench (sql-create-context): write the SQL "
+                "for a plain question, given the table's CREATE statement. Their 1,000 and "
+                "prompt; SQLParser F1 — the query's clauses as sets — as MobileAIBench scores "
+                "it (the Levenshtein ratio and exact match beside it). The SQL is taken from a "
+                "code block if the answer has one, else its first line starting with SELECT. "
+                "Instruct models only; never in the average."),
     "bbq_3000": ("trust & safety",
                  "BBQ's ambiguous questions: the context never says which person, so the "
                  "right answer is always \"unknown\". A seeded 3,000 of the 29,246. 0-shot, "
@@ -1595,6 +1622,26 @@ def shared_meta() -> dict:
     return out
 
 
+def mab_view(mab: dict | None) -> dict | None:
+    """12o.3: a model's MobileAIBench numbers beside its cells: HotpotQA's EM
+    and BLEU, SQL's Levenshtein ratio, exact match and answers with no SQL"""
+    t = (mab or {}).get("tasks") or {}
+    if not t:
+        return None
+    keep = {"mab_hotpotqa": ("f1", "em", "bleu", "n", "of"),
+            "mab_sql": ("sqlparser_f1", "levenshtein", "exact", "no_sql", "n", "of")}
+    return {k: {x: t[k].get(x) for x in keep[k]} for k in keep if k in t}
+
+
+def mab_meta() -> dict | None:
+    """12o.3: MobileAIBench's credit and the two datasets under it"""
+    try:
+        import mobileaibench as mab             # scripts/, beside this file
+        return {"credits": mab.credits(), "n": {t: len(mab.load(t)) for t in mab.TASKS}}
+    except (ImportError, OSError, ValueError, KeyError):
+        return None
+
+
 def trust_meta() -> dict:
     """12k.2: each set's credit (its licence asks for it) and the BBQ subset"""
     try:
@@ -1689,7 +1736,7 @@ def required_tasks(acc_tasks: list[str]) -> tuple[list[str], list[str]]:
             else list(_REQUIRED_DEFAULT))
     # never, whatever the env says — 12k.2: nor Trust & safety's own three
     want = [t for t in want if t not in CONTROL_TASKS and t not in TRUST_TASKS
-            and t not in FRONTIER_TASKS]
+            and t not in FRONTIER_TASKS and t not in MAB_TASKS]
     return [t for t in want if t in acc_tasks], [t for t in want if t not in acc_tasks]
 
 
@@ -1722,6 +1769,9 @@ def above_chance(task: str, v: float) -> float:
 # Proportion metrics: the only ones the two-proportion z-test is valid for.
 PROPORTION = {"acc", "acc_norm", "exact_match", "pass@1", "f1", "em", "rubric_pass",
               "prompt_level_strict_acc", "safe", "correct"}
+# 12o.3: scores from 0 to 1, higher better, that are means of per-question
+# scores rather than shares — a column like a proportion's, never its z-test
+MEAN_SCORES = {"mab_f1", "sqlparser_f1"}
 
 _PARAM_RE = re.compile(r"(\d+(?:\.\d+)?)([mb])(?![a-z0-9])", re.I)
 
@@ -1875,7 +1925,7 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
     # never a cell; the guard keeps a future metric from putting them here
     headline = [t for t in headline if not t.startswith(("fr_", "exam_"))]
     acc_tasks = [t for t in headline
-                 if metric_used.get(t) in PROPORTION and not is_lower_better(t)]
+                 if metric_used.get(t) in PROPORTION | MEAN_SCORES and not is_lower_better(t)]
     ppl_tasks = [t for t in headline if t not in acc_tasks]
 
     # official vs preliminary: the average is over the REQUIRED list or it does
@@ -1894,7 +1944,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         # average, the diagnostic one included
         have = [cells[t][mid]["v"] for t in acc_tasks
                 if mid in cells.get(t, {}) and t not in CONTROL_TASKS and t not in tainted_acc
-                and t not in GEN_TASKS and t not in TRUST_TASKS and t not in FRONTIER_TASKS]
+                and t not in GEN_TASKS and t not in TRUST_TASKS and t not in FRONTIER_TASKS
+                and t not in MAB_TASKS]
         got_req = [t for t in required if mid in cells.get(t, {}) and t not in tainted_acc]
         missing = [t for t in required if mid not in cells.get(t, {})]
         official = bool(required) and not missing and not (set(tainted_acc) & set(required))
@@ -1988,6 +2039,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
                                                   for t in BBQ_TASKS}),
             # 12n.2: SimpleQA Verified's three shares — its cell is the first
             "simpleqa": simpleqa_view(r.get("simpleqa")),
+            # 12o.3: MobileAIBench's two, and their other numbers
+            "mab": mab_view(r.get("mab")),
             # 12f.1: served elsewhere — how, and what its server reported. Its
             # own row: never averaged with the model it is based on
             "served": served.get(mid) or r.get("served") or None,
@@ -2389,6 +2442,8 @@ def build_payload(by_model: dict[str, dict], title: str, source: str,
         # GPQA's questions are never shown
         "frontierTasks": list(FRONTIER_TASKS),
         "shared": shared_meta(),
+        "mabTasks": list(MAB_TASKS),
+        "mab": mab_meta(),
         "thinkingModes": _thinking_modes(),
         "published": {m: {t: {"v": v, "note": note} for t, (v, note) in ts.items()}
                       for m, ts in _PUBLISHED.items()},
@@ -3659,6 +3714,8 @@ h3 .qx-open { text-transform:none; letter-spacing:0; }
 .qx-gen .qx-ans { white-space:pre-wrap; max-height:220px; overflow:auto; margin-top:4px;
   overflow-wrap:anywhere; }
 .qx-m { font-weight:600; }
+.qx-ctx-t { white-space:pre-wrap; overflow-wrap:anywhere; max-height:260px; overflow:auto;
+  background:var(--plane); border-radius:var(--r-1); padding:8px 10px; }
 .qx-ok { color:var(--good, #1a7f37); font-weight:700; }
 .qx-no { color:var(--critical-text, #b42318); font-weight:700; }
 .qx-pager { align-items:center; gap:10px; margin:8px 0; }
@@ -6507,7 +6564,7 @@ function avgVerdictOf(m) {
 // ---- 12f.1: a model served elsewhere ----
 const SERVED_LINE = 'Multiple-choice benchmarks need the model loaded here; this one is served '
   + 'elsewhere.';
-const SERVED_SUITES = ['everyday', 'judged', 'generative', 'safety', 'shared'];
+const SERVED_SUITES = ['everyday', 'judged', 'generative', 'safety', 'shared', 'mobile'];
 const servedOf = id => (DATA.served || {})[id]
   || (DATA.models.find(x => x.id === id) || {}).served || null;
 const isServedId = id => /^served\//.test(String(id || ''));
@@ -6558,6 +6615,19 @@ function evdSuiteLabel(id) {
   const each = (s.speed || {}).secs_each, measured = each != null && each > 0;
   const min = Math.max(1, Math.round(n * (measured ? each : SERVED_GUESS_S) / 60));
   return `Everyday tasks — ${n} questions, about ${min} min` + (measured ? '' : ', a rough guess');
+}
+// 12o.3: the Mobile tasks suite, its 2,000 answers — and, for a served model,
+// how long by its measured seconds an answer, as Everyday's says
+function mabSuiteLabel(id) {
+  const n = ((DATA.mab || {}).n || {});
+  const k = (n.mab_hotpotqa || 1000) + (n.mab_sql || 1000);
+  const s = isServedId(id) ? servedOf(id) : null;
+  const head = 'Mobile tasks (MobileAIBench) — HotpotQA, SQL';
+  if (!s) return `${head}: ${k.toLocaleString('en')} answers`;
+  const each = (s.speed || {}).secs_each, measured = each != null && each > 0;
+  const min = Math.max(1, Math.round(k * (measured ? each : SERVED_GUESS_S) / 60));
+  return `${head}: ${k.toLocaleString('en')} answers, about ${min} min`
+    + (measured ? '' : ', a rough guess');
 }
 function servedCompare(m) {
   const s = servedOf(m.id), want = String((s || {}).based_on || '').toLowerCase();
@@ -6824,6 +6894,7 @@ function kindParts(m, kind) {
         })() + '.' }) : '',
       trustLine(m),
       sharedLine(m),
+      mabLine(m),
       part(resultsPart(m), 'results'),
       // 12f.3: measured on the GGUF — under its own heading
       ggufPart(m),
@@ -6871,6 +6942,15 @@ function sharedLine(m) {
         + 'our method differs, not the model' }) : '',
     na ? el('p', { class: 'small se', text: ((DATA.shared || {}).simpleqa || {}).honest || '' })
       : '');
+}
+// 12o.3: "HotpotQA F1 0.61 · SQL 0.78 (MobileAIBench's 1,000 each)"
+function mabLine(m) {
+  const h = cell('mab_hotpotqa', m.id), q = cell('mab_sql', m.id);
+  if (!h && !q) return '';
+  return el('p', { class: 'small', 'data-mab-line': m.id, title: [...mabCredit('mab_hotpotqa'),
+      ...mabCredit('mab_sql').slice(0, 1)].join('\n'),
+    text: [h ? `HotpotQA F1 ${h.v.toFixed(2)}` : '', q ? `SQL ${q.v.toFixed(2)}` : '']
+      .filter(Boolean).join(' · ') + ' (MobileAIBench\u2019s 1,000 each)' });
 }
 function trustLine(m) {
   const t = m.trust;
@@ -9022,6 +9102,8 @@ const CATS = [
   // 12n.2: shared with the frontier — GPQA Diamond's two lm_eval forms and
   // SimpleQA Verified; never in Avg, never ranked with what others report
   ['shared',       ['gpqa_diamond_cot_zeroshot', 'gpqa_diamond_zeroshot', 'simpleqa_verified']],
+  // 12o.3: MobileAIBench's HotpotQA and SQL — never in Avg, never in Improve
+  ['mobile',       ['mab_hotpotqa', 'mab_sql']],
 ];
 function radarAxes() {
   if (state.radarAxes === 'tasks') return DATA.accTasks.map(t => ({ key: t, label: t, tasks: [t] }));
@@ -9119,7 +9201,7 @@ function aboutBenchmarks(tasks, inline = false) {
 const LB_CHIPS = [
   ['all', 'All tasks'], ['knowledge', 'Knowledge'], ['commonsense', 'Commonsense'],
   ['reasoning', 'Reasoning'], ['math', 'Math'], ['trust', 'Trust & safety'],
-  ['instruction', 'Instruction & maths'], ['lm', 'Language modelling'],
+  ['instruction', 'Instruction & maths'], ['mobile', 'Mobile tasks'], ['lm', 'Language modelling'],
   // 12n.1: the home of reported scores (live: the frozen report carries none)
   ['frontier', 'Frontier · reported']];
 // the four kinds of test, named the same and in the same order everywhere.
@@ -9154,7 +9236,7 @@ function lbFactsShown() {
 }
 const LB_GROUP = { knowledge: 'Knowledge', commonsense: 'Commonsense', reasoning: 'Reasoning',
   math: 'Math', trust: 'Trust & safety', instruction: 'Instruction & maths',
-  shared: 'Shared with the frontier' };
+  shared: 'Shared with the frontier', mobile: 'Mobile tasks (MobileAIBench)' };
 // 12n.2: GPQA Diamond and SimpleQA Verified, measured here beside what others
 // report — never in Avg, never a training target, never in Improve
 const frontierTasks = () => DATA.frontierTasks || [];
@@ -9165,7 +9247,20 @@ const SIMPLEQA = 'simpleqa_verified';
 const FR_METHOD = { [GPQA_COT]: 'CoT, 0-shot', [GPQA_LL]: '4 options scored, 0-shot',
   'gguf:gpqa': 'llama.cpp, 0-shot', [SIMPLEQA]: 'graded by the judge, the dataset\u2019s grader' };
 // a task a server can be asked: the generative three, GPQA's chain of thought, SimpleQA
-const servedAsks = t => isGen(t) || t === GPQA_COT || t === SIMPLEQA;
+const servedAsks = t => isGen(t) || t === GPQA_COT || t === SIMPLEQA || isMab(t);
+// 12o.3: MobileAIBench's HotpotQA and SQL, scored by its own metrics
+const MAB = ['mab_hotpotqa', 'mab_sql'];
+const isMab = t => MAB.includes(t);
+const MAB_METRIC = { mab_hotpotqa: 'F1', mab_sql: 'SQLParser F1' };
+// "HotpotQA: Yang et al. … · CC BY-SA 4.0", and MobileAIBench's own credit
+function mabCredit(t) {
+  const c = ((DATA.mab || {}).credits || []), mab = c[0] || {};
+  const src = c.find(x => x.name === (t === 'mab_hotpotqa' ? 'HotpotQA' : 'sql-create-context'))
+    || {};
+  return [src.name && `${src.name}: ${src.cite} · ${src.licence}`,
+    mab.name && `their 1,000, sampled by ${mab.name} (${mab.licence}): ${mab.cite}`]
+    .filter(Boolean);
+}
 // asked through the chat template: an instruct model's
 const chatOnly = t => servedAsks(t) || t === 'do_not_answer' || t === 'xstest';
 // 12k.2: Do-Not-Answer, XSTest and BBQ — never in Avg, never in Improve
@@ -9337,7 +9432,8 @@ const BENCH_NAMES = { mmlu: 'MMLU', hellaswag: 'HellaSwag', piqa: 'PIQA', winogr
   hendrycks_math500: 'MATH-500', do_not_answer: 'Do-Not-Answer', xstest: 'XSTest',
   bbq_3000: 'BBQ', bbq_all: 'BBQ (all 29,246)',
   gpqa_diamond_cot_zeroshot: 'GPQA Diamond (CoT)', gpqa_diamond_zeroshot: 'GPQA Diamond (4 options)',
-  simpleqa_verified: 'SimpleQA Verified' };
+  simpleqa_verified: 'SimpleQA Verified', mab_hotpotqa: 'HotpotQA (MobileAIBench)',
+  mab_sql: 'SQL from a question (MobileAIBench)' };
 const benchName = t => isGgufKey(t) ? `${ggufLabel(t.slice(5))} (GGUF)`
   : BENCH_NAMES[t] || LB_SHORT[t] || t;
 // the mean of the chosen benchmarks, on the Scale pill's scale; each error
@@ -9655,7 +9751,8 @@ function lbColumns(ms) {
       .filter(t => DATA.accTasks.includes(t)).map(task);
     // 12h.1: Instruction & maths stands on its own three numbers — the
     // Standard rank and average are Standard's, and none of these is in them
-    if (L.chip === 'instruction')
+    // 12o.3: and Mobile tasks on its own two
+    if (L.chip === 'instruction' || L.chip === 'mobile')
       lead.splice(0, lead.length, ...lead.filter(c => c.key !== 'rank' && c.key !== 'avg'));
   }
   // 12f.2b: and, on All tasks, what was reported from the phone while a row
@@ -9668,7 +9765,7 @@ const LB_SHORT = { arc_challenge: 'ARC-C', arc_easy: 'ARC-E', truthfulqa_mc2: 'T
   ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro', hendrycks_math500: 'MATH-500',
   do_not_answer: 'Do-Not-Answer', xstest: 'XSTest', bbq_3000: 'BBQ', bbq_all: 'BBQ, all',
   gpqa_diamond_cot_zeroshot: 'GPQA CoT', gpqa_diamond_zeroshot: 'GPQA 4 opts',
-  simpleqa_verified: 'SimpleQA' };
+  simpleqa_verified: 'SimpleQA', mab_hotpotqa: 'HotpotQA', mab_sql: 'SQL' };
 
 // A column's setup, in words — its tooltip, and its accessible name. The
 // header shows only the name; this is where the n-shot, the unit and the
@@ -9683,6 +9780,13 @@ function lbColTip(c) {
       `${Number(b.n || 0).toLocaleString('en')} questions, the lm_eval column's own`
         + (b.note ? ` · ${b.note}` : ''), 'never in any average with the lm_eval columns'];
   }
+  // 12o.3: MobileAIBench's metric, and its others under each cell
+  if (c.task && isMab(c.task)) return [`${benchName(c.task)} — ${MAB_METRIC[c.task]}, as `
+    + 'MobileAIBench scores it', c.task === 'mab_hotpotqa'
+      ? 'exact match and BLEU on each cell · short answers score best: the reference is a few '
+        + 'words' : 'the Levenshtein ratio and exact match (case, spacing, quotes) on each cell · '
+        + 'the SQL from a code block if the answer has one, else its first line starting with '
+        + 'SELECT', ...mabCredit(c.task), 'instruct models only · never in any average'];
   if (c.key === 'rank' && (lbS().cols || lbS().models)) return ['# — this table\u2019s rows, '
     + 'in the order they are sorted'];
   if (c.key === 'rank') return ['# — rank among the ranked models on this board'];
@@ -10720,7 +10824,7 @@ function cmpEvd(id, g) {
 function cmpGroups(ms) {
   const prov = m => judgedOkM(m) ? '' : ' · provisional';
   const lmTasks = DATA.accTasks.filter(t => !isGen(t) && t !== 'do_not_answer' && t !== 'xstest'
-    && !(DATA.tasks[t] || {}).control && !isFrontierTask(t));
+    && !(DATA.tasks[t] || {}).control && !isFrontierTask(t) && !isMab(t));
   const safe = (key, label, pick, lower) => ({ key, label, lower, noBest: !!lower,
     get: m => {
       const t = m.trust || {}, x = pick(t);
@@ -10769,6 +10873,14 @@ function cmpGroups(ms) {
     // 12n.2: shared with the frontier — the phone build, the original,
     // Qwen3-1.7B and a frontier model on one line
     frCmpGroup(ms),
+    // 12o.3: MobileAIBench's two, each by its own metric
+    { key: 'mobile', name: 'Mobile tasks (MobileAIBench)', rows: MAB.map(t => ({ key: t,
+      label: `${LB_SHORT[t]} · ${MAB_METRIC[t]}`, get: m => {
+        const c = cell(t, m.id), x = ((m.mab || {})[t]) || {};
+        return c ? { v: c.v, se: c.se || null, tag: 'MobileAIBench\u2019s metric',
+          tip: t === 'mab_hotpotqa' ? `EM ${(100 * (x.em || 0)).toFixed(1)} · BLEU `
+            + `${(100 * (x.bleu || 0)).toFixed(1)}` : `Levenshtein ${(100 * (x.levenshtein
+            || 0)).toFixed(1)} · exact ${(100 * (x.exact || 0)).toFixed(1)}` } : null; } })) },
     // 12m.2: what others report, a source a group, each credited
     ...repCmpGroups(ms),
     // 12f.2: what someone measured on the phone, as they reported it
@@ -11180,7 +11292,7 @@ function vLeaderboard(ms) {
     || ggufRow(m);
   // a server can be asked this chip's generative tasks before any model has a
   // column for one: then it is "not tested", not absent
-  const chipAsks = L.chip === 'all' || [...genTasks(), GPQA_COT, SIMPLEQA].some(t =>
+  const chipAsks = L.chip === 'all' || [...genTasks(), GPQA_COT, SIMPLEQA, ...MAB].some(t =>
     ((CATS.find(([g]) => g === L.chip) || [])[1] || []).includes(t));
   const couldHave = m => cols.some(c => measures(c) && canHave(m, c))
     || (!!m.served && !custom && chipAsks);
@@ -11455,7 +11567,7 @@ function vLeaderboard(ms) {
     const miss = L.cols.filter(t => (cell(t, m.id) || {}).v == null);
     const text = 'no ' + miss.map(benchName).join(', ');
     // 12k.2: Do-Not-Answer and XSTest are the safety suite's, asked as IFEval is
-    const asked = t => t === 'do_not_answer' || t === 'xstest';
+    const asked = t => t === 'do_not_answer' || t === 'xstest' || isMab(t);
     const harness = miss.filter(t => !isGen(t) && !asked(t));
     if (m.thinkingRow && harness.filter(t => t !== GPQA_COT && t !== SIMPLEQA).length)
       return { text: text + ' · a thinking row has only IFEval, MMLU-Pro, MATH-500, GPQA '
@@ -11465,7 +11577,8 @@ function vLeaderboard(ms) {
     if (narrow(m) && harness.length) return { text: text + ' · served: a server can’t give the '
       + 'log-likelihoods ' + harness.map(benchName).join(', ') + (harness.length > 1 ? ' use'
         : ' uses'), suite: miss.some(isGen) ? 'generative' : null };
-    return { text, suite: harness.length ? 'full' : miss.some(isGen) ? 'generative' : 'safety' };
+    return { text, suite: harness.length ? 'full' : miss.some(isGen) ? 'generative'
+      : miss.some(isMab) ? 'mobile' : 'safety' };
   };
   // 12n.1: a served model or a GGUF these can't measure says why, and what
   // llama.cpp measured of it instead: "HellaSwag 82.7 · Winogrande 74.4"
@@ -14939,7 +15052,12 @@ function vQueue(part = { form: true, list: true }) {
         { sub: 'GPQA Diamond thinking step by step, and 1,000 short facts graded by the judge '
           + 'with the dataset\'s grader: beside what Epoch AI reports, never ranked with it. '
           + 'Instruct models only (a base model sits GPQA\'s four options in full); never in '
-          + 'the average.' }]]
+          + 'the average.' }],
+      // 12o.3: MobileAIBench's HotpotQA and SQL, scored by its own metrics
+      ['mobile', mabSuiteLabel(sf.hf_id.trim()),
+        { sub: 'Answer from ten given passages, and SQL from a plain question: MobileAIBench\'s '
+          + 'own 1,000 each and its prompt, scored by its metrics — no judge. Instruct models '
+          + 'only; never in the average.' }]]
       .map(o => srvId && !SERVED_SUITES.includes(o[0])
         ? [o[0], o[1], { ...(o[2] || {}), disabled: true, title: SERVED_LINE }] : o),
       sf.suite || 'full', v => { sf.suite = v; render(); }, { key: 'submit-suite' }),
@@ -16000,6 +16118,11 @@ function qxRow(row, d) {
   return el('section', { class: 'qx-q', 'data-qx-q': row.id },
     row.subject ? el('div', { class: 'small se qx-subj', text: row.subject }) : '',
     el('div', { class: 'qx-text', text: row.q }),
+    // 12o.3: HotpotQA's passages, or the table's CREATE statement, folded
+    row.context ? el('details', { class: 'qx-ctx', 'data-qx-context': row.id },
+      el('summary', { class: 'small se', text: row.context.startsWith('CREATE')
+        ? 'the table ▸' : 'the passages ▸' }),
+      el('div', { class: 'small qx-ctx-t', text: row.context })) : '',
     (row.options || []).length ? el('ol', { class: 'qx-opts' }, row.options.map((o, i) =>
       el('li', { class: right.has(i) ? 'qx-right' : '', 'data-qx-opt': String(i) },
         el('b', { text: (L[i] || i + 1) + '. ' }), o,
@@ -17936,7 +18059,7 @@ state.suiteOpen = new Set();
 const SUITE_NAMES = { full: 'Standard', quick: 'Standard · quick', control: 'MMLU control',
   judged: 'Knowledge exam', everyday: 'Everyday tasks', generative: 'Instruction & maths',
   safety: 'Trust & safety', gguf: 'Measured on the GGUF',
-  shared: 'Shared with the frontier' };
+  shared: 'Shared with the frontier', mobile: 'Mobile tasks (MobileAIBench)' };
 function suiteWords(r) {
   const w = SUITE_NAMES[r.suite] || r.suite;
   return r.suite === 'full' && r.bbq_all ? w + ' · all of BBQ' : w;

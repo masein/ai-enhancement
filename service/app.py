@@ -431,8 +431,9 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         raise HTTPException(422, "suite must be quick, full, control (mmlu_perm only), "
                                  "judged (free response + judge), everyday (Everyday tasks), "
                                  "generative (IFEval, MMLU-Pro, MATH-500), safety "
-                                 "(Do-Not-Answer, XSTest) or shared (GPQA Diamond, "
-                                 "SimpleQA Verified)")
+                                 "(Do-Not-Answer, XSTest), shared (GPQA Diamond, "
+                                 "SimpleQA Verified) or mobile (MobileAIBench's HotpotQA and "
+                                 "SQL)")
     if s.suite not in ("generative", "shared") and s.thinking:
         raise HTTPException(422, "thinking is for IFEval, MMLU-Pro and MATH-500 (suite "
                                  "generative) and GPQA Diamond and SimpleQA Verified (suite "
@@ -448,6 +449,8 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         raise HTTPException(422, config.SAFETY_INSTRUCT_ONLY + ". Nothing was queued.")
     if s.suite == "shared" and s.kind == "base":
         raise HTTPException(422, config.SHARED_INSTRUCT_ONLY + ". Nothing was queued.")
+    if s.suite == "mobile" and s.kind == "base":
+        raise HTTPException(422, config.MAB_INSTRUCT_ONLY + ". Nothing was queued.")
     total = sum(config.MMLU_PRO_SUBJECTS.values())
     if s.subset and not 0 < s.subset < total:
         raise HTTPException(422, f"subset is a number of MMLU-Pro items, from 1 to {total - 1}; "

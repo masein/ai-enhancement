@@ -54,7 +54,7 @@ LOGLIK_LINE = ("Multiple-choice benchmarks need the model loaded here; this one 
 CHANGED_LINE = ("The server now serves a different file than the one registered. Register it "
                 "again if that's intended.")
 KEPT_FOR_NEXT = " · the answers it gave are kept: the next run asks only the rest"
-SUITES = ("everyday", "judged", "generative", "safety", "shared")
+SUITES = ("everyday", "judged", "generative", "safety", "shared", "mobile")
 THINKING = {"on": "on", "off": "off", "auto": "the model decides"}
 PINNED = ("file", "size", "ctx", "build")
 TS_FMT = "%Y-%m-%dT%H-%M-%S.000000"
@@ -818,7 +818,7 @@ def estimate(rec: dict, suite: str, tasks: list[str] | None = None, subset: int 
             tin += k * GEN_PROMPT_TOKENS.get(task, 0)
             tout += k * runner.gen_thinking({}, meta)["budget"]
             continue
-        everyday = suite in ("everyday", "safety", "shared")
+        everyday = suite in ("everyday", "safety", "shared", "mobile")
         if suite == "everyday":
             import everyday as _ev
             docs = _ev.unanswered(model_dir(rec))
@@ -828,6 +828,10 @@ def estimate(rec: dict, suite: str, tasks: list[str] | None = None, subset: int 
         elif task == config.SIMPLEQA_TASK:
             import simpleqa as _sq                  # 12n.2: its questions, as the run sends them
             docs = [{"id": q["id"], "prompt": q["prompt"]} for q in _sq.load()]
+        elif task in config.MAB_TASKS:
+            import mobileaibench as _mab            # 12o.3: its prompts, and its system line
+            docs = [{"id": q["id"], "prompt": q["prompt"]} for q in _mab.load(task)]
+            tin += len(docs) * tokens_of(_mab.SYSTEM[task])
         else:
             path = config.JUDGED_TASKS_DIR / f"{task}.jsonl"
             docs = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines()

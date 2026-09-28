@@ -4157,6 +4157,70 @@ answers failed, some two thirds of them wrongly.
   keeps its tables in memory; no writer, Improve, the Playground or chat
   imports it (a test checks both).
 
+### 12o.3 — HotpotQA and SQL, from MobileAIBench
+
+- **Why:** two more of MobileAIBench's text sets that fit phone use and are
+  scored without a judge (we already measure its MMLU, GSM8K, TruthfulQA,
+  Do-Not-Answer and BBQ from their own sources): HotpotQA (answer from about
+  ten given passages: on-phone search and documents) and SQL from a question
+  (sql_create_context: the SQL for a plain question, given the table's
+  CREATE statement).
+- **The data:** MobileAIBench's own 1,000-row samples (`data/hotpot_qa.csv`,
+  `data/sql_create_context.csv`, github.com/SalesforceAIResearch/MobileAIBench,
+  Apache-2.0), pinned in `eval_tasks/mobileaibench/manifest.json` to commit
+  `cff7b48f` with each file's sha256 — so our numbers compare with their
+  paper's. Under them: HotpotQA is CC BY-SA 4.0 (Yang et al., 2018), and
+  sql-create-context CC BY 4.0 (b-mc2, from WikiSQL and Spider), both from
+  their dataset cards; credited in the columns' tooltips and the questions.
+- **The prompts are theirs, word for word** (`src/data_processing/
+  data_loader.py`): their system line (sent as the run's
+  `--system_instruction`, or a system message over a server), then
+  "context: …\nquestion: …\nanswer: " — and SQL's, typo ("hte") and all.
+- **The metrics are theirs, ported** (`scripts/mobileaibench.py`, from
+  `src/evaluation/evaluate.py` and `utils.py`):
+  - HotpotQA: exact match, F1 over `normalize_answer`'s tokens, and BLEU —
+    nltk's `sentence_bleu` with smoothing method 1 on the normalised strings,
+    which nltk reads character by character (a test checks the port against
+    nltk wherever nltk is installed: the server's image has it). Their
+    cleaning: a label before the first colon (within 100 characters) goes.
+    **The column is F1.**
+  - SQL: SQLParser F1 (the clauses, as sets) and the Levenshtein ratio (twice
+    the longest common subsequence over both lengths, as `Levenshtein.ratio`),
+    and the normalised exact match as a stricter reading. The SQL is taken
+    from a code block if the answer has one, else its first line starting
+    with SELECT, else the answer as written. **The column is SQLParser F1.**
+  - A thinking model's answer is the text after its thinking.
+- **The suite, "mobile"** ("Mobile tasks (MobileAIBench)"): both, 2,000
+  answers, with the Everyday settings; instruct, served and OpenRouter models
+  (the estimate first, the limit applied); base models are refused in one
+  line. Scored after the run into `mobileaibench.json`, no judge and no GPU.
+  Deploy step 4 checks it. **Standard benchmarks: never in the Avg (their
+  scores are means, not shares — a column, never the proportion z-test),
+  never a training target, never in Improve.**
+- **On the page:** a Mobile tasks chip (HotpotQA, SQL; no Standard rank or
+  Avg, as Instruction & maths); a panel each on Benchmarks, with their
+  questions (the passages or the table folded; each answer's F1, EM and
+  BLEU, or SQLParser F1, Levenshtein and exact, and where its SQL was found);
+  Compare's group of their own; the model page's line, "HotpotQA F1 0.61 ·
+  SQL 0.78 (MobileAIBench's 1,000 each)"; Test a model's suite, with a served
+  model's time from its measured speed.
+- **Their paper's numbers:** none of the models MobileAIBench reports
+  (TinyLlama, Phi-2, Gemma 2B and 7B, Llama-2-7B, Mistral-7B, Zephyr-3B,
+  XGen-3B) is on the board, so none is typed in. One that joins the board
+  gets its paper numbers as a reported card (12m.2), never ranked with ours.
+- **Not added, and why:**
+  - **cnn_dailymail and xsum (ROUGE):** Everyday's Summarise group covers
+    phone-style summarising with a rubric, and ROUGE punishes a good summary
+    worded differently.
+  - **databricks_dolly_15k:** open-ended answers scored by overlap with one
+    human answer.
+  - **mt_bench_question:** needs a strong judge per turn.
+  - **adv_instruction:** its labels need MobileAIBench's own judge prompt.
+    Revisit if masein asks.
+  - **privacy_leakage** (built from real people's emails) and
+    **social_chemistry_101** (contested moral judgements): left out on
+    purpose (12k).
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

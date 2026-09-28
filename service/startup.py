@@ -75,6 +75,11 @@ REQUIRED_REPO_FILES = [
     "eval_tasks/simpleqa/_simpleqa_template_yaml",
     "eval_tasks/simpleqa/simpleqa_verified.csv",
     "eval_tasks/simpleqa/grader_template.txt",
+    # 12o.3: mobileaibench.build_tasks() writes HotpotQA's and SQL's tasks from these
+    "eval_tasks/mobileaibench/manifest.json",
+    "eval_tasks/mobileaibench/_mab_template_yaml",
+    "eval_tasks/mobileaibench/hotpot_qa.csv",
+    "eval_tasks/mobileaibench/sql_create_context.csv",
     "FRIENDS.md",                           # served at /guide
     "clients/bench_client.py",              # served at /client
     *DELIVERED_TOPIC_FILES,

@@ -28,7 +28,10 @@ NAMES = {"mmlu": "MMLU", "hellaswag": "HellaSwag", "piqa": "PIQA", "winogrande":
          # 12n.2: shared with the frontier
          "gpqa_diamond_cot_zeroshot": "GPQA Diamond (CoT)",
          "gpqa_diamond_zeroshot": "GPQA Diamond (4 options)",
-         "simpleqa_verified": "SimpleQA Verified"}
+         "simpleqa_verified": "SimpleQA Verified",
+         # 12o.3: MobileAIBench's two
+         "mab_hotpotqa": "HotpotQA (MobileAIBench)",
+         "mab_sql": "SQL from a question (MobileAIBench)"}
 
 
 def shot(page_or_part, name, **kw):
