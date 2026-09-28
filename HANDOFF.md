@@ -3652,6 +3652,48 @@ From the overnight GGUF and served runs (§ 5d):
 3. #90: Re-run failed benchmarks, then Measure MMLU on each GGUF.
 4. Queue #96 again.
 
+### 12m.1 — Compare, shapes by method, and the Benchmarks filter
+
+masein, 2026-09-28: compare the phone build with non-phone models, any few
+models side by side, and filter Benchmarks to a couple.
+
+- **Compare** (`#tab=models&view=compare&m=<id>,<id>…`, `vCompare`): two to
+  eight models across, benchmarks down the side, grouped by method —
+  Standard · lm_eval, Measured on the GGUF, Instruction & maths, Everyday
+  tasks, Knowledge exam, Trust & safety (judged 0–2), On the phone · reported.
+  - Every cell has a method tag ("lm_eval · 5-shot", "llama.cpp · 0-shot",
+    "340 questions, our checks" — the bank's own count, "judged 0–4 ·
+    provisional"…). A row compares only the cells with its own tag (the one
+    most share): the best of those is bold; a cell measured another way is
+    grey with its tag and never ranked. Over-refusal is lower-is-better and
+    never "best". Nothing is averaged.
+  - Two models: a Δ column, only where both share the row's tag, with the
+    board's z-test (|z| > 1.96): "+2.8 · clear", "−1.6 · not a clear
+    difference", or "no error to test".
+  - A group fewer than two of the models have is folded, saying how many.
+  - Above the table, a line a model: its kind (base, instruct, served, GGUF,
+    phone build, checkpoint), size and setup.
+  - Reached by ticking rows on Models (Compare N ▸), Models ▾ ▸ Compare
+    these, and a model page's Compare with…; saved by Save view (spec
+    `{view: "compare", models}`, two to eight).
+- **Shapes** (`shapeCard`, and Insights' radar): one method at a time —
+  Standard, GGUF, Everyday groups, Instruction & maths (Insights also MMLU
+  and the exam by area) — only the axes at least two of the chosen models
+  have (one model: its own), named as the tables name them. A source
+  without three shared axes opens the next that has them (the phone build:
+  GGUF or Everyday); none: "Nothing measured the same way for these models
+  yet".
+- **Benchmarks ▸ Standard** takes Models ▾ — the same choice as Models, in
+  the address (`models=`) — and Highlight: up to three models in colour in
+  every panel, the rest grey (`hl=`). Each panel's header starts with its
+  method and how many of the chosen models it holds. A GGUF panel sits
+  beside the lm_eval panel of the same benchmark, never merged into it.
+- **Two fixes:** a GGUF's own row on Models holds its "as built" results
+  alone (it fell back to the first setup with results); measured only in a
+  setup, its cells read "not measured yet" beside that setup's row. The run
+  lists name a GGUF run with its setup ("… · GGUF · lookahead 1") and every
+  suite by the board's name, never its id (`SUITE_NAMES`).
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

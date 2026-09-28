@@ -323,8 +323,10 @@ def test_insights_has_the_frontier_weakest_topics_and_the_radar(live, page):
       .map(a => +JSON.parse(a.dataset.tip)[1].split(' ')[0])""")
     assert vals == sorted(vals)
     assert bars.first.get_attribute("href").startswith("#topic=")
-    # the radar: chips, not a compare column
-    assert page.locator(f"{LB} th.cmp, {LB} input[aria-label^='compare']").count() == 0
+    # the radar: chips, not a compare column. 12m.1: each row has a tick for
+    # Compare ▸, the view of its own — still no column in this table
+    assert page.locator(f"{LB} th.cmp").count() == 0
+    assert page.locator(f"{LB} input[data-cmp-tick]").count() > 0
     page.locator("#pill-radar-add").click()
     page.locator(f"#pop-radar-add [data-radar-pick='{TOP}']").click()
     page.wait_for_selector(f"[data-radar-chip='{TOP}']")
