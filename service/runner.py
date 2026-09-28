@@ -444,6 +444,8 @@ def include_args_for(task: str) -> list[str]:
         return ["--include_path", str(config.TRUST_TASKS_DIR)]
     if task == config.SIMPLEQA_TASK:                # 12n.2: simpleqa.build_tasks writes it
         return ["--include_path", str(config.SIMPLEQA_TASKS_DIR)]
+    if task in config.MAB_TASKS:                    # 12o.3: mobileaibench.build_tasks writes them
+        return ["--include_path", str(config.MAB_TASKS_DIR)]
     if task.startswith(("exam_", "fr_")):
         return ["--include_path", str(config.JUDGED_TASKS_DIR)]
     if config.EVAL_TASKS_DIR.is_dir() and any(config.EVAL_TASKS_DIR.glob("*.yaml")):
@@ -454,7 +456,7 @@ def include_args_for(task: str) -> list[str]:
 def lm_eval_cmd(model_args: str, task: str, shots: int, batch, task_out: Path, *,
                 chat: bool, max_gen_toks: int | None = None, backend: str = "hf",
                 samples: Path | None = None, limit: int | None = None,
-                cache: Path | None = None) -> list[str]:
+                cache: Path | None = None, system: str | None = None) -> list[str]:
     """The lm_eval command for one task. Built here only, so that
     scripts/check_tasks.py (deploy step 4) hands the installed harness exactly
     what a run hands it. 12h.1: `backend` is "hf" or "vllm" (vLLM sizes its
@@ -484,6 +486,9 @@ def lm_eval_cmd(model_args: str, task: str, shots: int, batch, task_out: Path, *
         cmd += ["--limit", str(limit)]
     if cache:
         cmd += ["--use_cache", str(cache)]
+    # 12o.3: a benchmark whose prompt has a system line of its own (MobileAIBench's)
+    if system:
+        cmd += ["--system_instruction", system]
     return cmd
 
 
@@ -721,7 +726,8 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
 def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, label: str,
                 log_path: Path, everyday: bool, asked: list[str] | None, safety: bool = False,
                 meter: _served.Meter | None = None, evd_dir: Path | None = None,
-                trust_dir: Path | None = None, sq_dir: Path | None = None):
+                trust_dir: Path | None = None, sq_dir: Path | None = None,
+                mab_dir: Path | None = None):
     """one Everyday, exam or Trust & safety task, asked over the model's
     server. (status, stopped): 0 or CANCELED, and a ServerStopped when it
     stopped answering — what it answered before that is written and kept.
@@ -735,6 +741,11 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
         # 12n.2: asked as typed, with the Everyday settings, as Trust & safety is
         items = (sq_dir or config.SIMPLEQA_TASKS_DIR) / f"{task}.jsonl"      # build_tasks'
         everyday, safety = True, True
+    elif task in config.MAB_TASKS:
+        # 12o.3: MobileAIBench's prompt as typed, its system line as the system
+        # message, with the Everyday settings
+        items = (mab_dir or config.MAB_TASKS_DIR) / f"{task}.jsonl"        # build_tasks'
+        everyday, safety = True, True
     elif everyday:
         items = (evd_dir or config.EVERYDAY_TASKS_DIR) / f"{config.EVERYDAY_TASK}.jsonl"
     else:
@@ -744,6 +755,10 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
     if everyday and not safety and asked is not None:
         docs = [d for d in docs if d.get("id") in set(asked)]
     s = _served.settings_for(rec, meta, everyday)
+    if task in config.MAB_TASKS:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import mobileaibench as _mab
+        s["system"] = _mab.SYSTEM[task]
     with open(log_path, "a") as lf:
         lf.write(f"\n===== [{sid}] {task} · served: {rec['name']} at {rec['base_url']} · "
                  f"{rec['pin'].get('version') or rec['pin'].get('file')} · {len(docs)} "
@@ -818,6 +833,9 @@ def run_submission(sub: dict) -> None:
     # 12n.2: GPQA Diamond's chain of thought, asked as the generative three are,
     # and SimpleQA Verified, asked as Trust & safety is and graded by the judge
     shared = sub["suite"] == "shared"
+    # 12o.3: MobileAIBench's HotpotQA and SQL, asked as SimpleQA is and scored
+    # by MobileAIBench's own metrics, with no judge
+    mobile = sub["suite"] == "mobile"
     # 12f.0: a run that can't save doesn't start — in the status dot's words
     from . import disk
     why = disk.blocks_run()
@@ -869,6 +887,7 @@ def run_submission(sub: dict) -> None:
     evd_dir = config.BENCH_ROOT / "remote" / "everyday-tasks" if remote else config.EVERYDAY_TASKS_DIR
     trust_dir = config.BENCH_ROOT / "remote" / "trust-tasks" if remote else config.TRUST_TASKS_DIR
     sq_dir = config.BENCH_ROOT / "remote" / "simpleqa-tasks" if remote else config.SIMPLEQA_TASKS_DIR
+    mab_dir = config.BENCH_ROOT / "remote" / "mab-tasks" if remote else config.MAB_TASKS_DIR
     db.update(sid, kind=kind, params=meta["params"], vocab=meta["vocab"],
               batch=meta["batch"], need_gb=meta["need_gb"],
               arch=json.dumps(meta.get("archinfo") or {}),
@@ -931,6 +950,11 @@ def run_submission(sub: dict) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import simpleqa as _sq
         _sq.build_tasks(sq_dir)
+    if set(tasks) & set(config.MAB_TASKS):
+        # 12o.3: MobileAIBench's two samples, from the pinned files
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import mobileaibench as _mab
+        _mab.build_tasks(mab_dir)
     if remote_code:      # the code that produced the scores is part of the record
         db.update(sid, progress=f"preflight ok · custom model code · batch={meta['batch']}")
     # 12h.1: a Hub model on the approved list runs its own code offline, as
@@ -1082,7 +1106,7 @@ def run_submission(sub: dict) -> None:
                 status, stopped = _ask_served(sid, rec, meta, task, task_out, label, log_path,
                                               everyday, asked, safety=safety, meter=meter,
                                               evd_dir=evd_dir, trust_dir=trust_dir,
-                                              sq_dir=sq_dir)
+                                              sq_dir=sq_dir, mab_dir=mab_dir)
                 gpu_seconds += time.time() - t_task
                 db.update(sid, gpu_seconds=gpu_seconds)
                 if status == CANCELED:
@@ -1106,7 +1130,7 @@ def run_submission(sub: dict) -> None:
             # ran out inside the thinking on every question of run #60. Only
             # its judged answers get more room, and only when its template is
             # the one that thinks; lm_eval records the override in its results
-            sq = task == config.SIMPLEQA_TASK
+            sq = task == config.SIMPLEQA_TASK or task in config.MAB_TASKS
             thinks = ((kind == "instruct" and task in judged or everyday or safety or sq)
                       and (meta.get("archinfo") or {}).get("reasoning_template"))
             # 12a.4: its everyday answers get more room still — 12d.1: said
@@ -1115,7 +1139,8 @@ def run_submission(sub: dict) -> None:
             room = (_everyday_settings(meta)["max_gen_toks"] if everyday or safety or sq
                     else _exam_settings(meta)["max_gen_toks"]) if thinks else None
             cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
-                              chat=kind == "instruct" or everyday, max_gen_toks=room)
+                              chat=kind == "instruct" or everyday, max_gen_toks=room,
+                              system=_mab.SYSTEM[task] if task in config.MAB_TASKS else None)
             if gen_task:
                 def gen_cmd(be):
                     samples = None
@@ -1325,6 +1350,21 @@ def run_submission(sub: dict) -> None:
                 db.update(sid, error=f"grading: {e}")
                 with open(log_path, "a") as lf:
                     lf.write(f"\n[service] SimpleQA Verified could not be graded: {e!r}\n")
+        # 12o.3: MobileAIBench's two, scored by its own metrics — no judge, no GPU
+        if mobile and not failed_tasks:
+            db.update(sid, status="running", progress="scoring the answers")
+            try:
+                out = _mab.mark(config.OUT_DIR / row_safe)
+                if out:
+                    _mab.write(config.OUT_DIR / row_safe, out)
+                judge_note = _mab.summary(out)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n===== [{sid}] MobileAIBench: {judge_note} =====\n")
+            except Exception as e:                      # noqa: BLE001 — the answers are on disk
+                failed_tasks.append("scoring")
+                db.update(sid, error=f"scoring: {e}")
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] MobileAIBench could not be scored: {e!r}\n")
         # 12h.1: the three read again, in this board's words — the letter an
         # answer settles on, the final answer compared as maths, the harness's
         # own IFEval verdicts — and the answers that ran out of room counted
@@ -1394,7 +1434,7 @@ def run_submission(sub: dict) -> None:
             what = (f"all {len(tasks)} tasks" if not only
                     else f"{', '.join(t.replace('exam_', '') for t in tasks)}")
             db.update(sid, status="done", finished_at=time.time(),
-                      progress=spent(judge_note if everyday or safety or shared
+                      progress=spent(judge_note if everyday or safety or shared or mobile
                                      else f"{what} done" + (f" · {note}" if note else "")
                                      + judge_note), error="")
     finally:

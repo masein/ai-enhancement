@@ -1,0 +1,24 @@
+# MobileAIBench's HotpotQA and SQL (12o.3). mobileaibench.build_tasks()
+# copies this into the run's task directory with the prompts' absolute path
+# filled in, as simpleqa.build_tasks does. The prompt is MobileAIBench's own
+# user turn; its system line goes as the run's --system_instruction; both
+# inside the model's own chat template, with the Everyday settings
+dataset_path: json
+dataset_kwargs:
+  data_files:
+    test: __ITEMS_PATH__
+test_split: test
+output_type: generate_until
+doc_to_text: "{{prompt}}"
+doc_to_target: ""
+generation_kwargs:
+  until: __UNTIL__
+  max_gen_toks: __MAX_GEN_TOKS__
+  do_sample: __DO_SAMPLE__
+  temperature: __TEMPERATURE__
+# no metric here: scripts/mobileaibench.py reads the answers after the run and
+# scores them with MobileAIBench's own metrics, ported, into mobileaibench.json
+metric_list:
+  - metric: bypass
+metadata:
+  version: 1.0

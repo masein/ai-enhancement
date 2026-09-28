@@ -164,7 +164,7 @@ def test_a_chip_fills_the_checklist_and_a_tick_makes_it_custom(live, page):
     # 12i.0: a group nothing has run yet (Math: GSM8K) is listed too, greyed
     # 12k.2: Truthfulness is Trust & safety
     assert groups == ["knowledge", "commonsense", "reasoning", "math", "trust",
-                      "instruction", "shared"]                         # 12n.2
+                      "instruction", "shared", "mobile"]               # 12n.2, 12o.3
     offered = page.locator("#pop-benchmarks [data-bench]").evaluate_all(
         "es => es.map(e => e.dataset.bench)")
     assert not [t for t in offered if t.startswith(("exam_", "fr_", "everyday")) or t == "mmlu_perm"]

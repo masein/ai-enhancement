@@ -415,6 +415,17 @@ SHARED_INSTRUCT_ONLY = ("GPQA Diamond's chain of thought and SimpleQA Verified a
                         "the chat template and marked on what the model writes, so only an "
                         "instruct model can sit them — this one runs as a base model (a base "
                         "model sits GPQA Diamond's four options scored, in the full suite)")
+# 12o.3: two of MobileAIBench's text sets, scored without a judge by its own
+# metrics (scripts/mobileaibench.py): HotpotQA (answer from the passages given)
+# and SQL from a question. Its own 1,000-row samples, pinned in
+# eval_tasks/mobileaibench. The "mobile" suite. Standard benchmarks: never in
+# the Avg, never a training target, never in Improve
+MAB_HOTPOT, MAB_SQL = "mab_hotpotqa", "mab_sql"
+MAB_TASKS = [MAB_HOTPOT, MAB_SQL]
+MAB_TASKS_DIR = Path(os.environ.get("MAB_TASKS_DIR", BENCH_ROOT / "mobileaibench" / "tasks"))
+MAB_INSTRUCT_ONLY = ("MobileAIBench's HotpotQA and SQL are asked through the chat template and "
+                     "scored on what the model writes, so only an instruct model can sit them — "
+                     "this one runs as a base model")
 
 # alone is 12,032 chain-of-thought answers, hours where the Standard tasks
 # take minutes — and never in the official average: a base model cannot be
@@ -440,7 +451,8 @@ GEN_INSTRUCT_ONLY = ("IFEval, MMLU-Pro and MATH-500 are asked through the chat t
 
 # every suite a run can ask for; scripts/check_tasks.py (deploy step 4) asks
 # the installed lm_eval to find every task of each
-SUITES = ("quick", "full", "control", "judged", "everyday", "generative", "safety", "shared")
+SUITES = ("quick", "full", "control", "judged", "everyday", "generative", "safety", "shared",
+          "mobile")
 
 
 def tasks_for_suite(suite: str, bbq_all: bool = False) -> list[str]:
@@ -456,6 +468,8 @@ def tasks_for_suite(suite: str, bbq_all: bool = False) -> list[str]:
         return list(GEN_TASKS)
     if suite == "shared":
         return list(SHARED_TASKS)
+    if suite == "mobile":
+        return list(MAB_TASKS)
     if suite == "judged":
         return judged_tasks()
     base = QUICK_TASKS if suite == "quick" else FULL_TASKS

@@ -63,6 +63,8 @@ def kind_of(task: str) -> str:
         return "safety"
     if task == "simpleqa_verified":
         return "simpleqa"
+    if task in ("mab_hotpotqa", "mab_sql"):
+        return "mab"                        # 12o.3: MobileAIBench's, by its own metrics
     if task.startswith(GEN):
         return "gen"
     return "lm"
@@ -245,6 +247,11 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
     elif kind == "simpleqa":
         import simpleqa as sq
         marks = {it["id"]: it for it in (sq.read(d) or {}).get("items") or []}
+    elif kind == "mab":
+        import mobileaibench as mab
+        marks = {it["id"]: it for it in (((mab.read(d) or {}).get("tasks") or {}).get(task)
+                                        or {}).get("items") or []}
+        gold = {q["id"]: q for q in mab.load(task)}
     elif kind == "exam":
         try:
             j = json.loads((d / "judge.json").read_text(encoding="utf-8"))
@@ -294,8 +301,26 @@ def _rows_of(task: str, d: Path) -> dict[str, dict]:
             row["reference"] = got.get("key") if task != "ifeval" else None
         else:
             a = _answer(rec)
-            m = marks.get(doc.get("id")) if kind in ("safety", "simpleqa") else marks.get(key)
-            if kind == "safety":
+            m = marks.get(doc.get("id")) if kind in ("safety", "simpleqa", "mab") \
+                else marks.get(key)
+            if kind == "mab":
+                q = gold.get(doc.get("id")) or {}
+                row["q"] = q.get("question") or row["q"]
+                # the CREATE statement, or HotpotQA's passages: folded on the page
+                row["context"] = q.get("context") if task == "mab_sql" else doc.get(
+                    "prompt", "").split("\nquestion: ", 1)[0].removeprefix("context: ")
+                row["reference"] = q.get("answer")
+                if not m:
+                    ok, verdict = None, "not scored yet"
+                elif task == "mab_hotpotqa":
+                    ok = m["f1"] >= 0.5
+                    verdict = f"F1 {m['f1']:.2f} · EM {m['em']} · BLEU {m['bleu']:.2f}"
+                else:
+                    ok = m["sqlparser"] >= 0.5
+                    verdict = (f"SQLParser F1 {m['sqlparser']:.2f} · Levenshtein "
+                               f"{m['levenshtein']:.2f} · exact {'✓' if m['exact'] else '✗'}"
+                               f" · SQL from {'no SQL found' if m['how'] == 'none' else m['how']}")
+            elif kind == "safety":
                 ok = None if not m or m.get("score") is None else m["score"] == 2
                 verdict = (m or {}).get("reason") or "not marked yet"
             elif kind == "simpleqa":
@@ -402,6 +427,13 @@ def meta(task: str) -> dict:
     if kind == "exam":
         return {"source": "the Knowledge exam, written for this board", "licence": None,
                 "revision": None, "url": None}
+    if kind == "mab":
+        import mobileaibench as mab
+        c = mab.credits()
+        src = c[1] if task == "mab_hotpotqa" else c[2]
+        return {"source": f"{src['name']} ({src['cite']}), MobileAIBench's 1,000-row sample",
+                "licence": f"{src['licence']}; the sample {c[0]['licence']}",
+                "revision": c[0]["revision"], "url": c[0]["url"]}
     if kind == "simpleqa":
         import simpleqa as sq
         c = sq.credit()
@@ -488,6 +520,7 @@ def page(task: str, *, offset: int = 0, limit: int = PAGE, q: str = "", subject:
         out_rows.append({"id": k, "q": r["q"], "options": r.get("options") or [],
                          "answer_idx": r.get("answer_idx"), "subject": r.get("subject") or "",
                          "reference": r.get("reference") or None,
+                         "context": r.get("context") or None,
                          "results": {m: r["results"].get(m) for m in shown},
                          # 12o.2: the GGUF's, where llama.cpp says which question it was
                          **({"gguf": {m: res.get(r.get("gkey")) for m, res in

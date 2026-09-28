@@ -203,6 +203,9 @@ def main() -> int:
         # 12n.2: SimpleQA Verified, from the pinned file
         import simpleqa
         config.SIMPLEQA_TASKS_DIR = simpleqa.build_tasks(Path(tmp) / "simpleqa-task")
+        # 12o.3: MobileAIBench's HotpotQA and SQL, from the pinned files
+        import mobileaibench
+        config.MAB_TASKS_DIR = mobileaibench.build_tasks(Path(tmp) / "mobileaibench-tasks")
         seen: dict[str, tuple[bool, str, str]] = {}
         # the full suite's second choice, all of BBQ, is checked as its own line
         for suite, tasks in [(s, config.tasks_for_suite(s)) for s in config.SUITES] + [

@@ -20,6 +20,8 @@ service.sqlite3*
 /everyday/
 # …and SimpleQA Verified's (12n.2), from eval_tasks/simpleqa
 /simpleqa/
+# …and MobileAIBench's two (12o.3), from eval_tasks/mobileaibench
+/mobileaibench/
 
 # tests and tooling
 .pytest_cache/

@@ -1,0 +1,43 @@
+{
+ "built": "2026-09-28",
+ "sampled_by": {
+  "name": "MobileAIBench",
+  "licence": "Apache-2.0",
+  "url": "https://github.com/SalesforceAIResearch/MobileAIBench",
+  "revision": "cff7b48f3b1e0c3e2549c2ae211ce14a4ceba8d1",
+  "cite": "Murthy et al., MobileAIBench: Benchmarking LLMs and LMMs for On-Device Use Cases (2024)"
+ },
+ "sources": {
+  "hotpot_qa": {
+   "name": "HotpotQA",
+   "licence": "CC BY-SA 4.0",
+   "url": "https://huggingface.co/datasets/hotpotqa/hotpot_qa",
+   "revision": null,
+   "cite": "Yang et al., HotpotQA: A Dataset for Diverse, Explainable Multi-hop Question Answering (EMNLP 2018)"
+  },
+  "sql_create_context": {
+   "name": "sql-create-context",
+   "licence": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/b-mc2/sql-create-context",
+   "revision": null,
+   "cite": "b-mc2, sql-create-context (2023), built from WikiSQL and Spider"
+  }
+ },
+ "note": "MobileAIBench's own 1,000-row samples, as its repository holds them at the revision above; the underlying datasets' revisions are not recorded there",
+ "files": {
+  "hotpot_qa": {
+   "file": "hotpot_qa.csv",
+   "from": "data/hotpot_qa.csv",
+   "sha256": "a49512b65844cfb25b4f51824e30a285ce05353599848c856ab2372e67f9fac6",
+   "bytes": 2936721,
+   "n": 1000
+  },
+  "sql_create_context": {
+   "file": "sql_create_context.csv",
+   "from": "data/sql_create_context.csv",
+   "sha256": "45e63fcc8c9d2dd5b36c915f7186d1bb2a6e1dcd4afe859a38576bed23c82818",
+   "bytes": 221593,
+   "n": 1000
+  }
+ }
+}

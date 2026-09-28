@@ -21,6 +21,7 @@ eval_tasks/*
 # (BBQ) and the safety suite build their tasks from them
 !eval_tasks/trust_safety
 !eval_tasks/simpleqa
+!eval_tasks/mobileaibench
 logs/
 artifacts/
 service.sqlite3*
