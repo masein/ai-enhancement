@@ -38,8 +38,6 @@ def docs_of(n_hs=12):
     mmlu = [{"question": f"What is {i} + {i}?", "choices": [str(2 * i - 1), str(2 * i),
                                                             str(2 * i + 1), "none"],
              "answer": 1, "subject": "arith"} for i in range(1, 7)]
-    mmlu.append({"question": "An empty choice?", "choices": ["a", "", "c", "d"], "answer": 0,
-                 "subject": "x"})
     hs = [{"query": f"Cooking: He cuts the onion {i}", "choices": ["and cries.", "and flies.",
                                                                    "and sings.", "and swims."],
            "gold": 0} for i in range(n_hs)]
@@ -51,6 +49,11 @@ def docs_of(n_hs=12):
     arc = [{"question": f"Which is a mammal {i}?", "choices": {"text": ["cat", "fish", "ant"],
                                                               "label": ["A", "B", "C"]},
             "answerKey": "A"} for i in range(4)]
+    # 12f.5: the question with an empty answer the format can't hold is ARC's
+    # now: MMLU's answers are letters
+    arc.append({"question": "An empty choice?", "choices": {"text": ["a", "", "c"],
+                                                            "label": ["A", "B", "C"]},
+                "answerKey": "A"})
     tqa = [{"question": "Is the earth flat?", "mc1_targets": {"choices": ["No.", "Yes."],
                                                              "labels": [1, 0]}}]
     by = {"mmlu": mmlu, "hellaswag": hs, "winogrande": wg, "arc_challenge": arc,
@@ -262,12 +265,16 @@ def test_the_converters_questions_are_lm_evals(tmp_path):
     docs = docs_of()
     man = gd.build(tmp_path, docs_of=docs)["benchmarks"]
     mmlu = gd.read_mc_binary((tmp_path / "mmlu-test.bin").read_bytes())
-    # the same questions, in lm_eval's order; the one it can't hold, counted
-    assert [t["question"] for t in mmlu] == [d["question"] for d in docs("mmlu")[:6]]
-    assert all(t["labels"] == [0, 1, 0, 0] for t in mmlu)
-    assert (man["mmlu"]["n"], man["mmlu"]["skipped"], man["mmlu"]["of"]) == (6, 1, 7)
+    # the same questions, in lm_eval's order — 12f.5: as lm_eval's mmlu asks
+    # them, lettered (test_12f5 has the whole prompt)
+    assert [t["question"].split("\n\n")[1].split("\n")[0] for t in mmlu] == \
+        [d["question"] for d in docs("mmlu")]
+    assert all(t["labels"] == [0, 1, 0, 0] and t["answers"] == ["A", "B", "C", "D"] for t in mmlu)
+    assert (man["mmlu"]["n"], man["mmlu"]["skipped"], man["mmlu"]["of"]) == (6, 0, 6)
     arc = gd.read_mc_binary((tmp_path / "arc-challenge-test.bin").read_bytes())
     assert arc[0]["answers"] == ["cat", "fish", "ant"] and arc[0]["labels"] == [1, 0, 0]
+    # the one it can't hold, counted
+    assert (man["arc_challenge"]["n"], man["arc_challenge"]["skipped"]) == (4, 1)
     tqa = gd.read_mc_binary((tmp_path / "truthfulqa-mc1-validation.bin").read_bytes())
     assert tqa[0]["labels"] == [1, 0]
     # six lines a HellaSwag task: the context, the gold index, four endings

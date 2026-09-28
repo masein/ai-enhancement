@@ -26,6 +26,12 @@ cached by size and mtime) and each dataset's against what the board queued —
 a changed one stops the job in one line; each benchmark run and read as it
 prints; the lock released. Ctrl+C, a cancel file or the time limit stop the
 running benchmark and keep the finished ones.
+
+12f.5: a multiple-choice benchmark runs with -np and -c sized from its file
+(gguf_bench.mc_flags), read here, so a manifest from before them needs
+nothing. And at start, what a worker that stopped mid-job left is cleared up
+(Worker.recover): its lock, and the job it was on, which fails saying "The
+GGUF worker restarted during this run."
 """
 
 from __future__ import annotations
@@ -48,6 +54,7 @@ import gguf_bench as gb  # noqa: E402
 
 POLL_S = 5.0
 LOCK_BEAT_S = 120            # a lock whose heartbeat is older is a dead worker's
+RESTARTED = gb.RESTARTED
 _stop = {"why": ""}
 
 
@@ -68,6 +75,19 @@ def read_json(p: Path) -> dict | None:
         return None
 
 
+def alive(pid: int) -> bool:
+    """whether a process of this host is running"""
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
 class Worker:
     def __init__(self, results: Path, binary: str, ld_path: str = "", poll: float = POLL_S,
                  time_limit: float = 24 * 3600):
@@ -86,6 +106,7 @@ class Worker:
             d.mkdir(parents=True, exist_ok=True)
         self.build = self._build()
         self.state = "idle"
+        self.owner = f"gguf-worker {socket.gethostname()} {os.getpid()}"
 
     # -- the heartbeat, the build ------------------------------------------------
     def _build(self) -> str:
@@ -111,23 +132,24 @@ class Worker:
     def heartbeat(self) -> None:
         write_json(self.beat, {"at": now(), "pid": os.getpid(), "host": socket.gethostname(),
                                "binary": self.binary, "build": self.build, "state": self.state})
-        if (self.lock / "owner").exists():
+        # 12f.5: its own lock only. A restarted worker kept a dead one's lock
+        # alive, and waited behind it for ever
+        if self._owner() == self.owner:
             try:
                 (self.lock / "heartbeat").write_text(str(now()))
             except OSError:
                 pass
 
     # -- the run lock ------------------------------------------------------------
-    def take_lock(self, sid: int) -> str:
+    def take_lock(self, sid: int, again: bool = True) -> str:
         """'' when taken, else who holds it"""
         try:
             self.lock.mkdir(parents=True)
         except FileExistsError:
-            beat = self.lock / "heartbeat"
-            if beat.exists() and now() - beat.stat().st_mtime > LOCK_BEAT_S:
+            if again and self._dead_lock():
                 # a worker that died holding it: take it over
                 self._rm_lock()
-                return self.take_lock(sid)
+                return self.take_lock(sid, again=False)
             held = ""
             try:
                 held = (self.lock / "submission").read_text().strip()
@@ -136,9 +158,33 @@ class Worker:
             return f"run #{held}" if held and held != "0" else "a run from the command line"
         (self.lock / "pid").write_text(str(os.getpid()))
         (self.lock / "submission").write_text(str(sid))
-        (self.lock / "owner").write_text(f"gguf-worker {socket.gethostname()} {os.getpid()}")
+        (self.lock / "owner").write_text(self.owner)
         (self.lock / "heartbeat").write_text(str(now()))
         return ""
+
+    def _owner(self) -> str:
+        try:
+            return (self.lock / "owner").read_text().strip()
+        except OSError:
+            return ""
+
+    def _dead_lock(self) -> bool:
+        """a worker's lock whose worker is gone: its heartbeat over LOCK_BEAT_S
+        old, or (12f.5) a worker of this host whose process has ended"""
+        beat = self.lock / "heartbeat"
+        try:
+            if now() - beat.stat().st_mtime > LOCK_BEAT_S:
+                return True
+        except OSError:
+            return False                       # no heartbeat: a board or command-line run's
+        mine = f"gguf-worker {socket.gethostname()} "
+        owner = self._owner()
+        if owner == self.owner or not owner.startswith(mine):
+            return False
+        try:
+            return not alive(int(owner[len(mine):]))
+        except ValueError:
+            return False
 
     def _rm_lock(self) -> None:
         for f in ("pid", "submission", "owner", "heartbeat"):
@@ -154,6 +200,43 @@ class Worker:
     def release_lock(self) -> None:
         if (self.lock / "owner").exists():
             self._rm_lock()
+
+    # -- 12f.5: at start, what a worker that stopped mid-job left ------------------
+    def recover(self) -> list[str]:
+        """a dead worker's lock goes; a job whose result still says "running"
+        (or "waiting" with no request left to take up) has nothing running it,
+        and fails, saying so — #89 sat "canceling" a day after its worker
+        crashed. Its request is done with, so it isn't run again: Re-run failed
+        benchmarks on the board queues what it didn't finish. A job waiting
+        for the lock with its request still here is queued: taken as any
+        other. The ids it failed"""
+        if self.lock.is_dir() and self._dead_lock():
+            self._rm_lock()
+        live = ""
+        if self._owner().startswith("gguf-worker ") and self._owner() != self.owner:
+            try:
+                live = (self.lock / "submission").read_text().strip()   # another worker's
+            except OSError:
+                pass
+        failed = []
+        for p in sorted(self.out.glob("*.json")):
+            res = read_json(p)
+            if not res or str(res.get("id")) == live:
+                continue
+            req = self.requests / f"{res.get('id')}.json"
+            if not (res.get("status") == "running"
+                    or (res.get("status") == "waiting" and not req.exists())):
+                continue
+            for v in (res.get("benchmarks") or {}).values():
+                if v.get("status") == "running":
+                    v.update(status="failed", error=RESTARTED)
+                elif v.get("status") == "queued":
+                    v["status"] = "not run"
+            res.update(status="failed", line=RESTARTED, finished_at=now())
+            write_json(p, res)
+            self._done(req, res)
+            failed.append(str(res.get("id")))
+        return failed
 
     # -- hashes --------------------------------------------------------------------
     def sha256(self, p: Path) -> str:
@@ -206,6 +289,7 @@ class Worker:
             return False
         try:
             self.state = f"running {req['id']}"
+            self.heartbeat()
             self.run(req, res, res_path)
         except Exception as e:                   # noqa: BLE001 — 12f.4: never left "running"
             # a crash ends its job, with what happened, and the worker goes on
@@ -283,6 +367,18 @@ class Worker:
                                 "again to measure on the new one.")
                 write_json(res_path, res)
                 return
+            if gb.BENCHMARKS[b]["mode"] == "multiple-choice":
+                # 12f.5: -np and -c from the file itself (a manifest from
+                # before 12f.5 has no shape), and whether its answers are
+                # letters, kept with what it measured
+                try:
+                    res["datasets"][b].update(gb.mc_shape(f.read_bytes()))
+                except ValueError as e:
+                    res.update(status="failed", finished_at=now(),
+                               line=f"The {gb.BENCHMARKS[b]['label']} dataset can't be read: "
+                                    f"{e}. Run the converter again (HANDOFF § 5d).")
+                    write_json(res_path, res)
+                    return
         limit = float(req.get("time_limit_s") or self.time_limit)
         for b in req["benchmarks"]:
             why = self.stop_why(req, t0, limit)
@@ -324,7 +420,7 @@ class Worker:
         setup = req.get("setup") or gb.AS_BUILT
         cmd = gb.command(b, self.binary, str(model),
                          (req.get("flags") or gb.DEFAULT_FLAGS) + list(setup.get("flags") or []),
-                         str(data), n)
+                         str(data), n, shape=(res.get("datasets") or {}).get(b))
         log = self.out / f"{req['id']}.{b}.log"
         cur = {"status": "running", "command": cmd, "env": setup.get("env") or {},
                "log": log.name, "started_at": now(), "done": 0, "total": n}
@@ -457,6 +553,9 @@ def main(argv: list[str] | None = None) -> int:
                a.time_limit_h * 3600)
     print(f"gguf worker: {w.build or 'llama-perplexity (no version)'} · watching {w.requests}",
           flush=True)
+    for rid in w.recover():
+        print(f"gguf worker: run #{rid} was left running by a worker that stopped: failed, "
+              "saying so", flush=True)
     if a.once:
         w.once()
     else:

@@ -19,11 +19,25 @@ says its file must be), written as:
   The file ends with a blank line: `-f` drops the last newline, and the reader
   then drops a last line with none;
 - **MMLU, ARC-Challenge, ARC-Easy, TruthfulQA (MC1)**: llama-perplexity's
-  multiple-choice binary (below).
+  multiple-choice binary (below). 12f.5: MMLU as lm_eval's mmlu asks it —
+  "The following are multiple choice questions (with answers) about
+  {subject}.", the question, the options lettered A. to D., "Answer:" — with
+  the letters as its answers (mmlu_task). The others are each option's text
+  after the question, as lm_eval scores them.
 
-The files, their sha256 and counts go in manifest.json beside them. A changed
-file is a new dataset version, as for the Everyday bank: results record the
-sha256 they were measured on.
+The files, their sha256 and counts go in manifest.json beside them, and for a
+multiple-choice file the most answers a task has, its biggest task's tokens
+and whether its answers are letters (gguf_bench.mc_shape): the worker's -np
+and -c. A build fills those in for the files it didn't rebuild too, so
+`--only mmlu` leaves every entry with them. A changed file is a new dataset
+version, as for the Everyday bank: results record the sha256 they were
+measured on.
+
+12f.5, once after deploying: MMLU again, lettered (the others' files don't
+change, so their results stay current):
+
+    sudo docker compose exec -T bench python scripts/gguf_data.py \\
+      --out /home/masein/benchmarks/results/gguf_data --only mmlu
 
 The multiple-choice binary, as perplexity.cpp's multiple_choice_score reads
 it (little-endian):
@@ -76,38 +90,8 @@ def mc_binary(tasks: list[dict]) -> bytes:
         + b"".join(bodies)
 
 
-def read_mc_binary(data: bytes) -> list[dict]:
-    """the file back, as multiple_choice_score deserialises it — and each
-    task read again from its own offset, as a subset run seeks to it"""
-    def string(at):
-        (n,) = struct.unpack_from("<I", data, at)
-        return data[at + 4:at + 4 + n].decode("utf-8"), at + 4 + n
-
-    def block(at):
-        (n,) = struct.unpack_from("<I", data, at)
-        if n > 100:
-            raise ValueError("more than 100 answers: llama-perplexity refuses it")
-        at += 4
-        answers = []
-        for _ in range(n):
-            a, at = string(at)
-            answers.append(a)
-        labels = list(struct.unpack_from(f"<{n}i", data, at))
-        return answers, labels, at + 4 * n
-
-    (n_task,) = struct.unpack_from("<I", data, 0)
-    offsets = struct.unpack_from(f"<{n_task}I", data, 4)
-    out, at = [], 4 + 4 * n_task
-    for i in range(n_task):
-        if offsets[i] != at:
-            raise ValueError(f"task {i} starts at {at}, its offset says {offsets[i]}")
-        q, at = string(at)
-        a1, l1, at = block(at)
-        a2, l2, at = block(at)
-        out.append({"question": q, "answers": a1, "labels": l1, "mc2": a2})
-    if at != len(data):
-        raise ValueError(f"{len(data) - at} bytes after the last task")
-    return out
+# the file back, as multiple_choice_score reads it: the worker reads it too
+read_mc_binary = gb.read_mc
 
 
 # ---------------------------------------------------------------------------
@@ -122,12 +106,25 @@ def _flat(text) -> str:
     return " ".join(str(text).split())
 
 
+MMLU_HEAD = "The following are multiple choice questions (with answers) about {subject}.\n\n"
+
+
 def mmlu_task(doc: dict) -> dict | None:
-    answers = [_flat(c) for c in doc["choices"]]
-    if not all(answers):
-        return None                         # llama-perplexity refuses an empty answer
-    return {"question": _flat(doc["question"]), "answers": answers,
-            "labels": _one_hot(len(answers), int(doc["answer"]))}
+    """12f.5: as lm_eval's mmlu asks it, 0-shot — its description (the subject,
+    underscores as spaces), then doc_to_text: the question stripped, each
+    option as lm_eval writes it after its letter, and "Answer:". The answers
+    are the letters: llama-perplexity scores question + " " + answer, so the
+    letter it scores is " A", lm_eval's target delimiter and choice. An empty
+    option is still a letter, so no question is left out"""
+    choices = [str(c) for c in doc["choices"]]
+    if not 2 <= len(choices) <= len(gb.LETTERS):
+        return None
+    letters = list(gb.LETTERS[:len(choices)])
+    subject = str(doc.get("subject") or "").replace("_", " ").strip()
+    text = (MMLU_HEAD.format(subject=subject) + str(doc["question"]).strip() + "\n"
+            + "".join(f"{k}. {c}\n" for k, c in zip(letters, choices)) + "Answer:")
+    return {"question": text, "answers": letters,
+            "labels": _one_hot(len(choices), int(doc["answer"]))}
 
 
 def arc_task(doc: dict) -> dict | None:
@@ -271,6 +268,15 @@ def build(out: Path, only: list[str] | None = None, docs_of=lm_eval_docs) -> dic
         print(f"{info['label']}: {n} of {len(docs)} questions"
               + (f" ({skipped} left out: the format can't hold them exactly)" if skipped else "")
               + f" -> {out / info['data']}")
+    # 12f.5: every multiple-choice file's shape, the ones not rebuilt too (a
+    # manifest from before has none): read from the file, which isn't changed
+    for key, entry in manifest["benchmarks"].items():
+        f = out / entry.get("file", "")
+        if gb.BENCHMARKS.get(key, {}).get("mode") == "multiple-choice" and f.is_file():
+            try:
+                entry.update(gb.mc_shape(f.read_bytes()))
+            except ValueError as e:
+                print(f"{gb.BENCHMARKS[key]['label']}: {f} can't be read ({e}): build it again")
     manifest["made_at"] = time.time()
     mpath.write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     return manifest

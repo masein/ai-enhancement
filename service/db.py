@@ -372,8 +372,44 @@ def add(hf_id: str, kind: str, suite: str, submitter: str, note: str,
         return int(cur.lastrowid)
 
 
-def claim_next() -> dict | None:
-    """Atomically move the oldest queued row to 'preflight' and return it."""
+# 12f.5: one queue — board runs and GGUF jobs take turns in the order they
+# were queued. A GGUF job not finished holds back the board runs queued after
+# it (while its worker is there to run it), and a board run not finished
+# holds back the GGUF jobs queued after it (gguf.sync hands their requests to
+# the worker only then)
+GGUF_UNFINISHED = ("queued", "waiting_lock", "running", "canceling")
+BOARD_UNFINISHED = ("queued", "preflight", "waiting_gpu", "waiting_lock", "running", "canceling")
+
+
+def board_ahead(sid: int) -> int | None:
+    """the oldest board run queued before GGUF job `sid` and not finished"""
+    with closing(_conn()) as c:
+        row = c.execute(f"SELECT id FROM submissions WHERE suite!='gguf' AND id<? AND status IN "
+                        f"({','.join('?' * len(BOARD_UNFINISHED))}) ORDER BY id LIMIT 1",
+                        (sid, *BOARD_UNFINISHED)).fetchone()
+    return int(row[0]) if row else None
+
+
+def gguf_ahead() -> tuple[int, int] | None:
+    """(the oldest queued board run, the oldest GGUF job queued before it and
+    not finished), or None when nothing holds that run back"""
+    with closing(_conn()) as c:
+        row = c.execute("SELECT id FROM submissions WHERE status='queued' AND suite!='gguf' "
+                        "ORDER BY id LIMIT 1").fetchone()
+        if not row:
+            return None
+        g = c.execute(f"SELECT id FROM submissions WHERE suite='gguf' AND id<? AND status IN "
+                      f"({','.join('?' * len(GGUF_UNFINISHED))}) ORDER BY id LIMIT 1",
+                      (row[0], *GGUF_UNFINISHED)).fetchone()
+    return (int(row[0]), int(g[0])) if g else None
+
+
+def claim_next(gguf_first: bool = False) -> dict | None:
+    """Atomically move the oldest queued row to 'preflight' and return it.
+    12f.5: with gguf_first (the GGUF worker is running), not while a GGUF job
+    queued before it hasn't finished"""
+    if gguf_first and gguf_ahead():
+        return None
     with closing(_conn()) as c:
         # 12f.3: a GGUF job is the host's worker's, never this queue's
         row = c.execute("SELECT id FROM submissions WHERE status='queued' AND suite!='gguf' "

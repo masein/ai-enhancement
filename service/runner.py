@@ -254,6 +254,50 @@ def acquire_lock(sid: int) -> bool:
 LOCK_BEAT_S = 120
 
 
+def gguf_holding() -> int | None:
+    """12f.5: the GGUF job holding the lock while its worker is alive — its
+    run id, 0 when the lock doesn't say — else None. Only the worker's lock
+    has a heartbeat, and acquire_lock takes one gone quiet"""
+    try:
+        if time.time() - (LOCK / "heartbeat").stat().st_mtime >= LOCK_BEAT_S:
+            return None
+    except OSError:
+        return None
+    try:
+        return int((LOCK / "submission").read_text().strip() or 0)
+    except (OSError, ValueError):
+        return 0
+
+
+def wait_for_lock(sid: int) -> bool:
+    """the run lock, taken for `sid`; False when it was canceled or gave up
+    waiting, the row saying so. 12f.5: the GGUF worker is a queued board job,
+    not a manual run — #96 gave up on it after six hours — so while it holds
+    the lock the run waits it out, saying for which run and how long; the six
+    hours count only while another run holds it"""
+    t0 = time.time()
+    while not acquire_lock(sid):
+        if db.cancel_requested(sid):
+            db.update(sid, status="canceled", finished_at=time.time(),
+                      progress="canceled by request while waiting for the run lock")
+            return False
+        g = gguf_holding()
+        if g is not None:
+            from . import gguf as _gguf
+            db.update(sid, status="waiting_lock", progress=_gguf.waiting_line(g))
+            t0 = time.time()
+        else:
+            db.update(sid, status="waiting_lock",
+                      progress="another run (service or CLI) holds the GPU lock")
+            if time.time() - t0 > config.GPU_WAIT_MAX_S:
+                db.update(sid, status="failed", finished_at=time.time(),
+                          error="gave up waiting for the run lock — a manual run has "
+                                "held the GPU for hours; resubmit later.")
+                return False
+        time.sleep(config.GPU_POLL_S)
+    return True
+
+
 def release_lock() -> None:
     subprocess.run(["rm", "-rf", str(LOCK)], check=False)
 
@@ -864,20 +908,8 @@ def run_submission(sub: dict) -> None:
         _chat.ENGINE.yield_gpu()
     except Exception:                                  # noqa: BLE001 — a run never waits on chat
         pass
-    t0 = time.time()
-    while not acquire_lock(sid):
-        if db.cancel_requested(sid):
-            db.update(sid, status="canceled", finished_at=time.time(),
-                      progress="canceled by request while waiting for the run lock")
-            return
-        db.update(sid, status="waiting_lock",
-                  progress="another run (service or CLI) holds the GPU lock")
-        if time.time() - t0 > config.GPU_WAIT_MAX_S:
-            db.update(sid, status="failed", finished_at=time.time(),
-                      error="gave up waiting for the run lock — a manual run has "
-                            "held the GPU for hours; resubmit later.")
-            return
-        time.sleep(config.GPU_POLL_S)
+    if not wait_for_lock(sid):
+        return
 
     # 12d.3: the lock is this run's, so a new chat message to the model it
     # tests waits (chat.Engine.place); the replies already streaming to it

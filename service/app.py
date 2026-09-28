@@ -544,6 +544,10 @@ def submissions(limit: int = 100):
     done — the row should say which topics it sat and how far the judge is."""
     gguf.sync()                           # 12f.3: the host worker's progress, into its rows
     rows = db.recent(min(limit, 500))
+    # 12f.5: what a finished GGUF run didn't finish, for Re-run failed benchmarks
+    for r in rows:
+        if r["suite"] == "gguf" and r["status"] in ("failed", "canceled"):
+            r["gguf_left"] = gguf.not_done(r["id"])
     # 12a: a pilot row waits on the judge for one question, and says so the
     # way a judged row does — by the batch it recorded, and nothing else
     # 12k.2: and a Trust & safety row the same way, by its batch
@@ -993,6 +997,28 @@ def gguf_run(a: GgufRunIn, x_token: str = Header(default="")):
         raise HTTPException(422, str(e)) from None
     w = gguf.worker()
     return {"id": ids[0], "ids": ids, "status": "queued", "worker": w}
+
+
+class GgufRerunIn(BaseModel):
+    by: str = ""
+
+
+@app.post("/api/gguf/runs/{sid}/rerun")
+def gguf_rerun(sid: int, a: GgufRerunIn, x_token: str = Header(default="")):
+    """12f.5: Re-run failed benchmarks — a new run of only the benchmarks
+    run `sid` didn't finish, in its setup and subset"""
+    _check_token(x_token)
+    by = _name(a.by, "a GGUF measurement")
+    why = disk.blocks_run()
+    if why:
+        raise HTTPException(409, why)
+    try:
+        out = gguf.rerun_failed(sid, by)
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from None
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    return {**out, "status": "queued", "worker": gguf.worker()}
 
 
 @app.get("/api/models/code")
