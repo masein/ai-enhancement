@@ -9,6 +9,12 @@ Its environment sets the rest:
 - FAKE_PPL_LOCK: a path; "lock held" is printed while it exists;
 - FAKE_PPL_ACC_LOOKAHEAD: its fraction under LLAMA_MOE_ROUTE_MODE=lookahead.
 It prints the routing variables it was given ("env LLAMA_MOE_ROUTE_MODE=…").
+
+12f.5: --multiple-choice keeps the real one's two limits, as perplexity.cpp
+sets them: at most max(4, -np) answers a task ("task N requires a higher
+-np|--parallel value (at least K)"), and a task's tokens within max(4, -np) ×
+-c (-c 512 unless given; "task N does not fit in the context window"). Its
+tokenizer is the worst there is: a token a byte, and a BOS.
 """
 
 from __future__ import annotations
@@ -18,6 +24,42 @@ import os
 import struct
 import sys
 import time
+
+
+def read_mc(data: bytes) -> list[tuple[str, list[str]]]:
+    """the questions and answers of a multiple-choice file, in order"""
+    def string(at):
+        (n,) = struct.unpack_from("<I", data, at)
+        return data[at + 4:at + 4 + n].decode("utf-8"), at + 4 + n
+    (count,) = struct.unpack_from("<I", data, 0)
+    offsets = struct.unpack_from(f"<{count}I", data, 4)
+    out = []
+    for at in offsets:
+        q, at = string(at)
+        (k,) = struct.unpack_from("<I", data, at)
+        at += 4
+        answers = []
+        for _ in range(k):
+            a, at = string(at)
+            answers.append(a)
+        out.append((q, answers))
+    return out
+
+
+def mc_refuses(i: int, question: str, answers: list[str], n_par: int, n_ctx: int) -> str:
+    """what multiple_choice_score prints when it can't take task i, or ''"""
+    if len(answers) > n_par:
+        return (f"multiple_choice_score : task {i} requires a higher -np|--parallel value "
+                f"(at least {len(answers)})")
+    seqs = [b"\x01" + (question + " " + a).encode("utf-8") for a in answers]
+    common = 0
+    while all(len(x) > common for x in seqs) and len({x[common] for x in seqs}) == 1:
+        common += 1
+    need = common + sum(len(x) - common for x in seqs)
+    if need > n_ctx:
+        return (f"multiple_choice_score : task {i} does not fit in the context window "
+                f"(requires {need} tokens)")
+    return ""
 
 
 def main(argv: list[str]) -> int:
@@ -74,12 +116,20 @@ def main(argv: list[str]) -> int:
         print(f"{name} : task 0 does not fit in the context window (requires 5000 tokens)",
               file=sys.stderr)
         return 0
+    # main(): n_parallel is max(4, -np), and the context n_parallel × -c
+    n_par = max(4, int(arg.get("-np", arg.get("--parallel", "1"))))
+    n_ctx = n_par * int(arg.get("-c", arg.get("--ctx-size", "512")))
+    tasks = read_mc(data) if mode == "--multiple-choice" else []
     print("\ntask\tacc_norm" + ("\t95% confidence interval" if mode == "--hellaswag" else ""),
           file=out, flush=True)
     right = 0
     for i in range(1, n + 1):
         if delay:
             time.sleep(delay)
+        why = mc_refuses(i - 1, *tasks[i - 1], n_par, n_ctx) if tasks else ""
+        if why:
+            print(why, file=sys.stderr, flush=True)
+            return 0
         if round(acc * i) > right:
             right += 1
         p = right / i

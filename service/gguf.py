@@ -14,6 +14,13 @@ The board can't run the fork's llama-perplexity in its container, so it:
 - says "The GGUF worker isn't running" when its heartbeat
   (results/gguf_worker.json) is older than a minute.
 
+12f.5: one queue. A GGUF job's request waits in gguf_requests/held/ while a
+board run queued before it hasn't finished, and a board run waits while a
+GGUF job queued before it hasn't (db.claim_next): they take turns in the
+order they were queued. A run that finds the worker holding the lock says
+"waiting for GGUF run #92 (about 40 min left)" and waits it out. And Re-run
+failed benchmarks queues only what a run didn't finish.
+
 The results never go where lm_eval's do: the page reads them from
 gguf_results/ into a column group of their own, never averaged with lm_eval's.
 """
@@ -44,6 +51,12 @@ DOWN = "The GGUF worker isn't running."
 STALE_S = 120
 GONE = ("The GGUF worker stopped while this ran{ago}: start it again (HANDOFF § 5d) and queue "
         "this again.")
+# 12f.5: a stop asked for while the worker had gone is done: nothing is running
+GONE_CANCELED = "canceled; the GGUF worker had stopped{ago}"
+NOT_STARTED = "canceled before it started"
+LOST = "Its request to the GGUF worker is gone: queue it again."
+OLD_DATASET = ("The {label} dataset is the old one, {what}: build it again with the converter "
+               "(HANDOFF § 5d). Nothing was queued.")
 
 
 def root() -> Path:
@@ -254,14 +267,10 @@ def setups_of(model_id: str, want: list[str] | None = None) -> list[dict]:
     return [s for s in have if s["id"] in want]
 
 
-def estimate(model_id: str, benchmarks: list[str], subset: int = 0,
-             setups: list[str] | None = None) -> dict:
-    """seconds for each benchmark, times the setups chosen: from the newest run
-    of this file that measured it, else a rough guess"""
-    k = len(setups_of(model_id, setups)) if model(model_id) else 1
-    m = model(model_id) or {}
-    sha = (m.get("pin") or {}).get("sha256")
-    man = manifest()
+def _seconds_each(model_id: str) -> dict[str, float]:
+    """seconds a task, by benchmark, from the newest run of this file that
+    measured it"""
+    sha = ((model(model_id) or {}).get("pin") or {}).get("sha256")
     measured: dict[str, float] = {}
     for res in results():
         if sha and (res.get("file") or {}).get("sha256") != sha:
@@ -269,6 +278,16 @@ def estimate(model_id: str, benchmarks: list[str], subset: int = 0,
         for b, v in (res.get("benchmarks") or {}).items():
             if v.get("seconds") is not None and v.get("done"):
                 measured.setdefault(b, v["seconds"] / v["done"])
+    return measured
+
+
+def estimate(model_id: str, benchmarks: list[str], subset: int = 0,
+             setups: list[str] | None = None) -> dict:
+    """seconds for each benchmark, times the setups chosen: from the newest run
+    of this file that measured it, else a rough guess"""
+    k = len(setups_of(model_id, setups)) if model(model_id) else 1
+    man = manifest()
+    measured = _seconds_each(model_id)
     out, rough = {}, False
     for b in benchmarks:
         n = subset or int((man.get(b) or {}).get("n") or gb.BENCHMARKS[b]["n"])
@@ -286,6 +305,41 @@ def _dur(s: float) -> str:
     return f"about {s / 3600:.1f} h" if s >= 5400 else f"about {max(1, round(s / 60))} min"
 
 
+def time_left(sid: int) -> float | None:
+    """12f.5: seconds GGUF job `sid` has left: the running benchmark's at the
+    pace it has had, then the ones not started at the pace of this file's
+    last run (or the rough guess); None when there is no such job"""
+    row = db.get(sid) if sid else None
+    if not row or row["suite"] != "gguf":
+        return None
+    res = _read(root() / "gguf_results" / f"{sid}.json") or {}
+    try:
+        asked = json.loads(row.get("tasks") or "[]")
+    except ValueError:
+        asked = []
+    benches = res.get("benchmarks") or {b: {"status": "queued"} for b in asked}
+    measured, man = _seconds_each(row["hf_id"]), manifest()
+    subset, left = int(row.get("subset") or 0), 0.0
+    for b, v in benches.items():
+        if b not in gb.BENCHMARKS or v.get("status") not in ("queued", "running"):
+            continue
+        n = subset or int((man.get(b) or {}).get("n") or gb.BENCHMARKS[b]["n"])
+        each = measured.get(b) or GUESS_S[gb.BENCHMARKS[b]["mode"]]
+        if v.get("status") == "running":
+            n = max(0, int(v.get("total") or n) - int(v.get("done") or 0))
+            each = v.get("secs_each") or each
+        left += n * each
+    return left
+
+
+def waiting_line(sid: int) -> str:
+    """12f.5: what a board run waiting on GGUF job `sid` says"""
+    if not sid:
+        return "waiting for a GGUF run"
+    left = time_left(sid)
+    return f"waiting for GGUF run #{sid}" + (f" ({_dur(left)} left)" if left else "")
+
+
 def queue(model_id: str, benchmarks: list[str], subset: int, by: str,
           time_limit_h: float = 24.0, setups: list[str] | None = None) -> list[int]:
     """a run for each setup chosen (every one when none is)"""
@@ -294,7 +348,7 @@ def queue(model_id: str, benchmarks: list[str], subset: int, by: str,
 
 
 def _queue_one(model_id: str, benchmarks: list[str], subset: int, by: str,
-               time_limit_h: float, setup: dict) -> int:
+               time_limit_h: float, setup: dict, note: str = "") -> int:
     m = model(model_id)
     if not m:
         raise ValueError(f"{model_id} has no GGUF file registered")
@@ -307,10 +361,16 @@ def _queue_one(model_id: str, benchmarks: list[str], subset: int, by: str,
     if missing:
         raise ValueError(f"No dataset yet for {', '.join(missing)}: run the converter once "
                          "(HANDOFF § 5d)")
+    # 12f.5: hours measuring MMLU's cloze file would land in History, not the column
+    for b in want:
+        form = gb.BENCHMARKS[b].get("format")
+        if form and man[b].get("format") != form:
+            raise ValueError(OLD_DATASET.format(label=gb.BENCHMARKS[b]["label"],
+                                                what="each option's text scored (cloze)"))
     subset = int(subset or 0)
     if subset < 0:
         raise ValueError("a subset is a number of tasks; 0 is every one")
-    sid = db.add(model_id, "instruct", "gguf", by, f"setup: {setup['name']}", tasks=want,
+    sid = db.add(model_id, "instruct", "gguf", by, f"setup: {setup['name']}{note}", tasks=want,
                  subset=subset)
     req = {"id": str(sid), "sid": sid, "model": model_id, "name": m["name"], "path": m["path"],
            "flags": m["flags"], "setup": setup, "benchmarks": want, "subset": subset,
@@ -318,16 +378,74 @@ def _queue_one(model_id: str, benchmarks: list[str], subset: int, by: str,
            "datasets": {b: {"sha256": man[b]["sha256"], "n": man[b]["n"]} for b in want},
            "time_limit_s": time_limit_h * 3600, "by": by, "at": time.time()}
     _dir("gguf_results")
-    _write(_dir("gguf_requests") / f"{sid}.json", req)
+    # 12f.5: its turn comes after the board runs queued before it
+    ahead = db.board_ahead(sid)
+    _write(_dir("gguf_requests/held" if ahead else "gguf_requests") / f"{sid}.json", req)
     w = worker()
-    db.update(sid, progress="waiting for the GGUF worker" + ("" if w["alive"] else f" · {DOWN}"),
+    db.update(sid, progress=_turn_line(ahead) if ahead else "waiting for the GGUF worker"
+              + ("" if w["alive"] else f" · {DOWN}"),
               arch=json.dumps({"gguf": {"path": m["path"], "flags": m["flags"], "setup": setup,
                                         "subset": subset, "benchmarks": want}}))
     return sid
 
 
+def _turn_line(ahead: int) -> str:
+    return f"waiting for run #{ahead}, queued before it"
+
+
+def _held(sid: int) -> Path:
+    return root() / "gguf_requests" / "held" / f"{sid}.json"
+
+
 def cancel(sid: int) -> None:
+    # 12f.5: a request still waiting its turn never reaches the worker
+    try:
+        _held(sid).replace(_dir("gguf_requests/done") / f"{sid}.json")
+        return
+    except OSError:
+        pass
     (_dir("gguf_requests") / f"{sid}.cancel").write_text("canceled")
+
+
+def not_done(sid: int) -> list[str]:
+    """12f.5: the benchmarks a finished GGUF run has no score for — failed,
+    stopped or not run — in the board's order"""
+    res = _read(root() / "gguf_results" / f"{sid}.json")
+    if res:
+        got = res.get("benchmarks") or {}
+        return [b for b in gb.ORDER if b in got and got[b].get("status") != "done"]
+    row = db.get(sid) or {}
+    try:
+        return [b for b in gb.ORDER if b in json.loads(row.get("tasks") or "[]")]
+    except ValueError:
+        return []
+
+
+def rerun_failed(sid: int, by: str) -> dict:
+    """12f.5: Re-run failed benchmarks — a new run of the same file, setup
+    and subset, of only the benchmarks run `sid` didn't finish; the finished
+    ones are kept"""
+    row = db.get(sid)
+    if not row or row["suite"] != "gguf":
+        raise LookupError(f"no GGUF run #{sid}")
+    if row["status"] in ACTIVE + ("canceling",):
+        raise ValueError(f"Run #{sid} hasn't finished yet.")
+    left = not_done(sid)
+    if not left:
+        raise ValueError(f"Every benchmark of run #{sid} finished: nothing to re-run.")
+    res = _read(root() / "gguf_results" / f"{sid}.json") or {}
+    try:
+        was = (json.loads(row.get("arch") or "{}").get("gguf") or {}).get("setup")
+    except ValueError:
+        was = None
+    was = res.get("setup") or was or gb.AS_BUILT
+    setup = next((x for x in setups_of(row["hf_id"]) if x["id"] == was.get("id")), None)
+    if setup is None:
+        raise ValueError(f"Run #{sid}'s setup, {was.get('name')}, is no longer registered with "
+                         "those settings: measure it again from Measure on the GGUF.")
+    new = _queue_one(row["hf_id"], left, int(res.get("subset") or row.get("subset") or 0), by,
+                     24.0, setup, note=f" · what #{sid} didn't finish")
+    return {"id": new, "benchmarks": left}
 
 
 def results() -> list[dict]:
@@ -337,23 +455,77 @@ def results() -> list[dict]:
     return sorted(out, key=lambda r: -(r.get("finished_at") or r.get("started_at") or 0))
 
 
+def _left_behind(sid: int) -> bool:
+    """12f.5: a worker runs one job at a time, so a job whose result says
+    "running" while the worker says it's on another was left by one that
+    stopped. Read after the result, then the result again: a job that ended
+    while the worker moved on to the next has its end written by then"""
+    w = worker()
+    on = w["state"]
+    if not w["alive"] or not on.startswith("running ") or on == f"running {sid}":
+        return False
+    return (_read(root() / "gguf_results" / f"{sid}.json") or {}).get("status") == "running"
+
+
+def _lost(row: dict) -> bool:
+    """12f.5: a job with no request for the worker, held or not, and no
+    result, a while after it was queued: the worker writes a job's result
+    before it moves its request away, so nothing will take it up"""
+    sid = row["id"]
+    return (time.time() - (row.get("created_at") or 0) > STALE_S and not _held(sid).exists()
+            and not (root() / "gguf_requests" / f"{sid}.json").exists()
+            and not (root() / "gguf_results" / f"{sid}.json").exists())
+
+
 def sync() -> None:
     """the worker's result files, into their run rows"""
     w = worker()
-    for row in db.recent(200):
+    for row in sorted(db.recent(200), key=lambda r: r["id"]):
         if row["suite"] != "gguf" or row["status"] not in ACTIVE + ("canceling",):
             continue
         res = _read(root() / "gguf_results" / f"{row['id']}.json")
+        # 12f.5: a stop asked for before the worker took it up is done now:
+        # its request is canceled, so the worker skips it
+        if row["status"] == "canceling" and (not res or res.get("status") == "queued"):
+            cancel(row["id"])
+            db.update(row["id"], status="canceled", finished_at=time.time(),
+                      progress=NOT_STARTED)
+            continue
         # 12f.4: a job never stays "running" after its worker is gone: it fails,
         # saying so, and its request is canceled so a restarted worker skips it
         quiet = time.time() - (w["at"] or 0)
         if res and res.get("status") in ("running", "waiting") and quiet > STALE_S:
             ago = f" (last seen {max(1, round(quiet / 60))} min ago)" if w["at"] else ""
-            line = GONE.format(ago=ago)
             cancel(row["id"])
+            if row["status"] == "canceling":            # 12f.5: stopped, as asked
+                db.update(row["id"], status="canceled", finished_at=time.time(),
+                          progress=GONE_CANCELED.format(ago=ago))
+                continue
+            line = GONE.format(ago=ago)
             db.update(row["id"], status="failed", finished_at=time.time(), progress=line,
                       error=line)
             continue
+        # 12f.5: a job left "running" by a worker that stopped (#89), or with
+        # nothing for the worker to take up, never ends — and holds up the queue
+        if (res and res.get("status") == "running" and _left_behind(row["id"])) or \
+                (not res and _lost(row)):
+            line = gb.RESTARTED if res else LOST
+            if res:
+                cancel(row["id"])                 # a restarted worker doesn't take it up
+            db.update(row["id"], status="failed", finished_at=time.time(), progress=line,
+                      error=line)
+            continue
+        # 12f.5: a request waiting its turn goes to the worker once the board
+        # runs queued before it have finished
+        if _held(row["id"]).exists():
+            ahead = db.board_ahead(row["id"])
+            if ahead:
+                db.update(row["id"], progress=_turn_line(ahead))
+                continue
+            try:
+                _held(row["id"]).replace(_dir("gguf_requests") / f"{row['id']}.json")
+            except OSError:
+                pass
         if not res or res.get("status") == "queued":
             db.update(row["id"], progress="waiting for the GGUF worker"
                       + ("" if w["alive"] else f" · {DOWN}"))

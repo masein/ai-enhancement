@@ -739,9 +739,11 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
     dataset (gguf_data/manifest.json); a subset only while there is no full
     one, and labelled so. Models shows the "as built" setup, or the first
     registered one with results. Runs on an earlier dataset, and every run,
-    are the model's History. Pairs, benchmark by benchmark, with the board's
-    own significance test: two GGUFs of one base model in the same setup, and
-    each setup of a GGUF against it as built."""
+    are the model's History — 12f.5: and MMLU measured on the cloze file
+    (each option's text scored, before it was lettered), "cloze, not
+    comparable", whatever the manifest says. Pairs, benchmark by benchmark,
+    with the board's own significance test: two GGUFs of one base model in
+    the same setup, and each setup of a GGUF against it as built."""
     import gguf_bench as gb
     if not results_root or not Path(results_root).is_dir():
         return None
@@ -787,12 +789,18 @@ def load_gguf(results_root: Path | None, out_dir: Path | None = None,
         seen_setup.setdefault(mid, {}).setdefault(su, setup)
         benches = {}
         for b, v in (r.get("benchmarks") or {}).items():
-            ds = ((r.get("datasets") or {}).get(b) or {}).get("sha256") or ""
+            dsi = (r.get("datasets") or {}).get(b) or {}
+            ds = dsi.get("sha256") or ""
             benches[b] = {k: v.get(k) for k in ("status", "acc", "se", "n", "done", "total",
                                                 "chance", "seconds", "why", "error")}
             benches[b]["dataset"] = ds[:12]
             now = man.get(b, {}).get("sha256")
-            if v.get("status") != "done" or v.get("acc") is None or (now and ds != now):
+            # 12f.5: asked another way (a result from before says nothing: cloze)
+            form = (gb.BENCHMARKS.get(b) or {}).get("format")
+            if form and dsi.get("format") != form:
+                benches[b]["earlier"] = gb.BENCHMARKS[b].get("earlier")
+            if v.get("status") != "done" or v.get("acc") is None or (now and ds != now) \
+                    or benches[b].get("earlier"):
                 benches[b]["current"] = False
                 continue
             benches[b]["current"] = True
@@ -6594,8 +6602,37 @@ function ggufHistoryCard(m) {
         `setup: ${r.setup.name} (${setupWords(r.setup)})`) : '',
       el('div', { class: 'se' }, Object.entries(r.benchmarks || {}).map(([b, v]) =>
         `${ggufLabel(b)} ${v.acc != null ? pct(v.acc) : v.status}`
-        + (v.acc != null && !v.current ? ' (an earlier dataset)' : '')).join(' · ')),
-      r.line ? el('div', { class: 'se', text: r.line }) : ''))));
+        // 12f.5: MMLU scored on each option's text is not the lettered MMLU
+        + (v.acc != null && !v.current ? ` (${v.earlier || 'an earlier dataset'})` : '')).join(' · ')),
+      r.line ? el('div', { class: 'se', text: r.line }) : '',
+      ggufRerunButton(r.sid, ggufLeft(r), ['failed', 'stopped'].includes(r.status))))));
+}
+// 12f.5: Re-run failed benchmarks — a run of only what a GGUF run didn't
+// finish, in its setup and subset; the finished ones are kept. On its row in
+// History and in the queue
+const ggufLeft = r => (G().order || []).filter(b => (r.benchmarks || {})[b]
+  && r.benchmarks[b].status !== 'done');
+function ggufRerunButton(sid, left, over) {
+  if (!LIVE || !over || !left.length) return '';
+  const names = left.map(ggufLabel);
+  const words = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+    : names[0];
+  return el('button', { class: 'ghost', 'data-gguf-rerun': String(sid), text: 'Re-run failed benchmarks',
+    title: `queues ${words} again, as #${sid} ran them; the finished ones are kept`,
+    onclick: e => ggufRerun(sid, e.currentTarget) });
+}
+async function ggufRerun(sid, btn) {
+  if (!whoName()) { askName(); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Queueing…'; }
+  try {
+    const j = await post(`api/gguf/runs/${sid}/rerun`, { by: whoName() });
+    rememberQueued(j.id);
+    toast(`Run #${j.id} queued: ${j.benchmarks.map(ggufLabel).join(', ')} again —`,
+      { key: 'gguf-rerun', go: () => followRun(j.id), link: 'follow it →' });
+  } catch (e) {
+    toast(`#${sid}: ${e.message}`, { key: 'gguf-rerun' });
+  }
+  await loadQueue(); (state.queueRedraw || render)();
 }
 // 12i.1: Knowledge exam scores an earlier judge marked — a score compares only
 // with the same judge's, so they are kept here, said once, and nowhere else
@@ -12256,7 +12293,10 @@ function queueActions(r) {
   const log = { label: 'Log', act: 'log', run: () => openReader({ kind: 'log', id: id },
     `[data-row-menu="q${id}"]`) };
   const raw = { label: 'Open raw log ↗', act: 'log-raw', href: `api/runs/${r.id}/log`, blank: true };
-  const resubmit = { label: 'Resubmit', act: 'resubmit', run: () => queueResubmit(r) };
+  // 12f.5: a GGUF run is queued again from Measure on the GGUF, or its
+  // failed benchmarks alone: the queue's own Resubmit can't take it
+  const resubmit = r.suite === 'gguf' ? null
+    : { label: 'Resubmit', act: 'resubmit', run: () => queueResubmit(r) };
   const copy = { label: 'Copy id', act: 'copy-id', run: () => copyText(id, '#' + id) };
   const page = DATA.models.some(m => m.id === r.hf_id)
     ? { label: 'Open model page', act: 'model', run: () => navigate({ model: r.hf_id, topic: null }) }
@@ -12297,6 +12337,8 @@ function queueActions(r) {
       { title: 'this checkpoint ships its own model code — resubmitting asks first',
         'aria-expanded': String(state.qRc === r.id) }));
   }
+  if (r.suite === 'gguf' && (r.status === 'failed' || r.status === 'canceled'))
+    return cell(ggufRerunButton(r.id, r.gguf_left || [], true));
   if (r.status === 'failed' || r.status === 'canceled')
     return cell(ghost('data-row-resubmit', 'Resubmit', () => queueResubmit(r),
       { title: `the same model, suite${r.suite === 'judged' ? ' and topics' : ''}, queued again` }));
@@ -12704,7 +12746,12 @@ async function ggMeasureDialog(id, returnTo) {
   const m = (page.models || []).find(x => x.id === id) || {};
   const sets = m.setups || (((G().registered || {})[id] || {}).setups) || [{ id: 'as-built', name: 'as built' }];
   const order = page.order || G().order || [];
-  const have = b => !!(page.datasets || {})[b];
+  // 12f.5: MMLU's cloze file is not offered: what it measured would go to History
+  const stale = b => { const f = ((page.benchmarks || {})[b] || {}).format;
+    return !!f && !!(page.datasets || {})[b] && page.datasets[b].format !== f; };
+  const have = b => !!(page.datasets || {})[b] && !stale(b);
+  const noData = b => stale(b) ? 'the old cloze file: build it again (HANDOFF § 5d)'
+    : 'no dataset yet: run the converter once (HANDOFF § 5d)';
   const S = { benches: new Set(order.filter(have)), setups: new Set(sets.map(x => x.id)),
     subset: false, n: 2000, est: null, busy: false };
   const back = el('div', { class: 'dlg-back', 'data-dialog': 'gguf-measure' });
@@ -12712,13 +12759,14 @@ async function ggMeasureDialog(id, returnTo) {
     : ((page.datasets || {})[b] || {}).n || ((page.benchmarks || {})[b] || {}).n || 0;
   const counts = {};
   const benches = el('div', { class: 'ggpick' }, order.map(b => el('label', { class: 'ggrow',
-      'data-gg-bench-row': b, title: have(b) ? '' : 'no dataset yet: run the converter once (HANDOFF § 5d)' },
+      'data-gg-bench-row': b, title: have(b) ? '' : noData(b) },
     el('input', { type: 'checkbox', 'data-gg-bench': b, checked: S.benches.has(b) ? '' : null,
       disabled: have(b) ? null : '', onchange: e => {
         if (e.target.checked) S.benches.add(b); else S.benches.delete(b); sync(true); } }),
     el('span', { text: ggufLabel(b) }),
     counts[b] = el('span', { class: 'small se mono', 'data-gg-count': b }),
-    have(b) ? '' : el('span', { class: 'small se', text: 'no dataset yet' }))));
+    have(b) ? '' : el('span', { class: 'small se', 'data-gg-no-data': b,
+      text: stale(b) ? 'the old cloze file' : 'no dataset yet' }))));
   const setups = el('div', { class: 'ggpick', 'data-gg-setups': id }, sets.map(x => el('label',
     { class: 'ggrow', title: setupWords(x) },
     el('input', { type: 'checkbox', 'data-gg-setup': x.id, checked: S.setups.has(x.id) ? '' : null,

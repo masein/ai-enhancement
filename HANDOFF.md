@@ -539,6 +539,34 @@ worker isn't running" while `results/gguf_worker.json` is older than a minute.
   their counts, the setups, the full sets or a subset, the estimate and
   Start.
 
+**12f.5, after the overnight runs:**
+- **-np and -c come from the dataset.** `--multiple-choice` scores a task's
+  answers side by side, a sequence each, and refused ARC's five-answer and
+  TruthfulQA's thirteen-answer questions: "task N requires a higher
+  -np|--parallel value (at least 5)". The worker reads each file's biggest
+  task and passes `-np` (the most answers, at least 4) and `-c` (so `-np` ×
+  `-c` holds that task) after the model's flags (`gguf_bench.mc_flags`).
+- **MMLU is lettered, as lm_eval asks it:** the subject's line, the
+  question, A. to D., "Answer:", scored on the letter. MMLU measured before
+  (each option's text, cloze) is in History, "cloze, not comparable", and a
+  run on the old file is refused until it is built again (below).
+- **At start, the worker clears up after one that stopped mid-job:** that
+  job fails, "The GGUF worker restarted during this run.", its finished
+  benchmarks kept, and the dead worker's lock goes. The board does the same
+  as soon as the worker says it's on another job.
+- **One queue:** board runs and GGUF jobs take turns in the order they were
+  queued. A run that meets the worker on the lock waits it out: "waiting for
+  GGUF run #92 (about 40 min left)".
+- **Re-run failed benchmarks** (History ▸ Measured on the GGUF, and the run's
+  row in All runs) queues only what a run didn't finish.
+
+Once, after deploying 12f.5, MMLU again (the other files don't change; the
+manifest gets every file's shape):
+
+```
+sudo docker compose exec -T bench python scripts/gguf_data.py --out /home/masein/benchmarks/results/gguf_data --only mmlu
+```
+
 **Setups:** a GGUF is measured "as built", and in each setup registered with
 it, one line each: `lookahead 1: LLAMA_MOE_ROUTE_MODE=lookahead
 LLAMA_MOE_ROUTE_LOOKAHEAD=1`. The worker passes a setup's variables in
@@ -3549,6 +3577,80 @@ answers are held back and its licence is non-commercial, no-derivatives.
   Improve; Improve's retest watch does look at them.
 - **Deploy step 4** (`scripts/check_tasks.py`) builds the four tasks and
   checks each, "full, all of BBQ" included.
+
+### 12f.5 — the GGUF runs: -np, lettered MMLU, one queue, a restarted worker
+
+From the overnight GGUF and served runs (§ 5d):
+- **ARC-C, ARC-E and TruthfulQA failed in llama-perplexity:** "task N
+  requires a higher -np|--parallel value (at least 5)".
+  - Read from `tools/perplexity/perplexity.cpp`: `main()` makes n_parallel
+    max(4, `-np`), sets the KV cache unified and n_ctx n_parallel × `-c`;
+    n_batch only splits a batch. `multiple_choice_score` gives each answer a
+    sequence, at most n_parallel, and a task must fit in n_ctx.
+  - So `-np` is the file's most answers (4 for MMLU, 5 for ARC, 13 for
+    TruthfulQA) and `-c` is its biggest task over `-np`, counted as UTF-8
+    bytes (a token is at least one), rounded up to 256 and never under 512,
+    llama-perplexity's default (`gguf_bench.mc_flags`). They go after the
+    model's and the setup's flags.
+  - The worker reads them from the `.bin` itself, so a manifest from before
+    needs nothing; `gguf_data.py` writes them into `manifest.json` too
+    (`max_answers`, `max_task_tokens`, `format`) for every multiple-choice
+    file, rebuilt or not.
+  - The fake llama-perplexity keeps both limits, with a byte tokenizer, so
+    the tests fail on the old command.
+- **MMLU was cloze** (the question alone, each option's text scored): the
+  35B scored 42.5 against its author's ~82.
+  - `gguf_data.mmlu_task` now writes lm_eval's mmlu prompt: "The following
+    are multiple choice questions (with answers) about {subject}." (the
+    subject's underscores as spaces), the question, A. to D., "Answer:". The
+    answers are the letters, so what is scored is " A", lm_eval's
+    continuation. An empty option is a letter, so no question is left out.
+  - ARC, HellaSwag, Winogrande and TruthfulQA are unchanged: lm_eval scores
+    those by the option's text too.
+  - A result records its dataset's `format`. MMLU without "lettered" (every
+    result before 12f.5) is in History, "cloze, not comparable", never in
+    the column, whatever the manifest says.
+  - Measure refuses MMLU while the manifest's file is the cloze one, and the
+    dialog says "the old cloze file".
+- **#96 gave up on the run lock** the GGUF worker held ("a manual run has
+  held the GPU for hours").
+  - A run that finds the worker's lock with a live heartbeat waits,
+    "waiting for GGUF run #92 (about 40 min left)": the running benchmark's
+    pace, then the rest at this file's last pace or the rough guess
+    (`gguf.waiting_line`). The six hours count only while another run holds
+    it (`runner.wait_for_lock`).
+  - **One queue.** A GGUF job's request waits in `gguf_requests/held/` while
+    a board run queued before it hasn't finished, and `sync` hands it to the
+    worker after. While the worker is alive, `db.claim_next` doesn't start a
+    board run while a GGUF job queued before it hasn't finished; the
+    waiting run says for which. With the worker down, board runs go ahead.
+  - The service's queue thread runs `gguf.sync` itself now, so a GGUF job's
+    end is seen without the page open.
+- **#89 sat "canceling"** after the worker crashed mid-job: its result said
+  "running", the restarted worker was alive, and nothing ended it.
+  - The worker, at start (`Worker.recover`), fails a job left "running":
+    "The GGUF worker restarted during this run." Its finished benchmarks are
+    kept, and its request is done with.
+  - A restarted worker had also kept the dead one's lock alive (it beat any
+    lock it found). It beats only its own now, and a lock of this host's
+    worker whose process has ended is taken over.
+  - The board fails such a job as soon as the worker says it's on another
+    (it runs one at a time), and a job with no request and no result.
+  - A stop asked of a job the worker never took up is canceled at once; one
+    whose worker went quiet is canceled, not failed.
+- **Re-run failed benchmarks** on a failed or stopped GGUF run (History ▸
+  Measured on the GGUF, and its row in All runs) queues a run of only the
+  benchmarks without a score, in its setup and subset
+  (`POST /api/gguf/runs/{id}/rerun`). A GGUF row has no Resubmit: the
+  queue's couldn't take it.
+
+**Deploy (code only; skip step 3):** steps 1, 2 and 4, then:
+1. Restart the GGUF worker from the new code (§ 5d: stop, then start). On
+   start it prints "run #89 was left running by a worker that stopped" if
+   the board hasn't already let #89 go.
+2. MMLU again, lettered (§ 5d's `gguf_data.py --only mmlu`).
+3. #90: Re-run failed benchmarks, then Measure MMLU on each GGUF.
+4. Queue #96 again.
 
 ## 11. Known gaps, risks, loose ends
 

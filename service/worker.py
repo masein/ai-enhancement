@@ -12,18 +12,35 @@ import threading
 import time
 import traceback
 
-from . import db
+from . import db, gguf
 from .runner import run_submission
 
 POLL_S = 3
 _stop = threading.Event()
 
 
+def _gguf_first() -> bool:
+    """12f.5: the host's GGUF worker's jobs, into their rows (their turn
+    depends on it), and whether it's there to run them — a board run waits
+    for a GGUF job queued before it only then"""
+    try:
+        gguf.sync()
+        if not gguf.worker()["alive"]:
+            return False
+        ahead = db.gguf_ahead()
+        if ahead:
+            db.update(ahead[0], progress=gguf.waiting_line(ahead[1]))
+        return True
+    except Exception:                               # noqa: BLE001 — the queue goes on
+        traceback.print_exc()
+        return False
+
+
 def loop() -> None:
     while not _stop.is_set():
         sub = None
         try:
-            sub = db.claim_next()
+            sub = db.claim_next(gguf_first=_gguf_first())
             if sub is None:
                 _stop.wait(POLL_S)
                 continue
