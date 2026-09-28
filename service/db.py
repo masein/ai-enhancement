@@ -406,10 +406,19 @@ GGUF_UNFINISHED = ("queued", "waiting_lock", "running", "canceling")
 BOARD_UNFINISHED = ("queued", "preflight", "waiting_gpu", "waiting_lock", "running", "canceling")
 
 
+# 12m.3: a run of a model from OpenRouter never touches the GPU: it is in a
+# lane of its own (worker.loop_remote), outside the run lock and the GPU queue
+# — never waiting there, and never keeping a GPU run or a GGUF job waiting
+_REMOTE = ("hf_id IN (SELECT id FROM served_models "
+           "WHERE json_extract(data, '$.via') = 'openrouter')")
+
+
 def board_ahead(sid: int) -> int | None:
-    """the oldest board run queued before GGUF job `sid` and not finished"""
+    """the oldest board run queued before GGUF job `sid` and not finished — a
+    run of a model from OpenRouter isn't one: it doesn't use the GPU"""
     with closing(_conn()) as c:
-        row = c.execute(f"SELECT id FROM submissions WHERE suite!='gguf' AND id<? AND status IN "
+        row = c.execute(f"SELECT id FROM submissions WHERE suite!='gguf' AND NOT {_REMOTE} "
+                        f"AND id<? AND status IN "
                         f"({','.join('?' * len(BOARD_UNFINISHED))}) ORDER BY id LIMIT 1",
                         (sid, *BOARD_UNFINISHED)).fetchone()
     return int(row[0]) if row else None
@@ -419,8 +428,8 @@ def gguf_ahead() -> tuple[int, int] | None:
     """(the oldest queued board run, the oldest GGUF job queued before it and
     not finished), or None when nothing holds that run back"""
     with closing(_conn()) as c:
-        row = c.execute("SELECT id FROM submissions WHERE status='queued' AND suite!='gguf' "
-                        "ORDER BY id LIMIT 1").fetchone()
+        row = c.execute(f"SELECT id FROM submissions WHERE status='queued' AND suite!='gguf' "
+                        f"AND NOT {_REMOTE} ORDER BY id LIMIT 1").fetchone()
         if not row:
             return None
         g = c.execute(f"SELECT id FROM submissions WHERE suite='gguf' AND id<? AND status IN "
@@ -429,16 +438,18 @@ def gguf_ahead() -> tuple[int, int] | None:
     return (int(row[0]), int(g[0])) if g else None
 
 
-def claim_next(gguf_first: bool = False) -> dict | None:
+def claim_next(gguf_first: bool = False, remote: bool = False) -> dict | None:
     """Atomically move the oldest queued row to 'preflight' and return it.
     12f.5: with gguf_first (the GGUF worker is running), not while a GGUF job
-    queued before it hasn't finished"""
-    if gguf_first and gguf_ahead():
+    queued before it hasn't finished. 12m.3: `remote`, the lane of runs of
+    models from OpenRouter — the GPU lane never takes one, and they take
+    nothing of its turn"""
+    if not remote and gguf_first and gguf_ahead():
         return None
     with closing(_conn()) as c:
         # 12f.3: a GGUF job is the host's worker's, never this queue's
-        row = c.execute("SELECT id FROM submissions WHERE status='queued' AND suite!='gguf' "
-                        "ORDER BY id LIMIT 1").fetchone()
+        row = c.execute(f"SELECT id FROM submissions WHERE status='queued' AND suite!='gguf' "
+                        f"AND {'' if remote else 'NOT '}{_REMOTE} ORDER BY id LIMIT 1").fetchone()
         if not row:
             return None
         sid = row[0]

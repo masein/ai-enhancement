@@ -36,30 +36,51 @@ def _gguf_first() -> bool:
         return False
 
 
+def _idle() -> None:
+    # 12m.2: the day's reported scores, in a thread of their own
+    try:
+        reported.daily()
+    except Exception:                               # noqa: BLE001 — the queue goes on
+        traceback.print_exc()
+
+
+def once(remote: bool = False) -> bool:
+    """one claim and its run, in the GPU lane or (12m.3) the lane of models
+    from OpenRouter; False when nothing was queued for it"""
+    sub = None
+    try:
+        sub = db.claim_next(remote=True) if remote else db.claim_next(gguf_first=_gguf_first())
+        if sub is None:
+            return False
+        run_submission(sub)
+    except Exception as e:                          # noqa: BLE001 — worker must survive anything
+        traceback.print_exc()
+        if sub is not None:
+            db.update(sub["id"], status="failed", finished_at=time.time(),
+                      error=f"internal error: {e!r} — see service log")
+    return True
+
+
 def loop() -> None:
     while not _stop.is_set():
-        sub = None
-        try:
-            sub = db.claim_next(gguf_first=_gguf_first())
-            if sub is None:
-                # 12m.2: the day's reported scores, in a thread of their own
-                try:
-                    reported.daily()
-                except Exception:                   # noqa: BLE001 — the queue goes on
-                    traceback.print_exc()
-                _stop.wait(POLL_S)
-                continue
-            run_submission(sub)
-        except Exception as e:                      # noqa: BLE001 — worker must survive anything
-            traceback.print_exc()
-            if sub is not None:
-                db.update(sub["id"], status="failed", finished_at=time.time(),
-                          error=f"internal error: {e!r} — see service log")
+        if not once():
+            _idle()
+            _stop.wait(POLL_S)
+
+
+def loop_remote() -> None:
+    """12m.3: runs of models from OpenRouter never touch the GPU: they skip the
+    run lock and the GPU queue, one at a time among themselves, and a GPU run
+    never waits behind one. The judge they call is any run's"""
+    while not _stop.is_set():
+        if not once(remote=True):
+            _stop.wait(POLL_S)
 
 
 def start() -> threading.Thread:
     t = threading.Thread(target=loop, name="benchmark-worker", daemon=True)
     t.start()
+    threading.Thread(target=loop_remote, name="remote-worker", daemon=True).start()
     return t
 
 
