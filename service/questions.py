@@ -350,13 +350,16 @@ _cache: dict[tuple, dict] = {}
 
 
 def _stamp(task: str, dirs: dict[str, Path]) -> tuple:
+    """12a.8: each file's time to the nanosecond and size, not the newest time
+    alone — a file dated in the future hid every later write"""
     out = []
     for mid, d in sorted(dirs.items()):
         files = ([d / "everyday.json"] if task == "everyday" else
                  [f for x in _task_dirs(d, task) for f in x.rglob("samples_*.jsonl")]
                  + [d / n for n in ("judge.json", "safety.json", "simpleqa.json",
-                                    "generative.json")])
-        out.append((mid, max((f.stat().st_mtime for f in files if f.exists()), default=0)))
+                                    "generative.json", "mobileaibench.json")])
+        out.append((mid, tuple(sorted((str(f), f.stat().st_mtime_ns, f.stat().st_size)
+                                      for f in files if f.exists()))))
     return tuple(out)
 
 

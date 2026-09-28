@@ -24,6 +24,8 @@ model has no such answer to — after a bank change, the new ones.
     python scripts/everyday.py results/full -m org/x   one model
     python scripts/everyday.py results/full --judge    12a.6: and send the judge what waits on it
     python scripts/everyday.py results/full --compare  12a.6: before and after, model by model
+    python scripts/everyday.py results/full --judge -q everyday-summarising-07
+                                                       12a.8: the judge for one question's answers
 
 It reads the generations the harness logged, marks each one on the text
 after the reasoning block (judge.answer_parts, #59's split — never the raw
@@ -2076,15 +2078,24 @@ def main() -> int:
                     help="12a.6: also send the answers waiting on the judge (no model runs)")
     ap.add_argument("--compare", action="store_true",
                     help="12a.6: before and after the re-mark, model by model")
+    ap.add_argument("-q", "--question", action="append", default=[],
+                    help="12a.8: with --judge, send the judge only this question's answers "
+                         "(a rubric or reference changed); every model is still marked")
     a = ap.parse_args()
     if not a.results.is_dir():
         print(f"no such directory: {a.results}", file=sys.stderr)
+        return 2
+    unknown = sorted(set(a.question) - {q["id"] for q in load_bank()})
+    if unknown:
+        print(f"no such question: {', '.join(unknown)}", file=sys.stderr)
         return 2
     if a.compare:
         print(compare(a.results))
         return 0
     want = {m.replace("/", "__") for m in a.model}
-    res = remark(a.results, want, judge=a.judge)
+    # 12a.8: one question's answers — no new "before" for --compare
+    res = remark(a.results, want, judge=a.judge, only=set(a.question) or None,
+                 snapshot=not a.question)
     for model, line in res["models"].items():
         print(f"{model}: {line}")
     print(f"marked {len(res['models'])} model(s)")

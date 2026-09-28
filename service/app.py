@@ -109,7 +109,24 @@ _WATCH = ("results*.json", "diagnose.json", "model_meta.json", "judge.json",
           # 12k.2: the judge's marks on Do-Not-Answer and XSTest land after the run
           "safety.json",
           # 12n.2: and its grades on SimpleQA Verified
-          "simpleqa.json")
+          "simpleqa.json",
+          # 12o.3: MobileAIBench's scores, written after the run
+          "mobileaibench.json")
+
+
+def files_stamp(files) -> str:
+    """12a.8: what a set of files is now — each one's path, time to the
+    nanosecond and size, hashed. Any file rewritten changes it, whatever the
+    others' times: the newest time alone missed a re-mark once a file dated
+    in the future (copied, unpacked or from another clock) was among them"""
+    h = hashlib.sha256()
+    for f in sorted(files):
+        try:
+            st = f.stat()
+        except OSError:
+            continue
+        h.update(f"{f}\0{st.st_mtime_ns}\0{st.st_size}\n".encode("utf-8"))
+    return h.hexdigest()
 
 # 11h: the dashboard no longer links to, serves or reads anything of the
 # demo tree ($BENCH_ROOT/demo). scripts/demo_loop.py stays a command-line
@@ -242,13 +259,11 @@ def _tree_key() -> tuple:
     # 12f.3: and what the host's GGUF worker has written
     gd = config.RESULTS_ROOT / "gguf_results"
     gg = [f for f in gd.glob("*.json")] if gd.is_dir() else []
-    ggs = (len(gg), max((f.stat().st_mtime for f in gg), default=0.0),
-           _mtime(config.RESULTS_ROOT / "gguf_data" / "manifest.json"))
+    ggs = (len(gg), files_stamp(gg), _mtime(config.RESULTS_ROOT / "gguf_data" / "manifest.json"))
     if not config.OUT_DIR.is_dir():
         return (0, 0.0, db.taint_stamp(), exam, judge_v, ggs)
     files = [f for pat in _WATCH for f in config.OUT_DIR.rglob(pat)]
-    return (len(files), max((f.stat().st_mtime for f in files), default=0.0),
-            db.taint_stamp(), exam, judge_v, ggs)
+    return (len(files), files_stamp(files), db.taint_stamp(), exam, judge_v, ggs)
 
 
 def taint_for(model_ids) -> dict[str, list[str]]:
