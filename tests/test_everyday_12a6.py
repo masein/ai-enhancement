@@ -91,12 +91,13 @@ def test_a_length_counts_only_if_the_request_states_one(prompt, said):
 
 def test_the_rubric_says_what_scores_in_plain_words():
     tldr = ev.judge_check(BANK["everyday-pilot-03"])["rubric"]
-    assert tldr.startswith("Score the answer from 0 to 4 as a summary")
+    # 12a.7: on what it says, not its style
+    assert tldr.startswith("Score the answer from 0 to 4 on what it says as a summary")
     assert "It passes at 3 or more." in tldr
-    assert "versions or options to choose from" in tldr and "lead-in" in tldr
+    assert "several versions instead of one" in tldr and "lead-in" in tldr
     assert "judged by meaning and not by exact words" in tldr
     assert "It should keep all 2 of these:\n- 11:30\n- thursday" in tldr
-    assert "Take off 2 if it says anything the text doesn't" in tldr
+    assert "Take off 2 if it says anything invented or wrong" in tldr
     assert "The request asks for it shorter" in tldr
     # a request that states no length is never marked on it
     email = next(q for q in SUMMARISE if q["prompt"].startswith("can u summarise this email thread"))
@@ -109,8 +110,9 @@ def test_the_rubric_says_what_scores_in_plain_words():
     assert facts and "at least 5 of these" in ev.judge_check(email)["rubric"]
     # the page says what the rubric asks, not the whole of it
     assert ev.describe(ev.judge_check(email)) == (
-        "the judge, on a rubric (0 to 4, passing at 3): one summary, the key facts, nothing "
-        "invented, and the length only if the request asks one")
+        # 12a.7: on what it says
+        "the judge, on a rubric (0 to 4, passing at 3): the key facts, nothing invented or "
+        "wrong, one version, and the length only if the request asks one — never the style")
 
 
 @pytest.mark.parametrize("reply,want", [

@@ -2617,6 +2617,21 @@ body.reading .dlg-back { z-index:95; }
 .reader-wrap.open .reader-scrim { opacity:1; }
 .reader:focus { outline:none; }
 @media (max-width:720px) { .reader { width:100vw; border-left:0; } }
+/* 12a.7: an Everyday reader — a group's questions side by side, a model's
+   answers — is wide: 70% of the page unless dragged, and remembered; the
+   whole screen under 800px */
+.reader-wrap.rd-wide .reader { width:var(--rdw, 70vw); max-width:100vw; }
+.rd-grip { display:none; position:absolute; top:0; bottom:0; left:-4px; width:9px; z-index:3;
+  cursor:col-resize; touch-action:none; }
+.rd-grip::after { content:""; position:absolute; top:calc(50% - 24px); height:48px; left:3px;
+  width:3px; border-radius:2px; background:var(--border); }
+.rd-grip:hover::after, .rd-grip:focus-visible::after, .rd-grip.drag::after { background:var(--accent); }
+.rd-grip:focus-visible { outline:none; }
+.reader-wrap.rd-wide .rd-grip { display:block; }
+@media (max-width:800px) {
+  .reader-wrap.rd-wide .reader { width:100vw; border-left:0; }
+  .reader-wrap.rd-wide .rd-grip { display:none; }
+}
 .rd-head { display:flex; gap:12px; align-items:flex-start; justify-content:space-between;
   padding:14px 18px 12px; border-bottom:1px solid var(--border); }
 .rd-titles { min-width:0; }
@@ -4033,7 +4048,8 @@ input.gbox { margin:0 2px 0 0; vertical-align:-2px; }
 .grpq { border-top:1px solid var(--border); padding:12px 0; }
 .grpq-head { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
 .evside { display:flex; gap:10px; overflow-x:auto; padding:4px 0 8px; scroll-snap-type:x proximity; }
-.evside-card { flex:0 0 min(300px, 85%); border:1px solid var(--border); border-radius:8px;
+/* 12a.7: the cards share a wide reader's width, one model's at most 560px */
+.evside-card { flex:1 0 min(300px, 85%); max-width:560px; border:1px solid var(--border); border-radius:8px;
   padding:8px 10px; background:var(--surface-1); scroll-snap-align:start; min-width:0; }
 .evside-card[data-mark="no"] { border-color:color-mix(in srgb, var(--s8) 45%, var(--border)); }
 .evside-head { display:flex; gap:6px; align-items:center; }
@@ -13908,6 +13924,56 @@ async function readFetch(r, extra) {
 }
 
 // ---- the sheet ----------------------------------------------------------------
+// 12a.7: an Everyday reader's width, as a share of the page, kept in this
+// browser (in memory where storage is off): 70% until someone drags it
+const RD_WIDE = { key: 'bench-reader-width', dflt: 70, min: 30, max: 100, step: 2 };
+const rdWideKind = kind => kind === 'everyday' || kind === 'group';
+function rdWidth() {
+  let v = null;
+  try { v = parseFloat(localStorage.getItem(RD_WIDE.key)); } catch (e) { v = state.rdWidth; }
+  return Number.isFinite(v) && v >= RD_WIDE.min && v <= RD_WIDE.max ? v : RD_WIDE.dflt;
+}
+function rdWidthSet(v) {
+  v = Math.round(Math.max(RD_WIDE.min, Math.min(RD_WIDE.max, v)) * 10) / 10;
+  state.rdWidth = v;
+  try { if (v === RD_WIDE.dflt) localStorage.removeItem(RD_WIDE.key);
+        else localStorage.setItem(RD_WIDE.key, String(v)); } catch (e) { /* this page's memory */ }
+  return v;
+}
+// its left edge: drag, ←/→ once focused, a double-click back to 70%
+function readerGrip(aside) {
+  const grip = el('span', { class: 'rd-grip', role: 'separator', tabindex: '0',
+    'aria-orientation': 'vertical', 'aria-label': 'the reader’s width: ← wider, → narrower',
+    'data-reader-grip': '1', title: 'drag to widen or narrow · double-click for 70%' });
+  const show = v => { aside.style.setProperty('--rdw', v + 'vw');
+    grip.setAttribute('aria-valuenow', String(Math.round(v))); };
+  grip.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    grip.setPointerCapture(e.pointerId);
+    grip.classList.add('drag');
+    const at = ev => Math.max(RD_WIDE.min, Math.min(RD_WIDE.max,
+      100 * (innerWidth - ev.clientX) / innerWidth));
+    const move = ev => show(at(ev));
+    const up = ev => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', up);
+      grip.removeEventListener('pointercancel', up);
+      grip.classList.remove('drag');
+      show(rdWidthSet(at(ev)));
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+    grip.addEventListener('pointercancel', up);
+  });
+  grip.addEventListener('dblclick', e => { e.preventDefault(); show(rdWidthSet(RD_WIDE.dflt)); });
+  grip.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault(); e.stopPropagation();
+    show(rdWidthSet(rdWidth() + (e.key === 'ArrowLeft' ? 1 : -1) * RD_WIDE.step)); });
+  show(rdWidth());
+  return grip;
+}
 function readerShell() {
   const title = el('h2', { id: 'readerTitle', class: 'rd-title' });
   const src = el('p', { class: 'rd-src' });
@@ -13920,6 +13986,7 @@ function readerShell() {
     el('header', { class: 'rd-head' }, el('div', { class: 'rd-titles' }, title, src),
       el('div', { class: 'rd-top' }, acts, close)),
     body);
+  aside.append(readerGrip(aside));
   const wrap = el('div', { id: 'reader', class: 'reader-wrap' },
     el('div', { class: 'reader-scrim', onclick: () => closeReader() }), aside);
   // focus stays inside while it is open; Esc closes it, unless a menu of
@@ -13971,6 +14038,7 @@ function renderReader() {
     wrap._stop = null;
     wrap.dataset.key = k;
     wrap.dataset.kind = r.kind;
+    wrap.classList.toggle('rd-wide', rdWideKind(r.kind));
     wrap._v = -1;
     if (!state.readData[k] || (!state.readData[k].data && !state.readData[k].loading)) readFetch(r);
   }
