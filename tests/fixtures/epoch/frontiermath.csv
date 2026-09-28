@@ -1,0 +1,4 @@
+Model version,mean_score,Best score (across scorers),Release date,Organization,Country,Training compute (FLOP),Training compute notes,stderr,Log viewer,Logs,Started at,id
+claude-opus-4-8_max,0.4724137931034483,0.4724137931034483,2026-05-28,Anthropic,United States of America,,,0.029366965952163048,,https://epoch-benchmarks-staging-private.s3.us-east-2.amazonaws.com/inspect_ai_logs/6dUEQ3YfeMZzSm9ytgiuDi.eval,2026-06-08T00:20:40.000Z,6dUEQ3YfeMZzSm9ytgiuDi
+qwen3.6-max-preview,0.23103448275862068,0.23103448275862068,2026-04-20,Alibaba,China,,,0.02479378972186167,,,2026-05-27T22:28:21.000Z,T6yJ47dEheZTjRVDS6Bgzt
+gemini-3.5-flash_high,0.3896551724137931,0.3896551724137931,2026-05-19,Google DeepMind,United States of America,,,0.028686590614000477,,,2026-05-22T16:42:34.000Z,Ectc9Fcn4xSKZFQwj9Xn7R

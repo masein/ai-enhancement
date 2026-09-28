@@ -1,0 +1,460 @@
+{
+ "_note": "a canned response in the shape of Artificial Analysis's free Data API (GET /api/v2/data/llms/models, their documentation read 2026-09-28): the models and numbers are made up for tests, never theirs",
+ "status": 200,
+ "prompt_options": {
+  "parallel_queries": 1,
+  "prompt_length": "medium"
+ },
+ "data": [
+  {
+   "id": "id-frontier-test-1",
+   "name": "Frontier Test 1",
+   "slug": "frontier-test-1",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-01-10",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 40,
+    "mmlu_pro": 0.6,
+    "gpqa": 0.4,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-2",
+   "name": "Frontier Test 2",
+   "slug": "frontier-test-2",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-02-11",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 41,
+    "mmlu_pro": 0.61,
+    "gpqa": 0.41,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-3",
+   "name": "Frontier Test 3",
+   "slug": "frontier-test-3",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-03-12",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 42,
+    "mmlu_pro": 0.62,
+    "gpqa": 0.42,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-4",
+   "name": "Frontier Test 4",
+   "slug": "frontier-test-4",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-04-13",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 43,
+    "mmlu_pro": 0.63,
+    "gpqa": 0.43,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-5",
+   "name": "Frontier Test 5",
+   "slug": "frontier-test-5",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-05-14",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 44,
+    "mmlu_pro": 0.64,
+    "gpqa": 0.44,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-6",
+   "name": "Frontier Test 6",
+   "slug": "frontier-test-6",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-06-15",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 45,
+    "mmlu_pro": 0.65,
+    "gpqa": 0.45,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-7",
+   "name": "Frontier Test 7",
+   "slug": "frontier-test-7",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-07-16",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 46,
+    "mmlu_pro": 0.66,
+    "gpqa": 0.46,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-8",
+   "name": "Frontier Test 8",
+   "slug": "frontier-test-8",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-08-17",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 47,
+    "mmlu_pro": 0.67,
+    "gpqa": 0.47,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-9",
+   "name": "Frontier Test 9",
+   "slug": "frontier-test-9",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-09-18",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 48,
+    "mmlu_pro": 0.68,
+    "gpqa": 0.48,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-10",
+   "name": "Frontier Test 10",
+   "slug": "frontier-test-10",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-01-19",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 49,
+    "mmlu_pro": 0.69,
+    "gpqa": 0.49,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-11",
+   "name": "Frontier Test 11",
+   "slug": "frontier-test-11",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-02-20",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 50,
+    "mmlu_pro": 0.7,
+    "gpqa": 0.5,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-12",
+   "name": "Frontier Test 12",
+   "slug": "frontier-test-12",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-03-21",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 51,
+    "mmlu_pro": 0.71,
+    "gpqa": 0.51,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-frontier-test-5.5",
+   "name": "Frontier Test 5.5",
+   "slug": "frontier-test-5.5",
+   "model_creator": {
+    "id": "c-openai",
+    "name": "OpenAI",
+    "slug": "openai"
+   },
+   "release_date": "2026-09-20",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 71.5,
+    "mmlu_pro": 0.873,
+    "gpqa": 0.702,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-gemini-test-3",
+   "name": "Gemini Test 3",
+   "slug": "gemini-test-3",
+   "model_creator": {
+    "id": "c-google",
+    "name": "Google",
+    "slug": "google"
+   },
+   "release_date": "2026-08-01",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 68.0,
+    "mmlu_pro": 0.851,
+    "gpqa": 0.69,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-gemini-test-2",
+   "name": "Gemini Test 2",
+   "slug": "gemini-test-2",
+   "model_creator": {
+    "id": "c-google",
+    "name": "Google",
+    "slug": "google"
+   },
+   "release_date": "2026-03-01",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 60.0,
+    "mmlu_pro": 0.8,
+    "gpqa": 0.6,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-claude-test-5",
+   "name": "Claude Test 5",
+   "slug": "claude-test-5",
+   "model_creator": {
+    "id": "c-anthropic",
+    "name": "Anthropic",
+    "slug": "anthropic"
+   },
+   "release_date": "2026-09-01",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 70.0,
+    "mmlu_pro": 0.86,
+    "gpqa": 0.71,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-qwen3-5-2b",
+   "name": "Qwen3.5 2B",
+   "slug": "qwen3-5-2b",
+   "model_creator": {
+    "id": "c-alibaba",
+    "name": "Alibaba",
+    "slug": "alibaba"
+   },
+   "release_date": "2026-02-01",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 20.0,
+    "mmlu_pro": 0.553,
+    "gpqa": 0.301,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  },
+  {
+   "id": "id-other-test-1",
+   "name": "Other Test 1",
+   "slug": "other-test-1",
+   "model_creator": {
+    "id": "c-alibaba",
+    "name": "Alibaba",
+    "slug": "alibaba"
+   },
+   "release_date": "2026-02-02",
+   "evaluations": {
+    "artificial_analysis_intelligence_index": 25.0,
+    "mmlu_pro": 0.5,
+    "gpqa": 0.3,
+    "hle": null,
+    "math_500": null
+   },
+   "pricing": {
+    "price_1m_blended_3_to_1": 1.0,
+    "price_1m_input_tokens": 0.5,
+    "price_1m_output_tokens": 2.0
+   },
+   "median_output_tokens_per_second": 100.0,
+   "median_time_to_first_token_seconds": 0.5
+  }
+ ]
+}

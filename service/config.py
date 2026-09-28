@@ -315,6 +315,19 @@ OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL",
                                      "https://openrouter.ai/api/v1").strip().rstrip("/")
 OPENROUTER_CONCURRENCY = int(os.environ.get("OPENROUTER_CONCURRENCY", "8"))
 OPENROUTER_MAX_TOKENS = int(os.environ.get("OPENROUTER_MAX_TOKENS", "4096"))
+# 12m.2: reported scores from outside the board (service/reported.py). The
+# Artificial Analysis key is masein's, in .env like OpenRouter's; without one
+# nothing asks them. The default import: each maker's REPORTED_PER_MAKER most
+# recent models, and the open models already on the board
+AA_API_KEY = os.environ.get("ARTIFICIAL_ANALYSIS_API_KEY", "")
+AA_URL = os.environ.get("ARTIFICIAL_ANALYSIS_URL",
+                        "https://artificialanalysis.ai/api/v2/data/llms/models")
+EPOCH_URL = os.environ.get("EPOCH_URL", "https://epoch.ai/data/benchmark_data.zip")
+REPORTED_MAKERS = [m.strip() for m in os.environ.get("REPORTED_MAKERS",
+                                                      "OpenAI,Google,Anthropic").split(",")
+                   if m.strip()]
+REPORTED_PER_MAKER = int(os.environ.get("REPORTED_PER_MAKER", "10"))
+REPORTED_DAILY = os.environ.get("REPORTED_DAILY", "1") == "1"
 # the monthly AI spend limit, in dollars; the page changes it. At the limit AI
 # jobs wait, with a plain message — they never fall back to another model
 AI_MONTHLY_LIMIT_USD = float(os.environ.get("AI_MONTHLY_LIMIT_USD", "20"))

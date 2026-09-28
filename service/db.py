@@ -247,6 +247,31 @@ CREATE TABLE IF NOT EXISTS served_models (
 );
 -- 12f.2: numbers measured on the phone and typed in, as reported — never a
 -- results file, a board column or an average
+-- 12m.2: reported scores from outside the board (service/reported.py): each
+-- import with its file's sha256 and date, the scores it held, the ones typed
+-- in from a model card (no import), and the aliases that make two names one model
+CREATE TABLE IF NOT EXISTS reported_imports (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  source      TEXT NOT NULL,                     -- epoch | aa
+  sha256      TEXT NOT NULL,
+  at          REAL NOT NULL,
+  checked_at  REAL,
+  n           INTEGER NOT NULL,
+  models      INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reported_scores (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  import_id   INTEGER,                           -- null: typed in from a model card
+  source      TEXT NOT NULL,                     -- epoch | aa | card
+  data        TEXT NOT NULL,                     -- JSON: key, name, maker, benchmark, value, …
+  created_at  REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reported_aliases (
+  alias       TEXT PRIMARY KEY,
+  target      TEXT NOT NULL,
+  by_whom     TEXT NOT NULL,
+  at          REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS phone_reports (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   model       TEXT NOT NULL,
@@ -1165,6 +1190,82 @@ def served_get(model_id: str) -> dict | None:
     with closing(_conn()) as c:
         row = c.execute("SELECT data FROM served_models WHERE id=?", (model_id,)).fetchone()
     return json.loads(row[0]) if row else None
+
+
+def reported_import_add(source: str, sha: str, rows: list[dict]) -> int:
+    """12m.2: an import and every score it held, together"""
+    now = time.time()
+    with closing(_conn()) as c:
+        cur = c.execute("INSERT INTO reported_imports (source, sha256, at, checked_at, n, models) "
+                        "VALUES (?,?,?,?,?,?)", (source, sha, now, now, len(rows),
+                                                 len({r["key"] for r in rows})))
+        iid = int(cur.lastrowid)
+        c.executemany("INSERT INTO reported_scores (import_id, source, data, created_at) "
+                      "VALUES (?,?,?,?)", [(iid, source, json.dumps(r), now) for r in rows])
+        c.commit()
+        return iid
+
+
+def reported_import_last(source: str) -> dict | None:
+    with closing(_conn()) as c:
+        row = c.execute("SELECT id, source, sha256, at, checked_at, n, models FROM reported_imports "
+                        "WHERE source=? ORDER BY id DESC LIMIT 1", (source,)).fetchone()
+    return dict(zip(("id", "source", "sha256", "at", "checked_at", "n", "models"), row)) \
+        if row else None
+
+
+def reported_imports(source: str) -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT id, source, sha256, at, checked_at, n, models FROM "
+                         "reported_imports WHERE source=? ORDER BY id", (source,)).fetchall()
+    return [dict(zip(("id", "source", "sha256", "at", "checked_at", "n", "models"), r))
+            for r in rows]
+
+
+def reported_import_checked(iid: int) -> None:
+    with closing(_conn()) as c:
+        c.execute("UPDATE reported_imports SET checked_at=? WHERE id=?", (time.time(), iid))
+        c.commit()
+
+
+def reported_card_add(row: dict) -> int:
+    with closing(_conn()) as c:
+        cur = c.execute("INSERT INTO reported_scores (import_id, source, data, created_at) "
+                        "VALUES (NULL, 'card', ?, ?)", (json.dumps(row), time.time()))
+        c.commit()
+        return int(cur.lastrowid)
+
+
+def reported_scores() -> list[dict]:
+    """each source's newest import's scores, and every one typed in"""
+    with closing(_conn()) as c:
+        rows = c.execute(
+            "SELECT s.id, s.source, s.data FROM reported_scores s WHERE s.import_id IS NULL "
+            "OR s.import_id = (SELECT MAX(i.id) FROM reported_imports i WHERE i.source = s.source) "
+            "ORDER BY s.id").fetchall()
+    return [{**json.loads(d), "id": i, "source": src} for i, src, d in rows]
+
+
+def reported_aliases() -> list[dict]:
+    with closing(_conn()) as c:
+        rows = c.execute("SELECT alias, target, by_whom, at FROM reported_aliases "
+                         "ORDER BY alias").fetchall()
+    return [dict(zip(("alias", "target", "by", "at"), r)) for r in rows]
+
+
+def reported_alias_set(alias: str, target: str, by: str) -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT INTO reported_aliases (alias, target, by_whom, at) VALUES (?,?,?,?) "
+                  "ON CONFLICT(alias) DO UPDATE SET target=excluded.target, "
+                  "by_whom=excluded.by_whom, at=excluded.at", (alias, target, by, time.time()))
+        c.commit()
+
+
+def reported_alias_delete(alias: str) -> bool:
+    with closing(_conn()) as c:
+        n = c.execute("DELETE FROM reported_aliases WHERE alias=?", (alias,)).rowcount
+        c.commit()
+        return n > 0
 
 
 def phone_add(model: str, data: dict) -> int:

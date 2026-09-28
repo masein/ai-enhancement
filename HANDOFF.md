@@ -3701,6 +3701,42 @@ models side by side, and filter Benchmarks to a couple.
   lists name a GGUF run with its setup ("… · GGUF · lookahead 1") and every
   suite by the board's name, never its id (`SUITE_NAMES`).
 
+### 12m.2 — reported scores from outside the board
+
+- **Sources** (`service/reported.py`), each credited wherever its numbers show:
+  - Epoch AI's Benchmarking Hub: "Data: Epoch AI, CC BY 4.0";
+  - Artificial Analysis's free Data API (`GET /api/v2/data/llms/models`,
+    header `x-api-key`): "Data: Artificial Analysis". **Its free tier is
+    for internal use: never show these numbers on anything shared outside
+    the tailnet.** They reach only the live page, never the results payload
+    and so never the frozen single-file report. The key is masein's, in
+    `.env` as `ARTIFICIAL_ANALYSIS_API_KEY`, like OpenRouter's; without one
+    nothing asks them, and the import says so in one line;
+  - model cards and papers, typed in on AI models ▸ Outside data: model,
+    maker, benchmark, value, their setting, the source's URL, the date, who
+    entered it.
+- **Imports** run once a day from the queue's idle loop (`reported.daily`,
+  `REPORTED_DAILY=0` turns it off) and on AI models ▸ Outside data ▸ Import
+  now. Each keeps its file's sha256 and the date; the same file is only
+  checked, a changed one is a new import, and the newest import's numbers
+  are the ones shown.
+- **Which models:** each of `REPORTED_MAKERS` (OpenAI, Google, Anthropic)'s
+  `REPORTED_PER_MAKER` (10) most recent, and any model already on the board
+  (matched by name). An **alias** (Outside data ▸ Aliases) makes two names
+  one model — "GPT-5.5" at Epoch and "openai/gpt-5.5" through OpenRouter,
+  or a reported name and a model on the board: its measured and reported
+  numbers side by side, never mixed.
+- **On the page** (`/api/reported`, never `DATA`):
+  - Models ▾ has "Reported (not run here) · <maker>"; a reported-only model
+    chosen there is a row with the "Reported · <source>" columns — never a
+    leader, an average or a rank, and never deciding which rows show.
+  - Compare has a "Reported · <source>" group a source, credited in its
+    head; a cell's tag is "reported by <source> · <their setting>", so two
+    settings are never one row.
+  - Benchmarks ▸ Standard puts a reported panel beside the lm_eval panel of
+    the same benchmark (by name), its method and credit in its header and
+    tooltips.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

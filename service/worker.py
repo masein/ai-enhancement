@@ -12,7 +12,7 @@ import threading
 import time
 import traceback
 
-from . import db, gguf
+from . import db, gguf, reported
 from .runner import run_submission
 
 POLL_S = 3
@@ -42,6 +42,11 @@ def loop() -> None:
         try:
             sub = db.claim_next(gguf_first=_gguf_first())
             if sub is None:
+                # 12m.2: the day's reported scores, in a thread of their own
+                try:
+                    reported.daily()
+                except Exception:                   # noqa: BLE001 — the queue goes on
+                    traceback.print_exc()
                 _stop.wait(POLL_S)
                 continue
             run_submission(sub)

@@ -1,0 +1,6 @@
+Model version,EM,Release date,Organization,Country,Training compute (FLOP),Training compute notes,Name,Shots,Source,Source link,Notes,id
+amazon.nova-lite-v1:0,0.77,2024-12-03,Amazon,United States of America,,,Amazon Nova Lite,5,Stanford CRFM Leaderboard,https://crfm.stanford.edu/helm/lite/latest/#/leaderboard/mmlu,,reccNX56mRCIhx9ok
+amazon.nova-micro-v1:0,0.708,2024-12-03,Amazon,United States of America,,,Amazon Nova Micro,5,Stanford CRFM Leaderboard,https://crfm.stanford.edu/helm/lite/latest/#/leaderboard/mmlu,,recMu6jniW4Q1aHhj
+amazon.nova-pro-v1:0,0.82,2024-12-03,Amazon,United States of America,6.000010000000001e+24,"""probably just below 1e25 stemming from the Llama 70B serving speed.  If Llama 70B is trained proportionally to 405B, then it's at ~ 6.6e24. Nova Pro is served at 100tk/s, while Llama 70B is served at 70tk/s on average, and 100tk/s by together.ai at FP8. So Nova Pro would be >1e25 if they roughly 2x the amount of training compared to Llama 70B which [seems unlikely]""",Amazon Nova Pro,5,Stanford CRFM Leaderboard,https://crfm.stanford.edu/helm/lite/latest/#/leaderboard/mmlu,,recIRlQ5EAWn5dxqD
+,0.652,,,,,,AquilaChat2 34B,0,Yi: Open Foundation Models by 01.AI,http://arxiv.org/abs/2403.04652,,recyryG18K2x30duJ
+,0.667,,,,,,AquilaChat2 34B,5,Yi: Open Foundation Models by 01.AI,http://arxiv.org/abs/2403.04652,,rechbRaRakeh7m35k
