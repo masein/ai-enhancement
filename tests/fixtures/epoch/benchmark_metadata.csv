@@ -1,0 +1,5 @@
+benchmark,in_eci,source_file,score_column,scale,random_baseline,score_ceiling,release_date,superseded_by
+GPQA diamond,True,gpqa_diamond.csv,Best score (across scorers),1.0,0.25,1.0,2023-11-20,
+FrontierMath-2025-02-28-Private,True,frontiermath.csv,Best score (across scorers),1.0,0.0,0.57,2025-02-28,FrontierMath-Tiers-1-3-v2-Private
+Aider polyglot,True,aider_polyglot_external.csv,Percent correct,0.01,0.0,1.0,2024-12-21,
+MMLU,True,mmlu_external.csv,EM,1.0,0.25,1.0,2020-09-07,

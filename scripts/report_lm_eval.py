@@ -9101,7 +9101,8 @@ const repTag = s => `reported by ${repSrc(s.source).name}` + (s.setting ? ` · $
 // its panel sits beside that one's on Benchmarks, never merged into it
 const REP_SAME = { mmlu: ['mmlu'], mmlu_pro: ['mmlu-pro', 'mmlu pro'], hendrycks_math500:
   ['math-500', 'math 500'], gsm8k: ['gsm8k'], hellaswag: ['hellaswag'], winogrande:
-  ['winogrande'], arc_challenge: ['arc-challenge', 'arc challenge', 'arc-c'], truthfulqa_mc2:
+  ['winogrande'], arc_challenge: ['arc-challenge', 'arc challenge', 'arc-c', 'arc ai2'],
+  truthfulqa_mc2:
   ['truthfulqa'], ifeval: ['ifeval'], piqa: ['piqa'] };
 const repSame = (t, b) => (REP_SAME[t] || []).includes(String(b).toLowerCase().trim());
 function repPanels(t, ms, hl) {
@@ -9135,7 +9136,7 @@ function repCmpGroups(ms) {
           && s.unit === 'points') ? 'n1' : null,
         get: m => {
           const s = repOf(m.id, source).find(x => x.benchmark === b);
-          return s ? { v: s.unit === 'points' ? s.value : s.value, se: null, tag: repTag(s),
+          return s ? { v: s.value, se: s.se ?? null, tag: repTag(s),
             tip: [repSrc(source).credit, s.url, s.date ? 'as of ' + s.date : '',
               s.by ? 'entered by ' + s.by : ''].filter(Boolean).join(' · ') } : null;
         } })) };

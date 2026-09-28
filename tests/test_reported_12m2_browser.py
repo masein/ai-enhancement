@@ -15,7 +15,7 @@ import pytest
 
 from conftest import set_name
 from service import config, reported
-from test_reported_12m2 import KEY, canned
+from test_reported_12m2 import KEY, canned, epoch_fetch, epoch_zip
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12m2"
@@ -36,6 +36,7 @@ def imported(live):
         reported.import_aa(fetch=canned())
     finally:
         config.AA_API_KEY = saved
+    reported.import_epoch(fetch=epoch_fetch(epoch_zip()))
     # a number from a model card: MMLU, the benchmark the board runs too
     reported.card_add({"model": "Frontier Test 5.5", "maker": "OpenAI", "benchmark": "MMLU",
                        "value": "91.2%", "setting": "5-shot", "url": "https://example.org/card",
@@ -128,8 +129,8 @@ def test_outside_data_says_what_each_source_holds(live, page):
     aa = card.locator("[data-rep-line='aa']").inner_text()
     assert aa.startswith("Artificial Analysis: 39 scores for 13 models, imported ")
     assert "· Data: Artificial Analysis" in aa
-    assert card.locator("[data-rep-line='epoch']").inner_text().startswith(
-        "Epoch AI: not imported yet")
+    ep = card.locator("[data-rep-line='epoch']").inner_text()
+    assert ep.startswith("Epoch AI: ") and ep.endswith("· Data: Epoch AI, CC BY 4.0")
     assert "internal use" in card.inner_text()
     # a number from a card, refused in one line, then added
     card.locator("[data-rep-card-form] > summary").click()
@@ -142,3 +143,22 @@ def test_outside_data_says_what_each_source_holds(live, page):
     shot(card, "outside-data.png")
     # the refusal's own 422, as the browser logs it, and nothing else
     assert [e for e in page.errors if "status of 422" not in e] == []
+
+
+def test_epochs_numbers_are_their_own_group_credited(live, page):
+    ids = ("reported/openai/gpt-5.5", "reported/anthropic/claude-opus-5")
+    page.set_viewport_size({"width": 1400, "height": 1000})
+    page.goto("about:blank")
+    page.goto(live["base"] + "/#tab=models&view=compare&m=" + ",".join(quote(m, safe="") for m in ids))
+    page.wait_for_selector("[data-compare='2']")
+    assert page.locator("[data-cmp-credit='rep:epoch']").inner_text() == " · Data: Epoch AI, CC BY 4.0"
+    assert page.locator("[data-cmp-main='rep:epoch:GPQA diamond']").inner_text() == \
+        "reported by Epoch AI · Epoch AI's own run"
+    assert page.locator(f"[data-cmp-kind='{ids[0]}']").inner_text() == " · reported only · OpenAI"
+    names = page.locator("[data-cmp-chip]").all_inner_texts()
+    assert names[0].startswith("GPT-5.5 (xhigh)")
+    # two models, one method: the Δ, z-tested on their own standard errors
+    d = page.locator("[data-cmp-delta='rep:epoch:GPQA diamond']").inner_text()
+    assert d.endswith("· clear") or d.endswith("· not a clear difference"), d
+    shot(page.locator("[data-compare]"), "compare-epoch.png")
+    assert page.errors == []

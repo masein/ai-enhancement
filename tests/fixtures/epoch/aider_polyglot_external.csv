@@ -1,0 +1,14 @@
+Model version,Percent correct,Release date,Organization,Country,Training compute (FLOP),Training compute notes,Percent using correct edit format,Edit format,Cost,Source,Source link,Notes,Time per case (seconds),Date of evaluation,id
+gpt-oss-120b_high,41.8,2025-08-05,OpenAI,United States of America,4.94e+24,"""The training run for gpt-oss-120b required 2.1 million H100-hours to complete""
+(2.1e6 hours)*(1,979 H100 FLOP/s)*(30% utilization)*(60*60) = 4.49e24
+They also do post training similar to o3, which we assume adds at least 10% as much compute, so we multiply this estimate by 1.1 to get 4.94e24
+
+",79.1,diff,0.0033,Aider LLM Leaderboards,,,,,recpcTosmykQScJV3
+Qwen3-235B-A22B,59.6,2025-04-29,Alibaba,China,4.752e+24,6 FLOP / parameter / token * 22*10^9 active parameters * 36000000000000 tokens = 4.752e+24 FLOP,92.9,diff,,Aider LLM Leaderboards,https://aider.chat/docs/leaderboards/,"no cost data
+",,,recPTyOmNpRhK82Et
+,52.9,,,,,,97.3,diff,,Aider LLM Leaderboards,https://aider.chat/docs/leaderboards/#polyglot-leaderboard,"Model ""Optimus Alpha""
+",,,rec0UuNYP04KqNja4
+DeepSeek-V3.2-Exp,70.2,2025-09-29,DeepSeek,China,4.18e+24,"3.594058e+24 FLOP [base model] + 2.095014e+23 FLOP = 3.8035594e+24 FLOP for pre-training plus continued pre-training
+
+Then, ""this framework allocates a
+post-training computational budget exceeding 10% of the pre-training cost"", so 4.18e24",98.2,diff,0.0039,Aider LLM Leaderboards,https://aider.chat/docs/leaderboards/#polyglot-leaderboard,,,,recGIpKLux7lz5yX2

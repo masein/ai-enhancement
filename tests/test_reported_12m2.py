@@ -184,3 +184,112 @@ def test_the_import_runs_once_a_day_off_the_queue(monkeypatch):
     assert reported.daily() is False
     monkeypatch.setattr(config, "REPORTED_DAILY", True)
     assert reported.daily() is True and reported.daily() is False
+
+
+# ---------------------------------------------------------------------------
+# Epoch AI: a trimmed copy of their zip (tests/fixtures/epoch, CC BY 4.0)
+# ---------------------------------------------------------------------------
+
+EPOCH = Path(__file__).resolve().parent / "fixtures" / "epoch"
+
+
+def epoch_zip(edit=None) -> bytes:
+    """the fixture's CSVs as Epoch ships them, in a zip — the same bytes each time"""
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(EPOCH.glob("*.csv")):
+            text = f.read_text(encoding="utf-8")
+            if edit:
+                text = edit(f.name, text)
+            info = zipfile.ZipInfo(f.name, date_time=(2026, 9, 28, 0, 0, 0))
+            z.writestr(info, text)
+    return buf.getvalue()
+
+
+def epoch_fetch(blob):
+    asked = []
+
+    def fetch(url, headers=None, timeout=60):
+        asked.append(url)
+        return blob
+    fetch.asked = asked
+    return fetch
+
+
+@pytest.fixture
+def qwen_here(svc):
+    d = config.OUT_DIR / "Qwen__Qwen3-1.7B"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "model_meta.json").write_text(json.dumps({"model": "Qwen/Qwen3-1.7B", "kind": "instruct"}))
+    return svc
+
+
+def test_epoch_imports_with_its_hash_and_date(qwen_here):
+    import hashlib
+    client, _, _ = qwen_here
+    blob = epoch_zip()
+    fetch = epoch_fetch(blob)
+    out = reported.import_epoch(fetch=fetch)
+    assert fetch.asked == [config.EPOCH_URL] and out["status"] == "imported"
+    last = db.reported_import_last("epoch")
+    assert last["sha256"] == hashlib.sha256(blob).hexdigest()
+    view = client.get("/api/reported").json()
+    line = view["sources"]["epoch"]["line"]
+    assert line.startswith(f"Epoch AI: {last['n']} scores for {last['models']} models, imported ")
+    assert line.endswith(f"· file {last['sha256'][:12]}")
+    ms = {m["name"]: m for m in view["models"]}
+    # OpenAI's ten newest of the twelve in the file; GPT-5.2, the oldest, is not one
+    assert sum(1 for m in view["models"] if m["maker"] == "OpenAI") == 10
+    assert not [n for n in ms if n.startswith("GPT-5.2")]
+    # a model is one row, at the highest effort they report, named so
+    assert "GPT-5.5 (xhigh)" in ms and not [n for n in ms if n.startswith("GPT-5.5 (")
+                                            and n != "GPT-5.5 (xhigh)"]
+    g55 = [s for s in view["scores"] if s["model"] == ms["GPT-5.5 (xhigh)"]["id"]]
+    assert [(s["benchmark"], round(s["value"], 4), s["setting"]) for s in g55] == [
+        ("GPQA diamond", 0.94, "Epoch AI's own run")]
+    # Google DeepMind's two and Anthropic's two; the open model on the board is itself
+    assert sum(1 for m in view["models"] if m["maker"] == "Google DeepMind") == 2
+    assert sum(1 for m in view["models"] if m["maker"] == "Anthropic") == 2
+    qwen = next(m for m in view["models"] if m["key"] == "alibaba/qwen3-1.7b")
+    assert qwen["id"] == qwen["measured"] == "Qwen/Qwen3-1.7B"
+    assert [round(s["value"], 4) for s in view["scores"] if s["model"] == "Qwen/Qwen3-1.7B"] == [
+        0.3801]                                                       # its default run, not "none"
+    # a superseded benchmark is left out
+    assert not [s for s in view["scores"] if s["benchmark"].startswith("FrontierMath")]
+
+
+def test_epoch_rows_from_elsewhere_keep_their_source_and_scale(svc, monkeypatch):
+    client, _, _ = svc
+    monkeypatch.setattr(config, "REPORTED_MAKERS", ["OpenAI", "Alibaba", "DeepSeek"])
+    reported.import_epoch(fetch=epoch_fetch(epoch_zip()))
+    view = client.get("/api/reported").json()
+    aider = [s for s in view["scores"] if s["benchmark"] == "Aider polyglot"]
+    # "Percent correct" at scale 0.01: a share, and the leaderboard it came from
+    assert aider and all(0 <= s["value"] <= 1 for s in aider)
+    assert {s["setting"] for s in aider} == {"from Aider LLM Leaderboards"}
+    assert all(s["url"] for s in aider)
+
+
+def test_a_changed_epoch_file_is_a_new_import(svc):
+    reported.import_epoch(fetch=epoch_fetch(epoch_zip()))
+    again = reported.import_epoch(fetch=epoch_fetch(epoch_zip()))
+    assert again["status"] == "unchanged" and len(db.reported_imports("epoch")) == 1
+
+    def drop_one(name, text):
+        return text if name != "gpqa_diamond.csv" else "\n".join(text.splitlines()[:-1]) + "\n"
+    new = reported.import_epoch(fetch=epoch_fetch(epoch_zip(drop_one)))
+    assert new["status"] == "imported" and len(db.reported_imports("epoch")) == 2
+    a, b = db.reported_imports("epoch")
+    assert a["sha256"] != b["sha256"]
+
+
+def test_import_now_runs_both_and_says_what_each_did(svc, monkeypatch):
+    client, _, _ = svc
+    monkeypatch.setattr(reported, "_fetch", lambda url, headers=None, timeout=60:
+                        epoch_zip() if url == config.EPOCH_URL else pytest.fail(url))
+    r = client.post("/api/reported/import", json={"by": "masein"})
+    assert r.status_code == 200
+    lines = {x["source"]: x["line"] for x in r.json()["results"]}
+    assert lines["epoch"].startswith("Epoch AI: ") and lines["aa"] == reported.NO_AA_KEY

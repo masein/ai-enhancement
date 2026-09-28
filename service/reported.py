@@ -24,12 +24,16 @@ editable alias table makes them one model — and one measured here too.
 
 from __future__ import annotations
 
+import csv
 import datetime as _dt
 import hashlib
+import io
 import json
 import re
 import threading
 import urllib.request
+import zipfile
+from pathlib import Path
 
 from . import config, db
 
@@ -188,6 +192,88 @@ def import_aa(fetch=None, board: list[str] | None = None) -> dict:
     return _store("aa", sha, keep(rows, board=board))
 
 
+# a model's reasoning effort, as Epoch names its versions ("gpt-6-astra_max"),
+# highest first — a version with none named is the model's default, above
+# "none" and "unknown": a model is one row, at the highest effort they report
+EFFORT = ["promax", "max", "xhigh", "high", "medium", "low", "minimal", "", "none", "unknown"]
+
+
+def _num(v) -> float | None:
+    try:
+        x = float(str(v).strip().rstrip("%"))
+    except (TypeError, ValueError):
+        return None
+    return x if x == x else None                     # not NaN
+
+
+def import_epoch(fetch=None, board: list[str] | None = None) -> dict:
+    """Epoch AI's Benchmarking Hub: its benchmark table names each benchmark's
+    file, score column and scale; the model table each version's model,
+    maker and release date. Their own runs are "Epoch AI's own run"; a row
+    from another source (a technical report, a leaderboard) keeps it — its
+    shots and its name — in the setting, so it is never one row with theirs.
+    A superseded benchmark is left out"""
+    board = board_ids() if board is None else board
+    blob = (fetch or _fetch)(config.EPOCH_URL)
+    sha, same = _begin("epoch", blob)
+    if same:
+        db.reported_import_checked(same["id"])
+        return {"source": "epoch", "status": "unchanged", "line": _line("epoch", same)}
+    z = zipfile.ZipFile(io.BytesIO(blob))
+    files = {Path(n).name: n for n in z.namelist() if n.endswith(".csv")}
+
+    def read(name: str) -> list[dict]:
+        with z.open(files[name]) as fh:
+            return list(csv.DictReader(io.TextIOWrapper(fh, encoding="utf-8", newline="")))
+    meta = {r["model_version"]: r for r in read("model_metadata.csv") if r.get("model_version")}
+    rows = []
+    for b in read("benchmark_metadata.csv"):
+        f, col = (b.get("source_file") or "").strip(), (b.get("score_column") or "").strip()
+        if not f or f not in files or not col or (b.get("superseded_by") or "").strip():
+            continue
+        scale = _num(b.get("scale")) or 1.0
+        outside = f.endswith("_external.csv")
+        for r in read(f):
+            v = _num(r.get(col))
+            mv = (r.get("Model version") or "").strip()
+            if v is None or not mv:
+                continue
+            m = meta.get(mv, {})
+            group = (m.get("model_group") or r.get("Name") or mv).strip()
+            maker = (m.get("organization") or r.get("Organization") or "").split(",")[0].strip()
+            tail = mv.rsplit("_", 1)[-1] if "_" in mv else ""
+            shots = (r.get("Shots") or "").strip()
+            rows.append({
+                "key": key(group, maker), "name": group, "maker": maker, "version": mv,
+                "effort": tail if tail in EFFORT else "",
+                "released": (m.get("date") or r.get("Release date") or "").strip(),
+                "benchmark": b["benchmark"].strip(), "unit": "share", "value": v * scale,
+                # their own runs' standard error: a Δ between two is z-tested
+                "se": (_num(r.get("stderr")) or 0) * scale or None,
+                "setting": (f"from {r.get('Source', '').strip() or 'another source'}"
+                            + (f", {shots}-shot" if shots else "")) if outside
+                else "Epoch AI's own run",
+                "url": (r.get("Source link") or "").strip() if outside
+                else "https://epoch.ai/benchmarks"})
+    # a model is one row: its highest reasoning effort (named in it, when one
+    # is), and what others report of it
+    best: dict[str, str] = {}
+    for r in rows:
+        if r["setting"] != "Epoch AI's own run":
+            continue
+        if r["key"] not in best or EFFORT.index(r["effort"]) < EFFORT.index(best[r["key"]]):
+            best[r["key"]] = r["effort"]
+    kept = []
+    for r in rows:
+        want = best.get(r["key"])
+        if r["setting"] == "Epoch AI's own run" and r["effort"] != want:
+            continue
+        if want:
+            r["name"] = f"{r['name']} ({want})"
+        kept.append(r)
+    return _store("epoch", sha, keep(kept, board=board))
+
+
 def _store(source: str, sha: str, rows: list[dict]) -> dict:
     iid = db.reported_import_add(source, sha, rows)
     rec = db.reported_import_last(source)
@@ -198,7 +284,7 @@ def run_all(fetch=None, board: list[str] | None = None) -> list[dict]:
     """every source that imports, once: its line each (an error is a line too)"""
     board = board_ids() if board is None else board
     out = []
-    for name, fn in (("aa", import_aa),):
+    for name, fn in (("epoch", import_epoch), ("aa", import_aa)):
         try:
             out.append(fn(fetch=fetch, board=board))
         except Exception as e:                      # noqa: BLE001 — one source's error is its line
@@ -280,7 +366,8 @@ def view(board: list[str] | None = None) -> dict:
         models.setdefault(rid, {"id": rid, "key": r["key"], "name": r["name"],
                                 "maker": r["maker"], "measured": mid if here else None})
         scores.append({"model": rid, "source": r["source"], "benchmark": r["benchmark"],
-                       "value": r["value"], "unit": r["unit"], "setting": r["setting"],
+                       "value": r["value"], "se": r.get("se"), "unit": r["unit"],
+                       "setting": r["setting"],
                        "url": r["url"], "date": r.get("date") or "", "by": r.get("by") or ""})
     srcs = {}
     for s, meta in SOURCES.items():
