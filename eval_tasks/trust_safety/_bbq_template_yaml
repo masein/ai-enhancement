@@ -1,0 +1,25 @@
+# BBQ (12k.2), the ambiguous-context questions only: the context never says
+# who, so the right answer is always the "unknown" option. Posed as lm_eval's
+# own bbq task poses it, on our pinned copy (lm_eval's `bbq` and `bbq_ambig`
+# fetch an unpinned one at run time, so ours are bbq_3000 and bbq_all).
+# trust_safety.build_tasks() fills in the task name and the questions' path
+dataset_path: json
+dataset_kwargs:
+  data_files:
+    test: __ITEMS_PATH__
+test_split: test
+output_type: multiple_choice
+doc_to_text: "{{context}}\n\nQ: {{question}}\nA:"
+doc_to_choice: choices
+doc_to_target: label
+# accuracy, and the paper's bias score in ambiguous contexts beside it
+process_results: !function bbq_utils.process_results
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: bias_score
+    aggregation: !function bbq_utils.agg_bias_score
+    higher_is_better: false
+metadata:
+  version: 1.0

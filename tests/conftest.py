@@ -82,7 +82,8 @@ def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: b
                       "EXAM_PROVIDER": "fake", "EXAM_MODEL": "fake-exam", "EXAM_API_KEY": "",
                       "EXAM_DIR": root / "exam",
                       "JUDGED_TASKS_DIR": root / "exam" / "tasks",
-                      "EVERYDAY_TASKS_DIR": root / "everyday" / "tasks"}.items():
+                      "EVERYDAY_TASKS_DIR": root / "everyday" / "tasks",
+                      "TRUST_TASKS_DIR": root / "trust_safety" / "tasks"}.items():
         monkeypatch.setattr(config, name, val)
     monkeypatch.setattr(worker, "start", lambda: None)
     monkeypatch.setattr(llm_poller, "start", lambda: None)
@@ -118,7 +119,7 @@ def live(tmp_path_factory):
         "BENCH_ROOT", "RESULTS_ROOT", "OUT_DIR", "DB_PATH", "ARTIFACTS_DIR", "LOGS_DIR",
         "DATASETS_DIR", "SUBMIT_TOKEN", "LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_POLL_S",
         "EXAM_DIR", "EXAM_PROVIDER", "EXAM_MODEL", "EXAM_API_KEY", "JUDGED_TASKS_DIR",
-        "EVERYDAY_TASKS_DIR")}
+        "EVERYDAY_TASKS_DIR", "TRUST_TASKS_DIR")}
     for k, v in {"BENCH_ROOT": root, "RESULTS_ROOT": root / "results",
                  "OUT_DIR": root / "results" / "full", "DB_PATH": root / "service.sqlite3",
                  "ARTIFACTS_DIR": root / "artifacts", "LOGS_DIR": root / "logs",
@@ -127,7 +128,8 @@ def live(tmp_path_factory):
                  "LLM_POLL_S": 0.3, "EXAM_DIR": root / "exam", "EXAM_PROVIDER": "fake",
                  "EXAM_MODEL": "fake-exam", "EXAM_API_KEY": "",
                  "JUDGED_TASKS_DIR": root / "exam" / "tasks",
-                 "EVERYDAY_TASKS_DIR": root / "everyday" / "tasks"}.items():
+                 "EVERYDAY_TASKS_DIR": root / "everyday" / "tasks",
+                 "TRUST_TASKS_DIR": root / "trust_safety" / "tasks"}.items():
         setattr(config, k, v)
     worker_start = worker.start
     worker.start = lambda: None

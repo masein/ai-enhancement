@@ -143,9 +143,13 @@ NFEWSHOT = {
     # 12h.1: MMLU-Pro is 5-shot chain of thought, as the harness and its
     # published numbers pose it; IFEval and MATH-500 are asked once, cold
     "ifeval": 0, "mmlu_pro": 5, "hendrycks_math500": 0,
+    # 12k.2: Trust & safety, all asked cold
+    "bbq_3000": 0, "bbq_all": 0, "do_not_answer": 0, "xstest": 0,
 }
+# 12k.2: BBQ's ambiguous questions, a seeded 3,000 of the 29,246; a run can ask
+# for all of them instead (bbq_all, the second choice)
 FULL_TASKS = ["mmlu", "hellaswag", "arc_challenge", "arc_easy",
-              "winogrande", "piqa", "truthfulqa_mc2", "gsm8k"]
+              "winogrande", "piqa", "truthfulqa_mc2", "gsm8k", "bbq_3000"]
 QUICK_TASKS = ["hellaswag", "arc_easy"]
 
 # The permutation control (eval_tasks/mmlu_perm in this repo): MMLU with the
@@ -170,6 +174,18 @@ EVERYDAY_TASKS_DIR = Path(os.environ.get("EVERYDAY_TASKS_DIR", BENCH_ROOT / "eve
 # this many questions — a score from fewer is noise, and training toward it
 # would chase noise. One setting
 EVERYDAY_MIN_HIDDEN = int(os.environ.get("EVERYDAY_MIN_HIDDEN", "20"))
+# 12k.2: Trust & safety (scripts/trust_safety.py). Do-Not-Answer and XSTest
+# are the "safety" suite: asked through the chat template with the Everyday
+# settings, marked by the judge. BBQ is in the full suite. All four are
+# written here from eval_tasks/trust_safety at each run (build_tasks)
+SAFETY_TASKS = ["do_not_answer", "xstest"]
+BBQ_TASK, BBQ_ALL_TASK = "bbq_3000", "bbq_all"
+TRUST_TASKS = [*SAFETY_TASKS, BBQ_TASK, BBQ_ALL_TASK]
+TRUST_TASKS_DIR = Path(os.environ.get("TRUST_TASKS_DIR", BENCH_ROOT / "trust_safety" / "tasks"))
+SAFETY_INSTRUCT_ONLY = ("Do-Not-Answer and XSTest are asked through the chat template and marked "
+                        "on what the model writes, so only an instruct model can sit them — this "
+                        "one runs as a base model (it has no chat template, or was submitted as "
+                        "base)")
 # what a model with no chat template is told: the pilot asks it as a person would
 NO_CHAT_TEMPLATE = ("This model has no chat template, so it can't be asked questions the "
                     "way a person would.")
@@ -369,12 +385,16 @@ GEN_INSTRUCT_ONLY = ("IFEval, MMLU-Pro and MATH-500 are asked through the chat t
 
 # every suite a run can ask for; scripts/check_tasks.py (deploy step 4) asks
 # the installed lm_eval to find every task of each
-SUITES = ("quick", "full", "control", "judged", "everyday", "generative")
+SUITES = ("quick", "full", "control", "judged", "everyday", "generative", "safety")
 
 
-def tasks_for_suite(suite: str) -> list[str]:
+def tasks_for_suite(suite: str, bbq_all: bool = False) -> list[str]:
+    """`bbq_all`: the full suite asks all 29,246 of BBQ's ambiguous questions
+    instead of the seeded 3,000"""
     if suite == "control":
         return list(CONTROL_TASKS)
+    if suite == "safety":
+        return list(SAFETY_TASKS)
     if suite == "everyday":
         return [EVERYDAY_TASK]
     if suite == "generative":
@@ -382,4 +402,6 @@ def tasks_for_suite(suite: str) -> list[str]:
     if suite == "judged":
         return judged_tasks()
     base = QUICK_TASKS if suite == "quick" else FULL_TASKS
+    if bbq_all and suite == "full":
+        base = [BBQ_ALL_TASK if t == BBQ_TASK else t for t in base]
     return base + discovered_ppl_tasks()

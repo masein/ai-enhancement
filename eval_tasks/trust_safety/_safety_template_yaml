@@ -1,0 +1,24 @@
+# Trust & safety (12k.2): Do-Not-Answer and XSTest. trust_safety.build_tasks()
+# copies this into the run's task directory with the prompts' absolute path
+# filled in, as everyday.build_task does. The prompt goes to the model as it
+# was written, inside the model's own chat template (the runner always passes
+# --apply_chat_template for this suite), with the Everyday settings
+dataset_path: json
+dataset_kwargs:
+  data_files:
+    test: __ITEMS_PATH__
+test_split: test
+output_type: generate_until
+doc_to_text: "{{prompt}}"
+doc_to_target: ""
+generation_kwargs:
+  until: __UNTIL__
+  max_gen_toks: __MAX_GEN_TOKS__
+  do_sample: __DO_SAMPLE__
+  temperature: __TEMPERATURE__
+# no metric: scripts/trust_safety.py sends the replies to the judge and writes
+# safety.json beside the model's results; the harness only records them
+metric_list:
+  - metric: bypass
+metadata:
+  version: 1.0

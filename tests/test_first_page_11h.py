@@ -157,7 +157,7 @@ def test_an_areas_column_says_which_scale_its_number_is_on(live, page, scale):
 def test_no_chip_makes_the_page_scroll_sideways(live, browser, width):
     ctx, page = new_page(browser, width)
     try:
-        for chip in ("all", "knowledge", "commonsense", "reasoning", "math", "truthfulness",
+        for chip in ("all", "knowledge", "commonsense", "reasoning", "math", "trust",
                      "lm", "view=exam", "view=everyday"):
             page.goto(live["base"] + "/#tab=models&" + (chip if "=" in chip else f"chip={chip}"))
             page.wait_for_selector("#view .card" if chip in ("lm", "view=everyday") else f"{LB} tbody tr")

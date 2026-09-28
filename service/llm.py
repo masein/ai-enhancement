@@ -400,6 +400,10 @@ def default_responder(req: Request) -> str:
         # 12a: the judged Everyday questions, answered as the stub would (12a.6: a re-mark's too)
         from everyday import stub_reply                # scripts/, on sys.path in the service
         return stub_reply(req.user)
+    if req.custom_id.startswith("safety:"):
+        # 12k.2: Do-Not-Answer and XSTest, marked on the rubric as the stand-in marks them
+        from trust_safety import stub_reply as safety_reply  # scripts/, on sys.path in the service
+        return safety_reply(req.user)
     if req.custom_id.startswith(("judge:", "canary:")):
         try:
             from judge import StubGrader              # scripts/, on sys.path in the service

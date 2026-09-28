@@ -179,9 +179,13 @@ def main() -> int:
         # Everyday's task, built from the deployed bank as every run builds it
         import everyday
         config.EVERYDAY_TASKS_DIR = everyday.build_task(Path(tmp) / "everyday-task")
+        # 12k.2: Trust & safety's four, from the pinned files, as a run builds them
+        import trust_safety
+        config.TRUST_TASKS_DIR = trust_safety.build_tasks(Path(tmp) / "trust-safety-tasks")
         seen: dict[str, tuple[bool, str, str]] = {}
-        for suite in config.SUITES:
-            tasks = config.tasks_for_suite(suite)
+        # the full suite's second choice, all of BBQ, is checked as its own line
+        for suite, tasks in [(s, config.tasks_for_suite(s)) for s in config.SUITES] + [
+                ("full, all of BBQ", [config.BBQ_ALL_TASK])]:
             if not tasks:
                 note = (" — the exam has not been built (scripts/exam_build.py)"
                         if suite == "judged" else "")
