@@ -3068,8 +3068,9 @@ table.lb .mcell { display:flex; align-items:center; gap:4px; max-width:260px; ov
 table.lb .mcell .mname { flex:0 3 auto; min-width:40px; max-width:none; overflow:hidden;
   text-overflow:ellipsis; }
 /* 12f.2b: a phone build's row carries a setup in its name, "k4-LDA · lookahead 1" */
-table.lb td.model:has([data-phone-tag]) { max-width:340px; }
-table.lb td.model:has([data-phone-tag]) .mcell { max-width:320px; }
+/* 12m.1: 22px more for the Compare tick before the name */
+table.lb td.model:has([data-phone-tag]) { max-width:362px; }
+table.lb td.model:has([data-phone-tag]) .mcell { max-width:342px; }
 /* a long badge ("duplicate of <name>") gives way too, after the name: every
    child stays inside the cell. The short ones (base, prelim) keep their word */
 table.lb .mcell .badge { flex:none; white-space:nowrap; }
@@ -3105,6 +3106,8 @@ table.lb .mcell .duptoggle { flex:none; padding:0 2px; min-height:0; }
   table.lb td.model { padding-left:6px; padding-right:4px; }
   table.lb .mcell { max-width:calc(45cqi - 42px); }
   table.lb .mcell .badge:not(.prelim), table.lb .mcell .duptoggle { display:none; }
+  /* 12m.1: and no Compare tick — on a phone, Models ▾ ▸ Compare these */
+  table.lb .mcell input.cmptick { display:none; }
   /* the active parameters stay in the tooltip: Params is one short number */
   table.lb td .act { display:none; }
   table.lb .mcell .badge.prelim { flex:0 1 auto; min-width:0; overflow:hidden;
