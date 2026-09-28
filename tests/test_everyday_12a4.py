@@ -21,6 +21,7 @@ import pytest
 
 import everyday as ev
 import report_lm_eval as report
+from test_12a8 import FIXED, SCHOOL_RUN
 
 REPO = Path(__file__).resolve().parents[1]
 BRIEF = REPO / "docs" / "prompts" / "phase-12a4"
@@ -58,8 +59,11 @@ def test_the_neutral_wording_stands():
     for q in NEUTRAL:
         if q["id"] in retired:
             continue
-        assert {k: BANK[q["id"]][k] for k in ("prompt", "reference", "written_by")} == \
-            {k: q[k] for k in ("prompt", "reference", "written_by")}, q["id"]
+        # 12a.8: one reference fixed since — she takes Zain to football, not you
+        want = {k: q[k] for k in ("prompt", "reference", "written_by")}
+        if q["id"] == SCHOOL_RUN:
+            want["reference"] = FIXED
+        assert {k: BANK[q["id"]][k] for k in ("prompt", "reference", "written_by")} == want, q["id"]
     assert [q["id"] for q in qs].index("everyday-pilot-01") == 15
     # the one pilot question that needed it: Toronto, not Dubai
     p2 = BANK["everyday-pilot-02"]

@@ -4031,6 +4031,23 @@ answers failed, some two thirds of them wrongly.
   remembered in this browser (`bench-reader-width`); the whole screen under
   800px. Other readers are as they were.
 
+### 12a.8 — every reader shows the marks a re-mark wrote
+
+- **The server's practice readers kept 12a.6's verdicts after 12a.7's
+  re-mark** (the Checks line new, every verdict old). The re-mark marks both
+  halves ("340 re-marked"); the page's data was cached on the newest time
+  among the watched result files, so one file dated in the future (copied,
+  unpacked, another clock) hid every write after it. The key is now each
+  watched file's path, time to the nanosecond and size, hashed
+  (`app.files_stamp`): any file rewritten changes it. The question browser's
+  stamp is the same. `mobileaibench.json` is watched now too.
+- **`everyday.py --judge -q <id>`** sends the judge one question's answers
+  after its rubric or reference changed; every model is still marked, and no
+  new "before" is written.
+- **The school run plan's reference** (`everyday-summarising-07`): she takes
+  Zain to football at 4, you pick Layla up at 5:30. The rubric quotes it,
+  so its key changes and its verdicts are asked again.
+
 ### 12o.1 — every column's width and place, and what the live check of #103/#104 found
 
 - **Columns** (the Models table on every chip, the Knowledge exam's included,

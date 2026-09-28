@@ -27,6 +27,7 @@ import everyday as ev
 import report_lm_eval as report
 from conftest import make_service
 from service import config, db, runner
+from test_12a8 import FIXED, SCHOOL_RUN
 from test_everyday_12a import fake_gpu, queue_pilot
 
 REPO = Path(__file__).resolve().parents[1]
@@ -108,8 +109,11 @@ def test_the_bank_is_340_questions_in_seven_groups():
         if q["id"] in gone:
             continue
         if BANK[q["id"]]["group"] == "summarising":
-            assert {k: v for k, v in BANK[q["id"]].items() if k not in ("group", "checks")} == \
-                {k: v for k, v in q.items() if k not in ("group", "checks")}
+            # 12a.8: one reference fixed since — she takes Zain to football, not you
+            want = {k: v for k, v in q.items() if k not in ("group", "checks")}
+            if q["id"] == SCHOOL_RUN:
+                want["reference"] = FIXED
+            assert {k: v for k, v in BANK[q["id"]].items() if k not in ("group", "checks")} == want
         else:
             assert BANK[q["id"]] == q
     assert sorted(set(BANK) - {q["id"] for q in IMPORTED}) == \
