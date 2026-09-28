@@ -3,6 +3,8 @@
 
     python scripts/judge_calibrate.py export results/full --out cal.csv [-m model …] [--n 100]
     #   → a person fills in the human_score column (0–4) with the rubric beside each row
+    python scripts/judge_calibrate.py export results/full --out cal.csv \
+        --include-report-half --by <the board's owner>      # both halves; logged
     python scripts/judge_calibrate.py import results/full cal.csv
 
 export samples judged answers stratified by category and by the judge's
@@ -13,6 +15,11 @@ results/full/judge_calibration.json, which the dashboard shows next to every
 judged number. Below κ 0.60 the suite is preliminary: shown, never ranked,
 never in an average. That is the same mechanism a model missing required
 tasks gets, applied to the judge.
+
+The sheet shows each answer's question, so export takes the exam's diagnose
+half only (12o.4): the report half is never listed. The board's owner may add
+it with --include-report-half, and that export is logged before the sheet is
+written — who, when, which topics — where the page's audits are.
 """
 
 from __future__ import annotations
@@ -28,12 +35,16 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent))
 from judge import criteria_ids, flag_ids, label_of, rubric_for  # noqa: E402
 
 KAPPA_MIN = 0.60
 CALIBRATION_FILE = "judge_calibration.json"
 FIELDS = ["id", "model", "task", "category", "prompt", "reference", "answer", "answer_words",
           "rubric", "human_score"]
+DIAGNOSE = "diagnose"
+REPORT_WARNING = ("warning: this sheet holds the exam's report half. Those questions are the test: "
+                  "don't train on them or write questions toward them. This export is logged.")
 
 
 def cohen_kappa(a: list[int], b: list[int]) -> float | None:
@@ -151,9 +162,35 @@ def criteria_columns(rows: list[dict]) -> list[str]:
     return flags + crit if crit else []
 
 
-def export(results: Path, out: Path, models: list[str], n: int, seed: int) -> int:
+def log_report_half(by: str, picked: list[dict]) -> dict:
+    """12o.4: an export with the report half in it, in the log of hidden
+    halves opened that Data & sources lists — who, when, which topics, and
+    how many of its questions"""
+    from service import db
+    shown = [r for r in picked if r["half"] != DIAGNOSE]
+    topics = sorted({str(r["category"]) for r in shown})
+    what = ("judge calibration export · the exam's report half · "
+            + (", ".join(topics) if topics else "no topic"))
+    n = len({(r["task"], r["id"].rsplit("|", 1)[1]) for r in shown})
+    db.hidden_audit_add(by.strip()[:80], what, n)
+    return {"group": what, "n": n, "topics": topics}
+
+
+def export(results: Path, out: Path, models: list[str], n: int, seed: int,
+           include_report_half: bool = False, by: str = "") -> int:
+    from service import config
+    if include_report_half and not config.is_owner(by):
+        raise PermissionError("Only the board's owner exports the report half: "
+                              "--by <the board's owner>")
     rows = _judged_rows(results, {m.replace("/", "__") for m in models})
+    if not include_report_half:
+        # the grader reads each question: the report half is never listed,
+        # and a row whose half can't be told stays out with it
+        rows = [r for r in rows if r["half"] == DIAGNOSE]
     picked = sample(rows, n, seed)
+    if include_report_half:
+        # logged before anything is written: no log, no sheet
+        log_report_half(by, picked)
     extra = criteria_columns(picked)
     with open(out, "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=FIELDS + extra)
@@ -249,13 +286,25 @@ def main() -> int:
     e.add_argument("-m", "--model", action="append", default=[])
     e.add_argument("--n", type=int, default=100)
     e.add_argument("--seed", type=int, default=1234)
+    e.add_argument("--include-report-half", action="store_true",
+                   help="the board's owner only, with --by: the exam's report half too, logged")
+    e.add_argument("--by", default="", help="who is exporting, for the log")
     i = sub.add_parser("import")
     i.add_argument("results", type=Path)
     i.add_argument("csv", type=Path)
     a = ap.parse_args()
     if a.cmd == "export":
-        n = export(a.results, a.out, a.model, a.n, a.seed)
-        print(f"wrote {n} rows to {a.out} — fill human_score (0–4) with the rubric column "
+        try:
+            n = export(a.results, a.out, a.model, a.n, a.seed,
+                       include_report_half=a.include_report_half, by=a.by)
+        except PermissionError as err:
+            print(err, file=sys.stderr)
+            return 2
+        if a.include_report_half:
+            print(REPORT_WARNING, file=sys.stderr)
+        print(f"wrote {n} rows to {a.out}"
+              + ("" if a.include_report_half else ", the diagnose half only")
+              + " — fill human_score (0–4) with the rubric column "
               f"beside you, then: judge_calibrate.py import {a.results} {a.out}")
         return 0 if n else 1
     out = import_csv(a.results, a.csv)

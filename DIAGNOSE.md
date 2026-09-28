@@ -273,6 +273,10 @@ per category and overall and writes `results/full/judge_calibration.json`.
 Below κ 0.60 every judged number is preliminary — shown, never ranked, never
 averaged. Above it, the leaderboard gains judged columns with κ in the header
 and a separate judged average that never touches the multiple-choice one.
+The sheet shows each answer's question, so it holds the exam's diagnose half
+only: the report half is never listed. The board's owner may add it with
+`--include-report-half --by <name>`, which prints a warning and logs the
+export — who, when, which topics — with the audits on Data & sources.
 
 ## The log
 
