@@ -8214,10 +8214,12 @@ function auditsCard() {
   const names = Object.fromEntries(evdGroups());
   return el('div', { class: 'card', 'data-audits': A.loaded ? String((A.list || []).length) : 'loading' },
     el('h2', { text: 'The hidden half, opened' }),
-    // 12o.2: and a benchmark's report half, from its questions
+    // 12o.2: and a benchmark's report half, from its questions; 12o.4: and
+    // the exam's, in a judge calibration sheet
     el('p', { class: 'sub', text: 'Every time a half that is never listed was opened for an '
-      + 'audit — an Everyday group’s hidden half, or a benchmark’s report half from its '
-      + 'questions: the board’s owner only, after a warning. Those questions are the test.' }),
+      + 'audit — an Everyday group’s hidden half, a benchmark’s report half from its '
+      + 'questions, or the exam’s report half in a judge calibration sheet: the board’s owner '
+      + 'only, after a warning. Those questions are the test.' }),
     !A.loaded ? skeleton(2) : !(A.list || []).length
       ? el('p', { class: 'small', text: 'Nobody has opened a hidden half.' })
       : el('ul', { class: 'small' }, A.list.map(a => el('li', { 'data-audit-row': String(a.id) },

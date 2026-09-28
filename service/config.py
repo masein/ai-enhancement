@@ -336,6 +336,14 @@ REPORTED_DAILY = os.environ.get("REPORTED_DAILY", "1") == "1"
 # hidden half (every opening logged) and edit a hidden question. Names are
 # typed, as everywhere on this board: the tailnet is the boundary
 BOARD_OWNER = os.environ.get("BOARD_OWNER", "masein").strip()
+
+
+def is_owner(by: str) -> bool:
+    """the name typed is the board's owner's — the page's audits and 12o.4's
+    calibration export ask the same question"""
+    return bool(BOARD_OWNER) and (by or "").strip().lower() == BOARD_OWNER.lower()
+
+
 # the monthly AI spend limit, in dollars; the page changes it. At the limit AI
 # jobs wait, with a plain message — they never fall back to another model
 AI_MONTHLY_LIMIT_USD = float(os.environ.get("AI_MONTHLY_LIMIT_USD", "20"))

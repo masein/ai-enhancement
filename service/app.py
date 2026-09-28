@@ -2939,7 +2939,7 @@ AUDIT_WARNING = ("These questions are the test. Don’t train on them or write q
 
 
 def _is_owner(by: str) -> bool:
-    return bool(config.BOARD_OWNER) and (by or "").strip().lower() == config.BOARD_OWNER.lower()
+    return config.is_owner(by)
 
 
 def _evq(qid: str, by: str):

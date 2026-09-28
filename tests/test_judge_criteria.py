@@ -467,9 +467,10 @@ def test_the_gap_finder_carries_labels_and_numbers_and_nothing_else(tree):
 def test_calibration_exports_a_column_per_criterion_and_per_flag(tree, tmp_path):
     out = tmp_path / "cal.csv"
     # the sample is round-robin over (topic, score) in alphabetical order: with
-    # 36 topics, Law and Medicine only come round after some seventy rows
-    n = jc.export(tree["out_dir"], out, [], 120, 7)
-    assert n == 120
+    # 36 topics, Law and Medicine only come round after some seventy rows — and
+    # from the diagnose half alone (12o.4), exam_law's after some 150
+    n = jc.export(tree["out_dir"], out, [], 150, 7)
+    assert n == 150
     with open(out, newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
         fields, rows = list(reader.fieldnames), list(reader)
