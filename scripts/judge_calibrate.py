@@ -71,6 +71,8 @@ def _judged_rows(results: Path, models: set[str]) -> list[dict]:
                     continue
                 rows.append({"id": f"{d.name}|{task}|{it['doc_hash']}", "model": d.name,
                              "task": task, "category": it.get("category") or task[3:],
+                             # 12o.1: which half the question is in, as the judge wrote it
+                             "half": it.get("half"),
                              "prompt": a["prompt"], "reference": a["reference"],
                              "answer": a["answer"], "answer_words": it["answer_words"],
                              "judge_score": it["score"],

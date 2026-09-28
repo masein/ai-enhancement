@@ -17,6 +17,19 @@ COPY requirements.txt /tmp/requirements.txt
 RUN python -m pip install --no-cache-dir --break-system-packages -r /tmp/requirements.txt \
     && rm /tmp/requirements.txt
 
+# 12o.1: the question builder's duplicate check embeds on this server's CPU —
+# BAAI/bge-small-en-v1.5 (MIT, 133 MB), pinned to one commit and its weights'
+# sha256 — so no question, the hidden half included, leaves the server to be
+# embedded (service/embed_local.py holds the same pins)
+ARG BGE_REVISION=5c38ec7c405ec4b44b94cc5a9bb96e735b38267a
+ARG BGE_SHA256=3c9f31665447c8911517620762200d2245a2518d6e7208acc78cd9db317e21ad
+RUN python -c "from huggingface_hub import snapshot_download; \
+snapshot_download('BAAI/bge-small-en-v1.5', revision='${BGE_REVISION}', \
+local_dir='/opt/models/bge-small-en-v1.5', allow_patterns=['config.json', 'model.safetensors', \
+'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json', 'vocab.txt'])" \
+    && rm -rf /opt/models/bge-small-en-v1.5/.cache \
+    && echo "${BGE_SHA256}  /opt/models/bge-small-en-v1.5/model.safetensors" | sha256sum -c -
+
 # The unit suite also runs inside the running container, on this image's
 # Python and packages (HANDOFF.md § Checks, deploy step 3). That needs pytest,
 # and httpx for FastAPI's test client, and nothing else: the tests are not in

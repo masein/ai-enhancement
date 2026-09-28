@@ -18,6 +18,8 @@ eval_tasks/*.lock
 service.sqlite3*
 # the Everyday pilot's harness task, written per run under BENCH_ROOT (12a)
 /everyday/
+# …and SimpleQA Verified's (12n.2), from eval_tasks/simpleqa
+/simpleqa/
 
 # tests and tooling
 .pytest_cache/

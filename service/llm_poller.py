@@ -187,10 +187,22 @@ def _finish_safety(row: dict, results: dict[str, llm.Result]) -> None:
         db.update(sub["id"], progress=_safety.summary(out))
 
 
+def _simpleqa_dir(row: dict):
+    """12o.1: the folder whose answers this batch grades — a thinking run's
+    are its thinking row's"""
+    d, sub = _everyday_dir(row)
+    if d is None:
+        return d, sub
+    for x in (d.with_name(d.name + "__thinking"), d):
+        if ((_sq.read(x) or {}).get("judge") or {}).get("batch_id") == row["batch_id"]:
+            return x, sub
+    return d, sub
+
+
 def _finish_simpleqa(row: dict, results: dict[str, llm.Result]) -> None:
     """12n.2: the judge's grades on SimpleQA Verified; the row that ran it
     says the share correct once they land"""
-    d, sub = _everyday_dir(row)
+    d, sub = _simpleqa_dir(row)
     if d is None:
         return
     out = _sq.finish(d, results)
@@ -354,7 +366,7 @@ def _mark_failed(r: dict, why: str) -> None:
             _safety.judge_failed(d, why)
             db.update(sub["id"], progress=_safety.summary(_safety.read(d)))
     elif r["kind"] == "simpleqa":
-        d, sub = _everyday_dir(r)
+        d, sub = _simpleqa_dir(r)
         if d is not None:
             _sq.judge_failed(d, why)
             db.update(sub["id"], progress=_sq.summary(_sq.read(d)))

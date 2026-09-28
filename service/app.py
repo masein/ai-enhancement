@@ -402,7 +402,8 @@ class SubmissionIn(BaseModel):
     # 12h.1, the generative suite only: think before answering (a model with
     # a switch; its run is a row of its own), and a seeded MMLU-Pro subset
     # of this many items (0: all 12,032 — the only run comparable to
-    # published numbers)
+    # published numbers). 12o.1: thinking in the shared suite too — GPQA
+    # measured the way Epoch runs it, with reasoning
     thinking: bool = False
     subset: int = 0
     # 12k.2, the full suite only: BBQ's 29,246 ambiguous questions instead of
@@ -432,9 +433,12 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "generative (IFEval, MMLU-Pro, MATH-500), safety "
                                  "(Do-Not-Answer, XSTest) or shared (GPQA Diamond, "
                                  "SimpleQA Verified)")
-    if s.suite != "generative" and (s.thinking or s.subset):
-        raise HTTPException(422, "thinking and subset are for IFEval, MMLU-Pro and MATH-500 "
-                                 "(suite generative) only")
+    if s.suite not in ("generative", "shared") and s.thinking:
+        raise HTTPException(422, "thinking is for IFEval, MMLU-Pro and MATH-500 (suite "
+                                 "generative) and GPQA Diamond and SimpleQA Verified (suite "
+                                 "shared) only")
+    if s.suite != "generative" and s.subset:
+        raise HTTPException(422, "subset is for MMLU-Pro (suite generative) only")
     if s.suite == "generative" and s.kind == "base":
         raise HTTPException(422, config.GEN_INSTRUCT_ONLY + ". Nothing was queued.")
     if s.bbq_all and s.suite != "full":
@@ -941,6 +945,32 @@ def served_check(f: ServedIn):
         return {"reported": served.check(f.model_dump())}
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
+
+
+class SameAsIn(BaseModel):
+    served: str = ""            # the served entry; "" (from a GGUF's side) clears that setup
+    gguf: str = ""              # its GGUF entry; "" guesses again, "none" never joins
+    setup: str = "as-built"
+    by: str = ""
+
+
+@app.post("/api/served/same-as")
+def served_same_as(a: SameAsIn, x_token: str = Header(default="")):
+    """12o.1: a served entry and a GGUF entry's setup are one file, said
+    outright — the join never guesses them. From either entry's form"""
+    _check_token(x_token)
+    _name(a.by, "linking a served model to its GGUF")
+    try:
+        if not a.served:
+            if not a.gguf or a.gguf == "none":
+                raise ValueError("which served model: none was named")
+            out = {"cleared": served.same_as_clear(a.gguf, a.setup)}
+        else:
+            out = {"served": a.served, "same_as": served.same_as_set(a.served, a.gguf, a.setup)}
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return out
 
 
 @app.post("/api/served")
@@ -1700,7 +1730,10 @@ def builder_page():
             "writer_blocked": builder.blocked("writer"),
             "checker_blocked": builder.blocked("checker"),
             "has_key": ai_models.has_key(),
-            "dedup_how": "13-gram and embeddings" if ai_models.has_key() else "13-gram",
+            # 12o.1: on this server unless set to OpenRouter — then said to send
+            # every question out
+            "dedup_how": builder.dedup_how(),
+            "dedup_warning": builder.REMOTE_WARNING if builder.embeds_remotely() else "",
             # 12i.4: newest first, with who wrote them, for the past batches
             "drafts": sorted([{"id": d["id"], "kind": d["kind"], "spec": d["spec"],
                                "stage": d["stage"], "status": d["status"], "by": d.get("by", ""),
@@ -3376,6 +3409,8 @@ class ViewSpec(BaseModel):
     chip: str = "all"
     cols: list[str] | None = None      # the chosen benchmarks, or the chip's own
     models: list[str] | None = None    # the chosen models, or every one
+    # 12o.1: each table's widths and order, as it was left: {table: {w, order, groups}}
+    layout: dict[str, dict] | None = None
 
 
 class ViewIn(BaseModel):
@@ -3400,7 +3435,37 @@ def _view_name(s: str) -> str:
     return s
 
 
+def _view_layout(layout: dict | None) -> dict | None:
+    """a table's widths in pixels and its columns' order — names, never more"""
+    if not layout:
+        return None
+    if len(layout) > 8:
+        raise HTTPException(422, "a view keeps the layout of at most 8 tables")
+    names = lambda xs, n, cap: isinstance(xs, list) and len(xs) <= n and all(  # noqa: E731
+        isinstance(x, str) and len(x) <= cap for x in xs)
+    out = {}
+    for key, lay in layout.items():
+        if not (isinstance(key, str) and 0 < len(key) <= 80 and isinstance(lay, dict)):
+            raise HTTPException(422, "a layout is a table's name and its widths and order")
+        w, order, groups = lay.get("w") or {}, lay.get("order") or [], lay.get("groups") or []
+        if not (isinstance(w, dict) and len(w) <= 400 and all(
+                isinstance(k, str) and len(k) <= 200 and isinstance(px, int)
+                and not isinstance(px, bool) and 44 <= px <= 640 for k, px in w.items())):
+            raise HTTPException(422, "column widths are 44 to 640 pixels")
+        if not names(order, 400, 200) or not names(groups, 60, 120):
+            raise HTTPException(422, "a column order is column names")
+        # all empty: the table as it comes, which the view opens it as
+        out[key] = {"w": w, "order": order, "groups": groups}
+    return out or None
+
+
 def _view_spec(v: ViewSpec) -> dict:
+    spec = _view_spec_of(v)
+    layout = _view_layout(v.layout)
+    return {**spec, "layout": layout} if layout else spec
+
+
+def _view_spec_of(v: ViewSpec) -> dict:
     cols = v.cols if v.cols else None
     models = v.models if v.models else None
     if v.view not in ("standard", "compare"):

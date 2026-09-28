@@ -350,6 +350,16 @@ JUDGE_TEST_MIN = int(os.environ.get("JUDGE_TEST_MIN", "100"))
 # check (alone when there is no key)
 OPENROUTER_EMBED_MODEL = os.environ.get("OPENROUTER_EMBED_MODEL", "openai/text-embedding-3-small")
 QB_DUP_COSINE = float(os.environ.get("QB_DUP_COSINE", "0.9"))
+# 12o.1: …on this server by default — bge-small-en-v1.5 on the CPU, in the image
+# (service/embed_local.py), so no question, the hidden half included, leaves
+# it. "openrouter" sends every question to OPENROUTER_EMBED_MODEL instead, and
+# the builder says so. Its cosine: what `python -m service.dup_threshold`
+# found on this bank (BENCH_ROOT/builder/dup_threshold.json), else this —
+# QB_DUP_COSINE_LOCAL, when set, over both
+QB_EMBED_MODEL = os.environ.get("QB_EMBED_MODEL", "local").strip().lower()
+QB_EMBED_DIR = Path(os.environ.get("QB_EMBED_DIR", "/opt/models/bge-small-en-v1.5"))
+QB_DUP_COSINE_LOCAL_DEFAULT = 0.94
+QB_DUP_COSINE_LOCAL = os.environ.get("QB_DUP_COSINE_LOCAL", "")
 # 12m.3: a model tested through OpenRouter sits a seeded MMLU-Pro subset of
 # this many unless a person clears it — all 12,032 five-shot answers is a bill
 OPENROUTER_GEN_SUBSET = int(os.environ.get("OPENROUTER_GEN_SUBSET", "1000"))

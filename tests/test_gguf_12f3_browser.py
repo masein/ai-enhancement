@@ -128,8 +128,11 @@ def test_the_custom_table_averages_gguf_columns_only_with_each_other(live, page,
     page.set_viewport_size({"width": 1400, "height": 900})
     page.goto(live["base"] + "/#tab=models&cols=mmlu,gguf:mmlu")
     page.wait_for_selector("[data-custom-line]")
-    assert "no Avg: the GGUF columns average only with other GGUF columns" in \
-        page.locator("[data-gguf-mix]").inner_text()
+    # 12o.1: one Avg a method, never one across them
+    assert "no Avg across methods" in page.locator("[data-gguf-mix]").inner_text()
+    assert page.locator("th[data-col='cavg'] .hname").text_content() == "Avg · lm_eval"
+    assert page.locator("th[data-col='cavg:llama.cpp'] .hname").text_content() == \
+        "Avg · llama.cpp"
     page.goto("about:blank")
     page.goto(live["base"] + "/#tab=models&cols=gguf:mmlu,gguf:hellaswag")
     page.wait_for_selector("[data-custom-line]")

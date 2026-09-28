@@ -213,7 +213,10 @@ def test_compare_is_reached_from_ticks_the_models_menu_and_the_model_page(live, 
     page.locator("#pill-models").click()
     page.locator("[data-models-clear]").click()
     for mid in (GOOD, SMALL, PHONE):
-        page.locator(f"#pop-models [data-model-pick='{mid}']").check()
+        # 12o.1: a served model is its setup's row, by model and setup
+        own = page.locator(f"#pop-models [data-model-pick='{mid}']")
+        (own if own.count() else page.locator(
+            f"#pop-models [data-setup-pick][data-ids*='{json.dumps(mid)}']")).check()
     page.locator("[data-models-compare]").click()
     page.wait_for_selector("[data-compare='3']")
     # the model page: Compare with…, then Add a model
