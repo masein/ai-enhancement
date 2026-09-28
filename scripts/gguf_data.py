@@ -54,6 +54,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import random
+import re
 import struct
 import sys
 import time
@@ -144,8 +146,26 @@ def truthfulqa_task(doc: dict) -> dict | None:
             "labels": [int(x) for x in t["labels"]]}
 
 
+def gpqa_task(doc: dict) -> dict | None:
+    """12n.2: as lm_eval's gpqa_diamond_zeroshot asks it — the question, its
+    four choices (shuffled by lm_eval's process_docs) after (A) to (D), and
+    "Answer:"; the answers are "(A)" to "(D)", as lm_eval scores them"""
+    choices = [_flat(doc.get(f"choice{i}") or "") for i in range(1, 5)]
+    letter = str(doc.get("answer") or "").strip("() ")
+    if not all(choices) or letter not in "ABCD" or not letter:
+        return None
+    text = ("What is the correct answer to this question:" + str(doc["Question"]) + "\nChoices:\n"
+            + "".join(f"({k}) {c}\n" for k, c in zip("ABCD", choices)) + "Answer:")
+    return {"question": text, "answers": ["(A)", "(B)", "(C)", "(D)"],
+            "labels": _one_hot(4, "ABCD".index(letter))}
+
+
 MC = {"mmlu": mmlu_task, "arc_challenge": arc_task, "arc_easy": arc_task,
-      "truthfulqa": truthfulqa_task}
+      "truthfulqa": truthfulqa_task, "gpqa": gpqa_task}
+# 12n.2: GPQA's dataset is gated — said in one line, as the board's runs say it
+GPQA_GATED = ("GPQA is gated: accept its terms at https://huggingface.co/datasets/Idavidrein/gpqa "
+              "with this server's HF account")
+_GATED = re.compile(r"gated|authenticat|401|403|GatedRepo", re.I)
 
 
 def hellaswag_text(docs: list[dict]) -> tuple[str, int, int]:
@@ -247,7 +267,16 @@ def build(out: Path, only: list[str] | None = None, docs_of=lm_eval_docs) -> dic
         version = ""
     for key in only or gb.ORDER:
         info = gb.BENCHMARKS[key]
-        docs = docs_of(info["lm_eval"])
+        if key == "gpqa":
+            # lm_eval's process_docs shuffles GPQA's choices with Python's own
+            # generator: seeded, so a rebuild makes the same file
+            random.seed(0)
+        try:
+            docs = docs_of(info["lm_eval"])
+        except Exception as e:
+            if key == "gpqa" and _GATED.search(f"{type(e).__name__} {e}"):
+                raise SystemExit(GPQA_GATED) from None
+            raise
         mode = info["mode"]
         if mode == "hellaswag":
             text, n, skipped = hellaswag_text(docs)

@@ -145,11 +145,15 @@ NFEWSHOT = {
     "ifeval": 0, "mmlu_pro": 5, "hendrycks_math500": 0,
     # 12k.2: Trust & safety, all asked cold
     "bbq_3000": 0, "bbq_all": 0, "do_not_answer": 0, "xstest": 0,
+    # 12n.2: shared with the frontier, asked cold as their makers and Epoch ask them
+    "gpqa_diamond_zeroshot": 0, "gpqa_diamond_cot_zeroshot": 0, "simpleqa_verified": 0,
 }
 # 12k.2: BBQ's ambiguous questions, a seeded 3,000 of the 29,246; a run can ask
 # for all of them instead (bbq_all, the second choice)
+# 12n.2: and GPQA Diamond's four options scored, the form a base model can sit
 FULL_TASKS = ["mmlu", "hellaswag", "arc_challenge", "arc_easy",
-              "winogrande", "piqa", "truthfulqa_mc2", "gsm8k", "bbq_3000"]
+              "winogrande", "piqa", "truthfulqa_mc2", "gsm8k", "bbq_3000",
+              "gpqa_diamond_zeroshot"]
 QUICK_TASKS = ["hellaswag", "arc_easy"]
 
 # The permutation control (eval_tasks/mmlu_perm in this repo): MMLU with the
@@ -381,6 +385,27 @@ def discovered_ppl_tasks() -> list[str]:
 # 12h.1: three benchmarks that generate text, for instruct models only: they
 # are asked through the chat template and scored on what the model writes
 # (scripts/generative.py reads the answers). A suite of their own — MMLU-Pro
+# 12n.2: benchmarks shared with the frontier — measured here, beside what
+# Epoch AI and others report for the same questions, never ranked against
+# them. GPQA Diamond (Rein et al., gated on Hugging Face: never committed,
+# never shown — lm_eval loads it at run time with this server's HF token) in
+# three forms, each its own cell: chain of thought through the chat template
+# (the "shared" suite), four options scored (the full suite), and llama.cpp's
+# on a GGUF. SimpleQA Verified (Google DeepMind, MIT; eval_tasks/simpleqa),
+# graded by the judge with the dataset's own grader (scripts/simpleqa.py).
+# Standard benchmarks: never in the Avg, never a training target, never in Improve
+GPQA_COT, GPQA_LOGLIK = "gpqa_diamond_cot_zeroshot", "gpqa_diamond_zeroshot"
+SIMPLEQA_TASK = "simpleqa_verified"
+SHARED_TASKS = [GPQA_COT, SIMPLEQA_TASK]
+FRONTIER_TASKS = [GPQA_COT, GPQA_LOGLIK, SIMPLEQA_TASK]
+SIMPLEQA_TASKS_DIR = Path(os.environ.get("SIMPLEQA_TASKS_DIR", BENCH_ROOT / "simpleqa" / "tasks"))
+GPQA_URL = "https://huggingface.co/datasets/Idavidrein/gpqa"
+GPQA_GATED = f"GPQA is gated: accept its terms at {GPQA_URL} with this server's HF account"
+SHARED_INSTRUCT_ONLY = ("GPQA Diamond's chain of thought and SimpleQA Verified are asked through "
+                        "the chat template and marked on what the model writes, so only an "
+                        "instruct model can sit them — this one runs as a base model (a base "
+                        "model sits GPQA Diamond's four options scored, in the full suite)")
+
 # alone is 12,032 chain-of-thought answers, hours where the Standard tasks
 # take minutes — and never in the official average: a base model cannot be
 # scored on them fairly
@@ -405,7 +430,7 @@ GEN_INSTRUCT_ONLY = ("IFEval, MMLU-Pro and MATH-500 are asked through the chat t
 
 # every suite a run can ask for; scripts/check_tasks.py (deploy step 4) asks
 # the installed lm_eval to find every task of each
-SUITES = ("quick", "full", "control", "judged", "everyday", "generative", "safety")
+SUITES = ("quick", "full", "control", "judged", "everyday", "generative", "safety", "shared")
 
 
 def tasks_for_suite(suite: str, bbq_all: bool = False) -> list[str]:
@@ -419,6 +444,8 @@ def tasks_for_suite(suite: str, bbq_all: bool = False) -> list[str]:
         return [EVERYDAY_TASK]
     if suite == "generative":
         return list(GEN_TASKS)
+    if suite == "shared":
+        return list(SHARED_TASKS)
     if suite == "judged":
         return judged_tasks()
     base = QUICK_TASKS if suite == "quick" else FULL_TASKS

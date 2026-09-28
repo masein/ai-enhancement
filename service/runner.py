@@ -310,6 +310,10 @@ _FRIENDLY = [
     (r"out of memory|OutOfMemoryError",
      "ran out of GPU memory — the card was busier than when the run started. "
      "Resubmit; the finished tasks are kept and only the missing ones re-run."),
+    # 12n.2: GPQA's dataset is gated, not the model — said so, with where to accept it
+    (r"(?s)Idavidrein/gpqa.{0,400}(?:gated|authenticat|401|403|GatedRepoError)"
+     r"|(?:gated|authenticat|401|403|GatedRepoError).{0,400}Idavidrein/gpqa",
+     config.GPQA_GATED),
     (r"GatedRepoError|401 Client",
      "the model is gated for this server's HF account — accept the license on "
      "huggingface.co and resubmit."),
@@ -438,6 +442,8 @@ def include_args_for(task: str) -> list[str]:
         return ["--include_path", str(config.EVERYDAY_TASKS_DIR)]
     if task in config.TRUST_TASKS:                  # 12k.2: trust_safety.build_tasks writes them
         return ["--include_path", str(config.TRUST_TASKS_DIR)]
+    if task == config.SIMPLEQA_TASK:                # 12n.2: simpleqa.build_tasks writes it
+        return ["--include_path", str(config.SIMPLEQA_TASKS_DIR)]
     if task.startswith(("exam_", "fr_")):
         return ["--include_path", str(config.JUDGED_TASKS_DIR)]
     if config.EVAL_TASKS_DIR.is_dir() and any(config.EVAL_TASKS_DIR.glob("*.yaml")):
@@ -715,7 +721,7 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
 def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, label: str,
                 log_path: Path, everyday: bool, asked: list[str] | None, safety: bool = False,
                 meter: _served.Meter | None = None, evd_dir: Path | None = None,
-                trust_dir: Path | None = None):
+                trust_dir: Path | None = None, sq_dir: Path | None = None):
     """one Everyday, exam or Trust & safety task, asked over the model's
     server. (status, stopped): 0 or CANCELED, and a ServerStopped when it
     stopped answering — what it answered before that is written and kept.
@@ -725,6 +731,10 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
     if safety:
         items = (trust_dir or config.TRUST_TASKS_DIR) / f"{task}.jsonl"      # build_tasks'
         everyday = True
+    elif task == config.SIMPLEQA_TASK:
+        # 12n.2: asked as typed, with the Everyday settings, as Trust & safety is
+        items = (sq_dir or config.SIMPLEQA_TASKS_DIR) / f"{task}.jsonl"      # build_tasks'
+        everyday, safety = True, True
     elif everyday:
         items = (evd_dir or config.EVERYDAY_TASKS_DIR) / f"{config.EVERYDAY_TASK}.jsonl"
     else:
@@ -805,6 +815,9 @@ def run_submission(sub: dict) -> None:
     everyday = sub["suite"] == "everyday"
     generative = sub["suite"] == "generative"
     safety = sub["suite"] == "safety"            # 12k.2: Do-Not-Answer and XSTest
+    # 12n.2: GPQA Diamond's chain of thought, asked as the generative three are,
+    # and SimpleQA Verified, asked as Trust & safety is and graded by the judge
+    shared = sub["suite"] == "shared"
     # 12f.0: a run that can't save doesn't start — in the status dot's words
     from . import disk
     why = disk.blocks_run()
@@ -837,6 +850,8 @@ def run_submission(sub: dict) -> None:
                 raise PreflightError(config.GEN_INSTRUCT_ONLY)
             if safety and meta["kind"] != "instruct":
                 raise PreflightError(config.SAFETY_INSTRUCT_ONLY)
+            if shared and meta["kind"] != "instruct":
+                raise PreflightError(config.SHARED_INSTRUCT_ONLY)
     except PreflightError as e:
         db.update(sid, status="failed", error=str(e), finished_at=time.time())
         return
@@ -853,6 +868,7 @@ def run_submission(sub: dict) -> None:
     remote = meter is not None
     evd_dir = config.BENCH_ROOT / "remote" / "everyday-tasks" if remote else config.EVERYDAY_TASKS_DIR
     trust_dir = config.BENCH_ROOT / "remote" / "trust-tasks" if remote else config.TRUST_TASKS_DIR
+    sq_dir = config.BENCH_ROOT / "remote" / "simpleqa-tasks" if remote else config.SIMPLEQA_TASKS_DIR
     db.update(sid, kind=kind, params=meta["params"], vocab=meta["vocab"],
               batch=meta["batch"], need_gb=meta["need_gb"],
               arch=json.dumps(meta.get("archinfo") or {}),
@@ -875,7 +891,7 @@ def run_submission(sub: dict) -> None:
     # 12h.1: a thinking-on run of a model that can turn thinking off is a row
     # of its own, "Qwen3.5-2B · thinking": its answers live apart, so nothing
     # ever averages them with the thinking-off ones
-    th = gen_thinking(sub, meta) if generative else None
+    th = gen_thinking(sub, meta) if generative or shared else None
     row_safe = safe + "__thinking" if th and th["separate"] else safe
     config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
     config.OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -898,8 +914,8 @@ def run_submission(sub: dict) -> None:
             {"model": sub["hf_id"] + " · thinking", "base_model": sub["hf_id"], "kind": kind,
              "params": meta["params"], "kind_reason": meta.get("kind_reason"),
              **(meta.get("archinfo") or {})}), encoding="utf-8")
-    backend, not_vllm = (gen_backend() if generative and not rec else
-                         (_served.BACKEND, "") if generative else ("hf", ""))
+    backend, not_vllm = (gen_backend() if (generative or shared) and not rec else
+                         (_served.BACKEND, "") if generative or shared else ("hf", ""))
     fell_back = ""
     if everyday:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
@@ -910,6 +926,11 @@ def run_submission(sub: dict) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import trust_safety as _trust
         _trust.build_tasks(trust_dir)
+    if config.SIMPLEQA_TASK in tasks:
+        # 12n.2: SimpleQA Verified, from the pinned file
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import simpleqa as _sq
+        _sq.build_tasks(sq_dir)
     if remote_code:      # the code that produced the scores is part of the record
         db.update(sid, progress=f"preflight ok · custom model code · batch={meta['batch']}")
     # 12h.1: a Hub model on the approved list runs its own code offline, as
@@ -1004,12 +1025,14 @@ def run_submission(sub: dict) -> None:
         reused: dict[str, int | None] = {}
         asked: list[str] | None = None
         stopped: _served.ServerStopped | None = None       # 12f.1: the server stopped
-        if generative and meter:
+        if (generative or shared) and meter:
             relay = _served.Relay(rec, meter).__enter__()
         for i, task in enumerate(tasks, 1):
             if canceled or db.cancel_requested(sid):
                 canceled = True
                 break
+            # 12n.2: a task asked as the generative three are — GPQA's chain of thought
+            gen_task = generative or (shared and task == config.GPQA_COT)
             shots = config.NFEWSHOT.get(task, 0)
             task_out = config.OUT_DIR / row_safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
@@ -1050,13 +1073,14 @@ def run_submission(sub: dict) -> None:
                              f"than the task holds now; kept at {moved}, answering again\n")
             db.update(sid, status="running", progress=label)
 
-            if rec and not generative:
+            if rec and not gen_task:
                 # 12f.1: Everyday and the exam, asked over the server with the
                 # settings a local run uses, into the files lm_eval writes
                 t_task = time.time()
                 status, stopped = _ask_served(sid, rec, meta, task, task_out, label, log_path,
                                               everyday, asked, safety=safety, meter=meter,
-                                              evd_dir=evd_dir, trust_dir=trust_dir)
+                                              evd_dir=evd_dir, trust_dir=trust_dir,
+                                              sq_dir=sq_dir)
                 gpu_seconds += time.time() - t_task
                 db.update(sid, gpu_seconds=gpu_seconds)
                 if status == CANCELED:
@@ -1080,16 +1104,17 @@ def run_submission(sub: dict) -> None:
             # ran out inside the thinking on every question of run #60. Only
             # its judged answers get more room, and only when its template is
             # the one that thinks; lm_eval records the override in its results
-            thinks = ((kind == "instruct" and task in judged or everyday or safety)
+            sq = task == config.SIMPLEQA_TASK
+            thinks = ((kind == "instruct" and task in judged or everyday or safety or sq)
                       and (meta.get("archinfo") or {}).get("reasoning_template"))
             # 12a.4: its everyday answers get more room still — 12d.1: said
             # by everyday.run_settings, the function the Playground reads too.
             # 12k.2: Trust & safety is asked with the Everyday settings
-            room = (_everyday_settings(meta)["max_gen_toks"] if everyday or safety
+            room = (_everyday_settings(meta)["max_gen_toks"] if everyday or safety or sq
                     else _exam_settings(meta)["max_gen_toks"]) if thinks else None
             cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
                               chat=kind == "instruct" or everyday, max_gen_toks=room)
-            if generative:
+            if gen_task:
                 def gen_cmd(be):
                     samples = None
                     if task == "mmlu_pro" and int(sub.get("subset") or 0) > 0:
@@ -1124,11 +1149,11 @@ def run_submission(sub: dict) -> None:
                     pass
             with open(log_path, "a") as lf:
                 lf.write(f"\n===== [{sid}] {task} ({shots}-shot) =====\n")
-                if room and not generative:
+                if room and not gen_task:
                     lf.write(f"[reasoning model] answers get {room} tokens, not "
-                             f"{512 if everyday or safety else 256}: the chat template writes its "
-                             f"reasoning before the answer\n")
-                if generative:
+                             f"{512 if everyday or safety or sq else 256}: the chat template "
+                             f"writes its reasoning before the answer\n")
+                if gen_task:
                     lf.write(f"[generative] thinking {'on' if th['on'] else 'off'} "
                              f"({th['mode']}) · {th['budget']} tokens per answer · on {backend}"
                              + (f" ({not_vllm})" if not_vllm else "")
@@ -1161,7 +1186,7 @@ def run_submission(sub: dict) -> None:
                     canceled = True
                 # 12h.1: a model vLLM cannot load runs on the harness's own
                 # loader instead, and the result says which models fell back
-                if (generative and backend == "vllm" and status not in (0, CANCELED)
+                if (gen_task and backend == "vllm" and status not in (0, CANCELED)
                         and config.GEN_BACKEND != "vllm"):
                     fell_back = f"vLLM could not run it (exit {status}); ran on hf"
                     backend = "hf"
@@ -1281,6 +1306,23 @@ def run_submission(sub: dict) -> None:
                 db.update(sid, error=f"marking: {e}")
                 with open(log_path, "a") as lf:
                     lf.write(f"\n[service] Do-Not-Answer and XSTest could not be marked: {e!r}\n")
+        # 12n.2: SimpleQA Verified, graded by the judge with the dataset's grader —
+        # submitted here (seconds, no GPU); the poller lands the grades
+        if shared and config.SIMPLEQA_TASK in tasks and not failed_tasks:
+            db.update(sid, status="running", progress="sending the answers to the judge")
+            try:
+                sr = _sq.start(config.OUT_DIR / safe, submission=sid)
+                judge_note = _sq.summary(sr)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n===== [{sid}] SimpleQA Verified: {judge_note}"
+                             + (f" · judge batch {sr['batch_id']}" if sr.get("batch_id") else "")
+                             + (f" · the judge could not be asked: {sr['error']}"
+                                if sr.get("error") else "") + " =====\n")
+            except Exception as e:                      # noqa: BLE001 — the answers are on disk
+                failed_tasks.append("grading")
+                db.update(sid, error=f"grading: {e}")
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] SimpleQA Verified could not be graded: {e!r}\n")
         # 12h.1: the three read again, in this board's words — the letter an
         # answer settles on, the final answer compared as maths, the harness's
         # own IFEval verdicts — and the answers that ran out of room counted
@@ -1350,7 +1392,7 @@ def run_submission(sub: dict) -> None:
             what = (f"all {len(tasks)} tasks" if not only
                     else f"{', '.join(t.replace('exam_', '') for t in tasks)}")
             db.update(sid, status="done", finished_at=time.time(),
-                      progress=spent(judge_note if everyday or safety
+                      progress=spent(judge_note if everyday or safety or shared
                                      else f"{what} done" + (f" · {note}" if note else "")
                                      + judge_note), error="")
     finally:

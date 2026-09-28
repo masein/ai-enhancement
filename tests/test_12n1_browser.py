@@ -312,7 +312,8 @@ def test_our_cells_are_tagged_and_a_model_in_both_shows_both(live, page):
     assert ours.count() >= 2
     for i in range(ours.count()):
         tag = ours.nth(i).locator(".fr-tag").inner_text()
-        assert tag.startswith("measured here · lm_eval, "), tag
+        # 12n.2: the GGUF's MMLU is ours too, by its own method
+        assert tag.startswith(("measured here · lm_eval, ", "measured here · llama.cpp, ")), tag
         assert "ranked only with the cells measured the same way here" in tip(ours.nth(i))
     # ours are never ranked with the reported: bold only for the best of ours
     here = page.locator("[data-fr-cell='mmlu'] [data-fr-set^='here|'], "
@@ -552,8 +553,10 @@ def test_the_model_column_widens_fits_resets_and_wraps_on_a_phone(live, page):
     assert abs(kept - w1) <= 2
     # the sort did not change: the handle is not the header's click
     page.reload()
-    page.wait_for_selector("[data-lb-table][data-mcol]")
-    assert abs(page.locator("[data-lb-table] thead th.model").bounding_box()["width"] - w1) <= 2
+    page.wait_for_selector("[data-lb-table][data-mcol] thead th.model")
+    # measured in the page: a poll may draw the header again between a wait and a read
+    assert abs(page.evaluate("document.querySelector('[data-lb-table] thead th.model')"
+                             ".getBoundingClientRect().width") - w1) <= 2
     # the keyboard: ← narrower
     page.locator("[data-mcol-grip='models']").focus()
     page.keyboard.press("ArrowLeft")
@@ -568,7 +571,8 @@ def test_the_model_column_widens_fits_resets_and_wraps_on_a_phone(live, page):
     page.locator("[data-mcol-reset='models']").click()
     page.wait_for_selector("[data-lb-table]:not([data-mcol])")
     assert page.evaluate("localStorage.getItem('bench-mcol-models')") is None
-    assert abs(page.locator("[data-lb-table] thead th.model").bounding_box()["width"] - w0) <= 2
+    assert abs(page.evaluate("document.querySelector('[data-lb-table] thead th.model')"
+                             ".getBoundingClientRect().width") - w0) <= 2
     # a phone: no handle, and a long name wraps to two lines
     go(page, live, f"tab=models&models={ids(SERVED_LA, GOOD)}", "[data-lb-table]", width=400)
     assert not page.locator("[data-mcol-grip='models']").is_visible()

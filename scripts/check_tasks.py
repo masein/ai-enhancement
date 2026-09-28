@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -165,6 +166,23 @@ def find(cli, task: str, work: Path) -> tuple[bool, str, str]:
     return True, "", out["text"]
 
 
+def gpqa_access(check=None) -> str:
+    """one line: whether this server's HF account may read GPQA's dataset
+    (its terms accepted), from Hugging Face's own check — or why it can't say"""
+    try:
+        if check is None:
+            from huggingface_hub import auth_check as check
+        check("Idavidrein/gpqa", repo_type="dataset")
+    except ImportError:
+        return "gpqa      not checked: this huggingface_hub has no auth_check"
+    except Exception as e:                         # noqa: BLE001 — said in one line
+        text = f"{type(e).__name__} {e}"
+        if re.search(r"gated|authenticat|401|403|GatedRepo", text, re.I):
+            return "gpqa      " + config.GPQA_GATED
+        return f"gpqa      not checked: {type(e).__name__}"
+    return "gpqa      this server's HF account can read GPQA Diamond"
+
+
 def main() -> int:
     try:
         cli, version = _harness()
@@ -182,6 +200,9 @@ def main() -> int:
         # 12k.2: Trust & safety's four, from the pinned files, as a run builds them
         import trust_safety
         config.TRUST_TASKS_DIR = trust_safety.build_tasks(Path(tmp) / "trust-safety-tasks")
+        # 12n.2: SimpleQA Verified, from the pinned file
+        import simpleqa
+        config.SIMPLEQA_TASKS_DIR = simpleqa.build_tasks(Path(tmp) / "simpleqa-task")
         seen: dict[str, tuple[bool, str, str]] = {}
         # the full suite's second choice, all of BBQ, is checked as its own line
         for suite, tasks in [(s, config.tasks_for_suite(s)) for s in config.SUITES] + [
@@ -206,6 +227,9 @@ def main() -> int:
             print(f"{suite:<9} {ok} of {len(tasks)} found")
         found = sum(1 for good, _, _ in seen.values() if good)
         total = len(seen)
+    # 12n.2: GPQA's dataset is gated — finding its tasks says nothing of whether
+    # this server's HF account may read it; this asks Hugging Face
+    print(gpqa_access())
     if failed:
         print(f"tasks FAILED: {found} of {total} found by lm_eval {version} — "
               f"not found: {', '.join(failed)}")

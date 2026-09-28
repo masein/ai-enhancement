@@ -107,7 +107,9 @@ _cache: dict = {"key": None, "payload": None, "at": 0.0}
 _WATCH = ("results*.json", "diagnose.json", "model_meta.json", "judge.json",
           "judge_calibration.json", "everyday.json",
           # 12k.2: the judge's marks on Do-Not-Answer and XSTest land after the run
-          "safety.json")
+          "safety.json",
+          # 12n.2: and its grades on SimpleQA Verified
+          "simpleqa.json")
 
 # 11h: the dashboard no longer links to, serves or reads anything of the
 # demo tree ($BENCH_ROOT/demo). scripts/demo_loop.py stays a command-line
@@ -427,8 +429,9 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     if s.suite not in config.SUITES:
         raise HTTPException(422, "suite must be quick, full, control (mmlu_perm only), "
                                  "judged (free response + judge), everyday (Everyday tasks), "
-                                 "generative (IFEval, MMLU-Pro, MATH-500) or safety "
-                                 "(Do-Not-Answer, XSTest)")
+                                 "generative (IFEval, MMLU-Pro, MATH-500), safety "
+                                 "(Do-Not-Answer, XSTest) or shared (GPQA Diamond, "
+                                 "SimpleQA Verified)")
     if s.suite != "generative" and (s.thinking or s.subset):
         raise HTTPException(422, "thinking and subset are for IFEval, MMLU-Pro and MATH-500 "
                                  "(suite generative) only")
@@ -439,6 +442,8 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
                                  "don't ask BBQ")
     if s.suite == "safety" and s.kind == "base":
         raise HTTPException(422, config.SAFETY_INSTRUCT_ONLY + ". Nothing was queued.")
+    if s.suite == "shared" and s.kind == "base":
+        raise HTTPException(422, config.SHARED_INSTRUCT_ONLY + ". Nothing was queued.")
     total = sum(config.MMLU_PRO_SUBJECTS.values())
     if s.subset and not 0 < s.subset < total:
         raise HTTPException(422, f"subset is a number of MMLU-Pro items, from 1 to {total - 1}; "
@@ -563,10 +568,11 @@ def submissions(limit: int = 100):
     # 12a: a pilot row waits on the judge for one question, and says so the
     # way a judged row does — by the batch it recorded, and nothing else
     # 12k.2: and a Trust & safety row the same way, by its batch
-    pilot = [r for r in rows if r["suite"] in ("everyday", "safety") and r.get("judge_batch")]
+    pilot = [r for r in rows if r["suite"] in ("everyday", "safety", "shared")
+             and r.get("judge_batch")]
     if pilot:
         batches = {b["batch_id"]: b for b in db.batches_list(500)
-                   if b["kind"] in ("everyday", "safety")}
+                   if b["kind"] in ("everyday", "safety", "simpleqa")}
         for r in pilot:
             b = batches.get(r["judge_batch"])
             if b:
@@ -3493,7 +3499,12 @@ def run_log(sid: int, tail: int = 200):
     if not path.exists():
         return "(no log yet — the run has not reached lm_eval)"
     lines = path.read_text(errors="replace").splitlines()
-    return "\n".join(lines[-min(tail, 2000):])
+    # 12n.2: the raw text withholds what the Reader's lines do — a hidden exam
+    # question, and any line quoting a GPQA question
+    qids, texts = reader._hidden_marks()
+    return "\n".join("[line withheld — it quotes a hidden question]"
+                     if reader._withheld(line, qids, texts) else line
+                     for line in lines[-min(tail, 2000):])
 
 
 @app.get("/healthz")

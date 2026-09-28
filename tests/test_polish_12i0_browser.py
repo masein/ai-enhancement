@@ -24,7 +24,11 @@ NAMES = {"mmlu": "MMLU", "hellaswag": "HellaSwag", "piqa": "PIQA", "winogrande":
          "hendrycks_math500": "MATH-500",
          # 12k.2: Trust & safety's three, listed before anything has run them
          "do_not_answer": "Do-Not-Answer", "xstest": "XSTest", "bbq_3000": "BBQ",
-         "bbq_all": "BBQ (all 29,246)"}
+         "bbq_all": "BBQ (all 29,246)",
+         # 12n.2: shared with the frontier
+         "gpqa_diamond_cot_zeroshot": "GPQA Diamond (CoT)",
+         "gpqa_diamond_zeroshot": "GPQA Diamond (4 options)",
+         "simpleqa_verified": "SimpleQA Verified"}
 
 
 def shot(page_or_part, name, **kw):

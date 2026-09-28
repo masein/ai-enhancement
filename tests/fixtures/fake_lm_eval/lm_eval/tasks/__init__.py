@@ -6,6 +6,8 @@ BUILT_IN = {"mmlu", "hellaswag", "arc_challenge", "arc_easy", "winogrande", "piq
             "truthfulqa_mc2", "gsm8k",
             # 12h.1: all three are in 0.4.12 (hendrycks_math500 in hendrycks_math/)
             "ifeval", "mmlu_pro", "hendrycks_math500",
+            # 12n.2: GPQA Diamond's two forms, as lm_eval 0.4.12 ships them
+            "gpqa_diamond_zeroshot", "gpqa_diamond_cot_zeroshot",
             # 12k.2: its own BBQ, on an unpinned copy — the board's are bbq_3000 and bbq_all
             "bbq", "bbq_ambig"}
 

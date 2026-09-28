@@ -54,7 +54,7 @@ LOGLIK_LINE = ("Multiple-choice benchmarks need the model loaded here; this one 
 CHANGED_LINE = ("The server now serves a different file than the one registered. Register it "
                 "again if that's intended.")
 KEPT_FOR_NEXT = " · the answers it gave are kept: the next run asks only the rest"
-SUITES = ("everyday", "judged", "generative", "safety")
+SUITES = ("everyday", "judged", "generative", "safety", "shared")
 THINKING = {"on": "on", "off": "off", "auto": "the model decides"}
 PINNED = ("file", "size", "ctx", "build")
 TS_FMT = "%Y-%m-%dT%H-%M-%S.000000"
@@ -709,8 +709,11 @@ CHARS_PER_TOKEN = 4
 # first run, not on this server before — so their size is said here: how many
 # questions, and about how many tokens each prompt is as lm_eval poses it
 # (MMLU-Pro with its five worked examples). As rough as the rule above
-GEN_ITEMS = {"ifeval": 541, "hendrycks_math500": 500}
-GEN_PROMPT_TOKENS = {"ifeval": 90, "mmlu_pro": 2300, "hendrycks_math500": 110}
+# 12n.2: and GPQA Diamond's 198, gated — its question, four options and the
+# "think step by step" line
+GEN_ITEMS = {"ifeval": 541, "hendrycks_math500": 500, "gpqa_diamond_cot_zeroshot": 198}
+GEN_PROMPT_TOKENS = {"ifeval": 90, "mmlu_pro": 2300, "hendrycks_math500": 110,
+                     "gpqa_diamond_cot_zeroshot": 330}
 
 
 def tokens_of(text: str) -> int:
@@ -759,7 +762,8 @@ def estimate(rec: dict, suite: str, tasks: list[str] | None = None, subset: int 
     meta = {"archinfo": archinfo(rec)}
     n = tin = tout = 0
     for task in _run_tasks(rec, suite, tasks):
-        if suite == "generative":
+        # 12n.2: GPQA's chain of thought is asked as the generative three are
+        if suite == "generative" or task == config.GPQA_COT:
             k = (min(subset, sum(config.MMLU_PRO_SUBJECTS.values())) if task == "mmlu_pro"
                  and subset > 0 else sum(config.MMLU_PRO_SUBJECTS.values())
                  if task == "mmlu_pro" else GEN_ITEMS.get(task, 0))
@@ -767,13 +771,16 @@ def estimate(rec: dict, suite: str, tasks: list[str] | None = None, subset: int 
             tin += k * GEN_PROMPT_TOKENS.get(task, 0)
             tout += k * runner.gen_thinking({}, meta)["budget"]
             continue
-        everyday = suite in ("everyday", "safety")
+        everyday = suite in ("everyday", "safety", "shared")
         if suite == "everyday":
             import everyday as _ev
             docs = _ev.unanswered(model_dir(rec))
         elif suite == "safety":
             import trust_safety as _ts
             docs = _ts.load(task)
+        elif task == config.SIMPLEQA_TASK:
+            import simpleqa as _sq                  # 12n.2: its questions, as the run sends them
+            docs = [{"id": q["id"], "prompt": q["prompt"]} for q in _sq.load()]
         else:
             path = config.JUDGED_TASKS_DIR / f"{task}.jsonl"
             docs = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines()
