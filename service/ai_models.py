@@ -138,10 +138,13 @@ def models(refresh: bool = False) -> list[dict]:
         pin, pout = (per_million((m.get("pricing") or {}).get(k)) for k in ("prompt", "completion"))
         if pin is None or pout is None or str(m.get("id", "")).endswith(":free"):
             continue
+        params = m.get("supported_parameters")
         out.append({"id": m["id"], "name": m.get("name") or m["id"],
                     "version": m.get("canonical_slug") or m["id"],
                     "price_in": pin, "price_out": pout,
-                    "context": m.get("context_length")})
+                    "context": m.get("context_length"),
+                    # 12m.3: whether it thinks before it answers, when OpenRouter says
+                    "reasons": ("reasoning" in params) if isinstance(params, list) else None})
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps({"at": time.time(), "models": out}), encoding="utf-8")
     return out
@@ -151,22 +154,46 @@ def model(model_id: str) -> dict | None:
     return next((m for m in models() if m["id"] == model_id), None)
 
 
-def first_provider(model_id: str) -> dict | None:
-    """The first provider OpenRouter lists for the model — the one pinned:
-    {name, tag, precision, price_in, price_out}"""
+def providers(model_id: str) -> list[dict] | None:
+    """Every provider OpenRouter lists for the model, in its order — {name,
+    tag, precision, price_in, price_out, up} — or None when it can't be asked"""
     try:
         eps = (_get(f"/models/{model_id}/endpoints").get("data") or {}).get("endpoints") or []
     except Exception:                               # noqa: BLE001
         return None
+    out = []
     for e in eps:
-        if e.get("status", 0) not in (0, None):     # down: never pin a provider that isn't up
-            continue
         pr = e.get("pricing") or {}
-        return {"name": e.get("provider_name") or "", "tag": e.get("tag") or "",
-                "precision": e.get("quantization") or "unknown",
-                "price_in": per_million(pr.get("prompt")),
-                "price_out": per_million(pr.get("completion"))}
-    return None
+        out.append({"name": e.get("provider_name") or "", "tag": e.get("tag") or "",
+                    "precision": e.get("quantization") or "unknown",
+                    "price_in": per_million(pr.get("prompt")),
+                    "price_out": per_million(pr.get("completion")),
+                    "up": e.get("status", 0) in (0, None)})
+    return out
+
+
+def first_provider(model_id: str) -> dict | None:
+    """The first provider OpenRouter lists for the model — the one pinned:
+    {name, tag, precision, price_in, price_out}. Never one that is down"""
+    return next(({k: v for k, v in p.items() if k != "up"} for p in providers(model_id) or []
+                 if p["up"]), None)
+
+
+# 12m.3: who makes a model, by its id's organisation — a picker groups the
+# models tested through OpenRouter under these
+MAKERS = {"openai": "OpenAI", "google": "Google", "anthropic": "Anthropic", "x-ai": "xAI",
+          "meta-llama": "Meta", "mistralai": "Mistral", "deepseek": "DeepSeek", "qwen": "Qwen",
+          "z-ai": "Z.ai", "moonshotai": "Moonshot AI", "microsoft": "Microsoft",
+          "nvidia": "NVIDIA", "amazon": "Amazon", "cohere": "Cohere", "minimax": "MiniMax"}
+
+
+def maker(model_id: str, name: str = "") -> str:
+    """"openai/gpt-6-luna" -> "OpenAI"; an organisation not listed is named
+    as OpenRouter names it ("Acme: Painter" -> "Acme")"""
+    org = (model_id or "").split("/")[0].lower()
+    if org in MAKERS:
+        return MAKERS[org]
+    return name.split(": ", 1)[0] if ": " in (name or "") else org[:1].upper() + org[1:]
 
 
 # ---------------------------------------------------------------------------
@@ -258,6 +285,26 @@ def label(job: str) -> str:
     return f"{p} {m}".strip() if p else "none"
 
 
+def pin(model_id: str) -> dict:
+    """An OpenRouter model, pinned: the id, its dated version and its first
+    provider, with that provider's prices — or ValueError, in one line. The
+    judge is pinned by this, and (12m.3) a model tested through OpenRouter"""
+    if not has_key():
+        raise ValueError("OpenRouter has no key on this server (OPENROUTER_API_KEY)")
+    m = model(model_id)
+    if not m:
+        raise ValueError(f"{model_id} is not one of OpenRouter's text models")
+    prov = first_provider(model_id)
+    if not prov:
+        raise ValueError(f"OpenRouter lists no provider running {model_id} now")
+    return {"kind": "openrouter", "id": m["id"], "version": m["version"],
+            "name": m["name"], "provider": prov["tag"] or prov["name"],
+            "provider_name": prov["name"], "precision": prov["precision"],
+            "price_in": prov["price_in"] if prov["price_in"] is not None else m["price_in"],
+            "price_out": prov["price_out"] if prov["price_out"] is not None
+            else m["price_out"]}
+
+
 def save(job: str, model_id: str, by: str) -> dict:
     """Pin a job to a model: LOCAL, or an OpenRouter id — saved with its dated
     version and its first provider, never an alias alone"""
@@ -269,18 +316,7 @@ def save(job: str, model_id: str, by: str) -> dict:
         if not has_key():
             raise ValueError("OpenRouter has no key on this server (OPENROUTER_API_KEY), "
                              "so only Local can be chosen")
-        m = model(model_id)
-        if not m:
-            raise ValueError(f"{model_id} is not one of OpenRouter's text models")
-        prov = first_provider(model_id)
-        if not prov:
-            raise ValueError(f"OpenRouter lists no provider running {model_id} now")
-        value = {"kind": "openrouter", "id": m["id"], "version": m["version"],
-                 "name": m["name"], "provider": prov["tag"] or prov["name"],
-                 "provider_name": prov["name"], "precision": prov["precision"],
-                 "price_in": prov["price_in"] if prov["price_in"] is not None else m["price_in"],
-                 "price_out": prov["price_out"] if prov["price_out"] is not None
-                 else m["price_out"]}
+        value = pin(model_id)
     db.ai_set("job:" + job, value, by)
     return value
 

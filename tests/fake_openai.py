@@ -7,7 +7,14 @@ counted.
 
 It runs in a thread on a free port. A test changes the file it serves, asks
 for a key, or makes it stop answering after so many answers (a 503 each
-time after, as a server that has gone away behind a proxy would)."""
+time after, as a server that has gone away behind a proxy would).
+
+12m.3: it answers as OpenRouter too, for a test that sends OpenRouter's
+address here (tests/test_12m3.py) — its models list with prices and dated
+versions (`catalog`), each model's providers (`endpoints`), and a chat
+reply's usage with its cost and reasoning tokens, and the thinking as
+OpenRouter says it (`reasoning_field = "reasoning"`). Nothing reaches
+OpenRouter itself."""
 
 from __future__ import annotations
 
@@ -50,6 +57,14 @@ class FakeServer:
         self.on_request = None                   # called with each chat body
         self.stream_delay_s = 0.0                # 12d.3: between streamed pieces
         self.hung_up = 0                         # streams the client closed early
+        # 12m.3: as OpenRouter — its list, a model's providers, and a reply's cost
+        self.catalog: list[dict] | None = None   # set: /v1/models is OpenRouter's list
+        self.endpoints: list[dict] = []          # /v1/models/<id>/endpoints
+        self.prompt_tokens = 10
+        self.cost = None                         # dollars a reply reports (or a function)
+        self.reasoning_field = "reasoning_content"
+        self.reasoning_tokens = None             # a function: completion_tokens_details
+        self.provider = ""                       # the provider a reply names
         self._lock = threading.Lock()
         app = FastAPI()
 
@@ -60,8 +75,14 @@ class FakeServer:
                 return JSONResponse({"error": {"message": "Invalid API Key"}}, status_code=401)
             return None
 
+        @app.get("/v1/models/{mid:path}/endpoints")
+        def endpoints(mid: str, request: Request):
+            return refused(request) or {"data": {"id": mid, "endpoints": self.endpoints}}
+
         @app.get("/v1/models")
         def models(request: Request):
+            if self.catalog is not None:
+                return refused(request) or {"data": self.catalog}
             return refused(request) or {"object": "list", "data": [{
                 "id": self.model_path.rsplit("/", 1)[-1], "object": "model",
                 "owned_by": "llamacpp",
@@ -99,14 +120,22 @@ class FakeServer:
                 think = self.reasoning(body) if callable(self.reasoning) else self.reasoning
                 msg = {"role": "assistant", "content": content}
                 if think:
-                    msg["reasoning_content"] = think
+                    msg[self.reasoning_field] = think
                 used = (self.tokens(body) if callable(self.tokens)
                         else len(content.split()) + len((think or "").split()))
                 with self._lock:
                     self.answered += 1
                 out = {"id": "chatcmpl-1", "object": "chat.completion",
                        "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}],
-                       "usage": {"prompt_tokens": 10, "completion_tokens": used}}
+                       "usage": {"prompt_tokens": self.prompt_tokens, "completion_tokens": used}}
+                if callable(self.reasoning_tokens):
+                    out["usage"]["completion_tokens_details"] = {
+                        "reasoning_tokens": self.reasoning_tokens(body)}
+                cost = self.cost(body) if callable(self.cost) else self.cost
+                if cost is not None:
+                    out["usage"]["cost"] = cost
+                if self.provider:
+                    out["provider"] = self.provider
                 if callable(self.timings):
                     out["timings"] = self.timings(body)
                 return out

@@ -132,6 +132,8 @@ def test_outside_data_says_what_each_source_holds(live, page):
     set_name(page, "masein")
     card = page.locator("[data-outside]")
     card.wait_for()
+    # it draws at once and fills in when api/reported has answered
+    page.wait_for_selector("[data-outside] [data-rep-lines='1']")
     aa = card.locator("[data-rep-line='aa']").inner_text()
     assert aa.startswith("Artificial Analysis: 39 scores for 13 models, imported ")
     assert "· Data: Artificial Analysis" in aa

@@ -303,12 +303,14 @@ def board_models() -> list[dict]:
                     "source": "artifact" if mid.startswith("local/") else "hub",
                     "chat": not why, "why_not": why})
     # 12d.3: a model served elsewhere chats through its server — its
-    # model_meta.json was skipped above, so it is listed once
+    # model_meta.json was skipped above, so it is listed once. 12m.3: a model
+    # from OpenRouter doesn't: a chat's cost isn't counted against the month
     from . import served
     for rec in db.served_all():
+        why = "openrouter" if served.is_openrouter(rec) else ""
         out.append({"id": rec["id"], "name": rec["name"], "kind": "instruct", "params": None,
                     "archinfo": served.archinfo(rec), "source": "served", "served": True,
-                    "phone": served.is_phone(rec), "chat": True, "why_not": ""})
+                    "phone": served.is_phone(rec), "chat": not why, "why_not": why})
     return out
 
 

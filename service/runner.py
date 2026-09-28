@@ -681,7 +681,9 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
     CANCELED when someone asked the queue to stop this run. Polled every two
     seconds, so a cancel costs at most that plus a clean shutdown. `cwd` is
     lm_eval_cwd(), never BENCH_ROOT. `on_poll()` is called at each poll: a
-    served run's progress, read from the harness's own progress bar."""
+    served run's progress, read from the harness's own progress bar. 12m.3:
+    what it returns, when it isn't empty, is why the child stops now (a model
+    from OpenRouter at the month's AI limit)"""
     proc = subprocess.Popen(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=cwd,
                             env=env, **({"user": run_as[0], "group": run_as[1]}
                                         if run_as else {}))
@@ -691,11 +693,10 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
             return proc.wait(timeout=2)
         except subprocess.TimeoutExpired:
             pass
-        if on_poll:
-            on_poll()
+        stop = (on_poll() or "") if on_poll else ""
         why = ("canceled by request" if db.cancel_requested(sid)
-               else f"killed after {config.TASK_TIMEOUT_S}s timeout"
-               if time.time() - t0 > config.TASK_TIMEOUT_S else "")
+               else stop or (f"killed after {config.TASK_TIMEOUT_S}s timeout"
+                             if time.time() - t0 > config.TASK_TIMEOUT_S else ""))
         if why:
             proc.terminate()
             try:
@@ -712,11 +713,14 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
 # ---------------------------------------------------------------------------
 
 def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, label: str,
-                log_path: Path, everyday: bool, asked: list[str] | None, safety: bool = False):
+                log_path: Path, everyday: bool, asked: list[str] | None, safety: bool = False,
+                meter: _served.Meter | None = None):
     """one Everyday, exam or Trust & safety task, asked over the model's
     server. (status, stopped): 0 or CANCELED, and a ServerStopped when it
     stopped answering — what it answered before that is written and kept.
-    12k.2: Do-Not-Answer and XSTest are asked as Everyday is, as typed"""
+    12k.2: Do-Not-Answer and XSTest are asked as Everyday is, as typed.
+    12m.3: a model from OpenRouter's questions go through its run's meter,
+    and its progress says the running total"""
     if safety:
         items = config.TRUST_TASKS_DIR / f"{task}.jsonl"                      # build_tasks'
         everyday = True
@@ -731,15 +735,16 @@ def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, labe
     s = _served.settings_for(rec, meta, everyday)
     with open(log_path, "a") as lf:
         lf.write(f"\n===== [{sid}] {task} · served: {rec['name']} at {rec['base_url']} · "
-                 f"{rec['pin'].get('file')} · {len(docs)} question(s), "
-                 f"{config.SERVED_CONCURRENCY} at a time · {json.dumps(s)} =====\n")
+                 f"{rec['pin'].get('version') or rec['pin'].get('file')} · {len(docs)} "
+                 f"question(s), {_served.concurrency(rec)} at a time · {json.dumps(s)} =====\n")
 
     def progress(done: int, total: int, each: float) -> None:
-        db.update(sid, status="running", progress=f"{label} · {time_left(done, total, each)}")
+        db.update(sid, status="running", progress=f"{label} · {time_left(done, total, each)}"
+                  + (f" · {meter.line()}" if meter else ""))
     try:
         status = _served.answer_task(rec, task, docs, task_out, s, everyday,
                                      on_progress=progress,
-                                     canceled=lambda: db.cancel_requested(sid))
+                                     canceled=lambda: db.cancel_requested(sid), meter=meter)
         return status, None
     except _served.ServerStopped as e:
         e.task = task
@@ -762,16 +767,23 @@ def _tqdm_last(text: str) -> tuple[int, int, float] | None:
     return int(m.group(1)), int(m.group(2)), float(h * 3600 + mi * 60 + se)
 
 
-def _served_poll(sid: int, label: str, log_path: Path, mark: int) -> None:
-    """a served generative task's progress, from lm_eval's own bar"""
+def _served_poll(sid: int, label: str, log_path: Path, mark: int,
+                 meter: _served.Meter | None = None) -> str:
+    """a served generative task's progress, from lm_eval's own bar — 12m.3:
+    with the running total of a model from OpenRouter, and, once its meter
+    has stopped at the month's AI limit, why lm_eval stops now"""
     try:
         size = log_path.stat().st_size
         got = _tqdm_last(_read_from(log_path, max(mark, size - 4096)))
     except OSError:
-        return
+        got = None
     if got and got[0]:
         done, total, secs = got
-        db.update(sid, progress=f"{label} · {time_left(done, total, secs / done)}")
+        db.update(sid, progress=f"{label} · {time_left(done, total, secs / done)}"
+                  + (f" · {meter.line()}" if meter else ""))
+    elif meter:
+        db.update(sid, progress=f"{label} · {meter.line()}")
+    return "stopped at this month's AI limit" if meter and meter.stopped else ""
 
 
 _SERVER_GONE = re.compile(r"ConnectionError|Connection refused|ClientConnectorError|"
@@ -830,11 +842,17 @@ def run_submission(sub: dict) -> None:
     rec = meta.get("served")
     kind = meta["kind"]
     remote_code = bool(meta.get("remote_code"))
+    # 12m.3: a model from OpenRouter — each answer's cost counted as it lands,
+    # against the month's AI limit
+    est = meta.get("estimate") or {}
+    meter = _served.Meter(rec, sid, est.get("usd", 0.0)) if _served.is_openrouter(rec) else None
     db.update(sid, kind=kind, params=meta["params"], vocab=meta["vocab"],
               batch=meta["batch"], need_gb=meta["need_gb"],
               arch=json.dumps(meta.get("archinfo") or {}),
               progress=f"preflight ok · batch={meta['batch']} · "
                        f"needs ~{meta['need_gb']:g} GB" if not rec else
+                       f"preflight ok · via OpenRouter: {rec['pin']['version']} · this run "
+                       f"{est.get('line', '')}" if meter else
                        f"preflight ok · served elsewhere: {rec['pin'].get('file') or rec['name']}")
 
     tasks = config.tasks_for_suite(sub["suite"], bbq_all=bool(sub.get("bbq_all")))
@@ -910,6 +928,7 @@ def run_submission(sub: dict) -> None:
         pass
     if not wait_for_lock(sid):
         return
+    relay = None          # 12m.3: a model from OpenRouter's generative three go through it
 
     # 12d.3: the lock is this run's, so a new chat message to the model it
     # tests waits (chat.Engine.place); the replies already streaming to it
@@ -975,6 +994,8 @@ def run_submission(sub: dict) -> None:
         reused: dict[str, int | None] = {}
         asked: list[str] | None = None
         stopped: _served.ServerStopped | None = None       # 12f.1: the server stopped
+        if generative and meter:
+            relay = _served.Relay(rec, meter).__enter__()
         for i, task in enumerate(tasks, 1):
             if canceled or db.cancel_requested(sid):
                 canceled = True
@@ -1024,7 +1045,7 @@ def run_submission(sub: dict) -> None:
                 # settings a local run uses, into the files lm_eval writes
                 t_task = time.time()
                 status, stopped = _ask_served(sid, rec, meta, task, task_out, label, log_path,
-                                              everyday, asked, safety=safety)
+                                              everyday, asked, safety=safety, meter=meter)
                 gpu_seconds += time.time() - t_task
                 db.update(sid, gpu_seconds=gpu_seconds)
                 if status == CANCELED:
@@ -1069,7 +1090,7 @@ def run_submission(sub: dict) -> None:
                         # 12f.1: through lm_eval's local-chat-completions; the
                         # answers it has are kept in its cache, by what was served
                         return lm_eval_cmd(
-                            _served.lm_eval_model_args(rec), task, shots, 1, task_out,
+                            _served.lm_eval_model_args(rec, relay), task, shots, 1, task_out,
                             chat=True, max_gen_toks=th["budget"], backend=be,
                             samples=samples, cache=_served.cache_path(rec, task))
                     return lm_eval_cmd(
@@ -1111,12 +1132,16 @@ def run_submission(sub: dict) -> None:
                 mark = log_path.stat().st_size      # this task's output starts here
                 if rec:
                     lf.write(f"[served] {rec['name']} at {rec['base_url']} · "
-                             f"{rec['pin'].get('file')} · thinking as the server does "
-                             f"(lm_eval sends no switch) · {config.SERVED_CONCURRENCY} at a time\n")
+                             f"{rec['pin'].get('version') or rec['pin'].get('file')} · thinking "
+                             f"as the server does (lm_eval sends no switch) · "
+                             f"{_served.concurrency(rec)} at a time"
+                             + (" · through the board's relay, which counts each answer's cost"
+                                if relay else "") + "\n")
                     lf.flush()
                 # 12f.1: a served run's key, and its progress from lm_eval's bar;
-                # a local run is called as it always was
-                served_kw = ({"on_poll": lambda: _served_poll(sid, label, log_path, mark)}
+                # a local run is called as it always was. 12m.3: and a model from
+                # OpenRouter's running total, and its stop at the AI limit
+                served_kw = ({"on_poll": lambda: _served_poll(sid, label, log_path, mark, meter)}
                              if rec else {})
                 status = _run_task(sid, cmd, lf,
                                    _served.job_env(job_env, rec) if rec else job_env, run_as,
@@ -1165,6 +1190,10 @@ def run_submission(sub: dict) -> None:
                 _served.adopt_lm_eval_results(task_out, rec)
             if rec and status not in (0, CANCELED):
                 got = _served_stopped_in_log(_read_from(log_path, mark))
+                if meter and meter.stopped:
+                    # 12m.3: stopped at the month's AI limit — where, from lm_eval's bar
+                    bar = _tqdm_last(_read_from(log_path, mark)) or (0, 0, 0.0)
+                    got = _served.LimitReached(bar[0], bar[1], meter)
                 if got:
                     stopped = got
                     failed_tasks.append(task)
@@ -1292,24 +1321,30 @@ def run_submission(sub: dict) -> None:
                 with open(log_path, "a") as lf:
                     lf.write(f"\n[service] judge could not be submitted: {e!r}\n")
 
+        # 12m.3: what the run cost on OpenRouter, on its row
+        def spent(line: str) -> str:
+            return " · ".join(x for x in (line, f"{_served.usd(meter.spent)} on OpenRouter")
+                              if x) if meter else line
         if failed_tasks:
             db.update(sid, status="failed", finished_at=time.time(),
-                      progress=f"failed on: {', '.join(failed_tasks)}")
+                      progress=spent(f"failed on: {', '.join(failed_tasks)}"))
         elif stopped:
             # 12f.1: a partial result, and it says so — what was answered is
             # marked (and judged) like any answer; the rest is asked next time
             db.update(sid, status="failed", finished_at=time.time(),
                       error=f"{stopped.task}: {stopped} · the {stopped.done} answered are kept "
                             f"and marked",
-                      progress=(judge_note or "").strip(" ·"))
+                      progress=spent((judge_note or "").strip(" ·")))
         else:
             what = (f"all {len(tasks)} tasks" if not only
                     else f"{', '.join(t.replace('exam_', '') for t in tasks)}")
             db.update(sid, status="done", finished_at=time.time(),
-                      progress=judge_note if everyday or safety
-                      else f"{what} done" + (f" · {note}" if note else "") + judge_note,
-                      error="")
+                      progress=spent(judge_note if everyday or safety
+                                     else f"{what} done" + (f" · {note}" if note else "")
+                                     + judge_note), error="")
     finally:
+        if relay is not None:
+            relay.__exit__(None, None, None)
         release_lock()
         if remote_code:
             shutil.rmtree(config.BENCH_ROOT / ".jobscratch" / str(sid),

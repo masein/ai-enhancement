@@ -342,6 +342,9 @@ JUDGE_TEST_MIN = int(os.environ.get("JUDGE_TEST_MIN", "100"))
 # check (alone when there is no key)
 OPENROUTER_EMBED_MODEL = os.environ.get("OPENROUTER_EMBED_MODEL", "openai/text-embedding-3-small")
 QB_DUP_COSINE = float(os.environ.get("QB_DUP_COSINE", "0.9"))
+# 12m.3: a model tested through OpenRouter sits a seeded MMLU-Pro subset of
+# this many unless a person clears it — all 12,032 five-shot answers is a bill
+OPENROUTER_GEN_SUBSET = int(os.environ.get("OPENROUTER_GEN_SUBSET", "1000"))
 
 
 def judged_tasks() -> list[str]:

@@ -93,8 +93,14 @@ def board_ids() -> list[str]:
 
 
 def aliases() -> dict[str, str]:
-    """alias key -> the key or board model id it is"""
-    return {a["alias"]: a["target"] for a in db.reported_aliases()}
+    """alias key -> the key or board model id it is. 12m.3: a model from
+    OpenRouter measured here is its OpenRouter id's without anyone typing it
+    ("openai/gpt-5.5" is served/openrouter-openai-gpt-5.5); an alias typed on
+    the page wins"""
+    out = {key(r["pin"]["model"]): r["id"] for r in db.served_all()
+           if r.get("via") == "openrouter" and (r.get("pin") or {}).get("model")}
+    out.update({a["alias"]: a["target"] for a in db.reported_aliases()})
+    return out
 
 
 def resolve(k: str, board: list[str] | None = None, al: dict | None = None) -> str:
