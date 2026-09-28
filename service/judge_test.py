@@ -95,10 +95,14 @@ def _exam_rows() -> list[dict]:
     import judge_calibrate as jc
     if not config.OUT_DIR.is_dir():
         return []
+    # 12o.1: the diagnose half only — the judge test shows the question, and
+    # the report half is never listed
     return [{"key": "exam:" + r["id"], "kind": "exam", "model": r["model"].replace("__", "/", 1),
              "task": r["task"], "topic": r["category"], "question": r["prompt"],
-             "reference": r["reference"], "answer": r["answer"], "judge": r["judge_score"]}
-            for r in jc._judged_rows(config.OUT_DIR, set()) if (r["answer"] or "").strip()]
+             "reference": r["reference"], "answer": r["answer"], "judge": r["judge_score"],
+             "half": "diagnose"}
+            for r in jc._judged_rows(config.OUT_DIR, set())
+            if (r["answer"] or "").strip() and r["half"] == "diagnose"]
 
 
 def _everyday_rows() -> list[dict]:
@@ -122,7 +126,32 @@ def _everyday_rows() -> list[dict]:
                         "model": e.get("model") or f.parent.name, "task": it["id"],
                         "topic": ev.groups().get(q["group"], q["group"]), "question": q["prompt"],
                         "reference": q.get("reference") or "", "rubric": rubric,
-                        "answer": it["answer_text"], "judge": 4 if it["pass"] else 0})
+                        "answer": it["answer_text"], "judge": 4 if it["pass"] else 0,
+                        "half": ev.PRACTICE})
+    return out
+
+
+def _screened(sample: dict) -> dict:
+    """12o.1: a sample drawn before the halves were checked, less every answer
+    to a question that is never shown — the exam's report half, Everyday's
+    hidden half, or one whose half can't be told now. The rest keep their
+    version, and their marks; the file is written back with each one's half"""
+    _scripts()
+    import everyday as ev
+    import judge_calibrate as jc
+    exam = ({"exam:" + r["id"]: r["half"] for r in jc._judged_rows(config.OUT_DIR, set())}
+            if config.OUT_DIR.is_dir() else {})
+    qs = {q["id"]: q for q in ev.load_bank()}
+    kept = []
+    for a in sample.get("answers") or []:
+        if "half" not in a:
+            q = qs.get(a["task"]) if a["kind"] == "everyday" else None
+            a = {**a, "half": exam.get(a["key"]) if a["kind"] == "exam"
+                 else ev.half(q) if q else None}
+        if a["half"] == ("diagnose" if a["kind"] == "exam" else ev.PRACTICE):
+            kept.append(a)
+    out = {**sample, "answers": kept}
+    _sample_path().write_text(json.dumps(out), encoding="utf-8")
     return out
 
 
@@ -197,6 +226,8 @@ def answers(n: int | None = None, rebuild: bool = False) -> list[dict]:
     drawn"""
     n = n or config.JUDGE_TEST_N
     got = _sample()
+    if got.get("answers") and any("half" not in a for a in got["answers"]):
+        got = _screened(got)
     if not rebuild and got.get("n") == n and got.get("builder") == BUILDER:
         return got["answers"]
     if got.get("answers"):

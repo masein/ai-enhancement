@@ -83,7 +83,9 @@ def make_service(root: Path, monkeypatch, *, llm_provider: str = "fake", tree: b
                       "EXAM_DIR": root / "exam",
                       "JUDGED_TASKS_DIR": root / "exam" / "tasks",
                       "EVERYDAY_TASKS_DIR": root / "everyday" / "tasks",
-                      "TRUST_TASKS_DIR": root / "trust_safety" / "tasks"}.items():
+                      "TRUST_TASKS_DIR": root / "trust_safety" / "tasks",
+                      # 12o.1: the run's SimpleQA task under the test's root, not the repo's
+                      "SIMPLEQA_TASKS_DIR": root / "simpleqa" / "tasks"}.items():
         monkeypatch.setattr(config, name, val)
     monkeypatch.setattr(worker, "start", lambda: None)
     monkeypatch.setattr(llm_poller, "start", lambda: None)
@@ -132,7 +134,8 @@ def live(tmp_path_factory):
                  "EXAM_MODEL": "fake-exam", "EXAM_API_KEY": "",
                  "JUDGED_TASKS_DIR": root / "exam" / "tasks",
                  "EVERYDAY_TASKS_DIR": root / "everyday" / "tasks",
-                 "TRUST_TASKS_DIR": root / "trust_safety" / "tasks"}.items():
+                 "TRUST_TASKS_DIR": root / "trust_safety" / "tasks",
+                 "SIMPLEQA_TASKS_DIR": root / "simpleqa" / "tasks"}.items():
         setattr(config, k, v)
     worker_start = worker.start
     worker.start = lambda: None

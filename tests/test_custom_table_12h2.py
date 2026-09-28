@@ -73,8 +73,12 @@ def rows(page):
 
 
 def tip_number(td):
-    """a cell's number and its ±, from its tooltip: "76.9 ± 3.1" """
-    first = json.loads(td.get_attribute("data-tip"))[0]
+    """a cell's number and its ±, from its tooltip: "76.9 ± 3.1" — none, two
+    empty fields (12o.1: a row with some of the chosen, not all)"""
+    tip = td.get_attribute("data-tip")
+    if tip is None:
+        return "", ""
+    first = json.loads(tip)[0]
     v, _, se = first.partition(" ± ")
     return v, se
 
@@ -105,8 +109,9 @@ def test_three_benchmarks_make_an_average_of_those_three(live, page):
     # 12i.0: it says what it is
     assert heads == ["model", "params", "avg above chance", "ifeval", "mmlu-pro", "math-500"]
     assert page.locator("th[data-col='avg']").count() == 0        # not the board's Avg
-    # the rows: the models with all three, ranked on this average
-    assert rows(page) == [THINK, MODEL]                             # thinking: the better IFEval
+    # the rows: the models with all three, ranked on this average — 12o.1: and,
+    # after them, one with some of them, unaveraged
+    assert rows(page) == [THINK, MODEL, SHORT]                      # thinking: the better IFEval
     assert page.locator(f"tr[data-lb-row='{THINK}'] td.rank").inner_text() == "1"
     # the number and its ±, as the chosen columns make them
     for mid in (MODEL, THINK):
@@ -123,28 +128,24 @@ def test_three_benchmarks_make_an_average_of_those_three(live, page):
     assert (page.locator(f"td[data-cavg='{MODEL}']").get_attribute("data-lead") == "1") == tied
     # one line says what is shown
     assert page.locator("[data-custom-what]").inner_text() == \
-        "Custom · IFEval, MMLU-Pro, MATH-500 · 2 models"
+        "Custom · IFEval, MMLU-Pro, MATH-500 · 3 models"
     assert page.evaluate("location.hash") == "#tab=models&" + THREE_URL
     assert page.errors == []
 
 
 def test_a_model_missing_one_is_not_averaged_and_says_what_is_missing(live, page):
     models_tab(page, live["base"], THREE_URL)
-    assert SHORT not in rows(page)
+    # 12o.1: a row with the two it has; its Avg says what it lacks
+    assert SHORT in rows(page)
+    avg = page.locator(f"td[data-cavg='{SHORT}']")
+    assert avg.inner_text() == "— 2/3" and avg.get_attribute("title") == "no MATH-500"
+    assert avg.get_attribute("data-lead") is None
     page.locator("[data-not-tested-toggle]").click()
-    short = page.locator(f"[data-not-tested-row='{SHORT}']")
-    name = page.evaluate(f"DATA.models.find(m => m.id === {json.dumps(SHORT)}).name")
-    assert short.inner_text() == f"{name} · no MATH-500 · Test"
     # a base model cannot sit them: said, and no Test
     base = page.locator(f"[data-missing='{BASE}']")
     assert base.inner_text() == " · no IFEval, MMLU-Pro, MATH-500 · instruct only"
     assert page.locator(f"[data-not-tested-test='{BASE}']").count() == 0
     shot(page, "12h2-custom-1400-light.png", full_page=True)
-    # Test opens the form, filled in for what is missing
-    page.locator(f"[data-not-tested-test='{SHORT}']").click()
-    page.locator("[data-dialog='test']").wait_for()
-    assert page.evaluate("[state.sub.hf_id, state.sub.suite]") == [SHORT, "generative"]
-    page.keyboard.press("Escape")
     assert page.errors == []
 
 
@@ -236,7 +237,8 @@ def test_the_url_round_trips(live, page, browser):
     page.locator(f"#pop-models [data-model-pick='{MODEL}']").check()
     page.locator(f"#pop-models [data-model-pick='{SHORT}']").check()
     page.keyboard.press("Escape")
-    page.wait_for_function("document.querySelectorAll('tr[data-lb-row]').length === 1")
+    # 12o.1: both are rows — the one with two of the three unaveraged
+    page.wait_for_function("document.querySelectorAll('tr[data-lb-row]').length === 2")
     url = page.url
     assert url.endswith("#tab=models&" + THREE_URL + "&models="
                         + ",".join(quote(m, safe="") for m in (MODEL, SHORT)))
@@ -245,7 +247,8 @@ def test_the_url_round_trips(live, page, browser):
         return {"heads": p.locator("[data-lb-table] thead tr.names th .hname").all_inner_texts(),
                 "rows": rows(p), "avg": [tip_number(td) for td in p.locator("td[data-cavg]").all()],
                 "line": p.locator("[data-custom-what]").inner_text(),
-                "missing": p.locator("[data-not-tested]").get_attribute("data-not-tested")}
+                "missing": p.locator("[data-cavg-missing]").evaluate_all(
+                    "xs => xs.map(x => x.dataset.cavgMissing)")}
     first = table(page)
     ctx = browser.new_context(viewport={"width": 1400, "height": 1000}, reduced_motion="reduce")
     try:
@@ -369,13 +372,14 @@ def test_the_csv_is_the_table_with_the_average_and_its_errors(live, page):
                 "" if params == "—" else params]                  # a dash is an empty field
         for td in [page.locator(f"td[data-cavg='{mid}']"),
                    *(tr.locator(f"td[data-gen-cell='{t}']") for t in THREE)]:
-            line.extend(tip_number(td))
+            # 12o.1: a benchmark a row lacks is two empty fields
+            line.extend(tip_number(td) if td.count() else ("", ""))
         want.append(line)
-    assert got[1:] == want and len(want) == 2
+    assert got[1:] == want and len(want) == 3
     page.locator("[data-custom-more]").click()
     page.locator("[data-copy-csv]").click()
     page.wait_for_selector("[data-toast='copy']")
-    assert "Copied 2 rows as CSV" in page.locator("[data-toast='copy']").inner_text()
+    assert "Copied 3 rows as CSV" in page.locator("[data-toast='copy']").inner_text()
     assert page.errors == []
 
 

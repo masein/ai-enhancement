@@ -262,6 +262,8 @@ def test_a_near_duplicate_of_a_bank_question_is_flagged_and_keep_old_drops_it(sv
 
 def test_embeddings_find_a_reworded_duplicate_and_the_toggle_turns_it_off(svc, monkeypatch):
     client, _, _ = svc
+    # 12o.1: OpenRouter's embeddings are a choice now, not the default
+    monkeypatch.setattr(config, "QB_EMBED_MODEL", "openrouter")
     fake = FakeOpenRouter.install(monkeypatch)
     import everyday as ev
     bank = next(q for q in ev.load_bank() if 10 < len(q["prompt"].split()) < 30)
@@ -272,7 +274,7 @@ def test_embeddings_find_a_reworded_duplicate_and_the_toggle_turns_it_off(svc, m
     d = rest(client, review_all(client, d))
     dup = next(f for it in d["items"] if it["n"] == 11 for f in it["flags"] if f["kind"] == "dup")
     assert dup["how"].startswith("cosine ") and float(dup["how"].split()[1]) >= 0.9
-    assert d["dedup_how"] == "13-gram and embeddings" and fake.embedded
+    assert d["dedup_how"] == "13-gram and embeddings through OpenRouter" and fake.embedded
     assert fake.embedded[0]["model"] == config.OPENROUTER_EMBED_MODEL
     # the bank is embedded once: the second draft asks only for its own
     n_first = sum(len(e["input"]) for e in fake.embedded)

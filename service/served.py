@@ -271,9 +271,54 @@ def register(f: dict, by: str) -> dict:
            "pin": pin_of(p), "answered": p["answered"], "by": by, "at": time.time()}
     if rec["gguf_path"] and old.get("gguf_path") == rec["gguf_path"] and old.get("gguf_pin"):
         rec["gguf_pin"] = old["gguf_pin"]
+    # 12o.1: registered again, it keeps the file someone said it serves
+    if old.get("same_as"):
+        rec["same_as"] = old["same_as"]
     db.served_put(rec)
     write_meta(rec)
     return public(rec)
+
+
+def same_as_set(served_id: str, gguf_id: str, setup: str = "as-built") -> dict | None:
+    """12o.1: "Same file as" — the GGUF entry, and the setup of it, a served
+    entry serves: the board joins them without guessing. gguf_id "" guesses
+    again (by file, then routing); "none" is never the same file. Kept on the
+    served entry; the GGUF entry's own form sets the same thing from its side"""
+    from . import gguf
+    rec = get(served_id)
+    if not rec:
+        raise ValueError(f"no served model {served_id}")
+    if not gguf_id:
+        rec.pop("same_as", None)
+    elif gguf_id == "none":
+        rec["same_as"] = {"none": True}
+    else:
+        g = db.gguf_get(gguf_id)
+        if not g:
+            raise ValueError(f"no GGUF entry {gguf_id}")
+        ids = [gguf.gb.AS_BUILT["id"]] + [x["id"] for x in g.get("setups") or []]
+        if setup not in ids:
+            raise ValueError(f"{g['name']} has no setup {setup}: its setups are "
+                             + ", ".join(ids))
+        if rec.get("gguf_path"):
+            raise ValueError(f"{rec['name']} has a GGUF file of its own")
+        rec["same_as"] = {"gguf": gguf_id, "setup": setup}
+    db.served_put(rec)
+    write_meta(rec)
+    return rec.get("same_as")
+
+
+def same_as_clear(gguf_id: str, setup: str) -> list[str]:
+    """the GGUF entry's side: no served entry is this setup of it now"""
+    out = []
+    for rec in db.served_all():
+        ln = rec.get("same_as") or {}
+        if ln.get("gguf") == gguf_id and (ln.get("setup") or "as-built") == setup:
+            rec.pop("same_as")
+            db.served_put(rec)
+            write_meta(rec)
+            out.append(rec["id"])
+    return out
 
 
 def slug_openrouter(model_id: str) -> str:
@@ -325,6 +370,8 @@ def view(rec: dict) -> dict:
             "phone": is_phone(rec),
             "gguf_path": rec.get("gguf_path") or "",
             "gguf_setups": rec.get("gguf_setups") or [],
+            # 12o.1: the GGUF entry, and its setup, someone said it serves
+            "same_as": rec.get("same_as"),
             # 12i.4: measured by its last run — Test a model's time estimate
             "speed": rec.get("speed"),
             # 12m.3: a model from OpenRouter, its maker, and the MMLU-Pro

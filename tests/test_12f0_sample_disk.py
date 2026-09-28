@@ -23,9 +23,10 @@ LOOP = " ".join(["The following is the following:"] * 12)
 
 
 def row(i, model, answer, question="Why do prices rise when supply falls?"):
+    # 12o.1: a diagnose-half question's — a row with no half is screened out
     return {"key": f"exam:{model}|{i}", "kind": "exam", "model": model, "task": "exam_economics",
             "topic": f"Economics {i % 5}", "question": question, "reference": "r",
-            "answer": answer, "judge": 0}
+            "answer": answer, "judge": 0, "half": "diagnose"}
 
 
 def test_what_counts_as_a_loop():

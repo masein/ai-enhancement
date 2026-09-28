@@ -461,7 +461,7 @@ def test_every_chosen_model_is_a_row_or_says_why_not(live, page):
     go(page, live, f"tab=models&cols={LOGLIK}&models={ids(*chosen)}", "[data-lb-table]")
     empty = page.locator("[data-none-has]")
     assert empty.locator("p").inner_text() == (
-        "None of the 3 has all 6. 3 can’t be measured this way (served or GGUF) · "
+        "None of the 3 has any of these 6. 3 can’t be measured this way (served or GGUF) · "
         "Show their llama.cpp columns")
     # under the line, open from the start: the table has no rows
     assert page.locator("[data-not-tested-toggle]").get_attribute("aria-expanded") == "true"
@@ -537,11 +537,14 @@ def test_everyday_and_the_exam_follow_the_choice(live, page):
 
 
 def test_the_model_column_widens_fits_resets_and_wraps_on_a_phone(live, page):
+    # 12o.1: the Model column's width is one of every column's, kept per table
+    key = "bench-layout-models:standard:all"
+    kept_w = f"(JSON.parse(localStorage.getItem('{key}') || '{{}}').w || {{}}).name"
     go(page, live, "tab=models", "[data-lb-table]")
-    page.evaluate("localStorage.removeItem('bench-mcol-models')")
+    page.evaluate(f"localStorage.removeItem('{key}')")
     th = page.locator("[data-lb-table] thead th.model")
     w0 = th.bounding_box()["width"]
-    grip = page.locator("[data-mcol-grip='models']")
+    grip = th.locator("[data-col-grip='name']")
     b = grip.bounding_box()
     page.mouse.move(b["x"] + b["width"] / 2, b["y"] + b["height"] / 2)
     page.mouse.down()
@@ -549,33 +552,33 @@ def test_the_model_column_widens_fits_resets_and_wraps_on_a_phone(live, page):
     page.mouse.up()
     w1 = th.bounding_box()["width"]
     assert w1 > w0 + 80
-    kept = int(page.evaluate("localStorage.getItem('bench-mcol-models')"))
+    kept = int(page.evaluate(kept_w))
     assert abs(kept - w1) <= 2
     # the sort did not change: the handle is not the header's click
     page.reload()
-    page.wait_for_selector("[data-lb-table][data-mcol] thead th.model")
+    page.wait_for_selector("[data-lb-table] thead th.model[data-lw]")
     # measured in the page: a poll may draw the header again between a wait and a read
     assert abs(page.evaluate("document.querySelector('[data-lb-table] thead th.model')"
                              ".getBoundingClientRect().width") - w1) <= 2
     # the keyboard: ← narrower
-    page.locator("[data-mcol-grip='models']").focus()
+    page.locator("[data-lb-table] thead th.model [data-col-grip='name']").focus()
     page.keyboard.press("ArrowLeft")
-    assert int(page.evaluate("localStorage.getItem('bench-mcol-models')")) == kept - 16
+    assert int(page.evaluate(kept_w)) == kept - 16
     # a double-click fits the longest name shown: none is cut
-    page.locator("[data-mcol-grip='models']").dblclick()
+    page.locator("[data-lb-table] thead th.model [data-col-grip='name']").dblclick()
     cut = page.locator("[data-lb-table] tbody .mname").evaluate_all(
         "xs => xs.filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.textContent)")
     assert cut == []
-    # Reset, in the header's ⋯
-    page.locator("[data-mcol-more='models']").click()
-    page.locator("[data-mcol-reset='models']").click()
-    page.wait_for_selector("[data-lb-table]:not([data-mcol])")
-    assert page.evaluate("localStorage.getItem('bench-mcol-models')") is None
+    # Reset layout, in the header's ⋯
+    page.locator("[data-lb-table] thead th.model [data-col-more='name']").click()
+    page.locator("[data-layout-reset='models:standard:all']").click()
+    page.wait_for_selector("[data-lb-table] thead th.model:not([data-lw])")
+    assert page.evaluate(f"localStorage.getItem('{key}')") is None
     assert abs(page.evaluate("document.querySelector('[data-lb-table] thead th.model')"
                              ".getBoundingClientRect().width") - w0) <= 2
     # a phone: no handle, and a long name wraps to two lines
     go(page, live, f"tab=models&models={ids(SERVED_LA, GOOD)}", "[data-lb-table]", width=400)
-    assert not page.locator("[data-mcol-grip='models']").is_visible()
+    assert not page.locator("[data-lb-table] [data-col-grip='name']").is_visible()
     name = page.locator(f"tr[data-lb-row='{SERVED_LA}'] .mname")
     lh = float(name.evaluate("x => parseFloat(getComputedStyle(x).lineHeight) || 16"))
     assert name.bounding_box()["height"] > 1.5 * lh

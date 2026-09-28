@@ -28,7 +28,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import ai_models, config, contamination, db, llm
+from . import ai_models, config, contamination, db, embed_local, llm
 
 REPO = Path(__file__).resolve().parent.parent
 # the default writing instructions, where the image carries them (docs/ is not
@@ -727,14 +727,59 @@ def _others(d: dict) -> list[dict]:
     return out
 
 
+# 12o.1: where the duplicate check embeds — this server unless it was set to
+# OpenRouter, which is then said wherever the check is
+REMOTE_WARNING = ("Embeddings through OpenRouter: every question is sent to it to be embedded, "
+                  "the hidden half included. QB_EMBED_MODEL=local keeps them on this server.")
+
+
+def embeds_remotely() -> bool:
+    return config.QB_EMBED_MODEL == "openrouter"
+
+
+def embed_ident() -> str:
+    return config.OPENROUTER_EMBED_MODEL if embeds_remotely() else embed_local.IDENT
+
+
+def can_embed() -> bool:
+    return ai_models.has_key() if embeds_remotely() else embed_local.available()
+
+
+def dedup_how() -> str:
+    """the check as the page says it"""
+    if not can_embed():
+        return ("13-gram" if embeds_remotely() else
+                "13-gram — the embedding model isn't in this image: build it again")
+    return ("13-gram and embeddings through OpenRouter" if embeds_remotely()
+            else "13-gram and embeddings on this server")
+
+
+def dup_cosine() -> float:
+    """a pair at this cosine or above is flagged: the remote model's setting;
+    for the local one, what its check on this bank found, unless set"""
+    if embeds_remotely():
+        return config.QB_DUP_COSINE
+    if config.QB_DUP_COSINE_LOCAL:
+        return float(config.QB_DUP_COSINE_LOCAL)
+    try:
+        got = json.loads((config.BENCH_ROOT / "builder" / "dup_threshold.json")
+                         .read_text(encoding="utf-8"))
+        if got.get("model") == embed_local.IDENT and got.get("cosine"):
+            return float(got["cosine"])
+    except (OSError, ValueError):
+        pass
+    return config.QB_DUP_COSINE_LOCAL_DEFAULT
+
+
 def _embeddings(texts: list[str]) -> list[list[float]] | None:
     """cached by model and text, so the bank is embedded once"""
     p = config.BENCH_ROOT / "builder" / "embeddings.json"
     cache = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
-    key = lambda t: _sha(config.OPENROUTER_EMBED_MODEL + "\0" + t)   # noqa: E731
+    ident = embed_ident()
+    key = lambda t: _sha(ident + "\0" + t)   # noqa: E731
     todo = sorted({t for t in texts if key(t) not in cache})
     if todo:
-        got = ai_models.embed(todo)
+        got = ai_models.embed(todo) if embeds_remotely() else embed_local.embed(todo)
         if got is None:
             return None
         cache.update({key(t): v for t, v in zip(todo, got)})
@@ -749,8 +794,9 @@ def _dedup(d: dict) -> None:
         return
     others = _others(d)
     new_texts = [_text(d, it["q"]) for it in live]
-    vecs = _embeddings(new_texts + [o["text"] for o in others]) if ai_models.has_key() else None
-    d["dedup_how"] = "13-gram and embeddings" if vecs else "13-gram"
+    vecs = _embeddings(new_texts + [o["text"] for o in others]) if can_embed() else None
+    d["dedup_how"] = dedup_how() if vecs else "13-gram"
+    cut = dup_cosine()
     grams_o = [_grams(o["text"]) for o in others]
     grams_n = [_grams(t) for t in new_texts]
     for i, it in enumerate(live):
@@ -770,7 +816,7 @@ def _dedup(d: dict) -> None:
                     >= contamination.NGRAM else "the same words"
             elif vecs is not None:
                 cos = ai_models.cosine(vecs[i], v)
-                if cos >= config.QB_DUP_COSINE:
+                if cos >= cut:
                     how = f"cosine {cos:.2f}"
             if how:
                 best = (o, how)

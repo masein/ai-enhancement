@@ -1031,8 +1031,10 @@ def run_submission(sub: dict) -> None:
             if canceled or db.cancel_requested(sid):
                 canceled = True
                 break
-            # 12n.2: a task asked as the generative three are — GPQA's chain of thought
-            gen_task = generative or (shared and task == config.GPQA_COT)
+            # 12n.2: a task asked as the generative three are — GPQA's chain of thought.
+            # 12o.1: and in a thinking run, SimpleQA too: its answers are the
+            # thinking row's, what follows the thinking
+            gen_task = generative or (shared and (task == config.GPQA_COT or th["separate"]))
             shots = config.NFEWSHOT.get(task, 0)
             task_out = config.OUT_DIR / row_safe / f"{task}_{shots}shot"
             label = f"{i}/{len(tasks)} · {task} ({shots}-shot)"
@@ -1311,7 +1313,7 @@ def run_submission(sub: dict) -> None:
         if shared and config.SIMPLEQA_TASK in tasks and not failed_tasks:
             db.update(sid, status="running", progress="sending the answers to the judge")
             try:
-                sr = _sq.start(config.OUT_DIR / safe, submission=sid)
+                sr = _sq.start(config.OUT_DIR / row_safe, submission=sid)
                 judge_note = _sq.summary(sr)
                 with open(log_path, "a") as lf:
                     lf.write(f"\n===== [{sid}] SimpleQA Verified: {judge_note}"

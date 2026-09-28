@@ -3992,6 +3992,91 @@ for and hold the run lock and take its turn in the one queue. Now:
   - **SWE-bench Verified, Terminal Bench and OSWorld:** agentic. They need
     sandboxes, tools and long multi-turn runs that this board doesn't have.
 
+### 12o.1 — every column's width and place, and what the live check of #103/#104 found
+
+- **Columns** (the Models table on every chip, the Knowledge exam's included,
+  Compare, Frontier, Models ▸ Everyday and Benchmarks ▸ Everyday):
+  - a header's right edge is a handle: drag it, ←/→ once focused (16px,
+    ×3 with Shift), or double-click to fit the widest content shown;
+  - a header drags to another place in its group, and a group's header (the
+    top row on All tasks) moves the whole group. Where the columns are
+    models — Compare and Benchmarks ▸ Everyday — any model goes anywhere;
+    Compare's order is its models' order in the address;
+  - the header's ⋯ says the same for a keyboard or a finger: Move left ·
+    Move right · Move to start (a column alone in its group moves the
+    group) · Reset layout;
+  - #, Model, Params and the Avg (Avg, the custom Avg, Judged avg) stay at
+    the left; their widths still change. Moving a column never moves a rank,
+    the sort, the tint or the bold;
+  - kept per table in this browser (`localStorage` `bench-layout-<table>`, in
+    memory where storage is off), and in a saved view (`spec.layout`: the
+    table's widths and order, "as it comes" included, so a shared view opens
+    the same way; a view from before has none and leaves yours);
+  - under 600px: no handles and no ⋯, and names wrap.
+  - The page's code: `layoutOrder`, `layoutApply`, `layoutGrip`, `layoutMore`,
+    `layoutDrag`, `layoutGroupDrag` in `scripts/report_lm_eval.py`. A header
+    in a table that scrolls sideways is `position:relative` now (it was
+    static): its handle sits in it.
+- **The judge test showed the Knowledge exam's report half.** Its exam rows
+  are the diagnose half only now, as its Everyday rows are the practice half
+  (12n.1). A sample drawn before is screened when it's next read: a row whose
+  question may not be shown (or whose half can't be told) leaves it, and the
+  rest keep their version and marks.
+- **The question builder's duplicate check embeds on this server.** It sent
+  every Everyday question, the hidden half included, to OpenRouter's
+  `openai/text-embedding-3-small`. Now:
+  - `BAAI/bge-small-en-v1.5` (MIT, 133 MB) on the CPU, in the image at
+    `/opt/models/bge-small-en-v1.5`, pinned to commit `5c38ec7c…` and its
+    weights' sha256 (the Dockerfile checks it; `service/embed_local.py` holds
+    the same pins). Vectors are cached as before, under the model's name.
+  - `QB_EMBED_MODEL=openrouter` still sends them to `OPENROUTER_EMBED_MODEL`;
+    Build questions then says "every question is sent to it to be embedded,
+    the hidden half included".
+  - **Its cosine is checked on this bank, on the server**, once after
+    deploying: `python -m service.dup_threshold` (see Deploy). It reads the
+    vectors OpenRouter's model left in the builder's cache, flags the pairs
+    it put at `QB_DUP_COSINE` (0.9) or above, embeds the same texts locally,
+    and keeps the cosine whose flags agree best with those —
+    `BENCH_ROOT/builder/dup_threshold.json`, which the builder reads. It
+    prints counts, never a question. Until it has run: 0.94.
+    `QB_DUP_COSINE_LOCAL` overrides both.
+- **Deploy step 3's GPQA check** walks the tree when it isn't a git checkout
+  (the `git archive` copy has no .git), leaving out .git, results/ and
+  `__pycache__`.
+- **The shared suite thinks when asked** (`thinking: true`, a model with a
+  switch), so GPQA can be measured the way Epoch runs it, with reasoning. As
+  for the generative suite, the run is a row of its own
+  ("Qwen3-1.7B · thinking"): GPQA's and SimpleQA's answers both, and
+  SimpleQA's grades land there. The Frontier calibration line says which:
+  "measured here 31.3 (thinking off) · Epoch 38.0"; a thinking row shows the
+  same reported number, unranked.
+- **A served model and its GGUF join as they should.** On the server neither
+  had:
+  - the original's GGUF entry had no pin (its first job's hash was never
+    written back), so there was no size to compare. The join takes the file's
+    size and sha256 from the worker's newest run when the pin is empty, and
+    compares file names wherever either says the file lives;
+  - the phone build's "· lookahead" wasn't matched to the setup
+    "lookahead 1", so it counted as a second plain entry and blocked the
+    join. A setup is matched by its routing now — its environment
+    (`LLAMA_MOE_ROUTE_MODE=lookahead`) against what the served entry's
+    "How it's served" says it runs with — and by name only as a fallback,
+    trailing numbers aside. Routing that contradicts a setup is never it.
+  - **"Same file as"**, said outright, wins over any guess: on a served entry
+    (Test a model ▸ A model served elsewhere, its row: a GGUF entry · setup,
+    "Guess from the file", or "Not the same file as any GGUF entry"), and on
+    the GGUF entry (A GGUF file, its row: each setup's served entry). Kept on
+    the served entry (`same_as`), and kept when it's registered again.
+- **A custom set that mixes methods** (lm_eval and llama.cpp columns): a model
+  is a row with any value in a chosen column (every custom set now), missing
+  cells "—". One Avg a method — "Avg · lm_eval", "Avg · llama.cpp", each only
+  with all of its method's columns, each sortable — and never one across
+  them. The empty line appears only when no chosen model has any chosen value.
+- **Models ▾ groups served models and GGUFs by model and setup:** a group a
+  model (its file), a row a setup (as built, lookahead 1, MTP…), badged
+  "chat ✓" (measured through its server) and "llama.cpp ✓" (on its GGUF).
+  One tick a setup takes every row of it. Other models keep their groups.
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

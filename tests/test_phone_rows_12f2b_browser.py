@@ -113,16 +113,21 @@ def test_models_menu_groups_phone_builds_and_served_next_to_instruct_and_base(li
     page.locator("[data-models-menu]").click()
     groups = page.locator("[data-model-group]").evaluate_all(
         "xs => xs.map(x => x.dataset.modelGroup)")
-    assert groups[:2] == ["phone builds", "served"] and "instruct" in groups and "base" in groups
-    # a served entry on the build's own file is one of its setups: a phone build
+    # 12o.1: a served model and its GGUF by model and setup — the phone build first
+    assert groups[0].startswith("model:") and "instruct" in groups and "base" in groups
+    assert "phone builds" not in groups and "served" not in groups
+    phone = groups[0]
+    assert page.locator(f"[data-model-group='{phone}']").inner_text().strip().startswith(
+        "phone build · ")
+    # a served entry on the build's own file is one of its setups
     picks = page.locator("#pop-models").evaluate(
         """p => { const out = {}; let g = null;
-                  for (const x of p.querySelectorAll('[data-model-group], [data-model-pick]'))
+                  for (const x of p.querySelectorAll('[data-model-group], [data-setup-pick]'))
                     if (x.dataset.modelGroup) g = x.dataset.modelGroup;
-                    else out[x.dataset.modelPick] = g;
+                    else for (const id of JSON.parse(x.dataset.ids)) out[id] = g;
                   return out; }""")
-    assert picks[PHONE] == picks[MTP] == "phone builds" and picks[OTHER] == "served"
-    page.locator("[data-model-group-only='phone builds']").click()
+    assert picks[PHONE] == picks[MTP] == phone and picks[OTHER] not in (None, phone)
+    page.locator(f"[data-model-group-only='{phone}']").click()
     page.keyboard.press("Escape")
     ids = page.locator("tr[data-lb-row]").evaluate_all("xs => xs.map(x => x.dataset.lbRow)")
     assert set(ids) == {PHONE, f"{PHONE} · lookahead 1"}
