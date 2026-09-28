@@ -3737,6 +3737,80 @@ models side by side, and filter Benchmarks to a couple.
     the same benchmark (by name), its method and credit in its header and
     tooltips.
 
+### 12m.3 — frontier models measured here, through OpenRouter
+
+`docs/prompts/phase-12m-compare-anything.md` §6. A model from OpenRouter is a
+served model (12f.1) that the board asks at OpenRouter's address with AI
+models' key; `service/served.py` holds it. Nothing in the tests or CI calls
+OpenRouter: the fake OpenAI-compatible server answers at its address.
+- **Added** in Test a model ▸ A model from OpenRouter: the list AI models
+  shows (`/api/ai/models`), under each maker, with prices; **Add** keeps it
+  (`POST /api/served/openrouter`) as `served/openrouter-<org>-<name>`,
+  pinned as the judge is (`ai_models.pin`): the dated version (the
+  canonical slug) and the first provider, with that provider's prices, sent
+  as `provider: {order: [it], allow_fallbacks: false}` on every request.
+  Whether it thinks is what OpenRouter says (`supported_parameters`); not
+  said, "the model decides". **Pin again** re-pins to what OpenRouter lists
+  now. The key is never kept with it: every request reads
+  `OPENROUTER_API_KEY` and `OPENROUTER_BASE_URL` when it is sent.
+- **Every run checks the pin first**, asking OpenRouter's list afresh: the
+  id moved to another dated version, or the pinned provider no longer runs
+  it (none listed up), stops the run in one line, asking nothing.
+- **What it sits:** what any served model sits — Everyday tasks, the
+  Knowledge exam, Trust & safety, and IFEval, MMLU-Pro and MATH-500 — with
+  the same settings function (`settings_for`; no template switch is sent).
+  MMLU-Pro is a seeded subset of `OPENROUTER_GEN_SUBSET` (1,000) by default
+  in the form; clearing it runs all 12,032. Questions go
+  `OPENROUTER_CONCURRENCY` at a time. Not the Playground: a chat's cost isn't
+  metered, and the Playground and the Chat tab say so.
+- **Money:**
+  - **Before Start** the form shows "About $0.40 for 388 questions — each
+    answer counted at its full length, so it usually costs less · this month
+    $1.20 of the $5.00 limit" (`POST /api/served/estimate`, `served.estimate`).
+    The rule, in its docstring: each prompt as sent at a token for every four
+    characters, each answer at its whole budget (the settings function's max
+    tokens, the thinking budgets for a model that thinks), at the pinned
+    prices; only what the run would ask (the Everyday questions it has no
+    answer to, the tasks not answered already). The generative three's
+    prompts are lm_eval's, so their sizes are constants (`GEN_ITEMS`,
+    `GEN_PROMPT_TOKENS`).
+  - **A run that would pass the month's AI limit doesn't start**: Start is
+    greyed with the line, `POST /api/submissions` refuses it (409), and a run
+    queued some other way fails at its start: "This run could cost about
+    $16.40, more than the $2.90 left of this month's $5.00 AI limit — test
+    fewer questions, or raise the limit on AI models."
+  - **Each answer's cost is counted as it lands** (`Meter`) into the ai_spend
+    ledger AI models reads, under the job "tests", the run's `run-<id>` as
+    its batch: OpenRouter's reported `usage.cost`, else its tokens at the
+    pinned prices. Reasoning tokens count: OpenRouter counts them in
+    `completion_tokens`, and more reported apart are added. AI models' spend
+    line names what testing cost.
+  - **The running total is in the progress**: "… · 140 of 388 · 3.1 s an
+    answer · about 13 min left · $0.12 of about $0.40 so far · limit $5.00,
+    $4.60 left". Finished, the row ends "· $0.31 on OpenRouter".
+  - **The run stops at the limit**: before each question it holds what that
+    question could cost at most (its prompt at twice the rule, its whole
+    budget); when that would pass the limit, it asks nothing more. What is
+    answered is kept and marked, and the row says "everyday: stopped at 140
+    of 388: the next question could pass this month's $5.00 AI limit ·
+    $4.98 spent on this run · the 140 answered are kept and marked". The
+    next run asks only the rest. A provider billing more than its listed
+    price can pass the limit by what the questions in flight overshoot.
+  - **IFEval, MMLU-Pro and MATH-500** go through lm_eval's
+    `local-chat-completions` to a relay on 127.0.0.1 (`Relay`, under a random
+    path, for the run's length), which holds each request against the limit,
+    adds the key and the pinned provider, and counts its cost. At the limit
+    it answers 402 and the runner stops lm_eval at its next look
+    (`_run_task`'s `on_poll` can now say why to stop); the answers lm_eval
+    has stay in its cache for the next run. The lm_eval child gets no key.
+- **OpenRouter typed into A model served elsewhere** is refused, in one
+  line, before anything is asked: it would go unmetered.
+- **On the page:** its rows are tagged **via OpenRouter** (the tooltip says
+  its version and provider); Models ▾ groups them under their maker
+  (OpenAI, Google, Anthropic…, from the id's organisation, `ai_models.MAKERS`);
+  its page says "Pinned to <version> · on <provider>, with no fallbacks.
+  Every run checks it still is."
+
 ## 11. Known gaps, risks, loose ends
 
 - `transformers` unpinned (`>=4.55`); the guard catches the failure mode we saw,

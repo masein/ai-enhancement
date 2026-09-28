@@ -3340,6 +3340,10 @@ select { max-width:100%; }
   border-top:1px solid var(--border); }
 .srvlist li .se { overflow-wrap:anywhere; }
 .srvsum { font-weight:600; cursor:pointer; list-style:none; }
+/* 12m.3: OpenRouter's models, under their makers */
+.orlist { max-height:340px; overflow-y:auto; }
+.orlist .ormaker { font-weight:600; border-top:0; padding-top:10px; }
+.orlist li button:first-of-type { margin-left:auto; }
 /* 12i.4: a published batch's questions, and the past batches */
 .qbbatch { margin-top:var(--sp-4); }
 .qbbatch h3 { margin:0 0 4px; }
@@ -4242,6 +4246,9 @@ const state = {
   srv: { open: false, f: { name: '', base_url: '', key: '', based_on: '', how: '', thinking: 'auto',
          phone: false },
          msg: '', reported: null, saved: false, busy: '', list: null, loading: false },
+  // 12m.3: Test a model ▸ A model from OpenRouter, and a run's estimate before Start
+  orm: { open: false, q: '', models: null, hasKey: null, loading: false, busy: '', msg: '' },
+  orEst: { key: '', est: null },
   // in-place refreshers registered by the mounted tab, so the 5s poll updates
   // data WITHOUT rebuilding the DOM — a full render() mid-keystroke would steal
   // focus from filter inputs and kill slider drags
@@ -6064,14 +6071,24 @@ const SERVED_SUITES = ['everyday', 'judged', 'generative', 'safety'];
 const servedOf = id => (DATA.served || {})[id]
   || (DATA.models.find(x => x.id === id) || {}).served || null;
 const isServedId = id => /^served\//.test(String(id || ''));
+// 12m.3: a model from OpenRouter is served too, and says where: "via OpenRouter"
+const isOpenRouter = s => !!s && s.via === 'openrouter';
 function servedTag(id) {
   const s = servedOf(id);
+  if (isOpenRouter(s))
+    return el('span', { class: 'badge served', 'data-served-tag': id, 'data-via-openrouter': id,
+      title: s.how, text: 'via OpenRouter' });
   return s ? el('span', { class: 'badge served', 'data-served-tag': id, title: s.how,
     text: 'served' }) : '';
 }
 // what its server reported: "…UD-Q4_K_XL.gguf · 22.9 GB · context 16,384 · build b6500"
+// 12m.3: or what a model from OpenRouter is pinned to: "openai/gpt-6-luna-20260922 · on
+// OpenAI · context 400,000"
 function pinLine(p) {
   p = p || {};
+  if (p.version) return [p.version, p.provider_name ? 'on ' + p.provider_name : null,
+    p.precision && p.precision !== 'unknown' ? p.precision : null,
+    p.ctx ? 'context ' + Number(p.ctx).toLocaleString('en') : null].filter(Boolean).join(' · ');
   return [p.file, p.size ? (p.size / 1e9).toFixed(1) + ' GB' : null,
     p.ctx ? 'context ' + Number(p.ctx).toLocaleString('en') : null,
     p.build ? 'build ' + p.build : null].filter(Boolean).join(' · ');
@@ -6142,8 +6159,9 @@ function servedHead(m) {
   if (!s) return '';
   return el('div', { class: 'served-head', 'data-served-head': m.id },
     el('p', { class: 'small', 'data-served-how': m.id }, servedTag(m.id), ' ', s.how),
-    el('p', { class: 'small se', 'data-served-pin': m.id, text: 'Its server reported '
-      + pinLine(s.pin) + '. Every run checks it still does.' }),
+    el('p', { class: 'small se', 'data-served-pin': m.id, text: isOpenRouter(s)
+      ? `Pinned to ${pinLine(s.pin)}, with no fallbacks. Every run checks it still is.`
+      : 'Its server reported ' + pinLine(s.pin) + '. Every run checks it still does.' }),
     el('p', { class: 'small', 'data-served-loglik': m.id, text: SERVED_LINE }),
     servedCompare(m), servedSetups(m));
 }
@@ -6517,7 +6535,11 @@ function modelChatTab(m) {
   const offered = pgModel(m.id);
   if (!offered) return [el('div', { class: 'card', 'data-model-chat': m.id, 'data-model-chat-none': '1' },
     el('h2', { text: 'Chat' }),
-    el('p', { class: 'small', 'data-model-chat-why': '1', text: m.kind === 'instruct'
+    el('p', { class: 'small', 'data-model-chat-why': '1', text: isOpenRouter(servedOf(m.id))
+      // 12m.3: a chat's cost isn't counted the way a run's is
+      ? 'A model from OpenRouter doesn\u2019t chat here: a chat\u2019s cost isn\u2019t counted '
+        + 'against the monthly AI limit.'
+      : m.kind === 'instruct'
       ? 'This model can\u2019t chat here: it runs its own code, which chat doesn\u2019t run.'
       : BASE_NO_CHAT }))];
   if (!whoName()) return [el('div', { class: 'card', 'data-model-chat': m.id },
@@ -6726,7 +6748,8 @@ function provRecord(m) {
     ['hub id', sv ? null : m.id], ['parameters', params],
     // 12f.1: where and how it is served, and what its server reported
     ...(sv ? [['served at', sv.base_url], ['how it’s served', sv.how],
-      ['its server reported', pinLine(sv.pin)], ['based on', sv.based_on || null],
+      [isOpenRouter(sv) ? 'pinned to' : 'its server reported', pinLine(sv.pin)],
+      ['based on', sv.based_on || null],
       ['thinking', sv.thinking === 'auto' ? 'the model decides' : sv.thinking]] : []),
     ['training compute', comp ? `${flop(comp.c)} FLOP (6ND, run ${comp.run.name})` : null],
     ['architecture', a.arch], ['shape', a.hidden ? `hidden ${a.hidden} · layers ${a.layers}`
@@ -8649,6 +8672,9 @@ function lbSet(patch) {
 // the Models popover.
 function famOf(m) {
   if (m.id.startsWith('local/')) return m.id.slice(6).replace(/-step\d+$/, '');
+  // 12m.3: a model from OpenRouter is its maker's
+  const sv = (DATA.served || {})[m.id] || m.served;
+  if (isOpenRouter(sv) && sv.maker) return sv.maker;
   return m.id.includes('/') ? m.id.split('/')[0] : m.family || m.id;
 }
 let _famKey = null, _famMap = null;
@@ -10429,25 +10455,30 @@ function lbModelsPill(ms) {
     const apply = () => lbSet({ models: allOn() ? null : [...pick] });
     // 12f.2b: phone builds and served models are groups of their own
     // 12m.1: and a GGUF file, or a setup of one, is a group of its own
+    // 12m.3: a model from OpenRouter is under its maker — OpenAI, Google, Anthropic…
+    const orOf = m => { const sv = (DATA.served || {})[m.id] || m.served;
+      return isOpenRouter(sv) ? sv.maker || 'OpenRouter' : ''; };
     const groupOf = m => m.reportedOnly ? 'reported · ' + (m.maker || 'other')
-      : isPhoneRow(m) ? 'phone builds' : m.served ? 'served'
+      : isPhoneRow(m) ? 'phone builds' : orOf(m) || (m.served ? 'served'
       : m.rowOf || ggufOnly(m) ? 'GGUF'
-      : m.source === 'artifact' ? 'checkpoints' : m.kind === 'instruct' ? 'instruct' : 'base';
+      : m.source === 'artifact' ? 'checkpoints' : m.kind === 'instruct' ? 'instruct' : 'base');
+    const makers = [...new Set(board.map(orOf).filter(Boolean))].sort(natCmp);
     const row = m => el('label', { class: 'small mrow' },
       el('input', { type: 'checkbox', 'data-model-pick': m.id, checked: pick.has(m.id) ? '' : null,
         onchange: e => { if (e.target.checked) pick.add(m.id); else pick.delete(m.id);
           say(); apply(); } }),
       el('span', { class: 'famdot', style: `background:${famColor(m)}`, title: famOf(m) }),
-      ' ' + m.name, el('span', { class: 'se', text: ' ' + famOf(m) }));
-    // Reported (not run here), a maker a group: the makers imported first, as set
-    const makers = [...new Set([...((REP().settings || {}).makers || []),
+      ' ' + m.name, orOf(m) ? el('span', { class: 'se', 'data-pick-via': m.id,
+        text: ' via OpenRouter' }) : el('span', { class: 'se', text: ' ' + famOf(m) }));
+    // 12m.2: Reported (not run here), a maker a group: the makers imported first, as set
+    const repMakers = [...new Set([...((REP().settings || {}).makers || []),
       ...reps.map(m => m.maker || 'other')])].map(mk => 'reported · ' + mk);
     const gname = g => g.startsWith('reported · ') ? 'Reported (not run here) · ' + g.slice(11) : g;
     const fill = q => {
       const hit = all.filter(m => !q
         || (m.name + ' ' + m.id + ' ' + famOf(m)).toLowerCase().includes(q.toLowerCase()));
-      list.replaceChildren(...['phone builds', 'served', 'GGUF', 'instruct', 'base', 'checkpoints',
-        ...makers].flatMap(g => {
+      list.replaceChildren(...['phone builds', 'served', ...makers, 'GGUF', 'instruct', 'base',
+        'checkpoints', ...repMakers].flatMap(g => {
           const gs = hit.filter(m => groupOf(m) === g);
           // a group's name chooses it alone: "only phone builds"
           return gs.length ? [el('div', { class: 'small se mgroup', 'data-model-group': g }, gname(g),
@@ -13050,6 +13081,14 @@ function vQueue(part = { form: true, list: true }) {
     sf.kind = 'instruct';
     if (!SERVED_SUITES.includes(sf.suite)) sf.suite = 'everyday';
   }
+  // 12m.3: a model from OpenRouter sits a seeded MMLU-Pro subset unless a
+  // person clears it, and its run's cost shows before Start
+  const orRec = srvId ? servedOf(sf.hf_id.trim()) : null;
+  const orId = isOpenRouter(orRec);
+  if (orId && sf.suite === 'generative' && sf.subsetFor !== sf.hf_id.trim()) {
+    sf.subset = orRec.subset || 0;
+    sf.subsetFor = sf.hf_id.trim();
+  }
   const f = {
     hf_id: modelBox('submit', sf.hf_id, v => { sf.hf_id = v; },
       it => { sf.hf_id = it.id; if (it.kind) sf.kind = it.kind; sf.allow = false;
@@ -13169,7 +13208,7 @@ function vQueue(part = { form: true, list: true }) {
         // the form goes back to where it started: an empty model box and the
         // ticks it opens with, so the next submission is not the last one's
         sf.hf_id = ''; sf.note = ''; sf.allow = false;
-        sf.tasks = null; sf.control = false; sf.bbqAll = false;
+        sf.tasks = null; sf.control = false; sf.bbqAll = false; sf.subsetFor = null;
         state.testOpen = false;                       // 12b: the dialog's job is done
         toast(j.note ? `#${j.id}: ${j.note} —` : `Run #${j.id} queued —`,
               { key: 'submit', go: () => followRun(j.id), link: 'follow it →' });
@@ -13305,8 +13344,8 @@ function vQueue(part = { form: true, list: true }) {
   function gateSubmit() {
     const code = info ? ownCodeWhy(info, !!sf.allow) : '';
     const w = judgedOff() ? (cannotRun(sf.hf_id) ? noWeightsWhy(sf.hf_id.trim()) : judgeWhy())
-      : code || (sf.suite === 'judged' && built.length && !(sf.tasks || []).length
-                 && !sf.control ? 'Tick at least one topic.' : '');
+      : code || (orId ? orGate(sf) : '') || (sf.suite === 'judged' && built.length
+                 && !(sf.tasks || []).length && !sf.control ? 'Tick at least one topic.' : '');
     btn.disabled = !!w;
     btn.title = w;
     ownWhy.textContent = judgedOff() ? '' : code;
@@ -13321,8 +13360,9 @@ function vQueue(part = { form: true, list: true }) {
         + 'One test runs at a time; results appear on Models.' }),
       el('div', { class: 'frm' }, f.hf_id, srvId ? '' : f.kind, f.suite, f.note, btn,
         srvId ? el('span', { class: 'propwhy', 'data-why': 'served' },
-          el('span', { class: 'badge served', title: (servedOf(sf.hf_id.trim()) || {}).how || '',
-            text: 'served' }), ' ', SERVED_LINE) :
+          orId ? servedTag(sf.hf_id.trim()) : el('span', { class: 'badge served',
+            title: (servedOf(sf.hf_id.trim()) || {}).how || '', text: 'served' }),
+          ' ', SERVED_LINE) :
         cannotRun(sf.hf_id)
           ? el('span', { class: 'propwhy', 'data-why': 'weights',
                          text: noWeightsWhy(sf.hf_id.trim()) })
@@ -13331,9 +13371,11 @@ function vQueue(part = { form: true, list: true }) {
         ownWhy),
       ownCodeBox(info, sf.allow, v => { sf.allow = v; gateSubmit(); }, 'submit'),
       topicBoxes, genOpts, bbqOpts,
+      orId ? orEstimateLine(sf) : '',
       state.qmsg ? el('p', { class: 'warn', 'data-qmsg': '1', style: 'margin-top:8px',
         text: state.qmsg }) : '') : null,
     part.form ? servedCard(sf) : null,
+    part.form ? openrouterCard(sf) : null,
     part.form ? ggufCard() : null,
     part.list ? el('div', { class: 'card', 'data-all-runs': '1' },
       el('h2', { text: 'All runs' }),
@@ -13655,6 +13697,137 @@ function servedCard(sf) {
             state.qmsg = '';
             render();
           } })))) : '');
+}
+
+// ---------------------------------------------------------------------------
+// 12m.3: Test a model's fifth way — a model from OpenRouter, picked from the
+// list AI models shows and pinned as the judge is. A run costs money: its
+// estimate shows before Start, a run that would pass the month's AI limit
+// can't start, and the running total is in its progress
+// ---------------------------------------------------------------------------
+const orKey = sf => JSON.stringify([sf.hf_id.trim(), sf.suite,
+  sf.suite === 'judged' ? [...(sf.tasks || []), ...(sf.control && (DATA.judged || {}).control
+    ? [DATA.judged.control] : [])] : [], sf.suite === 'generative' ? sf.subset || 0 : 0]);
+async function loadOrEst(key) {
+  const E = state.orEst;
+  E.key = key; E.est = null;
+  const [model, suite, tasks, subset] = JSON.parse(key);
+  let est;
+  try { est = await post('api/served/estimate', { model, suite, tasks, subset }); }
+  catch (e) { est = { error: String((e && e.message) || e) }; }
+  if (E.key !== key) return;                     // a later choice asked again
+  E.est = est;
+  if (state.testOpen) render();
+}
+// '' when Start may go ahead; else why not — the estimate first, then the limit
+function orGate(sf) {
+  const E = state.orEst, key = orKey(sf);
+  if (E.key !== key) { if (netReady()) loadOrEst(key); return 'Working out what it would cost…'; }
+  if (!E.est) return 'Working out what it would cost…';
+  return E.est.error || E.est.refused || '';
+}
+function orEstimateLine(sf) {
+  const E = state.orEst, key = orKey(sf);
+  if (E.key !== key && netReady()) loadOrEst(key);
+  const e = E.key === key ? E.est : null;
+  if (!e) return el('p', { class: 'small se', 'data-or-estimate': 'working',
+    text: 'Working out what this run would cost…' });
+  if (e.error) return el('p', { class: 'warn small', 'data-or-estimate': 'error', text: e.error });
+  if (e.refused) return el('p', { class: 'warn', 'data-or-estimate': 'refused', text: e.refused });
+  const what = e.n ? `${e.n.toLocaleString('en')} question${e.n === 1 ? '' : 's'}`
+    : 'no new questions';
+  return el('p', { class: 'small', 'data-or-estimate': String(e.usd) },
+    el('b', { text: e.line[0].toUpperCase() + e.line.slice(1) }), ` for ${what}`,
+    el('span', { class: 'se', text: ' — each answer counted at its full length, so it usually '
+      + `costs less · this month ${usd(e.month)} of the ${usd(e.limit)} limit` }));
+}
+async function loadOrModels() {
+  const O = state.orm;
+  O.loading = true;
+  try {
+    const j = await api('api/ai/models');
+    O.models = j.models || []; O.hasKey = !!j.has_key;
+  } catch (e) { O.models = []; O.msg = 'OpenRouter’s list could not be loaded.'; }
+  O.loading = false;
+  if (state.testOpen) render();
+}
+async function orAdd(id, sf) {
+  const O = state.orm;
+  if (!whoName()) { askName(); return; }
+  O.busy = id; O.msg = ''; render();
+  try {
+    const m = (await post('api/served/openrouter', { model: id, by: whoName() })).model;
+    O.msg = `Added ${m.name}: pinned to ${m.pin.version} on ${m.pin.provider_name}, with no `
+      + 'fallbacks. Pick what to test it on above — what it would cost shows before Start.';
+    state.srv.list = null;
+    await refreshResults();
+    Object.assign(sf, { hf_id: m.id, kind: 'instruct', note: '' });
+    if (!SERVED_SUITES.includes(sf.suite)) sf.suite = 'everyday';
+    state.qmsg = '';
+  } catch (e) { O.msg = String((e && e.message) || e); }
+  O.busy = ''; render();
+}
+const orMaker = m => String(m.name || '').includes(': ') ? m.name.split(': ')[0]
+  : String(m.id).split('/')[0];
+// OpenRouter's models under their makers, the search's matches only
+function orRows(sf) {
+  const O = state.orm;
+  const q = (O.q || '').trim().toLowerCase();
+  const hit = (O.models || []).filter(m => !q || (m.id + ' ' + m.name).toLowerCase().includes(q))
+    .sort((a, b) => natCmp(orMaker(a), orMaker(b)) || natCmp(a.name, b.name)).slice(0, 80);
+  // added already: Test it, or pin it again to what OpenRouter lists now
+  const added = new Map(Object.entries(DATA.served || {}).filter(([, x]) => isOpenRouter(x))
+    .map(([id, x]) => [(x.pin || {}).model, id]));
+  const rows = [];
+  let last = null;
+  for (const m of hit) {
+    if (orMaker(m) !== last) {
+      last = orMaker(m);
+      rows.push(el('li', { class: 'small se ormaker', 'data-or-maker': last, text: last }));
+    }
+    const sid = added.get(m.id);
+    rows.push(el('li', { 'data-or-row': m.id },
+      el('b', { text: m.name.split(': ').pop() }),
+      el('span', { class: 'small se mono', text: `${usd(m.price_in)} in · ${usd(m.price_out)} out`
+        + ' per million' + (m.context ? ` · ${Math.round(m.context / 1000)}k context` : '') }),
+      sid ? el('button', { class: 'quiet', 'data-or-test': sid, text: 'Test it', onclick: () => {
+        Object.assign(sf, { hf_id: sid, kind: 'instruct' });
+        if (!SERVED_SUITES.includes(sf.suite)) sf.suite = 'everyday';
+        state.qmsg = ''; render(); } }) : '',
+      el('button', { class: sid ? 'quiet' : 'secondary', 'data-or-add': m.id,
+        disabled: O.busy ? '' : null, text: O.busy === m.id ? 'Pinning…' : sid ? 'Pin again' : 'Add',
+        title: sid ? 'pin it again, to the version and provider OpenRouter lists now' : '',
+        onclick: () => orAdd(m.id, sf) })));
+  }
+  if (!rows.length && O.models && O.hasKey && q)
+    rows.push(el('li', { class: 'small se', text: 'No model matches.' }));
+  return rows;
+}
+function openrouterCard(sf) {
+  const O = state.orm;
+  // the list loads when the card is opened, as A model served elsewhere's does
+  if (O.open && O.models == null && !O.loading && netReady()) loadOrModels();
+  // a search redraws the list alone, never the dialog under the typing
+  const list = el('ul', { class: 'srvlist orlist', 'data-or-list': '1' }, orRows(sf));
+  return el('details', { class: 'card', 'data-openrouter-card': '1', open: O.open ? '' : null,
+      ontoggle: e => {
+        O.open = e.target.open;
+        if (O.open && O.models == null && !O.loading && netReady()) loadOrModels();
+      } },
+    el('summary', { class: 'srvsum', text: 'A model from OpenRouter ▸' }),
+    el('p', { class: 'sub', text: 'A model OpenRouter serves, asked with the key on AI models '
+      + 'and pinned to its dated version and one provider, with no fallbacks. What a run would '
+      + 'cost shows before Start, and it counts toward the monthly limit.' }),
+    O.hasKey === false ? el('p', { class: 'note', 'data-or-no-key': '1', text: 'OpenRouter has '
+      + 'no key on this server: add OPENROUTER_API_KEY to its .env to test a model from there.' })
+      : '',
+    O.models && O.hasKey ? el('input', { type: 'search', placeholder: 'search OpenRouter’s models…',
+      'aria-label': 'search OpenRouter’s models', 'data-keep': 'or-q', value: O.q || '',
+      'data-or-search': '1', style: 'width:100%;margin-top:8px',
+      oninput: e => { O.q = e.target.value; list.replaceChildren(...orRows(sf)); } }) : '',
+    O.loading ? el('p', { class: 'small se', text: 'Loading OpenRouter’s list…' }) : '',
+    (O.models || []).length ? list : '',
+    O.msg ? el('p', { class: 'small', 'data-or-msg': '1', text: O.msg }) : '');
 }
 
 // ---------------------------------------------------------------------------
@@ -15686,7 +15859,8 @@ function suiteWords(r) {
 // "Qwen3.6-35B-A3B original k=8 · GGUF · lookahead 1"
 function runName(r) {
   const name = (DATA.models.find(m => m.id === r.hf_id) || {}).name
-    || ((G().registered || {})[r.hf_id] || {}).name || r.hf_id.split('/').pop();
+    || ((G().registered || {})[r.hf_id] || {}).name
+    || ((DATA.served || {})[r.hf_id] || {}).name || r.hf_id.split('/').pop();
   if (r.suite !== 'gguf') return name;
   let su = '';
   try { su = ((JSON.parse(r.arch || '{}').gguf || {}).setup || {}).name || ''; }
@@ -16647,6 +16821,9 @@ function aiSpendLine(P) {
           render(); } }))
         : el('button', { class: 'quiet', 'data-ai-limit-edit': '1', text: 'change the limit',
           onclick: () => { A.editLimit = true; render(); } })),
+    // 12m.3: runs of models from OpenRouter count toward it too
+    (s.by_job || {}).tests ? el('p', { class: 'small se', 'data-ai-spend-tests': String(s.by_job.tests),
+      text: `${usd(s.by_job.tests)} of it on testing models from OpenRouter` }) : '',
     s.waiting ? el('p', { class: 'warn', 'data-ai-waiting': '1', text: s.waiting }) : '');
 }
 

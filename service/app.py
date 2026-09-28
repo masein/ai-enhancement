@@ -473,6 +473,16 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         if s.thinking:
             raise HTTPException(422, "A served model thinks as it was registered: register it "
                                      "again to change that. Nothing was queued.")
+        # 12m.3: a model from OpenRouter — a run that would pass this month's
+        # AI limit is refused here, before it is queued, with its estimate
+        rec = served.get(hf_id)
+        if served.is_openrouter(rec):
+            if not ai_models.has_key():
+                raise HTTPException(409, "OpenRouter has no key on this server "
+                                         "(OPENROUTER_API_KEY). Nothing was queued.")
+            why = served.over_limit_line(served.estimate(rec, s.suite, chosen, s.subset))
+            if why:
+                raise HTTPException(409, why + " Nothing was queued.")
     # 11i: a checkpoint that ships its own model code is answered HERE, before
     # anything is queued, in the words the page shows beside its disabled
     # button. #56 learned it at start, after the wait — and its Resubmit had
@@ -868,7 +878,51 @@ class ServedIn(BaseModel):
 @app.get("/api/served")
 def served_list():
     return {"models": served.all_public(), "suites": list(served.SUITES),
-            "line": served.LOGLIK_LINE, "thinking": served.THINKING}
+            "line": served.LOGLIK_LINE, "thinking": served.THINKING,
+            # 12m.3: models from OpenRouter — offered with a key, never the key
+            "openrouter": {"has_key": ai_models.has_key(),
+                           "subset": config.OPENROUTER_GEN_SUBSET}}
+
+
+class OpenRouterIn(BaseModel):
+    model: str
+    by: str = ""
+
+
+@app.post("/api/served/openrouter")
+def served_add_openrouter(f: OpenRouterIn, x_token: str = Header(default="")):
+    """12m.3: a model from OpenRouter's list (the one AI models shows), kept
+    as a served entry pinned to its dated version and first provider"""
+    _check_token(x_token)
+    by = _name(f.by, "a model from OpenRouter")
+    try:
+        out = {"model": served.register_openrouter(f.model, by)}
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return out
+
+
+class EstimateIn(BaseModel):
+    model: str
+    suite: str = "everyday"
+    tasks: list[str] = []
+    subset: int = 0
+
+
+@app.post("/api/served/estimate")
+def served_estimate(a: EstimateIn):
+    """12m.3: what a run of a model from OpenRouter would cost, about, before
+    Start — and whether this month's AI limit leaves room for it"""
+    rec = served.get(a.model)
+    if not served.is_openrouter(rec):
+        raise HTTPException(422, f"{a.model} is not a model from OpenRouter")
+    if a.suite not in served.SUITES:
+        raise HTTPException(422, served.LOGLIK_LINE)
+    est = served.estimate(rec, a.suite, a.tasks, a.subset)
+    cap, month = ai_models.limit(), db.spend_this_month()
+    return {**est, "month": round(month, 4), "limit": cap, "left": round(max(0.0, cap - month), 4),
+            "refused": served.over_limit_line(est)}
 
 
 @app.post("/api/served/check")
