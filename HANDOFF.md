@@ -3992,6 +3992,45 @@ for and hold the run lock and take its turn in the one queue. Now:
   - **SWE-bench Verified, Terminal Bench and OSWorld:** agentic. They need
     sandboxes, tools and long multi-turn runs that this board doesn't have.
 
+### 12a.7 — Summarise, marked on what it says
+
+Read across all 29 practice questions and five served setups, about 50 of 145
+answers failed, some two thirds of them wrongly.
+- **The rubric** (`everyday.RUBRIC`, all 60 Summarise questions; 12a.6's is
+  kept as `RUBRIC_12A6`) scores content, not style:
+  - start at 4;
+  - −1 for each key fact short, 2 at most, and the judge names the missing fact;
+  - −2 for anything invented or wrong (a number worked out right is fine; one
+    worked out wrong, "half the time" as "50% faster", is wrong);
+  - −1 for several versions ("Option 1 / Option 2");
+  - nothing for a lead-in, a closing offer, headings, bullets, bold or emoji;
+  - a length only when the request states one, as before;
+  - two worked examples on an invented text: a bulleted summary with a lead-in
+    and an offer, every fact kept → 4; one fact missing → 3.
+  - The bank's rubrics are regenerated from the same facts, request and
+    reference. A rubric the question builder published in 12a.6's words is
+    replaced as it's read; one someone wrote or edited stays theirs.
+- **`numbers_from_source`** flags only what the text can't account for:
+  - a bare hour the text says as a time ("back around 2", "now 8") is that
+    hour: "~2 PM", "8:00";
+  - an option's or a list's number is a label ("Option 1", "1)");
+  - a note on the answer's own length is not a fact ("reduced from ~48 to 33
+    words", "~30% shorter");
+  - number words count ("half", "twice", "a dozen");
+  - a number worked out from the text passes to the judge when the answer
+    says so: a sum or difference of one kind of thing near "total", "in all",
+    "comes to", "+", "=", "difference", "extra"… (£900 + £200 → "£1,100 in
+    total"), and the time between two of its times written as a duration
+    near "delay", "late", "took"… (7:15 → 8:00, "45-minute delay").
+  - Every original probe still gets 12a.5's verdict (the parity test).
+- **Re-marking:** `--judge` then `--compare`, as 12a.6. This round's "before"
+  is `full/everyday_before_12a7.json` (12a.6's marks); 12a.6's own file is
+  left as it was.
+- **The Everyday readers** (a group's questions, a model's answers) are 70%
+  of the page wide, draggable by the left edge (←/→, double-click for 70%),
+  remembered in this browser (`bench-reader-width`); the whole screen under
+  800px. Other readers are as they were.
+
 ### 12o.1 — every column's width and place, and what the live check of #103/#104 found
 
 - **Columns** (the Models table on every chip, the Knowledge exam's included,

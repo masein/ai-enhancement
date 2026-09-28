@@ -204,7 +204,7 @@ def _valid(q: dict, where: str, known: dict | None = None) -> dict:
     """one question, checked as the bank is read — or ValueError, naming where"""
     known = groups() if known is None else known
     q["group"] = MERGED.get(q["group"], q["group"])
-    if q["group"] == "summarising" and not _rubric_check(q):
+    if q["group"] == "summarising" and (not _rubric_check(q) or _upgraded(q)):
         q["checks"] = summarise_checks(q)          # 12a.6: marked by the judge's rubric
     if q["group"] not in known:
         raise ValueError(f"{where}: unknown group {q['group']!r}")
@@ -328,10 +328,19 @@ HHMM = re.compile(r'(?<![\d:.,$\u20ac\u00a3])([01]\d|2[0-3])([0-5]\d)(?:\s*(?:hr
                   r'(?!\d|[:.,]\d|\s*%)', re.I)
 
 
-def clock_times(text: str) -> set[tuple[int, int]]:
+# 12a.7: a bare hour after these is a time too — "back around 2", "it's now 8"
+_AROUND = r"\b(around|about|approx(?:imately)?|roughly|circa|now|since|it's|its)\s+"
+
+
+def clock_times(text: str, loose: bool = False) -> set[tuple[int, int]]:
     """every time of day the text gives, as (hour, minute): "3 pm", "15:00",
-    "at three" and "noon" are all times. A time with no am/pm may be either"""
+    "at three" and "noon" are all times. A time with no am/pm may be either.
+    12a.7, `loose`: and a bare hour after "around", "about", "now"…"""
     out, t = set(), _ampm(text)
+    if loose:
+        t = re.sub(_AROUND + r'(\d{1,2})\b(?![:%\d]|[.,]\d|\s*(?:am|pm|a\.m|p\.m|st|nd|rd|th|'
+                   r'hours?|minutes?|mins?|people|days?|weeks?|percent|%|kg|km|years?|' + _MONTHS
+                   + r'))', lambda m: m.group(1) + ' ' + m.group(2) + ':00', t, flags=re.I)
     t = re.sub(r'\b(noon|midday)\b', '12:00 pm', t, flags=re.I)
     t = re.sub(r'\bmidnight\b', '12:00 am', t, flags=re.I)
     hours = {w: i for w, i in _ONES.items() if 1 <= i <= 12}
@@ -366,6 +375,10 @@ def word_numbers(text: str) -> set[float]:
                           'eleventh twelfth'.split(), 1):
         if re.search(r'\b' + w + r'\b', t):
             out.add(float(i))
+    # 12a.7: "half the time", "twice as long", "a couple of days"
+    for w, vs in FRACTION_WORDS.items():
+        if re.search(r'\b' + w + r's?\b', t):
+            out.update(vs)
     return out
 
 
@@ -513,6 +526,78 @@ MONTH_DAYS = {"january": 31, "february": 28, "march": 31, "april": 30, "may": 31
               "july": 31, "august": 31, "september": 30, "october": 31, "november": 30,
               "december": 31}
 END_OF_MONTH = re.compile(r'\bend of (' + '|'.join(MONTH_DAYS) + r')\b', re.I)
+# 12a.7: numbers_from_source rejected correct answers. An option's, a
+# version's or a step's number is its label ("Option 1", "(2)", "3)"); a note
+# on the answer's own length is about the answer ("reduced from ~48 to 33
+# words", "~30% shorter"). Neither is a fact the text must give
+LABEL_NUM = re.compile(r'\b(?:option|version|choice|alternative|draft|variant|take|step|point|'
+                       r'part|summary|no\.?)\s*#?\s*\d{1,2}\b|(?<![\w.])\(?\d{1,2}\)(?=\s)', re.I)
+OWN_LENGTH = re.compile(
+    r'(?:(?:reduced|cut|trimmed|shortened|condensed|down)\s+)?from\s+(?:about\s+|~)?\d+\s*'
+    r'(?:words?\s*)?(?:to|→|->|–)\s*(?:about\s+|~)?\d+\s*words?\b'
+    r'|(?:about\s+|~)?\d+(?:\.\d+)?\s*%\s*(?:shorter|briefer|fewer\s+words|less\s+text|reduction|'
+    r'smaller)\b|(?:shorter|reduced|cut|trimmed|shortened|condensed)\s+by\s+(?:about\s+|~)?'
+    r'\d+(?:\.\d+)?\s*%', re.I)
+# …and the text's numbers include the ones it writes as words ("half",
+# "twice", "a dozen"), and the ones worked out from them — a sum, a
+# difference, how long between two times — which pass this gate for the
+# judge to mark: right is fine, wrong costs 2 (12a.7's rubric)
+FRACTION_WORDS = {"half": (0.5, 50.0), "quarter": (0.25, 25.0), "twice": (2.0,),
+                  "double": (2.0,), "triple": (3.0,), "thrice": (3.0,), "couple": (2.0,),
+                  "pair": (2.0,), "dozen": (12.0,)}
+
+
+# a number and what it counts: a currency before it, a % after it, or the
+# word after it ("24 chairs") — a sum is only ever of one kind of thing
+NUM_UNIT = re.compile(r'([£$€])?\s?(-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?)'
+                      r'(?:\s*(%)|\s*-?\s*([a-z]+))?', re.I)
+
+
+def _unit(m) -> str:
+    w = (m.group(4) or '').lower()
+    return m.group(1) or m.group(3) or (w[:-1] if w.endswith('s') and len(w) > 3 else w)
+
+
+def derived_numbers(text: str) -> dict[str, set[float]]:
+    """what the text's numbers make, kind by kind: each pair's sum and
+    difference — £900 and £200 make £1,100 and £700; 24 chairs and 16
+    chairs, 40 — never a sum of a price and a count"""
+    kinds: dict[str, set[float]] = {}
+    for m in NUM_UNIT.finditer(text):
+        if _unit(m) and not re.match(r'[\w.]', text[m.start() - 1:m.start()] or ' '):
+            kinds.setdefault(_unit(m), set()).add(float(m.group(2).replace(',', '')))
+    out = {}
+    for u, vs in kinds.items():
+        vals = sorted(vs)[:100]
+        out[u] = ({round(a + b, 2) for i, a in enumerate(vals) for b in vals[i + 1:]}
+                  | {round(b - a, 2) for i, a in enumerate(vals) for b in vals[i + 1:]})
+    return out
+
+
+def durations(times: set[tuple[int, int]]) -> set[float]:
+    """the time between two of the text's times, in minutes and in hours"""
+    out, mins = set(), sorted({h * 60 + m for h, m in times})
+    for i, a in enumerate(mins):
+        for b in mins[i + 1:]:
+            for d in (b - a, 1440 - (b - a)):
+                out |= {float(d), round(d / 60, 2)}
+    return out
+
+
+# …and the answer says it worked it out: a sum near "total", "in all", "comes
+# to", "+", "="; a difference near "difference", "extra", "more", "left" —
+# so a wrong £75 for the text's £70 is not taken for £45 + £30
+WORKED = re.compile(r'\btotal|\bin all\b|\baltogether\b|\bcombined\b|\bsum\b|\boverall\b|'
+                    r'\bplus\b|\+|=|\bmak(?:es?|ing)\b|\bbring(?:s|ing)?\b|\bcomes? to\b|'
+                    r'\badds? up\b|\bdifference\b|\bextra\b|\bmore\b|\bless\b|\bfewer\b|'
+                    r'\bleft\b|\bremaining\b|\bbalance\b|\bsav(?:es?|ing)\b|\bover budget\b|'
+                    r'\bunder budget\b|\bincrease\b|\bdecrease\b|\bup from\b|\bdown from\b', re.I)
+# a number the answer writes as a length of time — "45-minute delay", "2 hours
+# late" — not "every 10 minutes", which is how often
+DURATION_WORDS = re.compile(r'\bdela(?:y|yed)\b|\blate\b|\blater\b|\bearl(?:y|ier)\b|\bbehind\b|'
+                            r'\boverdue\b|\bwait(?:ing|ed)?\b|\btook\b|\btakes?\b|\blast(?:s|ing|ed)?\b|'
+                            r'\blong(?:er)?\b|\bbetween\b|\bgap\b|\bin all\b|\btotal\b', re.I)
+DURATION = re.compile(r'(?<![\w.])(\d+(?:\.\d+)?)\s*-?\s*(?:minutes?|mins?|hours?|hrs?)\b', re.I)
 
 
 def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
@@ -584,15 +669,22 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
         # "(Word count: 89)", "… 12 words" at the very end (Qwen3 adds them)
         body = re.sub(r'(?m)^\s*(?:[-*•]\s*)?\d{1,2}[.)]\s+', '', a)
         body = LENGTH_NOTE.sub('', body)
+        body = OWN_LENGTH.sub(' ', LABEL_NUM.sub(' ', body))
         # times are compared as times: "3 pm", "15:00" and "3:00 pm" are the
         # same; "noon" is 12:00
-        given, bad = clock_times(_norm(prompt)), []
+        # 12a.7: and a bare hour the text says as one ("back around 2", "now
+        # 8") is that hour: "~2 PM", "8:00"
+        given, bad = clock_times(_norm(prompt), loose=True), []
+        src = set(numbers(_norm(prompt))) | word_numbers(prompt)
 
         def keep(m):
             h, mi, ap = _hm(m)
             if not ((h, mi) in given or (not ap and h <= 12 and ((h + 12) % 24, mi) in given)):
                 bad.append(m.group(0).strip())
+            else:
+                times.add((h, mi))
             return ' '
+        times = set(given)
         body = re.sub(r'\b(noon|midday)\b', '12:00 pm', body, flags=re.I)
         body = re.sub(r'\bmidnight\b', '12:00 am', body, flags=re.I)
         # 12a.6: "1100" for the text's 11:00 is that time, not an invented 1100
@@ -602,11 +694,19 @@ def run_check(check: dict, answer: str, prompt: str) -> tuple[bool | None, str]:
         if bad:
             return False, 'invented the time ' + bad[0]
         # …and a number the question writes in words is one it gives
-        src = set(numbers(_norm(prompt))) | word_numbers(prompt)
         # 12i.0: "end of October" gives that month's last day, so "by October
         # 31" isn't invented
         for mo in END_OF_MONTH.findall(prompt):
             src.add(float(MONTH_DAYS[mo.lower()]))
+        # …a sum or a difference of them, and — written as a length of time
+        # ("45-minute delay") — the time between two of its times
+        made, gaps = derived_numbers(_norm(prompt)), durations(times)
+        body = DURATION.sub(lambda m: ' ' if round(float(m.group(1)), 2) in gaps
+                            and DURATION_WORDS.search(m.string[max(0, m.start() - 40):m.end() + 40])
+                            else m.group(0), body)
+        body = NUM_UNIT.sub(lambda m: ' ' if _unit(m) and round(float(m.group(2).replace(
+            ',', '')), 2) in made.get(_unit(m), ()) and WORKED.search(
+            m.string[max(0, m.start() - 40):m.end() + 40]) else m.group(0), body)
         extra = [n for n in numbers(body) if n not in src]
         return not extra, f'invented {extra[0]:g}' if extra else ''
     if t == 'word_count':
@@ -709,10 +809,11 @@ def describe(check: dict) -> str:
         return ', or '.join(describe(c) for c in check['checks'])
     if t == 'judge':
         if check.get('scale'):
-            # 12a.6: the rubric is the judge's to read; the page says what it asks
+            # 12a.6: the rubric is the judge's to read; the page says what it asks.
+            # 12a.7: what it says, not how it's set out
             return (f"the judge, on a rubric (0 to {check['scale']}, passing at "
-                    f"{check['pass_at']}): one summary, the key facts, nothing invented, "
-                    "and the length only if the request asks one")
+                    f"{check['pass_at']}): the key facts, nothing invented or wrong, one version, "
+                    "and the length only if the request asks one — never the style")
         return 'the judge: ' + check['rubric']
     raise ValueError(f"unknown check type: {t}")
 
@@ -766,7 +867,7 @@ THE ANSWER
 
 
 # 12a.6: a rubric that scores — Summarise's, 0 to 4, passing at 3
-SCORED_PROMPT = """You are marking ONE answer from an assistant against a rubric that gives it a score. Read the question, the rubric and the answer, work out the score the rubric gives, and reply with one JSON object and nothing else: {{"score": <a whole number from 0 to {scale}>, "reason": <one short sentence for a person, about the answer: what cost it points, or that it lost none>}}.
+SCORED_PROMPT = """You are marking ONE answer from an assistant against a rubric that gives it a score. Read the question, the rubric and the answer, work out the score the rubric gives, and reply with one JSON object and nothing else: {{"score": <a whole number from 0 to {scale}>, "reason": <one short sentence for a person, about the answer: what cost it points, naming each key fact it misses, or that it lost none>}}.
 
 QUESTION
 {question}
@@ -819,13 +920,35 @@ STATED_LENGTH = re.compile(
     r'about|around|to)\s+)?' + _N + r'\s+(?:words?|sentences?|lines?|bullet(?:\s*points?)?|'
     r'points?|paragraphs?)\b|\b(?:one|a|single)[\s-]+(?:line|liner|sentence|paragraph)\b', re.I)
 SHORTER = re.compile(r'\b(?:shorten|shorter|short|tl;?\s?dr|condense|brief(?:ly)?)\b', re.I)
-RUBRIC = """Score the answer from 0 to {scale} as a summary of the text in the question. Start at {scale} and take points off as below, never going under 0. It passes at {pass_at} or more.
+# 12a.7: 12a.6's rubric marked style as much as the summary — a lead-in and a
+# closing offer a point each, a bulleted summary "not one summary" — and ~50
+# of 145 practice answers failed, about two-thirds of them wrongly. Kept to
+# know a rubric generated from it (see _upgraded), which the new one replaces
+RUBRIC_12A6 = """Score the answer from 0 to {scale} as a summary of the text in the question. Start at {scale} and take points off as below, never going under 0. It passes at {pass_at} or more.
 1. One summary. The text itself, or most of it copied, is not a summary: score it 0. Take off 1 if it is not one summary: versions or options to choose from, or the summary wrapped in a lead-in ("Here's a summary:"), a heading, notes about it or a closing offer. Plain formatting of the one summary, such as short lines or bullets, is fine.
 2. The key facts, judged by meaning and not by exact words (a date, time or amount written another way is the same fact). It should keep {need}:
 {facts}
 Take off 1 for each fact it is short of that, and 1 for each fact it gets wrong.
 3. It invents nothing. Take off 2 if it says anything the text doesn't: a name, number, date, time, place or detail that isn't there.
 4. Length. {length}{reference}"""
+RUBRIC = """Score the answer from 0 to {scale} on what it says as a summary of the text in the question: its content, not its style. Start at {scale} and take points off as below, never going under 0. It passes at {pass_at} or more.
+1. The text itself, or most of it copied, is not a summary: score it 0.
+2. The key facts, judged by meaning and not by exact words (a date, time or amount written another way is the same fact). It should keep {need}:
+{facts}
+Take off 1 for each fact it is short of that, 2 at most, and name each missing fact in your reason.
+3. Take off 2 if it says anything invented or wrong: a wrong number, person, day, time or place, or a detail the text doesn't give. A number worked out correctly from the text (a total, a difference, how long something took) is not invented; one worked out wrongly is wrong ("half the time" is not "50% faster").
+4. Take off 1 if it gives several versions instead of one ("Option 1 / Option 2").
+5. Style costs nothing: a lead-in ("Here's a concise summary:"), a closing offer ("Let me know if you'd like it shorter"), headings, bullets, bold and emoji take nothing off. A summary in bullets is one summary.
+6. Length. {length}{reference}
+
+Two worked examples, on another text: "Team lunch moves from Thursday to Friday, 12:30, at Luigi's. Sam is booking the table; bring £15 cash."
+Example 1 scores 4: every fact is there, and the lead-in, the bullets and the offer cost nothing.
+    Here's a concise summary:
+    - Lunch moves to Friday, 12:30, at Luigi's
+    - Sam is booking
+    - Bring £15 cash
+    Let me know if you'd like it any shorter!
+Example 2 scores 3: the same answer without "- Bring £15 cash" misses one fact, the £15 cash."""
 
 
 def request_of(prompt: str) -> str:
@@ -845,17 +968,35 @@ def stated_length(prompt: str) -> str:
 
 def _facts_of(q: dict) -> tuple[list[list[str]], int]:
     """the question's key facts, each a list of ways to say it, and how many
-    it must keep — from its facts check, or its contains checks"""
+    it must keep — from its facts check, or its contains checks; 12a.7: or
+    from the rubric it carries, as a rubric generated from them lists them"""
     for c in q.get("checks") or []:
         if c.get("type") == "facts":
             return c["values"], int(c["n"])
     fs = [list(c["values"]) for c in q.get("checks") or [] if c.get("type") == "contains_any"]
     fs += [[v] for c in q.get("checks") or [] if c.get("type") == "contains_all"
            for v in c["values"]]
-    return fs, len(fs)
+    if fs:
+        return fs, len(fs)
+    return _facts_in((_rubric_check(q) or {}).get("rubric", ""))
 
 
-def summarise_rubric(q: dict) -> str:
+_KEEP = re.compile(r"It should keep (?:all (\d+) of these|at least (\d+) of these (\d+)):\n"
+                   r"((?:- .*\n)+)")
+
+
+def _facts_in(rubric: str) -> tuple[list[list[str]], int]:
+    """the key facts a generated rubric lists ("- 16 oct / oct 16"), and how
+    many it asks for"""
+    m = _KEEP.search(rubric or "")
+    if not m:
+        return [], 0
+    facts = [[v.strip() for v in line[2:].split(" / ")] for line in m.group(4).splitlines()
+             if line.startswith("- ") and not line.startswith("- (none listed")]
+    return facts, int(m.group(1) or m.group(2) or len(facts))
+
+
+def summarise_rubric(q: dict, template: str | None = None) -> str:
     facts, need = _facts_of(q)
     show = lambda vs: " / ".join(list(dict.fromkeys(v.strip() for v in vs))[:2])   # noqa: E731
     length = stated_length(q["prompt"])
@@ -867,7 +1008,7 @@ def summarise_rubric(q: dict) -> str:
                 "off 1 if it doesn't keep to that.")
     else:
         says = "The request states no length: take nothing off for length."
-    return RUBRIC.format(
+    return (template or RUBRIC).format(
         scale=RUBRIC_SCALE, pass_at=RUBRIC_PASS,
         need=(f"all {len(facts)} of these" if need >= len(facts) else
               f"at least {need} of these {len(facts)}"),
@@ -882,6 +1023,14 @@ def summarise_checks(q: dict) -> list[dict]:
     return [{"type": "numbers_from_source"},
             {"type": "judge", "scale": RUBRIC_SCALE, "pass_at": RUBRIC_PASS,
              "rubric": summarise_rubric(q)}]
+
+
+def _upgraded(q: dict) -> bool:
+    """12a.7: a Summarise question whose rubric is exactly the one 12a.6
+    generated from its facts (the repo's, or one the question builder
+    published) takes today's; a rubric someone wrote or edited stays theirs"""
+    c = _rubric_check(q)
+    return bool(c) and c.get("rubric") == summarise_rubric(q, RUBRIC_12A6)
 
 
 def _sentences(text: str) -> int:
@@ -1795,7 +1944,9 @@ def judge_failed(model_dir: Path, why: str) -> None:
 # model's marks are kept (BEFORE_NAME), so the change reads model by model
 # ---------------------------------------------------------------------------
 
-BEFORE_NAME = "everyday_before_12a6.json"
+# 12a.7: each round of re-marking keeps its own — 12a.6's is the marks from
+# before 12a.6, so this round's before is 12a.6's marks
+BEFORE_NAME = "everyday_before_12a7.json"
 REMARK = "everyday-remark"
 
 
