@@ -60,6 +60,8 @@ def bench(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "JUDGED_TASKS_DIR", exam)
     monkeypatch.setattr(config, "EVAL_TASKS_DIR", root / "eval_tasks")
     monkeypatch.setattr(config, "EVERYDAY_TASKS_DIR", root / "everyday" / "tasks")
+    # 12k.2: the check builds Trust & safety's tasks in its own folder, and says so here
+    monkeypatch.setattr(config, "TRUST_TASKS_DIR", root / "trust_safety" / "tasks")
     monkeypatch.chdir(root)            # where the service itself happens to run
     return root
 
@@ -95,12 +97,16 @@ def test_the_check_finds_every_task_of_every_suite(harness, bench, capsys):
     assert harness.main() == 0
     out = capsys.readouterr().out.splitlines()
     assert out[0] == f"lm_eval 0.4.12-fake · BENCH_ROOT {bench}"
-    assert out[1:] == ["quick     2 of 2 found", "full      8 of 8 found",
+    assert out[1:] == ["quick     2 of 2 found",
+                       # 12k.2: BBQ's seeded 3,000 is in full
+                       "full      9 of 9 found",
                        "control   1 of 1 found", "judged    3 of 3 found",
                        "everyday  1 of 1 found",
                        # 12h.1: IFEval, MMLU-Pro and MATH-500 are in deploy step 4's list
                        "generative 3 of 3 found",
-                       "tasks OK: 16 of 16 found by lm_eval 0.4.12-fake"]
+                       # 12k.2: Do-Not-Answer and XSTest, and all of BBQ, the second choice
+                       "safety    2 of 2 found", "full, all of BBQ 1 of 1 found",
+                       "tasks OK: 20 of 20 found by lm_eval 0.4.12-fake"]
     # it wrote nothing outside its temporary folder
     assert sorted(p.name for p in bench.iterdir()) == ["everyday", "exam"]
     assert list((bench / "everyday" / "tasks").iterdir()) == []
@@ -115,7 +121,7 @@ def test_the_check_catches_what_failed_62_to_65(harness, bench, capsys, monkeypa
             f"lm_eval runs, and lm_eval reads a --tasks value that names a folder as a folder "
             f"of task files") in out
     assert "everyday  0 of 1 found" in out and "judged    3 of 3 found" in out
-    assert out.rstrip().endswith("tasks FAILED: 15 of 16 found by lm_eval 0.4.12-fake — "
+    assert out.rstrip().endswith("tasks FAILED: 19 of 20 found by lm_eval 0.4.12-fake — "
                                  "not found: everyday")
 
 

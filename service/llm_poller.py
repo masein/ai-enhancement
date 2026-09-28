@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import everyday as _everyday  # noqa: E402
 import exam_build as _exam  # noqa: E402
 import judge as _judge  # noqa: E402
+import trust_safety as _safety  # noqa: E402
 
 _stop = threading.Event()
 
@@ -171,6 +172,18 @@ def _finish_everyday(row: dict, results: dict[str, llm.Result]) -> None:
     db.batch_progress(row["batch_id"], f"{row['n_items']}/{row['n_items']} done")
     if out:
         db.update(sub["id"], progress=_everyday.summary(out))
+
+
+def _finish_safety(row: dict, results: dict[str, llm.Result]) -> None:
+    """12k.2: the judge's marks on Do-Not-Answer and XSTest; the row that
+    ran them says the rates once they land"""
+    d, sub = _everyday_dir(row)
+    if d is None:
+        return
+    out = _safety.finish(d, results)
+    db.batch_progress(row["batch_id"], f"{row['n_items']}/{row['n_items']} done")
+    if out:
+        db.update(sub["id"], progress=_safety.summary(out))
 
 
 def judged_line(run: dict, at: float | None = None, note: str = "") -> str:
@@ -322,6 +335,11 @@ def _mark_failed(r: dict, why: str) -> None:
             out = _everyday.read(d)
             if out:
                 db.update(sub["id"], progress=_everyday.summary(out))
+    elif r["kind"] == "safety":
+        d, sub = _everyday_dir(r)
+        if d is not None:
+            _safety.judge_failed(d, why)
+            db.update(sub["id"], progress=_safety.summary(_safety.read(d)))
     elif r["kind"] == "everyday_remark":
         # 12a.6: each model this re-mark sent says so, instead of waiting
         for d in (p for p in config.OUT_DIR.iterdir() if p.is_dir()) if config.OUT_DIR.is_dir() else []:
@@ -344,7 +362,8 @@ def tick() -> int:
             # 12i.2: a question builder batch to the job, as that draft chose it
             backend = (judge_test.batch_backend(r["batch_id"]) if r["kind"] == "judge_test"
                        else builder.batch_backend(r["batch_id"]) if r["kind"] == "qb"
-                       else llm.client("judge" if r["kind"] in ("judge", "everyday", "everyday_remark")
+                       else llm.client("judge" if r["kind"] in ("judge", "everyday", "everyday_remark",
+                                                                "safety")
                                        else "llm"))
         except llm.LocalUnreachable as e:
             # vLLM restarting (or still loading after a reboot) is not a reason
@@ -383,6 +402,8 @@ def tick() -> int:
                 _finish_judge(r, results)
             elif r["kind"] == "everyday":
                 _finish_everyday(r, results)
+            elif r["kind"] == "safety":
+                _finish_safety(r, results)
             elif r["kind"] == "everyday_remark":
                 # 12a.6: a re-mark's verdicts, for every model it sent
                 _everyday.finish_remark(config.OUT_DIR, results)

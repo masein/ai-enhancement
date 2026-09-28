@@ -17,7 +17,7 @@ import pytest
 
 from conftest import set_name
 from fake_openai import FakeServer
-from service import config, db, runner
+from service import config, db, phone, runner
 
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12f2"
@@ -51,6 +51,31 @@ def fake(live):
     s.close()
 
 
+def sit_everyday() -> None:
+    """measured by the board: an Everyday run through the served model"""
+    saved = runner.acquire_lock, runner.release_lock, config.JUDGE_MODEL
+    runner.acquire_lock, runner.release_lock = (lambda sid: True), (lambda: None)
+    config.JUDGE_MODEL = "stub"
+    try:
+        sid = db.add(SID, "instruct", "everyday", "masein", "")
+        runner.run_submission(db.get(sid))
+    finally:
+        runner.acquire_lock, runner.release_lock, config.JUDGE_MODEL = saved
+    assert db.get(sid)["status"] == "done"
+
+
+def ready(live, fake) -> None:
+    """what the card test leaves — the phone build, its Everyday run, Sam's
+    report — for a test that reads it: pytest-split can put the two in
+    different shards (12k.2's new tests moved the line between them)"""
+    register(live, fake, phone=True)
+    if not (config.OUT_DIR / SID.replace("/", "__") / "everyday.json").exists():
+        sit_everyday()
+    if not phone.reports(SID):
+        post(live, "/api/phone/reports", {**phone.README, "model": SID, "by": "Sam",
+                                          "date": "2026-09-25", "entered_by": "masein"})
+
+
 def views(page, live):
     page.goto("about:blank")                  # a load, not a hash change: the page's data anew
     page.goto(live["base"] + "/#tab=models")
@@ -74,16 +99,7 @@ def test_on_phone_is_no_view_and_its_old_link_chooses_the_phone_builds(live, pag
 
 def test_the_card_shows_what_was_reported_beside_what_the_board_measured(live, page, fake):
     register(live, fake, phone=True)
-    # measured by the board: an Everyday run through the served model
-    saved = runner.acquire_lock, runner.release_lock, config.JUDGE_MODEL
-    runner.acquire_lock, runner.release_lock = (lambda sid: True), (lambda: None)
-    config.JUDGE_MODEL = "stub"
-    try:
-        sid = db.add(SID, "instruct", "everyday", "masein", "")
-        runner.run_submission(db.get(sid))
-    finally:
-        runner.acquire_lock, runner.release_lock, config.JUDGE_MODEL = saved
-    assert db.get(sid)["status"] == "done"
+    sit_everyday()
     page.set_viewport_size({"width": 1400, "height": 900})
     page.goto(live["base"] + "/#tab=home")
     set_name(page, "masein")
@@ -132,6 +148,7 @@ def test_the_card_shows_what_was_reported_beside_what_the_board_measured(live, p
 
 
 def test_the_model_page_has_it_as_its_fourth_kind_and_nowhere_else(live, page, fake):
+    ready(live, fake)
     page.set_viewport_size({"width": 1400, "height": 900})
     page.goto(live["base"] + "/#model=" + SID.replace("/", "%2F"))
     tile = page.locator("[data-kind-tile='phone']")

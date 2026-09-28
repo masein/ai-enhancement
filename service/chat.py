@@ -52,7 +52,7 @@ DOWN_LINE = "The server at {where} isn't answering."
 SERVED_READ_S = 120                # the longest wait for a served model's next piece
 SUITE_WORDS = {"full": "Standard tests", "quick": "quick tests", "control": "control tests",
                "judged": "Knowledge exam", "everyday": "Everyday tasks",
-               "generative": "instruction and maths tests"}
+               "generative": "instruction and maths tests", "safety": "Trust & safety tests"}
 
 
 def now() -> float:

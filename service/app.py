@@ -105,7 +105,9 @@ _cache: dict = {"key": None, "payload": None, "at": 0.0}
 # writes it long after the eval finished, and a key that ignores it means the
 # payload keeps being served from cache with no diagnosis in it.
 _WATCH = ("results*.json", "diagnose.json", "model_meta.json", "judge.json",
-          "judge_calibration.json", "everyday.json")
+          "judge_calibration.json", "everyday.json",
+          # 12k.2: the judge's marks on Do-Not-Answer and XSTest land after the run
+          "safety.json")
 
 # 11h: the dashboard no longer links to, serves or reads anything of the
 # demo tree ($BENCH_ROOT/demo). scripts/demo_loop.py stays a command-line
@@ -399,6 +401,9 @@ class SubmissionIn(BaseModel):
     # published numbers)
     thinking: bool = False
     subset: int = 0
+    # 12k.2, the full suite only: BBQ's 29,246 ambiguous questions instead of
+    # the seeded 3,000
+    bbq_all: bool = False
 
 
 ACTIVE = ("queued", "preflight", "waiting_gpu", "waiting_lock", "running")
@@ -419,13 +424,19 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
         raise HTTPException(422, "kind must be auto, base or instruct")
     if s.suite not in config.SUITES:
         raise HTTPException(422, "suite must be quick, full, control (mmlu_perm only), "
-                                 "judged (free response + judge), everyday (Everyday tasks) "
-                                 "or generative (IFEval, MMLU-Pro, MATH-500)")
+                                 "judged (free response + judge), everyday (Everyday tasks), "
+                                 "generative (IFEval, MMLU-Pro, MATH-500) or safety "
+                                 "(Do-Not-Answer, XSTest)")
     if s.suite != "generative" and (s.thinking or s.subset):
         raise HTTPException(422, "thinking and subset are for IFEval, MMLU-Pro and MATH-500 "
                                  "(suite generative) only")
     if s.suite == "generative" and s.kind == "base":
         raise HTTPException(422, config.GEN_INSTRUCT_ONLY + ". Nothing was queued.")
+    if s.bbq_all and s.suite != "full":
+        raise HTTPException(422, "bbq_all asks all of BBQ in the full suite; the other suites "
+                                 "don't ask BBQ")
+    if s.suite == "safety" and s.kind == "base":
+        raise HTTPException(422, config.SAFETY_INSTRUCT_ONLY + ". Nothing was queued.")
     total = sum(config.MMLU_PRO_SUBJECTS.values())
     if s.subset and not 0 < s.subset < total:
         raise HTTPException(422, f"subset is a number of MMLU-Pro items, from 1 to {total - 1}; "
@@ -515,13 +526,14 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
             same = not chosen
         # 12h.1: thinking on is another row, and a subset another run
         same = same and bool(row.get("thinking")) == s.thinking \
-            and int(row.get("subset") or 0) == s.subset
+            and int(row.get("subset") or 0) == s.subset \
+            and bool(row.get("bbq_all")) == s.bbq_all
         if row["suite"] == s.suite and same:
             return {"id": row["id"], "status": row["status"],
                     "note": "already in the queue — joining the existing run"}
     sid = db.add(hf_id, s.kind, s.suite, s.submitter.strip()[:80], s.note.strip()[:200],
                  allow_remote_code=s.allow_remote_code, tasks=chosen,
-                 thinking=s.thinking, subset=s.subset)
+                 thinking=s.thinking, subset=s.subset, bbq_all=s.bbq_all)
     return {"id": sid, "status": "queued", "tasks": sorted(chosen)}
 
 
@@ -534,9 +546,11 @@ def submissions(limit: int = 100):
     rows = db.recent(min(limit, 500))
     # 12a: a pilot row waits on the judge for one question, and says so the
     # way a judged row does — by the batch it recorded, and nothing else
-    pilot = [r for r in rows if r["suite"] == "everyday" and r.get("judge_batch")]
+    # 12k.2: and a Trust & safety row the same way, by its batch
+    pilot = [r for r in rows if r["suite"] in ("everyday", "safety") and r.get("judge_batch")]
     if pilot:
-        batches = {b["batch_id"]: b for b in db.batches_list(500) if b["kind"] == "everyday"}
+        batches = {b["batch_id"]: b for b in db.batches_list(500)
+                   if b["kind"] in ("everyday", "safety")}
         for r in pilot:
             b = batches.get(r["judge_batch"])
             if b:

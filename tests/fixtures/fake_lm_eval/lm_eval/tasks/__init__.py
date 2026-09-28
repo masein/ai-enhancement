@@ -5,7 +5,9 @@ from pathlib import Path
 BUILT_IN = {"mmlu", "hellaswag", "arc_challenge", "arc_easy", "winogrande", "piqa",
             "truthfulqa_mc2", "gsm8k",
             # 12h.1: all three are in 0.4.12 (hendrycks_math500 in hendrycks_math/)
-            "ifeval", "mmlu_pro", "hendrycks_math500"}
+            "ifeval", "mmlu_pro", "hendrycks_math500",
+            # 12k.2: its own BBQ, on an unpinned copy — the board's are bbq_3000 and bbq_all
+            "bbq", "bbq_ambig"}
 
 
 def names_in(yaml_text: str) -> set[str]:

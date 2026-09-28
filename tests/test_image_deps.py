@@ -56,3 +56,36 @@ def test_local_chat_completions_and_every_package_of_the_api_extra_import():
     for dist in extra:
         name = MODULE.get(dist.lower(), dist.replace("-", "_").lower())
         importlib.import_module(name)
+
+
+def test_trust_and_safety_tasks_load_in_the_installed_harness(tmp_path):
+    """12k.2: BBQ, Do-Not-Answer and XSTest as a run builds them, found by the
+    installed lm_eval under our own names (it ships a `bbq` and a `bbq_ambig`
+    of its own, on an unpinned copy), and posing what we mean them to — no
+    model is loaded"""
+    lm_eval()
+    import sys
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import trust_safety as ts
+    from lm_eval.tasks import TaskManager, get_task_dict
+    d = ts.build_tasks(tmp_path / "tasks")
+    tm = TaskManager(include_path=str(d))
+    assert {"bbq", "bbq_ambig"} <= set(tm.all_tasks)          # lm_eval's own, left alone
+    tasks = get_task_dict(["bbq_3000", "do_not_answer", "xstest"], task_manager=tm)
+    bbq = tasks["bbq_3000"]
+    docs = list(bbq.test_docs())
+    assert len(docs) == 3000 and bbq.OUTPUT_TYPE == "multiple_choice"
+    q = docs[0]
+    assert bbq.doc_to_text(q) == f"{q['context']}\n\nQ: {q['question']}\nA:"
+    assert bbq.doc_to_choice(q) == q["choices"] and bbq.doc_to_target(q) == q["label"]
+    # its scoring: the option with the highest log-likelihood, and the bias score beside acc
+    got = bbq.process_results(q, [(-1.0 if i == q["label"] else -9.0, False) for i in range(3)])
+    assert got["acc"] == 1 and tuple(got["bias_score"]) == (1, 0, 0)
+    assert bbq.aggregation()["bias_score"]([(0, 1, 1), (0, 0, 1)]) == 0.0
+    for name, n in (("do_not_answer", 939), ("xstest", 450)):
+        t = tasks[name]
+        docs = list(t.test_docs())
+        assert len(docs) == n and t.OUTPUT_TYPE == "generate_until"
+        assert t.doc_to_text(docs[0]) == docs[0]["prompt"]
+        assert t.config.generation_kwargs["max_gen_toks"] == 512
+    assert len(list(get_task_dict(["bbq_all"], task_manager=tm)["bbq_all"].test_docs())) == 29_246

@@ -392,6 +392,8 @@ def include_args_for(task: str) -> list[str]:
         return ["--include_path", str(config.CONTROL_TASKS_DIR)]
     if task == config.EVERYDAY_TASK:
         return ["--include_path", str(config.EVERYDAY_TASKS_DIR)]
+    if task in config.TRUST_TASKS:                  # 12k.2: trust_safety.build_tasks writes them
+        return ["--include_path", str(config.TRUST_TASKS_DIR)]
     if task.startswith(("exam_", "fr_")):
         return ["--include_path", str(config.JUDGED_TASKS_DIR)]
     if config.EVAL_TASKS_DIR.is_dir() and any(config.EVAL_TASKS_DIR.glob("*.yaml")):
@@ -666,17 +668,21 @@ def _run_task(sid: int, cmd: list[str], lf, env: dict, run_as, cwd: Path,
 # ---------------------------------------------------------------------------
 
 def _ask_served(sid: int, rec: dict, meta: dict, task: str, task_out: Path, label: str,
-                log_path: Path, everyday: bool, asked: list[str] | None):
-    """one Everyday or exam task, asked over the model's server. (status,
-    stopped): 0 or CANCELED, and a ServerStopped when it stopped answering —
-    what it answered before that is written and kept"""
-    if everyday:
+                log_path: Path, everyday: bool, asked: list[str] | None, safety: bool = False):
+    """one Everyday, exam or Trust & safety task, asked over the model's
+    server. (status, stopped): 0 or CANCELED, and a ServerStopped when it
+    stopped answering — what it answered before that is written and kept.
+    12k.2: Do-Not-Answer and XSTest are asked as Everyday is, as typed"""
+    if safety:
+        items = config.TRUST_TASKS_DIR / f"{task}.jsonl"                      # build_tasks'
+        everyday = True
+    elif everyday:
         items = config.EVERYDAY_TASKS_DIR / f"{config.EVERYDAY_TASK}.jsonl"   # build_task's
     else:
         items = config.JUDGED_TASKS_DIR / f"{task}.jsonl"                     # exam_build's
     docs = [json.loads(line) for line in items.read_text(encoding="utf-8").splitlines()
             if line.strip()]
-    if everyday and asked is not None:
+    if everyday and not safety and asked is not None:
         docs = [d for d in docs if d.get("id") in set(asked)]
     s = _served.settings_for(rec, meta, everyday)
     with open(log_path, "a") as lf:
@@ -741,6 +747,7 @@ def run_submission(sub: dict) -> None:
     sid = sub["id"]
     everyday = sub["suite"] == "everyday"
     generative = sub["suite"] == "generative"
+    safety = sub["suite"] == "safety"            # 12k.2: Do-Not-Answer and XSTest
     # 12f.0: a run that can't save doesn't start — in the status dot's words
     from . import disk
     why = disk.blocks_run()
@@ -771,6 +778,8 @@ def run_submission(sub: dict) -> None:
             # writes, so only an instruct model can sit them fairly
             if generative and meta["kind"] != "instruct":
                 raise PreflightError(config.GEN_INSTRUCT_ONLY)
+            if safety and meta["kind"] != "instruct":
+                raise PreflightError(config.SAFETY_INSTRUCT_ONLY)
     except PreflightError as e:
         db.update(sid, status="failed", error=str(e), finished_at=time.time())
         return
@@ -784,7 +793,7 @@ def run_submission(sub: dict) -> None:
                        f"needs ~{meta['need_gb']:g} GB" if not rec else
                        f"preflight ok · served elsewhere: {rec['pin'].get('file') or rec['name']}")
 
-    tasks = config.tasks_for_suite(sub["suite"])
+    tasks = config.tasks_for_suite(sub["suite"], bbq_all=bool(sub.get("bbq_all")))
     judged = set(config.judged_tasks())
     # a judged run narrowed to one topic: the same suite, fewer tasks. The
     # judge below grades only these, so a person can sit one topic in minutes
@@ -827,6 +836,11 @@ def run_submission(sub: dict) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
         import everyday as _everyday
         _everyday.build_task(config.EVERYDAY_TASKS_DIR)
+    if set(tasks) & set(config.TRUST_TASKS):
+        # 12k.2: BBQ, Do-Not-Answer and XSTest, from the pinned files
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import trust_safety as _trust
+        _trust.build_tasks(config.TRUST_TASKS_DIR)
     if remote_code:      # the code that produced the scores is part of the record
         db.update(sid, progress=f"preflight ok · custom model code · batch={meta['batch']}")
     # 12h.1: a Hub model on the approved list runs its own code offline, as
@@ -978,7 +992,7 @@ def run_submission(sub: dict) -> None:
                 # settings a local run uses, into the files lm_eval writes
                 t_task = time.time()
                 status, stopped = _ask_served(sid, rec, meta, task, task_out, label, log_path,
-                                              everyday, asked)
+                                              everyday, asked, safety=safety)
                 gpu_seconds += time.time() - t_task
                 db.update(sid, gpu_seconds=gpu_seconds)
                 if status == CANCELED:
@@ -1002,11 +1016,12 @@ def run_submission(sub: dict) -> None:
             # ran out inside the thinking on every question of run #60. Only
             # its judged answers get more room, and only when its template is
             # the one that thinks; lm_eval records the override in its results
-            thinks = ((kind == "instruct" and task in judged or everyday)
+            thinks = ((kind == "instruct" and task in judged or everyday or safety)
                       and (meta.get("archinfo") or {}).get("reasoning_template"))
             # 12a.4: its everyday answers get more room still — 12d.1: said
-            # by everyday.run_settings, the function the Playground reads too
-            room = (_everyday_settings(meta)["max_gen_toks"] if everyday
+            # by everyday.run_settings, the function the Playground reads too.
+            # 12k.2: Trust & safety is asked with the Everyday settings
+            room = (_everyday_settings(meta)["max_gen_toks"] if everyday or safety
                     else _exam_settings(meta)["max_gen_toks"]) if thinks else None
             cmd = lm_eval_cmd(margs, task, shots, meta["batch"], task_out,
                               chat=kind == "instruct" or everyday, max_gen_toks=room)
@@ -1047,7 +1062,7 @@ def run_submission(sub: dict) -> None:
                 lf.write(f"\n===== [{sid}] {task} ({shots}-shot) =====\n")
                 if room and not generative:
                     lf.write(f"[reasoning model] answers get {room} tokens, not "
-                             f"{512 if everyday else 256}: the chat template writes its "
+                             f"{512 if everyday or safety else 256}: the chat template writes its "
                              f"reasoning before the answer\n")
                 if generative:
                     lf.write(f"[generative] thinking {'on' if th['on'] else 'off'} "
@@ -1177,6 +1192,23 @@ def run_submission(sub: dict) -> None:
                 db.update(sid, error=f"marking: {e}")
                 with open(log_path, "a") as lf:
                     lf.write(f"\n[service] everyday tasks could not be marked: {e!r}\n")
+        # 12k.2: Do-Not-Answer and XSTest, marked by the judge on the rubric —
+        # submitted here (seconds, no GPU); the poller lands the marks
+        if safety and not failed_tasks:
+            db.update(sid, status="running", progress="sending the answers to the judge")
+            try:
+                ts = _trust.start(config.OUT_DIR / safe, submission=sid)
+                judge_note = _trust.summary(ts)
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n===== [{sid}] trust & safety: {judge_note}"
+                             + (f" · judge batch {ts['batch_id']}" if ts.get("batch_id") else "")
+                             + (f" · the judge could not be asked: {ts['error']}"
+                                if ts.get("error") else "") + " =====\n")
+            except Exception as e:                      # noqa: BLE001 — the answers are on disk
+                failed_tasks.append("marking")
+                db.update(sid, error=f"marking: {e}")
+                with open(log_path, "a") as lf:
+                    lf.write(f"\n[service] Do-Not-Answer and XSTest could not be marked: {e!r}\n")
         # 12h.1: the three read again, in this board's words — the letter an
         # answer settles on, the final answer compared as maths, the harness's
         # own IFEval verdicts — and the answers that ran out of room counted
@@ -1242,7 +1274,7 @@ def run_submission(sub: dict) -> None:
             what = (f"all {len(tasks)} tasks" if not only
                     else f"{', '.join(t.replace('exam_', '') for t in tasks)}")
             db.update(sid, status="done", finished_at=time.time(),
-                      progress=judge_note if everyday
+                      progress=judge_note if everyday or safety
                       else f"{what} done" + (f" · {note}" if note else "") + judge_note,
                       error="")
     finally:

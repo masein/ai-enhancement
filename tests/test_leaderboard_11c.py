@@ -57,7 +57,8 @@ def uncalibrated(page):
     ("commonsense", ["hellaswag", "piqa", "winogrande"]),
     ("reasoning", ["arc_challenge", "arc_easy"]),
     ("math", ["gsm8k"]),
-    ("truthfulness", ["truthfulqa_mc2"]),
+    # 12k.2: Truthfulness is Trust & safety, TruthfulQA first
+    ("trust", ["truthfulqa_mc2", "do_not_answer", "xstest", "bbq_3000", "bbq_all"]),
 ])
 def test_a_chip_shows_exactly_its_groups_columns(live, page, chip, want):
     open_lb(page, live["base"])

@@ -1,0 +1,69 @@
+{
+ "built": "2026-09-28",
+ "sources": {
+  "do_not_answer": {
+   "name": "Do-Not-Answer",
+   "licence": "Apache-2.0",
+   "url": "https://huggingface.co/datasets/LibrAI/do-not-answer",
+   "revision": "74e74f2e4507ef256fe536f78a776f4a1ff67955",
+   "cite": "Wang et al., Do-Not-Answer: A Dataset for Evaluating Safeguards in LLMs (2023)",
+   "files": {
+    "data_en.csv": "410449674780aa7304512043706f7981f666a79528d11546da34ebdd9595681c"
+   }
+  },
+  "xstest": {
+   "name": "XSTest",
+   "licence": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/Paul/XSTest",
+   "revision": "f600c994b256f12867dfa5b3eb3d545a3e62f8b5",
+   "cite": "Röttger et al., XSTest: A Test Suite for Identifying Exaggerated Safety Behaviours in Large Language Models (NAACL 2024)",
+   "files": {
+    "xstest_prompts.csv": "11783fb294ed017473ee53c207d71f2161c7672c8d0b037501e78387f801cb5a"
+   }
+  },
+  "bbq": {
+   "name": "BBQ",
+   "licence": "CC BY 4.0",
+   "url": "https://github.com/nyu-mll/BBQ",
+   "revision": "bea11bd97d79217245b5871acd247b9d6eb24598",
+   "cite": "Parrish et al., BBQ: A Hand-Built Bias Benchmark for Question Answering (Findings of ACL 2022)",
+   "files": {
+    "data/Age.jsonl": "46e805b3fc2d8cbd26eeb8e8430d98cf7b2dc9c83574ff3674e8ce4f0fca2a60",
+    "data/Disability_status.jsonl": "375d40d9b71f056150264445ec189b13934998f3f49a1e311aa7578eb3b45e5f",
+    "data/Gender_identity.jsonl": "8b5adbb368510a97d5775dc43e1c719e0249fe2da33f13c83e3e29edafec7a00",
+    "data/Nationality.jsonl": "a583e74666aec0341ded8aa3983e7cad694eb24de72c254d28b2df3035720090",
+    "data/Physical_appearance.jsonl": "e48d7e13508565f4801574e611043470c25c95a0a62af3699cb5ee7cb02608fb",
+    "data/Race_ethnicity.jsonl": "4a9f1214cfaa115ce7f0bdb40609122e431f5152c71b8ca64d665e483b946ae6",
+    "data/Race_x_SES.jsonl": "af8e2ae3d0e5be9ebcbfe7149e591d47ff649e263307f4548f7fb12f6a6d83e8",
+    "data/Race_x_gender.jsonl": "e5dbba782f8c4e25b99dd5470b5136e2db73dbf401cf6d4a5a3ed31b02f95696",
+    "data/Religion.jsonl": "cb9555f9f3454a52cd2df85956b59bd7fcca5aa922c8527693b1164d08417616",
+    "data/SES.jsonl": "9f92754bb037b0982604b9112705fb81d60a19d9e759c67e4a85e484a070f528",
+    "data/Sexual_orientation.jsonl": "2c71036b9e7584fe589c42aef32c1a42bc01b9a5e9b1b8704342630cdb08cefd",
+    "analysis_scripts/additional_metadata.csv": "f36708416b0e7adb81b47ad1926f9c39c2beb611702b73b01e06c9b6c9ffbd3d"
+   }
+  }
+ },
+ "files": {
+  "do_not_answer.jsonl": {
+   "sha256": "8d5c3d4c2dc1943b325178eee7bf5902e27b6b22c8ce6fde70bc70c978ed76a5",
+   "n": 939
+  },
+  "xstest.jsonl": {
+   "sha256": "6bc93ea3a5c26786f4ab2a59cacfd69f23650256b3e40e72aff9adfe73dc59ca",
+   "n": 450
+  },
+  "bbq_ambig.jsonl.gz": {
+   "sha256": "9aa2e6bd09fcf6cea7c251e4fda52ef062d27cad54d753e081994d401ed9248c",
+   "n": 29246
+  },
+  "bbq_ambig_3000.jsonl": {
+   "sha256": "f07ce94d7435e9162f41a54b59aff3f5485dcf68172daf76f775539b15d42d11",
+   "n": 3000
+  }
+ },
+ "bbq_subset": {
+  "seed": "bbq-ambig-3000",
+  "n": 3000,
+  "of": 29246
+ }
+}
