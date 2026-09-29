@@ -26,15 +26,18 @@ from service import config, db, llm, llm_poller, runner
 MODEL = "fx/one-option-70m"          # a fixture model Everyday tasks have not asked yet
 
 
-# the TL;DR (03), in one sentence with the time and the day: the stand-in passes it
-TLDR = "School closes early at 11:30 on Thursday; buses leave at 11:15."
-FULL = '{"name": "Sara Ahmed", "age": 34, "role": "product manager", "city": "Toronto", ' \
-       '"joined": "March 2021"}'
+# the TL;DR (03), in one sentence with the time and the day: the stand-in passes it.
+# 12p.2: the pilot's 02 and 03 are hidden questions — the tests sit invented ones
+# (tests/fixtures/everyday_hidden_invented.jsonl), a pool notice and a librarian
+TLDR = "The fixture pool shuts at 10:45 on Wednesday; lessons move to Friday."
+FULL = '{"name": "Mara Quill", "age": 41, "role": "fixture librarian", "city": "Oslo", ' \
+       '"joined": "May 2019"}'
 BANK = ev.load_bank()
 Q = {q["id"]: q for q in BANK}
 JUDGED = [q["id"] for q in BANK if any(c["type"] == "judge" for c in q["checks"])]
-# 12a.6: 340 questions after the merge, 179 of them hidden
-N, HIDDEN = 340, 179
+# 12a.6: 340 questions after the merge, 179 of them hidden; 12p.2: the repo's 161
+# practice questions and the tests' invented hidden 149
+N, HIDDEN = 310, 149
 HIDDEN_JUDGED = sum(1 for q in BANK if q["id"] in JUDGED and ev.half(q) == ev.HIDDEN)
 
 
@@ -44,7 +47,8 @@ def test_the_judges_questions_and_its_stand_in():
     judge check (the TL;DR, round 2's five and round 3's five), each beside
     script checks. 12a.6: and all of Summarise, 60 — the TL;DR among them —
     on a rubric that scores 0 to 4, passing at 3."""
-    assert len(JUDGED) == 70 and "everyday-pilot-03" in JUDGED
+    # 12p.2: the practice half's 32, and the invented hidden half's 22 Summarise
+    assert len(JUDGED) == 54 and "everyday-pilot-03" in JUDGED
     assert all(q["id"] in JUDGED for q in BANK if q["group"] == "summarising")
     q = Q["everyday-pilot-03"]
     assert q["prompt"].startswith("tldr pls:")
@@ -57,8 +61,8 @@ def test_the_judges_questions_and_its_stand_in():
     v = ev.parse_verdict(ev.stub_reply(p), ev.judge_check(q), q, TLDR)
     assert {k: v[k] for k in ("pass", "score", "scale", "reason")} == {
         "pass": True, "score": 4, "scale": 4, "reason": "4 of 4: all key facts, one version"}
-    assert ev.stub_verdict("School closes early on Thursday.")["pass"] is False
-    assert ev.stub_verdict("Thursday: closes at 11:30. Buses at 11:15. Pickup by 11:45.") == {
+    assert ev.stub_verdict("The fixture pool shuts on Wednesday.")["pass"] is False
+    assert ev.stub_verdict("Wednesday: shuts at 10:45. Lessons Friday. Lockers by 10:30.") == {
         "pass": False, "reason": "more than two sentences"}
     assert ev.parse_verdict('{"pass": "yes"}') is None           # a reply it cannot read
 
@@ -92,7 +96,7 @@ def pilot(*answers) -> dict[str, str]:
 def test_an_unfinished_answer_fails_every_check_with_one_reason(tmp_path):
     mdir = tmp_path / "fx__thinker"
     write_bank(mdir, pilot(*["<think>\nlet me think about february, it has 29 days in a leap "
-                             "year, and the json would be {\"name\": \"Sara Ahmed\"}"] * 5),
+                             "year, and the json would be {\"name\": \"Mara Quill\"}"] * 5),
                budget=2048)
     out = ev.mark(mdir)
     assert [(it["pass"], it["reason"]) for it in out["items"]] == \
@@ -120,7 +124,7 @@ def test_the_thinking_is_never_marked(tmp_path):
     assert out["earlier"] is False and out["unasked"] == N - 5
     got = {it["id"][-2:]: (it["pass"], it["reason"]) for it in out["items"]}
     assert got["01"] == (False, "never mentions: 29, twenty-nine, twenty nine")   # 12a.4
-    assert got["02"][0] is True and got["02"][1].startswith("valid JSON with sara")
+    assert got["02"][0] is True and got["02"][1].startswith("valid JSON with mara quill")
     assert got["03"] == (None, "waiting for the judge")
     assert got["04"][0] is True
     assert got["05"] == (True, "3 lines · at most 15 words")
@@ -141,10 +145,10 @@ def test_a_script_check_that_fails_is_never_sent_to_the_judge(tmp_path):
     they pass. 12a.6: the TL;DR's is Summarise's gate — a time the notice
     never gives fails before any judge"""
     mdir = tmp_path / "fx__x"
-    write_bank(mdir, pilot("29", FULL, "School closes early at 10:30 on Thursday.", "x",
+    write_bank(mdir, pilot("29", FULL, "The fixture pool shuts at 11:15 on Wednesday.", "x",
                            "a\nb\nc"))
     it = ev.mark(mdir)["items"][2]
-    assert it["pass"] is False and it["reason"] == "invented the time 10:30"
+    assert it["pass"] is False and it["reason"] == "invented the time 11:15"
 
 
 def test_a_verdict_is_kept_while_the_answer_is_the_same(tmp_path):
@@ -314,10 +318,11 @@ def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeyp
     runner.run_submission(db.get(sid))
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
     assert row["status"] == "done"
-    # 12g.2: the hidden half's score; the judge marks both halves' 70 (12a.6: Summarise's 60)
+    # 12g.2: the hidden half's score; the judge marks both halves' 54 (12a.6: Summarise's;
+    # 12p.2: the invented hidden half's)
     assert row["progress"] == (f"Everyday tasks: {HIDDEN - HIDDEN_JUDGED} of {HIDDEN} hidden · "
-                               f"the judge is marking 70 · {N} new questions")
-    assert row["judge"]["n_items"] == 70 and row["judge"]["progress"] == "0/70 done"
+                               f"the judge is marking 54 · {N} new questions")
+    assert row["judge"]["n_items"] == 54 and row["judge"]["progress"] == "0/54 done"
     assert row["judge"]["status"] == "submitted"
     # one request per judged question, and nothing else
     sent = [r for r in llm.FakeBatches("fake-judge", config.BENCH_ROOT).recorded()
