@@ -102,3 +102,24 @@ def test_the_encrypted_export_imports():
     assert re.search(r"^pyrage==1\.4\.0", (ROOT / "requirements.txt").read_text(encoding="utf-8"),
                      re.M)
     assert md.version("pyrage") == "1.4.0" and pyrage.x25519.Identity.generate()
+
+
+VENDORED = ("instructions.py", "instructions_registry.py", "instructions_util.py", "utils.py")
+
+
+def test_the_vendored_ifeval_checker_is_lm_evals():
+    """12q: scripts/ifeval_official is lm_eval's IFEval checker, but for its two
+    marked changes — its imports are the folder's own, and punkt is fetched
+    when a sentence is first counted. Both undone, it is the installed one"""
+    lm_eval()
+    import importlib.util
+    theirs = Path(next(iter(importlib.util.find_spec("lm_eval").submodule_search_locations))) \
+        / "tasks" / "ifeval"
+    for name in VENDORED:
+        ours = (ROOT / "scripts" / "ifeval_official" / name).read_text(encoding="utf-8")
+        ours = "".join(x for x in ours.splitlines(keepends=True) if not x.startswith("# 12q:"))
+        ours = ours.replace("from . import ", "from lm_eval.tasks.ifeval import ")
+        ours = ours.replace("\n# download_nltk_resources()  # 12q: on the first sentence counted\n",
+                            "\ndownload_nltk_resources()\n")
+        ours = ours.replace("    download_nltk_resources()  # 12q: here, not on import\n", "")
+        assert ours == (theirs / name).read_text(encoding="utf-8"), name

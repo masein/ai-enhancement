@@ -14,7 +14,11 @@ address here (tests/test_12m3.py) — its models list with prices and dated
 versions (`catalog`), each model's providers (`endpoints`), and a chat
 reply's usage with its cost and reasoning tokens, and the thinking as
 OpenRouter says it (`reasoning_field = "reasoning"`). Nothing reaches
-OpenRouter itself."""
+OpenRouter itself.
+
+12q: a reply's finish reason (`finish`, "length" when a test says the cap cut
+it), and llama-server's own /tokenize and /completion, which the devicemark
+speed test asks: a word a token, and the decode speed a test sets."""
 
 from __future__ import annotations
 
@@ -66,6 +70,11 @@ class FakeServer:
         self.reasoning_field = "reasoning_content"
         self.reasoning_tokens = None             # a function: completion_tokens_details
         self.provider = ""                       # the provider a reply names
+        self.finish = None                       # 12q: a function: a reply's finish_reason
+        self.completions: list[dict] = []        # 12q: every /completion body, as sent
+        self.decode_tok_s = 42.0                 # 12q: /completion's timings say this
+        self.raw_reply = None                    # 12q: a recorded reply, sent as it is
+        self.tokenized: list[str] = []           # 12q: every /tokenize content, as sent
         self._lock = threading.Lock()
         app = FastAPI()
 
@@ -99,6 +108,21 @@ class FakeServer:
         def health():
             return {"status": "ok"}
 
+        @app.post("/tokenize")
+        def tokenize(body: dict):
+            # 12q: a word a token, as far as a test needs one
+            self.tokenized.append(str(body.get("content") or ""))
+            return {"tokens": list(range(len(str(body.get("content") or "").split())))}
+
+        @app.post("/completion")
+        def completion(body: dict):
+            self.completions.append(body)
+            n = int(body.get("n_predict") or 0)
+            return {"content": "x " * n, "tokens_predicted": n,
+                    "timings": {"prompt_n": len(body.get("prompt") or []), "predicted_n": n,
+                                "predicted_per_second": self.decode_tok_s,
+                                "prompt_per_second": 900.0}}
+
         @app.post("/v1/chat/completions")
         def chat(request: Request, body: dict):
             no = refused(request)
@@ -119,6 +143,11 @@ class FakeServer:
                 self.max_in_flight = max(self.max_in_flight, self.in_flight)
             if self.on_request:
                 self.on_request(body)
+            if self.raw_reply is not None:
+                with self._lock:
+                    self.in_flight -= 1
+                    self.answered += 1
+                return self.raw_reply
             if body.get("stream"):
                 return self._stream(request, body)
             try:
@@ -133,8 +162,9 @@ class FakeServer:
                         else len(content.split()) + len((think or "").split()))
                 with self._lock:
                     self.answered += 1
+                fin = self.finish(body) if callable(self.finish) else "stop"
                 out = {"id": "chatcmpl-1", "object": "chat.completion",
-                       "choices": [{"index": 0, "message": msg, "finish_reason": "stop"}],
+                       "choices": [{"index": 0, "message": msg, "finish_reason": fin}],
                        "usage": {"prompt_tokens": self.prompt_tokens, "completion_tokens": used}}
                 if callable(self.reasoning_tokens):
                     out["usage"]["completion_tokens_details"] = {

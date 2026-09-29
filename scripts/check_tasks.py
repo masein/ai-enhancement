@@ -206,6 +206,11 @@ def main() -> int:
         # 12o.3: MobileAIBench's HotpotQA and SQL, from the pinned files
         import mobileaibench
         config.MAB_TASKS_DIR = mobileaibench.build_tasks(Path(tmp) / "mobileaibench-tasks")
+        # 12q: DeviceMark's three, with a stand-in for each question: only whether
+        # lm_eval finds the task is asked, and no dataset is fetched for that
+        import devicemark
+        config.DM_TASKS_DIR = devicemark.build_tasks(Path(tmp) / "devicemark-tasks",
+                                                     devicemark.stand_in_items())
         seen: dict[str, tuple[bool, str, str]] = {}
         # the full suite's second choice, all of BBQ, is checked as its own line
         for suite, tasks in [(s, config.tasks_for_suite(s)) for s in config.SUITES] + [

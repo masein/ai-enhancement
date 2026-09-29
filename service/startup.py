@@ -80,6 +80,10 @@ REQUIRED_REPO_FILES = [
     "eval_tasks/mobileaibench/_mab_template_yaml",
     "eval_tasks/mobileaibench/hotpot_qa.csv",
     "eval_tasks/mobileaibench/sql_create_context.csv",
+    # 12q: devicemark's battery, the ids it was drawn from, and its prompts
+    "eval_tasks/devicemark/battery-v1.json",
+    "eval_tasks/devicemark/source_ids.json",
+    "eval_tasks/devicemark/prompts.json",
     "FRIENDS.md",                           # served at /guide
     "clients/bench_client.py",              # served at /client
     *DELIVERED_TOPIC_FILES,

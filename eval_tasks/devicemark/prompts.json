@@ -1,0 +1,8 @@
+{
+ "version": "devicemark-replica-v1",
+ "what": "12q: DeviceMark's prompts, one file, every row the same: 0-shot, sent through the chat template as the one user message. {fields} are filled from the item; \\boxed{X} and \\boxed{} are text.",
+ "ifeval": "{prompt}",
+ "mmlu_pro": "{question}\n\n{options}\n\nThink step by step, then give your final answer as \\boxed{X}, where X is the letter of the correct option.",
+ "mmlu_pro_option": "{letter}. {option}",
+ "math": "{problem}\n\nSolve it step by step, then put your final answer in \\boxed{}."
+}

@@ -472,10 +472,24 @@ GEN_INSTRUCT_ONLY = ("IFEval, MMLU-Pro and MATH-500 are asked through the chat t
                      "fairly — this one runs as a base model (it has no chat template, or "
                      "was submitted as base)")
 
+# 12q: DeviceMark's protocol (scripts/devicemark.py): its battery of IFEval,
+# MMLU-Pro and MATH, greedy, capped at 4,096 tokens thinking included. A served
+# setup is asked over its server (service/devicemark.py) — the battery, the
+# pilot, the MTP parity check, the speed test; a Hugging Face model sits the
+# battery as these three tasks, on hf. The questions are read on the server
+# from the pinned datasets, into DM_ITEMS
+DM_TASKS = ["dm_ifeval", "dm_mmlu_pro", "dm_math"]
+DM_TASKS_DIR = Path(os.environ.get("DM_TASKS_DIR", BENCH_ROOT / "devicemark" / "tasks"))
+DM_ITEMS = Path(os.environ.get("DM_ITEMS", BENCH_ROOT / "devicemark" / "items-v1.jsonl"))
+DM_PARTS = ("full", "pilot", "parity", "speed")
+DM_INSTRUCT_ONLY = ("DeviceMark's battery is asked through the chat template and scored on "
+                    "what the model writes, so only an instruct model can sit it — this one "
+                    "runs as a base model")
+
 # every suite a run can ask for; scripts/check_tasks.py (deploy step 4) asks
 # the installed lm_eval to find every task of each
 SUITES = ("quick", "full", "control", "judged", "everyday", "generative", "safety", "shared",
-          "mobile")
+          "mobile", "devicemark")
 
 
 def tasks_for_suite(suite: str, bbq_all: bool = False) -> list[str]:
@@ -493,6 +507,8 @@ def tasks_for_suite(suite: str, bbq_all: bool = False) -> list[str]:
         return list(SHARED_TASKS)
     if suite == "mobile":
         return list(MAB_TASKS)
+    if suite == "devicemark":
+        return list(DM_TASKS)
     if suite == "judged":
         return judged_tasks()
     base = QUICK_TASKS if suite == "quick" else FULL_TASKS

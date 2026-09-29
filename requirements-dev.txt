@@ -12,3 +12,8 @@ uvicorn
 httpx            # fastapi.testclient
 pydantic
 pyrage==1.4.0    # 12p.1: the encrypted export's round trip is tested
+# 12q: IFEval's official checkers (scripts/ifeval_official, lm_eval 0.4.12's,
+# vendored) import these; the image has them through lm_eval[ifeval]
+langdetect==1.0.9
+nltk==3.10.3
+immutabledict==4.3.1

@@ -18140,9 +18140,16 @@ state.suiteOpen = new Set();
 const SUITE_NAMES = { full: 'Standard', quick: 'Standard · quick', control: 'MMLU control',
   judged: 'Knowledge exam', everyday: 'Everyday tasks', generative: 'Instruction & maths',
   safety: 'Trust & safety', gguf: 'Measured on the GGUF',
-  shared: 'Shared with the frontier', mobile: 'Mobile tasks (MobileAIBench)' };
+  shared: 'Shared with the frontier', mobile: 'Mobile tasks (MobileAIBench)',
+  devicemark: 'DeviceMark protocol' };
+// 12q: a devicemark run says its part: the battery, the pilot, the parity
+// check against the setup without MTP, or the speed test
+const DM_PARTS = { pilot: 'pilot (30 items)', parity: 'MTP parity', speed: 'speed test' };
 function suiteWords(r) {
   const w = SUITE_NAMES[r.suite] || r.suite;
+  if (r.suite === 'devicemark')
+    return [w, DM_PARTS[r.part], r.part === 'parity' && r.pair ? 'against ' + r.pair : '']
+      .filter(Boolean).join(' · ');
   return r.suite === 'full' && r.bbq_all ? w + ' · all of BBQ' : w;
 }
 // 12m.1: a run's model, and a GGUF run's setup with it:

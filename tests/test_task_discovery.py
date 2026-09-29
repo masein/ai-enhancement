@@ -115,10 +115,12 @@ def test_the_check_finds_every_task_of_every_suite(harness, bench, capsys):
                        "shared    2 of 2 found",
                        # 12o.3: MobileAIBench's HotpotQA and SQL
                        "mobile    2 of 2 found",
+                       # 12q: DeviceMark's battery, as a Hugging Face model sits it
+                       "devicemark 3 of 3 found",
                        # 12k.2: and all of BBQ, the second choice
                        "full, all of BBQ 1 of 1 found",
                        "gpqa      (not asked in tests)",
-                       "tasks OK: 25 of 25 found by lm_eval 0.4.12-fake"]
+                       "tasks OK: 28 of 28 found by lm_eval 0.4.12-fake"]
     # it wrote nothing outside its temporary folder
     assert sorted(p.name for p in bench.iterdir()) == ["everyday", "exam"]
     assert list((bench / "everyday" / "tasks").iterdir()) == []
@@ -133,7 +135,7 @@ def test_the_check_catches_what_failed_62_to_65(harness, bench, capsys, monkeypa
             f"lm_eval runs, and lm_eval reads a --tasks value that names a folder as a folder "
             f"of task files") in out
     assert "everyday  0 of 1 found" in out and "judged    3 of 3 found" in out
-    assert out.rstrip().endswith("tasks FAILED: 24 of 25 found by lm_eval 0.4.12-fake — "
+    assert out.rstrip().endswith("tasks FAILED: 27 of 28 found by lm_eval 0.4.12-fake — "
                                  "not found: everyday")
 
 

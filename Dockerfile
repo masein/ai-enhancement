@@ -98,6 +98,9 @@ COPY eval_tasks/simpleqa/ eval_tasks/simpleqa/
 # 12o.3: MobileAIBench's HotpotQA and SQL samples (Apache-2.0; CC BY-SA 4.0 and
 # CC BY 4.0 under them), pinned — mobileaibench.build_tasks() writes their tasks
 COPY eval_tasks/mobileaibench/ eval_tasks/mobileaibench/
+# 12q: DeviceMark's battery (ids only), its source ids and its prompts —
+# devicemark.load_items reads the questions for them from the pinned datasets
+COPY eval_tasks/devicemark/ eval_tasks/devicemark/
 COPY FRIENDS.md ./
 
 # the same check the service runs at startup, at BUILD time: an image missing
