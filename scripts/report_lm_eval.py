@@ -1073,6 +1073,12 @@ def load_everyday(out_dir: Path | None) -> dict | None:
     # 12p.1: without its hidden set the bank can't score it: each model's
     # scores are shown as they were last marked, and nothing is marked again
     paused = ev.hidden_status()["why"]
+    # 12p.3: the versions scored on a hidden set since switched out
+    try:
+        retired_sets = {r["old_version"] for r in json.loads(
+            (ev.built_dir() / "switches.json").read_text(encoding="utf-8"))}
+    except (OSError, ValueError, KeyError, TypeError):
+        retired_sets = set()
     # 12g.2: the split — the hidden half scores and is never shown; the page
     # gets the practice half's questions and answers, and the hidden counts
     half_of = {q["id"]: ev.half(q) for q in qs}
@@ -1097,6 +1103,8 @@ def load_everyday(out_dir: Path | None) -> dict | None:
                 "passed": e.get("passed", sum(1 for it in e["items"] if it.get("pass") is True)),
                 "total": e.get("total", len(e["items"])), "marked_at": e.get("marked_at"),
                 "hash": ver, "label": ev.BEFORE_SPLIT if not stamp.get("split")
+                # 12p.3: marked before the owner switched to a new hidden set
+                else "scored on the retired hidden set" if ver in retired_sets
                 else "an earlier wording"}
             continue
         # a question the bank no longer holds is not shown (and not counted)
@@ -19378,7 +19386,9 @@ async function loadQbDraft(id) {
   const Q = state.qb;
   if (Q.draftAsked) return;
   Q.draftAsked = true;
-  try { Q.draft = await api('api/builder/' + encodeURIComponent(id)); Q.msg = ''; }
+  // 12p.3: a draft for the hidden set is its owner's: the name goes with the ask
+  try { Q.draft = await api('api/builder/' + encodeURIComponent(id) + '?by='
+    + encodeURIComponent(whoName() || '')); Q.msg = ''; }
   catch (e) { Q.msg = e.message; Q.draft = null; }
   Q.draftAsked = false;
   if (state.tab === 'build') render();
@@ -19402,7 +19412,8 @@ function qbOpen(id) {
   navigate({ tab: 'build', model: null, topic: null });
 }
 const qbWhat = d => d.kind === 'knowledge' ? `${d.spec.topic} · ${d.spec.level}`
-  : `Everyday · ${d.spec.group_label || d.spec.group}`;
+  : `Everyday · ${d.spec.group_label || d.spec.group}`
+    + (d.spec.target === 'hidden' ? ' · for the new hidden set' : '');
 
 function vBuild() {
   const Q = state.qb;
@@ -19425,8 +19436,112 @@ function vBuild() {
     steps, Q.msg ? el('p', { class: 'warn', text: Q.msg }) : '');
   if (!Q.page) return [head, el('div', { class: 'card' }, skeleton(4, { 'data-loading': 'qb' }))];
   if (Q.id && !d) return [head, el('div', { class: 'card' }, skeleton(4, { 'data-loading': 'qb-draft' }))];
-  if (!d) return [head, qbPast(), qbStepOne(), qbDrafts()];
+  if (!d) return [head, qbPast(), qbHiddenSet(), qbStepOne(), qbDrafts()];
   return [head, qbDraftCard(d)];
+}
+
+// 12p.3: a new hidden set for Everyday — its plan and cost before anything
+// starts, the owner's drafts, and the switch, once every group has its new
+// questions. Written any time; switched to when the owner says
+function qbHiddenSet() {
+  const Q = state.qb;
+  const R = Q.rot = Q.rot || { loaded: false };
+  if (!R.loaded && !R.loading && netReady()) {
+    R.loading = true;
+    api('api/everyday/rotation').then(j => { R.v = j; }).catch(() => { R.v = null; })
+      .finally(() => { R.loading = false; R.loaded = true; render(); });
+  }
+  const v = R.v, owner = evdOwner();
+  if (!R.loaded) return el('div', { class: 'card' }, skeleton(3, { 'data-loading': 'rot' }));
+  if (!v || !(v.groups || []).length) return '';
+  const again = () => { Object.assign(R, { loaded: false, cands: null }); render(); };
+  const table = el('table', { class: 'tbl', 'data-rot-groups': String(v.groups.length) },
+    el('thead', {}, el('tr', {}, ['Group', 'Hidden now', 'New ready', 'To write', 'Cost']
+      .map(t => el('th', { text: t })))),
+    el('tbody', {}, v.groups.map(g => el('tr', { 'data-rot-group': g.group },
+      el('td', { text: g.label }), el('td', { class: 'num', text: String(g.target) }),
+      el('td', { class: 'num', 'data-rot-staged': g.group,
+        text: `${g.staged} of ${g.target}` + (g.running ? ' · being written' : '') }),
+      el('td', { class: 'num', text: String(g.write) }),
+      el('td', { class: 'num', text: g.estimate.usd == null ? '—'
+        : `$${g.estimate.usd.toFixed(2)}` })))));
+  const rules = el('ul', { class: 'small', 'data-rot-rules': v.rules.every(r => r.ok) ? 'ok' : 'no' },
+    v.rules.map(r => el('li', { class: r.ok ? '' : 'st-bad', 'data-rot-rule': r.ok ? 'ok' : 'no' },
+      `${r.ok ? '✓' : '✗'} ${r.rule} — ${r.line}`)));
+  const est = v.estimate;
+  const start = owner ? el('button', { class: 'primary', 'data-rot-start': '1',
+    disabled: v.can_start ? null : '', text: 'Start writing it…',
+    onclick: () => qbRotConfirm('start', `Start writing a new hidden set: ${est.line}.`,
+      'The first ten of each group’s draft are asked of the writer now; the rest after your '
+      + 'review, as any draft.', async () => {
+        await post('api/everyday/rotation/start', { by: whoName(), confirm: true });
+        again(); loadQb(true);
+      }) }) : '';
+  const cands = R.cands;
+  const sw = !v.can_switch ? '' : !owner
+    ? el('p', { class: 'small', text: 'Every group has its new questions: the board’s owner '
+      + 'switches to them.' })
+    : !cands ? el('button', { 'data-rot-review': '1', text: 'Review the old set to switch…',
+        onclick: async () => {
+          try {
+            R.cands = (await api('api/everyday/rotation/candidates?by='
+              + encodeURIComponent(whoName() || ''))).candidates;
+            R.retire = new Set(R.cands.map(c => c.id));
+          } catch (e) { R.msg = String(e.message || e); }
+          render();
+        } })
+    : el('div', { 'data-rot-switch': '1' },
+      el('p', { class: 'small', text: `The old set becomes practice questions — it has been `
+        + `public — but for the ones you retire. ${cands.length} worth retiring, each with why `
+        + '(ticked: retired):' }),
+      el('ul', { class: 'small rotcands' }, cands.map(c => el('li', { 'data-rot-cand': c.id },
+        el('label', {}, el('input', { type: 'checkbox', checked: R.retire.has(c.id) ? '' : null,
+          onchange: e => { e.target.checked ? R.retire.add(c.id) : R.retire.delete(c.id); } }),
+          ` ${c.prompt}`), el('span', { class: 'se', text: ` · ${c.group} · ${c.why.join('; ')}` })))),
+      el('button', { class: 'primary', 'data-rot-go': '1', text: 'Switch to the new set…',
+        onclick: () => qbRotConfirm('switch', 'Switch Everyday to the new hidden set?',
+          'Every model’s Everyday score moves to History, “scored on the retired hidden set”; '
+          + 'each is asked the new questions on its next run. '
+          + `${R.retire.size} of the old set retired, the rest made practice.`, async () => {
+            await post('api/everyday/rotation/switch', { by: whoName(), confirm: true,
+              retire: [...R.retire] });
+            again();
+          }) }));
+  return el('div', { class: 'card', 'data-rot': v.can_switch ? 'ready' : 'plan' },
+    el('h2', { text: 'A new hidden set for Everyday' }),
+    el('p', { class: 'sub', text: 'Written now, switched to when you say: new hidden questions '
+      + 'change every Everyday score. Each group’s draft is the board’s owner’s, reviewed as any '
+      + 'draft is; what it publishes waits, shown nowhere and scoring nothing, until the switch.' }),
+    table, rules,
+    el('p', { class: 'small', 'data-rot-estimate': est.usd == null ? '' : String(est.usd),
+      text: `Cost: ${est.line}` + (est.usd ? ` (writer $${est.parts.writer.toFixed(2)} · `
+        + `checker $${est.parts.checker.toFixed(2)} · judge $${est.parts.judge.toFixed(2)})` : '') }),
+    owner ? '' : el('p', { class: 'small se', text: 'The board’s owner writes and switches a '
+      + 'hidden set.' }),
+    v.why && owner ? el('p', { class: 'small', 'data-rot-why': '1', text: v.why }) : '',
+    R.msg ? el('p', { class: 'warn', text: R.msg }) : '',
+    el('div', { class: 'rvbar' }, start), sw,
+    (v.switches || []).length ? el('p', { class: 'small se', 'data-rot-switched': '1',
+      text: v.switches.map(x => `Switched ${new Date(x.at * 1000).toISOString().slice(0, 10)} by `
+        + `${x.by}: ${x.count} new, ${x.to_practice} to practice, ${x.retired.length} retired`)
+        .join(' · ') }) : '');
+}
+function qbRotConfirm(key, title, body, run) {
+  const back = el('div', { class: 'dlg-back', 'data-dialog': 'rot-' + key });
+  const err = el('div', { class: 'warn', hidden: '', 'data-dialog-error': '1' });
+  const close = () => back.remove();
+  const go = el('button', { class: 'primary', 'data-rot-confirm': key, text: key === 'switch'
+    ? 'Switch' : 'Start', onclick: async () => {
+      go.disabled = true;
+      try { await run(); close(); }
+      catch (e) { err.hidden = false; err.textContent = String(e.message || e); go.disabled = false; }
+    } });
+  back.append(el('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true' },
+    el('h2', { text: title }), el('p', { text: body }), err,
+    el('div', { class: 'dlg-actions' },
+      el('button', { 'data-dialog-cancel': '1', text: 'Cancel', onclick: close }), go)));
+  document.body.append(back);
+  go.focus();
 }
 
 // 12i.4: the batches published so far, newest first — ten, then Show all

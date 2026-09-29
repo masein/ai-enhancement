@@ -1802,6 +1802,7 @@ class BuildIn(BaseModel):
     dedup: bool = True
     prompt: str = ""
     by: str = ""
+    target: str = ""                      # 12p.3: "hidden", for a new hidden set
 
 
 @app.post("/api/builder")
@@ -1823,9 +1824,17 @@ def _draft(draft_id: str) -> dict:
         raise HTTPException(404, f"no draft {draft_id}") from None
 
 
+def _draft_for(draft_id: str, by: str) -> dict:
+    """12p.3: a draft for the hidden set is the board's owner's alone"""
+    d = _draft(draft_id)
+    if (d.get("spec") or {}).get("target") == "hidden" and not _is_owner(by):
+        raise HTTPException(403, "A draft for the hidden set is the board's owner's")
+    return d
+
+
 @app.get("/api/builder/{draft_id}")
-def builder_draft(draft_id: str):
-    return builder.view(_draft(draft_id))
+def builder_draft(draft_id: str, by: str = ""):
+    return builder.view(_draft_for(draft_id, by))
 
 
 class BuildReviewIn(BaseModel):
@@ -1839,7 +1848,7 @@ class BuildReviewIn(BaseModel):
 @app.post("/api/builder/{draft_id}/review")
 def builder_review(draft_id: str, a: BuildReviewIn, x_token: str = Header(default="")):
     _check_token(x_token)
-    _draft(draft_id)
+    _draft_for(draft_id, a.by)
     by = _name(a.by, "a review")
     try:
         d = builder.review(draft_id, a.n, a.verdict, by, a.reason, a.edited or None)
@@ -1857,7 +1866,7 @@ class BuildDupIn(BaseModel):
 @app.post("/api/builder/{draft_id}/duplicate")
 def builder_duplicate(draft_id: str, a: BuildDupIn, x_token: str = Header(default="")):
     _check_token(x_token)
-    _draft(draft_id)
+    _draft_for(draft_id, a.by)
     by = _name(a.by, "a choice between duplicates")
     try:
         d = builder.resolve_dup(draft_id, a.n, a.keep, by)
@@ -1874,7 +1883,7 @@ class BuildByIn(BaseModel):
 def builder_step(draft_id: str, step: str, a: BuildByIn, x_token: str = Header(default="")):
     """rest (make the rest, checked), cancel, resume, publish"""
     _check_token(x_token)
-    _draft(draft_id)
+    _draft_for(draft_id, a.by)
     by = _name(a.by, "this step")
     fn = {"rest": builder.rest, "cancel": builder.cancel, "resume": builder.resume,
           "publish": builder.publish}.get(step)
@@ -1893,6 +1902,74 @@ def builder_step(draft_id: str, step: str, a: BuildByIn, x_token: str = Header(d
         out["version"] = (fp.get(builder._task(_draft(draft_id))) or "")[:12]
     _cache.update(key=None, payload=None, at=0.0)
     return {"published": out, "draft": builder.view(_draft(draft_id))}
+
+
+# ---------------------------------------------------------------------------
+# 12p.3: a new hidden set for Everyday — planned with its cost, written as
+# Build questions drafts for the hidden set, staged, and switched to by the
+# board's owner when they say
+# ---------------------------------------------------------------------------
+
+@app.get("/api/everyday/rotation")
+def rotation_plan():
+    """per group, what the new set takes; the models and their two rules; the
+    cost of all of it — counts and prices, never a question"""
+    from . import rotation
+    return rotation.plan()
+
+
+class RotationStartIn(BaseModel):
+    by: str = ""
+    confirm: bool = False
+
+
+@app.post("/api/everyday/rotation/start")
+def rotation_start(a: RotationStartIn, x_token: str = Header(default="")):
+    """the drafts, once the owner has seen the cost"""
+    from . import rotation
+    _check_token(x_token)
+    if a.confirm is not True:
+        raise HTTPException(428, "Start writing a new hidden set: " + rotation.plan()[
+            "estimate"]["line"])
+    try:
+        made = rotation.start(a.by)
+    except PermissionError as e:
+        raise HTTPException(403, str(e)) from None
+    except (ValueError, llm.LLMError) as e:
+        raise HTTPException(422, str(e)) from None
+    return {"drafts": made, "plan": rotation.plan()}
+
+
+@app.get("/api/everyday/rotation/candidates")
+def rotation_candidates(by: str = ""):
+    """the old hidden questions worth retiring, with why — the owner's, and an
+    opening of the hidden half, so logged"""
+    from . import rotation
+    if not _is_owner(by):
+        raise HTTPException(403, "Only the board's owner opens the hidden half")
+    got = rotation.candidates()
+    db.hidden_audit_add(by.strip()[:80], "Everyday's hidden set · the switch's review", len(got))
+    return {"candidates": got, "warning": AUDIT_WARNING}
+
+
+class RotationSwitchIn(BaseModel):
+    by: str = ""
+    confirm: bool = False
+    retire: list[str] = []
+
+
+@app.post("/api/everyday/rotation/switch")
+def rotation_switch(a: RotationSwitchIn, x_token: str = Header(default="")):
+    from . import rotation
+    _check_token(x_token)
+    try:
+        rec = rotation.switch(a.by, a.retire, a.confirm)
+    except PermissionError as e:
+        raise HTTPException(403, str(e)) from None
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from None
+    _cache.update(key=None, payload=None, at=0.0)
+    return rec
 
 
 # ---------------------------------------------------------------------------

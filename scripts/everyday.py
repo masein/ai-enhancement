@@ -203,6 +203,16 @@ def manifest_of(rows: list[dict]) -> dict:
     return {"count": len(rows), "groups": counts, "digest": hidden_digest(rows)}
 
 
+def switched_digests() -> set[str]:
+    """12p.3: the hidden sets the owner switched to (service/rotation.py) —
+    accepted as the committed one is, until the manifest is committed again"""
+    try:
+        return {r["new_digest"] for r in json.loads(
+            (built_dir() / "switches.json").read_text(encoding="utf-8"))}
+    except (OSError, ValueError, KeyError, TypeError):
+        return set()
+
+
 def hidden_status() -> dict:
     """{ok, state, count, why}: "store" (on the data volume, as committed),
     "repo" (still in the repo's bank, not moved yet), "unchecked" (nothing
@@ -214,7 +224,8 @@ def hidden_status() -> dict:
             rows = _raw_rows(p)
         except (OSError, ValueError):
             rows = None
-        if rows is not None and (not m or hidden_digest(rows) == m.get("digest")):
+        if rows is not None and (not m or hidden_digest(rows) in (
+                {m.get("digest")} | switched_digests())):
             return {"ok": True, "state": "store" if m else "unchecked", "count": len(rows),
                     "why": ""}
         return {"ok": False, "state": "changed", "count": len(rows or []),
