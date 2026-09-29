@@ -178,6 +178,21 @@ EVERYDAY_TASKS_DIR = Path(os.environ.get("EVERYDAY_TASKS_DIR", BENCH_ROOT / "eve
 # this many questions — a score from fewer is noise, and training toward it
 # would chase noise. One setting
 EVERYDAY_MIN_HIDDEN = int(os.environ.get("EVERYDAY_MIN_HIDDEN", "20"))
+# 12p.1: what Everyday's hidden set and the exam's report half should be —
+# committed as a count and a digest, and the report half's qids (public
+# already); the sets themselves live on the data volume
+HIDDEN_MANIFEST = Path(os.environ.get(
+    "HIDDEN_MANIFEST", Path(__file__).resolve().parent.parent / "eval_tasks" / "everyday"
+    / "hidden_manifest.json"))
+EXAM_REPORT_MANIFEST = Path(os.environ.get(
+    "EXAM_REPORT_MANIFEST", Path(__file__).resolve().parent.parent / "eval_tasks" / "fr"
+    / "report_manifest.json"))
+# 12p.1: backups of what lives only on the data volume, on another disk; and
+# an age public key for `hidden_store backup --export` (the server can
+# encrypt with it and never decrypt)
+BACKUP_DIR = Path(os.environ.get("BACKUP_DIR", "/data-03/evalboard-backups"))
+BACKUP_KEEP = int(os.environ.get("BACKUP_KEEP", "14"))
+BACKUP_AGE_RECIPIENT = os.environ.get("EVALBOARD_BACKUP_AGE_RECIPIENT", "").strip()
 # 12k.2: Trust & safety (scripts/trust_safety.py). Do-Not-Answer and XSTest
 # are the "safety" suite: asked through the chat template with the Everyday
 # settings, marked by the judge. BBQ is in the full suite. All four are

@@ -96,7 +96,8 @@ def test_saving_a_model_pins_its_version_and_provider_and_requests_never_fall_ba
     assert len(fake.chat) == 2
     for req in fake.chat:
         assert req["model"] == "z-ai/glm-5.3"
-        assert req["provider"] == {"order": ["inference-net"], "allow_fallbacks": False}
+        assert req["provider"] == {"order": ["inference-net"], "allow_fallbacks": False,
+                                   "data_collection": "deny"}       # 12p.1
     # its cost counts against the month, as OpenRouter reported it
     assert db.spend_this_month() == pytest.approx(0.002)
     assert db.spend_this_month_by_job() == {"data": pytest.approx(0.002)}

@@ -75,6 +75,8 @@ class FakeOpenRouter:
         self.calls: list[tuple[str, str]] = []      # (method, path)
         self.chat: list[dict] = []                   # every chat completion's body
         self.embedded: list[dict] = []               # every embeddings request's body
+        self.probes: list[dict] = []                 # 12p.1: each pin's one-token question
+        self.collects: set[str] = set()              # providers that may train on prompts
         self.reply = default_reply
         self.cost = 0.001                            # dollars a completion reports
 
@@ -101,6 +103,15 @@ class FakeOpenRouter:
             return 200, json.dumps({"data": {"id": m.group(1), "endpoints": ENDPOINTS}}).encode()
         if path == "/chat/completions":
             req = json.loads(body)
+            prov = req.get("provider") or {}
+            if prov.get("data_collection") == "deny" and set(prov.get("order") or []) & self.collects:
+                return 404, json.dumps({"error": {"message": "No endpoints found matching your "
+                                                             "data policy"}}).encode()
+            if req.get("max_tokens") == 1 and req["messages"][-1]["content"] == "ping":
+                self.probes.append(req)
+                return 200, json.dumps({"choices": [{"message": {"content": "p"}}],
+                                        "usage": {"prompt_tokens": 1, "completion_tokens": 1,
+                                                  "cost": 0.0}}).encode()
             self.chat.append(req)
             return 200, json.dumps({
                 "choices": [{"message": {"content": self.reply(req)}, "finish_reason": "stop"}],

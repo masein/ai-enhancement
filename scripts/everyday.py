@@ -148,6 +148,93 @@ def built_path() -> Path:
     return built_dir() / "built.jsonl"
 
 
+# ---------------------------------------------------------------------------
+# 12p.1: the hidden half lives on the data volume (BENCH_ROOT/everyday/
+# hidden.jsonl), beside what the builder published and the edits — never in
+# the repo, which is mirrored in public. What it should be is committed as a
+# count and a digest (eval_tasks/everyday/hidden_manifest.json); when the set
+# is missing or doesn't match, Everyday runs and scoring stop until it is
+# restored, and every page says so. The rest of the board works
+# ---------------------------------------------------------------------------
+
+HIDDEN_NAME = "hidden.jsonl"
+RESTORE = "sudo docker compose exec -T bench python -m service.hidden_store restore"
+
+
+class HiddenMissing(RuntimeError):
+    """Everyday's hidden set is missing or changed: nothing is scored until
+    it is restored"""
+
+
+def hidden_path() -> Path:
+    return built_dir() / HIDDEN_NAME
+
+
+def _raw_rows(path: Path) -> list[dict]:
+    """a bank file's rows as written — no check, no upgrade — for its digest"""
+    return [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
+
+
+def hidden_digest(rows: list[dict]) -> str:
+    """the hidden set's digest: its rows as written, in id order"""
+    lines = sorted(json.dumps(q, ensure_ascii=False, sort_keys=True) for q in rows)
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def repo_hidden() -> list[dict]:
+    """the hidden half as the repo's bank holds it, each row marked hidden —
+    what `hidden_store move` writes to the store"""
+    return [{**q, "half": HIDDEN} for q in _raw_rows(BANK_PATH) if half(q) == HIDDEN]
+
+
+def hidden_manifest() -> dict | None:
+    from service import config
+    try:
+        return json.loads(Path(config.HIDDEN_MANIFEST).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def manifest_of(rows: list[dict]) -> dict:
+    """what is committed of a hidden set: how many, per group, and its digest"""
+    counts: dict[str, int] = {}
+    for q in rows:
+        counts[q["group"]] = counts.get(q["group"], 0) + 1
+    return {"count": len(rows), "groups": counts, "digest": hidden_digest(rows)}
+
+
+def hidden_status() -> dict:
+    """{ok, state, count, why}: "store" (on the data volume, as committed),
+    "repo" (still in the repo's bank, not moved yet), "unchecked" (nothing
+    committed to check it against), "changed" or "missing" — the last two
+    stop Everyday runs and scoring"""
+    m, p = hidden_manifest(), hidden_path()
+    if p.exists():
+        try:
+            rows = _raw_rows(p)
+        except (OSError, ValueError):
+            rows = None
+        if rows is not None and (not m or hidden_digest(rows) == m.get("digest")):
+            return {"ok": True, "state": "store" if m else "unchecked", "count": len(rows),
+                    "why": ""}
+        return {"ok": False, "state": "changed", "count": len(rows or []),
+                "why": "Everyday's hidden set is missing or changed: restore it · " + RESTORE}
+    rows = repo_hidden()
+    if not m:
+        return {"ok": True, "state": "unchecked", "count": len(rows), "why": ""}
+    if rows and hidden_digest(rows) == m.get("digest"):
+        return {"ok": True, "state": "repo", "count": len(rows), "why": ""}
+    return {"ok": False, "state": "missing", "count": 0,
+            "why": "Everyday's hidden set is missing or changed: restore it · " + RESTORE}
+
+
+def need_hidden() -> None:
+    """HiddenMissing, with the banner's words, unless the hidden set is here"""
+    st = hidden_status()
+    if not st["ok"]:
+        raise HiddenMissing(st["why"])
+
+
 def groups() -> dict[str, str]:
     """the eight groups, then any the question builder added (id -> label),
     in the order the page shows them"""
@@ -168,8 +255,19 @@ def load_bank(path: Path | None = None) -> list[dict]:
 
 
 def _base_bank() -> list[dict]:
-    """the repo's bank and what the question builder published, before any edit"""
+    """the repo's bank and what the question builder published, before any edit.
+    12p.1: and the hidden half from the data volume — in the repo's place where
+    the repo still holds it, else after its group's questions"""
     rows = _read_bank(BANK_PATH)
+    hid = hidden_path()
+    if hid.exists():
+        store = {q["id"]: q for q in _read_bank(hid)}
+        rows = [store.pop(q["id"], q) for q in rows]
+        if store:
+            order = list(groups())
+            rows = sorted(rows + list(store.values()),
+                          key=lambda q: order.index(q["group"]) if q["group"] in order
+                          else len(order))
     built = built_path()
     if built.exists():
         ids = {q["id"] for q in rows}
@@ -1897,6 +1995,7 @@ def mark(model_dir: Path, verdicts: dict[str, dict] | None = None,
     marks can say "55 new questions · 333 re-marked". A model with no answer
     to today's words at all is marked as 12a.4 marked it: its answers are to
     an earlier wording, and stay as they were marked."""
+    need_hidden()                 # 12p.1: nothing is scored without the hidden set
     got = keep_answers(model_dir)
     bank = load_bank()
     now = version()
@@ -2073,7 +2172,7 @@ def build_task(dest: Path, only: list[str] | None = None) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
     bank = load_bank()                # a bad bank fails here, before any GPU
     items = dest / f"{TASK}.jsonl"
-    if only is None and not built_path().exists():
+    if only is None and not built_path().exists() and not hidden_path().exists():
         shutil.copyfile(BANK_PATH, items)
     else:
         want = set(only) if only is not None else {q["id"] for q in bank}
