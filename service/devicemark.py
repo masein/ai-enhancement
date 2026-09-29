@@ -472,3 +472,48 @@ def mark_hf(sid: int, sub: dict, meta: dict, row: Path, thinking: dict) -> str:
              "lookahead": False, "mtp": False, "quant": "bf16", "battery": d.VERSION,
              "cap": d.CAP, "seed": d.SEED, "revision": meta.get("revision")}
     return summary_line(d.mark(row, items, setup, records, "full"))
+
+
+# ---------------------------------------------------------------------------
+# 12q.C: a row's answers, for the model page's Answers tab
+# ---------------------------------------------------------------------------
+
+ANSWERS_PAGE = 50
+
+
+def answers(model: str, thinking: bool, bench: str = "", offset: int = 0,
+            limit: int = ANSWERS_PAGE) -> dict | None:
+    """every item of a row (public benchmark items, all of them): the
+    question, the output with its thinking apart, what was read from it, the
+    answer, pass or fail, its tokens and whether it ran out of room — no
+    answer first, then wrong, then right. One bench, or all; a page at a time.
+    None when the row has no answers here"""
+    from . import questions
+    d = dm()
+    rdir = row_dir(model, thinking)
+    if not (rdir / d.ITEMS_NAME).exists():
+        return None
+    rows, counts = [], {}
+    for task, b in questions.DM_TASKS.items():
+        got = questions._dm_rows(task, rdir)
+        c = counts[b] = {"n": 0, "no_answer": 0, "wrong": 0, "capped": 0}
+        for key, x in got.items():
+            r = x["res"]
+            c["n"] += 1
+            c["no_answer"] += not r["answered"]
+            c["wrong"] += r["answered"] and not r["ok"]
+            c["capped"] += r["capped"]
+            if bench and b != bench:
+                continue
+            rows.append({"bench": b, "key": key, "q": x["q"], "options": x["options"],
+                         "subject": x["subject"], "gold": x["reference"], "parsed": r["parsed"],
+                         "answered": r["answered"], "ok": r["ok"], "capped": r["capped"],
+                         "tokens": r["tokens"], "answer": r["answer"], "thinking": r["thinking"],
+                         "verdict": r["verdict"], "_order": x["order"]})
+    rows.sort(key=lambda x: (0 if not x["answered"] else 1 if not x["ok"] else 2,
+                             d.BENCHES.index(x["bench"]), x["_order"][1]))
+    for x in rows:
+        del x["_order"]
+    return {"model": model, "thinking": bool(thinking), "bench": bench or None,
+            "total": len(rows), "offset": offset, "counts": counts,
+            "items": rows[offset:offset + limit]}

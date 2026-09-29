@@ -3607,6 +3607,15 @@ details.howto .about { margin-top:12px; }
    12px on the screen; on a phone it scrolls sideways in its own box */
 .chartscroll { overflow-x:auto; }
 .chartscroll > svg { display:block; max-width:680px; }
+/* 12q.C: a model's DeviceMark card: its parts, the one "Open results" opened marked,
+   and a row the chart was sent to */
+.dmcard .dmpart { margin-top:14px; padding-top:10px; border-top:1px solid var(--border); }
+.dmcard .dmpart.dmfocus, table.lb.dmtable tr.dmfocus td { background:var(--accent-soft); }
+/* what "Open results" scrolls to lands below the bar, not under it */
+.dmcard .dmpart, table.lb.dmtable tr[data-dm-row], [data-kind-block^="dm"] {
+  scroll-margin-top:calc(var(--bar-h) + 12px); }
+.dmans { border-top:1px solid var(--border); }
+.dmans-head .badge { margin-left:6px; }
 /* 12q.B2: the On-device chart is drawn at its card's width */
 .chartscroll > svg.dmchart { max-width:none; }
 /* Weakest topics on a phone: HTML rows, not a shrunken SVG */
@@ -4652,7 +4661,9 @@ const state = {
   trXAxis: 'step',                     // benchmark-join chart: step | tokens | compute
   cmpSel: [], cmpColors: {}, cmpOpen: {},
   rep: {},                                                 // 12m.2: api/reported, loaded once
-  dm: { sel: null, edit: null },                           // 12q.B: api/devicemark, the On-device chart                               // radar: compared models (≤CMP_MAX)
+  dm: { sel: null, edit: null, focus: null, flash: null },
+  dmAns: {},                                               // 12q.C: a model's DeviceMark answers
+  dmPart: null,                                            // 12q.C: the run "Open results" opened                           // 12q.B: api/devicemark, the On-device chart                               // radar: compared models (≤CMP_MAX)
   accScale: 'raw',                     // task panels: 'raw' | 'chance' (diverging)
   cmpEvicted: '',                      // last model the compare FIFO dropped
   radarNorm: 'chance', radarAxes: 'tasks',                 // radar scaling / axis mode
@@ -6528,10 +6539,17 @@ function modelKinds(m) {
     (servedOf(m.id) || {}).phone ? { kind: 'phone', label: 'On the phone · reported',
       taken: phoneReports(m.id).length > 0 || !!state.phone.open[m.id],
       at: (phoneReports(m.id)[0] || {}).at || 0 } : null,
+    // 12q.C: DeviceMark's protocol, a card for each thinking mode it ran
+    ...Object.entries(DM_KINDS).map(([kind, [mode, label]]) => {
+      const c = (dmRunsOf(m.id) || {})[mode];
+      return c ? { kind, label, taken: true, at: Math.max(0, ...[c.row, c.pilot, c.parity, c.speed]
+        .map(x => (x || {}).at || 0)) } : null;
+    }),
   ].filter(Boolean);
 }
 // a kind's one number, and the line under it
 function kindValue(m, kind) {
+  if (DM_KINDS[kind]) return dmKindValue(m, DM_KINDS[kind][0]);
   if (kind === 'phone') {
     const r = phoneReports(m.id)[0];
     if (!r) return ['—', 'nothing reported from the phone yet'];
@@ -6726,9 +6744,9 @@ function servedSetups(m) {
   return el('div', { class: 'lb-wrap', 'data-served-setups': pin.file },
     el('p', { class: 'small', text: `Setups of this file (${pin.file}), side by side:` }),
     el('table', { class: 'lb mtbl' },
-      el('thead', {}, el('tr', {}, ['Setup', 'Everyday', 'Knowledge exam', 'Median tokens',
-        'Ran out', 'MTP drafts accepted'].map((t, i) => el('th', { class: i ? 'num' : '',
-        text: t })))),
+      el('thead', {}, el('tr', {}, ['Setup', 'Everyday', 'Knowledge exam', 'DeviceMark',
+        'Median tokens', 'Ran out', 'MTP drafts accepted'].map((t, i) => el('th', {
+        class: i ? 'num' : '', text: t })))),
       el('tbody', {}, same.map(x => {
         const e = evdOf(x.id), a = al(x.id), d = (a || {}).draft, r = row(x.id);
         return el('tr', { 'data-served-setup': x.id, class: x.id === m.id ? 'open' : null },
@@ -6736,6 +6754,7 @@ function servedSetups(m) {
             : el('a', { href: '#model=' + encodeURIComponent(x.id), text: x.name })),
           el('td', { class: 'num', text: e ? `${e.passed} of ${e.total}` : '—' }),
           el('td', { class: 'num', text: r.judgedAvg != null ? num(r.judgedAvg, 2) : '—' }),
+          dmSetupCell(x.id),
           el('td', { class: 'num', text: a ? a.median.toLocaleString('en') : '—' }),
           el('td', { class: 'num', text: a ? `${a.ran_out} of ${a.n}` : '—' }),
           el('td', { class: 'num', 'data-served-draft': x.id, title: d
@@ -6937,6 +6956,7 @@ function kindParts(m, kind) {
         el('summary', { text: 'What the score can’t show ▸' }), diag) : ''].filter(Boolean);
   }
   if (kind === 'phone') return [phoneBody(servedOf(m.id), m.id)];
+  if (DM_KINDS[kind]) return [dmModelCard(m, DM_KINDS[kind][0])];
   if (kind === 'exam') {
     const earlier = vEarlier(m), judged = part(vJudged(m, [earlier]), 'judged');
     // a card that stopped early (not judged on the current exam) still keeps
@@ -7060,15 +7080,19 @@ function modelAnswersTab(m, kinds) {
   // weakest first; a topic with no score keeps its answers readable (11l)
   const cats = Object.keys(tasks).filter(t => (J.exam || []).includes(t))
     .sort((a, b) => (pubScore(tasks[a]) ?? 9) - (pubScore(tasks[b]) ?? 9));
+  const dmModes = dmAnswerModes(m.id);
   const have = [cats.length ? ['exam', 'Knowledge exam'] : null,
-    evdOf(m.id) ? ['everyday', 'Everyday tasks'] : null].filter(Boolean);
+    evdOf(m.id) ? ['everyday', 'Everyday tasks'] : null,
+    // 12q.C: DeviceMark's items are public benchmark items: all of them are shown
+    dmModes.length ? ['dm', 'DeviceMark protocol'] : null].filter(Boolean);
   const card = el('div', { class: 'card', 'data-model-answers': m.id },
     el('h2', { text: 'Answers' }),
     el('p', { class: 'sub', text: 'What the model wrote, on the questions anyone may read. '
       + 'The hidden questions stay hidden: their score is all you see of them.' }));
   if (!have.length) {
     card.append(el('p', { class: 'small', 'data-answers-none': '1', text: 'No written answers '
-      + 'yet: this model has not sat the Knowledge exam or the Everyday tasks.' }));
+      + 'yet: this model has not sat the Knowledge exam, the Everyday tasks or DeviceMark’s '
+      + 'protocol.' }));
     return [card];
   }
   const kind = have.some(([k]) => k === state.mans) ? state.mans : have[0][0];
@@ -7076,9 +7100,9 @@ function modelAnswersTab(m, kinds) {
     have.map(([k, label]) => el('button', { class: 'chip-btn' + (k === kind ? ' on' : ''),
       'data-answers-kind': k, 'aria-pressed': String(k === kind), text: label,
       onclick: () => { state.mans = k; render(); } }))));
-  if (kind === 'exam') card.append(LIVE ? modelAnswers(m, cats)
-    : el('p', { class: 'small', text: 'The answers are read from the live board; this report '
-      + 'does not carry them.' }));
+  if (kind === 'exam' || kind === 'dm') card.append(!LIVE ? el('p', { class: 'small',
+    text: 'The answers are read from the live board; this report does not carry them.' })
+    : kind === 'exam' ? modelAnswers(m, cats) : dmAnswersList(m, dmModes));
   else card.append(evdAnswersList(m));
   return [card];
 }
@@ -10886,7 +10910,8 @@ function dmTable(rows) {
     el('thead', {}, el('tr', {}, head.map(h => el('th', { class: /^(Model|#)/.test(h) ? '' : 'num',
       scope: 'col', text: h })))),
     el('tbody', {}, rows.map(r => el('tr', { 'data-dm-row': r.id,
-        'data-dm-external': r.external ? '1' : null },
+        'data-dm-external': r.external ? '1' : null,
+        class: r.id === D.flash ? 'dmfocus' : null },
       el('td', { 'data-dm-rank': r.id, text: r.rank || (r.kind === 'cloud' ? '☁' : ''),
         'data-tip': r.kind === 'cloud' ? JSON.stringify(['a cloud API: not ranked, as on '
           + 'DeviceMark’s board']) : null }),
@@ -10929,6 +10954,12 @@ function lbOnDevice(ms) {
   }
   const d = D.data || {}, ext = d.external || {};
   const rows = dmRows();
+  // 12q.C: a row a model page or "Open results" sent here: scrolled to, marked
+  if (D.focus && rows.some(r => r.id === D.focus)) {
+    state.after = { scroll: `tr[data-dm-row="${D.focus}"]` };
+    D.flash = D.focus;
+    D.focus = null;
+  }
   const sel = D.sel || new Set(rows.filter(r => !r.external).slice(0, 4).map(r => r.id));
   const editing = D.edit && rows.find(r => r.id === D.edit && !r.external);
   card.append(
@@ -10965,6 +10996,218 @@ function lbOnDevice(ms) {
           ({ ...o, name: `${r.model} (ours, ${o.label.split(',')[0]})`, external: false }))]))))
         : el('p', { class: 'small', text: 'No row ticked.' })));
   return [card];
+}
+// ---- 12q.C: a model's DeviceMark runs -------------------------------------
+// its page's cards (one per thinking mode: the full row, the pilot, the parity
+// check, the speed test), the setups table's column, "Open results", and its
+// answers. The runs come with the results (DATA.devicemark), by model and mode
+const DM_KINDS = { dm: ['off', 'DeviceMark protocol'],
+                   dm_thinking: ['on', 'DeviceMark protocol · thinking'] };
+const dmRunsOf = id => ((DATA.devicemark || {})[id]) || null;
+const dmHalf = c => c && c.ci ? ` ±${(50 * (c.ci[1] - c.ci[0])).toFixed(1)}` : '';
+const dmComp = c => c && c.value != null ? dmPct(c.value) + dmHalf(c) : '—';
+const dmTok = n => n == null ? '—' : Math.round(n).toLocaleString('en');
+function dmKindValue(m, mode) {
+  const c = (dmRunsOf(m.id) || {})[mode] || {}, r = c.row;
+  if (!r) return ['—', c.pilot ? 'the pilot only: no full run yet'
+    : c.parity ? 'the MTP parity check only' : 'the speed test only'];
+  return [dmComp(r.composite), (r.rank ? `rank ${r.rank} on the On-device chart`
+    : r.paired ? 'beside DeviceMark’s own row' : 'composite') + (r.inherited ? ' · from MTP' : '')];
+}
+// the table's column: each setup's composite, thinking off, then on
+function dmSetupCell(id) {
+  const c = dmRunsOf(id) || {}, off = (c.off || {}).row, on = (c.on || {}).row;
+  return el('td', { class: 'num', 'data-served-dm': id,
+    title: off && off.inherited ? off.inherited.line : null,
+    text: !off && !on ? '—' : [off ? dmComp(off.composite) : null,
+      on ? `thinking ${dmComp(on.composite)}` : null].filter(Boolean).join(' · ') });
+}
+// the On-device chart, scrolled to a row and marked
+function dmOpenRow(id) {
+  Object.assign(lbS(), { view: 'standard', chip: 'ondevice', cols: null });
+  state.dm.focus = id;
+  navigate({ tab: 'leaderboard', model: null, topic: null });
+}
+function dmOpenRun(r) {
+  const mode = r.thinking ? 'on' : 'off', part = r.part || 'full';
+  const kind = mode === 'on' ? 'dm_thinking' : 'dm';
+  const c = (dmRunsOf(r.hf_id) || {})[mode];
+  const has = c && (part === 'full' ? c.row : c[part]);
+  if (has && DATA.models.some(m => m.id === r.hf_id)) {
+    (state.mblk[r.hf_id] = state.mblk[r.hf_id] || {})[kind] = true;
+    state.mtab = 'scores';
+    state.dmPart = { model: r.hf_id, mode, part };
+    state.after = { scroll: `[data-kind-block="${kind}"]`
+      + (part === 'full' ? '' : ` [data-dm-part="${part}"]`) };
+    return navigate({ model: r.hf_id, topic: null });
+  }
+  if (has && part === 'full') return dmOpenRow(c.row.chart_id);
+  toast(`${r.hf_id}: this DeviceMark run's result isn't on the board yet — it lands on the next `
+    + 'refresh');
+}
+const dmBenchCells = b => ['ifeval', 'mmlu_pro', 'math'].map(x => el('td', { class: 'num',
+  'data-dm-card-bench': x, text: b && b[x] && b[x].acc != null ? dmPct(b[x].acc) + dmHalf(b[x])
+    : '—' }));
+function dmModelCard(m, mode) {
+  const c = (dmRunsOf(m.id) || {})[mode] || {}, r = c.row, P = state.dmPart || {};
+  const here = part => P.model === m.id && P.mode === mode && P.part === part ? ' dmfocus' : '';
+  const box = el('div', { class: 'kpart dmcard', 'data-dm-card': `${m.id}|${mode}` });
+  const th = hs => el('thead', {}, el('tr', {}, hs.map((h, i) => el('th', { class: i ? 'num' : '',
+    text: h }))));
+  if (r) box.append(
+    el('p', { class: 'mprose', 'data-dm-card-line': mode },
+      el('b', { text: dmComp(r.composite) }), ' composite',
+      r.rank ? ` · rank ${r.rank}` : r.paired ? ' · beside DeviceMark’s own row' : '',
+      r.label ? ` · ${r.label}` : '', ' · ',
+      el('a', { href: '#', 'data-dm-card-chart': r.chart_id, text: 'its row on the On-device chart',
+        onclick: e => { e.preventDefault(); dmOpenRow(r.chart_id); } })),
+    r.inherited ? el('p', { class: 'small se', 'data-dm-card-inherited': mode,
+      text: `${r.inherited.line}: this setup's quality is its MTP partner's (${r.inherited.from})` })
+      : '',
+    el('div', { class: 'lb-wrap' }, el('table', { class: 'lb mtbl', 'data-dm-card-table': mode },
+      th(['', 'IFEval', 'MMLU-Pro', 'MATH', 'Answered', 'Median tokens', 'Device tok/s',
+        'Server tok/s']),
+      el('tbody', {}, el('tr', {}, el('td', { text: `${(r.n || 0).toLocaleString('en')} items` }),
+        ...dmBenchCells(r.benches),
+        el('td', { class: 'num', text: r.answered_pct == null ? '—' : dmPct(r.answered_pct) + '%' }),
+        el('td', { class: 'num', text: dmTok(r.median_tokens) }),
+        el('td', { class: 'num', 'data-dm-card-device': mode, title: r.device
+          ? `${r.device.device} · ${r.device.source}` : 'no speed measured on a device yet',
+          text: r.device ? `${r.device.tok_s} · ${r.device.device}` : '—' }),
+        el('td', { class: 'num', 'data-dm-card-server': mode, title: r.server_label || null,
+          text: r.server_tok_s == null ? '—' : String(r.server_tok_s) }))))),
+    r.items ? el('p', { class: 'small' }, el('a', { href: '#', 'data-dm-card-answers': mode,
+      text: 'Its answers ▸', onclick: e => { e.preventDefault();
+        Object.assign(state.dmAns, { model: m.id, mode, bench: '', n: 50, key: null });
+        state.mans = 'dm'; setModelTab('answers'); } })) : '');
+  if (c.pilot) {
+    const p = c.pilot, cc = p.cap_check || {};
+    box.append(el('div', { class: 'dmpart' + here('pilot'), 'data-dm-part': 'pilot' },
+      el('p', { class: 'eyebrow', text: `Pilot · ${p.n} items` }),
+      el('p', { class: 'small', 'data-dm-pilot-line': mode,
+        text: `composite ${dmComp(p.composite)} · IFEval ${dmPct(((p.benches || {}).ifeval
+          || {}).acc)} · MMLU-Pro ${dmPct(((p.benches || {}).mmlu_pro || {}).acc)} · MATH `
+          + `${dmPct(((p.benches || {}).math || {}).acc)} · answered `
+          + `${p.answered_pct == null ? '—' : dmPct(p.answered_pct) + '%'} · median `
+          + `${dmTok(p.median_tokens)} tokens` }),
+      el('p', { class: 'small' + (cc.ok === false ? ' warn' : ''), 'data-dm-cap-check': mode,
+        text: `Cap check: ${cc.line || 'not checked'}` })));
+  }
+  if (c.parity) {
+    const q = c.parity, n = q.n || 0;
+    box.append(el('div', { class: 'dmpart' + here('parity'), 'data-dm-part': 'parity' },
+      el('p', { class: 'eyebrow', text: 'MTP parity check' }),
+      el('p', { class: 'small', 'data-dm-parity-line': mode,
+        text: `${q.mtp} (MTP) against ${q.plain}, thinking ${q.thinking ? 'on' : 'off'}: `
+          + `identical ${q.identical}/${n} · same answer ${q.same_answer}/${n} · ` + (q.passes
+          ? `passes (${q.need} or more): the setup without MTP takes its quality from the MTP run`
+          : `under ${q.need}: the setup without MTP needs a full run of its own`) }),
+      (q.differ || []).length ? el('div', { class: 'lb-wrap' }, el('table', { class: 'lb mtbl',
+        'data-dm-parity-differ': mode },
+        th(['Pair that differs', 'What differs', 'Answer: MTP · without', 'Tokens: MTP · without']),
+        el('tbody', {}, q.differ.map(x => el('tr', { 'data-dm-differ': `${x.bench}:${x.key}` },
+          el('td', { text: `${DM_BENCH_WORDS[x.bench] || x.bench} · ${x.key}` }),
+          el('td', { class: 'num', text: x.same_answer ? 'the tokens, not the answer'
+            : 'the answer' }),
+          el('td', { class: 'num', text: x.bench === 'ifeval' ? 'IFEval’s checks'
+            : `${x.mtp ?? 'no answer'} · ${x.plain ?? 'no answer'}` }),
+          el('td', { class: 'num', text: `${dmTok(x.mtp_tokens)} · ${dmTok(x.plain_tokens)}` }))))))
+        : el('p', { class: 'small se', text: 'Every pair is identical, token for token.' })));
+  }
+  if (c.speed) {
+    const sp = c.speed;
+    box.append(el('div', { class: 'dmpart' + here('speed'), 'data-dm-part': 'speed' },
+      el('p', { class: 'eyebrow', text: 'Speed test' }),
+      el('p', { class: 'small', 'data-dm-speed-line': mode,
+        text: `${sp.decode_tok_s} tok/s decode, the mean of the timed trials · ${sp.prompt_tokens} `
+          + `prompt tokens, ${sp.decode_tokens} decoded · ${sp.label} — the server’s speed, `
+          + 'never on the chart' }),
+      el('div', { class: 'lb-wrap' }, el('table', { class: 'lb mtbl', 'data-dm-speed-trials': mode },
+        th(['Trial', 'Prompt tokens', 'Decoded', 'Decode tok/s', 'Prefill tok/s']),
+        el('tbody', {}, (sp.trials || []).map((t, i) => el('tr', {},
+          el('td', { text: t.warmup ? 'warm-up (not counted)' : `trial ${i}` }),
+          el('td', { class: 'num', text: dmTok(t.prompt_n) }),
+          el('td', { class: 'num', text: dmTok(t.predicted_n) }),
+          el('td', { class: 'num', text: t.decode_tok_s == null ? '—' : String(t.decode_tok_s) }),
+          el('td', { class: 'num', text: t.prefill_tok_s == null ? '—'
+            : String(t.prefill_tok_s) }))))))));
+  }
+  return box;
+}
+// the modes with answers to read
+const dmAnswerModes = id => ['off', 'on'].filter(mo => (((dmRunsOf(id) || {})[mo] || {}).row || {})
+  .items);
+const DM_BENCH_WORDS = { ifeval: 'IFEval', mmlu_pro: 'MMLU-Pro', math: 'MATH' };
+function dmAnswersList(m, modes) {
+  const A = state.dmAns;
+  if (A.model !== m.id) Object.assign(A, { model: m.id, mode: modes[0], bench: '', n: 50,
+    data: null, key: null, msg: '' });
+  if (!modes.includes(A.mode)) A.mode = modes[0];
+  const key = `${A.model}|${A.mode}|${A.bench}|${A.n}`;
+  if (A.key !== key && !A.loading) {
+    A.loading = true;
+    api(`api/devicemark/answers?model=${encodeURIComponent(A.model)}&thinking=${A.mode === 'on'}`
+      + `&bench=${A.bench}&limit=${A.n}`)
+      .then(j => { A.data = j; A.msg = ''; })
+      .catch(e => { A.msg = String((e && e.message) || e); })
+      .finally(() => { A.loading = false; A.key = key; render(); });
+  }
+  const d = A.key === key ? A.data : null, counts = (d || A.data || {}).counts || {};
+  const chip = (on, label, attrs, go) => el('button', { class: 'chip-btn' + (on ? ' on' : ''),
+    'aria-pressed': String(on), ...attrs, onclick: () => { go(); render(); } }, label);
+  const tally = b => { const c = counts[b]; if (!c) return '';
+    const bits = [c.no_answer ? `${c.no_answer} no answer` : '', c.wrong ? `${c.wrong} wrong` : '']
+      .filter(Boolean);
+    return el('span', { class: 'se', text: ` · ${c.n}` + (bits.length ? ` · ${bits.join(', ')}` : '') }); };
+  const wrap = el('div', { 'data-panel': 'dm-answers', 'data-dm-answers': `${m.id}|${A.mode}` },
+    el('p', { class: 'small', text: 'DeviceMark’s protocol: public benchmark items, all of them. '
+      + 'No answer first, then wrong, then right; each output with its thinking folded, what '
+      + 'was read from it and the answer.' }),
+    modes.length > 1 ? el('div', { class: 'chiprow', 'data-dm-ans-modes': '1' },
+      modes.map(mo => chip(mo === A.mode, `thinking ${mo}`, { 'data-dm-ans-mode': mo },
+        () => { A.mode = mo; A.n = 50; }))) : '',
+    el('div', { class: 'chiprow', 'data-dm-ans-benches': '1' },
+      chip(!A.bench, 'All', { 'data-dm-ans-bench': 'all' }, () => { A.bench = ''; A.n = 50; }),
+      ['ifeval', 'mmlu_pro', 'math'].map(b => chip(A.bench === b, [DM_BENCH_WORDS[b], tally(b)],
+        { 'data-dm-ans-bench': b }, () => { A.bench = b; A.n = 50; }))));
+  if (!d) {
+    wrap.append(el('p', { class: 'small se', 'data-dm-ans-loading': '1',
+      text: A.msg || 'Loading the answers…' }));
+    return wrap;
+  }
+  wrap.append(el('p', { class: 'small se', 'data-dm-ans-shown': String(d.items.length),
+    text: `${d.items.length.toLocaleString('en')} of ${d.total.toLocaleString('en')} shown` }));
+  for (const x of d.items) {
+    const mk = !x.answered ? { t: '✗', cls: 'no', words: 'no answer' }
+      : x.ok ? { t: '✓', cls: 'ok', words: 'right' } : { t: '✗', cls: 'no', words: 'wrong' };
+    const id = `${x.bench}:${x.key}`;
+    wrap.append(el('div', { class: 'evans-wrap dmans', 'data-dm-ans': id, 'data-dm-ans-mark': mk.words },
+      el('p', { class: 'small dmans-head' },
+        el('span', { class: 'evmark ' + mk.cls, 'aria-label': mk.words, text: mk.t }), ' ',
+        el('b', { text: mk.words }), ` · ${DM_BENCH_WORDS[x.bench]} · ${x.key}`
+          + (x.subject ? ` · ${x.subject}` : '')
+          + (x.tokens != null ? ` · ${x.tokens.toLocaleString('en')} tokens` : ''),
+        x.capped ? el('span', { class: 'badge warn', 'data-dm-ans-capped': id,
+          text: 'ran out of room' }) : ''),
+      el('p', { class: 'evq-label', text: 'Question' }),
+      el('blockquote', { class: 'evq', 'data-dm-ans-q': id, text: x.q
+        + ((x.options || []).length ? '\n\n' + x.options.map((o, i) =>
+          `${String.fromCharCode(65 + i)}. ${o}`).join('\n') : '') }),
+      el('p', { class: 'small', 'data-dm-ans-read': id, text: x.bench === 'ifeval' ? x.verdict
+        : `read as: ${x.parsed ?? 'nothing (no answer)'} · the answer: ${x.gold ?? '—'}` }),
+      el('p', { class: 'evq-label', text: 'Output' }),
+      x.answer ? el('div', { class: 'evans', 'data-dm-ans-out': id, text: x.answer })
+        : el('p', { class: 'evans none', 'data-dm-ans-out': id, text: x.capped
+          ? 'No answer: it was still thinking when it ran out of room.'
+          : '(nothing after the thinking)' }),
+      x.thinking ? el('details', { class: 'evthink', 'data-dm-ans-thinking': id },
+        el('summary', { text: `thinking ▸ ${x.thinking.length.toLocaleString('en')} characters` }),
+        el('div', { class: 'evthink-t', text: x.thinking })) : ''));
+  }
+  if (d.total > d.items.length) wrap.append(el('button', { class: 'quiet', 'data-dm-ans-more': '1',
+    text: `Show ${Math.min(50, d.total - d.items.length)} more`,
+    onclick: () => { A.n += 50; render(); } }));
+  return wrap;
 }
 // 12n.1: on every other chip, a line when chosen models are known only as reported
 function repHiddenLine() {
@@ -15321,6 +15564,9 @@ function queueOpen(r) {
     }
     return navigate({ tab: 'everyday', model: null, topic: null });
   }
+  // 12q.C: a DeviceMark run opens its own result — the full row's card, or
+  // its pilot's, parity check's or speed test's part of it
+  if (r.suite === 'devicemark') return dmOpenRun(r);
   if (DATA.models.some(m => m.id === r.hf_id)) return navigate({ model: r.hf_id, topic: null });
   toast(`${r.hf_id} is not on the board yet — its results land on the next refresh`);
 }

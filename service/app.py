@@ -111,7 +111,9 @@ _WATCH = ("results*.json", "diagnose.json", "model_meta.json", "judge.json",
           # 12n.2: and its grades on SimpleQA Verified
           "simpleqa.json",
           # 12o.3: MobileAIBench's scores, written after the run
-          "mobileaibench.json")
+          "mobileaibench.json",
+          # 12q.C: a DeviceMark run's row, pilot, parity check, speed test and device speed
+          "devicemark*.json")
 
 
 def files_stamp(files) -> str:
@@ -382,6 +384,11 @@ def results_payload() -> dict:
                                        gguf=report.load_gguf(config.RESULTS_ROOT, config.OUT_DIR,
                                                              served_map))
         payload["live"] = True
+        # 12q.C: each model's DeviceMark runs, for its page and "Open results"
+        try:
+            payload["devicemark"] = _dm().model_runs(config.OUT_DIR)
+        except Exception as e:                      # noqa: BLE001 — the board still loads
+            payload["devicemark"] = {"_error": f"the DeviceMark runs couldn't be read: {e}"[:300]}
         # 12g.2: the hidden questions an Everyday group needs before Improve takes it
         if payload.get("everyday"):
             payload["everyday"]["minHidden"] = config.EVERYDAY_MIN_HIDDEN
@@ -1311,6 +1318,23 @@ def devicemark_rows():
     d = _dm()
     return {"version": d.VERSION, "whose": d.WHOSE, "cap": d.CAP,
             "server_speed_label": d.SERVER_SPEED_LABEL, **d.board(config.OUT_DIR)}
+
+
+@app.get("/api/devicemark/answers")
+def devicemark_answers(model: str, thinking: bool = False, bench: str = "", offset: int = 0,
+                       limit: int = 50):
+    """12q.C: a DeviceMark row's answers, for the model page's Answers tab —
+    public benchmark items, all of them, no answer and wrong first"""
+    from . import devicemark as _devicemark
+    if not _HF_ID_RE.match(model):
+        raise HTTPException(422, "model must be a model id on the board, like served/<name>")
+    if bench and bench not in _dm().BENCHES:
+        raise HTTPException(422, f"bench is one of {', '.join(_dm().BENCHES)}, or none for all")
+    got = _devicemark.answers(model, thinking, bench, max(0, offset), max(1, min(limit, 200)))
+    if got is None:
+        raise HTTPException(404, f"no DeviceMark answers for {model}"
+                                 + (" with thinking on" if thinking else ""))
+    return got
 
 
 class DeviceSpeedIn(BaseModel):

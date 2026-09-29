@@ -880,6 +880,103 @@ def board(out_dir: Path) -> dict:
         "source", "last_modified", "fetched", "credit", "licence", "device")}}}
 
 
+# ---------------------------------------------------------------------------
+# 12q.C: a model's DeviceMark runs, as its page reads them
+# ---------------------------------------------------------------------------
+
+PARITY_ANSWERS = "devicemark_parity_{}_answers.jsonl"
+BENCH_KEYS = ("acc", "ci", "n", "answered", "capped", "median_tokens")
+
+
+def _benches(row: dict) -> dict:
+    return {b: {k: ((row.get("benches") or {}).get(b) or {}).get(k) for k in BENCH_KEYS}
+            for b in BENCHES}
+
+
+def _said(bench: str, rec: dict | None):
+    """what an answer says, read without its gold: MMLU-Pro's letter, MATH's
+    boxed answer; IFEval has none to read"""
+    if not rec or bench == "ifeval":
+        return None
+    ans = rec.get("answer")
+    if ans is None:
+        _, ans = split_thinking(rec.get("text") or "")
+    if not ans:
+        return None
+    return mmlu_letter(ans)[0] if bench == "mmlu_pro" else math_answer(ans)
+
+
+def _parity_card(rep: dict, out_dir: Path, suffix: str) -> dict:
+    """the parity check, and each pair that differs with what each setup
+    answered"""
+    def answers(model: str, tag: str) -> dict:
+        d = out_dir / (str(model).replace("/", "__") + suffix)
+        return {(r["bench"], str(r["key"])): r
+                for r in read_items(d, PARITY_ANSWERS.format(tag))}
+    a, b = answers(rep.get("mtp"), "mtp"), answers(rep.get("plain"), "plain")
+    differ = []
+    for it in rep.get("items") or []:
+        if it.get("identical") and it.get("same_answer"):
+            continue
+        k = (it["bench"], str(it["key"]))
+        differ.append({"bench": it["bench"], "key": str(it["key"]),
+                       "identical": bool(it.get("identical")),
+                       "same_answer": bool(it.get("same_answer")),
+                       "mtp": _said(it["bench"], a.get(k)), "plain": _said(it["bench"], b.get(k)),
+                       "mtp_tokens": (a.get(k) or {}).get("gen_tokens"),
+                       "plain_tokens": (b.get(k) or {}).get("gen_tokens")})
+    return {**{k: rep.get(k) for k in ("n", "identical", "same_answer", "need", "passes", "mtp",
+                                       "plain", "thinking", "at")}, "differ": differ}
+
+
+def model_runs(out_dir: Path) -> dict[str, dict]:
+    """each model with a DeviceMark run, by thinking mode ("off", "on"): its
+    full row as the board ranks it — and its row on the On-device chart, its
+    own or DeviceMark's beside it — then its pilot, its parity check and its
+    speed test. The model page's DeviceMark cards, and what "Open results"
+    opens"""
+    if not out_dir.is_dir():
+        return {}
+    full = {r["id"]: r for r in board(out_dir)["rows"]}
+    out: dict[str, dict] = {}
+    for d in sorted(p for p in out_dir.iterdir() if p.is_dir()):
+        mode = "on" if d.name.endswith("__thinking") else "off"
+        model = _model_of(d)
+        rid = model + (" · thinking" if mode == "on" else "")
+        r = full.get(rid)
+        pilot, rep = _json(d / PILOT_NAME), _json(d / PARITY_NAME)
+        speed = _json(d / SPEED_NAME) if mode == "off" else None
+        if not (r or pilot or rep or speed):
+            continue
+        card: dict = {"id": rid, "row": None, "pilot": None, "parity": None, "speed": None}
+        if r:
+            row = r["row"]
+            card["row"] = {
+                "composite": row.get("composite"), "benches": _benches(row),
+                "answered_pct": row.get("answered_pct"), "median_tokens": row.get("median_tokens"),
+                "n": row.get("n"), "rank": r.get("rank_all"), "label": r.get("label"),
+                "device": r.get("device"), "server_tok_s": r.get("server_tok_s"),
+                "server_label": r.get("server_label"), "inherited": row.get("inherited"),
+                "paired": r.get("paired"), "chart_id": r.get("paired") or r["id"],
+                "items": (d / ITEMS_NAME).exists(), "at": row.get("at"),
+                "version": row.get("version")}
+        if pilot:
+            cc = pilot.get("cap_check") or {}
+            card["pilot"] = {"composite": pilot.get("composite"), "benches": _benches(pilot),
+                             "answered_pct": pilot.get("answered_pct"),
+                             "median_tokens": pilot.get("median_tokens"),
+                             "n": pilot.get("n") or len(pilot.get("items") or []),
+                             "cap_check": {"ok": cc.get("ok"), "line": cc.get("line")},
+                             "at": pilot.get("at")}
+        if rep:
+            card["parity"] = _parity_card(rep, out_dir, "__thinking" if mode == "on" else "")
+        if speed:
+            card["speed"] = {k: speed.get(k) for k in ("decode_tok_s", "trials", "prompt_tokens",
+                                                       "decode_tokens", "label", "at")}
+        out.setdefault(model, {})[mode] = card
+    return out
+
+
 def fetch_snapshot() -> dict:
     """DeviceMark's board.json again — by hand, never from a page; the notes
     we keep beside their rows stay"""
