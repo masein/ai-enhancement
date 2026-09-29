@@ -141,7 +141,8 @@ the questions carry.
 The five banks the exam had before — medicine & health, law, economics,
 computer science, physics & engineering — are retired. Their files are in
 `eval_tasks/fr/retired/`, kept as the record of what their judged runs were
-graded on; nothing the service or the demo reads points there.
+graded on (12p.4: their report-half questions withheld, in the server's store);
+nothing the service or the demo reads points there.
 
 Use an **instruct** model for this topic. A base model answers a triage
 question with word salad and scores 0 on everything, which teaches nothing;

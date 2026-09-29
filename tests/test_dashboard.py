@@ -19,6 +19,7 @@ from urllib.parse import quote
 import pytest
 
 from conftest import go_tab, model_tab, open_filters, open_kind, show_all_columns
+import make_fixture  # noqa: E402
 
 pytestmark = pytest.mark.dashboard
 
@@ -546,7 +547,7 @@ def demo_report(tmp_path_factory) -> Path:
     r = subprocess.run(
         [sys.executable, str(repo / "scripts" / "demo_loop.py"),
          "--topic", "Medicine & Clinical Health",
-         "--import", str(repo / "eval_tasks" / "fr" / "retired" / "medicine_v2.json"),
+         "--import", str(make_fixture.retired_whole_dir() / "medicine_v2.json"),  # 12p.4
          "--approver", "Dr. Hossein", "--sit", "stub", "--count", "4", "--keep"],
         capture_output=True, text=True, timeout=300, env=env, cwd=repo)
     assert r.returncode == 0, r.stdout + r.stderr

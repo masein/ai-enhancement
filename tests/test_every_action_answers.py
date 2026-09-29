@@ -20,6 +20,7 @@ import pytest
 
 from conftest import choose, go_tab, make_service, open_filters, open_kind, open_submit, set_name
 from test_page_recovery import Live
+import make_fixture  # noqa: E402
 
 MODEL = "fx/good-750m"
 
@@ -289,11 +290,10 @@ def test_a_judged_submit_chooses_its_topics(live, page, monkeypatch):
 
 @pytest.mark.dashboard
 def test_the_import_panel_labels_its_fields_and_says_when_nothing_is_new(live, page):
-    from conftest import ROOT as REPO
     base = live["base"]
     # law as first delivered, retired with the 37-topic exam: this is about the
     # panel, and any file of law questions will do
-    raw = (REPO / "eval_tasks" / "fr" / "retired" / "law_v2.json").read_text(encoding="utf-8")
+    raw = (make_fixture.retired_whole_dir() / "law_v2.json").read_text(encoding="utf-8")
     page.goto(base + "/#tab=exam")
     panel = page.locator("[data-panel='import']")
     panel.wait_for()

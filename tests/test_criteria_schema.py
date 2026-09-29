@@ -25,19 +25,21 @@ import pytest
 import exam_build as eb
 import judge as jd
 from conftest import assert_no_report_half_text
+import make_fixture  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 RUBRICS = REPO / "eval_tasks" / "fr" / "rubrics"
-RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+RETIRED = make_fixture.retired_whole_dir()                        # 12p.4: whole
+RETIRED_RUBRICS = REPO / "eval_tasks" / "fr" / "retired" / "rubrics"  # as delivered
 # every topic arrived with a rubric and a criteria file — Arts last, 2026-09-22
 DELIVERED = list(eb.TOPICS)
 # the 37 the judge reads, then the 5 it no longer does
 CRITERIA = sorted(RUBRICS.glob("*.criteria.json")) + sorted(
-    (RETIRED / "rubrics").glob("*.criteria.json"))
+    (RETIRED_RUBRICS).glob("*.criteria.json"))
 
 
 def retired(slug: str) -> dict:
-    return json.loads((RETIRED / "rubrics" / f"{slug}.criteria.json").read_text(
+    return json.loads((RETIRED_RUBRICS / f"{slug}.criteria.json").read_text(
         encoding="utf-8"))
 
 

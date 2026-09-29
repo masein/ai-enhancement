@@ -16,6 +16,7 @@ import pytest
 import exam_build as eb
 import judge as jd
 from conftest import make_service
+import make_fixture  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 TOPIC = "Medicine & Clinical Health"
@@ -24,7 +25,7 @@ LAW = "exam_law"
 # the provenance tests below are about the banks of that run — the files
 # whose source and author came out wrong — so they import those files,
 # now retired, into the topic that replaced theirs
-RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+RETIRED = make_fixture.retired_whole_dir()                        # 12p.4: whole
 
 
 @pytest.fixture

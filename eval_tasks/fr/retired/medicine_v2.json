@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "prompt": "My 5 year old has had a fever around 38.5 and a cough since yesterday. He is drinking and playing a little. When should I worry?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #1, qid 3e474ade7e50",
     "intent": "symptom_assessment_triage",
     "subject": "child",
     "age_group": "5-12",
@@ -49,7 +49,7 @@
   },
   {
     "id": 5,
-    "prompt": "itchy red rash on my arms after using new laundry detergent. no breathing problems. what can i do?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #5, qid b54cbf4a699a",
     "intent": "symptom_assessment_triage",
     "subject": "self",
     "age_group": "18-24",
@@ -61,7 +61,7 @@
   },
   {
     "id": 6,
-    "prompt": "Burning when I pee and needing to go every hour since last night. I'm a 27 year old woman, no fever. Do I need antibiotics?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #6, qid 92427856255b",
     "intent": "symptom_assessment_triage",
     "subject": "self",
     "age_group": "25-34",
@@ -97,7 +97,7 @@
   },
   {
     "id": 9,
-    "prompt": "My 6 month old has small red bumps on his chest and back after a hot day. He seems fine otherwise. heat rash?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #9, qid 657505fbaf9c",
     "intent": "symptom_assessment_triage",
     "subject": "child",
     "age_group": "0-4",
@@ -145,7 +145,7 @@
   },
   {
     "id": 13,
-    "prompt": "My 2 year old has vomited 6 times today and has not peed for about 8 hours. She keeps asking for water but throws it up. What should I do?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #13, qid cf1b61a7286c",
     "intent": "symptom_assessment_triage",
     "subject": "child",
     "age_group": "0-4",
@@ -157,7 +157,7 @@
   },
   {
     "id": 14,
-    "prompt": "My 78 year old mother suddenly became confused and her right arm seems weak. She was normal an hour ago. Could this just be low blood sugar?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #14, qid 4010ed511477",
     "intent": "symptom_assessment_triage",
     "subject": "parent",
     "age_group": "75+",
@@ -169,7 +169,7 @@
   },
   {
     "id": 15,
-    "prompt": "Lower back pain after lifting a box yesterday. It hurts to bend but no leg weakness or numbness. Should I rest or keep moving?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #15, qid d8f014e0e2c9",
     "intent": "symptom_assessment_triage",
     "subject": "self",
     "age_group": "35-44",
@@ -181,7 +181,7 @@
   },
   {
     "id": 16,
-    "prompt": "Sometimes my heart suddenly races for 5 or 10 minutes even when I'm sitting. I'm 36 and it stops by itself. What causes that?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #16, qid 5787cc8d7e4b",
     "intent": "symptom_assessment_triage",
     "subject": "self",
     "age_group": "35-44",
@@ -193,7 +193,7 @@
   },
   {
     "id": 17,
-    "prompt": "My 4 year old is wheezing hard, breathing fast and his lips look a little blue. He has asthma. Can I give another inhaler dose?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #17, qid cd2918d939b0",
     "intent": "symptom_assessment_triage",
     "subject": "child",
     "age_group": "0-4",
@@ -205,7 +205,7 @@
   },
   {
     "id": 18,
-    "prompt": "I have a cold with blocked nose and sore throat. What actually helps me feel better and recover faster?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #18, qid dbd5b7842322",
     "intent": "treatment_self_care",
     "subject": "self",
     "age_group": "25-34",
@@ -229,7 +229,7 @@
   },
   {
     "id": 20,
-    "prompt": "My 15 year old rolled her ankle playing basketball. It is swollen but she can walk with a limp. Ice or heat? Should we get an xray?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #20, qid e7f917a2692d",
     "intent": "treatment_self_care",
     "subject": "child",
     "age_group": "13-17",
@@ -241,7 +241,7 @@
   },
   {
     "id": 21,
-    "prompt": "I have eczema on my hands that keeps cracking from washing them a lot. What can I use at home?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #21, qid 2bca1180d5a0",
     "intent": "treatment_self_care",
     "subject": "self",
     "age_group": "25-34",
@@ -277,7 +277,7 @@
   },
   {
     "id": 24,
-    "prompt": "I get migraines about twice a month. What should I do when one starts, and is there anything that prevents them?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #24, qid b87e0f01aaf7",
     "intent": "treatment_self_care",
     "subject": "self",
     "age_group": "25-34",
@@ -289,7 +289,7 @@
   },
   {
     "id": 25,
-    "prompt": "painful hemorrhoid after constipation. any home treatment that works fast?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #25, qid f2fd810e113a",
     "intent": "treatment_self_care",
     "subject": "self",
     "age_group": "45-59",
@@ -301,7 +301,7 @@
   },
   {
     "id": 26,
-    "prompt": "I've been having panic attacks where my heart races and I feel like I can't breathe, but previous heart tests were normal. What can I do when an attack starts?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #26, qid 1bbf1f31e63a",
     "intent": "treatment_self_care",
     "subject": "self",
     "age_group": "18-24",
@@ -325,7 +325,7 @@
   },
   {
     "id": 28,
-    "prompt": "Metformin is giving me diarrhea almost every day. Does this usually get better or should I stop it?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #28, qid 2d7ad7c3d304",
     "intent": "medication",
     "subject": "self",
     "age_group": "45-59",
@@ -361,7 +361,7 @@
   },
   {
     "id": 31,
-    "prompt": "Can my 12 year old take cetirizine every day for allergies? does it make kids sleepy long term?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #31, qid 40371e3f146e",
     "intent": "medication",
     "subject": "child",
     "age_group": "5-12",
@@ -397,7 +397,7 @@
   },
   {
     "id": 34,
-    "prompt": "My fasting sugars are usually 130 to 150 even though I take my diabetes medicine. What changes would make the biggest difference?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #34, qid 040bf68b185a",
     "intent": "chronic_management",
     "subject": "self",
     "age_group": "45-59",
@@ -409,7 +409,7 @@
   },
   {
     "id": 35,
-    "prompt": "My home blood pressure is around 145/90 most days. I'm 42 and already trying to eat less salt. Is that high enough to need medicine?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #35, qid a4320bb1bfd8",
     "intent": "chronic_management",
     "subject": "self",
     "age_group": "35-44",
@@ -421,7 +421,7 @@
   },
   {
     "id": 36,
-    "prompt": "I use my asthma rescue inhaler 3 or 4 days a week lately. Does that mean my asthma isn't controlled?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #36, qid 55a6cda01b4d",
     "intent": "chronic_management",
     "subject": "self",
     "age_group": "25-34",
@@ -433,7 +433,7 @@
   },
   {
     "id": 37,
-    "prompt": "My dad has stage 3 kidney disease. What everyday things should he avoid so it doesn't get worse?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #37, qid e110deb5babe",
     "intent": "chronic_management",
     "subject": "parent",
     "age_group": "60-74",
@@ -445,7 +445,7 @@
   },
   {
     "id": 38,
-    "prompt": "I was told I have fatty liver on ultrasound. I don't drink much. How much weight do I need to lose for it to improve?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #38, qid 9d2d9cb3f0ef",
     "intent": "chronic_management",
     "subject": "self",
     "age_group": "35-44",
@@ -457,7 +457,7 @@
   },
   {
     "id": 39,
-    "prompt": "My HbA1c is 6.1%. Does that mean I have diabetes or prediabetes, and what should I do next?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #39, qid edb8ae458109",
     "intent": "tests_results",
     "subject": "self",
     "age_group": "35-44",
@@ -481,7 +481,7 @@
   },
   {
     "id": 41,
-    "prompt": "ALT 78 AST 44 on my blood test. I'm 33 and feel fine. How concerning is this?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #41, qid 38358451c15a",
     "intent": "tests_results",
     "subject": "self",
     "age_group": "25-34",
@@ -493,7 +493,7 @@
   },
   {
     "id": 42,
-    "prompt": "My ferritin is 8 and hemoglobin 10.9. I've been tired for months and have heavy periods. Is this iron deficiency?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #42, qid c97b6fc0f6cd",
     "intent": "tests_results",
     "subject": "self",
     "age_group": "25-34",
@@ -529,7 +529,7 @@
   },
   {
     "id": 45,
-    "prompt": "My 1 year old is due for vaccines but has a mild runny nose today and no fever. Should we postpone them?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #45, qid 2ff3232f1a9e",
     "intent": "prevention",
     "subject": "child",
     "age_group": "0-4",
@@ -553,7 +553,7 @@
   },
   {
     "id": 47,
-    "prompt": "I'm breastfeeding a 3 month old and have a bad toothache. Is ibuprofen safe while breastfeeding?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #47, qid 73b6705b54c7",
     "intent": "reproductive_pregnancy",
     "subject": "self",
     "age_group": "25-34",
@@ -577,7 +577,7 @@
   },
   {
     "id": 49,
-    "prompt": "The ultrasound says I have gallstones and my doctor suggested surgery, but the attacks only happen every few months. Is surgery usually necessary?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #49, qid 0b936b38c911",
     "intent": "post_diagnosis_second_opinion",
     "subject": "self",
     "age_group": "35-44",
@@ -589,7 +589,7 @@
   },
   {
     "id": 50,
-    "prompt": "My brother had an appendix removed 4 days ago. The wound is more red today and there is a little yellow drainage, but no fever. Is that normal healing?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #50, qid 08294852016c",
     "intent": "post_diagnosis_second_opinion",
     "subject": "sibling",
     "age_group": "18-24",
@@ -601,7 +601,7 @@
   },
   {
     "id": 51,
-    "prompt": "My 3 year old has had a fever of 39.2°C for two days but is drinking fluids and urinating normally. When should he be seen?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #51, qid 94e2764e2b42",
     "intent": "symptom_assessment_triage",
     "subject": "child",
     "age_group": "0-4",
@@ -613,7 +613,7 @@
   },
   {
     "id": 52,
-    "prompt": "My 7 year old is breathing faster than usual with a cough and fever, but I can't tell if he is struggling to breathe. What should I look for?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #52, qid 2d6b12686a68",
     "intent": "symptom_assessment_triage",
     "subject": "child",
     "age_group": "5-12",
@@ -625,7 +625,7 @@
   },
   {
     "id": 53,
-    "prompt": "My baby is 2 months old and has a temperature of 38.1°C. She otherwise looks okay. Should I wait and see?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #53, qid 5406aec7827b",
     "intent": "symptom_assessment_triage",
     "subject": "child",
     "age_group": "0-4",
@@ -649,7 +649,7 @@
   },
   {
     "id": 55,
-    "prompt": "I suddenly developed severe shortness of breath and chest pain after a long flight. What should I do?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #55, qid 17935ef99561",
     "intent": "symptom_assessment_triage",
     "subject": "self",
     "age_group": "35-44",
@@ -661,7 +661,7 @@
   },
   {
     "id": 56,
-    "prompt": "My face drooped for a few minutes and my speech was slurred, but everything is normal now. Do I still need medical attention?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #56, qid d4c083c19c48",
     "intent": "symptom_assessment_triage",
     "subject": "self",
     "age_group": "60-74",
@@ -709,7 +709,7 @@
   },
   {
     "id": 60,
-    "prompt": "My 70 year old father fell and hit his head. He seems fine now. Does he need to be checked?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #60, qid 82d33fa1788e",
     "intent": "symptom_assessment_triage",
     "subject": "parent",
     "age_group": "60-74",
@@ -745,7 +745,7 @@
   },
   {
     "id": 63,
-    "prompt": "I have a sprained wrist from yesterday. It is swollen but I can move my fingers. Should I use ice, compression, or rest?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #63, qid b0efaf292b8c",
     "intent": "treatment_self_care",
     "subject": "self",
     "age_group": "25-34",
@@ -769,7 +769,7 @@
   },
   {
     "id": 65,
-    "prompt": "I have a sore throat and runny nose but no fever. What can I do to feel better?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #65, qid 65db543278bc",
     "intent": "treatment_self_care",
     "subject": "self",
     "age_group": "25-34",
@@ -805,7 +805,7 @@
   },
   {
     "id": 68,
-    "prompt": "I have a mild cold. Do vitamin C or zinc actually shorten it?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #68, qid 823cd31db8bd",
     "intent": "treatment_self_care",
     "subject": "self",
     "age_group": "35-44",
@@ -817,7 +817,7 @@
   },
   {
     "id": 69,
-    "prompt": "I've had mild muscle pain after starting a new exercise program. How can I tell normal soreness from an injury?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #69, qid e6b83c0adc7c",
     "intent": "treatment_self_care",
     "subject": "self",
     "age_group": "18-24",
@@ -865,7 +865,7 @@
   },
   {
     "id": 73,
-    "prompt": "I started an antibiotic yesterday and now have hives and swelling around my lips. Should I take the next dose?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #73, qid 707a51933bb5",
     "intent": "medication",
     "subject": "self",
     "age_group": "25-34",
@@ -877,7 +877,7 @@
   },
   {
     "id": 74,
-    "prompt": "Can I take ibuprofen while I am taking a blood thinner?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #74, qid 2dfeacbd735a",
     "intent": "medication",
     "subject": "self",
     "age_group": "60-74",
@@ -913,7 +913,7 @@
   },
   {
     "id": 77,
-    "prompt": "Can I drink alcohol while taking metronidazole?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #77, qid 0578c1631bdf",
     "intent": "medication",
     "subject": "self",
     "age_group": "25-34",
@@ -925,7 +925,7 @@
   },
   {
     "id": 78,
-    "prompt": "I am pregnant and have a headache. Which over-the-counter pain medicines are generally considered safer, and which should I avoid?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #78, qid 8293fbec513c",
     "intent": "medication",
     "subject": "self",
     "age_group": "25-34",
@@ -937,7 +937,7 @@
   },
   {
     "id": 79,
-    "prompt": "I've been taking a sleeping pill every night for six months. Can I stop it suddenly?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #79, qid 5652fb28ea7b",
     "intent": "medication",
     "subject": "self",
     "age_group": "35-44",
@@ -961,7 +961,7 @@
   },
   {
     "id": 81,
-    "prompt": "My LDL cholesterol is 190 mg/dL. What does that usually mean, and what should I discuss with my doctor?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #81, qid 4cf07c35ebab",
     "intent": "tests_results",
     "subject": "self",
     "age_group": "35-44",
@@ -1009,7 +1009,7 @@
   },
   {
     "id": 85,
-    "prompt": "My creatinine has increased from 1.0 to 1.5 over several months. How concerning is that?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #85, qid 7406d0f1c3db",
     "intent": "tests_results",
     "subject": "self",
     "age_group": "60-74",
@@ -1033,7 +1033,7 @@
   },
   {
     "id": 87,
-    "prompt": "My child has a positive COVID test but is eating, drinking, and acting normally. What should I watch for?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #87, qid 90896a051669",
     "intent": "chronic_or_infectious_management",
     "subject": "child",
     "age_group": "5-12",
@@ -1045,7 +1045,7 @@
   },
   {
     "id": 88,
-    "prompt": "I have type 2 diabetes and my fasting glucose is consistently above my usual range. When should I contact my doctor?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #88, qid efc508dc1b0e",
     "intent": "chronic_management",
     "subject": "self",
     "age_group": "45-59",
@@ -1057,7 +1057,7 @@
   },
   {
     "id": 89,
-    "prompt": "My asthma is usually controlled, but I've needed my rescue inhaler every day this week. What should I do?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #89, qid ccb3ae47876b",
     "intent": "chronic_management",
     "subject": "self",
     "age_group": "25-34",
@@ -1081,7 +1081,7 @@
   },
   {
     "id": 91,
-    "prompt": "My 4 year old has eczema and keeps scratching at night. What long-term measures can reduce flare-ups?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #91, qid 975d11975023",
     "intent": "chronic_management",
     "subject": "child",
     "age_group": "0-4",
@@ -1105,7 +1105,7 @@
   },
   {
     "id": 93,
-    "prompt": "I am 58 and have never had a colon cancer screening test. What are the usual options?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #93, qid 5f95a2cc75aa",
     "intent": "prevention",
     "subject": "self",
     "age_group": "45-59",
@@ -1117,7 +1117,7 @@
   },
   {
     "id": 94,
-    "prompt": "My 65 year old father wants to know which vaccines adults his age should generally discuss with a doctor.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #94, qid 405d52cfbdc5",
     "intent": "prevention",
     "subject": "parent",
     "age_group": "60-74",
@@ -1153,7 +1153,7 @@
   },
   {
     "id": 97,
-    "prompt": "I am 28 weeks pregnant and have a severe headache with flashing lights in my vision. Should I wait until my next appointment?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #97, qid 7dd2f5b31f01",
     "intent": "symptom_assessment_triage",
     "subject": "self",
     "age_group": "25-34",
@@ -1165,7 +1165,7 @@
   },
   {
     "id": 98,
-    "prompt": "I had surgery last week and now have increasing redness, swelling, and pus coming from the incision. What should I do?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — medicine_v2 #98, qid d60eed691411",
     "intent": "post_diagnosis_second_opinion",
     "subject": "self",
     "age_group": "35-44",

@@ -684,9 +684,9 @@ topics of §10c:
 
 | What | Where |
 |---|---|
-| 100 consumer health questions with metadata, as delivered | `eval_tasks/fr/retired/medicine_v2.json` |
-| 100 law questions with metadata, his own difficulty levels and `jurisdiction_required` | `eval_tasks/fr/retired/law_v2.json` |
-| 100 questions each for computer science, economics and physics & engineering | `eval_tasks/fr/retired/computer_science_v1.json`, `economics_v1.json`, `physics_engineering_v1.json` |
+| 100 consumer health questions with metadata, as delivered — 12p.4: the report half's questions withheld (in the server's store), each row's id and metadata kept | `eval_tasks/fr/retired/medicine_v2.json` |
+| 100 law questions with metadata, his own difficulty levels and `jurisdiction_required` — the report half withheld as above | `eval_tasks/fr/retired/law_v2.json` |
+| 100 questions each for computer science, economics and physics & engineering — the report half withheld as above | `eval_tasks/fr/retired/computer_science_v1.json`, `economics_v1.json`, `physics_engineering_v1.json` |
 | their criteria files and **his own prose rubrics** — not drafts, he wrote the 0–4 anchors | `eval_tasks/fr/retired/rubrics/{computer_science,economics,physics_engineering}.{md,criteria.json}` |
 | his criteria files, **verbatim** — the platform's schema is his | `eval_tasks/fr/retired/rubrics/medicine_health.criteria.json`, `law.criteria.json` |
 | his scoring notes for each, as delivered | `docs/medicine-criteria-v2.md`, `docs/law-criteria-v2.md` |
@@ -4181,6 +4181,43 @@ answers failed, some two thirds of them wrongly.
   the repo's diagnose half and an invented report half in its shape).
 - **The training-data leak gate** (`service/contamination.py`) reads the
   store's hidden set too: it read only the repo's bank and the builder's.
+
+### 12p.4 — the exam's report half that was still in the repo, out, and the guard that missed it
+
+- **What step 3 found on the server** (29 Sep, `test_on_the_server_no_question_of_any_length_is_in_the_repo`):
+  242 distinct questions of the Knowledge exam's **report half**, all from the five **retired**
+  topics (none of Everyday's hidden set):
+  - the five retired banks, `eval_tasks/fr/retired/*.json`: computer science 46, economics 55,
+    law 46, medicine 54, physics & engineering 41;
+  - `docs/law-criteria-v1.md`, law's same 46; `docs/medicine-criteria-v1.md`, one of medicine's;
+  - `tests/fixtures/make_fixture.py`, one of law's (the imported law bank's row 1).
+- **Out of the repo**:
+  - the retired banks keep every row's id and metadata; a report-half row's question is
+    **withheld** (`"withheld"`: in the server's store, with its bank row and 12 characters of its
+    qid). Tests that need the banks whole get them from `make_fixture.retired_whole_dir()`, an
+    invented question in each withheld place, in the same half, outside the repo;
+  - the two docs cite each by id instead of text;
+  - the fixture's law row 1 is a made-up question, in the report half as before.
+- **Why the guard missed them**: `hidden_store.fingerprints` left out, as a "common phrase", every
+  run the repo already held — so a question already whole in the repo had every one of its runs
+  left out, and the guard had nothing to find. All 1,338 of the 242's fingerprints were missing
+  from `protected_fingerprints.txt`; they are in it now.
+- **The fix**: a question at least half of whose runs the repo holds is the question itself: every
+  run of it is kept (never "common", even one another question shares), and it is named — by id
+  and file, never its words — and `fingerprints --out` exits 1. A shorter shared phrase is still
+  common. The guard reads a JSON file's strings decoded and a Python file's literals as written, so
+  an escape or two joined literals hide nothing. Tests plant one question three ways (an escaped
+  JSON bank with a newline in it, a doc, a fixture joined from two literals): the builder keeps
+  and names it, and the guard fails on each file.
+- **What it means for the rotation**: the 242 were in the public mirror's **current tree** — anyone
+  could read them there, not only in its history, which keeps them for good. They are retired
+  rows: "never built, counted", so no current Knowledge score was measured on them, and the 37
+  current topics' report half was not found in the repo. But they are exposed for good: they must
+  never be un-retired or reused as report-half questions. The exam's report-half rotation (12p.3's
+  plan) should count them as practice, or drop them from the store's report half, when it runs.
+- **After a new hidden set or exam report half**: `python -m service.hidden_store fingerprints
+  --out …` exits 1 and names any question the repo holds whole; commit the file only when it
+  exits 0.
 
 ### 12p.3 — a new hidden set for Everyday: built, switched to when the owner says
 

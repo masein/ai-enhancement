@@ -14,7 +14,8 @@ Arts, empty then, on 2026-09-22.
 The five topics the exam had before — medicine & health, law, economics,
 computer science, physics & engineering — are **retired**: their files are in
 `retired/`, their rows stay in the bank marked `retired_at`, and their judged
-runs are history.
+runs are history. 12p.4: a retired file's report-half questions are withheld —
+each row keeps its id and metadata, and says it is in the server's store.
 
 ## Who writes it
 

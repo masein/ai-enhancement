@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "prompt": "A dynamic array doubles its capacity whenever it becomes full. Explain why appending n elements has O(n) total time even though an individual resize can take O(n).",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #1, qid aaf8989deb46",
     "intent": "Explain amortized cost of dynamic-array growth and distinguish worst-case operation cost from total cost.",
     "domain": "Algorithms and Data Structures",
     "acuity": "routine",
@@ -11,7 +11,7 @@
   },
   {
     "id": 2,
-    "prompt": "You need to process a stream of integers and repeatedly answer whether a value has appeared before. Compare a hash table and a balanced binary search tree, including expected/worst-case lookup complexity and ordering capabilities.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #2, qid 5385ff37a69f",
     "intent": "Compare data structures using complexity and functional trade-offs.",
     "domain": "Algorithms and Data Structures",
     "acuity": "routine",
@@ -21,7 +21,7 @@
   },
   {
     "id": 3,
-    "prompt": "A breadth-first search starts at vertex s in an unweighted graph. Explain why the first time BFS reaches a vertex v, the discovered path from s to v has minimum number of edges.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #3, qid 49aff0d8a27a",
     "intent": "Reason about the correctness invariant behind BFS shortest paths in unweighted graphs.",
     "domain": "Algorithms and Data Structures",
     "acuity": "routine",
@@ -61,7 +61,7 @@
   },
   {
     "id": 7,
-    "prompt": "For an undirected connected weighted graph, compare Kruskal's and Prim's algorithms. Explain why both can produce a minimum spanning tree while making different local choices.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #7, qid 487fd36da009",
     "intent": "Compare two greedy algorithms and explain their correctness at a conceptual level.",
     "domain": "Algorithms and Data Structures",
     "acuity": "routine",
@@ -81,7 +81,7 @@
   },
   {
     "id": 9,
-    "prompt": "A dynamic-programming solution stores an answer for every pair (i,j), where 1<=i,j<=n, and each state is computed in O(n) time. What are its time and space complexities, and what change would reduce the space if only the previous row is needed?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #9, qid 5e447254b2e0",
     "intent": "Combine state-counting, transition cost, and space optimization reasoning.",
     "domain": "Algorithms and Data Structures",
     "acuity": "routine",
@@ -121,7 +121,7 @@
   },
   {
     "id": 13,
-    "prompt": "You have a linked list and need to delete a node when you are given only a pointer to that node, not its predecessor. Under what conditions can this be done in O(1), and what limitation makes the usual technique impossible for the final node?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #13, qid c89b1bdae070",
     "intent": "Trace pointer-based list operations and identify an edge case.",
     "domain": "Algorithms and Data Structures",
     "acuity": "routine",
@@ -141,7 +141,7 @@
   },
   {
     "id": 15,
-    "prompt": "Explain why a reduction from problem A to problem B can be used to transfer hardness: if A is known to be difficult and A reduces to B, what would a fast algorithm for B imply about A?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #15, qid 0b05f46db5a5",
     "intent": "Reason about polynomial-time reductions and their role in complexity theory.",
     "domain": "Theory of Computation",
     "acuity": "routine",
@@ -151,7 +151,7 @@
   },
   {
     "id": 16,
-    "prompt": "A deterministic finite automaton recognizes a language by processing one input symbol at a time with a finite set of states. Explain why it cannot recognize arbitrary balanced-parentheses strings, and what additional memory model a pushdown automaton provides.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #16, qid 726bd0459c94",
     "intent": "Distinguish regular languages from context-free languages using computational memory requirements.",
     "domain": "Theory of Computation",
     "acuity": "routine",
@@ -171,7 +171,7 @@
   },
   {
     "id": 18,
-    "prompt": "A program's CPU utilization is low while it spends most of its time waiting for disk I/O. Explain why adding CPU cores is unlikely to solve the main performance problem.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #18, qid c0a26f9a2597",
     "intent": "Identify an I/O-bound workload and distinguish CPU capacity from the actual bottleneck.",
     "domain": "Operating Systems and Computer Systems",
     "acuity": "routine",
@@ -241,7 +241,7 @@
   },
   {
     "id": 25,
-    "prompt": "A program allocates many short-lived objects and shows increasing memory usage even though references should eventually become unreachable. What evidence would distinguish a garbage-collection delay from a true memory leak or retained references?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #25, qid 0d5cbc1fe4f9",
     "intent": "Use observable evidence to distinguish memory-management failure modes.",
     "domain": "Operating Systems and Computer Systems",
     "acuity": "routine",
@@ -251,7 +251,7 @@
   },
   {
     "id": 26,
-    "prompt": "Explain why a system call can be more expensive than an ordinary function call, and why operating systems still need system calls rather than allowing applications unrestricted direct hardware access.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #26, qid 515e0846ee26",
     "intent": "Connect privilege boundaries, protection, and call overhead.",
     "domain": "Operating Systems and Computer Systems",
     "acuity": "routine",
@@ -261,7 +261,7 @@
   },
   {
     "id": 27,
-    "prompt": "A file-system workload performs many small random writes. Explain why write latency may be dominated by I/O behavior rather than CPU time, and discuss how buffering or batching can change the performance profile.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #27, qid c0987e620a5e",
     "intent": "Reason about file I/O bottlenecks and mitigation trade-offs.",
     "domain": "Operating Systems and Computer Systems",
     "acuity": "routine",
@@ -271,7 +271,7 @@
   },
   {
     "id": 28,
-    "prompt": "A five-stage CPU pipeline has a branch every few instructions, and mispredicted branches require several cycles to recover. Explain how branch prediction affects throughput and why a faster clock alone may not improve performance as expected.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #28, qid 761cbcb250f3",
     "intent": "Reason about pipeline hazards and branch-prediction effects.",
     "domain": "Computer Architecture",
     "acuity": "routine",
@@ -281,7 +281,7 @@
   },
   {
     "id": 29,
-    "prompt": "A loop repeatedly processes a contiguous array, then a second version accesses the same data through scattered locations. Explain the cache-locality difference and why the second version can have much lower performance even with identical asymptotic complexity.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #29, qid 9ddfac0bccff",
     "intent": "Connect memory locality to cache behavior and performance.",
     "domain": "Computer Architecture",
     "acuity": "routine",
@@ -291,7 +291,7 @@
   },
   {
     "id": 30,
-    "prompt": "A workload's CPU execution units are mostly idle while memory requests wait for DRAM. Explain the distinction between latency and bandwidth and identify which one is likely limiting a single dependent access chain versus a highly parallel streaming workload.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #30, qid 59efc8aa0ba6",
     "intent": "Distinguish memory latency from bandwidth under different access patterns.",
     "domain": "Computer Architecture",
     "acuity": "routine",
@@ -301,7 +301,7 @@
   },
   {
     "id": 31,
-    "prompt": "A program's serial portion is 40% of total runtime. Using Amdahl's law, what is the maximum theoretical speedup from making the remaining 60% infinitely fast, and what does this imply about optimization priorities?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #31, qid 06c1f6a51cea",
     "intent": "Apply Amdahl's law quantitatively and interpret its engineering implication.",
     "domain": "Computer Architecture",
     "acuity": "routine",
@@ -311,7 +311,7 @@
   },
   {
     "id": 32,
-    "prompt": "Explain why SIMD can accelerate applying the same arithmetic operation to many independent data elements, and give an example of a dependency pattern that limits SIMD benefit.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #32, qid 438967c89d94",
     "intent": "Reason about data parallelism and dependency constraints.",
     "domain": "Computer Architecture",
     "acuity": "routine",
@@ -321,7 +321,7 @@
   },
   {
     "id": 33,
-    "prompt": "A GPU kernel has thousands of threads but performs irregular pointer chasing with little data reuse. Explain why simply increasing the number of GPU threads may fail to improve performance.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #33, qid b0bc63b89db9",
     "intent": "Analyze GPU parallelism in relation to memory latency, locality, and workload structure.",
     "domain": "Computer Architecture",
     "acuity": "routine",
@@ -391,7 +391,7 @@
   },
   {
     "id": 40,
-    "prompt": "A web service works directly but fails intermittently when placed behind a reverse proxy. Some requests receive connection resets while others succeed. What evidence would you collect to determine whether the proxy, upstream service, timeout configuration, or network path is responsible?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #40, qid cb903c5e88a8",
     "intent": "Design a layered debugging approach for intermittent network failures.",
     "domain": "Networking",
     "acuity": "routine",
@@ -411,7 +411,7 @@
   },
   {
     "id": 42,
-    "prompt": "A user downloads a large file from a CDN. Explain how caching can reduce latency and origin load, and identify a case where a cached response could be incorrect or stale unless cache-control rules are used appropriately.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #42, qid 637ee2b8ddf4",
     "intent": "Reason about HTTP caching, CDNs, and freshness semantics.",
     "domain": "Networking",
     "acuity": "routine",
@@ -421,7 +421,7 @@
   },
   {
     "id": 43,
-    "prompt": "A private service is reachable from the internet through a NAT gateway. Explain what NAT changes about addressing and why it does not by itself provide a complete application-layer security boundary.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #43, qid ac7136a5c466",
     "intent": "Distinguish address translation from security controls.",
     "domain": "Networking",
     "acuity": "routine",
@@ -431,7 +431,7 @@
   },
   {
     "id": 44,
-    "prompt": "A link has 100 Mbps bandwidth and a round-trip time of 100 ms. Explain why a single small request can still experience about 100 ms of network round-trip delay despite the high bandwidth, and distinguish bandwidth from latency.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #44, qid 73076b76fdbd",
     "intent": "Apply basic networking performance concepts and distinguish throughput from delay.",
     "domain": "Networking",
     "acuity": "routine",
@@ -471,7 +471,7 @@
   },
   {
     "id": 48,
-    "prompt": "Two tables are joined on indexed keys, but the query is still slow. What database-level evidence would you inspect to determine whether the problem is cardinality estimation, an unsuitable join strategy, missing filtering, or I/O pressure?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #48, qid 6a540c22529c",
     "intent": "Use query plans and runtime evidence to diagnose database performance.",
     "domain": "Databases",
     "acuity": "routine",
@@ -481,7 +481,7 @@
   },
   {
     "id": 49,
-    "prompt": "Explain why normalization can reduce update anomalies, and why a production system might deliberately denormalize part of a schema despite the resulting redundancy.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #49, qid ec697b30c7b3",
     "intent": "Analyze normalization and denormalization as workload-dependent trade-offs.",
     "domain": "Databases",
     "acuity": "routine",
@@ -521,7 +521,7 @@
   },
   {
     "id": 53,
-    "prompt": "A service performs a payment and then retries the same request after a timeout. The first request may have committed even though the client did not receive the response. Explain how an idempotency key can prevent duplicate business effects.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #53, qid 9fc18f01666e",
     "intent": "Reason about retries, ambiguous outcomes, and idempotent transaction design.",
     "domain": "Databases",
     "acuity": "routine",
@@ -531,7 +531,7 @@
   },
   {
     "id": 54,
-    "prompt": "A database is replicated asynchronously. A client writes a record and immediately reads from a replica that does not yet have the update. Explain why this can occur and what architectural choices could provide read-after-write behavior.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #54, qid 13713fb1fd25",
     "intent": "Explain replication lag and consistency choices.",
     "domain": "Databases",
     "acuity": "routine",
@@ -571,7 +571,7 @@
   },
   {
     "id": 58,
-    "prompt": "A message consumer processes a message successfully but crashes before acknowledging it. Explain why an at-least-once queue may deliver the message again and how the consumer should be designed to tolerate duplicates.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #58, qid 4cd740400901",
     "intent": "Explain at-least-once delivery and idempotent consumption.",
     "domain": "Distributed Systems",
     "acuity": "routine",
@@ -581,7 +581,7 @@
   },
   {
     "id": 59,
-    "prompt": "A service retries a request whenever it times out. Explain how retries can amplify load during an outage, and describe mechanisms such as exponential backoff, jitter, and retry budgets that can reduce the amplification.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #59, qid 5fbc84ae438e",
     "intent": "Analyze retry storms and defensive distributed-system behavior.",
     "domain": "Distributed Systems",
     "acuity": "routine",
@@ -631,7 +631,7 @@
   },
   {
     "id": 64,
-    "prompt": "A system uses wall-clock timestamps to order events across machines. Explain why clock skew can make this ordering unreliable and how logical clocks provide a different notion of event ordering.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #64, qid 6c9d817e9f1c",
     "intent": "Distinguish physical-clock time from logical event ordering.",
     "domain": "Distributed Systems",
     "acuity": "routine",
@@ -651,7 +651,7 @@
   },
   {
     "id": 66,
-    "prompt": "Explain why 'exactly once delivery' is often an end-to-end application property rather than a simple property of a message transport, especially when a consumer can crash after performing a side effect.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #66, qid 586efbd0b33a",
     "intent": "Distinguish transport delivery semantics from end-to-end effect semantics.",
     "domain": "Distributed Systems",
     "acuity": "routine",
@@ -661,7 +661,7 @@
   },
   {
     "id": 67,
-    "prompt": "A distributed cache returns stale data after a write to the primary database. Explain several ways the stale result could arise and how invalidation, versioning, or read routing can change the consistency behavior.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #67, qid 8a3f038bad8c",
     "intent": "Analyze cache consistency and mitigation trade-offs.",
     "domain": "Distributed Systems",
     "acuity": "routine",
@@ -681,7 +681,7 @@
   },
   {
     "id": 69,
-    "prompt": "A distributed system must remain available during a network partition, but different clients may temporarily observe different values. Explain the trade-off being made and why the word 'consistency' needs a precise definition before evaluating the design.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #69, qid fcb09733db2f",
     "intent": "Reason about partition tolerance, availability, and precise consistency semantics.",
     "domain": "Distributed Systems",
     "acuity": "routine",
@@ -731,7 +731,7 @@
   },
   {
     "id": 74,
-    "prompt": "A codebase has many mocks and unit tests pass, but integration failures are frequent. Explain how excessive mocking can create false confidence and when an integration test is more informative than a unit test.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #74, qid ef7056f2919a",
     "intent": "Analyze test isolation and the limits of mocks.",
     "domain": "Software Engineering",
     "acuity": "routine",
@@ -741,7 +741,7 @@
   },
   {
     "id": 75,
-    "prompt": "A public API changes a response field from a string to an object. Explain why this can be a breaking change even if the endpoint and URL remain identical, and give compatibility strategies.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #75, qid 0f4f7f8105fe",
     "intent": "Reason about API contracts and backward compatibility.",
     "domain": "Software Engineering",
     "acuity": "routine",
@@ -751,7 +751,7 @@
   },
   {
     "id": 76,
-    "prompt": "A team uses semantic versioning. Explain the intended relationship between breaking API changes and major versions, and why version numbers alone cannot make an incompatible change safe for existing clients.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #76, qid 554a8e640cb9",
     "intent": "Explain semantic versioning while recognizing its limits as a compatibility mechanism.",
     "domain": "Software Engineering",
     "acuity": "routine",
@@ -761,7 +761,7 @@
   },
   {
     "id": 77,
-    "prompt": "A production service becomes slower after a feature release. Logs show no obvious errors. Describe a profiling and observability workflow that distinguishes CPU, allocation/GC, database, network, and lock-contention regressions.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #77, qid e75f574af3ba",
     "intent": "Design a causal performance-debugging workflow using evidence rather than symptoms.",
     "domain": "Software Engineering",
     "acuity": "routine",
@@ -771,7 +771,7 @@
   },
   {
     "id": 78,
-    "prompt": "A CI pipeline runs unit tests on every commit and a smaller set of end-to-end tests after deployment. Explain the trade-off between fast feedback and broad behavioral coverage, and when the arrangement should be changed.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #78, qid a54653fc028a",
     "intent": "Evaluate CI/CD test strategy and feedback-loop trade-offs.",
     "domain": "Software / System Performance",
     "acuity": "routine",
@@ -781,7 +781,7 @@
   },
   {
     "id": 79,
-    "prompt": "A team wants to refactor a large legacy component but cannot tolerate a long freeze on feature work. Explain how incremental refactoring can reduce risk and what role characterization tests can play.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #79, qid e9db7961d946",
     "intent": "Design a safe incremental refactoring approach under delivery constraints.",
     "domain": "Software Engineering",
     "acuity": "routine",
@@ -811,7 +811,7 @@
   },
   {
     "id": 82,
-    "prompt": "Compare static and dynamic typing in terms of when type errors are detected and what information is available at compile time versus runtime. Explain why static typing does not mean a program can have no runtime type-related failures.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #82, qid 53593612d36b",
     "intent": "Distinguish typing-time guarantees from complete runtime behavior.",
     "domain": "Programming Languages and Compilers",
     "acuity": "routine",
@@ -821,7 +821,7 @@
   },
   {
     "id": 83,
-    "prompt": "A closure refers to a variable from an enclosing lexical scope after the enclosing function has returned. Explain how lexical scoping and closure environments make this possible.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #83, qid 788027d39841",
     "intent": "Reason about lexical scope and captured environments.",
     "domain": "Programming Languages and Compilers",
     "acuity": "routine",
@@ -841,7 +841,7 @@
   },
   {
     "id": 85,
-    "prompt": "A language implementation first compiles source into bytecode and then executes hot bytecode paths with a JIT compiler. Explain why this can outperform simple interpretation and what runtime information a JIT can exploit.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #85, qid 8c8d226744ee",
     "intent": "Explain JIT compilation and runtime optimization.",
     "domain": "Programming Languages and Compilers",
     "acuity": "routine",
@@ -851,7 +851,7 @@
   },
   {
     "id": 86,
-    "prompt": "A garbage-collected runtime pauses intermittently as the heap grows. Explain why allocation rate, object lifetime distribution, and collector strategy can affect pause behavior, and what measurements would help diagnose the issue.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #86, qid 54af9ab5a949",
     "intent": "Connect garbage collection behavior with workload characteristics and empirical diagnosis.",
     "domain": "Programming Languages and Compilers",
     "acuity": "routine",
@@ -861,7 +861,7 @@
   },
   {
     "id": 87,
-    "prompt": "A generic function is instantiated for multiple types, while another language implementation uses type erasure. Compare the runtime and compile-time trade-offs that can arise from these two implementation strategies.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #87, qid 6e5481dc83ad",
     "intent": "Reason about generic implementation strategies without depending on one language.",
     "domain": "Programming Languages and Compilers",
     "acuity": "routine",
@@ -931,7 +931,7 @@
   },
   {
     "id": 94,
-    "prompt": "A build pipeline downloads a third-party package and executes its build scripts with broad repository credentials. Explain the supply-chain risks and propose controls that reduce the blast radius if a dependency or build step is compromised.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #94, qid 6a63361f5ce1",
     "intent": "Analyze dependency and build-pipeline supply-chain risk with defense in depth.",
     "domain": "Security",
     "acuity": "routine",
@@ -961,7 +961,7 @@
   },
   {
     "id": 97,
-    "prompt": "A model scores 98% on a random train/test split but only 72% after deployment. Investigation shows that near-duplicate records from the same users appeared in both training and test sets. Explain the leakage mechanism and how the evaluation should be redesigned.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #97, qid 38ed142148a7",
     "intent": "Diagnose data leakage and design a more valid evaluation split.",
     "domain": "AI and Machine Learning",
     "acuity": "routine",
@@ -981,7 +981,7 @@
   },
   {
     "id": 99,
-    "prompt": "A production classifier's ROC-AUC remains stable, but the probability outputs become poorly calibrated after the input population changes. Explain why ranking quality and calibration can diverge under distribution shift, and what evaluation or recalibration steps you would consider.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — computer_science_v1 #99, qid 1795778502f1",
     "intent": "Distinguish ranking metrics from probability calibration under distribution shift.",
     "domain": "AI and Machine Learning",
     "acuity": "routine",

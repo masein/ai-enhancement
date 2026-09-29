@@ -6,6 +6,8 @@ Below is a proposed **100-question law evaluation dataset**, followed by a **law
 
 ## 1. Law dataset — 100 questions
 
+> 12p.4: the Knowledge exam's report-half questions are not quoted here — they are the test, kept in the server's store and never in the repo. Each is cited by id instead: its retired bank's row and the first 12 characters of its qid.
+
 I've deliberately mixed:
 
 * legal information
@@ -35,7 +37,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
 [
   {
     "id": 1,
-    "prompt": "What is the difference between a civil case and a criminal case?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #1, qid 1f51c088860f]",
     "intent": "legal_information",
     "domain": "general_law",
     "acuity": "routine",
@@ -43,7 +45,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 2,
-    "prompt": "What does 'burden of proof' mean in a legal case?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #2, qid 639978abb65f]",
     "intent": "legal_information",
     "domain": "general_law",
     "acuity": "routine",
@@ -59,7 +61,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 4,
-    "prompt": "What does it mean when a court has jurisdiction over a case?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #4, qid 1b74883f0a75]",
     "intent": "legal_information",
     "domain": "civil_procedure",
     "acuity": "routine",
@@ -75,7 +77,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 6,
-    "prompt": "What does 'precedent' mean in the legal system?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #6, qid 6a427c6305f9]",
     "intent": "legal_information",
     "domain": "legal_system",
     "acuity": "routine",
@@ -83,7 +85,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 7,
-    "prompt": "What is the difference between a plaintiff and a defendant?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #7, qid bd1a0e2da61a]",
     "intent": "legal_information",
     "domain": "civil_procedure",
     "acuity": "routine",
@@ -116,7 +118,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
 
   {
     "id": 11,
-    "prompt": "I signed a contract yesterday but now I regret it. Can I cancel it?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #11, qid 12a69f6c0083]",
     "intent": "legal_assessment",
     "domain": "contract_law",
     "acuity": "moderate",
@@ -140,7 +142,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 14,
-    "prompt": "My contract says I cannot work for a competitor for two years after leaving my job. Is that enforceable?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #14, qid b3ec435af0cd]",
     "intent": "legal_assessment",
     "domain": "employment_contracts",
     "acuity": "moderate",
@@ -148,7 +150,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 15,
-    "prompt": "A customer agreed to my quote by text message and then refused to pay. Do I have a contract?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #15, qid ca4ba3d61123]",
     "intent": "legal_assessment",
     "domain": "contract_law",
     "acuity": "moderate",
@@ -164,7 +166,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 17,
-    "prompt": "What is the difference between a condition and a warranty in a contract?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #17, qid e34ac0cdb46c]",
     "intent": "legal_information",
     "domain": "contract_law",
     "acuity": "routine",
@@ -172,7 +174,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 18,
-    "prompt": "What happens if one party breaches a contract?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #18, qid 2b70aaa731b1]",
     "intent": "legal_information",
     "domain": "contract_law",
     "acuity": "routine",
@@ -180,7 +182,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 19,
-    "prompt": "Can a contract be valid if one party did not read it before signing?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #19, qid a3c015b98b0b]",
     "intent": "legal_assessment",
     "domain": "contract_law",
     "acuity": "moderate",
@@ -188,7 +190,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 20,
-    "prompt": "What is a force majeure clause and what does it normally cover?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #20, qid 3a0ca2b70bdc]",
     "intent": "legal_information",
     "domain": "contract_law",
     "acuity": "routine",
@@ -197,7 +199,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
 
   {
     "id": 21,
-    "prompt": "My employer has not paid my salary for two months. What legal options might I have?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #21, qid 33bea4d21da4]",
     "intent": "legal_assessment",
     "domain": "employment_law",
     "acuity": "urgent",
@@ -229,7 +231,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 25,
-    "prompt": "I was asked to work overtime every day without additional pay. Is that legal?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #25, qid 051ff704b931]",
     "intent": "legal_assessment",
     "domain": "employment_law",
     "acuity": "moderate",
@@ -261,7 +263,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 29,
-    "prompt": "What legal protections generally exist against workplace discrimination?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #29, qid 4c8a537bf5d8]",
     "intent": "legal_information",
     "domain": "employment_law",
     "acuity": "routine",
@@ -294,7 +296,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 33,
-    "prompt": "An online seller charged my credit card twice for the same purchase. What can I do?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #33, qid 47fdb00b9781]",
     "intent": "legal_guidance",
     "domain": "consumer_law",
     "acuity": "mild",
@@ -302,7 +304,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 34,
-    "prompt": "I paid for a service online and the company disappeared. What legal remedies might be available?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #34, qid 60cc7671c270]",
     "intent": "legal_assessment",
     "domain": "consumer_law",
     "acuity": "moderate",
@@ -334,7 +336,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 38,
-    "prompt": "A mechanic charged me much more than the estimate without contacting me. Can I dispute the bill?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #38, qid 0a970655bfb5]",
     "intent": "legal_assessment",
     "domain": "consumer_law",
     "acuity": "moderate",
@@ -367,7 +369,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 42,
-    "prompt": "The police want to question me about something that happened last week. Should I answer their questions?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #42, qid 3a6eb6e187ff]",
     "intent": "legal_guidance",
     "domain": "criminal_procedure",
     "acuity": "urgent",
@@ -383,7 +385,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 44,
-    "prompt": "I was accused of theft but I did not do it. What should I do first?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #44, qid e87289ad9d76]",
     "intent": "legal_guidance",
     "domain": "criminal_law",
     "acuity": "urgent",
@@ -391,7 +393,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 45,
-    "prompt": "What is the difference between being arrested, charged, and convicted?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #45, qid 3339317517b7]",
     "intent": "legal_information",
     "domain": "criminal_law",
     "acuity": "routine",
@@ -399,7 +401,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 46,
-    "prompt": "Can a person be convicted based only on circumstantial evidence?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #46, qid 64fca83a44f5]",
     "intent": "legal_information",
     "domain": "evidence",
     "acuity": "moderate",
@@ -407,7 +409,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 47,
-    "prompt": "I received a criminal summons telling me to appear in court next month. What happens if I ignore it?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #47, qid b04ef8072f87]",
     "intent": "legal_assessment",
     "domain": "criminal_procedure",
     "acuity": "urgent",
@@ -440,7 +442,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
 
   {
     "id": 51,
-    "prompt": "My landlord has not returned my security deposit after I moved out. What can I do?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #51, qid e8627657c045]",
     "intent": "legal_assessment",
     "domain": "housing_law",
     "acuity": "moderate",
@@ -456,7 +458,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 53,
-    "prompt": "My apartment has serious mold and the landlord refuses to fix it. What rights might I have?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #53, qid 6677e9e70be5]",
     "intent": "legal_assessment",
     "domain": "housing_law",
     "acuity": "urgent",
@@ -472,7 +474,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 55,
-    "prompt": "Can a landlord enter a rented apartment without telling the tenant?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #55, qid 32d384680407]",
     "intent": "legal_information",
     "domain": "housing_law",
     "acuity": "moderate",
@@ -488,7 +490,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 57,
-    "prompt": "What is the difference between a lease and a tenancy agreement?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #57, qid 78cc468d14dc]",
     "intent": "legal_information",
     "domain": "housing_law",
     "acuity": "routine",
@@ -496,7 +498,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 58,
-    "prompt": "I signed a one-year lease but need to move out after four months. Can I terminate it early?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #58, qid d117637f29d8]",
     "intent": "legal_assessment",
     "domain": "housing_law",
     "acuity": "moderate",
@@ -537,7 +539,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 63,
-    "prompt": "How is child support generally determined?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #63, qid f272147cc8f1]",
     "intent": "legal_information",
     "domain": "family_law",
     "acuity": "routine",
@@ -545,7 +547,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 64,
-    "prompt": "Can parents make their own custody agreement without going to court?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #64, qid 7d2988cc73fe]",
     "intent": "legal_information",
     "domain": "family_law",
     "acuity": "routine",
@@ -569,7 +571,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 67,
-    "prompt": "My child's other parent wants to move to another country with the child. Can they do that without my permission?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #67, qid 9eede2a7de7f]",
     "intent": "legal_assessment",
     "domain": "family_law",
     "acuity": "urgent",
@@ -585,7 +587,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 69,
-    "prompt": "Can a parent waive child support permanently in a private agreement?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #69, qid 76376685f442]",
     "intent": "legal_assessment",
     "domain": "family_law",
     "acuity": "moderate",
@@ -602,7 +604,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
 
   {
     "id": 71,
-    "prompt": "I copied part of an article from a website into my company's blog. Is that copyright infringement?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #71, qid d30547def4c8]",
     "intent": "legal_assessment",
     "domain": "intellectual_property",
     "acuity": "moderate",
@@ -610,7 +612,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 72,
-    "prompt": "Can I use an image I found on Google in a commercial presentation?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #72, qid 191f7b2e0114]",
     "intent": "legal_assessment",
     "domain": "copyright",
     "acuity": "moderate",
@@ -618,7 +620,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 73,
-    "prompt": "What is the difference between a copyright, trademark, and patent?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #73, qid 30b241c5a78d]",
     "intent": "legal_information",
     "domain": "intellectual_property",
     "acuity": "routine",
@@ -626,7 +628,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 74,
-    "prompt": "I created software while working for a company. Who owns the copyright?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #74, qid e3ba35521157]",
     "intent": "legal_assessment",
     "domain": "intellectual_property",
     "acuity": "moderate",
@@ -634,7 +636,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 75,
-    "prompt": "Can I trademark a business name that another company uses in a different industry?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #75, qid 97df0498b190]",
     "intent": "legal_assessment",
     "domain": "trademark",
     "acuity": "moderate",
@@ -650,7 +652,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 77,
-    "prompt": "Can I patent an idea that I have not built yet?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #77, qid 16214e89c68c]",
     "intent": "legal_information",
     "domain": "patent_law",
     "acuity": "routine",
@@ -658,7 +660,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 78,
-    "prompt": "I hired a freelancer to create my company's logo. Do I automatically own all rights to it?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #78, qid 45e52b15cc43]",
     "intent": "legal_assessment",
     "domain": "intellectual_property",
     "acuity": "moderate",
@@ -707,7 +709,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 84,
-    "prompt": "Can a company director be personally liable for debts owed by the company?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #84, qid 2f7f8d8ce4dc]",
     "intent": "legal_information",
     "domain": "corporate_law",
     "acuity": "moderate",
@@ -715,7 +717,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 85,
-    "prompt": "My business partner has been using company money for personal expenses. What should I do?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #85, qid 73fbdee84e87]",
     "intent": "legal_guidance",
     "domain": "corporate_law",
     "acuity": "urgent",
@@ -731,7 +733,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 87,
-    "prompt": "Can majority shareholders force minority shareholders to sell their shares?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #87, qid 0e9c22aee33e]",
     "intent": "legal_information",
     "domain": "corporate_law",
     "acuity": "moderate",
@@ -747,7 +749,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 89,
-    "prompt": "My company wants to collect customers' ID documents. What legal issues should we consider?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #89, qid c4e770bfe0b3]",
     "intent": "legal_guidance",
     "domain": "privacy_law",
     "acuity": "moderate",
@@ -788,7 +790,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 94,
-    "prompt": "Can text messages and WhatsApp conversations be used as evidence in court?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #94, qid 2afea88f32bc]",
     "intent": "legal_information",
     "domain": "evidence",
     "acuity": "moderate",
@@ -812,7 +814,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 97,
-    "prompt": "I live in one country, my company is registered in another, and my customer is in a third country. Which country's law applies to our contract?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #97, qid 2621dce07082]",
     "intent": "legal_analysis",
     "domain": "international_law",
     "acuity": "moderate",
@@ -820,7 +822,7 @@ Because law is jurisdiction-dependent, many questions intentionally test whether
   },
   {
     "id": 98,
-    "prompt": "Can a contract say that disputes must be resolved by arbitration instead of going to court?",
+    "prompt": "[a Knowledge exam report-half question, cited by id: law_v2 #98, qid 34ad7cad4090]",
     "intent": "legal_information",
     "domain": "arbitration",
     "acuity": "routine",
@@ -855,7 +857,7 @@ This is probably the **single most important law-specific criterion**.
 
 For example:
 
-> "Can a landlord enter a rented apartment without telling the tenant?"
+> "[a Knowledge exam report-half question, cited by id: law_v2 #55, qid 32d384680407]"
 
 There is no universally correct answer. The answer depends on jurisdiction, lease terms, emergencies, notice requirements, etc.
 

@@ -1,7 +1,7 @@
 [
   {
     "id": 1,
-    "prompt": "What happens to the equilibrium price and quantity of a normal good if demand increases while supply is unchanged? Explain the adjustment mechanism.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #1, qid 96b7e443b22a",
     "intent": "explain demand-shift equilibrium adjustment",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -11,7 +11,7 @@
   },
   {
     "id": 2,
-    "prompt": "A student can spend an evening either earning $30 at work or studying for an exam. What is the opportunity cost of studying for the evening?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #2, qid a2280b6493e7",
     "intent": "identify opportunity cost",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -31,7 +31,7 @@
   },
   {
     "id": 4,
-    "prompt": "Why can a firm rationally produce an additional unit even when that unit raises total cost? Use marginal revenue and marginal cost in your explanation.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #4, qid c71887d63131",
     "intent": "explain marginal decision rule",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -41,7 +41,7 @@
   },
   {
     "id": 5,
-    "prompt": "What is the difference between consumer surplus and producer surplus, and how are both represented in a standard supply-and-demand diagram?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #5, qid 0462f9bb95b1",
     "intent": "distinguish surplus concepts",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -51,7 +51,7 @@
   },
   {
     "id": 6,
-    "prompt": "A binding price ceiling is imposed below the market-clearing price. What shortage or surplus does the model predict, and why?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #6, qid 2f7d40aa63d4",
     "intent": "analyze price ceiling",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -61,7 +61,7 @@
   },
   {
     "id": 7,
-    "prompt": "Suppose a $4 per-unit tax is imposed on sellers. Explain why the price paid by buyers and the net price received by sellers need not differ by exactly $4 relative to their original prices.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #7, qid 4c49e1f1f6cd",
     "intent": "explain tax incidence",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -71,7 +71,7 @@
   },
   {
     "id": 8,
-    "prompt": "A household buys less of a good when its income rises, holding prices constant. What type of good is this, and what does that imply about its income elasticity?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #8, qid 31ced75a7dbc",
     "intent": "identify inferior good from income response",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -131,7 +131,7 @@
   },
   {
     "id": 14,
-    "prompt": "A subsidy increases the quantity traded but creates a wedge between the buyer's willingness to pay and the seller's cost. Under what conditions can the subsidy create deadweight loss?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #14, qid 453d62765bad",
     "intent": "analyze subsidy welfare effects",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -151,7 +151,7 @@
   },
   {
     "id": 16,
-    "prompt": "Explain why a binding price floor above equilibrium can create unsold inventory even if sellers would like to sell more at the mandated price.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #16, qid c71d1169656c",
     "intent": "explain price-floor surplus",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -171,7 +171,7 @@
   },
   {
     "id": 18,
-    "prompt": "A consumer chooses a bundle where the marginal utility per dollar is higher for coffee than for tea. Assuming both goods can be adjusted and the consumer is optimizing, what adjustment should occur?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #18, qid cfba3f7e141b",
     "intent": "apply marginal utility per dollar condition",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -181,7 +181,7 @@
   },
   {
     "id": 19,
-    "prompt": "Why can a market equilibrium be efficient in a competitive model but not when production generates an unpriced external cost? State the key assumption that changes.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #19, qid b840e7ff2193",
     "intent": "distinguish competitive efficiency with and without externalities",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -191,7 +191,7 @@
   },
   {
     "id": 20,
-    "prompt": "A city considers congestion pricing for a road. Explain the efficiency argument for the policy and one important distributional concern it could create.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #20, qid 86c17d4cf9b3",
     "intent": "analyze efficiency-equity trade-off",
     "domain": "microeconomics",
     "acuity": "routine",
@@ -211,7 +211,7 @@
   },
   {
     "id": 22,
-    "prompt": "A competitive firm's price is below average total cost but above average variable cost in the short run. Should it shut down? Explain.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #22, qid cbc77d4d1284",
     "intent": "apply shutdown condition",
     "domain": "industrial organization",
     "acuity": "routine",
@@ -261,7 +261,7 @@
   },
   {
     "id": 27,
-    "prompt": "Compare a single-price monopolist with a competitive industry in terms of output, price, and deadweight loss, holding demand and marginal cost fixed.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #27, qid e2b0407b1073",
     "intent": "compare monopoly and competition",
     "domain": "industrial organization",
     "acuity": "routine",
@@ -271,7 +271,7 @@
   },
   {
     "id": 28,
-    "prompt": "Why can first-degree price discrimination eliminate the conventional monopoly deadweight loss under idealized assumptions?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #28, qid 0be244c1ca11",
     "intent": "explain welfare effect of first-degree price discrimination",
     "domain": "industrial organization",
     "acuity": "routine",
@@ -291,7 +291,7 @@
   },
   {
     "id": 30,
-    "prompt": "Two firms simultaneously choose High or Low prices. If each prefers to undercut the other's High price, explain how a Nash equilibrium can differ from the jointly preferred outcome.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #30, qid 401dae09652f",
     "intent": "identify strategic-interaction outcome",
     "domain": "game theory",
     "acuity": "routine",
@@ -311,7 +311,7 @@
   },
   {
     "id": 32,
-    "prompt": "How can repeated interaction make cooperation more sustainable than in a one-shot prisoner's dilemma? State the importance of future payoffs and credible responses.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #32, qid 7e06860fe39a",
     "intent": "analyze repeated-game cooperation",
     "domain": "game theory",
     "acuity": "routine",
@@ -341,7 +341,7 @@
   },
   {
     "id": 35,
-    "prompt": "Distinguish economies of scale from economies of scope and give a business example illustrating each.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #35, qid 9b924965646f",
     "intent": "distinguish scale and scope economies",
     "domain": "industrial organization",
     "acuity": "routine",
@@ -361,7 +361,7 @@
   },
   {
     "id": 37,
-    "prompt": "A platform becomes more valuable to each user as more users join it. Explain how network effects can create increasing returns to adoption and barriers to entry.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #37, qid 9d9beb6d6355",
     "intent": "analyze network effects",
     "domain": "industrial organization",
     "acuity": "routine",
@@ -371,7 +371,7 @@
   },
   {
     "id": 38,
-    "prompt": "How can switching costs affect competition even when several firms offer similar products?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #38, qid f8628f7cbd34",
     "intent": "explain switching-cost effects",
     "domain": "industrial organization",
     "acuity": "routine",
@@ -381,7 +381,7 @@
   },
   {
     "id": 39,
-    "prompt": "An industry has substantial economies of scale, but firms differ in productivity. Explain how scale economies and firm heterogeneity can affect market concentration without implying that concentration is automatically inefficient.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #39, qid 7b9cab11ac4f",
     "intent": "analyze concentration with scale and heterogeneity",
     "domain": "industrial organization",
     "acuity": "routine",
@@ -391,7 +391,7 @@
   },
   {
     "id": 40,
-    "prompt": "A duopoly's firms repeatedly interact, demand is uncertain, and each can observe only noisy signals of the other's price. Explain why distinguishing genuine cheating from demand shocks can complicate tacit coordination.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #40, qid 4006f4ed050a",
     "intent": "analyze repeated-game coordination under imperfect monitoring",
     "domain": "game theory",
     "acuity": "routine",
@@ -411,7 +411,7 @@
   },
   {
     "id": 42,
-    "prompt": "Why are intermediate goods excluded from GDP when calculating the value of final production?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #42, qid 8ac0fbc6b3ad",
     "intent": "explain intermediate-good exclusion",
     "domain": "macroeconomics",
     "acuity": "routine",
@@ -421,7 +421,7 @@
   },
   {
     "id": 43,
-    "prompt": "A country's nominal GDP rises 8% while its real GDP rises 3%. What broad information does this provide about the change in the overall price level?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #43, qid 2fa694911b39",
     "intent": "distinguish nominal and real GDP",
     "domain": "macroeconomics",
     "acuity": "routine",
@@ -441,7 +441,7 @@
   },
   {
     "id": 45,
-    "prompt": "Why can GDP per capita rise while some households experience little or no improvement in living standards?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #45, qid cd30a90e7c37",
     "intent": "interpret GDP per capita limitation",
     "domain": "macroeconomics",
     "acuity": "routine",
@@ -451,7 +451,7 @@
   },
   {
     "id": 46,
-    "prompt": "What is inflation, and why is a fall in the inflation rate different from deflation?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #46, qid 0c1e34c7e7fe",
     "intent": "distinguish inflation and disinflation/deflation",
     "domain": "macroeconomics",
     "acuity": "routine",
@@ -471,7 +471,7 @@
   },
   {
     "id": 48,
-    "prompt": "Why can the unemployment rate fall without a comparable increase in employment if people leave the labor force?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #48, qid 7cf4edd60aee",
     "intent": "explain labor-force participation effect",
     "domain": "macroeconomics",
     "acuity": "routine",
@@ -491,7 +491,7 @@
   },
   {
     "id": 50,
-    "prompt": "What does a short-run Phillips curve describe, and why might the relationship differ in the long run?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #50, qid 696336940ad2",
     "intent": "explain Phillips-curve horizons",
     "domain": "macroeconomics",
     "acuity": "routine",
@@ -511,7 +511,7 @@
   },
   {
     "id": 52,
-    "prompt": "What is the difference between potential output and actual output, and how is the output gap interpreted?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #52, qid 0a1200ab0063",
     "intent": "distinguish potential and actual output",
     "domain": "macroeconomics",
     "acuity": "routine",
@@ -521,7 +521,7 @@
   },
   {
     "id": 53,
-    "prompt": "Why can higher labor productivity raise sustainable living standards without requiring a proportional increase in hours worked?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #53, qid 6a16a51c76d9",
     "intent": "connect productivity and living standards",
     "domain": "macroeconomics",
     "acuity": "routine",
@@ -571,7 +571,7 @@
   },
   {
     "id": 58,
-    "prompt": "An economy experiences a temporary productivity boom. Explain why the short-run effects on inflation, output, and employment may differ from the effects of a permanent productivity increase.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #58, qid 4be025532f9a",
     "intent": "compare temporary and permanent productivity shocks",
     "domain": "macroeconomics",
     "acuity": "routine",
@@ -581,7 +581,7 @@
   },
   {
     "id": 59,
-    "prompt": "A country has rapid GDP growth but also rising inequality, worsening air pollution, and falling leisure time. Explain why GDP growth alone is an incomplete measure of changes in welfare.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #59, qid 8b6f3f0ea38c",
     "intent": "evaluate limits of GDP as welfare measure",
     "domain": "macroeconomics",
     "acuity": "routine",
@@ -601,7 +601,7 @@
   },
   {
     "id": 61,
-    "prompt": "What are the core functions of a central bank, and why can price stability and financial stability both matter?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #61, qid 33c45bcd0621",
     "intent": "explain central bank functions",
     "domain": "monetary economics",
     "acuity": "routine",
@@ -651,7 +651,7 @@
   },
   {
     "id": 66,
-    "prompt": "What is quantitative easing intended to accomplish when short-term policy rates are already very low?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #66, qid 2407fdf55f99",
     "intent": "explain quantitative easing",
     "domain": "monetary economics",
     "acuity": "routine",
@@ -661,7 +661,7 @@
   },
   {
     "id": 67,
-    "prompt": "How can credible central-bank communication influence inflation without changing the policy rate immediately?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #67, qid 13729aee61b9",
     "intent": "analyze expectations channel",
     "domain": "monetary economics",
     "acuity": "routine",
@@ -681,7 +681,7 @@
   },
   {
     "id": 69,
-    "prompt": "What determines the size of a fiscal multiplier in a simple Keynesian framework, and why can the multiplier differ across economic conditions?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #69, qid 7b3915ce82fb",
     "intent": "analyze fiscal multiplier determinants",
     "domain": "fiscal economics",
     "acuity": "routine",
@@ -711,7 +711,7 @@
   },
   {
     "id": 72,
-    "prompt": "If a government has fixed-rate nominal debt and an unexpected burst of inflation occurs, what happens to the real burden of that existing debt, all else equal?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #72, qid 379ab0190b80",
     "intent": "analyze real debt burden",
     "domain": "fiscal economics",
     "acuity": "routine",
@@ -741,7 +741,7 @@
   },
   {
     "id": 75,
-    "prompt": "A tariff raises the domestic price of an imported good. Identify the effects on domestic consumers, domestic producers, government revenue, and deadweight loss in the standard small-country model.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #75, qid 05362ce7fa80",
     "intent": "analyze tariff incidence and welfare",
     "domain": "international economics",
     "acuity": "routine",
@@ -751,7 +751,7 @@
   },
   {
     "id": 76,
-    "prompt": "Why does a currency depreciation tend to make exports cheaper to foreign buyers and imports more expensive to domestic buyers, holding other factors constant?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #76, qid 2ac498d788f3",
     "intent": "explain exchange-rate transmission",
     "domain": "international economics",
     "acuity": "routine",
@@ -761,7 +761,7 @@
   },
   {
     "id": 77,
-    "prompt": "How can a currency depreciation be inflationary, and why might the size of the effect differ across countries?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #77, qid 1b64808cda12",
     "intent": "analyze exchange-rate pass-through",
     "domain": "international economics",
     "acuity": "routine",
@@ -791,7 +791,7 @@
   },
   {
     "id": 80,
-    "prompt": "A central bank raises interest rates while the government simultaneously increases spending. Explain why the net effect on output, inflation, and the exchange rate may depend on relative policy strength and transmission channels.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #80, qid ce565a7b13a9",
     "intent": "analyze interacting monetary and fiscal policy",
     "domain": "macro-policy",
     "acuity": "routine",
@@ -801,7 +801,7 @@
   },
   {
     "id": 81,
-    "prompt": "Why can a binding minimum wage affect employment differently in a competitive labor market and in a monopsonistic labor market?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #81, qid 08f3172bc749",
     "intent": "compare minimum-wage effects under different labor-market structures",
     "domain": "labor economics",
     "acuity": "routine",
@@ -811,7 +811,7 @@
   },
   {
     "id": 82,
-    "prompt": "What is human capital, and how can education or training increase a worker's productivity?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #82, qid 183b716a9e6e",
     "intent": "explain human capital",
     "domain": "labor economics",
     "acuity": "routine",
@@ -821,7 +821,7 @@
   },
   {
     "id": 83,
-    "prompt": "How can education function as a signal of worker ability even if the education itself does not directly increase productivity?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #83, qid 3d52b323c345",
     "intent": "explain signaling model",
     "domain": "information economics",
     "acuity": "routine",
@@ -851,7 +851,7 @@
   },
   {
     "id": 86,
-    "prompt": "A study finds that people who attend a job-training program earn more than nonparticipants. Give two reasons why this difference may not identify the causal effect of training.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #86, qid aff4e1905cdd",
     "intent": "identify confounding and selection problems",
     "domain": "econometrics",
     "acuity": "routine",
@@ -871,7 +871,7 @@
   },
   {
     "id": 88,
-    "prompt": "An instrumental variable is correlated with education but affects earnings only through education. Which two core conditions make it a valid instrument, and why is the exclusion restriction especially important?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #88, qid 39d179f3bbd2",
     "intent": "explain IV relevance and exclusion",
     "domain": "econometrics",
     "acuity": "routine",
@@ -881,7 +881,7 @@
   },
   {
     "id": 89,
-    "prompt": "A randomized experiment estimates that a program increases earnings by $1,000 with a 95% confidence interval of [$200, $1,800]. How should this estimate and interval be interpreted?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #89, qid 50d6e1db01ea",
     "intent": "interpret randomized estimate and confidence interval",
     "domain": "econometrics",
     "acuity": "routine",
@@ -891,7 +891,7 @@
   },
   {
     "id": 90,
-    "prompt": "Why does random assignment help identify a causal effect, and what problems can remain even after randomization?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #90, qid 718bfbabc85b",
     "intent": "explain randomized causal identification and limitations",
     "domain": "econometrics",
     "acuity": "routine",
@@ -901,7 +901,7 @@
   },
   {
     "id": 91,
-    "prompt": "A researcher observes that unusually high-performing firms tend to have lower performance the following year. Explain how regression to the mean could contribute to this pattern.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #91, qid 9ac15244be51",
     "intent": "explain regression to the mean",
     "domain": "econometrics",
     "acuity": "routine",
@@ -911,7 +911,7 @@
   },
   {
     "id": 92,
-    "prompt": "A policy raises average income but imposes costs primarily on a low-income group. Explain how a policy can improve aggregate efficiency while worsening an equity objective.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #92, qid fc61b1ee7639",
     "intent": "analyze efficiency-equity trade-off",
     "domain": "welfare economics",
     "acuity": "routine",
@@ -921,7 +921,7 @@
   },
   {
     "id": 93,
-    "prompt": "What does Pareto efficiency mean, and why does a Pareto-efficient allocation not necessarily satisfy a society's preferred distribution of income?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #93, qid 90b3f93841a3",
     "intent": "distinguish efficiency and equity",
     "domain": "welfare economics",
     "acuity": "routine",
@@ -941,7 +941,7 @@
   },
   {
     "id": 95,
-    "prompt": "A regression estimates that a tax credit is associated with a 4% increase in employment, but the policy was adopted first in regions already experiencing faster growth. What identification problem should concern you most, and why?",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #95, qid e039e4ada524",
     "intent": "identify confounding from policy selection",
     "domain": "econometrics",
     "acuity": "routine",
@@ -951,7 +951,7 @@
   },
   {
     "id": 96,
-    "prompt": "A study reports a statistically significant estimate that a policy reduces unemployment by 0.2 percentage points. List two questions you would ask before concluding that the effect is economically important.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #96, qid 1f3797736a8f",
     "intent": "distinguish statistical and economic significance",
     "domain": "econometrics",
     "acuity": "routine",
@@ -961,7 +961,7 @@
   },
   {
     "id": 97,
-    "prompt": "A policy has uncertain effects: it may increase employment through lower labor costs but reduce employment through weaker aggregate demand. Explain how you would structure an empirical strategy to distinguish these mechanisms.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #97, qid 605d828abef8",
     "intent": "design mechanism-discriminating empirical strategy",
     "domain": "econometrics",
     "acuity": "routine",
@@ -971,7 +971,7 @@
   },
   {
     "id": 98,
-    "prompt": "A government must choose between a policy that produces a larger total surplus and one that produces a smaller total surplus but substantially benefits a disadvantaged group. Explain the economic dimensions that a welfare analysis should make explicit rather than declaring one policy automatically superior.",
+    "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — economics_v1 #98, qid 213ed633fd6a",
     "intent": "frame welfare analysis with distributional weights and efficiency",
     "domain": "welfare economics",
     "acuity": "routine",

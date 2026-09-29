@@ -1,3 +1,5 @@
+> 12p.4: the Knowledge exam's report-half questions are not quoted here — they are the test, kept in the server's store and never in the repo. Each is cited by id instead: its retired bank's row and the first 12 characters of its qid.
+
 Recommended evaluation criteria
 1. Relevance
 
@@ -90,7 +92,7 @@ What it measures: Whether the answer covers the important aspects necessary to a
 
 For example, for:
 
-"My 5 year old has had a fever around 38.5 and a cough since yesterday. He is drinking and playing a little. When should I worry?"
+"[a Knowledge exam report-half question, cited by id: medicine_v2 #1, qid 3e474ade7e50]"
 
 A sufficiently complete answer would generally address:
 

@@ -18,13 +18,14 @@ import exam_build as eb
 import judge as jd
 from conftest import assert_no_report_half_text, make_service
 from service import proposals as prop
+import make_fixture  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 # the author's revised bank of the old exam, kept for what it proves about
 # the import: v1's hundred prompts re-delivered with new metadata. Nothing
 # reads eval_tasks/fr/retired/ at run time; the test imports it into the
 # current topic by hand.
-LAW_V2 = REPO / "eval_tasks" / "fr" / "retired" / "law_v2.json"
+LAW_V2 = make_fixture.retired_whole_dir() / "law_v2.json"          # 12p.4: whole
 # the Law bank the current exam is built from
 LAW = REPO / "eval_tasks" / "fr" / "banks" / "law_v1.json"
 TOPIC = "Medicine & Clinical Health"
@@ -91,7 +92,7 @@ def test_the_author_may_write_the_register_sentence_herself(svc, tmp_path, monke
 
 
 BANKS = REPO / "eval_tasks" / "fr" / "banks"
-RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+RETIRED = make_fixture.retired_whole_dir()                        # 12p.4: whole
 EXPLAINER = "set the problem up, state the assumptions, carry units and check limiting cases"
 
 

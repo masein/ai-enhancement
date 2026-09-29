@@ -23,9 +23,10 @@ import exam_build as eb
 import judge as jd
 from service import llm
 from conftest import assert_no_report_half_text
+import make_fixture  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
-RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+RETIRED = make_fixture.retired_whole_dir()                        # 12p.4: whole
 MEDICINE = RETIRED / "medicine_v2.json"
 LAW_V2 = RETIRED / "law_v2.json"
 TOPIC = "Medicine & Clinical Health"
