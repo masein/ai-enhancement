@@ -62,14 +62,17 @@ def test_every_summarise_rubric_scores_content_not_style():
                             "content, not its style. Give no score"), q["id"]
         assert "1. The checklist. Check each of the key facts against the text and the " \
                "answer." in r
-        assert "List anything else the answer says that is invented or wrong: a detail the " \
-               "text doesn't give, or a wrong number, person, day, time or place" in r
+        # 12a.10: against the text in the question, never the reference
+        assert "List each thing the answer says that the text doesn't give, or gets wrong: a " \
+               "number, person, day, time, place or amount" in r
         assert 'Several versions: true if it gives several versions instead of one ' \
                '("Option 1 / Option 2"). A summary in bullets is one summary.' in r
-        assert ("Style is never a finding: a lead-in (\"Here's a concise summary:\"), a closing "
-                "offer (\"Let me know if you'd like it shorter\"), headings, bullets, bold and "
-                "emoji.") in r
-        # the two worked examples, as checklists
+        # 12a.10: an option's name and a tip are style too
+        assert ("Style is never a finding: a lead-in (\"Here's a concise summary:\"), a heading "
+                "or an option's name (\"Option 2: Bulleted\"), a closing offer (\"Let me know if "
+                "you'd like it shorter\"), a tip on using it (\"Replace the name with your "
+                "manager's\"), bullets, bold and emoji.") in r
+        # the worked examples, as checklists
         assert "Example 1: every fact is correct, and the lead-in, the bullets and the offer " \
                "are style." in r
         assert "Here's a concise summary:\n    - Lunch moves to Friday" in r
@@ -104,7 +107,7 @@ def test_the_judge_is_asked_to_name_what_is_missing():
     assert "one entry for every key fact in the rubric's list, in its order" in p
     assert '"status": <"correct", "wrong" or "missing">' in p
     assert "Give no score" in p and '"score"' not in p
-    assert "Two worked examples, on another text" in p
+    assert "Three worked examples, on another text" in p
 
 
 def test_a_rubric_someone_wrote_stays_theirs_and_a_generated_one_is_replaced(tmp_path):
@@ -189,12 +192,13 @@ def test_the_re_mark_judges_on_the_new_rubric_and_compares_with_12a6s_marks(
     (root / "everyday_before_12a6.json").write_text(json.dumps({"models": {"org/a": {}}}))
     (root / "everyday_before_12a7.json").write_text(json.dumps({"models": {"org/a": {}}}))
     (root / "everyday_before_12a8.json").write_text(json.dumps({"models": {"org/a": {}}}))
+    (root / "everyday_before_12a9.json").write_text(json.dumps({"models": {"org/a": {}}}))
     ev.remark(root, judge=True)
     now = ev.read(d)
     rubric = {q["id"]: ev.rubric_key(q) for q in SUMMARISE}
     judged = [it for it in now["items"] if it["group"] == "summarising" and it.get("score")]
     assert judged and all(it["rubric"] == rubric[it["id"]] for it in judged)
-    assert (root / ev.BEFORE_NAME).exists() and ev.BEFORE_NAME == "everyday_before_12a9.json"
+    assert (root / ev.BEFORE_NAME).exists() and ev.BEFORE_NAME == "everyday_before_12a10.json"
     monkeypatch.setattr(sys, "argv", ["everyday.py", str(root), "--compare"])
     assert ev.main() == 0
     table = capsys.readouterr().out.strip().splitlines()

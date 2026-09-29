@@ -4327,6 +4327,68 @@ Not before the demo: a new hidden set changes every Everyday score.
   hidden. The tests' two answers are the stored ones, both on the practice
   half: a hidden question's answer never comes into the repo.
 
+### 12a.10 — Summarise: "invented or wrong" is checked against the text
+
+- 12a.9's re-mark failed good summaries. Of the 18 practice fails for the
+  original and the phone build, about 11 were the judge listing as "invented
+  or wrong" either style (a lead-in, an option's heading, a closing offer, a
+  tip on using it) or true lines of the text the reference leaves out
+  ("Kofi's birthday tomorrow", "Grace keeps her fee at £45"), and the code
+  kept them because they quoted the answer.
+- **Each claim gives the answer's words and the line of the text it
+  contradicts, word for word, or "not in the source"** (`CHECKLIST_PROMPT`;
+  `RUBRIC`'s item 2: judged against the text in the question, never the
+  reference; a third worked example, a street the text doesn't give). Item 4
+  counts a heading, an option's name and a tip as style.
+- **The code decides each claim** (`claims_kept`), and each one dropped is
+  said, greyed, under the verdict, as 12a.8's are:
+  - not the answer's words: dropped (12a.8's rule);
+  - no fact in it (`claim_facts`: no number, amount, time, date, month, day,
+    and no name: a word written with a capital where a sentence doesn't
+    start, or one of the text's names), or a lead-in or closing offer:
+    **style, dropped**. An option's, draft's or step's number is its label,
+    not a fact;
+  - "not in the source": **kept only if none of its facts is anywhere in the
+    text**, else dropped, saying which the text gives;
+  - a line it contradicts: **kept only if that line is the text's, word for
+    word, and shares a fact with the claim**, else dropped.
+  - A judge that cites the line a true claim comes from as its
+    "contradiction" can't be told apart by the code: the line is the text's
+    and shares the fact. The rubric tells it a true detail of the text isn't
+    invented.
+  - A reply in 12a.9's shape (bare quotes) reads as "not in the source".
+- **Every reply parses: the judge is held to a JSON schema**
+  (`judge_schema`, sent as `response_format: {"type": "json_schema",
+  "strict": true}` by `llm.Request.schema`): the checklist's facts by name,
+  each status one of "correct", "wrong", "missing", each claim `{quote,
+  source}`, `length_ok` one of three. vLLM and llama-server decode to it
+  (guided decoding); OpenAI's batches honour it. On OpenRouter it holds only
+  where the pinned provider supports structured outputs; one that doesn't
+  leaves the prompt and 12a.8's one retry to do it. Anthropic has no such
+  field.
+- **12a.9's bullets bug, fixed** (`_upgraded`): a generated rubric is known
+  whichever length reading made it. 12a.9 read "as 4 bullets" as a length,
+  which changed what 12a.8's rubric generates for such a request, so five
+  hidden questions' stored 12a.8 rubrics stopped matching, weren't upgraded,
+  and kept their 12a.8 verdicts through 12a.9's re-mark. They are re-marked
+  now, with the rest.
+- **"Waiting" is an answer with no verdict, and nothing else.** A reply
+  unreadable after its one retry stays waiting ("the judge's reply couldn't
+  be read"); it never takes an earlier verdict. 12a.9's second table counted
+  as waiting every answer it couldn't score again from a stored checklist:
+  those a script check failed (never sent to the judge), those with no
+  answer, and the five questions above.
+- **`--compare`'s second table is this round's** (`moved`), per model and
+  half: each Summarise answer's pass before (`everyday_before_12a10.json`,
+  12a.9's marks) and now, the claims that stood, those dropped by why (style;
+  the text gives it; no line of the text behind it; not the answer's words),
+  and the answers waiting. A hidden question is counted, never named.
+- The tests' five cases are the brief's, on the practice half, each answer
+  written around the line the brief quotes: the school notice with three
+  options, a lead-in and a closing offer (3, passes); the leave request with
+  tips (3); the coffee line and Kofi's birthday (dropped); the business cards
+  listed as decided while still open (kept, −2).
+
 ### 12q — DeviceMark's protocol, run here (PR A: the suite, the runner, the scoring)
 
 - **The battery, `devicemark-replica-v1`** (`eval_tasks/devicemark/battery-v1.json`,

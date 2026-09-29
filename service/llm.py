@@ -60,6 +60,14 @@ class LocalUnreachable(LLMError):
     restarts: the poller tries again next tick instead of failing the batch."""
 
 
+def json_schema_format(schema: dict) -> dict:
+    """12a.10: response_format for a reply that must match `schema` — OpenAI's
+    structured outputs, which vLLM and llama-server honour by constraining the
+    decoding to it"""
+    return {"type": "json_schema", "json_schema": {"name": "reply", "strict": True,
+                                                   "schema": schema}}
+
+
 @dataclass
 class Request:
     custom_id: str
@@ -73,6 +81,10 @@ class Request:
     # response_format=json_object on the wire, anthropic has no such field and
     # relies on the prompt. extract_json stays the fallback either way
     json: bool = False
+    # 12a.10: the reply's JSON schema, when the caller has one — sent as
+    # response_format json_schema (strict), which vLLM and llama-server decode
+    # to (guided decoding), so every reply parses; anthropic relies on the prompt
+    schema: dict | None = None
 
 
 @dataclass
@@ -255,7 +267,9 @@ class OpenAIBatches(Backend):
         """One request's body. JSON mode only when the caller asked for it:
         OpenAI rejects a JSON-mode request whose prompt does not mention JSON."""
         b = {"model": model, "max_tokens": r.max_tokens}
-        if r.json:
+        if r.schema:
+            b["response_format"] = json_schema_format(r.schema)
+        elif r.json:
             b["response_format"] = {"type": "json_object"}
         b["messages"] = [{"role": "system", "content": r.system},
                          {"role": "user", "content": r.user}]
@@ -655,7 +669,7 @@ class FakeBatches(Backend):
         bid = "fake_" + uuid.uuid4().hex[:12]
         rows = [{"batch_id": bid, "custom_id": r.custom_id, "system": r.system,
                  "user": r.user, "max_tokens": r.max_tokens, "json": r.json,
-                 "meta": r.meta} for r in requests]
+                 "schema": r.schema, "meta": r.meta} for r in requests]
         with open(self.log, "a", encoding="utf-8") as fh:
             for row in rows:
                 fh.write(json.dumps(row) + "\n")
@@ -885,8 +899,8 @@ class LocalOpenAI(Backend):
         tmp = d / "requests.jsonl.tmp"
         tmp.write_text("".join(json.dumps({"custom_id": r.custom_id, "system": r.system,
                                            "user": r.user, "max_tokens": r.max_tokens,
-                                           "json": r.json}) + "\n" for r in requests),
-                       encoding="utf-8")
+                                           "json": r.json, "schema": r.schema}) + "\n"
+                               for r in requests), encoding="utf-8")
         tmp.replace(d / "requests.jsonl")
         self._ensure_worker(bid)
         return bid
@@ -986,7 +1000,9 @@ class LocalOpenAI(Backend):
         body = {"model": self.model, "max_tokens": min(int(row["max_tokens"]), self.max_tokens),
                 "messages": ([{"role": "system", "content": row["system"]}] if row["system"] else [])
                 + [{"role": "user", "content": row["user"]}]}
-        if row.get("json"):
+        if row.get("schema"):
+            body["response_format"] = json_schema_format(row["schema"])
+        elif row.get("json"):
             body["response_format"] = {"type": "json_object"}
         payload = json.dumps(body).encode()
         rec = {"custom_id": row["custom_id"], "text": "", "error": "", "attempts": 0}
@@ -1062,7 +1078,9 @@ class OpenRouterChat(LocalOpenAI):
                 # 12p.1: and never a provider that may store or train on the prompt
                 "provider": ai_models.provider_prefs(self.pin.get("provider")),
                 "usage": {"include": True}}
-        if row.get("json"):
+        if row.get("schema"):
+            body["response_format"] = json_schema_format(row["schema"])
+        elif row.get("json"):
             body["response_format"] = {"type": "json_object"}
         payload = json.dumps(body).encode()
         rec = {"custom_id": row["custom_id"], "text": "", "error": "", "attempts": 0}

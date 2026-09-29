@@ -101,7 +101,7 @@ def test_the_rubric_says_what_scores_in_plain_words():
     assert "Judged by meaning, not by exact words" in tldr
     # 12p.2: the tests' invented TL;DR (the pilot's is hidden)
     assert "It should keep all 2 of these:\n- 10:45\n- wednesday" in tldr
-    assert "List anything else the answer says that is invented or wrong" in tldr
+    assert "List each thing the answer says that the text doesn't give, or gets wrong: a number, person, day, time, place or amount" in tldr
     assert "The request asks for it shorter" in tldr
     # a request that states no length is never marked on it
     email = next(q for q in SUMMARISE if q["prompt"].startswith("can u summarise this email thread"))
