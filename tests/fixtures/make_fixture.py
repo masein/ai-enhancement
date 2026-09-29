@@ -651,7 +651,7 @@ IMPORTED = [
 # zeroing, so every test of the flag path has a file that needs both
 IMPORT_TOPIC_LAW = "Law"
 IMPORTED_LAW = [
-    {"id": 1, "prompt": "What is the difference between a civil case and a criminal case?",
+    {"id": 1, "prompt": "What paperwork do I need before renting out the spare room in my flat?",
      "intent": "legal_information", "domain": "general_law", "acuity": "routine",
      "style": "conversational", "difficulty": 1, "jurisdiction_required": False},
     {"id": 2, "prompt": "I was served with a court claim eleven days ago and the form says I "
@@ -997,6 +997,46 @@ def exam_bank_whole(src: Path, out_dir: Path, overrides=None) -> Path:
     f = Path(out_dir) / Path(src).name
     f.write_text(json.dumps(items + out, indent=2), encoding="utf-8")
     return f
+
+
+_RETIRED_WHOLE: list[Path] = []
+
+
+def retired_whole_dir() -> Path:
+    """12p.4: eval_tasks/fr/retired as the tests need it — the five retired
+    topics' banks whole, each withheld row (a report-half question, in the
+    server's store and not the repo) given an invented question in its place:
+    its id and metadata kept, its question made up, in the same half. The
+    rubrics beside them are the repo's. Made once, outside the repo"""
+    if _RETIRED_WHOLE:
+        return _RETIRED_WHOLE[0]
+    import shutil
+    import tempfile
+
+    import exam_build as eb
+    src = REPO / "eval_tasks" / "fr" / "retired"
+    out = Path(tempfile.mkdtemp(prefix="retired-whole-"))
+    shutil.copytree(src / "rubrics", out / "rubrics")
+    for f in sorted(src.glob("*.json")):
+        raw = f.read_text(encoding="utf-8")
+        d = json.loads(raw)
+        rows, i = [], 0
+        for r in (d["questions"] if isinstance(d, dict) else d):
+            if "withheld" in r:
+                while True:
+                    prompt = (f"Invented retired question {i} for {f.stem}: someone describes "
+                              "their situation and asks what they should do next, and why.")
+                    i += 1
+                    if eb.half_of(eb.qid_of(prompt)) == "report":
+                        break
+                r = {"id": r["id"], "prompt": prompt,
+                     **{k: v for k, v in r.items() if k not in ("id", "withheld")}}
+            rows.append(r)
+        doc = {**d, "questions": rows} if isinstance(d, dict) else rows
+        (out / f.name).write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
+                                  encoding="utf-8")
+    _RETIRED_WHOLE.append(out)
+    return out
 
 
 def build(root: Path, seed: int = SEED, diagnose: bool = True,

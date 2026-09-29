@@ -6,9 +6,10 @@ each. Until now the questions went in by CLI and the rubrics by git commit,
 and he has neither a shell on the box nor a checkout.
 
 The bank here is his medicine bank of phase 8, retired with its topic in
-phase 10 and kept byte for byte in eval_tasks/fr/retired/: these tests are
-about the import door and know its numbers, so it goes in under the topic
-that replaced "medicine & health"."""
+phase 10 and kept in eval_tasks/fr/retired/ (12p.4: its report-half
+questions withheld; make_fixture.retired_whole_dir() puts invented ones in
+their places): these tests are about the import door and know its numbers,
+so it goes in under the topic that replaced "medicine & health"."""
 
 from __future__ import annotations
 
@@ -20,9 +21,10 @@ import pytest
 import exam_build as eb
 import judge as jd
 from conftest import assert_no_report_half_text, make_service
+import make_fixture  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
-RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+RETIRED = make_fixture.retired_whole_dir()                        # 12p.4: whole
 MEDICINE = RETIRED / "medicine_v2.json"
 TOPIC = "Medicine & Clinical Health"
 TASK = "exam_medicine_clinical_health"

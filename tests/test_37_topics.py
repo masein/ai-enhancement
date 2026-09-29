@@ -18,11 +18,13 @@ import pytest
 import categories
 import exam_build as eb
 import judge as jd
+import make_fixture  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 BANKS = REPO / "eval_tasks" / "fr" / "banks"
 RUBRICS = REPO / "eval_tasks" / "fr" / "rubrics"
-RETIRED = REPO / "eval_tasks" / "fr" / "retired"
+# 12p.4: whole, with an invented question for each withheld one (make_fixture)
+RETIRED = make_fixture.retired_whole_dir()
 # 12p.2: the repo's banks hold each topic's diagnose half — its report half is the
 # server's, by qid in eval_tasks/fr/report_manifest.json
 IN_REPO = {b.name[:-len("_v1.json")]: len(json.loads(b.read_text(encoding="utf-8")))

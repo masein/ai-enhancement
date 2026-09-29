@@ -72,7 +72,7 @@
     },
     {
       "id": 8,
-      "prompt": "A skater pulls her arms inward while spinning. Explain quantitatively how angular speed changes if external torque is negligible, and distinguish angular momentum conservation from kinetic-energy conservation.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #8, qid 0f0f810beed3",
       "intent": "conceptual",
       "domain": "Classical Mechanics",
       "acuity": "routine",
@@ -82,7 +82,7 @@
     },
     {
       "id": 9,
-      "prompt": "A pendulum has a 1.0 m length. Derive its small-angle period and state the approximation that makes the simple harmonic model valid. Estimate the period for g = 9.8 m/s².",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #9, qid 079ad34e29ef",
       "intent": "derivation",
       "domain": "Classical Mechanics",
       "acuity": "routine",
@@ -92,7 +92,7 @@
     },
     {
       "id": 10,
-      "prompt": "A 1200 kg satellite is in a circular orbit around Earth at radius r from Earth's center. Derive its orbital speed and explain why the satellite's acceleration points toward Earth even though its speed is constant.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #10, qid 59a24e70576b",
       "intent": "derivation",
       "domain": "Classical Mechanics",
       "acuity": "routine",
@@ -122,7 +122,7 @@
     },
     {
       "id": 13,
-      "prompt": "A projectile is launched at speed v at angle theta with negligible air resistance. Derive the range and identify the angle that maximizes it for a fixed launch and landing height.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #13, qid a000918a2ca1",
       "intent": "derivation",
       "domain": "Classical Mechanics",
       "acuity": "routine",
@@ -172,7 +172,7 @@
     },
     {
       "id": 18,
-      "prompt": "For a closed system, 500 J of heat enters while the system does 200 J of work on its surroundings. Using the convention that work done by the system is positive, find the change in internal energy.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #18, qid ac4d7f39cbc6",
       "intent": "quantitative",
       "domain": "Thermodynamics & Heat Transfer",
       "acuity": "routine",
@@ -222,7 +222,7 @@
     },
     {
       "id": 23,
-      "prompt": "A metal rod is heated uniformly by 100 K. Given its linear expansion coefficient, derive the change in length and identify conditions under which the simple linear relation fails.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #23, qid b5510c33409d",
       "intent": "derivation",
       "domain": "Thermodynamics & Heat Transfer",
       "acuity": "routine",
@@ -252,7 +252,7 @@
     },
     {
       "id": 26,
-      "prompt": "Two point charges exert an electric force on each other. State how the force changes if their separation doubles and one charge triples, and explain the vector direction.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #26, qid 65af39f4782f",
       "intent": "conceptual",
       "domain": "Electromagnetism & Circuits",
       "acuity": "routine",
@@ -272,7 +272,7 @@
     },
     {
       "id": 28,
-      "prompt": "A 10 microfarad capacitor is charged to 20 V. Calculate its stored energy and explain where that energy resides physically.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #28, qid 17c9306944b6",
       "intent": "quantitative",
       "domain": "Electromagnetism & Circuits",
       "acuity": "routine",
@@ -282,7 +282,7 @@
     },
     {
       "id": 29,
-      "prompt": "Use Kirchhoff's voltage and current laws to set up equations for a two-loop circuit with a shared resistor. Explain the sign convention rather than simply quoting the final currents.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #29, qid 8809cf714c49",
       "intent": "derivation",
       "domain": "Electromagnetism & Circuits",
       "acuity": "routine",
@@ -312,7 +312,7 @@
     },
     {
       "id": 32,
-      "prompt": "An RL circuit is connected to a DC source. Derive the current as a function of time and identify the time constant. Explain the limiting behavior at t = 0 and t much greater than the time constant.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #32, qid fbe280028dc0",
       "intent": "derivation",
       "domain": "Electromagnetism & Circuits",
       "acuity": "routine",
@@ -332,7 +332,7 @@
     },
     {
       "id": 34,
-      "prompt": "A transformer steps 240 V RMS down to 24 V RMS with an ideal turns ratio. If the secondary supplies 5 A, estimate the primary current and explain the ideal power balance.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #34, qid 32be269723da",
       "intent": "quantitative",
       "domain": "Electromagnetism & Circuits",
       "acuity": "routine",
@@ -342,7 +342,7 @@
     },
     {
       "id": 35,
-      "prompt": "Explain at a conceptual level how Maxwell's equations connect changing electric and magnetic fields to electromagnetic waves, and why a propagating wave can carry energy through empty space.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #35, qid 9707432f4c30",
       "intent": "conceptual",
       "domain": "Electromagnetism & Circuits",
       "acuity": "routine",
@@ -362,7 +362,7 @@
     },
     {
       "id": 37,
-      "prompt": "Two coherent waves arrive with equal amplitude and phase difference pi. What is the result of their superposition at that point, and what does this imply about destructive interference?",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #37, qid d004eeae953b",
       "intent": "conceptual",
       "domain": "Waves & Optics",
       "acuity": "routine",
@@ -392,7 +392,7 @@
     },
     {
       "id": 40,
-      "prompt": "A converging thin lens forms an image from a real object. Use the lens equation and magnification relation to determine how image position and size change when object distance moves from far away toward the focal length.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #40, qid fe6f22c94137",
       "intent": "comparison",
       "domain": "Waves & Optics",
       "acuity": "routine",
@@ -402,7 +402,7 @@
     },
     {
       "id": 41,
-      "prompt": "Explain why a narrow slit produces a wider diffraction pattern than a wide slit, and connect the observation to Fourier or spatial-frequency reasoning.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #41, qid 53cb313b8d43",
       "intent": "conceptual",
       "domain": "Waves & Optics",
       "acuity": "routine",
@@ -432,7 +432,7 @@
     },
     {
       "id": 44,
-      "prompt": "A particle's speed approaches the speed of light. Explain why classical kinetic energy becomes inadequate and state the relativistic energy-momentum relationship.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #44, qid 1c6e7c141a25",
       "intent": "conceptual",
       "domain": "Modern Physics",
       "acuity": "routine",
@@ -452,7 +452,7 @@
     },
     {
       "id": 46,
-      "prompt": "Calculate the de Broglie wavelength of an electron with known momentum, and explain why increasing momentum makes its wavelength shorter.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #46, qid 0cafb1dcc67b",
       "intent": "quantitative",
       "domain": "Modern Physics",
       "acuity": "routine",
@@ -482,7 +482,7 @@
     },
     {
       "id": 49,
-      "prompt": "A radioactive isotope has a half-life of 8 days. If a sample initially contains N0 atoms, derive the remaining amount after 24 days and explain the probabilistic meaning of the half-life.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #49, qid f9175dbe582f",
       "intent": "derivation",
       "domain": "Modern Physics",
       "acuity": "routine",
@@ -502,7 +502,7 @@
     },
     {
       "id": 51,
-      "prompt": "Water at rest has density 1000 kg/m³. Calculate the gauge pressure 5 m below the surface and explain why pressure increases with depth.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #51, qid b3ad8492d5e4",
       "intent": "quantitative",
       "domain": "Fluid Mechanics",
       "acuity": "routine",
@@ -512,7 +512,7 @@
     },
     {
       "id": 52,
-      "prompt": "A floating object displaces 0.020 m³ of water. Determine its weight from Archimedes' principle and state the assumption about static equilibrium.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #52, qid d73122a085a8",
       "intent": "quantitative",
       "domain": "Fluid Mechanics",
       "acuity": "routine",
@@ -532,7 +532,7 @@
     },
     {
       "id": 54,
-      "prompt": "Apply Bernoulli's equation between two points in a horizontal pipe and explain why higher ideal-flow speed corresponds to lower static pressure, including the assumptions required.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #54, qid 020fd553beae",
       "intent": "conceptual",
       "domain": "Fluid Mechanics",
       "acuity": "routine",
@@ -542,7 +542,7 @@
     },
     {
       "id": 55,
-      "prompt": "A pipe system has a measured pressure drop that is much larger than an inviscid Bernoulli calculation predicts. Diagnose plausible causes and explain how Reynolds number and friction losses affect the model.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #55, qid d53e7a051746",
       "intent": "failure_analysis",
       "domain": "Fluid Mechanics",
       "acuity": "routine",
@@ -552,7 +552,7 @@
     },
     {
       "id": 56,
-      "prompt": "Estimate the Reynolds number for water flowing through a pipe using given density, viscosity, diameter, and speed. Interpret whether laminar or turbulent modeling is more appropriate and discuss transition uncertainty.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #56, qid fc1a4a7a86ec",
       "intent": "estimation",
       "domain": "Fluid Mechanics",
       "acuity": "routine",
@@ -562,7 +562,7 @@
     },
     {
       "id": 57,
-      "prompt": "A pump raises water to a higher elevation while maintaining a target flow rate. Formulate the minimum hydraulic power and explain how pump efficiency changes the required input power.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #57, qid 4b892ace1c44",
       "intent": "engineering_tradeoff",
       "domain": "Fluid Mechanics",
       "acuity": "routine",
@@ -572,7 +572,7 @@
     },
     {
       "id": 58,
-      "prompt": "A boundary layer separates from a curved surface. Explain the physical mechanism involving adverse pressure gradient and near-wall momentum, and discuss one design method to delay separation.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #58, qid eec29774a967",
       "intent": "failure_analysis",
       "domain": "Fluid Mechanics",
       "acuity": "routine",
@@ -642,7 +642,7 @@
     },
     {
       "id": 65,
-      "prompt": "A metal shaft fails after millions of cycles at a stress below its yield strength. Explain fatigue initiation and growth and why static yield strength alone is insufficient for fatigue design.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #65, qid 5cb14e855b12",
       "intent": "failure_analysis",
       "domain": "Mechanical Engineering",
       "acuity": "routine",
@@ -702,7 +702,7 @@
     },
     {
       "id": 71,
-      "prompt": "A sensor outputs 0–3.3 V and an ADC has 12-bit resolution over that range. Calculate the ideal voltage resolution per code and explain why effective resolution can be worse in a noisy system.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #71, qid 02601d044951",
       "intent": "quantitative",
       "domain": "Electrical / Electronics",
       "acuity": "routine",
@@ -712,7 +712,7 @@
     },
     {
       "id": 72,
-      "prompt": "A sampled signal contains frequency components above half the sampling rate. Explain aliasing, why an anti-alias filter is used, and how increasing sampling rate changes the design constraint.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #72, qid e5bd6580b710",
       "intent": "conceptual",
       "domain": "Electrical / Electronics",
       "acuity": "routine",
@@ -722,7 +722,7 @@
     },
     {
       "id": 73,
-      "prompt": "An op-amp is configured as an inverting amplifier. Derive its ideal gain and explain the assumptions behind virtual ground and negligible input current.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #73, qid e44d6b8587ee",
       "intent": "derivation",
       "domain": "Electrical / Electronics",
       "acuity": "routine",
@@ -752,7 +752,7 @@
     },
     {
       "id": 76,
-      "prompt": "A digital input is left electrically floating. Explain why its logic state can become unpredictable and give two robust hardware approaches for defining a default state.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #76, qid 0dbb944593c8",
       "intent": "conceptual",
       "domain": "Electrical / Electronics",
       "acuity": "routine",
@@ -762,7 +762,7 @@
     },
     {
       "id": 77,
-      "prompt": "A transformer is rated for a fixed apparent power. Explain why increasing secondary voltage at the same rated power changes current, and identify the main practical losses that prevent ideal behavior.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #77, qid 0e610202990f",
       "intent": "conceptual",
       "domain": "Electrical / Electronics",
       "acuity": "routine",
@@ -782,7 +782,7 @@
     },
     {
       "id": 79,
-      "prompt": "Compare open-loop and closed-loop control using a room-temperature heater example. Explain how feedback changes sensitivity to disturbances and modeling errors.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #79, qid dde9bb557c68",
       "intent": "comparison",
       "domain": "Control Systems",
       "acuity": "routine",
@@ -812,7 +812,7 @@
     },
     {
       "id": 82,
-      "prompt": "A closed-loop system has a large overshoot and long settling time after a step input. Propose a tuning strategy and explain how bandwidth, damping, and robustness are related.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #82, qid e546252d371b",
       "intent": "design",
       "domain": "Control Systems",
       "acuity": "routine",
@@ -852,7 +852,7 @@
     },
     {
       "id": 86,
-      "prompt": "A simply supported structural beam carries a known distributed load. Explain how support reactions, shear force, and bending moment are related and how the maximum moment location can be found.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #86, qid 72ed6fd800e9",
       "intent": "scenario",
       "domain": "Structural / Civil Engineering",
       "acuity": "routine",
@@ -872,7 +872,7 @@
     },
     {
       "id": 88,
-      "prompt": "A steel column has a calculated critical buckling load of 500 kN and an applied design load of 100 kN. Calculate the simple load-to-critical-load ratio and explain why a real design still requires a safety factor and model validation.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #88, qid e508501318b1",
       "intent": "quantitative",
       "domain": "Structural / Civil Engineering",
       "acuity": "routine",
@@ -882,7 +882,7 @@
     },
     {
       "id": 89,
-      "prompt": "A water-distribution line must maintain pressure at a remote elevation while limiting pipe diameter and pumping power. Explain the hydraulic trade-offs and the role of friction losses.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #89, qid a3bdc1d04b1b",
       "intent": "engineering_tradeoff",
       "domain": "Structural / Civil Engineering",
       "acuity": "routine",
@@ -892,7 +892,7 @@
     },
     {
       "id": 90,
-      "prompt": "A structure develops unexpected cracking near a connection. Propose a failure-investigation sequence that considers load paths, stress concentration, material properties, fatigue, fabrication defects, and environmental effects.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #90, qid 64f46383602e",
       "intent": "failure_analysis",
       "domain": "Structural / Civil Engineering",
       "acuity": "routine",
@@ -922,7 +922,7 @@
     },
     {
       "id": 93,
-      "prompt": "A component operates in a humid, salty environment. Explain the electrochemical basis of corrosion and compare at least two strategies for reducing corrosion risk.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #93, qid 2fd559cb2a13",
       "intent": "failure_analysis",
       "domain": "Materials Science",
       "acuity": "routine",
@@ -932,7 +932,7 @@
     },
     {
       "id": 94,
-      "prompt": "A polymer is considered for a load-bearing component that experiences elevated temperature. Explain how viscoelasticity and temperature affect stiffness and why a room-temperature strength value may be misleading.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #94, qid 6dbf342b2c2b",
       "intent": "engineering_tradeoff",
       "domain": "Materials Science",
       "acuity": "routine",
@@ -962,7 +962,7 @@
     },
     {
       "id": 97,
-      "prompt": "A rocket expels propellant at exhaust speed ve. Explain the Tsiolkovsky rocket equation and why staging can increase achievable delta-v, while identifying the assumptions of the ideal equation.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #97, qid d14b9ca0f941",
       "intent": "derivation",
       "domain": "Aerospace / Energy / Process Engineering",
       "acuity": "routine",
@@ -982,7 +982,7 @@
     },
     {
       "id": 99,
-      "prompt": "A process plant mixes two streams and must satisfy both mass and energy balances. Explain how to formulate the balances, identify when reaction or phase change terms matter, and describe how an inconsistent measured flow rate can be detected.",
+      "withheld": "a report-half question of the Knowledge exam: in the server's store, not the repo (12p.4) — physics_engineering_v1 #99, qid c5e56207ead9",
       "intent": "system_analysis",
       "domain": "Aerospace / Energy / Process Engineering",
       "acuity": "routine",

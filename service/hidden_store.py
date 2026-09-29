@@ -363,26 +363,37 @@ def _fp(run: str) -> str:
     return hashlib.sha256(run.encode("utf-8")).hexdigest()[:16]
 
 
+# 12p.4: a question at least this share of whose runs the repo holds is the
+# question itself, copied — a leak, never a common phrase
+WHOLE = 0.5
+
+
 def fingerprints(repo: Path | None = None) -> dict:
     """every fourth eight-word run of each question that is the test —
     Everyday's hidden set (prompt and reference) and the exam's report half
-    (prompt) — hashed; a run the repo (`repo`) holds is a common phrase and
-    left out. What tests/fixtures/protected_fingerprints.txt holds: after a
-    new hidden set, write it here and commit it"""
+    (prompt) — hashed. What tests/fixtures/protected_fingerprints.txt holds:
+    after a new hidden set, write it here and commit it.
+
+    A run the repo (`repo`) holds is a common phrase and left out — unless the
+    repo holds the question itself (12p.4): WHOLE or more of its runs. Then
+    every run of it is kept, so the guard fails on it, and it is named in
+    `whole` (by id, and the files that hold it). Before 12p.4 such a question's
+    runs were all "common": 242 of the exam's report half, whole in the repo,
+    left the guard nothing to find."""
     import diagnose as dx
     import exam_build as eb
     ev = _ev()
-    keep: dict[str, str] = {}
+    questions: list[tuple[str, list[str]]] = []
     for q in (ev._raw_rows(ev.hidden_path()) if ev.hidden_path().exists() else []):
-        for r in _fp_runs(q["prompt"]) + _fp_runs(q.get("reference") or ""):
-            keep[_fp(r)] = r
+        questions.append((q["id"], _fp_runs(q["prompt"]) + _fp_runs(q.get("reference") or "")))
     for r in eb.all_bank_rows(config.EXAM_DIR) if eb.bank_dir(config.EXAM_DIR).is_dir() else []:
         if r.get("prompt") and dx.split_of(eb.qid_of(r["prompt"])) == "report":
-            for x in _fp_runs(r["prompt"]):
-                keep[_fp(x)] = x
-    common = set()
+            questions.append((eb.qid_of(r["prompt"]), _fp_runs(r["prompt"])))
+    keep = {_fp(x): x for _, runs in questions for x in runs}
+    held: dict[str, set[str]] = {}
+    root = Path(repo or REPO)
     skip = {".git", "results", "__pycache__", "_screens", "node_modules"}
-    for d, dirs, files in os.walk(repo or REPO):
+    for d, dirs, files in os.walk(root):
         dirs[:] = [x for x in dirs if x not in skip]
         for name in files:
             f = Path(d) / name
@@ -393,8 +404,21 @@ def fingerprints(repo: Path | None = None) -> dict:
                 text = f.read_text(encoding="utf-8")
             except (UnicodeDecodeError, OSError):
                 continue
-            common |= {_fp(x) for x in _fp_runs(text, 1)} & set(keep)
-    return {"fingerprints": sorted(set(keep) - common), "common": len(common)}
+            for h in {_fp(x) for x in _fp_runs(text, 1)} & keep.keys():
+                held.setdefault(h, set()).add(str(f.relative_to(root)))
+    common: set[str] = set()
+    kept: set[str] = set()
+    whole = []
+    for qid, runs in questions:
+        mine = {_fp(x) for x in runs}
+        here = mine & held.keys()
+        if mine and len(here) >= WHOLE * len(mine):
+            whole.append({"id": qid, "files": sorted(set().union(*(held[h] for h in here)))})
+            kept |= mine                   # every run of it, whatever else shares one
+        else:
+            common |= here
+    common -= kept
+    return {"fingerprints": sorted(set(keep) - common), "common": len(common), "whole": whole}
 
 
 # ---------------------------------------------------------------------------
@@ -465,6 +489,14 @@ def main(argv: list[str] | None = None) -> int:
                              + "\n".join(got["fingerprints"]) + "\n", encoding="utf-8")
             print(f"{len(got['fingerprints'])} fingerprints to {a.out} ({got['common']} common "
                   "phrases left out); commit it as tests/fixtures/protected_fingerprints.txt")
+            if got["whole"]:
+                # 12p.4: the repo holds questions that are the test — named by id and
+                # file, never by their words; the guard fails on them until they go
+                files = sorted({f for w in got["whole"] for f in w["files"]})
+                print(f"{len(got['whole'])} question(s) that are the test are in the repo whole, "
+                      f"in {len(files)} file(s): {', '.join(files)}. Their ids: "
+                      + ", ".join(w["id"][:12] for w in got["whole"]))
+                return 1
             return 0
         if a.cmd == "move":
             got = move()
