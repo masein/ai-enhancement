@@ -133,10 +133,21 @@ def test_math_reads_the_last_box_with_nested_braces():
 
 @pytest.mark.parametrize("pred,gold,same", [
     ("1/2", "\\frac{1}{2}", True), ("0.5", "\\frac{1}{2}", True), ("0.5", "1/2", True),
+    ("3", "4", False), ("\\frac{1}{3}", "0.33", False),
+])
+def test_math_equality(pred, gold, same):
+    """everywhere: with math-verify, or the board's plain fallback without it"""
+    assert dm.math_equal(pred, gold) is same
+
+
+@pytest.mark.parametrize("pred,gold,same", [
     ("\\sqrt{8}", "2\\sqrt{2}", True), ("(-\\infty, 3]", "(-\\infty,3]", True),
-    ("[1,2)", "[1,2]", False), ("3", "4", False), ("\\frac{1}{3}", "0.33", False),
+    ("[1,2)", "[1,2]", False), ("\\frac{\\sqrt{2}}{2}", "\\frac{1}{\\sqrt{2}}", True),
 ])
 def test_math_equality_is_symbolic(pred, gold, same):
+    """as the server scores: math-verify on sympy (in the image and the local
+    check; CI's unit shards don't carry it — deploy step 3 runs this)"""
+    pytest.importorskip("math_verify")
     assert dm.math_equal(pred, gold) is same
 
 
