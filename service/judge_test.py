@@ -417,7 +417,7 @@ def request_for(a: dict) -> tuple[str, int]:
     if a["kind"] == "everyday":
         import everyday as ev
         q = next(q for q in ev.load_bank() if q["id"] == a["task"])
-        return ev.judge_prompt(q, a["answer"]), 200
+        return ev.judge_prompt(q, a["answer"]), ev.judge_tokens(q, 200)
     import judge
     rub = judge.rubric_for(a["task"])
     spec = rub.criteria

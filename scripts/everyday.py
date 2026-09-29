@@ -919,6 +919,13 @@ def describe(check: dict) -> str:
     if t == 'any':
         return ', or '.join(describe(c) for c in check['checks'])
     if t == 'judge':
+        if check.get('checklist'):
+            # 12a.9: each key fact checked, and its number or name looked for in code
+            return (f"the judge's checklist of the key facts, checked and scored in code (0 to "
+                    f"{check['scale']}, passing at {check['pass_at']}): a key fact missing, or "
+                    "without its number or name, −1 (2 at most); a fact wrong — who, when or how "
+                    "much — or anything invented −2; several versions −1; a length asked and not "
+                    "kept −1 — never the style")
         if check.get('findings'):
             # 12a.8: the judge says what is wrong; the score is worked out from it
             return (f"the judge's findings, scored in code (0 to {check['scale']}, passing at "
@@ -1011,8 +1018,32 @@ THE ANSWER
 {answer}"""
 
 
+# 12a.9: 12a.8's findings let a small judge say "all key facts" of a fact with
+# the wrong person, or without its number. It fills in a checklist instead —
+# each key fact correct, wrong (quoting the answer) or missing — and the code
+# checks each one it calls correct for the fact's numbers and names
+CHECKLIST_PROMPT = """You are checking ONE answer from an assistant: a summary. Read the question, the rubric and the answer, and fill in the rubric's checklist as one JSON object and nothing else. Give no score: it is worked out from what you report.
+{{"checklist": [<one entry for every key fact in the rubric's list, in its order: {{"fact": <the fact, quoted exactly as the list gives it>, "status": <"correct", "wrong" or "missing">, "quote": <for "wrong": the answer's own words that state it>}}>], "invented_or_wrong": [<anything else the answer says that is invented or wrong, quoting the answer's own words exactly>], "several_versions": <true or false>, "length_ok": <"yes", "no" or "not asked">, "note": <one short sentence for a person>}}
+
+QUESTION
+{question}
+
+RUBRIC
+{rubric}
+
+THE ANSWER
+{answer}"""
+# the judge's reply cap: a checklist is a line for each fact
+JUDGE_TOKENS, CHECKLIST_TOKENS = 300, 800
+
+
 def judge_check(item: dict) -> dict | None:
     return next((c for c in item.get("checks") or [] if c.get("type") == "judge"), None)
+
+
+def judge_tokens(item: dict, cap: int = JUDGE_TOKENS) -> int:
+    """how long the judge's reply may be: 12a.9's checklist needs more"""
+    return CHECKLIST_TOKENS if (judge_check(item) or {}).get("checklist") else cap
 
 
 def _rubric_check(item: dict | None) -> dict | None:
@@ -1030,6 +1061,9 @@ def rubric_key(item: dict) -> str:
 
 def judge_prompt(item: dict, answer: str) -> str:
     c = judge_check(item)
+    if c.get("checklist"):
+        return CHECKLIST_PROMPT.format(question=item["prompt"], rubric=c["rubric"],
+                                       answer=answer.strip() or "(empty)")
     if c.get("findings"):
         return FINDINGS_PROMPT.format(question=item["prompt"], rubric=c["rubric"],
                                       answer=answer.strip() or "(empty)")
@@ -1052,8 +1086,9 @@ _N = (r'(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|fo
       r'a hundred)')
 STATED_LENGTH = re.compile(
     r'\b(?:(?:in|under|within|below|at most|no more than|max(?:imum)?|less than|fewer than|'
-    r'about|around|to)\s+)?' + _N + r'\s+(?:words?|sentences?|lines?|bullet(?:\s*points?)?|'
+    r'about|around|to)\s+)?' + _N + r'\s+(?:words?|sentences?|lines?|bullets?(?:\s*points?)?|'
     r'points?|paragraphs?)\b|\b(?:one|a|single)[\s-]+(?:line|liner|sentence|paragraph)\b', re.I)
+# 12a.9: "as 4 bullets" states a length as "in 4 bullet points" does
 SHORTER = re.compile(r'\b(?:shorten|shorter|short|tl;?\s?dr|condense|brief(?:ly)?)\b', re.I)
 # 12a.7: 12a.6's rubric marked style as much as the summary — a lead-in and a
 # closing offer a point each, a bulleted summary "not one summary" — and ~50
@@ -1088,7 +1123,11 @@ Example 1 scores 4: every fact is there, and the lead-in, the bullets and the of
     - Bring £15 cash
     Let me know if you'd like it any shorter!
 Example 2 scores 3: the same answer without "- Bring £15 cash" misses one fact, the £15 cash."""
-RUBRIC = """Report what is wrong with the answer as a summary of the text in the question: its content, not its style. Give no score: it is worked out from what you report.
+# 12a.9: 12a.8's rubric, kept to know a rubric generated from it (_upgraded).
+# The judge reported "all key facts" of a fact with the wrong person (the
+# school run plan: "She … will pick up Layla") or without its number (the
+# overtime cap with no 10 hours)
+RUBRIC_12A8 = """Report what is wrong with the answer as a summary of the text in the question: its content, not its style. Give no score: it is worked out from what you report.
 1. Missing facts. The key facts, judged by meaning and not by exact words (a date, time or amount written another way is the same fact; "mum", "mom" and "mother" are one). It should keep {need}:
 {facts}
 List each of these the answer does not have, quoted exactly as above. Nothing else is a missing fact.
@@ -1107,6 +1146,28 @@ Example 1 has no findings: every fact is there, and the lead-in, the bullets and
     {{"missing_facts": [], "invented_or_wrong": [], "several_versions": false, "length_ok": "not asked", "note": "every key fact, one summary"}}
 Example 2 is the same answer without "- Bring £15 cash": one fact is missing.
     {{"missing_facts": ["£15 cash"], "invented_or_wrong": [], "several_versions": false, "length_ok": "not asked", "note": "misses the £15 cash"}}"""
+RUBRIC = """Check the answer as a summary of the text in the question: its content, not its style. Give no score: it is worked out from what you report.
+1. The checklist. Check each of the key facts against the text and the answer. It should keep {need}:
+{facts}
+For each fact, one of:
+- "correct": the answer states it as the text does, with the right person, day, time, place and amount. Judged by meaning, not by exact words: a date, time or amount written another way is the same, and "mum", "mom" and "mother" are one.
+- "wrong": the answer states it with something wrong — who does it, the day, the time, the place or the amount. Quote the answer's own words. "She picks up Layla" is wrong when the text says you pick her up.
+- "missing": the answer doesn't state it, or states it without its number, time, amount or name ("overtime is capped" for "overtime is capped at 10 hours").
+2. Invented or wrong. List anything else the answer says that is invented or wrong: a detail the text doesn't give, or a wrong number, person, day, time or place outside the key facts, quoting the answer's own words. A number worked out correctly from the text (a total, a difference, how long something took) is not invented; one worked out wrongly is wrong ("half the time" is not "50% faster").
+3. Several versions: true if it gives several versions instead of one ("Option 1 / Option 2"). A summary in bullets is one summary.
+4. Style is never a finding: a lead-in ("Here's a concise summary:"), a closing offer ("Let me know if you'd like it shorter"), headings, bullets, bold and emoji.
+5. Length. {length}{reference}
+
+Two worked examples, on another text: "Team lunch moves from Thursday to Friday, 12:30, at Luigi's. Sam is booking the table; bring £15 cash." Its key facts: Friday; 12:30; Luigi's; Sam / booking; £15 / cash.
+Example 1: every fact is correct, and the lead-in, the bullets and the offer are style.
+    Here's a concise summary:
+    - Lunch moves to Friday, 12:30, at Luigi's
+    - Sam is booking
+    - Bring £15 cash
+    Let me know if you'd like it any shorter!
+    {{"checklist": [{{"fact": "Friday", "status": "correct"}}, {{"fact": "12:30", "status": "correct"}}, {{"fact": "Luigi's", "status": "correct"}}, {{"fact": "Sam / booking", "status": "correct"}}, {{"fact": "£15 / cash", "status": "correct"}}], "invented_or_wrong": [], "several_versions": false, "length_ok": "not asked", "note": "every key fact, one summary"}}
+Example 2: the same answer with "- You're booking the table" for "- Sam is booking" and "- Bring cash" for "- Bring £15 cash". The booking is given to the wrong person, and the cash has lost its amount.
+    {{"checklist": [{{"fact": "Friday", "status": "correct"}}, {{"fact": "12:30", "status": "correct"}}, {{"fact": "Luigi's", "status": "correct"}}, {{"fact": "Sam / booking", "status": "wrong", "quote": "You're booking the table"}}, {{"fact": "£15 / cash", "status": "missing"}}], "invented_or_wrong": [], "several_versions": false, "length_ok": "not asked", "note": "says you book, not Sam, and no £15"}}"""
 
 
 def request_of(prompt: str) -> str:
@@ -1163,7 +1224,7 @@ def summarise_rubric(q: dict, template: str | None = None) -> str:
     facts, need = _facts_of(q)
     show = _show
     length = stated_length(q["prompt"])
-    if template is None or template == RUBRIC:
+    if template in (None, RUBRIC, RUBRIC_12A8):
         # 12a.8: what the judge reports for it
         says = ('The request states no length: length_ok is "not asked".' if not length else
                 'The request asks for it shorter: length_ok is "yes" if the summary itself (not '
@@ -1181,8 +1242,11 @@ def summarise_rubric(q: dict, template: str | None = None) -> str:
         says = "The request states no length: take nothing off for length."
     return (template or RUBRIC).format(
         scale=RUBRIC_SCALE, pass_at=RUBRIC_PASS,
-        need=(f"all {len(facts)} of these" if need >= len(facts) else
-              f"at least {need} of these {len(facts)}"),
+        # 12a.9: every key fact counts, unless the request limits the length —
+        # then a summary may choose, as far as the question's "at least n" allows
+        need=(f"all {len(facts)} of these" if need >= len(facts)
+              or (template in (None, RUBRIC) and not length)
+              else f"at least {need} of these {len(facts)}"),
         facts="\n".join(f"- {show(f)}" for f in facts) or "- (none listed: what the text is about)",
         length=says,
         reference=f'\nA good summary, for reference: "{q["reference"]}"' if q.get("reference") else "")
@@ -1191,20 +1255,24 @@ def summarise_rubric(q: dict, template: str | None = None) -> str:
 def summarise_checks(q: dict) -> list[dict]:
     """12a.6: a Summarise question's checks — one script gate, no number the
     text doesn't give, then the judge's rubric, 0 to 4, passing at 3. 12a.8:
-    the judge reports findings on it, and the code scores them"""
+    the judge reports findings on it, and the code scores them; 12a.9: a
+    checklist of its key facts, which the code checks"""
     return [{"type": "numbers_from_source"},
-            {"type": "judge", "scale": RUBRIC_SCALE, "pass_at": RUBRIC_PASS, "findings": True,
+            {"type": "judge", "scale": RUBRIC_SCALE, "pass_at": RUBRIC_PASS, "checklist": True,
              "rubric": summarise_rubric(q)}]
 
 
 def _upgraded(q: dict) -> bool:
     """12a.7: a Summarise question whose rubric is exactly the one 12a.6 — or,
-    12a.8, 12a.7 — generated from its facts (the repo's, or one the question
-    builder published) takes today's; a rubric someone wrote or edited stays
-    theirs"""
+    12a.8, 12a.7, or, 12a.9, 12a.8 — generated from its facts (the repo's, or
+    one the question builder published) takes today's; a rubric someone wrote
+    or edited stays theirs"""
     c = _rubric_check(q)
-    return bool(c) and not c.get("findings") and c.get("rubric") in (
-        summarise_rubric(q, RUBRIC_12A6), summarise_rubric(q, RUBRIC_12A7))
+    if not c or c.get("checklist"):
+        return False
+    if c.get("findings"):
+        return c.get("rubric") == summarise_rubric(q, RUBRIC_12A8)
+    return c.get("rubric") in (summarise_rubric(q, RUBRIC_12A6), summarise_rubric(q, RUBRIC_12A7))
 
 
 # ---------------------------------------------------------------------------
@@ -1219,11 +1287,17 @@ LENGTHS = ("yes", "no", "not asked")
 # one word for one person, as the rubric says: "mum", "mom" and "mother" are one
 SAME_WORD = {"mom": "mum", "mother": "mum", "mam": "mum", "mummy": "mum", "mommy": "mum",
              "father": "dad", "daddy": "dad", "children": "kids", "child": "kid"}
-MONTHS = {m[:3]: m[:3] for m in ("january", "february", "march", "april", "may", "june", "july",
-                                 "august", "september", "october", "november", "december")}
+_MONTH_NAMES = ("january", "february", "march", "april", "may", "june", "july", "august",
+                "september", "october", "november", "december")
+MONTHS = {**{m: m[:3] for m in _MONTH_NAMES}, **{m[:3]: m[:3] for m in _MONTH_NAMES}, "sept": "sep"}
 KEY_STOP = {"a", "an", "the", "of", "to", "and", "or", "in", "on", "at", "for", "by", "is", "are",
             "be", "with", "from", "your", "you", "my", "her", "his", "their", "it", "its", "that",
             "this", "will", "was", "has", "have", "up", "am", "pm"}
+# 12a.9: a number in words is that number ("twelve" is 12), as the number rule reads it
+NUMBER_WORDS = {w: str(i) for i, w in enumerate(
+    "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
+    "fifteen sixteen seventeen eighteen nineteen twenty".split()) if i >= 2}
+NUMBER_WORDS.update(thirty="30", forty="40", fifty="50", sixty="60")
 _TIME = re.compile(r'(?<![\d,.$£€])(\d{1,2})[:.]([0-5]\d)\s*(a\.?m\.?|p\.?m\.?)?(?![\d])', re.I)
 _HOUR = re.compile(r'(?<![\d:.,$£€])(\d{1,2})\s*(a\.?m\.?|p\.?m\.?)(?![a-z])', re.I)
 _MONEY = re.compile(r'(?<![\w:.,])[$£€]?\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?(?![\w:])')
@@ -1247,8 +1321,10 @@ def key_words(text: str) -> set[str]:
     out = set()
     for w in re.findall(r"\d+:\d{2}|\d+(?:st|nd|rd|th)(?![a-z])|\d+(?:\.\d+)?|[a-z]+", t):
         w = re.sub(r"^(\d+)(?:st|nd|rd|th)$", r"\1", w)
+        w = NUMBER_WORDS.get(w, w)
         w = SAME_WORD.get(w, w)
-        w = MONTHS.get(w[:3], w) if w[:3] in MONTHS and w.isalpha() and len(w) >= 3 else w
+        # 12a.9: a month's name or its short form — not "Mariam" or "novel"
+        w = MONTHS.get(w, w)
         if w.isalpha() and len(w) > 3 and w.endswith("s") and not w.endswith("ss"):
             w = w[:-1]
         if w not in KEY_STOP:
@@ -1256,18 +1332,73 @@ def key_words(text: str) -> set[str]:
     return out
 
 
-def has_fact(answer: str, fact: list[str]) -> bool:
-    """any way of saying the fact whose key words are all in the answer"""
+def _need(way: str) -> set[str]:
+    """a way of saying a fact, as the key words it needs: "6 pm" needs the
+    hour, 6, which "at 6", "6pm" and "18:00" all give"""
+    k = key_words(way)
+    return {w for w in k if not (w.endswith(":00") and w[:-3] in k)}
+
+
+def names(text: str) -> set[str]:
+    """12a.9: the text's names, as key words — each word it writes with a
+    capital, somewhere a sentence doesn't start, and never without: Mariam,
+    Hamilton, Copper Kettle, November. "Your mum" isn't one"""
+    caps, lower, text = set(), set(), str(text or "")
+    for m in re.finditer(r"[A-Za-z]+", text):
+        w, before = m.group(0), text[:m.start()].rstrip(" \t\"'\u201c\u2018(*-\u2022")
+        if w[0].islower():
+            lower.add(w.lower())
+        elif before and before[-1] not in ".!?\n" and len(w) > 1:
+            caps.add(w.lower())
+    return key_words(" ".join(sorted(caps - lower)))
+
+
+def anchors(way: str, named: set[str]) -> set[str]:
+    """12a.9: what a way of saying a fact can't be right without — its
+    numbers, times and amounts, and its names"""
+    return {w for w in _need(way) if any(ch.isdigit() for ch in w) or w in named}
+
+
+def _ways(fact: list[str], named: set[str] | None) -> list[str]:
+    """the ways of saying a fact that count: when some carry a number or a
+    name, only those — "overtime" is not "10 hours / overtime" without its 10"""
+    held = [v for v in fact if anchors(v, named or set())]
+    return held or list(fact)
+
+
+def has_fact(answer: str, fact: list[str], named: set[str] | None = None) -> bool:
+    """any way of saying the fact whose key words are all in the answer. 12a.9:
+    of those with a number or a name (`named`, the text's), when it has one"""
     have = key_words(answer)
-    return any(k and k <= have for k in (key_words(v) for v in fact))
+    return any(k and k <= have for k in (_need(v) for v in _ways(fact, named)))
+
+
+def unsaid(answer: str, fact: list[str], named: set[str]) -> str:
+    """12a.9: the number or name a fact needs and the answer doesn't give, in
+    the fact's words ("10 hours") — "" when it gives one, or has none to give"""
+    held = {}
+    for v in fact:                  # "9:30 / 9.30" is one time: said once
+        held.setdefault(frozenset(anchors(v, named)), v.strip())
+    held.pop(frozenset(), None)
+    have = key_words(answer)
+    if not held or any(k <= have for k in held):
+        return ""
+    return " or ".join(f"“{v}”" for v in held.values())
 
 
 def _quoted(claim: str, answer: str) -> bool:
     """a claim that quotes the answer: its words there, in order, whatever the
     case, spacing or quote marks"""
     norm = lambda x: " ".join(re.sub(r"[\u2018\u2019\u201c\u201d\"'`*]", "", str(x)).lower().split())  # noqa: E731
-    c = norm(claim).strip(" .,;:!?-–—")
-    return bool(c) and c in norm(answer)
+    # 12a.9: a quote cut short with "…" is its pieces, in order
+    parts = [norm(p).strip(" .,;:!?-–—") for p in re.split(r"\.\.\.|\u2026", str(claim))]
+    parts, text, at = [p for p in parts if p], norm(answer), 0
+    for p in parts:
+        at = text.find(p, at)
+        if at < 0:
+            return False
+        at += len(p)
+    return bool(parts)
 
 
 COPY_WINDOW, COPY_SHARE = 6, 0.6
@@ -1299,11 +1430,16 @@ def copied(q: dict, answer: str) -> bool:
 
 
 def _fact_of(claim: str, facts: list[list[str]]) -> int | None:
-    """which listed fact a claimed missing fact quotes"""
+    """which listed fact a claimed missing fact quotes. 12a.9: the one it
+    quotes exactly first — "1 october" is in "31 october" — then the words"""
     c = " ".join(str(claim).lower().split()).strip(" .\"'")
-    for i, f in enumerate(facts):
-        ways = [" ".join(v.lower().split()) for v in f] + [_show(f).lower()]
-        if any(c == w or (w and w in c) or (c and c in w) for w in ways):
+    ways = [[" ".join(v.lower().split()) for v in f] + [_show(f).lower()] for f in facts]
+    for i, ws in enumerate(ways):
+        if c in ws:
+            return i
+    inside = lambda a, b: bool(a) and re.search(r"(?<!\w)" + re.escape(a) + r"(?!\w)", b)  # noqa: E731
+    for i, ws in enumerate(ways):
+        if any(inside(w, c) or inside(c, w) for w in ws):
             return i
     return None
 
@@ -1315,16 +1451,41 @@ def _findings(obj) -> dict | None:
     miss, wrong = obj.get("missing_facts"), obj.get("invented_or_wrong")
     if not isinstance(miss, list) or not isinstance(wrong, list):
         return None
+    rest = _versions_length(obj)
+    if rest is None:
+        return None
+    return {"missing_facts": [str(x) for x in miss if str(x).strip()],
+            "invented_or_wrong": [str(x) for x in wrong if str(x).strip()], **rest}
+
+
+def _versions_length(obj: dict) -> dict | None:
+    """several versions, the length and the note, as the judge reports them"""
     sev = obj.get("several_versions", False)
     if isinstance(sev, str) and sev.strip().lower() in ("true", "false"):
         sev = sev.strip().lower() == "true"
     length = str(obj.get("length_ok", "not asked")).strip().lower()
     if not isinstance(sev, bool) or length not in LENGTHS:
         return None
-    return {"missing_facts": [str(x) for x in miss if str(x).strip()],
-            "invented_or_wrong": [str(x) for x in wrong if str(x).strip()],
-            "several_versions": sev, "length_ok": length,
+    return {"several_versions": sev, "length_ok": length,
             "note": " ".join(str(obj.get("note") or "").split())[:200]}
+
+
+def _invented(claims: list[str], answer: str, dropped: list[dict]) -> list[str]:
+    """the invented or wrong things the judge quotes from the answer; a claim
+    that is style, or doesn't quote it, is dropped, and said"""
+    wrong = []
+    for claim in claims:
+        if _style(claim):
+            dropped.append({"kind": "style", "claim": claim,
+                            "text": f"the judge counted “{claim}” as invented or wrong; style is "
+                                    "never a finding"})
+        elif _quoted(claim, answer):
+            wrong.append(claim)
+        else:
+            dropped.append({"kind": "invented", "claim": claim,
+                            "text": f"the judge said “{claim}” is invented or wrong; the answer "
+                                    "doesn’t say that"})
+    return wrong
 
 
 def findings_verdict(obj, q: dict, answer: str) -> dict | None:
@@ -1338,6 +1499,7 @@ def findings_verdict(obj, q: dict, answer: str) -> dict | None:
     c = judge_check(q) or {}
     scale, pass_at = int(c.get("scale") or RUBRIC_SCALE), int(c.get("pass_at") or RUBRIC_PASS)
     facts, need = _facts_in(c.get("rubric", ""))
+    named = names(q.get("prompt", ""))
     missing, dropped, seen = [], [], set()
     for claim in f["missing_facts"]:
         i = _fact_of(claim, facts)
@@ -1347,25 +1509,14 @@ def findings_verdict(obj, q: dict, answer: str) -> dict | None:
                                     "key facts"})
         elif i in seen:
             continue
-        elif has_fact(answer, facts[i]):
+        elif has_fact(answer, facts[i], named):
             seen.add(i)
             dropped.append({"kind": "missing", "claim": claim,
                             "text": f"the judge said it missed “{claim}”; the answer has it"})
         else:
             seen.add(i)
             missing.append(_show(facts[i]))
-    wrong = []
-    for claim in f["invented_or_wrong"]:
-        if _style(claim):
-            dropped.append({"kind": "style", "claim": claim,
-                            "text": f"the judge counted “{claim}” as invented or wrong; style is "
-                                    "never a finding"})
-        elif _quoted(claim, answer):
-            wrong.append(claim)
-        else:
-            dropped.append({"kind": "invented", "claim": claim,
-                            "text": f"the judge said “{claim}” is invented or wrong; the answer "
-                                    "doesn’t say that"})
+    wrong = _invented(f["invented_or_wrong"], answer, dropped)
     short = max(0, len(missing) - (len(facts) - need)) if facts else len(missing)
     asked = bool(stated_length(q.get("prompt", "")))
     too_long = asked and f["length_ok"] == "no"
@@ -1393,6 +1544,134 @@ def findings_verdict(obj, q: dict, answer: str) -> dict | None:
             **({"dropped": dropped} if dropped else {}),
             # for the audit: what the judge said, as it said it
             "judge_raw": obj}
+
+
+# ---------------------------------------------------------------------------
+# 12a.9: the judge's checklist, checked and scored in code — each key fact
+# correct, wrong or missing; one it calls correct without the fact's number or
+# name is missing, one it calls missing that the answer has is correct, and a
+# "wrong" that doesn't quote the answer is decided by the code; each said
+# ---------------------------------------------------------------------------
+
+STATUSES = ("correct", "wrong", "missing")
+
+
+def _checklist(obj) -> dict | None:
+    """the judge's checklist, or None when it can't be read as one"""
+    if not isinstance(obj, dict) or not isinstance(obj.get("checklist"), list):
+        return None
+    rows = []
+    for r in obj["checklist"]:
+        st = str(r.get("status") or "").strip().lower() if isinstance(r, dict) else ""
+        if st not in STATUSES:
+            return None
+        rows.append({"fact": " ".join(str(r.get("fact") or "").split()), "status": st,
+                     "quote": " ".join(str(r.get("quote") or "").split())})
+    other = obj.get("invented_or_wrong", [])
+    rest = _versions_length(obj)
+    if not isinstance(other, list) or rest is None:
+        return None
+    return {"checklist": rows, "invented_or_wrong": [str(x) for x in other if str(x).strip()],
+            **rest}
+
+
+def checklist_verdict(obj, q: dict, answer: str) -> dict | None:
+    """12a.9: the score from the judge's checklist — 4, less 1 a missing fact
+    (2 at most), 2 for a fact wrong or anything invented, 1 for several
+    versions and 1 for a length asked and not met; passing at 3. Every key
+    fact counts unless the request limits the length (the rubric says which),
+    and the code has the last word on each, as said above"""
+    f = _checklist(obj)
+    if f is None:
+        return None
+    c = judge_check(q) or {}
+    scale, pass_at = int(c.get("scale") or RUBRIC_SCALE), int(c.get("pass_at") or RUBRIC_PASS)
+    facts, need = _facts_in(c.get("rubric", ""))
+    named = names(q.get("prompt", ""))
+    said, dropped = {}, []
+    for row in f["checklist"]:
+        i = _fact_of(row["fact"], facts)
+        if i is None:
+            dropped.append({"kind": "unknown", "claim": row["fact"],
+                            "text": f"the judge checked “{row['fact']}”, which isn’t one of the "
+                                    "key facts"})
+            continue
+        if i in said:
+            continue
+        show, st, by = _show(facts[i]), row["status"], "judge"
+        if st == "wrong" and not (row["quote"] and _quoted(row["quote"], answer)):
+            dropped.append({"kind": "wrong", "claim": row["quote"] or show,
+                            "text": f"the judge said “{show}” is wrong, quoting "
+                                    f"“{row['quote']}”; the answer doesn’t say that"
+                                    if row["quote"] else
+                                    f"the judge said “{show}” is wrong, quoting nothing"})
+            continue                                # the code decides it, below
+        if st == "missing" and has_fact(answer, facts[i], named):
+            dropped.append({"kind": "missing", "claim": row["fact"],
+                            "text": f"the judge said it missed “{row['fact']}”; the answer has it"})
+            st, by = "correct", "code"
+        elif st == "correct" and unsaid(answer, facts[i], named):
+            dropped.append({"kind": "correct", "claim": row["fact"],
+                            "text": f"the judge said it has “{show}”; the answer doesn’t say "
+                                    f"{unsaid(answer, facts[i], named)}"})
+            st, by = "missing", "code"
+        said[i] = {"fact": show, "status": st, "by": by,
+                   **({"quote": row["quote"]} if st == "wrong" else {})}
+    for i, fact in enumerate(facts):
+        if i not in said:
+            ok = has_fact(answer, fact, named)
+            said[i] = {"fact": _show(fact), "status": "correct" if ok else "missing", "by": "code"}
+            if not ok:
+                dropped.append({"kind": "unchecked", "claim": _show(fact),
+                                "text": f"the judge didn’t check “{_show(fact)}”; the answer "
+                                        "hasn’t got it"})
+    rows = [said[i] for i in range(len(facts))]
+    missing = [r["fact"] for r in rows if r["status"] == "missing"]
+    wrong = [r for r in rows if r["status"] == "wrong"]
+    other = _invented(f["invented_or_wrong"], answer, dropped)
+    asked = bool(stated_length(q.get("prompt", "")))
+    too_long = asked and f["length_ok"] == "no"
+    kept = {"checklist": rows, "invented_or_wrong": other,
+            "several_versions": f["several_versions"], "length_ok": f["length_ok"]}
+    extra = {**({"dropped": dropped} if dropped else {}), "judge_raw": obj}
+    if copied(q, answer):
+        return {"pass": False, "score": 0, "scale": scale,
+                "reason": f"0 of {scale}: the text given back, not a summary", "findings": kept,
+                **extra}
+    short = max(0, len(missing) - (len(facts) - need))
+    score = max(0, scale - min(2, short) - (2 if wrong or other else 0)
+                - (1 if f["several_versions"] else 0) - (1 if too_long else 0))
+    parts = []
+    if missing:
+        parts.append("missing: " + "; ".join(missing)
+                     + (f" (−{min(2, short)})" if short else " (it may leave that out)"))
+    if wrong:
+        parts.append("wrong: " + "; ".join(f"{r['fact']} (“{r['quote']}”)" for r in wrong))
+    if other:
+        parts.append("invented or wrong: " + "; ".join(f"“{w}”" for w in other))
+    if wrong or other:
+        parts[-1] += " (−2)"
+    if f["several_versions"]:
+        parts.append("several versions (−1)")
+    if too_long:
+        parts.append("not the length asked (−1)")
+    return {"pass": score >= pass_at, "score": score, "scale": scale,
+            "reason": f"{score} of {scale}: " + (" · ".join(parts) or "all key facts, one version"),
+            "findings": kept, **extra}
+
+
+def stub_checklist(rubric: str, answer: str, question: str = "") -> dict:
+    """the stand-in judge's checklist: each listed fact correct when the
+    answer has it, missing when not; several versions where it numbers its
+    options"""
+    facts, _ = _facts_in(rubric)
+    named = names(question)
+    return {"checklist": [{"fact": _show(f), "status": "correct" if has_fact(answer, f, named)
+                           else "missing"} for f in facts],
+            "invented_or_wrong": [],
+            "several_versions": bool(re.search(r"\b(?:option|version)\s*[1-9]\b", answer or "",
+                                               re.I)),
+            "length_ok": "not asked", "note": "the stand-in judge's checklist"}
 
 
 def stub_findings(rubric: str, answer: str) -> dict:
@@ -1439,8 +1718,10 @@ def stub_reply(prompt: str) -> str:
     """What the fake judge backend answers to a judge_prompt()."""
     answer = prompt.rsplit("THE ANSWER\n", 1)[-1]
     question = prompt.split("QUESTION\n", 1)[-1].split("\n\nRUBRIC", 1)[0]
+    rubric = prompt.split("\n\nRUBRIC\n", 1)[-1].rsplit("\n\nTHE ANSWER\n", 1)[0]
+    if prompt.startswith(CHECKLIST_PROMPT.split("{{", 1)[0]):
+        return json.dumps(stub_checklist(rubric, answer, question), ensure_ascii=False)
     if prompt.startswith(FINDINGS_PROMPT.split("{{", 1)[0]):
-        rubric = prompt.split("\n\nRUBRIC\n", 1)[-1].rsplit("\n\nTHE ANSWER\n", 1)[0]
         return json.dumps(stub_findings(rubric, answer), ensure_ascii=False)
     return json.dumps(stub_verdict(answer, question), ensure_ascii=False)
 
@@ -1450,11 +1731,13 @@ def parse_verdict(text: str, check: dict | None = None, q: dict | None = None,
     """the judge's reply: {pass, reason} — and, on a rubric that scores
     (12a.6), its score, the pass being the score at or over the line. 12a.8:
     on a rubric of findings, the score the code works out from them (q, the
-    question, and the answer they are about)"""
+    question, and the answer they are about); 12a.9, from a checklist"""
     from service import llm
     obj = llm.extract_json(text or "")
     if not isinstance(obj, dict):
         return None
+    if (check or {}).get("checklist"):
+        return checklist_verdict(obj, {**(q or {}), "checks": [check]}, answer)
     if (check or {}).get("findings"):
         return findings_verdict(obj, {**(q or {}), "checks": [check]}, answer)
     reason = " ".join(str(obj.get("reason") or "").split())[:200]
@@ -1483,6 +1766,9 @@ def parse_verdict(text: str, check: dict | None = None, q: dict | None = None,
 def stub_for(q: dict, answer: str) -> dict:
     """the stand-in judge's verdict on a question, scored when its rubric scores"""
     c = judge_check(q) or {}
+    if c.get("checklist"):
+        return checklist_verdict(stub_checklist(c["rubric"], answer, q.get("prompt", "")), q,
+                                 answer)
     if c.get("findings"):
         return findings_verdict(stub_findings(c["rubric"], answer), q, answer)
     v = stub_verdict(answer, q["prompt"])
@@ -2241,7 +2527,7 @@ def start(model_dir: Path, submission: int | None = None,
         backend = llm.client("judge")
         stamp = llm.provisional(backend, "marked")
         reqs = [llm.Request(custom_id=f"everyday:{submission or 0}:{q['id']}", system="",
-                            json=True, max_tokens=300,
+                            json=True, max_tokens=judge_tokens(q),
                             user=judge_prompt(q, answers[q["id"]]),
                             meta={"kind": "everyday", "id": q["id"]})
                 for q in todo]
@@ -2315,7 +2601,8 @@ def _ask_again(model_dir: Path, qs: list[dict], answers: dict) -> str | None:
         return None
     backend = llm.client("judge")
     reqs = [llm.Request(custom_id=f"{REMARK}:{model_dir.name}:retry:{q['id']}", system="",
-                        json=True, max_tokens=300, user=judge_prompt(q, answers[q["id"]]),
+                        json=True, max_tokens=judge_tokens(q),
+                        user=judge_prompt(q, answers[q["id"]]),
                         meta={"kind": "everyday", "id": q["id"]}) for q in qs]
     bid = backend.submit(reqs)
     db.batch_add(bid, "everyday_remark", 0, len(reqs), backend.name, backend.model)
@@ -2368,8 +2655,8 @@ def judge_failed(model_dir: Path, why: str) -> None:
 
 # 12a.7: each round of re-marking keeps its own — 12a.6's is the marks from
 # before 12a.6, 12a.7's the marks from before 12a.7; 12a.8's before is 12a.7's
-# marks, the judge adding points up
-BEFORE_NAME = "everyday_before_12a8.json"
+# marks, the judge adding points up; 12a.9's, 12a.8's marks, on findings
+BEFORE_NAME = "everyday_before_12a9.json"
 REMARK = "everyday-remark"
 
 
@@ -2435,7 +2722,7 @@ def remark(results: Path, want: set[str] | None = None, judge: bool = False,
     backend = llm.client("judge")
     stamp = llm.provisional(backend, "marked")
     reqs = [llm.Request(custom_id=f"{REMARK}:{name}:{q['id']}", system="", json=True,
-                        max_tokens=300, user=judge_prompt(q, ans),
+                        max_tokens=judge_tokens(q), user=judge_prompt(q, ans),
                         meta={"kind": "everyday", "id": q["id"]}) for name, q, ans in todo]
     bid = backend.submit(reqs)
     for name in {n for n, _, _ in todo}:

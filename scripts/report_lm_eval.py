@@ -7700,14 +7700,16 @@ const evdItem = (e, qid) => ((e && e.items) || []).find(x => x.id === qid) || nu
 // the question, the answer (with its mark and reason, in the side panel),
 // and the thinking folded away
 // 12a.8: what the judge claimed and the answer disproves, greyed — and its own
-// reply, folded, for the audit
+// reply, folded, for the audit. 12a.9: and what the code decided instead, as
+// a fact called correct without its number
 function evdJudgeNotes(it, id = '') {
   if (!it || (!(it.dropped || []).length && !it.judge_raw)) return '';
   return el('div', { class: 'evjudge', 'data-evd-judge': id },
     (it.dropped || []).map(d => el('p', { class: 'small evdropped', 'data-evd-dropped': d.kind,
       text: d.text })),
     it.judge_raw ? el('details', { class: 'evthink', 'data-evd-judge-raw': id },
-      el('summary', { text: 'the judge’s findings ▸' }),
+      el('summary', { text: it.judge_raw.checklist ? 'the judge’s checklist ▸'
+                                                   : 'the judge’s findings ▸' }),
       el('pre', { class: 'evthink-t', text: JSON.stringify(it.judge_raw, null, 1) })) : '');
 }
 function evdAnswer(q, it, attrs = {}, verdict = null) {

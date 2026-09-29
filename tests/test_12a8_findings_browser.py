@@ -1,7 +1,8 @@
 """12a.8 (the brief's) on the page: a Summarise answer's verdict is built
 from the judge's findings; a claim the answer disproves is shown greyed
 under it, and the judge's own reply is folded beneath, for the audit.
-Fixtures only."""
+Fixtures only. 12a.9: findings on a rubric 12a.8 wrote, as one someone edited
+keeps them (test_12a9_checklist_browser.py has the checklist)."""
 
 from __future__ import annotations
 
@@ -11,6 +12,7 @@ from pathlib import Path
 import pytest
 
 import everyday as ev
+from test_12a8_findings import findings
 from test_12n1_everyday_browser import GOOD, everyday, open_group
 
 pytestmark = pytest.mark.dashboard
@@ -29,7 +31,7 @@ def test_a_dropped_claim_is_greyed_and_the_judges_reply_folded(live, page, width
     out = json.loads(was)
     it = next(x for x in out["items"] if x["id"] == qid)
     q = next(q for q in ev.load_bank() if q["id"] == qid)
-    v = ev.parse_verdict(json.dumps(raw), ev.judge_check(q), q, it["answer_text"]
+    v = ev.parse_verdict(json.dumps(raw), findings(q), q, it["answer_text"]
                          + " Your mom arrives at 7:00 PM.")
     it.update({k: v[k] for k in ("pass", "reason", "score", "findings", "dropped", "judge_raw")})
     try:
