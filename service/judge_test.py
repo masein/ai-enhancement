@@ -427,6 +427,17 @@ def request_for(a: dict) -> tuple[str, int]:
     return judge.build_prompt(rub.text, a["question"], a["reference"], a["answer"]), 200
 
 
+def schema_for(a: dict) -> dict | None:
+    """12a.10: the reply's JSON schema for an Everyday answer on a checklist
+    rubric (constrained decoding); None for any other"""
+    if a["kind"] != "everyday":
+        return None
+    _scripts()
+    import everyday as ev
+    q = next((q for q in ev.load_bank() if q["id"] == a["task"]), None)
+    return ev.judge_schema(q) if q else None
+
+
 def read_mark(a: dict, text: str) -> int | None:
     _scripts()
     if a["kind"] == "everyday":
@@ -469,7 +480,8 @@ def run(model_ids: list[str], by: str) -> list[dict]:
         for i, a in enumerate(todo):
             user, cap = request_for(a)
             reqs.append(llm.Request(custom_id=f"jt:{i}", system="", user=user, max_tokens=cap,
-                                    json=True, meta={"kind": "judge_test", "key": a["key"]}))
+                                    json=True, schema=schema_for(a),
+                                    meta={"kind": "judge_test", "key": a["key"]}))
         be = backend(c)
         bid = be.submit(reqs)
         d = _runs_dir()

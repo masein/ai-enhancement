@@ -630,8 +630,13 @@ def _judge(d: dict, todo: list[dict]) -> None:
     reqs = []
     for it in todo:
         user, cap = _judge_request(d, it)
+        schema = None
+        if d["kind"] == "everyday":            # 12a.10: a checklist's reply, constrained
+            import everyday as ev
+            schema = ev.judge_schema(it["q"])
         reqs.append(llm.Request(f"qbj:{d['id']}:{it['n']}", "", user, max_tokens=cap,
-                                json=True, meta={"kind": "qb_judge", "draft_kind": d["kind"]}))
+                                json=True, schema=schema,
+                                meta={"kind": "qb_judge", "draft_kind": d["kind"]}))
     _submit(d, "judge", "judge", reqs)
     d["status"] = "checking"
 

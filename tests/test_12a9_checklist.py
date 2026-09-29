@@ -341,7 +341,7 @@ def test_the_remark_asks_every_summarise_answer_again_as_a_checklist(svc):
          "rubric": was[q["id"]], "answer_text": answer(q)} for q in qs]})
     res = ev.remark(config.OUT_DIR, judge=True)
     assert res["sent"] == len(qs) and (config.OUT_DIR / ev.BEFORE_NAME).exists()
-    assert ev.BEFORE_NAME == "everyday_before_12a9.json"
+    assert ev.BEFORE_NAME == "everyday_before_12a10.json"          # 12a.10's round now
     sent = [r for r in llm.FakeBatches("fake-judge", config.BENCH_ROOT).recorded()
             if r["custom_id"].startswith(ev.REMARK + ":")]
     assert {r["custom_id"].rsplit(":", 1)[1] for r in sent} == {q["id"] for q in qs}
@@ -358,66 +358,3 @@ def test_the_remark_asks_every_summarise_answer_again_as_a_checklist(svc):
                for i, it in items.items())
     assert (items[EMAIL]["pass"], items[EMAIL]["score"]) == (False, 2)
 
-
-def test_compare_says_which_change_moved_which_scores(svc):
-    """the brief: split --compare by cause. On one stored checklist each, the
-    columns add 12a.9's changes in turn — the school run plan fails on the
-    checklist, a four-bullet answer too long on the length now read, the email
-    thread on every fact counting — and the marks before are each answer's"""
-    qs = [q for q in BANK.values() if q["group"] == "summarising"]
-    FOUR = "everyday-summarising-long-14"                          # "as 4 bullets"
-    special = {SCHOOL_RUN: GEMMA_SCHOOL_RUN, EMAIL: QWEN_EMAIL}
-    answer = lambda q: special.get(q["id"], q["reference"])  # noqa: E731
-    mdir = config.OUT_DIR / "org__m"
-    _asked(mdir, qs, answer=answer)
-    ev.write(mdir, {"model": "org/m", "items": [
-        {"id": q["id"], "group": "summarising", "pass": True, "score": 4,
-         "reason": "4 of 4: all key facts, one version", "answer_text": answer(q),
-         "rubric": ev.rubric_key({"checks": [{"type": "judge", "rubric": ev.summarise_rubric(
-             q, ev.RUBRIC_12A8)}]})} for q in qs]})
-    ev.remark(config.OUT_DIR, judge=True)
-    snap = json.loads((config.OUT_DIR / ev.BEFORE_NAME).read_text())["summarise"]["org/m"]
-    assert set(snap) == {q["id"] for q in qs} and all(snap.values())
-    sent = [r for r in llm.FakeBatches("fake-judge", config.BENCH_ROOT).recorded()
-            if r["custom_id"].startswith(ev.REMARK + ":org__m:")]
-    replies = {r["custom_id"]: llm.Result(text=ev.stub_reply(r["user"])) for r in sent}
-    by = {c.rsplit(":", 1)[1]: c for c in replies}
-    replies[by[SCHOOL_RUN]] = llm.Result(text=listed(SCHOOL_RUN, **{
-        "5:30 / 5.30": ("wrong", "will pick up Layla from her friend's house at 5:30"),
-        "mum / mother": ("wrong", "Her mum is coming at 7")}))
-    replies[by[EMAIL]] = llm.Result(text=listed(EMAIL))
-    replies[by[FOUR]] = llm.Result(text=listed(FOUR, several=True, length="no"))
-    ev.finish_remark(config.OUT_DIR, replies)
-    items = {it["id"]: it for it in ev.read(mdir)["items"]}
-    assert [items[i]["score"] for i in (SCHOOL_RUN, FOUR, EMAIL)] == [2, 2, 2]
-    out = ev.compare(config.OUT_DIR).splitlines()
-    k = out.index("Summarise, what moved it: each column adds one change to the column before")
-    assert out[k + 2] == ("| model | half | before | the checklist | + lengths “as 4 bullets” "
-                          "asks | + every fact where no length is set (now) | waiting |")
-    n = {h: sum(1 for q in qs if ev.half(q) == h) for h in (ev.HIDDEN, ev.PRACTICE)}
-    p = n[ev.PRACTICE]
-    assert f"| org/m | practice | {p} of {p} | {p - 1} (−1) | {p - 2} (−1) | {p - 3} (−1) | 0 |" \
-        in out
-    h = n[ev.HIDDEN]
-    assert f"| org/m | hidden | {h} of {h} | {h} | {h} | {h} | 0 |" in out
-    # which questions each change reaches: practice ones named, hidden ones counted
-    assert out[-2:] == [
-        "Lengths “as 4 bullets” asks reach: long-14, long-16, long-30, long-33, long-44 in the "
-        "practice half; 0 hidden.",
-        "Every fact where no length is set reaches: long-01, long-08, long-11, long-15, long-22, "
-        "long-28 in the practice half; 0 hidden."]
-
-
-def test_a_hidden_question_a_change_reaches_is_counted_never_named(tmp_path, monkeypatch):
-    x = {"id": "everyday-summarising-invented-x", "group": "summarising", "half": ev.HIDDEN,
-         "prompt": 'give me the main points as 3 bullets: "Fixture text, invented for the tests."',
-         "reference": "Fixture text."}
-    x["checks"] = ev.summarise_checks({**x, "checks": [
-        {"type": "facts", "values": [["fixture"], ["text"], ["invented"], ["tests"]], "n": 2}]})
-    real = ev.load_bank
-    monkeypatch.setattr(ev, "load_bank", lambda *a, **k: real(*a, **k) + [x])
-    (tmp_path / ev.BEFORE_NAME).write_text(json.dumps({"models": {}, "summarise": {"org/x": {}}}))
-    out = ev.moved(tmp_path)
-    assert "invented-x" not in out
-    assert "Lengths “as 4 bullets” asks reach: long-14, long-16, long-30, long-33, long-44 in the " \
-           "practice half; 1 hidden." in out
