@@ -664,7 +664,9 @@ def load_results(path: Path) -> list[dict]:
 
 # what the page needs of each marked answer; everything else stays on disk
 _EVERYDAY_ITEM = ("id", "group", "pass", "reason", "answer_text", "had_reasoning",
-                  "reasoning_text", "reasoning_words", "no_answer", "failed")
+                  "reasoning_text", "reasoning_words", "no_answer", "failed",
+                  # 12a.8: the judge's claims the answer disproves, and its own reply
+                  "dropped", "judge_raw")
 
 
 def _evd_label(q: dict) -> str:
@@ -4132,6 +4134,8 @@ input.gbox { margin:0 2px 0 0; vertical-align:-2px; }
 .evside-head { display:flex; gap:6px; align-items:center; }
 .evside-card .evans { max-height:260px; overflow:auto; white-space:pre-wrap; font-size:var(--fs-1); }
 .evside-why { margin:4px 0; }
+.evdropped { color:var(--muted); margin:2px 0; }
+.evjudge pre.evthink-t { white-space:pre-wrap; font-size:var(--fs-1); }
 .audit-banner { margin-bottom:10px; }
 .grp-line { margin:0 0 6px; }
 .qeform { border:1px dashed var(--border); border-radius:8px; padding:10px; margin:8px 0; }
@@ -7671,6 +7675,17 @@ const evdItem = (e, qid) => ((e && e.items) || []).find(x => x.id === qid) || nu
 
 // the question, the answer (with its mark and reason, in the side panel),
 // and the thinking folded away
+// 12a.8: what the judge claimed and the answer disproves, greyed — and its own
+// reply, folded, for the audit
+function evdJudgeNotes(it, id = '') {
+  if (!it || (!(it.dropped || []).length && !it.judge_raw)) return '';
+  return el('div', { class: 'evjudge', 'data-evd-judge': id },
+    (it.dropped || []).map(d => el('p', { class: 'small evdropped', 'data-evd-dropped': d.kind,
+      text: d.text })),
+    it.judge_raw ? el('details', { class: 'evthink', 'data-evd-judge-raw': id },
+      el('summary', { text: 'the judge’s findings ▸' }),
+      el('pre', { class: 'evthink-t', text: JSON.stringify(it.judge_raw, null, 1) })) : '');
+}
 function evdAnswer(q, it, attrs = {}, verdict = null) {
   return el('div', { class: 'evans-wrap', ...attrs },
     el('p', { class: 'evq-label', text: 'Question' }),
@@ -7687,7 +7702,8 @@ function evdAnswer(q, it, attrs = {}, verdict = null) {
           text: (it && it.answer_text) || '(the model wrote nothing)' }),
     it && it.had_reasoning ? el('details', { class: 'evthink', 'data-evd-thinking': q.id },
       el('summary', { text: `thinking ▸ ${(it.reasoning_words || 0).toLocaleString('en')} words` }),
-      el('div', { class: 'evthink-t', text: it.reasoning_text || '' })) : '');
+      el('div', { class: 'evthink-t', text: it.reasoning_text || '' })) : '',
+    evdJudgeNotes(it, q.id));
 }
 
 // queue everyday tasks for these models, one run each; returns [{id, ok, sid, why}]
@@ -8012,6 +8028,7 @@ function evdSideCard(id, q, it, changed) {
     changed ? el('p', { class: 'small se', 'data-grp-changed': id,
         text: 'changed, not re-asked yet: its answer was to the old words, and doesn’t count' })
       : el('p', { class: 'small evside-why', 'data-grp-decided': id, text: evdDecided(it, q) }),
+    changed ? '' : evdJudgeNotes(it, id),
     changed || !it || it.no_answer ? '' : el('div', { class: 'evans', 'data-grp-text': id,
       text: it.answer_text || '(the model wrote nothing)' }),
     !changed && it && it.had_reasoning ? el('details', { class: 'evthink' },

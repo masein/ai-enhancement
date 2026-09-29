@@ -660,7 +660,8 @@ def _read_marks(d: dict, texts: dict[int, str]) -> None:
         it.pop("judge_pending", None)
         if d["kind"] == "everyday":
             import everyday as ev
-            v = ev.parse_verdict(text, ev.judge_check(it["q"])) if text else None
+            v = ev.parse_verdict(text, ev.judge_check(it["q"]), it["q"],
+                                 it.get("answer") or "") if text else None
             if v is None:
                 _flag(it, "checker", "the judge gave no verdict on the checker's answer")
             elif not v["pass"]:

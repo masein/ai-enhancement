@@ -4048,6 +4048,35 @@ answers failed, some two thirds of them wrongly.
   Zain to football at 4, you pick Layla up at 5:30. The rubric quotes it,
   so its key changes and its verdicts are asked again.
 
+### 12a.8 — Summarise: the judge reports findings, the code scores them
+
+- After 12a.7 and #111, 18 of 145 practice Summarise answers failed on the
+  five served setups; ten were "several versions", which the rubric makes −1
+  and the judge gave 0 to 2, and one was the judge missing "Your mom arrives".
+  The judge finds what is wrong well and adds points up badly.
+- **The judge replies with findings, no score** (`FINDINGS_PROMPT`, the
+  rubric `RUBRIC`, the check's `"findings": true`): the missing facts quoted
+  from the rubric's list, anything invented or wrong quoting the answer,
+  several versions, and whether a length asked was kept.
+- **The code scores them** (`findings_verdict`): 4, less 1 a missing fact (2
+  at most, counting only what "at least n of these k" doesn't allow), 2 for
+  anything invented or wrong, 1 for several versions, 1 for a length asked
+  and not kept; passing at 3. The reason is built from them.
+- **The code checks the claims**: a missing fact the answer has (its key
+  words, normalised: 7:00 PM = 7 pm = 7, mum = mom = mother, 2,450.00 = 2450)
+  is dropped; an invented thing the answer doesn't say word for word, or one
+  that is only a lead-in or a closing offer, is dropped. Each is said, greyed,
+  under the verdict; the judge's reply is kept on the answer (`judge_raw`).
+- **A copy of the text scores 0 in code** (`copied`), as 12a.7's rubric
+  scored it: the findings alone would give a pasted-back text 4.
+- **A reply that can't be read is asked once more**, as a re-mark batch; after
+  that it is "the judge's reply couldn't be read", neither pass nor fail, and
+  waiting.
+- The 60 Summarise rubrics in the bank are the findings form; a 12a.6 or 12a.7
+  rubric the builder published is upgraded as it is read, and one someone
+  wrote stays theirs, scored as before. This round's before is
+  `everyday_before_12a8.json`.
+
 ### 12o.1 — every column's width and place, and what the live check of #103/#104 found
 
 - **Columns** (the Models table on every chip, the Knowledge exam's included,
