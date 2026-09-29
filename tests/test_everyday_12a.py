@@ -56,8 +56,9 @@ def test_the_judges_questions_and_its_stand_in():
     rubric = next(c["rubric"] for c in q["checks"] if c["type"] == "judge")
     assert rubric in p and q["prompt"] in p and TLDR in p
     assert "arabic" not in p.lower()
-    # 12a.8: Summarise's judge reports findings, no score — the stand-in finds none here
-    assert json.loads(ev.stub_reply(p))["missing_facts"] == []
+    # 12a.8: Summarise's judge reports findings, no score — 12a.9: a checklist of the key
+    # facts, every one correct here
+    assert {r["status"] for r in json.loads(ev.stub_reply(p))["checklist"]} == {"correct"}
     v = ev.parse_verdict(ev.stub_reply(p), ev.judge_check(q), q, TLDR)
     assert {k: v[k] for k in ("pass", "score", "scale", "reason")} == {
         "pass": True, "score": 4, "scale": 4, "reason": "4 of 4: all key facts, one version"}
@@ -335,7 +336,8 @@ def test_the_judged_questions_wait_on_the_judge_and_the_row_says_so(svc, monkeyp
     tldr = next(it for it in out["items"] if it["id"] == "everyday-pilot-03")
     # 12a.6: on its rubric, scored — 12a.8: from the judge's findings, in code
     assert tldr["reason"] == "4 of 4: all key facts, one version"
-    assert tldr["score"] == 4 and tldr["findings"]["missing_facts"] == []
+    assert tldr["score"] == 4 and {r["status"] for r in tldr["findings"]["checklist"]} == \
+        {"correct"}
     row = next(r for r in client.get("/api/submissions").json() if r["id"] == sid)
     # the run's line stays the run's once the judge is in
     assert row["progress"] == f"Everyday tasks: {HIDDEN} of {HIDDEN} hidden · {N} new questions"

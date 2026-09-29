@@ -609,7 +609,7 @@ def _judge_request(d: dict, it: dict) -> tuple[str, int]:
     _scripts()
     if d["kind"] == "everyday":
         import everyday as ev
-        return ev.judge_prompt(it["q"], it["answer"]), 200
+        return ev.judge_prompt(it["q"], it["answer"]), ev.judge_tokens(it["q"], 200)
     import judge
     rub = judge.rubric_for(_task(d))
     ref = full_reference(it["q"])

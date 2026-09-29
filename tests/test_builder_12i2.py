@@ -154,8 +154,8 @@ def test_an_everyday_question_whose_reference_fails_its_own_checks_is_set_aside(
     assert it["auto"] == ""
     gate, rubric = it["q"]["checks"]
     assert gate == {"type": "numbers_from_source"}
-    assert (rubric["type"], rubric["scale"], rubric["pass_at"], rubric["findings"]) == \
-        ("judge", 4, 3, True)
+    assert (rubric["type"], rubric["scale"], rubric["pass_at"], rubric["checklist"]) == \
+        ("judge", 4, 3, True)                          # 12a.9: a checklist of its key facts
     assert "- thursday" in rubric["rubric"] and '"Bins on Thursday."' in rubric["rubric"]
     assert "The request asks for it shorter" in rubric["rubric"]            # "tldr"
     import everyday as ev

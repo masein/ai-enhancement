@@ -4233,6 +4233,63 @@ Not before the demo: a new hidden set changes every Everyday score.
   moves to History ("scored on the retired report half"). Do it once
   Everyday's switch has settled.
 
+### 12a.9 — Summarise: the judge fills in a checklist, the code checks it
+
+- After 12a.8 the findings judge was too lenient on the small models: "all
+  key facts" of a fact stated with the wrong person (gemma-3-270m-it, the
+  school run plan: "She … will pick up Layla", "Her mum is coming at 7") or
+  without its number (Qwen3-0.6B, the work project's email thread: the
+  overtime cap with no 10 hours, the daily call with no 9:30), each 4 of 4.
+- **The judge fills in a checklist** (`CHECKLIST_PROMPT`, the rubric
+  `RUBRIC`, the check's `"checklist": true`): every key fact in the rubric's
+  list, "correct", "wrong" (quoting the answer) or "missing". Who does what
+  is part of a fact: the wrong person, day, time, place or amount is "wrong";
+  a fact without its number, time, amount or name is "missing". Two worked
+  examples: every fact correct; the booking given to the wrong person and the
+  cash without its £15. Anything else invented or wrong is listed as before.
+  Its reply may run to 800 tokens (`judge_tokens`).
+- **The code checks it** (`checklist_verdict`):
+  - a fact called correct whose numbers, times, amounts or names aren't in
+    the answer is missing, and said ("the judge said it has “10 hours /
+    overtime”; the answer doesn’t say “10 hours”"). A way of saying a fact
+    with none ("overtime") doesn't count when another has one ("10 hours").
+    Names are the text's own (`names`): words it writes with a capital, not
+    at a sentence's start, and never without — Mariam, Copper Kettle,
+    November; "Your mum" isn't one. Normalised as 12a.8's: 7:00 PM = 7 pm =
+    7, 2,450.00 = 2450, twelve = 12, a month = its short form;
+  - a fact called missing that the answer has is correct, as 12a.8 dropped it;
+  - a "wrong" whose quote isn't the answer's words (a quote cut with "…" is
+    its pieces, in order) is dropped, and the fact decided as a skipped one:
+    correct if the answer has it, missing if not;
+  - a fact the judge skips is decided the same way; one it names that isn't
+    listed is dropped. Each is said, greyed, under the verdict.
+- **The score is 12a.8's**: 4, less 1 a missing fact (2 at most), 2 for a
+  fact wrong or anything invented, 1 for several versions, 1 for a length
+  asked and not kept; passing at 3. **Every key fact counts where the
+  request sets no length**; where it limits it (bullets, words, "short"), the
+  question's own "at least n of these k" still lets the summary choose.
+- `stated_length` reads "as 4 bullets" as a length now ("bullet points" only,
+  before): long-14, 16, 30, 33 and 44 are marked on it.
+- The email thread (`everyday-summarising-long-01`) lists its 9:30 daily call
+  as a key fact.
+- A month is a month's name or its short form only: 12a.8's key words read
+  "Mariam" as March and "novel" as November.
+- The 29 practice rubrics in the bank are the checklist form; a 12a.6, 12a.7
+  or 12a.8 rubric generated from a question's facts (the builder's, **and the
+  hidden set in the server's store**) is upgraded as it is read; one someone
+  wrote stays theirs and is marked as before. The check keeps the question's
+  own "at least n" (`at_least`) where the rubric no longer gives it.
+- **`--compare` says what moved Summarise, change by change** (`moved`): this
+  round's before (`everyday_before_12a9.json`) keeps each Summarise answer's
+  pass as well as the counts, and each answer's one stored checklist is
+  scored again with the changes added in turn — the checklist alone (12a.8's
+  facts, "at least n" and lengths), then the lengths "as 4 bullets" states,
+  then every fact where no length is set (with the facts a question gained,
+  `GAINED_12A9`: the email thread's 9:30). Per model and half; the questions
+  each change reaches are named on the practice half and counted on the
+  hidden. The tests' two answers are the stored ones, both on the practice
+  half: a hidden question's answer never comes into the repo.
+
 ### 12o.1 — every column's width and place, and what the live check of #103/#104 found
 
 - **Columns** (the Models table on every chip, the Knowledge exam's included,

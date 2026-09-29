@@ -8,7 +8,9 @@ or wrong −2, several versions −1, a length asked and not kept −1 — and d
 claim the answer disproves, saying so.
 
 The exact cases the brief names, and the retry. Nothing runs a model: the
-judge's replies are written here."""
+judge's replies are written here. 12a.9: a generated rubric is a checklist now
+(test_12a9_checklist.py); these are the findings a rubric someone edited
+under 12a.8 still asks for, marked as they were."""
 
 from __future__ import annotations
 
@@ -32,9 +34,18 @@ def said(**f) -> str:
                        "length_ok": "not asked", "note": "", **f})
 
 
+def findings(q: dict, need: int | None = None) -> dict:
+    """12a.9: the question's judge check as 12a.8 generated it — findings on
+    its facts, `need` of them if given"""
+    facts, n = ev._facts_of(q)
+    was = {**q, "checks": [{"type": "facts", "values": facts, "n": need or n}]}
+    return {"type": "judge", "scale": 4, "pass_at": 3, "findings": True,
+            "rubric": ev.summarise_rubric(was, ev.RUBRIC_12A8)}
+
+
 def verdict(qid: str, answer: str, **f) -> dict:
     q = BANK[qid]
-    return ev.parse_verdict(said(**f), ev.judge_check(q), q, answer)
+    return ev.parse_verdict(said(**f), findings(q), q, answer)
 
 
 LEAVE_3 = """Option 1: Annual leave 3–10 November requested; the Hamilton file is with Mariam, and I'm reachable by mobile. Form attached.
@@ -126,19 +137,18 @@ def test_everything_wrong_floors_at_0_and_the_judges_reply_is_kept():
 
 
 def test_a_fact_it_may_leave_out_costs_nothing():
-    """a question that keeps "at least n of these k": one short of k is fine"""
-    q = next(q for q in BANK.values() if q["group"] == "summarising"
-             and ev._facts_of(q)[1] < len(ev._facts_of(q)[0]))
-    facts, need = ev._facts_of(q)
+    """a rubric that keeps "at least n of these k": one short of k is fine"""
+    q = BANK["everyday-summarising-long-01"]
+    facts, _ = ev._facts_of(q)
     first = ev._show(facts[0])
-    v = ev.parse_verdict(said(missing_facts=[first]), ev.judge_check(q), q, "x")
+    v = ev.parse_verdict(said(missing_facts=[first]), findings(q, need=5), q, "x")
     assert v["score"] == 4 and v["reason"] == f"4 of 4: missing: {first} (it may leave that out)"
 
 
 def test_the_text_given_back_is_0_whatever_the_judge_finds():
     q = BANK[BANK_SMS]
     text = q["prompt"][q["prompt"].index('"') + 1:q["prompt"].rindex('"')]
-    v = ev.parse_verdict(said(), ev.judge_check(q), q, text)
+    v = ev.parse_verdict(said(), findings(q), q, text)
     assert (v["pass"], v["score"], v["reason"]) == (False, 0,
                                                     "0 of 4: the text given back, not a summary")
 
@@ -149,7 +159,7 @@ def test_the_text_given_back_is_0_whatever_the_judge_finds():
                                    '"length_ok": "maybe"}'])
 def test_a_reply_that_isnt_findings_is_not_read(reply):
     q = BANK[SCHOOL_RUN]
-    assert ev.parse_verdict(reply, ev.judge_check(q), q, SCHOOL_RUN_ANSWER) is None
+    assert ev.parse_verdict(reply, findings(q), q, SCHOOL_RUN_ANSWER) is None
 
 
 @pytest.fixture
@@ -182,9 +192,10 @@ def test_an_unreadable_reply_is_asked_again_then_waits(svc):
     [it] = out["items"]
     assert (it["pass"], it["reason"]) == (None, ev.UNREADABLE) and out["waiting"] == 1
     assert len([b for b in db.batches_pending() if b["kind"] == "everyday_remark"]) == 1  # no third
-    # a second asking that can be read lands as any verdict does
-    ev.finish_remark(config.OUT_DIR, {sent[0]["custom_id"]: llm.Result(
-        text=said(missing_facts=["mum / mother"]))})
+    # a second asking that can be read lands as any verdict does (12a.9: a checklist)
+    ev.finish_remark(config.OUT_DIR, {sent[0]["custom_id"]: llm.Result(text=json.dumps(
+        {**json.loads(ev.stub_reply(ev.judge_prompt(q, SCHOOL_RUN_ANSWER))),
+         "checklist": [{"fact": "mum / mother", "status": "missing"}]}))})
     [it] = ev.read(mdir)["items"]
     assert (it["pass"], it["score"]) == (True, 4)
     assert it["dropped"][0]["text"].endswith("the answer has it") and it["judge_raw"]
