@@ -4510,6 +4510,22 @@ Not before the demo: a new hidden set changes every Everyday score.
 - **The caption** says what is comparable: the same protocol and the same 300
   IFEval items; MMLU-Pro and MATH our draw of their design; our runs of their
   open models beside their rows, never at their device speed.
+- **12q.B2, from the first look on the server:**
+  - **The cloud APIs aren't ranked** (`rank_all` null, "☁" in the table), as
+    DeviceMark's board doesn't rank them: ranked, they put LFM2.5-1.2B at "=4"
+    against their "=1". A row of ours wholly above a row of theirs still
+    ranks above it.
+  - **Every point's label is clear** of the other labels, the points, the
+    whiskers and the dashed lines (`dmPlace`: the place covering least, of
+    eight around the point and four rings further out, with a leader line);
+    the most crowded placed first. Labels and leaders never take the
+    pointer.
+  - **The chart is as wide as its card** (900 at the least, where it
+    scrolls), drawn again when the window is resized.
+  - **Ours is named by its setup on the chart** (`devicemark.setup_label`):
+    "phone build (k4-LDA) · MTP · thinking off", "original (k=8) · …" — the
+    build from the setup's name or file. The row's name stays in the table
+    and heads its hover.
 - **Accuracy against budget**, for the rows ticked in the table: their
   `time_frontier`, ours worked out the same way (MMLU-Pro and MATH pooled).
 - **The question browser** lists the battery's three as "IFEval (DeviceMark

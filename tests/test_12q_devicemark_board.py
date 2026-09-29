@@ -157,10 +157,12 @@ def test_everyone_is_ranked_together_and_theirs_are_read_only(tmp_path, monkeypa
         theirs = j["external"]["rows"]
         assert len(theirs) == 12 and j["external"]["credit"].endswith("CC-BY-4.0")
         assert ours["server_tok_s"] == 21.5 and ours["device"] is None
-        allr = [ours] + theirs
-        assert [r["rank_all"] for r in allr] == dm.ranks(
+        # 12q.B2: the cloud APIs aren't ranked, as on DeviceMark's board
+        ranked = [r for r in theirs if r["kind"] != "cloud"]
+        assert [r["rank_all"] for r in [ours] + ranked] == dm.ranks(
             [{"ci": ours["row"]["composite"]["ci"]}] + [{"ci": r["composite"]["ci"]}
-                                                        for r in theirs])
+                                                        for r in ranked])
+        assert [r["rank_all"] for r in theirs if r["kind"] == "cloud"] == [None, None]
         # their rows can't be given a speed here: they are theirs
         r = client.put("/api/devicemark/device", json={
             "model": "lfm2.5-1.2b__int8hu__aimodel", "tok_s": 99, "device": "x", "source": "y"})
@@ -261,9 +263,39 @@ def test_our_run_of_their_model_sits_beside_their_row_never_ranked_apart(tmp_pat
         # ranked: our solo rows and theirs; a paired run of ours never apart
         assert ours[nemo]["rank_all"] is None and ours[lfm]["rank_all"] is None
         solo = [ours["Qwen/Qwen3-1.7B"], ours["served/Nanbeige4.1-3B-Q8"]]
-        allr = solo + j["external"]["rows"]
-        assert [r["rank_all"] for r in allr] == dm.ranks(
+        ranked = [r for r in j["external"]["rows"] if r["kind"] != "cloud"]
+        assert [r["rank_all"] for r in solo + ranked] == dm.ranks(
             [{"ci": r["row"]["composite"]["ci"]} for r in solo]
-            + [{"ci": r["composite"]["ci"]} for r in j["external"]["rows"]])
+            + [{"ci": r["composite"]["ci"]} for r in ranked])
     finally:
         client.__exit__(None, None, None)
+
+
+
+# ---------------------------------------------------------------------------
+# 12q.B2: the cloud APIs unranked; a served setup named by what it is
+# ---------------------------------------------------------------------------
+
+def test_the_cloud_apis_are_not_ranked_and_their_ranks_are_theirs(tmp_path):
+    b = dm.board(tmp_path)                                   # no rows of ours
+    got = {r["id"]: r["rank_all"] for r in b["external"]["rows"]}
+    assert got["gemini-flash__api__api"] is None and got["gemini-pro__api__api"] is None
+    # as on DeviceMark's board: LFM2.5-1.2B shares the first place
+    assert got["lfm2.5-1.2b__int8hu__aimodel"] == "=1"
+    assert got["apple-fm__system__system"] is not None      # the built-in model is ranked
+
+
+@pytest.mark.parametrize("setup,thinking,label", [
+    ({**SERVED, "phone": True, "name": "Qwen3.6-k4-LDA-MTP"}, False,
+     "phone build (k4-LDA) · MTP · thinking off"),
+    ({**SERVED, "phone": True, "mtp": False, "name": "Qwen3.6-35B-A3B-k4-LDA-phone-build"}, True,
+     "phone build (k4-LDA) · thinking on"),
+    ({**SERVED, "phone": True, "mtp": False, "lookahead": True, "name": "phone",
+      "file": "/home/masein/Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf"}, False,
+     "phone build (k4-LDA) · lookahead · thinking off"),
+    ({**SERVED, "phone": False, "name": "Qwen3.6-35B-A3B-Q4-original-k-8"}, False,
+     "original (k=8) · MTP · thinking off"),
+    ({"runtime": "hf transformers (lm_eval)"}, True, "Qwen/Qwen3-1.7B · thinking"),
+])
+def test_a_served_setup_is_named_by_what_it_is(setup, thinking, label):
+    assert dm.setup_label(setup, thinking, "Qwen/Qwen3-1.7B") == label

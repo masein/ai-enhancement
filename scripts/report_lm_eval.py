@@ -3607,6 +3607,8 @@ details.howto .about { margin-top:12px; }
    12px on the screen; on a phone it scrolls sideways in its own box */
 .chartscroll { overflow-x:auto; }
 .chartscroll > svg { display:block; max-width:680px; }
+/* 12q.B2: the On-device chart is drawn at its card's width */
+.chartscroll > svg.dmchart { max-width:none; }
 /* Weakest topics on a phone: HTML rows, not a shrunken SVG */
 .wrows { display:none; }
 .wrow { display:grid; grid-template-columns:minmax(0, 1fr) 34% auto; gap:8px; align-items:center;
@@ -10632,7 +10634,8 @@ function dmOurs(r) {
   const su = r.row.setup || {};
   const name = (su.runtime === 'llama-server' && su.name ? su.name : r.model)
     + (r.thinking ? ' · thinking' : '');
-  return { id: r.id, name, external: false, kind: su.runtime === 'llama-server' ? 'served' : 'hf',
+  return { id: r.id, name, label: r.label || name, external: false,
+    kind: su.runtime === 'llama-server' ? 'served' : 'hf',
     composite: r.row.composite, benches: r.row.benches, answered_pct: r.row.answered_pct,
     median_tokens: r.row.median_tokens, time_frontier: r.row.time_frontier, device: r.device,
     server_tok_s: r.server_tok_s, retention: r.retention, rank: r.rank_all, model: r.model,
@@ -10658,7 +10661,8 @@ const dmOursLines = r => (r.ours || []).flatMap(o => [
 function dmTip(r) {
   const c = r.composite;
   const ours = dmOursLines(r);
-  return [r.name, (ours.length ? `theirs (${r.label}): ` : '') + `composite ${dmPct(c.value)}`
+  return [r.name, ...(!r.external && r.label !== r.name ? [r.label] : []),
+    (ours.length ? `theirs (${r.label}): ` : '') + `composite ${dmPct(c.value)}`
       + dmIv(r), (ours.length ? '  ' : '') + dmBenchLine(r),
     ...ours,
     ...(ours.length ? ['ours is never plotted at their device speed: that speed is their '
@@ -10671,7 +10675,7 @@ function dmTip(r) {
     ...(r.note ? [r.note] : [])];
 }
 // labels that don't sit on each other: a line's, spread down the right edge;
-// a point's, at the first of four places clear of the ones already placed
+// a point's, at the clearest of its places (12q.B2)
 const dmTextW = t => 6.1 * t.length;
 function dmSpread(ys, gap = 12) {
   const order = ys.map((y, i) => [y, i]).sort((p, q) => p[0] - q[0]);
@@ -10680,24 +10684,47 @@ function dmSpread(ys, gap = 12) {
   for (const [y, i] of order) { last = Math.max(y, last + gap); out[i] = last; }
   return out;
 }
-function dmPlace(boxes, x, y, text) {
-  const w = dmTextW(text), h = 11;
-  const tries = [[8, -6, 'start'], [8, 14, 'start'], [-8, -6, 'end'], [-8, 14, 'end']];
-  const box = ([dx, dy, a]) => { const bx = a === 'start' ? x + dx : x + dx - w;
-    return { l: bx, r: bx + w, t: y + dy - h, b: y + dy }; };
-  const clear = bb => !boxes.some(o => bb.l < o.r && bb.r > o.l && bb.t < o.b && bb.b > o.t);
-  const pick = tries.find(t => clear(box(t))) || tries[0];
-  boxes.push(box(pick));
-  return { x: x + pick[0], y: y + pick[1], anchor: pick[2] };
+// 12q.B2: a point's label goes where it covers least — the labels already
+// placed and the points count most, the whiskers and the dashed lines less —
+// inside the plot, nearest first: eight places around the point, then four
+// rings further out, with a leader line back to it
+const DM_AROUND = [[8, 4, 'start'], [-8, 4, 'end'], [6, -8, 'start'], [6, 16, 'start'],
+  [-6, -8, 'end'], [-6, 16, 'end'], [0, -11, 'middle'], [0, 21, 'middle']];
+function dmPlace(obst, x, y, text, lim) {
+  // the text's own box at 11px: 10 above its baseline, 4 below, a little wider than 6px a letter
+  const w = 6.4 * text.length + 2;
+  const box = (dx, dy, a) => { const bx = a === 'start' ? x + dx : a === 'end' ? x + dx - w
+    : x + dx - w / 2; return { l: bx - 1, r: bx + w, t: y + dy - 11, b: y + dy + 4 }; };
+  const cover = bb => obst.reduce((sum, o) => sum + o.wt
+    * Math.max(0, Math.min(bb.r, o.r) - Math.max(bb.l, o.l))
+    * Math.max(0, Math.min(bb.b, o.b) - Math.max(bb.t, o.t)), 0);
+  let best = null;
+  [0, 1, 2, 3, 4].forEach(ring => DM_AROUND.forEach(([dx, dy, a], i) => {
+    const ddx = dx * (1 + 2 * ring), ddy = dy + Math.sign(dy - 4) * 13 * ring;
+    const bb = box(ddx, ddy, a);
+    const out = bb.l < lim.l || bb.r > lim.r || bb.t < lim.t || bb.b > lim.b;
+    const score = (out ? 1e6 : 0) + cover(bb) + 30 * ring + i * 0.01;
+    if (!best || score < best.score) best = { score, bb, ring, x: x + ddx, y: y + ddy, anchor: a };
+  }));
+  obst.push({ ...best.bb, wt: 3 });
+  return best;
 }
+// 12q.B2: the chart as wide as the card it's in — 900 at the least, which
+// scrolls on a phone — and drawn again when the window is resized
+const dmWidth = () => Math.max(900, Math.min(1800,
+  ((document.getElementById('view') || {}).clientWidth || 900) - 48));
+let dmDrawnAt = 0, dmResize = 0;
+addEventListener('resize', () => { clearTimeout(dmResize); dmResize = setTimeout(() => {
+  if (document.querySelector('[data-dm-chart]') && Math.abs(dmWidth() - dmDrawnAt) > 24) render();
+}, 150); });
 function dmChart(rows) {
-  const W = 900, H = 440, x0 = 48, x1 = W - 200, y0 = H - 40, y1 = 16;
+  const W = dmDrawnAt = dmWidth(), H = 460, x0 = 48, x1 = W - 270, y0 = H - 40, y1 = 16;
   const pts = rows.filter(r => r.device && r.device.tok_s);
   const lines = rows.filter(r => !(r.device && r.device.tok_s));
   const xmax = Math.max(10, ...pts.map(r => r.device.tok_s)) * 1.12;
   const X = v => x0 + (v / xmax) * (x1 - x0), Y = v => y0 - v * (y0 - y1);
-  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', class: 'dmchart',
-    style: `min-width:${W}px`, role: 'img', 'data-dm-chart': '1',
+  const svg = el('svg:svg', { viewBox: `0 0 ${W} ${H}`, width: W, class: 'dmchart',
+    role: 'img', 'data-dm-chart': '1',
     'aria-label': 'composite score against decode speed on a device' });
   for (let k = 0; k <= 5; k++) {
     const v = k / 5;
@@ -10715,6 +10742,8 @@ function dmChart(rows) {
       'text-anchor': 'middle', transform: `rotate(-90 12 ${y1 + (y0 - y1) / 2})`,
       text: 'composite' }));
   // a row with no device speed: a dashed line at its composite, named at the right
+  // (ours by its setup: "phone build (k4-LDA) · MTP · thinking off")
+  const obst = [];
   const ly = dmSpread(lines.map(r => Y(r.composite.value) + 4));
   lines.forEach((r, i) => {
     const col = r.external ? 'var(--text-secondary)' : 'var(--accent)';
@@ -10724,26 +10753,42 @@ function dmChart(rows) {
         'data-dm-external': r.external ? '1' : null, 'data-tip': JSON.stringify(dmTip(r)),
         tabindex: 0 }),
       el('svg:text', { x: x1 + 6, y: ly[i], 'font-size': 11, fill: col,
-        text: midTrunc(r.name, 30) }));
+        'data-dm-line-label': r.id, text: midTrunc(r.external ? r.name : r.label, 42) }));
+    obst.push({ l: x0, r: x1, t: y - 2, b: y + 2, wt: 1 });
   });
-  // a row with one: a point with its whisker, named beside it where there is room
-  const boxes = [];
+  // a row with one: a point with its whisker, named where it covers least
   for (const r of pts) {
     const col = r.external ? 'var(--text-secondary)' : 'var(--accent)';
     const cx = X(r.device.tok_s), cy = Y(r.composite.value), ci = dmCi(r);
-    if (ci) svg.append(el('svg:line', { x1: cx, x2: cx, y1: Y(ci[0]), y2: Y(ci[1]),
-      stroke: col, 'stroke-width': 1.2, 'data-dm-whisker': r.id }));
+    if (ci) {
+      svg.append(el('svg:line', { x1: cx, x2: cx, y1: Y(ci[0]), y2: Y(ci[1]),
+        stroke: col, 'stroke-width': 1.2, 'data-dm-whisker': r.id }));
+      obst.push({ l: cx - 2, r: cx + 2, t: Y(ci[1]), b: Y(ci[0]), wt: 2 });
+    }
     svg.append(el('svg:circle', { cx, cy, r: 5, fill: col,
       stroke: 'var(--surface-1)', 'stroke-width': 1.2, tabindex: 0, 'data-dm-point': r.id,
       'data-dm-external': r.external ? '1' : null, 'data-tip': JSON.stringify(dmTip(r)) }));
-    boxes.push({ l: cx - 5, r: cx + 5, t: cy - 5, b: cy + 5 });
+    obst.push({ l: cx - 6, r: cx + 6, t: cy - 6, b: cy + 6, wt: 3 });
   }
-  for (const r of pts) {
+  // the most crowded first, while there is most room
+  const near = r => pts.filter(o => o !== r && Math.hypot(X(o.device.tok_s) - X(r.device.tok_s),
+    Y(o.composite.value) - Y(r.composite.value)) < 90).length;
+  const said = r => midTrunc(r.external ? r.name : `${r.label} · ${r.device.device}`, 64);
+  for (const r of [...pts].sort((a, b) => near(b) - near(a) || said(b).length - said(a).length)) {
     const col = r.external ? 'var(--text-secondary)' : 'var(--accent)';
-    const text = midTrunc(r.external ? r.name : `${r.name} · ${r.device.device}`, 32);
-    const at = dmPlace(boxes, X(r.device.tok_s), Y(r.composite.value), text);
+    const text = said(r);
+    const cx = X(r.device.tok_s), cy = Y(r.composite.value);
+    const at = dmPlace(obst, cx, cy, text, { l: x0 + 2, r: x1 - 2, t: y1, b: y0 - 2 });
+    // a leader from the circle's edge to the label's nearest; neither takes the pointer
+    if (at.ring) {
+      const lx = Math.max(at.bb.l, Math.min(cx, at.bb.r)), ly2 = Math.max(at.bb.t, Math.min(cy, at.bb.b));
+      const d = Math.hypot(lx - cx, ly2 - cy) || 1;
+      svg.append(el('svg:line', { x1: cx + 6 * (lx - cx) / d, y1: cy + 6 * (ly2 - cy) / d,
+        x2: lx, y2: ly2, stroke: col, 'stroke-width': 0.8, opacity: 0.6,
+        'pointer-events': 'none', 'data-dm-leader': r.id }));
+    }
     svg.append(el('svg:text', { x: at.x, y: at.y, 'text-anchor': at.anchor, 'font-size': 11,
-      fill: col, text }));
+      fill: col, 'pointer-events': 'none', 'data-dm-label': r.id, text }));
   }
   return svg;
 }
@@ -10842,7 +10887,9 @@ function dmTable(rows) {
       scope: 'col', text: h })))),
     el('tbody', {}, rows.map(r => el('tr', { 'data-dm-row': r.id,
         'data-dm-external': r.external ? '1' : null },
-      el('td', { 'data-dm-rank': r.id, text: r.rank || '' }),
+      el('td', { 'data-dm-rank': r.id, text: r.rank || (r.kind === 'cloud' ? '☁' : ''),
+        'data-tip': r.kind === 'cloud' ? JSON.stringify(['a cloud API: not ranked, as on '
+          + 'DeviceMark’s board']) : null }),
       el('td', {}, el('span', { text: r.name }), ' ',
         el('span', { class: 'badge', 'data-dm-whose': r.external ? 'theirs' : 'ours',
           'data-tip': JSON.stringify(dmTip(r)),
@@ -10903,7 +10950,8 @@ function lbOnDevice(ms) {
     hfade('dmtable', el('div', { class: 'lb-wrap', 'data-hkeep': 'dmtable' }, dmTable(rows))),
     editing ? dmDeviceForm(editing) : '',
     el('p', { class: 'lbcap', text: 'Ranks: a row is above another only when its interval is '
-      + 'wholly above the other’s; a shared rank is a tie (=). Composite ± half its 95% interval '
+      + 'wholly above the other’s; a shared rank is a tie (=); the cloud APIs aren’t ranked (☁), '
+      + 'as on DeviceMark’s board. Composite ± half its 95% interval '
       + '(an item bootstrap); each bench with Wilson’s. Retention: a phone build’s score over the '
       + 'original’s, per bench, on the same items with the same thinking mode and no lookahead — '
       + 'shown when both have run.' }),
