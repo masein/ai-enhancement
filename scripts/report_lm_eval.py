@@ -1070,6 +1070,9 @@ def load_everyday(out_dir: Path | None) -> dict | None:
         return None
     group_of = {q["id"]: q["group"] for q in qs}
     now = ev.version()
+    # 12p.1: without its hidden set the bank can't score it: each model's
+    # scores are shown as they were last marked, and nothing is marked again
+    paused = ev.hidden_status()["why"]
     # 12g.2: the split — the hidden half scores and is never shown; the page
     # gets the practice half's questions and answers, and the hidden counts
     half_of = {q["id"]: ev.half(q) for q in qs}
@@ -1085,7 +1088,9 @@ def load_everyday(out_dir: Path | None) -> dict | None:
             continue
         stamp = e.get("version") or {}
         ver = stamp.get("hash") or ""
-        if ver != now["hash"]:
+        # 12p.1: without the hidden set today's version can't be told: each
+        # model's marks stand as they were
+        if ver != now["hash"] and not paused:
             # as it was marked then: its questions may be gone or reworded —
             # or it was marked on all of them, before the split (12g.2)
             earlier[e["model"]] = {
@@ -1108,11 +1113,13 @@ def load_everyday(out_dir: Path | None) -> dict | None:
             # the published score: the hidden half's
             "passed": sum(1 for it in hidden if it.get("pass") is True), "total": len(hidden),
             "waiting": sum(1 for it in hidden if it.get("pass") is None),
+            **({"passed": e.get("passed", 0), "total": e.get("total", 0),
+                "waiting": e.get("waiting", 0)} if paused else {}),
             "marked_at": e.get("marked_at"), "settings": e.get("settings") or {},
             "provisional": bool((e.get("judge") or {}).get("provisional")),
             "version": ver,
             # 12a.4: answers whose thinking used the whole budget
-            "ran_out": sum(1 for it in hidden if it.get("no_answer")),
+            "ran_out": e.get("ran_out", 0) if paused else sum(1 for it in hidden if it.get("no_answer")),
             # 12a.5: "55 new questions · 333 re-marked", and the questions it
             # has not been asked yet
             "marking": ev.marking_line(e), "unasked": int(e.get("unasked") or 0),
@@ -1120,7 +1127,7 @@ def load_everyday(out_dir: Path | None) -> dict | None:
             # id, hidden ones counted
             "changed": [i for i in e.get("changed") or [] if half_of.get(i) == ev.PRACTICE],
             "changedHidden": sum(1 for i in e.get("changed") or [] if half_of.get(i) == ev.HIDDEN),
-            "groups": by_group(hidden),
+            "groups": e.get("groups") or {} if paused else by_group(hidden),
             # the practice half: its counts, and its answers — the only ones shown
             "practice": by_group(practice), "items": practice,
         }
@@ -1140,7 +1147,8 @@ def load_everyday(out_dir: Path | None) -> dict | None:
                           for i, q in enumerate(shown, 1)],
             "hidden": {g: c["hidden"] for g, c in counts.items()},
             "practice": {g: c["practice"] for g, c in counts.items()},
-            "version": now, "models": models, "earlier": earlier}
+            "version": now, "models": models, "earlier": earlier,
+            **({"paused": paused} if paused else {})}
 
 
 def parse_run(blob: dict, source: Path) -> dict:
@@ -4136,6 +4144,14 @@ input.gbox { margin:0 2px 0 0; vertical-align:-2px; }
 .evside-why { margin:4px 0; }
 .evdropped { color:var(--muted); margin:2px 0; }
 .evjudge pre.evthink-t { white-space:pre-wrap; font-size:var(--fs-1); }
+#alarms:empty { display:none; }
+.st-bad { color:var(--critical-text); }
+.st-warn { color:var(--warning-text); }
+.alarm { margin:10px 0; padding:10px 14px; border-radius:8px; border:1px solid var(--critical);
+  background:color-mix(in srgb, var(--critical) 12%, transparent); color:var(--critical-text);
+  overflow-wrap:anywhere; }
+.alarm code { font-family:var(--font-mono); font-size:var(--fs-1); color:var(--text); }
+.alarm button { margin-left:8px; }
 .audit-banner { margin-bottom:10px; }
 .grp-line { margin:0 0 6px; }
 .qeform { border:1px dashed var(--border); border-radius:8px; padding:10px; margin:8px 0; }
@@ -8219,6 +8235,42 @@ function qeForm(paint) {
           text: 'Undo', onclick: () => qeDo('undo', paint) })] : '')))) : '');
 }
 // Data & sources: every opening of a hidden half
+// 12p.1: what lives only on the data volume — Everyday's hidden set and the
+// exam's questions — where each is, and the backups
+const STORE_STATE = { store: 'on this server, as committed', repo: 'still in the repo, not moved yet',
+  unchecked: 'on this server; nothing committed to check it against',
+  changed: 'changed: not the set that was committed', missing: 'missing' };
+function storeCard() {
+  const S = state.store = state.store || { loaded: false };
+  if (!S.loaded && !S.loading && netReady()) {
+    S.loading = true;
+    api('api/store').then(j => { S.v = j; }).catch(() => { S.v = null; })
+      .finally(() => { S.loading = false; S.loaded = true; render(); });
+  }
+  const v = S.v, when = t => new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' ');
+  const line = (key, label, st) => el('li', { 'data-store': key, 'data-store-state': st.state,
+      class: st.ok ? '' : 'st-bad' },
+    `${label}: ${STORE_STATE[st.state] || st.state} · ${(st.count || 0).toLocaleString('en')} `
+      + 'questions' + (st.missing ? ` (${st.missing.toLocaleString('en')} missing)` : ''));
+  const b = v && v.backup;
+  return el('div', { class: 'card', 'data-store-card': S.loaded ? '1' : 'loading' },
+    el('h2', { text: 'The questions only this server holds' }),
+    el('p', { class: 'sub', text: 'Everyday’s hidden set and the exam’s questions live on the data '
+      + 'volume, not in the repo, which is public; the repo keeps what they should be. They are '
+      + 'backed up once a day to another disk.' }),
+    !S.loaded ? skeleton(2) : !(v && v.hidden && v.exam && v.backup)
+      ? el('p', { class: 'small', text: 'Not available.' })
+      : el('ul', { class: 'small' },
+        line('hidden', 'Everyday’s hidden set', v.hidden),
+        line('exam', 'The exam’s report half', v.exam),
+        el('li', { 'data-store': 'backup', class: v.backup_error ? 'st-bad'
+            : v.backup_stale ? 'st-warn' : '' },
+          (b.at ? `Backups: ${b.kept} in ${b.dir}, the newest ${when(b.at)} UTC`
+            : `Backups: none yet in ${b.dir}`)
+          + (v.backup_error ? ` · the last one failed: ${v.backup_error}` : '')
+          + (v.export_key ? ' · an encrypted export can be made' : ' · no key for an encrypted '
+            + 'export yet'))));
+}
 function auditsCard() {
   if (!LIVE) return '';
   const A = state.audits = state.audits || { loaded: false };
@@ -13496,7 +13548,7 @@ function vRuns(ms) {
       el('button', { onclick: exportCsv, text: 'Download CSV' }),
       el('button', { onclick: exportJson, text: 'Download JSON' }))));
   // 12n.1: every opening of an Everyday group's hidden half
-  if (LIVE) frag.push(auditsCard());
+  if (LIVE) frag.push(storeCard(), auditsCard());
   return frag;
 }
 
@@ -20541,6 +20593,7 @@ function render() {
   // DOM of a tab that just got torn down — the mounted tab re-registers its own
   state.trRedraw = state.queueRedraw = null;
   renderWarnings();                 // one line, in the bar, on every tab
+  renderAlarms();                   // 12p.1: and in red, a set that is missing or changed
   const ms = visible();
   renderTabs();
   const view = document.getElementById('view');
@@ -20969,6 +21022,25 @@ function showMe(show) {
   navigate({ tab: show.tab, model: null, topic: null });
 }
 
+// 12p.1: Everyday's hidden set or the exam's report half missing or changed —
+// red, on every page, with the command that restores it
+let _alarmSig = null;
+function renderAlarms() {
+  const box = document.getElementById('alarms');
+  if (!box || !DATA) return;
+  const as = DATA.alarms || [];
+  const sig = JSON.stringify(as);
+  if (sig === _alarmSig) return;
+  _alarmSig = sig;
+  box.replaceChildren(...as.map(a => el('div', { class: 'alarm', role: 'alert',
+      'data-alarm': a.key },
+    el('b', { text: a.text }), ' · ',
+    el('code', { 'data-alarm-command': a.key, text: a.command }),
+    el('button', { class: 'quiet', type: 'button', text: 'Copy', onclick: e => {
+      try { navigator.clipboard.writeText(a.command); e.target.textContent = 'Copied'; }
+      catch (x) { /* select it by hand */ }
+    } }))));
+}
 function renderWarnings() {
   const box = document.getElementById('warnings');
   if (!box || !DATA) return;
@@ -21340,6 +21412,7 @@ TEMPLATE = """<!doctype html>
 </header>
 <div class="wrap">
 __BANNER__
+  <div id="alarms"></div>
   <div id="netstatus"></div>
   <div class="meta-chips" id="metaChips"></div>
   <div id="view"></div>

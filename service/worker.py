@@ -12,7 +12,7 @@ import threading
 import time
 import traceback
 
-from . import db, gguf, reported
+from . import db, gguf, hidden_store, reported
 from .runner import run_submission
 
 POLL_S = 3
@@ -40,6 +40,15 @@ def _idle() -> None:
     # 12m.2: the day's reported scores, in a thread of their own
     try:
         reported.daily()
+    except Exception:                               # noqa: BLE001 — the queue goes on
+        traceback.print_exc()
+    _backup()
+
+
+def _backup() -> None:
+    # 12p.1: what lives only on the data volume, backed up once a day
+    try:
+        hidden_store.daily()
     except Exception:                               # noqa: BLE001 — the queue goes on
         traceback.print_exc()
 
@@ -74,6 +83,7 @@ def loop_remote() -> None:
     never waits behind one. The judge they call is any run's"""
     while not _stop.is_set():
         if not once(remote=True):
+            _backup()                               # a long GPU queue never idles the other lane
             _stop.wait(POLL_S)
 
 

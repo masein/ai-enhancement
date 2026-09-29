@@ -188,7 +188,8 @@ def test_every_question_carries_the_pin_and_a_changed_pin_stops_the_next_run(svc
     assert len(fake.requests) == len(items)
     for body in fake.requests:
         assert body["model"] == LUNA
-        assert body["provider"] == {"order": ["openai"], "allow_fallbacks": False}
+        assert body["provider"] == {"order": ["openai"], "allow_fallbacks": False,
+                                    "data_collection": "deny"}      # 12p.1
         assert body["usage"] == {"include": True}
         assert "chat_template_kwargs" not in body         # OpenRouter has no template switch
         assert body["max_tokens"] == config.REASONING_MAX_GEN_TOKS    # it thinks
@@ -465,7 +466,8 @@ def test_the_generative_three_are_metered_through_the_relay(svc, fake, monkeypat
     assert len(fake.requests) == 12
     for body in fake.requests:
         assert body["model"] == PLAIN
-        assert body["provider"] == {"order": ["mistral"], "allow_fallbacks": False}
+        assert body["provider"] == {"order": ["mistral"], "allow_fallbacks": False,
+                                    "data_collection": "deny"}      # 12p.1
         assert body["usage"] == {"include": True}
     assert set(fake.auth) == {f"Bearer {KEY}"}
     for s in seen:

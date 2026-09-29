@@ -842,6 +842,14 @@ def run_submission(sub: dict) -> None:
     if why:
         db.update(sid, status="failed", finished_at=time.time(), error=why)
         return
+    # 12p.1: nor an Everyday run without its hidden set — in the red banner's words
+    if everyday:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+        import everyday as _everyday
+        why = _everyday.hidden_status()["why"]
+        if why:
+            db.update(sid, status="failed", finished_at=time.time(), error=why)
+            return
 
     # 12f.1: a model served elsewhere — asked over its server, never loaded here
     srv = _served.is_served(sub["hf_id"])

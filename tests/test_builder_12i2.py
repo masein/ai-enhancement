@@ -441,7 +441,8 @@ def test_a_writer_chosen_for_this_batch_is_pinned_and_its_spend_counted(svc, mon
     assert d["writer"]["id"] == "z-ai/glm-5.3-20260816"
     assert d["progress"]["written"] == 10 and not any(it["auto"] for it in d["items"])
     assert [(c["model"], c["provider"]) for c in fake.chat] == \
-        [("z-ai/glm-5.3", {"order": ["inference-net"], "allow_fallbacks": False})]
+        [("z-ai/glm-5.3", {"order": ["inference-net"], "allow_fallbacks": False,
+                            "data_collection": "deny"})]
     assert db.spend_this_month_by_job() == {"writer": pytest.approx(0.001)}
     # the AI models page's own choice for the job is untouched
     from service import ai_models

@@ -1059,8 +1059,8 @@ class OpenRouterChat(LocalOpenAI):
         body = {"model": self.model, "max_tokens": min(int(row["max_tokens"]), self.max_tokens),
                 "messages": ([{"role": "system", "content": row["system"]}] if row["system"] else [])
                 + [{"role": "user", "content": row["user"]}],
-                "provider": {"order": [self.pin.get("provider")] if self.pin.get("provider")
-                             else [], "allow_fallbacks": False},
+                # 12p.1: and never a provider that may store or train on the prompt
+                "provider": ai_models.provider_prefs(self.pin.get("provider")),
                 "usage": {"include": True}}
         if row.get("json"):
             body["response_format"] = {"type": "json_object"}

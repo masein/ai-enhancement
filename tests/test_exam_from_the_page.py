@@ -79,9 +79,14 @@ def test_the_preview_withholds_a_report_half_prompt(svc):
     for it in ITEMS:
         if eb.half_of(eb.qid_of(it["prompt"])) == "report":
             assert it["prompt"] not in body
-    # the metadata line still shows, for every half: it is the ground truth
-    assert all(it["reference"].startswith("Acuity: ") for it in p["items"])
-    assert all(it["meta"]["acuity"] for it in p["items"])
+    # the metadata line shows for the diagnose half; 12p.1: a report-half row's
+    # reference and meta are withheld with its prompt, as public_bank withholds
+    # them — a bank's meta.intent can describe its question in a sentence. The
+    # counts by acuity and intent stay, over both halves
+    assert all(it["reference"].startswith("Acuity: ") for it in diagnose_rows)
+    assert all(it["meta"]["acuity"] for it in diagnose_rows)
+    assert all(it["reference"] is None and it["meta"] is None for it in report_rows)
+    assert sum(p["acuity"].values()) == 100
 
 
 def test_commit_writes_the_same_records_as_the_cli(svc, tmp_path):

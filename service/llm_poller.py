@@ -444,6 +444,10 @@ def tick() -> int:
             elif r["kind"] == "qb":
                 builder.finish(r["batch_id"], results)
             db.batch_finish(r["batch_id"], "done", "")
+        except _everyday.HiddenMissing as e:
+            # 12p.1: the judge's verdicts wait, pending, until the hidden set is back
+            print(f"[llm] {r['batch_id']}: {e} — kept until it is")
+            continue
         except Exception as e:                       # noqa: BLE001 — one batch must not kill the loop
             traceback.print_exc()
             db.batch_finish(r["batch_id"], "failed", repr(e)[:400])

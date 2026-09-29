@@ -436,6 +436,10 @@ def submit(s: SubmissionIn, x_token: str = Header(default="")):
     why = disk.blocks_run()                  # 12f.0: a run can't save to a full disk
     if why:
         raise HTTPException(409, why)
+    if s.suite == "everyday":
+        why = _everyday_paused()             # 12p.1: not without its hidden set
+        if why:
+            raise HTTPException(409, why + ". Nothing was queued.")
     hf_id = s.hf_id.strip()
     if not _HF_ID_RE.match(hf_id):
         raise HTTPException(422, "model id must look like org/name — a Hugging Face repo "
@@ -1249,6 +1253,10 @@ def results():
     if d:
         payload = {**payload, "checks": [d, *(payload.get("checks") or [])],
                    "warnings": [d["text"], *(payload.get("warnings") or [])]}
+    # 12p.1: a set that lives only on the data volume, missing or changed — asked
+    # on every request, never cached with the scores
+    from . import hidden_store
+    payload = {**payload, "alarms": hidden_store.alarms()}
     return JSONResponse(payload)
 
 
@@ -2057,13 +2065,14 @@ def _import_preview(plan: dict) -> dict:
     for rec, what in ([(r, "new") for r in plan["records"]]
                       + [(r, "updated") for r in plan["updates"]]):
         half = exam_build.half_of(rec["qid"])
-        row = {"qid": rec["qid"], "half": half, "meta": rec["meta"],
-               "reference": rec["reference"], "change": what}
+        row = {"qid": rec["qid"], "half": half, "change": what}
         if half == "diagnose":
-            row["prompt"] = rec["prompt"]
+            row.update(prompt=rec["prompt"], meta=rec["meta"], reference=rec["reference"])
         else:
-            row["prompt"] = None
-            row["withheld"] = "report half — never shown, never exported"
+            # 12p.1: its reference and its meta too — `meta.intent` says what the
+            # question asks, in a sentence of its own — as public_bank withholds them
+            row.update(prompt=None, meta=None, reference=None,
+                       withheld="report half — never shown, never exported")
         shown.append(row)
     return ({k: v for k, v in plan.items() if k not in ("records", "updates")}
             | {"items": shown})
@@ -2953,6 +2962,12 @@ AUDIT_WARNING = ("These questions are the test. Don’t train on them or write q
                  "them. This opening is logged.")
 
 
+def _everyday_paused() -> str:
+    """12p.1: '' when Everyday may run and be scored; else the banner's words"""
+    import everyday as ev
+    return ev.hidden_status()["why"]
+
+
 def _is_owner(by: str) -> bool:
     return config.is_owner(by)
 
@@ -3092,6 +3107,14 @@ def evd_audit(a: AuditIn, x_token: str = Header(default="")):
             "questions": [{**_evq_view(ev, q), "describe": [ev.describe(c) for c in q["checks"]]}
                           for q in qs],
             "answers": answers, "changed": changed}
+
+
+@app.get("/api/store")
+def store_status():
+    """12p.1: where Everyday's hidden set and the exam's report half are, and
+    the backups — counts and states, never a question"""
+    from . import hidden_store
+    return hidden_store.overview()
 
 
 @app.get("/api/everyday/audits")

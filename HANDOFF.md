@@ -4077,6 +4077,58 @@ answers failed, some two thirds of them wrongly.
   wrote stays theirs, scored as before. This round's before is
   `everyday_before_12a8.json`.
 
+### 12p.1 — the hidden half on the data volume, kept and checked
+
+- **Where the questions that are the test live.** Everyday's hidden set moves
+  from `eval_tasks/everyday/bank.jsonl` (public, on the mirror) to
+  `BENCH_ROOT/everyday/hidden.jsonl`, beside `built.jsonl` and `edits.jsonl`:
+  the same rows, each marked `"half": "report"`, so the bank's version and
+  every score are unchanged. The exam's questions were on the volume already
+  (`EXAM_DIR/bank`). Once, after deploying 12p.1:
+  `python -m service.hidden_store move` (it refuses if the repo's set isn't the
+  committed one, or if the bank's version would change, and backs up after).
+  12p.2 then takes the hidden half out of the repo.
+- **What each should be is committed**: `eval_tasks/everyday/hidden_manifest.json`
+  (count, per group, and the digest of its rows) and
+  `eval_tasks/fr/report_manifest.json` (the report half's qids, public already).
+- **Missing or changed, the server still starts.** Every page shows a red
+  banner ("Everyday's hidden set is missing or changed: restore it · <command>"),
+  and only Everyday runs (refused at the queue, and a queued one fails before
+  any GPU) and Everyday scoring (`everyday.mark` raises `HiddenMissing`; the
+  judge's batches stay pending) stop. The Everyday numbers shown are each
+  model's as last marked. Data & sources says where each set is and the
+  backups.
+- **Backups**, once a day by the worker when idle, to `BACKUP_DIR`
+  (`/data-03/evalboard-backups`, the second disk, mounted into the container):
+  one `.tar.gz` of `everyday/` (hidden, built, edits, retired, groups),
+  `exam/bank/` and `rubrics/`, with each file's sha256 in `MANIFEST.json`;
+  `BACKUP_KEEP` (14) kept. By hand: `python -m service.hidden_store backup`.
+- **An encrypted export to copy off the server**: on your own machine,
+  `age-keygen -o ~/evalboard-backup.key` once, and put the public key it
+  prints (`age1…`) in `.env` as `EVALBOARD_BACKUP_AGE_RECIPIENT`. Then
+  `python -m service.hidden_store backup --export` writes
+  `BACKUP_DIR/evalboard-store-<time>.tar.gz.age`, encrypted to that key — the
+  server can make it and never open it. Copy it off (`scp`), and keep the key
+  file somewhere else again.
+- **Restore**: `python -m service.hidden_store restore` puts back Everyday's
+  hidden set from the newest backup that holds the committed one (the file
+  there now kept beside it), and adds any exam question missing from the
+  store — never over one there now. From an export: `age -d -i
+  ~/evalboard-backup.key X.tar.gz.age > X.tar.gz` on your machine, copy
+  `X.tar.gz` to the server, `restore /path/X.tar.gz`. `restore --all` puts back
+  every file, the ones there now moved to `BENCH_ROOT/restore-before-<time>`.
+  `status` prints both sets' state and the backups.
+- **OpenRouter never gets a provider that may store or train on prompts.**
+  Every request carries `provider.data_collection: "deny"`, set in one place,
+  `provider_prefs()` in `service/ai_models.py` (the jobs, models tested
+  through OpenRouter, the embeddings). A model is pinned to the first provider
+  that takes such a request (a one-token question when it is chosen); one
+  whose every provider refuses can't be chosen. The account-wide switch at
+  openrouter.ai/settings/privacy is the same rule: turn it on too.
+- The exam's import preview withheld a report-half question's prompt but not
+  its reference or `meta` (whose `intent` describes the question); it
+  withholds all three now, as `public_bank` does.
+
 ### 12o.1 — every column's width and place, and what the live check of #103/#104 found
 
 - **Columns** (the Models table on every chip, the Knowledge exam's included,

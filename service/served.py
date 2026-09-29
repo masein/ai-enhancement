@@ -110,7 +110,8 @@ def _pinned_route(rec: dict) -> dict:
     """what every request to a model from OpenRouter carries, as the judge's
     do: its pinned provider with no fallbacks, and the usage (with the cost)
     in the reply"""
-    return {"provider": {"order": [rec["pin"]["provider"]], "allow_fallbacks": False},
+    from . import ai_models
+    return {"provider": ai_models.provider_prefs(rec["pin"]["provider"]),
             "usage": {"include": True}}
 
 

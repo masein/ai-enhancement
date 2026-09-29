@@ -172,6 +172,38 @@ def providers(model_id: str) -> list[dict] | None:
     return out
 
 
+# 12p.1: every request to OpenRouter excludes the providers that may store or
+# train on prompts — our prompts are the test. Set here, on each request
+# (`provider.data_collection: "deny"`); the account-wide switch at
+# openrouter.ai/settings/privacy is the same rule, and worth turning on too
+DATA_COLLECTION = "deny"
+
+
+def provider_prefs(provider: str | None = None) -> dict:
+    """what every request to OpenRouter carries: the pinned provider with no
+    fallbacks, and none that may train on the prompt"""
+    return {**({"order": [provider], "allow_fallbacks": False} if provider else {}),
+            "data_collection": DATA_COLLECTION}
+
+
+PROBE = "ping"
+
+
+def accepts_prompts_kept_private(model_id: str, prov: dict) -> bool:
+    """12p.1: the provider takes a request that may not be stored or trained
+    on — one token, asked when a model is pinned"""
+    from . import llm
+    body = {"model": model_id, "max_tokens": 1,
+            "messages": [{"role": "user", "content": PROBE}],
+            "provider": provider_prefs(prov.get("tag") or prov.get("name"))}
+    try:
+        status, _ = llm._http("POST", config.OPENROUTER_BASE_URL + "/chat/completions", _headers(),
+                              json.dumps(body).encode(), timeout=30)
+    except Exception:                               # noqa: BLE001 — refused, or down: not this one
+        return False
+    return status == 200
+
+
 def first_provider(model_id: str) -> dict | None:
     """The first provider OpenRouter lists for the model — the one pinned:
     {name, tag, precision, price_in, price_out}. Never one that is down"""
@@ -294,9 +326,14 @@ def pin(model_id: str) -> dict:
     m = model(model_id)
     if not m:
         raise ValueError(f"{model_id} is not one of OpenRouter's text models")
-    prov = first_provider(model_id)
-    if not prov:
+    up = [{k: v for k, v in p.items() if k != "up"} for p in providers(model_id) or [] if p["up"]]
+    if not up:
         raise ValueError(f"OpenRouter lists no provider running {model_id} now")
+    # 12p.1: the first that takes a prompt it may not store or train on
+    prov = next((p for p in up if accepts_prompts_kept_private(m["id"], p)), None)
+    if not prov:
+        raise ValueError(f"every provider running {model_id} may store or train on prompts: "
+                         "choose another model")
     return {"kind": "openrouter", "id": m["id"], "version": m["version"],
             "name": m["name"], "provider": prov["tag"] or prov["name"],
             "provider_name": prov["name"], "precision": prov["precision"],
@@ -369,7 +406,9 @@ def embed(texts: list[str], job: str = "writer") -> list[list[float]] | None:
         try:
             status, raw = llm._http("POST", config.OPENROUTER_BASE_URL + "/embeddings", _headers(),
                                     json.dumps({"model": config.OPENROUTER_EMBED_MODEL,
-                                                "input": chunk}).encode(), timeout=60)
+                                                "input": chunk,
+                                                "provider": provider_prefs()}).encode(),
+                                    timeout=60)
             got = json.loads(raw)
         except Exception:                           # noqa: BLE001 — the 13-gram check stands
             return None

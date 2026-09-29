@@ -50,6 +50,7 @@ class FakeServer:
         self.stop_after: int | None = None      # answers, then it stops answering
         self.delay_s = 0.0
         self.requests: list[dict] = []           # every chat body, as sent
+        self.probes: list[dict] = []             # 12p.1: a pin's one-token question, apart
         self.auth: list[str] = []                # every Authorization header seen
         self.answered = 0
         self.in_flight = 0
@@ -103,6 +104,13 @@ class FakeServer:
             no = refused(request)
             if no:
                 return no
+            if body.get("max_tokens") == 1 and (body.get("messages") or [{}])[-1].get(
+                    "content") == "ping":
+                # 12p.1: asked when a model from OpenRouter is pinned, not by a run
+                self.probes.append(body)
+                return {"choices": [{"index": 0, "message": {"role": "assistant", "content": "p"},
+                                     "finish_reason": "length"}],
+                        "usage": {"prompt_tokens": 1, "completion_tokens": 1, "cost": 0.0}}
             with self._lock:
                 if self.stop_after is not None and self.answered >= self.stop_after:
                     return JSONResponse({"error": {"message": "unavailable"}}, status_code=503)

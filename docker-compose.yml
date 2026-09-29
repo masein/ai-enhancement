@@ -90,9 +90,16 @@ services:
       LOCAL_CONCURRENCY: ${LOCAL_CONCURRENCY:-2}
       LOCAL_MAX_TOKENS: ${LOCAL_MAX_TOKENS:-1024}
       LOCAL_TIMEOUT_S: ${LOCAL_TIMEOUT_S:-180}
+      # 12p.1: backups of what lives only on the data volume (Everyday's hidden
+      # set, the exam's questions), on the server's second disk; and the age
+      # PUBLIC key an encrypted export is made for — the private key stays on
+      # your own machine
+      BACKUP_DIR: ${BACKUP_DIR:-/data-03/evalboard-backups}
+      EVALBOARD_BACKUP_AGE_RECIPIENT: ${EVALBOARD_BACKUP_AGE_RECIPIENT:-}
     volumes:
       - ${BENCH_ROOT}:${BENCH_ROOT}
       - ${HF_HOME}:${HF_HOME}
+      - ${BACKUP_DIR:-/data-03/evalboard-backups}:${BACKUP_DIR:-/data-03/evalboard-backups}
     ports:
       - "${BIND}:8899:8899"
     deploy:

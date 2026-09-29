@@ -1,0 +1,14 @@
+{
+ "what": "Everyday's hidden set: how many questions, per group, and the digest of its rows (in id order). The set itself lives on the server's data volume (BENCH_ROOT/everyday/hidden.jsonl), never in the repo.",
+ "count": 179,
+ "groups": {
+  "understanding": 27,
+  "writing": 24,
+  "summarising": 31,
+  "transform": 25,
+  "quick_maths": 24,
+  "instructions": 24,
+  "honesty": 24
+ },
+ "digest": "6b9ec5a6ba9b70cfbc33316a5349ce0f5798b28243b8cad3bc8cc461c0f9d674"
+}
