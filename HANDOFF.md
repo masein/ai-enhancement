@@ -4103,21 +4103,38 @@ answers failed, some two thirds of them wrongly.
   one `.tar.gz` of `everyday/` (hidden, built, edits, retired, groups),
   `exam/bank/` and `rubrics/`, with each file's sha256 in `MANIFEST.json`;
   `BACKUP_KEEP` (14) kept. By hand: `python -m service.hidden_store backup`.
-- **An encrypted export to copy off the server**: on your own machine,
-  `age-keygen -o ~/evalboard-backup.key` once, and put the public key it
-  prints (`age1…`) in `.env` as `EVALBOARD_BACKUP_AGE_RECIPIENT`. Then
-  `python -m service.hidden_store backup --export` writes
-  `BACKUP_DIR/evalboard-store-<time>.tar.gz.age`, encrypted to that key — the
-  server can make it and never open it. Copy it off (`scp`), and keep the key
-  file somewhere else again.
+- **An encrypted export to copy off the server** (12p.1b: pyrage, in the
+  image). The server holds only the age *public* key; the private key never
+  touches it.
+  1. **The key pair, once, on your Mac**: `brew install age`, then
+     `age-keygen -o ~/evalboard-backup.key`. It prints `Public key: age1…`.
+  2. **The private key lives in your password manager**: open the file, copy
+     its whole contents (the `AGE-SECRET-KEY-1…` line and the comments above
+     it) into a secure note there, then delete the file (`rm
+     ~/evalboard-backup.key`). Lose it and no export can be opened.
+  3. **The public key goes in the server's `.env`** as
+     `EVALBOARD_BACKUP_AGE_RECIPIENT=age1…`, then `docker compose up -d` so the
+     container has it. A private key put there by mistake is refused, never
+     echoed; with no key, `--export` refuses in one line.
+  4. **Export and copy off**:
+     `sudo docker compose exec -T bench python -m service.hidden_store backup --export`
+     writes `BACKUP_DIR/evalboard-store-<time>.tar.gz.age`; from the Mac,
+     `scp <server>:/data-03/evalboard-backups/evalboard-store-<time>.tar.gz.age ~/Backups/`.
+  5. **Decrypt, on the Mac**, the key straight from the clipboard and never on
+     disk: copy the secure note, then
+     `age -d -i <(pbpaste) evalboard-store-<time>.tar.gz.age > evalboard-store-<time>.tar.gz`,
+     and clear the clipboard. `tar -tzf` lists it; its `MANIFEST.json` has each
+     file's sha256.
 - **Restore**: `python -m service.hidden_store restore` puts back Everyday's
-  hidden set from the newest backup that holds the committed one (the file
-  there now kept beside it), and adds any exam question missing from the
-  store — never over one there now. From an export: `age -d -i
-  ~/evalboard-backup.key X.tar.gz.age > X.tar.gz` on your machine, copy
-  `X.tar.gz` to the server, `restore /path/X.tar.gz`. `restore --all` puts back
-  every file, the ones there now moved to `BENCH_ROOT/restore-before-<time>`.
-  `status` prints both sets' state and the backups.
+  hidden set from the newest backup in `BACKUP_DIR` that holds the committed
+  one (the file there now kept beside it), and adds any exam question missing
+  from the store — never over one there now. From an export: decrypt it as
+  above, `scp evalboard-store-<time>.tar.gz <server>:/data-03/evalboard-backups/`,
+  then `sudo docker compose exec -T bench python -m service.hidden_store restore
+  /data-03/evalboard-backups/evalboard-store-<time>.tar.gz`. `restore --all`
+  puts back every file, the ones there now moved to
+  `BENCH_ROOT/restore-before-<time>`. `status` prints both sets' state and the
+  backups.
 - **OpenRouter never gets a provider that may store or train on prompts.**
   Every request carries `provider.data_collection: "deny"`, set in one place,
   `provider_prefs()` in `service/ai_models.py` (the jobs, models tested

@@ -31,3 +31,6 @@ huggingface_hub
 fastapi
 uvicorn[standard]
 tzdata                # zoneinfo data for TZ-aware timestamps in containers
+# 12p.1: `hidden_store backup --export` — one file encrypted to an age public
+# key, in-process; decrypted off the server with the standard `age` tool
+pyrage==1.4.0
