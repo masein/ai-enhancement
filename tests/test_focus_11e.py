@@ -29,15 +29,19 @@ TASK = "exam_economics"
 MODEL = "fx/good-750m"
 
 # the brief's tables, as the banks were delivered
+# 12p.2: counted on the repo's banks — each topic's diagnose half. The server's
+# whole banks split 18 by area and 19 by concept; with half the labels, two of
+# the concept topics (chemistry, medicine) read as areas
 BY_AREA_AS_WRITTEN = {"ai_machine_learning": 6, "finance_accounting": 9, "physics_astronomy": 12,
-                      "food_veterinary_sciences": 16, "mathematics_statistics": 18,
-                      "earth_environmental_sciences": 21, "general_multidisciplinary": 22,
-                      "agriculture": 25}
-BY_AREA_GROUPED = {"architecture_built_environment": (86, 7), "design": (97, 11),
-                   "education": (100, 11), "ethics_religion": (95, 8),
-                   "history_archaeology": (97, 11), "law": (52, 8),
-                   "manufacturing_applied_sciences": (88, 10), "media_communication": (100, 10),
-                   "philosophy": (81, 9), "political_science_international_relations": (100, 9)}
+                      "food_veterinary_sciences": 13, "mathematics_statistics": 17,
+                      "earth_environmental_sciences": 21, "general_multidisciplinary": 21,
+                      "agriculture": 25, "chemistry_materials_science": 25}
+BY_AREA_GROUPED = {"architecture_built_environment": (50, 7), "design": (47, 11),
+                   "education": (51, 11), "ethics_religion": (54, 8),
+                   "history_archaeology": (37, 11), "law": (31, 8),
+                   "manufacturing_applied_sciences": (44, 10), "media_communication": (50, 10),
+                   "medicine_clinical_health": (42, 22),
+                   "philosophy": (48, 9), "political_science_international_relations": (55, 9)}
 
 
 @pytest.fixture
@@ -134,7 +138,7 @@ def test_the_37_real_banks_split_18_by_area_and_19_by_concept():
             assert len({key(x) for x in distinct}) == g, slug               # by prefix
         else:
             assert mode == "concept", slug
-    assert modes == {"area": 18, "concept": 19}
+    assert modes == {"area": 20, "concept": 17}                # 12p.2: the diagnose halves
 
 
 def test_a_long_label_sends_its_group_and_a_hopeless_one_is_skipped():

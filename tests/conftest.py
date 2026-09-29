@@ -28,21 +28,10 @@ import make_fixture  # noqa: E402
 # 12p.2: the hidden half is not in the repo. Every test sits an invented one
 # (tests/fixtures/everyday_hidden_invented.jsonl, checked against its own
 # manifest), under whichever BENCH_ROOT it runs with — never the server's
-import shutil  # noqa: E402
 import tempfile  # noqa: E402
 
+from make_fixture import HIDDEN_FIXTURE, HIDDEN_FIXTURE_MANIFEST, sit_hidden  # noqa: E402,F401
 from service import config as _config  # noqa: E402
-
-HIDDEN_FIXTURE = ROOT / "tests" / "fixtures" / "everyday_hidden_invented.jsonl"
-HIDDEN_FIXTURE_MANIFEST = ROOT / "tests" / "fixtures" / "everyday_hidden_invented.manifest.json"
-
-
-def sit_hidden(root: Path) -> Path:
-    """the invented hidden set where the bank reads it with `root` as BENCH_ROOT"""
-    d = Path(root) / "everyday"
-    d.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(HIDDEN_FIXTURE, d / "hidden.jsonl")
-    return d / "hidden.jsonl"
 
 
 def hidden_env(root: Path) -> dict:

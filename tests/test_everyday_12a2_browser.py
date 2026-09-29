@@ -44,9 +44,9 @@ def test_the_results_are_groups_by_models_n_of_k(live, page):
               for th in page.locator("[data-everyday-table] th[data-evd-model]").all()]
     assert models == ["fx/good-750m", "fx/skewed-360m"]
     # 12g.2: the hidden half's score
-    assert page.locator("[data-evd-count='fx/good-750m']").inner_text() == "178 of 179"
+    assert page.locator("[data-evd-count='fx/good-750m']").inner_text() == "149 of 149"
     # k is the group's hidden half
-    assert page.locator("[data-evd-cell='fx/good-750m|quick_maths']").inner_text() == "23 of 24"
+    assert page.locator("[data-evd-cell='fx/good-750m|quick_maths']").inner_text() == "21 of 21"
     # 12a.4: one that sat the pilot only answered an earlier wording: not here
     assert page.locator("[data-evd-count='fx/chance-160m']").count() == 0
     # one badge, and the one action
@@ -80,7 +80,7 @@ def test_a_cell_opens_that_models_answers_in_that_group(live, page):
     # 12g.2: its one miss here is a hidden question — counted, never a row
     assert page.locator("[data-evd-row='everyday-maths-01']").count() == 0
     assert page.locator("[data-evd-split-note='quick_maths']").inner_text().endswith(
-        "The 24 hidden ones score it and are not shown.")
+        "The 21 hidden ones score it and are not shown.")
     page.locator("[data-evd-cell='fx/good-750m|quick_maths']").click()
     assert page.locator("[data-evd-panel]").count() == 0
     assert page.errors == []
@@ -111,13 +111,13 @@ def test_the_model_page_block_is_the_seven_groups(live, page):
     block = page.locator("[data-everyday-block='fx/good-750m']")
     assert [b.get_attribute("data-evd-group") for b in block.locator("[data-evd-group]").all()] == KEYS
     # 12g.2: the hidden half's count, and the practice half's answers
-    assert block.locator("[data-evd-group-count='honesty']").inner_text() == "24 of 24"
+    assert block.locator("[data-evd-group-count='honesty']").inner_text() == "21 of 21"
     block.locator("[data-evd-group='honesty']").click()
     rows = page.locator("[data-evd-answers='fx/good-750m|honesty'] [data-evd-row]")
     rows.first.wait_for()
     assert rows.count() == 27
     assert page.locator("[data-kind-tile='everyday'] [data-kind-value='everyday']").inner_text() == \
-        "178 of 179"
+        "149 of 149"
     # 12a.4: a model that sat the pilot answered an earlier wording — no
     # block, and its header says where the answers are
     page.goto(live["base"] + "/#model=fx%2Fbelow-135m-it")
@@ -137,8 +137,8 @@ def test_models_everyday_is_a_column_per_group_and_the_total(live, page):
     assert [h.lower() for h in heads[1:-1]] == [g.lower() for g in GROUPS]
     assert heads[-1].lower() == "total"
     row = t.locator("tr[data-lb-row='fx/good-750m']")
-    assert row.locator("[data-evd-g='writing']").inner_text() == "24 of 24"      # 12g.2
-    assert row.locator("[data-everyday-count]").inner_text() == "178 of 179"
+    assert row.locator("[data-evd-g='writing']").inner_text() == "21 of 21"      # 12g.2
+    assert row.locator("[data-everyday-count]").inner_text() == "149 of 149"
     assert page.locator("[data-lb-card] [data-pilot-badge]").count() == 1
     assert page.errors == []
 
@@ -149,13 +149,13 @@ def test_run_everyday_tasks_and_the_suite_say_340(live, page):
     dlg = page.locator("[data-dialog='everyday']")
     dlg.wait_for()
     assert dlg.locator("h2").inner_text() == "Run everyday tasks"
-    # 12a.5: a run asks what the model has no answer to — all 340 the first time (12a.6)
-    assert "all 340 the first time" in dlg.inner_text()
+    # 12a.5: a run asks what the model has no answer to — all 310 the first time (12p.2: the tests' bank)
+    assert "all 310 the first time" in dlg.inner_text()
     page.keyboard.press("Escape")
     page.locator("header [data-test-model]").click()
     page.get_by_label("suite").click()
     opt = page.locator("#pop-sel-submit-suite [role=option][data-value='everyday']")
-    assert opt.inner_text() == "Everyday tasks — 340 questions, a few minutes"
+    assert opt.inner_text() == "Everyday tasks — 310 questions, a few minutes"
     page.keyboard.press("Escape")
     assert page.errors == []
 

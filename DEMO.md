@@ -123,7 +123,11 @@ difficulty beside it), and the step prints the report/diagnose split, the
 per-acuity counts and where the topic stands against the 30-question floor.
 Every bank clears it — about 50 report-half questions each — so the step says
 so rather than asking for more. The run needs **no exam writer** configured
-— nobody is drafting anything.
+— nobody is drafting anything. Since 12p.2 the repo's banks hold each topic's
+diagnose half only (the report half lives on the server, in `EXAM_DIR/bank`,
+and `eval_tasks/fr/report_manifest.json` holds its qids), so a bank imported
+from the repo into the demo has no report half, and the step says it is under
+the floor.
 
 Step 6 differs by topic, because the criteria file does: a topic whose items
 carry several acuities is tabled by acuity (emergency → critical → urgent →

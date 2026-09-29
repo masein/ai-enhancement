@@ -21,7 +21,7 @@ REPO = Path(__file__).resolve().parents[1]
 BRIEF = REPO / "docs" / "prompts" / "phase-12i"
 NUMBERS = {"type": "numbers_from_source"}
 # every check of every question still in the bank (12a.6), and the 12i.0 probes
-N_12I0 = 2014 + 3
+N_12I0 = 1156 + 3              # 12p.2: the practice half's parity checks, 12a.5's 1156
 
 
 def _jsonl(path: Path) -> list[dict]:
@@ -106,4 +106,5 @@ def test_end_of_a_month_gives_its_last_day():
 def test_the_banks_version_does_not_change():
     """a checker change re-marks the answers on file; the words are the same.
     12a.6 changed the words: 48 short summaries retired"""
-    assert ev.version()["hash"] == "7489950e"
+    # 12p.2: the tests' bank's; the server's is still 7489950e
+    assert ev.version()["hash"] == "d8ffe0a2"

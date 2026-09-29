@@ -48,7 +48,7 @@ def as_12a6(q: dict, template: str | None = None) -> dict:
 # ---------------------------------------------------------------------------
 
 def test_every_summarise_rubric_scores_content_not_style():
-    assert len(SUMMARISE) == 60
+    assert len(SUMMARISE) == 51                    # 12p.2: the practice 29, the tests' hidden 22
     for q in SUMMARISE:
         c = ev.judge_check(q)
         r = c["rubric"]

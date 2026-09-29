@@ -349,7 +349,14 @@ def test_no_report_half_question_of_any_bank_leaves_it(five, tmp_path, monkeypat
     now — one rule, over the bodies actually sent."""
     from service import config, llm, proposals as prop
     current = tmp_path / "exam"
-    eb.import_dir(current, REPO / "eval_tasks" / "fr" / "banks", "Dr. Hossein")
+    # 12p.2: every bank whole — the repo's diagnose half and an invented report half
+    # in its shape, each intent a sentence of its own
+    import make_fixture
+    whole = tmp_path / "banks"
+    whole.mkdir()
+    for b in sorted((REPO / "eval_tasks" / "fr" / "banks").glob("*_v1.json")):
+        make_fixture.exam_bank_whole(b, whole)
+    eb.import_dir(current, whole, "Dr. Hossein")
     monkeypatch.setattr(config, "BENCH_ROOT", tmp_path)
     for root in (five, current):
         # the audience line is counted from whichever bank is the service's

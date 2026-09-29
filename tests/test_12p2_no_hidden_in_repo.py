@@ -128,8 +128,9 @@ def test_a_copy_with_no_git_is_walked_and_means_the_same(tmp_path):
         t.extractall(copy, filter="data")
     assert not (copy / ".git").exists()
     assert scan(copy, fingerprints()) == {}
-    assert list(scan(copy, invented_fingerprints())) == [
-        "tests/fixtures/everyday_hidden_invented.jsonl"]
+    held = scan(copy, invented_fingerprints())
+    assert "tests/fixtures/everyday_hidden_invented.jsonl" in held
+    assert not [f for f in held if not f.startswith("tests/") and f != "scripts/everyday.py"]
 
 
 @pytest.mark.skipif(not os.environ.get("HIDDEN_STORE_ROOT"),
@@ -158,3 +159,25 @@ def test_on_the_server_no_question_of_any_length_is_in_the_repo():
     hits = {name: n for name, body in bodies.items()
             if (n := sum(1 for w in want if f" {w} " in body))}
     assert hits == {}, f"these files hold a question of the server's store whole: {hits}"
+
+
+def test_the_server_makes_the_fingerprints_from_its_own_store(tmp_path, monkeypatch, capsys):
+    """after a new hidden set (12p.3's rotation), the fingerprints are made
+    where the questions are and committed — here, from the tests' invented
+    set, over a repo that quotes one of its questions in passing"""
+    from service import config, hidden_store
+    monkeypatch.setattr(config, "EXAM_DIR", tmp_path / "no-exam")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    q = json.loads(INVENTED.read_text(encoding="utf-8").splitlines()[5])
+    (repo / "notes.md").write_text("a quote: " + q["prompt"], encoding="utf-8")
+    monkeypatch.setattr(hidden_store, "REPO", repo)
+    got = hidden_store.fingerprints()
+    fx = invented_fingerprints()
+    quoted = {fp(r) for r in runs(q["prompt"])} & fx
+    # every one of the set's, less what the repo holds: a quote is a common phrase
+    assert set(got["fingerprints"]) == fx - quoted and got["common"] == len(quoted) > 0
+    out = tmp_path / "fp.txt"
+    assert hidden_store.main(["fingerprints", "--out", str(out)]) == 0
+    assert out.read_text().splitlines()[1:] == got["fingerprints"]
+    assert "commit it as tests/fixtures/protected_fingerprints.txt" in capsys.readouterr().out

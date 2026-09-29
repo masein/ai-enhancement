@@ -11,12 +11,12 @@ import pytest
 pytestmark = pytest.mark.dashboard
 SCREENS = Path(__file__).resolve().parent / "_screens" / "phase12a3"
 # 12a.6: one Summarise group — the long texts and the fifteen short ones kept
-SIZES = {"understanding": 45, "writing": 48, "summarising": 60,
-         "transform": 46, "quick_maths": 45, "instructions": 45, "honesty": 51}
-# 12g.2: each group's hidden half (scores, never shown) and practice half (shown)
-SPLIT = {"understanding": (27, 18), "writing": (24, 24), "summarising": (31, 29),
-         "transform": (25, 21), "quick_maths": (24, 21),
-         "instructions": (24, 21), "honesty": (24, 27)}
+# 12g.2: each group's hidden half (scores, never shown) and practice half (shown);
+# 12p.2: the hidden half is the tests' invented one
+SPLIT = {"understanding": (21, 18), "writing": (21, 24), "summarising": (22, 29),
+         "transform": (22, 21), "quick_maths": (21, 21),
+         "instructions": (21, 21), "honesty": (21, 27)}
+SIZES = {g: h + p for g, (h, p) in SPLIT.items()}
 
 
 def everyday_page(page, base, width=1400):
@@ -30,7 +30,7 @@ def test_the_question_list_is_340_with_each_groups_count(live, page):
     bank = page.locator("[data-everyday-bank]")
     # 12g.2: the 340 (12a.6), split — the practice half listed, the hidden half counted
     assert bank.locator("[data-evd-bank-q]").count() == 161
-    assert "161 practice questions in seven groups; 179 more are hidden" in bank.inner_text()
+    assert "161 practice questions in seven groups; 149 more are hidden" in bank.inner_text()
     for g, n in SIZES.items():
         hidden, practice = SPLIT[g]
         assert hidden + practice == n

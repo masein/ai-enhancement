@@ -958,6 +958,47 @@ def frozen_report(root: Path, path: Path, title: str = "Fixture board",
                                everyday=report.load_everyday(out_dir))
 
 
+# 12p.2: the hidden half is not in the repo. A tree sits the tests' invented one
+# (everyday_hidden_invented.jsonl, beside this file), where the bank reads it
+# for the tree's root as BENCH_ROOT — never the server's
+HIDDEN_FIXTURE = Path(__file__).resolve().parent / "everyday_hidden_invented.jsonl"
+HIDDEN_FIXTURE_MANIFEST = Path(__file__).resolve().parent / "everyday_hidden_invented.manifest.json"
+
+
+def sit_hidden(root: Path) -> Path:
+    """the invented hidden set where the bank reads it with `root` as BENCH_ROOT"""
+    import shutil
+    d = Path(root) / "everyday"
+    d.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(HIDDEN_FIXTURE, d / "hidden.jsonl")
+    return d / "hidden.jsonl"
+
+
+def exam_bank_whole(src: Path, out_dir: Path, overrides=None) -> Path:
+    """12p.2: a delivered exam bank as the server holds it — its diagnose half
+    as the repo does, and an invented report half in its shape, as many as the
+    committed report manifest says it had, each with an intent sentence of its
+    own. `overrides(k)`: more fields for the k-th invented question"""
+    import exam_build as eb
+    slug = Path(src).name[:-len("_v1.json")]
+    n = len(json.loads((REPO / "eval_tasks" / "fr" / "report_manifest.json").read_text(
+        encoding="utf-8"))["topics"][slug])
+    items = json.loads(Path(src).read_text(encoding="utf-8"))
+    out, i = [], 0
+    while len(out) < n:
+        prompt = (f"Invented report-half question {i} for {slug}: a situation is given, with "
+                  "what is known. What matters most here, and why?")
+        if eb.half_of(eb.qid_of(prompt)) == "report":
+            k = len(out)
+            out.append({**items[k % len(items)], "id": 1000 + k, "prompt": prompt,
+                        "intent": f"Invented intent {k}: decide what matters here and why.",
+                        **(overrides(k) if overrides else {})})
+        i += 1
+    f = Path(out_dir) / Path(src).name
+    f.write_text(json.dumps(items + out, indent=2), encoding="utf-8")
+    return f
+
+
 def build(root: Path, seed: int = SEED, diagnose: bool = True,
           report: Path | None = None, judged: bool = True) -> dict:
     """Write the whole tree under root/results/full and return a manifest the
@@ -965,6 +1006,7 @@ def build(root: Path, seed: int = SEED, diagnose: bool = True,
     task (with doc_hash and the question text as diagnose.py prints it), and
     which model is the odd one out for each planted inconsistency."""
     root = Path(root)
+    sit_hidden(root)
     out_dir = root / "results" / "full"
     docs = {task: make_docs(task, seed) for task in TASKS}
     models: dict[str, dict] = {}

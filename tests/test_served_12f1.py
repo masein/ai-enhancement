@@ -210,7 +210,7 @@ def test_everyday_goes_through_the_shared_settings_function(svc, fake, monkeypat
     assert first["served"]["pin"]["file"] == "Qwen3.6-35B-A3B-k4-LDA-UD-Q4_K_XL.gguf"
     assert first["served"]["settings"]["max_tokens"] == want["max_gen_toks"]
     # progress with the time left, from the seconds each answer took
-    assert any(re.search(r"\d+ of 340 · [\d.]+ s an answer · (about|under)", p or "")
+    assert any(re.search(r"\d+ of 310 · [\d.]+ s an answer · (about|under)", p or "")
                for p in progress)
     # on Models: its own row, called what it was registered as
     rows = {m["id"]: m for m in client.get("/api/results").json()["models"]}

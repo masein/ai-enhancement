@@ -14,6 +14,7 @@ the board works.
     python -m service.hidden_store backup [--export [--out FILE]]
     python -m service.hidden_store restore [FILE] [--all]
     python -m service.hidden_store manifest           what to commit for the set on this server
+    python -m service.hidden_store fingerprints --out FILE    12p.2: the CI guard's fingerprints
 
 Backups go to BACKUP_DIR (the server's second disk, /data-03/evalboard-backups
 by default), one .tar.gz a day, BACKUP_KEEP of them, each with the sha256 of
@@ -342,6 +343,61 @@ def move() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 12p.2: the CI guard's fingerprints — made here, where the questions are
+# ---------------------------------------------------------------------------
+
+FP_N, FP_STRIDE = 8, 4
+REPO = Path(__file__).resolve().parent.parent
+
+
+def _fp_runs(text: str, stride: int = FP_STRIDE) -> list[str]:
+    from .contamination import normalize
+    t = normalize(text)
+    if len(t) < FP_N:
+        return []
+    every = [" ".join(t[i:i + FP_N]) for i in range(len(t) - FP_N + 1)]
+    return every if stride == 1 or len(every) <= 3 else every[::stride] + [every[-1]]
+
+
+def _fp(run: str) -> str:
+    return hashlib.sha256(run.encode("utf-8")).hexdigest()[:16]
+
+
+def fingerprints(repo: Path | None = None) -> dict:
+    """every fourth eight-word run of each question that is the test —
+    Everyday's hidden set (prompt and reference) and the exam's report half
+    (prompt) — hashed; a run the repo (`repo`) holds is a common phrase and
+    left out. What tests/fixtures/protected_fingerprints.txt holds: after a
+    new hidden set, write it here and commit it"""
+    import diagnose as dx
+    import exam_build as eb
+    ev = _ev()
+    keep: dict[str, str] = {}
+    for q in (ev._raw_rows(ev.hidden_path()) if ev.hidden_path().exists() else []):
+        for r in _fp_runs(q["prompt"]) + _fp_runs(q.get("reference") or ""):
+            keep[_fp(r)] = r
+    for r in eb.all_bank_rows(config.EXAM_DIR) if eb.bank_dir(config.EXAM_DIR).is_dir() else []:
+        if r.get("prompt") and dx.split_of(eb.qid_of(r["prompt"])) == "report":
+            for x in _fp_runs(r["prompt"]):
+                keep[_fp(x)] = x
+    common = set()
+    skip = {".git", "results", "__pycache__", "_screens", "node_modules"}
+    for d, dirs, files in os.walk(repo or REPO):
+        dirs[:] = [x for x in dirs if x not in skip]
+        for name in files:
+            f = Path(d) / name
+            if f.suffix.lower() in (".png", ".jpg", ".gz", ".pdf", ".pyc") \
+                    or f.name == "protected_fingerprints.txt":
+                continue
+            try:
+                text = f.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            common |= {_fp(x) for x in _fp_runs(text, 1)} & set(keep)
+    return {"fingerprints": sorted(set(keep) - common), "common": len(common)}
+
+
+# ---------------------------------------------------------------------------
 # what the page says
 # ---------------------------------------------------------------------------
 
@@ -374,6 +430,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status")
     sub.add_parser("move")
     sub.add_parser("manifest")
+    fpp = sub.add_parser("fingerprints")
+    fpp.add_argument("--out", type=Path, required=True)
     b = sub.add_parser("backup")
     b.add_argument("--export", action="store_true")
     b.add_argument("--out", type=Path)
@@ -399,6 +457,14 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(ev.manifest_of(
                 ev._raw_rows(ev.hidden_path()) if ev.hidden_path().exists() else ev.repo_hidden()),
                 indent=1))
+            return 0
+        if a.cmd == "fingerprints":
+            got = fingerprints()
+            a.out.write_text("# 12p.2: eight-word runs of the questions that are the test, hashed "
+                             "(tests/test_12p2_no_hidden_in_repo.py)\n"
+                             + "\n".join(got["fingerprints"]) + "\n", encoding="utf-8")
+            print(f"{len(got['fingerprints'])} fingerprints to {a.out} ({got['common']} common "
+                  "phrases left out); commit it as tests/fixtures/protected_fingerprints.txt")
             return 0
         if a.cmd == "move":
             got = move()

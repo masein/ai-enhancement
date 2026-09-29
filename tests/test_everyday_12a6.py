@@ -20,7 +20,7 @@ import sys
 import pytest
 
 import everyday as ev
-from conftest import make_service
+from conftest import hidden_env, make_service
 from service import config, db, llm, llm_poller
 from test_everyday_12a5 import _asked
 
@@ -37,7 +37,9 @@ RETIRED = [json.loads(x) for x in ev.RETIRED_PATH.read_text(encoding="utf-8").sp
 
 def test_shorten_is_merged_into_summarise_and_the_rest_retired():
     assert "shorten" not in ev.groups() and ev.groups()["summarising"] == "Summarise"
-    assert len(SUMMARISE) == 60 and all(k in BANK and BANK[k]["group"] == "summarising" for k in KEPT)
+    # 12p.2: the practice 29 and the tests' invented hidden 22; the kept ones in the practice half
+    assert len(SUMMARISE) == 51
+    assert all(BANK[k]["group"] == "summarising" for k in KEPT if k in BANK)
     # 48 retired, each with the day and why, and none in the bank
     assert len(RETIRED) == 48 and not {q["id"] for q in RETIRED} & set(BANK)
     assert {q["retired"] for q in RETIRED} == {"2026-09-27"} and all(q["why"] for q in RETIRED)
@@ -96,7 +98,8 @@ def test_the_rubric_says_what_scores_in_plain_words():
     assert "Give no score" in tldr
     assert "several versions instead of one" in tldr and "lead-in" in tldr
     assert "judged by meaning and not by exact words" in tldr
-    assert "It should keep all 2 of these:\n- 11:30\n- thursday" in tldr
+    # 12p.2: the tests' invented TL;DR (the pilot's is hidden)
+    assert "It should keep all 2 of these:\n- 10:45\n- wednesday" in tldr
     assert "List anything the answer says that is invented or wrong" in tldr
     assert "The request asks for it shorter" in tldr
     # a request that states no length is never marked on it
@@ -133,7 +136,7 @@ def test_the_rubric_says_what_scores_in_plain_words():
 def test_the_judges_score_is_read_against_the_line(reply, want):
     """a rubric that scores, written by someone (12a.8: a generated one asks
     for findings, test_12a8_findings)"""
-    scored = {**ev.judge_check(BANK["everyday-summarising-02"]), "findings": False}
+    scored = {**ev.judge_check(BANK["everyday-summarising-01"]), "findings": False}
     assert ev.parse_verdict(reply, scored) == want
 
 
@@ -219,7 +222,7 @@ def test_the_re_mark_sends_summarise_to_the_judge_and_compares(svc, monkeypatch,
     assert "marked 2 model(s)" in out and "sent the judge " in out
     # the stand-in judge marks them at once: nothing waits
     a = ev.read(root / "org__a")
-    assert a["waiting"] == 0 and a["passed"] == a["total"] == 179
+    assert a["waiting"] == 0 and a["passed"] == a["total"] == 149      # 12p.2: the tests' hidden
     assert all(it["score"] == 4 for it in a["items"] if it["group"] == "summarising")
     # the marks from before are kept, once
     before = json.loads((root / ev.BEFORE_NAME).read_text())["models"]
@@ -234,7 +237,7 @@ def test_the_re_mark_sends_summarise_to_the_judge_and_compares(svc, monkeypatch,
     table = capsys.readouterr().out.strip().splitlines()
     assert table[0] == ("| model | before | after | Summarise before | Summarise after | "
                         "waiting |")
-    assert table[2] == "| org/a | 120 of 200 | 179 of 179 | 6 of 31 | 31 of 31 | 0 |"
+    assert table[2] == "| org/a | 120 of 200 | 149 of 149 | 6 of 31 | 22 of 22 | 0 |"
 
 
 def test_with_a_judge_elsewhere_one_batch_goes_and_the_poller_lands_it(svc, monkeypatch):
@@ -257,7 +260,7 @@ def test_with_a_judge_elsewhere_one_batch_goes_and_the_poller_lands_it(svc, monk
     llm_poller.tick()
     for name in ("org__a", "org__b"):
         out = ev.read(root / name)
-        assert out["waiting"] == 0 and out["passed"] == out["total"] == 179
+        assert out["waiting"] == 0 and out["passed"] == out["total"] == 149
 
 
 def test_a_re_mark_batch_that_fails_says_so_on_each_model(svc, monkeypatch):
@@ -278,7 +281,7 @@ def test_a_re_mark_batch_that_fails_says_so_on_each_model(svc, monkeypatch):
 
 def test_the_judge_test_reads_a_rubrics_score(monkeypatch):
     from service import judge_test
-    a = {"kind": "everyday", "task": "everyday-summarising-02", "answer": "x"}
+    a = {"kind": "everyday", "task": "everyday-summarising-01", "answer": "x"}
     # 12a.8: the score its findings give — here, several versions
     assert judge_test.read_mark(a, json.dumps({
         "missing_facts": [], "invented_or_wrong": [], "several_versions": True,
@@ -293,8 +296,9 @@ def test_the_re_mark_runs_as_the_server_runs_it(tmp_path):
     import os
     import subprocess
     root = tmp_path / "full"
-    _asked(root / "org__a", [BANK["everyday-summarising-02"]], answer=lambda q: q["reference"])
-    env = {**os.environ, "JUDGE_MODEL": "stub", "BENCH_ROOT": str(tmp_path), "PYTHONPATH": ""}
+    _asked(root / "org__a", [BANK["everyday-summarising-01"]], answer=lambda q: q["reference"])
+    env = {**os.environ, "JUDGE_MODEL": "stub", "PYTHONPATH": "",
+           **hidden_env(tmp_path)}                   # 12p.2: the tests' hidden set
     p = subprocess.run([sys.executable, str(ev.REPO / "scripts" / "everyday.py"), str(root),
                         "--judge"], capture_output=True, text=True, cwd=tmp_path, env=env,
                        timeout=120)

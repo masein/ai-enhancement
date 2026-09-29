@@ -25,11 +25,12 @@ def shot(part, name):
 @pytest.mark.parametrize("width", [1400, 400])
 def test_a_changed_set_is_red_on_every_page(live, page, width):
     import service.app as appmod
+    # 12p.2: the store's set (the tests' invented one), changed — and put back after
     p = ev.hidden_path()
-    rows = ev.repo_hidden()
+    was = p.read_bytes()
+    rows = ev._raw_rows(p)
     rows[0] = {**rows[0], "prompt": rows[0]["prompt"] + " (changed)"}
     try:
-        p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text("".join(json.dumps(q, ensure_ascii=False) + "\n" for q in rows),
                      encoding="utf-8")
         appmod._cache.update(key=None, payload=None, at=0.0)
@@ -62,7 +63,7 @@ def test_a_changed_set_is_red_on_every_page(live, page, width):
             shot(page.locator("#alarms"), "banner-400.png")
         assert page.errors == []
     finally:
-        p.unlink(missing_ok=True)
+        p.write_bytes(was)
         appmod._cache.update(key=None, payload=None, at=0.0)
 
 

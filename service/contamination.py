@@ -99,11 +99,13 @@ class BenchmarkIndex:
 
     @staticmethod
     def _everyday_files() -> list[Path]:
-        """the repo's Everyday bank, and (12i.2) what the question builder
-        published beside the data"""
+        """the repo's Everyday bank, (12i.2) what the question builder
+        published beside the data, and (12p.2) the hidden half, which lives
+        only on the data volume now — a training example copying it is still
+        dropped"""
         from . import config
-        return [p for p in (EVERYDAY_BANK, config.BENCH_ROOT / "everyday" / "built.jsonl")
-                if p.exists()]
+        d = config.BENCH_ROOT / "everyday"
+        return [p for p in (EVERYDAY_BANK, d / "built.jsonl", d / "hidden.jsonl") if p.exists()]
 
     def _key(self) -> tuple:
         files = list(self.root.rglob("samples_*.jsonl")) if self.root.is_dir() else []

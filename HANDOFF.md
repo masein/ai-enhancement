@@ -356,10 +356,12 @@ Step 2, the logs:
 sudo docker compose logs --since 2m bench | grep -iE "error|traceback" || echo "no errors"
 ```
 
-Step 3, the unit tests inside the container:
+Step 3, the unit tests inside the container — 12p.2: given the store
+(`HIDDEN_STORE_ROOT`), so the guard also checks every hidden and report-half
+question whole, the short ones the fingerprints can't hold:
 
 ```bash
-git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check && mkdir /tmp/check && cd /tmp/check && tar -x && exec env -i PATH="$PATH" HOME=/tmp/check LANG=C.UTF-8 python -m pytest -q -p no:cacheprovider -m "not gpu and not network and not dashboard"' 2>&1 | tail -15
+git archive HEAD | sudo docker compose exec -T bench sh -c 'rm -rf /tmp/check && mkdir /tmp/check && cd /tmp/check && tar -x && exec env -i PATH="$PATH" HOME=/tmp/check LANG=C.UTF-8 HIDDEN_STORE_ROOT="$BENCH_ROOT" python -m pytest -q -p no:cacheprovider -m "not gpu and not network and not dashboard"' 2>&1 | tail -15
 ```
 
 Step 4, the task-discovery check inside the container:
@@ -4145,6 +4147,40 @@ answers failed, some two thirds of them wrongly.
 - The exam's import preview withheld a report-half question's prompt but not
   its reference or `meta` (whose `intent` describes the question); it
   withholds all three now, as `public_bank` does.
+
+### 12p.2 — the questions that are the test, out of the repo
+
+- **Everyday**: `eval_tasks/everyday/bank.jsonl` holds the practice half (161);
+  the hidden 179 are the server's store (12p.1), by their committed manifest.
+  The `docs/prompts` copies of the bank and the probe files lost their hidden
+  rows (12a.3, 12a.4, 12a.5, 12b.3); the question-writing prompt's example and
+  two briefs that quoted hidden questions (the pilot's 02 and 03, and 03's
+  rubric) are redacted.
+- **The Knowledge exam**: `eval_tasks/fr/banks/*_v1.json` hold each topic's
+  diagnose half (1,872); the report half (1,828) is the server's
+  `EXAM_DIR/bank`, and `eval_tasks/fr/report_manifest.json` its qids. The 40
+  skill seeds (`fr_*.jsonl`, 19 report-half, legacy topic "other", not live)
+  and the retired banks stay. A fresh install has no report half: restore it
+  from a backup (12p.1).
+- **The CI guard** (`tests/test_12p2_no_hidden_in_repo.py`):
+  `tests/fixtures/protected_fingerprints.txt` holds every fourth eight-word
+  run of each question that is the test, hashed — any copy of eleven words in
+  a row is caught, and nothing can be read back. Every file the repo holds is
+  scanned; it names the file and the count, never the text. It walks the tree
+  where there is no git, and proves itself on the tests' invented set. Deploy
+  step 3 with `HIDDEN_STORE_ROOT` also checks every question whole, the short
+  ones included. After a new hidden set:
+  `python -m service.hidden_store fingerprints --out /tmp/fp.txt` on the
+  server, and commit it as `tests/fixtures/protected_fingerprints.txt`.
+- **The tests sit an invented hidden set**
+  (`tests/fixtures/everyday_hidden_invented.jsonl`, 149, 21 or 22 a group,
+  with invented stand-ins for the pilot's two hidden questions; its own
+  manifest), put where the bank reads it by `make_fixture.sit_hidden`; the
+  stand-in judge knows the invented TL;DR (`PILOT_NOTICE`). An exam test that
+  needs a report half imports a whole bank (`make_fixture.exam_bank_whole`:
+  the repo's diagnose half and an invented report half in its shape).
+- **The training-data leak gate** (`service/contamination.py`) reads the
+  store's hidden set too: it read only the repo's bank and the builder's.
 
 ### 12o.1 — every column's width and place, and what the live check of #103/#104 found
 
