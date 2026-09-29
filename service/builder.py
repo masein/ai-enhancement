@@ -285,10 +285,22 @@ def create(spec: dict, by: str) -> dict:
             s.update(group=g, group_label=known[g])
         else:
             raise ValueError("choose one of the Everyday groups, or a new one")
+        if spec.get("target") == "hidden":
+            # 12p.3: for a new hidden set — the board's owner's, staged until the switch
+            if not config.is_owner(by):
+                raise ValueError("Only the board's owner writes questions for the hidden set")
+            if s.get("new_group"):
+                raise ValueError("a new hidden set is for the groups there are")
+            s["target"] = "hidden"
     writer_o, checker_o = _override(spec.get("writer", "")), _override(spec.get("checker", ""))
     why = blocked("writer", writer_o)
     if why:
         raise ValueError(f"the question writer can't run: {why}")
+    if s.get("target") == "hidden":
+        from . import rotation
+        why = rotation.rules_ok(who("writer", writer_o), who("checker", checker_o))
+        if why:
+            raise ValueError(why)
     editable = _editable(kind, spec.get("prompt"))
     d = {"id": uuid.uuid4().hex[:10], "kind": kind, "spec": s, "by": by,
          "created_at": time.time(), "stage": "try", "status": "writing", "error": "",
@@ -715,7 +727,11 @@ def _others(d: dict) -> list[dict]:
                         "text": r["prompt"]})
     else:
         import everyday as ev
+        from . import rotation
         for q in ev.load_bank():
+            out.append({"src": "bank", "id": q["id"], "label": q["id"], "text": q["prompt"]})
+        # 12p.3: and the new hidden set's questions staged so far
+        for q in rotation.staged():
             out.append({"src": "bank", "id": q["id"], "label": q["id"], "text": q["prompt"]})
     for other in db.qb_list():
         if other["id"] == d["id"] or other["kind"] != d["kind"] or other.get("published"):
@@ -1128,6 +1144,8 @@ def publish(draft_id: str, by: str) -> dict:
                  "approved_by": by, "batch_id": d["id"]}
         if d["kind"] == "knowledge":
             out = _publish_exam(d, rows, stamp)
+        elif d["spec"].get("target") == "hidden":
+            out = _publish_hidden(d, rows, stamp)
         else:
             out = _publish_everyday(d, rows, stamp)
         d["published"] = {**out, "by": by, "at": time.time(), "n": len(rows)}
@@ -1156,6 +1174,31 @@ def _publish_exam(d: dict, rows: list[dict], stamp: dict) -> dict:
         have.add(qid)
         added += 1
     return {"kind": "knowledge", "topic": topic, "added": added}
+
+
+def _publish_hidden(d: dict, rows: list[dict], stamp: dict) -> dict:
+    """12p.3: staged for the new hidden set — scoring nothing, shown nowhere,
+    until the owner switches (service/rotation.py)"""
+    import everyday as ev
+    from . import rotation
+    s = d["spec"]
+    dest = rotation.staged_path()
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    ids = {q["id"] for q in ev.load_bank()} | {q["id"] for q in rotation.staged()}
+    lines = []
+    for k, it in enumerate(rows, 1):
+        q = it["q"]
+        qid = f"everyday-{s['group']}-h{d['id'][:6]}-{k:02d}"
+        if qid in ids:
+            continue
+        lines.append(json.dumps({"id": qid, **{f: q[f] for f in (
+            "group", "skill", "difficulty", "prompt", "reference", "checks", "notes")},
+            **stamp, "prompt_sha256": it["prompt_sha"], "edited": bool(it["edited"]),
+            "half": ev.HIDDEN}, ensure_ascii=False) + "\n")
+    with open(dest, "a", encoding="utf-8") as fh:
+        fh.writelines(lines)
+    ev._read_bank(dest)                 # a bad row fails here
+    return {"kind": "everyday", "group": s["group"], "added": len(lines), "staged": True}
 
 
 def _publish_everyday(d: dict, rows: list[dict], stamp: dict) -> dict:

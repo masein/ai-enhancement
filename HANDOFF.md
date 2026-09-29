@@ -4182,6 +4182,57 @@ answers failed, some two thirds of them wrongly.
 - **The training-data leak gate** (`service/contamination.py`) reads the
   store's hidden set too: it read only the repo's bank and the builder's.
 
+### 12p.3 — a new hidden set for Everyday: built, switched to when the owner says
+
+Not before the demo: a new hidden set changes every Everyday score.
+
+- **Build questions ▸ A new hidden set for Everyday** (`service/rotation.py`,
+  `GET /api/everyday/rotation`): per group, its hidden count now, what is
+  staged, and what to write (40% more, for what review sets aside); the two
+  rules — **the writer is not a Qwen model** (the board tests Qwen models),
+  **the checker is from another maker than the writer** (by the model id's
+  organisation) — each said, and **the cost of all of it, before anything
+  starts**. Choose the models on the AI models page first.
+- **Start** (the owner, after a dialog with the cost): one draft a group,
+  "for the new hidden set", reviewed as any draft (Try 10, the rest checked
+  blind, the flagged and a tenth reviewed). A draft for the hidden set is the
+  owner's alone: anyone else gets 403 on its questions. Its questions go to
+  OpenRouter to be written, checked and judged, with data collection denied
+  (12p.1). Publishing stages them in `BENCH_ROOT/everyday/hidden_next.jsonl`:
+  shown nowhere, scoring nothing; the builder's duplicate check includes them.
+- **The switch** (the owner, once every group has its new questions): the
+  old hidden questions worth retiring are listed with why — every model on the
+  board passes it, or fails it, or it was edited since — ticked to retire; the
+  review is logged as an opening of the hidden half. Switching:
+  1. backs up; the new set becomes `hidden.jsonl`; the old file is kept as
+     `hidden.before-<time>.jsonl`;
+  2. the old set becomes practice questions (in `built.jsonl`, each marked
+     `moved_from_hidden`) but for the retired;
+  3. each model's Everyday score goes to History as **"scored on the retired
+     hidden set"**, and each is asked the new questions on its next run
+     (answers are kept by question, so only the new ones);
+  4. `switches.json` records it (who, when, the digests and versions), the
+     audit log lists it, and it backs up again.
+  The new set is accepted by its switched digest until the manifest is
+  committed again. **After a switch**, commit on a branch:
+  `python -m service.hidden_store manifest` into
+  `eval_tasks/everyday/hidden_manifest.json`, and
+  `python -m service.hidden_store fingerprints --out …` into
+  `tests/fixtures/protected_fingerprints.txt`; and run an encrypted export.
+- **The Knowledge exam's report half, the plan for later** (not built): 1,828
+  questions over 37 topics (35 to 65 each). The same pattern, kind
+  `knowledge`: a draft a topic "for the report half", staged in
+  `EXAM_DIR/bank_next/`, switched per topic. The exam splits by qid alone, so
+  first a row's explicit `half` must win over its qid wherever a half is read
+  (exam_build, judge, questions, diagnose), so the old report questions can
+  become diagnose ones and the new ones be report ones whatever they hash to.
+  Every new question is judged, so it costs more than Everyday's: about 2,560
+  written for 1,828 kept is roughly 5.6M tokens in and 2M out — some $5–25 by
+  the models chosen (the page gives the figure first) — and the review is the
+  larger cost, some 20–30 hours over 37 topics. Every judged Knowledge score
+  moves to History ("scored on the retired report half"). Do it once
+  Everyday's switch has settled.
+
 ### 12o.1 — every column's width and place, and what the live check of #103/#104 found
 
 - **Columns** (the Models table on every chip, the Knowledge exam's included,
