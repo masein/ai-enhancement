@@ -115,8 +115,12 @@ def test_the_table_ranks_everyone_theirs_read_only(live, page, ours):
     assert nemo.locator(f"[data-dm-ours='{NEMO}']").count() == 6    # composite, 3 benches, 2 more
     assert nemo.locator("[data-dm-whose]").inner_text() == "DeviceMark · and ours"
     assert nemo.locator("[data-dm-device-edit]").count() == 0
-    ranks = t.locator("[data-dm-rank]").all_inner_texts()
-    assert ranks[0] == "=1" and all(r for r in ranks)
+    # 12q.B2: the cloud APIs unranked (☁), as on DeviceMark's board — LFM2.5-1.2B is =1 again
+    rank = {r.get_attribute("data-dm-rank"): r.inner_text()
+            for r in t.locator("[data-dm-rank]").all()}
+    assert rank["gemini-flash__api__api"] == rank["gemini-pro__api__api"] == "☁"
+    assert rank["lfm2.5-1.2b__int8hu__aimodel"] == "=1"
+    assert all(rank.values())
     assert page.errors == []
 
 
@@ -169,4 +173,64 @@ def test_at_400px(live, page, ours, scheme):
     open_chart(page, live, width=400)
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
     page.locator("[data-ondevice]").screenshot(path=SCREENS / f"on-device-400-{scheme}.png")
+    assert page.errors == []
+
+
+# ---------------------------------------------------------------------------
+# 12q.B2: every label clear, the chart at its card's width, ours by its setup
+# ---------------------------------------------------------------------------
+
+CLASHES = """() => {
+  const svg = document.querySelector('[data-dm-chart]');
+  const hit = (a, b) => a.x < b.x + b.width - 0.5 && b.x < a.x + a.width - 0.5
+    && a.y < b.y + b.height - 0.5 && b.y < a.y + a.height - 0.5;
+  const labels = [...svg.querySelectorAll('[data-dm-label]')].map(t =>
+    ({ id: t.dataset.dmLabel, b: t.getBBox() }));
+  const points = [...svg.querySelectorAll('[data-dm-point]')].map(c => ({ id: c.dataset.dmPoint,
+    b: { x: +c.getAttribute('cx') - 5, y: +c.getAttribute('cy') - 5, width: 10, height: 10 } }));
+  const lines = [...svg.querySelectorAll('[data-dm-line]')].map(l => ({ id: l.dataset.dmLine,
+    b: { x: +l.getAttribute('x1'), y: +l.getAttribute('y1') - 0.6,
+         width: +l.getAttribute('x2') - +l.getAttribute('x1'), height: 1.2 } }));
+  const whiskers = [...svg.querySelectorAll('[data-dm-whisker]')].map(l => ({
+    id: l.dataset.dmWhisker + ' (whisker)', b: { x: +l.getAttribute('x1') - 0.6,
+      y: Math.min(+l.getAttribute('y1'), +l.getAttribute('y2')), width: 1.2,
+      height: Math.abs(+l.getAttribute('y2') - +l.getAttribute('y1')) } }));
+  const out = [];
+  labels.forEach((a, i) => {
+    labels.slice(i + 1).forEach(b => { if (hit(a.b, b.b)) out.push(`${a.id} × ${b.id}`); });
+    for (const o of [...points, ...lines, ...whiskers])
+      if (hit(a.b, o.b)) out.push(`${a.id} × ${o.id}`);
+  });
+  return { n: labels.length, out, w: svg.getBoundingClientRect().width,
+           card: document.querySelector('[data-ondevice]').clientWidth };
+}"""
+
+
+@pytest.mark.parametrize("width", [1400, 400])
+def test_no_label_sits_on_another_a_point_a_whisker_or_a_line(live, page, ours, width):
+    open_chart(page, live, width=width)
+    SCREENS.mkdir(parents=True, exist_ok=True)
+    page.locator("[data-dm-chart]").screenshot(path=SCREENS / f"chart-labels-{width}.png")
+    got = page.evaluate(CLASHES)
+    assert got["n"] == 10                                  # their nine on the iPhone, and ours
+    assert got["out"] == []
+    if width == 1400:
+        assert got["w"] > 0.9 * got["card"] - 60           # the card's width, not 900
+    else:
+        assert got["w"] == 900                             # scrolls on a phone
+    assert page.errors == []
+
+
+def test_our_rows_are_named_by_their_setup_on_the_chart(live, page, ours):
+    open_chart(page, live)
+    chart = page.locator("[data-dm-chart]")
+    assert chart.locator(f"[data-dm-line-label='{ORIG}']").text_content() == \
+        "original (k=8) · MTP · thinking off"
+    assert chart.locator(f"[data-dm-label='{MTP}']").text_content() == \
+        "phone build (k4-LDA) · MTP · thinking off · iPhone 17 Pro"
+    # the row's name stays in the table
+    assert page.locator(f"[data-dm-row='{ORIG}'] td").nth(1).inner_text().startswith(
+        "Qwen3.6 original k=8")
+    tip = json.loads(chart.locator(f"[data-dm-line='{ORIG}']").get_attribute("data-tip"))
+    assert tip[:2] == ["Qwen3.6 original k=8", "original (k=8) · MTP · thinking off"]
     assert page.errors == []

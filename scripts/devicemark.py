@@ -707,6 +707,7 @@ def rows(out_dir: Path) -> list[dict]:
         mid = _model_of(out_dir / name)
         out.append({"id": mid + (" · thinking" if thinks else ""), "model": mid,
                     "thinking": thinks, "row": row,
+                    "label": setup_label(row.get("setup") or {}, thinks, mid),
                     "server_tok_s": speed.get("decode_tok_s") if speed else None,
                     "server_label": SERVER_SPEED_LABEL if speed else None,
                     "device": device or None})
@@ -839,17 +840,40 @@ def pair(ours: list[dict], theirs: list[dict]) -> None:
             t.setdefault("ours", []).append(_beside(r))
 
 
+# the build a served setup is: "k4-LDA" in a phone build's name or file, an
+# original's "k=8"
+_BUILD = re.compile(r"\bk\d+-[A-Za-z]+\b")
+_TOP_K = re.compile(r"\bk\s*[-=]?\s*(\d+)\b")
+
+
+def setup_label(su: dict, thinking: bool, model: str = "") -> str:
+    """12q.B2: a served setup as the chart names it — "phone build (k4-LDA) ·
+    MTP · thinking off"; any other row, its model"""
+    if su.get("runtime") != "llama-server":
+        return model + (" · thinking" if thinking else "")
+    where = f"{su.get('name') or ''} {su.get('file') or ''} {model}"
+    b = _BUILD.search(where)
+    k = None if b else _TOP_K.search(where)
+    tag = b.group(0) if b else f"k={k.group(1)}" if k else ""
+    return " · ".join(x for x in (
+        ("phone build" if su.get("phone") else "original") + (f" ({tag})" if tag else ""),
+        "MTP" if su.get("mtp") else "", "lookahead" if su.get("lookahead") else "",
+        f"thinking {'on' if thinking else 'off'}") if x)
+
+
 def board(out_dir: Path) -> dict:
     """ours and theirs, ranked together by their rule — our runs of their
-    models beside their rows, never ranked apart"""
+    models beside their rows, never ranked apart. 12q.B2: the cloud APIs
+    aren't ranked (their "☁" rows), as DeviceMark's board doesn't"""
     ours, theirs = rows(out_dir), external_rows()
     pair(ours, theirs)
     solo = [r for r in ours if not r.get("paired")]
+    ranked = [t for t in theirs if t["kind"] != "cloud"]
     rk = ranks([{"ci": r["row"]["composite"]["ci"]} for r in solo]
-               + [{"ci": r["composite"]["ci"]} for r in theirs])
-    for r in ours:
+               + [{"ci": r["composite"]["ci"]} for r in ranked])
+    for r in ours + theirs:
         r["rank_all"] = None
-    for r, k in zip(solo + theirs, rk):
+    for r, k in zip(solo + ranked, rk):
         r["rank_all"] = k
     s = snapshot()
     return {"rows": ours, "external": {"rows": theirs, **{k: s.get(k) for k in (
